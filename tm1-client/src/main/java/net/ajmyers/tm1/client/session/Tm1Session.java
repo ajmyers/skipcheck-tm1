@@ -4,6 +4,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.springframework.http.client.reactive.ClientHttpConnector;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -46,10 +47,19 @@ import tools.jackson.databind.json.JsonMapper;
  */
 public final class Tm1Session {
 
+	/** TM1's custom query option that runs a request in a sandbox. */
+	static final String SANDBOX_OPTION = "!sandbox";
+
 	private final Connection connection;
+	private final String sandbox;
 
 	Tm1Session(Connection connection) {
+		this(connection, null);
+	}
+
+	private Tm1Session(Connection connection, String sandbox) {
 		this.connection = Objects.requireNonNull(connection, "connection");
+		this.sandbox = sandbox;
 	}
 
 	/** A builder for a session on one TM1 server. */
@@ -66,7 +76,7 @@ public final class Tm1Session {
 	 * below HTTP as {@link net.ajmyers.tm1.client.error.Tm1TransportException}.
 	 */
 	public <T> Mono<T> execute(Tm1Request<T> request) {
-		return connection.execute(Objects.requireNonNull(request, "request"));
+		return connection.execute(inSandbox(Objects.requireNonNull(request, "request")));
 	}
 
 	/**
@@ -78,7 +88,35 @@ public final class Tm1Session {
 		if (request.response() != Tm1Request.Response.COLLECTION) {
 			return Flux.error(new IllegalArgumentException("Only collection requests are streamed: use execute() for " + request));
 		}
-		return connection.stream(request);
+		return connection.stream(inSandbox(request));
+	}
+
+	/**
+	 * A view of this session whose requests run in sandbox {@code name}: each gets TM1's
+	 * {@code !sandbox} query option, unless the request sets its own. The view shares this
+	 * session's login, cookie and connections, so it costs nothing; closing either closes both.
+	 *
+	 * <p>Derived rather than set on the session, so one caller's sandbox can't leak into another
+	 * caller's requests (plan §5). TM1 evaluates {@code NON EMPTY} and filters in the request's
+	 * sandbox, so every request of an operation needs it, cellset reads and deletes included
+	 * (plan §16.3); a service given this view gets that for free.
+	 */
+	public Tm1Session withSandbox(String name) {
+		Objects.requireNonNull(name, "name");
+		if (name.isBlank()) {
+			throw new IllegalArgumentException("sandbox name is blank");
+		}
+		return new Tm1Session(connection, name);
+	}
+
+	/** A view of this session whose requests run outside any sandbox, in base data. */
+	public Tm1Session withoutSandbox() {
+		return sandbox == null ? this : new Tm1Session(connection, null);
+	}
+
+	/** The sandbox this view's requests run in, if any. */
+	public Optional<String> sandbox() {
+		return Optional.ofNullable(sandbox);
 	}
 
 	/** Logs in now, rather than on the first request, and completes with this session. */
@@ -113,7 +151,14 @@ public final class Tm1Session {
 
 	@Override
 	public String toString() {
-		return "Tm1Session[" + connection.root() + "]";
+		return "Tm1Session[" + connection.root() + (sandbox == null ? "" : ", sandbox=" + sandbox) + "]";
+	}
+
+	private <T> Tm1Request<T> inSandbox(Tm1Request<T> request) {
+		if (sandbox == null || request.query().option(SANDBOX_OPTION) != null) {
+			return request;
+		}
+		return request.withQuery(request.query().option(SANDBOX_OPTION, sandbox));
 	}
 
 	/** Builds a {@link Tm1Session}. Only {@link #baseUrl} and credentials are required. */
@@ -121,6 +166,7 @@ public final class Tm1Session {
 
 		private String baseUrl;
 		private String authorization;
+		private String sessionContext;
 		private Tm1Timeouts timeouts = Tm1Timeouts.DEFAULTS;
 		private Tm1ErrorClassifier classifier = Tm1ErrorClassifier.defaults();
 		private ObjectMapper mapper;
@@ -147,6 +193,23 @@ public final class Tm1Session {
 			Objects.requireNonNull(user, "user");
 			String credentials = user + ":" + (password == null ? "" : password);
 			this.authorization = "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+			return this;
+		}
+
+		/**
+		 * A label for the TM1 session, shown as its {@code Context} in {@code Sessions} and
+		 * {@code Threads}, such as the application's name. Sent with the login.
+		 *
+		 * <p>It's a setting of the session, not of a view: TM1 keeps one label per session and
+		 * the last request to send one wins, so views sharing a session can't each have their
+		 * own. A different label needs a different session.
+		 */
+		public Builder sessionContext(String sessionContext) {
+			Objects.requireNonNull(sessionContext, "sessionContext");
+			if (sessionContext.length() > 250) {
+				throw new IllegalArgumentException("TM1 keeps at most 250 characters of session context, got " + sessionContext.length());
+			}
+			this.sessionContext = sessionContext;
 			return this;
 		}
 
@@ -209,7 +272,7 @@ public final class Tm1Session {
 			ClientHttpConnector http = connector != null ? connector : nettyConnector(timeouts);
 			WebClient web = (webClient != null ? webClient : WebClient.builder()).clientConnector(http).observationRegistry(observations).build();
 			ObjectMapper json = mapper != null ? mapper : JsonMapper.builder().build();
-			return new Tm1Session(new Connection(web, baseUrl, authorization, null, timeouts, classifier, json, observations));
+			return new Tm1Session(new Connection(web, baseUrl, authorization, sessionContext, timeouts, classifier, json, observations));
 		}
 
 		private static ClientHttpConnector nettyConnector(Tm1Timeouts timeouts) {

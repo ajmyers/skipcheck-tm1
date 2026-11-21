@@ -107,6 +107,40 @@ class Tm1SessionTm1Test {
 	}
 
 	@Test
+	void labelsTheSessionWithItsContext() {
+		Tm1Session session = Tm1Session.builder()
+			.baseUrl(server.getRestUrl())
+			.basicAuth(server.getUsername(), server.getPassword())
+			.sessionContext("tm1-client test")
+			.build();
+		try {
+			JsonNode active = session.execute(Tm1Request.get(ODataPath.of("ActiveSession"), ODataQuery.none().select("Context"), JsonNode.class))
+				.block(WAIT);
+			assertThat(active.get("Context").asString()).isEqualTo("tm1-client test");
+		}
+		finally {
+			session.close().block(WAIT);
+		}
+	}
+
+	/** TM1 reads {@code !sandbox} on any request: a sandbox that exists works, one that doesn't fails. */
+	@Test
+	void runsRequestsInTheViewsSandbox() {
+		Tm1Session session = session();
+		String sandbox = "zz_session_" + UUID.randomUUID().toString().substring(0, 8);
+		try {
+			session.execute(Tm1Request.post(ODataPath.of("Sandboxes"), Map.of("Name", sandbox), Void.class)).block(WAIT);
+			assertThat(session.withSandbox(sandbox).execute(SERVER).block(WAIT)).isNotNull();
+			Object missing = session.withSandbox(sandbox + "_missing").execute(SERVER).map(n -> (Object) n).onErrorResume(e -> Mono.just(e)).block(WAIT);
+			assertThat(missing).isInstanceOf(net.ajmyers.tm1.client.error.Tm1ApiException.class);
+		}
+		finally {
+			session.execute(Tm1Request.delete(ODataPath.of("Sandboxes").key(sandbox))).onErrorResume(e -> Mono.empty()).block(WAIT);
+			session.close().block(WAIT);
+		}
+	}
+
+	@Test
 	void streamsACollection() {
 		Tm1Session session = session();
 		try {
