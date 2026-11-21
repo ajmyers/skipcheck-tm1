@@ -516,8 +516,24 @@ These are concerns the requirements don't name, but that need deciding early:
      pre-signed URLs redacted;
    - TM1 session and thread IDs in exceptions.
 10. **Sandboxes** as request context, not global state (§5).
-11. **Batch and change sets:** JSON `$batch` works. Decide whether it's public API or internal
-    (e.g. for bulk element creation).
+11. **Batch (public API, Q8):**
+    - **What TM1 supports:** the JSON format only; multipart is rejected. `BatchSupport`
+      advertises no cross-request or ETag references, no `dependsOn` conditions and no
+      `continue-on-error`. So a batch is a list of independent requests.
+    - **Results per item:** the outer response is 200 even when every inner request failed
+      (§16.3). Each item gets its own result or error, never one exception for the batch.
+    - **Shape:** every service gets a `request()` view that builds the same `Tm1Request<T>` as
+      its direct method, without sending it. Direct methods are those requests run on their
+      own, so batching duplicates nothing and the coverage gate covers both.
+      `tm1.batch().add(request)` returns a `Mono<T>` that completes with that item's result when
+      the batch runs. `executeBatched(Flux<Tm1Request<T>>)` chunks a stream of requests into
+      several batches and streams `BatchResult<T>` outcomes in order.
+    - **To verify against TM1 first:** whether it stops at the first failure or carries on (the
+      spec and the production evidence point different ways), whether `atomicityGroup` works,
+      and the largest batch it accepts.
+    - **Not the same as TM1's change sets** (`BeginChangeSet`/`EndChangeSet`/`UndoChangeSet`),
+      which group cell changes for undo. Those are separate operations with a `usingWhen`
+      lifecycle (§7).
 12. **Thread-safety and concurrency limits on one TM1 session**, which still need testing (§2).
 13. **Nullability annotations:** JSpecify, which Spring 7 uses, so Kotlin and IDE users get null
     safety.
@@ -539,7 +555,7 @@ These are concerns the requirements don't name, but that need deciding early:
 | Q5 | Build per-user sessions (`Tm1SessionFactory`) in phase 0, or design only? | Design now, build when the first tool needs it. |
 | Q6 | Interim integration-test harness, or build #14 first? | **Decided 2026-11-21: Testcontainers works from the start.** #14 is part of phase 0, and there's no interim harness. |
 | Q7 | When does v12 / PA Cloud become in scope? | After the v11 surface is complete. Only `Tm1Dialect` and `Tm1Authenticator` are shaped for it now. |
-| Q8 | Is JSON `$batch` public API? | Internal first. Expose it once there's a real use. Internal use: batched cellset deletes (§16.3). |
+| Q8 | Is JSON `$batch` public API? | **Decided 2026-11-21: public.** See §13 item 11 for the shape. Batched cellset deletes (§16.3) use the same API. |
 | Q9 | Ship a blocking facade? Tooling built on a reactive TM1 client ends up full of `.block()` calls (§16.8). | **Decided 2026-11-21: no.** The API is reactive only, and there is no blocking facade. |
 | Q10 | Where do the data-access helpers in §16.8 live (MDX builder, keyed point reads, cellset-to-rows, attribute batch reader)? | **Agreed 2026-11-21.** In a **second layer** over the 1:1 services, in the fluent handles, after the endpoint surface is complete. The MDX member quoting helper comes earlier, because handles need it. |
 | Q11 | Session pool keyed by identity: phase 0 or later? | **Agreed 2026-11-21: good session handling is a priority.** Phase 0 for the design and the SPI. Impersonation is common enough in real use that the session model must not assume one identity per client (§16.1). |
@@ -560,7 +576,7 @@ These are concerns the requirements don't name, but that need deciding early:
 | **7. Server, configuration and logs** | Server, Static/ActiveConfiguration, deprecated Configuration, Loggers, Message/Transaction/Audit logs with delta `tail` Flux, ErrorLogFiles | Integration tests green |
 | **8. Contents and annotations** | Contents/Folders/Documents/Links/References (Copy/Move), Annotations, ApplicationContextFacets, DeleteAnnotationArtifacts | Integration tests green |
 | **9. Infrastructure endpoints** | Git (Init/Status/Pull/Push/Deploy/Plans), encryption at rest, OIDC keys, SQLDataSources | Implemented, with tagged and skipped tests where the container can't host them |
-| **10. Protocol extras** | Public async API, JSON `$batch` (if Q8 says public) | Coverage gate shows zero pending endpoints |
+| **10. Protocol extras** | Public async API. JSON `$batch` (public, Q8), whose `Tm1Request` / `request()` shape is set in phase 0. | Coverage gate shows zero pending endpoints |
 
 Phases 2 to 9 can proceed in parallel once phases 0 and 1 land.
 
