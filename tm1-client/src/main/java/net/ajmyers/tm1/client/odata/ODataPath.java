@@ -47,6 +47,15 @@ public final class ODataPath {
 	}
 
 	/**
+	 * The service's metadata document, {@code $metadata}: its CSDL XML. A path of its
+	 * own, since {@code $metadata} isn't an identifier {@link #of} accepts.
+	 * @return the path
+	 */
+	public static ODataPath metadata() {
+		return new ODataPath(List.of("$metadata"));
+	}
+
+	/**
 	 * Adds a single-part key with a string value: {@code ('Sales')}.
 	 * @param value the key value, any text; quoted and percent-encoded
 	 * @return a new path with the key on its last segment

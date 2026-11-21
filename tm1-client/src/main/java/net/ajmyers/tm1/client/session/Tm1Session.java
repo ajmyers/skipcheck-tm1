@@ -15,6 +15,9 @@ import io.netty.channel.ChannelOption;
 import net.ajmyers.tm1.client.Tm1Request;
 import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
+import net.ajmyers.tm1.client.version.Tm1Capabilities;
+import net.ajmyers.tm1.client.version.Tm1Dialect;
+import net.ajmyers.tm1.client.version.Tm1Version;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
@@ -92,7 +95,8 @@ public final class Tm1Session {
 			return Mono
 				.error(new IllegalArgumentException("Collection requests are streamed: use stream() for " + request));
 		}
-		return connection.execute(inSandbox(request));
+		Mono<T> send = connection.execute(inSandbox(request));
+		return request.requirement().map(needed -> connection.require(needed).then(send)).orElse(send);
 	}
 
 	/**
@@ -110,7 +114,28 @@ public final class Tm1Session {
 			return Flux.error(new IllegalArgumentException(
 					"Only collection requests are streamed: use execute() for " + request));
 		}
-		return connection.stream(inSandbox(request));
+		Flux<T> send = connection.stream(inSandbox(request));
+		return request.requirement().map(needed -> connection.require(needed).thenMany(send)).orElse(send);
+	}
+
+	/**
+	 * The server's product version, such as {@code 11.8.03500.6}, read from
+	 * {@code Server.ProductVersion} once per login. Logs in first if needed.
+	 * @return the version
+	 */
+	public Mono<Tm1Version> version() {
+		return connection.version();
+	}
+
+	/**
+	 * What the server supports, from its own {@code $metadata} (plan §9). Fetched once
+	 * per server version and shared by every session built from the same settings, a
+	 * pool's included. A request that declares {@link Tm1Request#requires} is checked
+	 * against it before it's sent.
+	 * @return the capabilities
+	 */
+	public Mono<Tm1Capabilities> capabilities() {
+		return connection.capabilities();
 	}
 
 	/**
@@ -214,6 +239,8 @@ public final class Tm1Session {
 
 		private @Nullable String baseUrl;
 
+		private Tm1Dialect dialect = Tm1Dialect.V11;
+
 		private @Nullable Tm1Authenticator authenticator;
 
 		private @Nullable String sessionContext;
@@ -221,6 +248,9 @@ public final class Tm1Session {
 		private @Nullable String impersonate;
 
 		private LongSupplier nanoTime = System::nanoTime;
+
+		/** Shared by copies, so a pool's sessions fetch $metadata once. */
+		private CapabilitiesCache capabilitiesCache = new CapabilitiesCache();
 
 		private Tm1Timeouts timeouts = Tm1Timeouts.DEFAULTS;
 
@@ -241,10 +271,12 @@ public final class Tm1Session {
 		Builder copy() {
 			Builder copy = new Builder();
 			copy.baseUrl = baseUrl;
+			copy.dialect = dialect;
 			copy.authenticator = authenticator;
 			copy.sessionContext = sessionContext;
 			copy.impersonate = impersonate;
 			copy.nanoTime = nanoTime;
+			copy.capabilitiesCache = capabilitiesCache;
 			copy.timeouts = timeouts;
 			copy.classifier = classifier;
 			copy.mapper = mapper;
@@ -268,6 +300,30 @@ public final class Tm1Session {
 		/** The observation registry, which the pool reports to as well. */
 		ObservationRegistry observations() {
 			return observations;
+		}
+
+		/**
+		 * The server's address, such as {@code http://tm1:8010}: its scheme, host and
+		 * HTTP port. The service root comes from the dialect, {@link Tm1Dialect#V11}
+		 * unless set, which adds {@code /api/v1/}. Use {@link #baseUrl} to give the
+		 * service root itself.
+		 * @param address the server's address
+		 * @return this builder
+		 * @throws IllegalArgumentException if the address doesn't fit the dialect
+		 */
+		public Builder address(String address) {
+			return baseUrl(dialect.serviceRoot(address));
+		}
+
+		/**
+		 * The kind of deployment, for {@link #address}. {@link Tm1Dialect#V11} unless
+		 * set.
+		 * @param dialect the dialect
+		 * @return this builder
+		 */
+		public Builder dialect(Tm1Dialect dialect) {
+			this.dialect = Objects.requireNonNull(dialect, "dialect");
+			return this;
 		}
 
 		/**
@@ -452,7 +508,7 @@ public final class Tm1Session {
 				.build();
 			ObjectMapper json = mapper != null ? mapper : JsonMapper.builder().build();
 			return new Tm1Session(new Connection(web, baseUrl, authenticator, sessionContext, impersonate, timeouts,
-					classifier, json, observations, nanoTime));
+					classifier, json, observations, nanoTime, capabilitiesCache));
 		}
 
 		private static ClientHttpConnector nettyConnector(Tm1Timeouts timeouts) {

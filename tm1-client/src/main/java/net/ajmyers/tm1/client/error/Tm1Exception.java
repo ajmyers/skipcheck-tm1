@@ -17,7 +17,7 @@ import lombok.Getter;
  * </ul>
  */
 public abstract sealed class Tm1Exception extends RuntimeException
-		permits Tm1ApiException, Tm1TransportException, Tm1ProtocolException {
+		permits Tm1ApiException, Tm1TransportException, Tm1ProtocolException, Tm1UnsupportedOperationException {
 
 	private static final long serialVersionUID = 1L;
 

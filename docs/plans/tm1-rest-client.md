@@ -397,6 +397,16 @@ Three mechanisms, from most to least preferred:
 error messages above, and version pinning in tests. Its `Kind` values are `Added`, `Modified` and
 `Deprecated`. Unknown kinds are tolerated.
 
+**Built in step 5 (#32).** `Tm1Capabilities` (mechanism 1) answers `supports(Tm1Capability)` from
+the connected server's `$metadata`. The session fetches it once per server and product version,
+and shares it with every session built from the same settings (a pool fetches it once).
+`Tm1Request.requires(capability)` makes the session check before sending and fail with
+`Tm1UnsupportedOperationException`, whose message compares the schema version that added the
+element (`Tm1Capability.since`, from `Core.Revisions`, which the generated model will fill in)
+with the server's `Core.SchemaVersion` and product version. `Tm1Session.version()` reads
+`Server.ProductVersion` inside the session, once per login. `Tm1Dialect.V11` (mechanism 3) maps
+an address to its `/api/v1/` root. Version ranges (mechanism 2) have no branches yet, as intended.
+
 **Deprecations.** Deprecated operations (e.g. `Process.Execute`, deprecated in 11.3.0 in favor
 of `ExecuteWithReturn`; `Chore.Activate`) are still covered, because servers still expose
 them. They get Java `@Deprecated` with a pointer to the replacement.
