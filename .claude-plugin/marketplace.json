@@ -1,0 +1,21 @@
+{
+  "name": "tm1-pa-developer-tools",
+  "description": "Agent plugins for IBM Planning Analytics (TM1) development, from ajmyers/tm1-pa-developer-tools.",
+  "owner": {
+    "name": "Andrew Myers",
+    "url": "https://ajmyers.net"
+  },
+  "plugins": [
+    {
+      "name": "tm1",
+      "source": "./agent-plugin",
+      "description": "Set up and run a local TM1 server in Docker with tm1-server, check it, and troubleshoot it.",
+      "category": "development",
+      "tags": [
+        "tm1",
+        "planning-analytics",
+        "docker"
+      ]
+    }
+  ]
+}

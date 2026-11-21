@@ -1,0 +1,19 @@
+{
+  "name": "tm1",
+  "displayName": "TM1 developer tools",
+  "description": "Set up and run a local IBM Planning Analytics (TM1) server in Docker with tm1-server, check it, and troubleshoot it. More TM1 tooling to come.",
+  "author": {
+    "name": "Andrew Myers",
+    "url": "https://ajmyers.net"
+  },
+  "homepage": "https://ajmyers.net/tm1/",
+  "repository": "https://github.com/ajmyers/tm1-pa-developer-tools",
+  "license": "AGPL-3.0-only",
+  "keywords": [
+    "tm1",
+    "planning-analytics",
+    "ibm",
+    "docker",
+    "tm1-server"
+  ]
+}
