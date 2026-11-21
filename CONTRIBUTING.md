@@ -38,6 +38,10 @@ PRs are squash-merged, so the PR title and description become the commit on `mas
 
 ## Code style
 
+**Layout is Spring Java Format, and the build checks it.** `./gradlew build` fails on a
+file the formatter would change; `./gradlew format` fixes them all. The pre-commit hook formats
+what you stage, so you rarely need to.
+
 **Value types are records.** Immutable data (requests, results, model types) is a Java
 record. Records already remove the boilerplate of constructors, accessors, `equals`,
 `hashCode` and `toString`.

@@ -48,6 +48,9 @@ val checkFormat by tasks.registering(CheckJavaFormat::class) {
 	report = layout.buildDirectory.file("reports/check-format.txt")
 	mustRunAfter(format)
 }
+tasks.named("check") {
+	dependsOn(checkFormat)
+}
 
 tasks.withType<Test>().configureEach {
 	useJUnitPlatform()
