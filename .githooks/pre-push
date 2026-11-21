@@ -27,12 +27,11 @@ zero="0000000000000000000000000000000000000000"
 commits=()
 while read -r local_ref local_sha remote_ref remote_sha; do
 	[[ "$local_sha" == "$zero" ]] && continue
-	# Only what the remote lacks: everything after the remote's tip of this branch, or, for a new
-	# branch (or a remote tip we don't have), everything not on any of the remote's branches
+	# Only what the remote lacks: not on the remote's tip of this branch, nor on any of its other
+	# branches (a commit merged in from master was built when it got there)
+	range=("$local_sha" --not --remotes="$remote/*")
 	if [[ "$remote_sha" != "$zero" ]] && git cat-file -e "$remote_sha^{commit}" 2> /dev/null; then
-		range=("$remote_sha..$local_sha")
-	else
-		range=("$local_sha" --not --remotes="$remote/*")
+		range+=("$remote_sha")
 	fi
 	while IFS= read -r commit; do
 		commits+=("$commit")
