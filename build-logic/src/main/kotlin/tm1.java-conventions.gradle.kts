@@ -1,9 +1,16 @@
 // Baseline for every Java subproject: toolchain, compiler flags, JUnit
 plugins {
 	java
+	id("io.freefair.lombok")
 }
 
 val libs = the<VersionCatalogsExtension>().named("libs")
+
+// Lombok: compile-time only, never a runtime dependency of published libraries.
+// The plugin also runs delombok for Javadoc, so generated methods are documented.
+lombok {
+	version = libs.findVersion("lombok").get().requiredVersion
+}
 
 java {
 	toolchain {
@@ -14,6 +21,8 @@ java {
 tasks.withType<JavaCompile>().configureEach {
 	options.encoding = "UTF-8"
 	options.compilerArgs.addAll(listOf("-parameters", "-Xlint:all,-serial,-processing,-options"))
+	// Warnings fail the build: a "static method called on an instance" warning once hid a real bug
+	options.compilerArgs.add("-Werror")
 }
 
 tasks.withType<Test>().configureEach {

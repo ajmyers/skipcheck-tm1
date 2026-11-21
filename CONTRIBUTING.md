@@ -35,3 +35,27 @@ Refs: #12
 - `Refs: #N` trailer: required; it links the issue.
 
 PRs are squash-merged, so the PR title and description become the commit on `master`. CI checks that the title follows the same rules and that the description links the issue with `Closes #N` or `Part of #N`.
+
+## Code style
+
+**Value types are records.** Immutable data (requests, results, model types) is a Java
+record. Records already remove the boilerplate of constructors, accessors, `equals`,
+`hashCode` and `toString`.
+
+**Lombok covers what records don't.** It's set up for every module, compile-time only, so
+published libraries don't depend on it. Settings are in the root `lombok.config`, and
+accessors are fluent (`status()`, not `getStatus()`) to match records.
+
+| Use | For |
+|---|---|
+| `@RequiredArgsConstructor` | Constructor injection of services and components |
+| `@Getter` on fields | Accessors on classes that can't be records, such as exceptions and container subclasses. Put the Javadoc on the field; delombok copies it to the accessor. |
+| `@Builder` | Options and configuration with many optional settings, including on records |
+| `@With` | Copy-on-change of immutable values, including on records |
+| `@CommonsLog` | Logging through Spring's commons-logging bridge, with no extra dependency |
+
+Not used, and refused by `lombok.config`: `@Data`, `@Setter`, `@SneakyThrows`, `val` and
+`var`. Experimental features need a good reason.
+
+**Compiler warnings fail the build** (`-Werror`). Fix the code; suppress a warning only with a
+comment saying why, as `Tm1ServerContainer` does for `this-escape`.

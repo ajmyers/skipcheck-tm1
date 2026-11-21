@@ -2,6 +2,8 @@ package net.ajmyers.tm1.client.error;
 
 import java.util.Objects;
 
+import lombok.Getter;
+
 /**
  * TM1 answered with an error status. Carries the status, the parsed OData error and what it
  * means ({@link #kind()}). The subclass follows from the kind first and the status second, so a
@@ -12,8 +14,16 @@ public sealed class Tm1ApiException extends Tm1Exception permits Tm1BadRequestEx
 
 	private static final long serialVersionUID = 1L;
 
+	/** The HTTP status. */
+	@Getter
 	private final int status;
+
+	/** What the error means. */
+	@Getter
 	private final Tm1ErrorKind kind;
+
+	/** The OData error body, or {@code null} if the response didn't have one. */
+	@Getter
 	private final transient ODataError error;
 
 	protected Tm1ApiException(int status, Tm1ErrorKind kind, ODataError error, String method, String url) {
@@ -63,21 +73,6 @@ public sealed class Tm1ApiException extends Tm1Exception permits Tm1BadRequestEx
 				}
 				return new Tm1ApiException(status, kind, error, method, url);
 		}
-	}
-
-	/** The HTTP status. */
-	public int status() {
-		return status;
-	}
-
-	/** What the error means. */
-	public Tm1ErrorKind kind() {
-		return kind;
-	}
-
-	/** The OData error body, or {@code null} if the response didn't have one. */
-	public ODataError error() {
-		return error;
 	}
 
 	/** True for statuses where trying again later may work: 429, 502, 503 and 504. */

@@ -8,6 +8,8 @@ assertj = "3.27.7"
 hamcrest = "3.0"
 spring-dependency-management = "1.1.7"
 maven-publish = "0.37.0"
+lombok = "1.18.48"
+freefair-lombok = "9.8.3"
 testcontainers = "2.0.5"
 # Keep reactor in step with what spring-webflux brings in
 reactor = "3.9.0"
@@ -35,3 +37,4 @@ testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "
 gradle-plugin-spring-boot = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "spring-boot" }
 gradle-plugin-spring-dependency-management = { module = "io.spring.gradle:dependency-management-plugin", version.ref = "spring-dependency-management" }
 gradle-plugin-maven-publish = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "maven-publish" }
+gradle-plugin-freefair-lombok = { module = "io.freefair.gradle:lombok-plugin", version.ref = "freefair-lombok" }
