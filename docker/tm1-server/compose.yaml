@@ -1,0 +1,63 @@
+# tm1-server: local IBM Planning Analytics (TM1 Server) for development and tests.
+#
+# The image is a thin runtime shell with no IBM software. You mount:
+#   TM1_HOME_DIR    -> /opt/ibm/cognos/tm1_64   your licensed TM1 Server install
+#   ./config/<name> -> /tm1/config              tm1s.cfg (a default is created if missing)
+#   ./data/<name>   -> /tm1/data                database
+#   ./logs/<name>   -> /tm1/logs                logs
+#
+#   cp .env.example .env        # set TM1_HOME_DIR
+#   docker compose up -d                       # empty db "tm1"  -> https://localhost:8010
+#   docker compose --profile samples up -d     # + IBM "SData"   -> https://localhost:8011
+
+x-tm1: &tm1
+  image: ${TM1_SERVER_IMAGE:-tm1-server:local}
+  build: .
+  platform: linux/amd64
+  stop_signal: SIGINT
+  stop_grace_period: 2m
+  restart: unless-stopped
+
+x-tm1-home: &tm1-home "${TM1_HOME_DIR:?Set TM1_HOME_DIR in .env to your TM1 install directory (the one containing bin64/)}:/opt/ibm/cognos/tm1_64"
+
+services:
+  tm1:
+    <<: *tm1
+    container_name: tm1
+    hostname: tm1
+    environment:
+      TM1_SERVER_NAME: tm1
+      TM1_SEED: empty
+      TM1_HTTP_PORT: "8010"
+      TM1_USE_SSL: ${TM1_USE_SSL:-T}
+    ports:
+      - "8010:8010"    # REST API
+      - "12345:12345"  # legacy TM1 API (Architect/Perspectives)
+      - "5895:5895"    # Admin server REST (http)
+      - "5898:5898"    # Admin server REST (https)
+    volumes:
+      - *tm1-home
+      - ./config/tm1:/tm1/config
+      - ./data/tm1:/tm1/data
+      - ./logs/tm1:/tm1/logs
+
+  sdata:
+    <<: *tm1
+    profiles: ["samples"]
+    container_name: tm1-sdata
+    hostname: tm1-sdata
+    environment:
+      TM1_SERVER_NAME: SData
+      TM1_SEED: sdata
+      TM1_HTTP_PORT: "8011"
+      TM1_PORT: "12346"
+      TM1_USE_SSL: ${TM1_USE_SSL:-T}
+      TM1_ADMIN_SERVER: "F"
+    ports:
+      - "8011:8011"
+      - "12346:12346"
+    volumes:
+      - *tm1-home
+      - ./config/sdata:/tm1/config
+      - ./data/sdata:/tm1/data
+      - ./logs/sdata:/tm1/logs

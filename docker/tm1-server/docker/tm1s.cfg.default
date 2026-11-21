@@ -1,0 +1,26 @@
+# tm1s.cfg - created by tm1-server because none was found in /tm1/config.
+# Edit freely; it is used as-is on the next start. tm1-server only changes
+# DataBaseDirectory, LoggingDirectory, RunningInBackground and AdminHost (to match
+# the container), plus any TM1_* overrides you set explicitly.
+# Parameter reference: IBM Planning Analytics docs, "Parameters in the tm1s.cfg file".
+[TM1S]
+ServerName=tm1
+DataBaseDirectory=/tm1/data
+LoggingDirectory=/tm1/logs
+AdminHost=localhost
+PortNumber=12345
+HTTPPortNumber=8010
+UseSSL=T
+IPVersion=ipv4
+RunningInBackground=T
+
+# Security: 1 = native TM1 users (a new database has user "Admin" with a blank password)
+IntegratedSecurityMode=1
+
+# Handy defaults for development
+EnableTIDebugging=T
+EnableNewHierarchyCreation=T
+AllowSeparateNandCRules=T
+PersistentFeeders=F
+AuditLogOn=F
+ServerLogging=F

@@ -1,0 +1,12 @@
+# local database + log files
+data/
+logs/
+# your TM1 install, if you keep it inside this folder
+tm1_64/
+# machine-specific paths
+.env
+# never commit IBM software
+*.tar.gz
+*.zip
+*.bin
+config/
