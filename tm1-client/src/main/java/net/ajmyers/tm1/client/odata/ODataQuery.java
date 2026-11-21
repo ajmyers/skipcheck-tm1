@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
  * {@code !sandbox}, and parameter aliases. Immutable: each method returns a new query.
  *
  * <pre>{@code
- * ODataQuery.select("Name", "Type")
+ * ODataQuery.none().select("Name", "Type")
  *     .expand("Hierarchies", h -> h.select("Name").top(5))
  *     .filter(Filter.startsWith(ODataProperty.of("Name"), "Q"))
  *     .toQueryString()
@@ -60,18 +60,11 @@ public final class ODataQuery {
 		return EMPTY;
 	}
 
-	/** A query selecting these properties. */
-	public static ODataQuery select(String... properties) {
-		return EMPTY.andSelect(properties);
-	}
-
-	/** A query selecting these properties. */
-	public static ODataQuery select(ODataProperty... properties) {
-		return EMPTY.andSelect(properties);
-	}
-
-	/** Adds properties to {@code $select}. */
-	public ODataQuery andSelect(String... properties) {
+	/**
+	 * Adds properties to {@code $select}. Like every option here it's an instance method, so it
+	 * works the same at the top level and inside {@link #expand(String, UnaryOperator)}.
+	 */
+	public ODataQuery select(String... properties) {
 		List<String> next = new ArrayList<>(select);
 		for (String p : properties) {
 			next.add(Objects.requireNonNull(p, "property"));
@@ -80,12 +73,12 @@ public final class ODataQuery {
 	}
 
 	/** Adds properties to {@code $select}. */
-	public ODataQuery andSelect(ODataProperty... properties) {
+	public ODataQuery select(ODataProperty... properties) {
 		String[] paths = new String[properties.length];
 		for (int i = 0; i < properties.length; i++) {
 			paths[i] = properties[i].path();
 		}
-		return andSelect(paths);
+		return select(paths);
 	}
 
 	/** Expands a navigation property with no nested options. */

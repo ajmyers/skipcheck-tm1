@@ -23,18 +23,25 @@ class ODataQueryTest {
 	@Test
 	void writesOptionsInAFixedOrder() {
 		ODataQuery query = ODataQuery.none().top(10).withCount().orderBy("Name").skip(5).filter(Filter.raw("Level eq 0")).expand("Hierarchies")
-			.andSelect("Name", "Type");
+			.select("Name", "Type");
 		assertThat(query).hasToString("$select=Name,Type&$expand=Hierarchies&$filter=Level eq 0&$orderby=Name&$top=10&$skip=5&$count=true");
 	}
 
 	@Test
 	void nestsExpandOptionsWithSemicolons() {
-		ODataQuery query = ODataQuery.select("Name")
+		ODataQuery query = ODataQuery.none().select("Name")
 			.expand("Hierarchies", h -> h.select("Name").expand("Elements", e -> e.select("Name").top(1)))
 			.expand("Cube");
 		assertThat(query).hasToString("$select=Name&$expand=Hierarchies($select=Name;$expand=Elements($select=Name;$top=1)),Cube");
 		// '=' inside a nested option is encoded; TM1 accepts it
 		assertThat(query.toQueryString()).isEqualTo("$select=Name&$expand=Hierarchies($select%3DName;$expand%3DElements($select%3DName;$top%3D1)),Cube");
+	}
+
+	@Test
+	void appliesNestedOptionsInAnyOrder() {
+		// select() is an instance method, so in a nested expand it adds to that expand's options
+		ODataQuery query = ODataQuery.none().expand("Hierarchies", h -> h.top(1).select("Name").orderBy("Name"));
+		assertThat(query).hasToString("$expand=Hierarchies($select=Name;$orderby=Name;$top=1)");
 	}
 
 	@Test
@@ -92,7 +99,7 @@ class ODataQueryTest {
 
 	@Test
 	void isImmutable() {
-		ODataQuery base = ODataQuery.select("Name");
+		ODataQuery base = ODataQuery.none().select("Name");
 		ODataQuery more = base.top(1);
 		assertThat(base).hasToString("$select=Name");
 		assertThat(more).hasToString("$select=Name&$top=1");

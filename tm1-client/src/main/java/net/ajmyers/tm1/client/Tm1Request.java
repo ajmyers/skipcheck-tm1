@@ -19,7 +19,7 @@ import net.ajmyers.tm1.client.odata.ODataQuery;
  * can do one request at a time, it can also batch. Requests are immutable.
  *
  * <pre>{@code
- * Tm1Request<JsonNode> cube = Tm1Request.get(ODataPath.of("Cubes").key("Sales"), ODataQuery.select("Name"), JsonNode.class);
+ * Tm1Request<JsonNode> cube = Tm1Request.get(ODataPath.of("Cubes").key("Sales"), ODataQuery.none().select("Name"), JsonNode.class);
  * Tm1Request<Void> reserve = Tm1Request.post(ODataPath.of("Cubes").key("Sales").action("tm1.Reserve"), Map.of(), Void.class);
  * }</pre>
  *

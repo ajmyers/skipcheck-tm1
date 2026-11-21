@@ -15,7 +15,7 @@ class Tm1RequestTest {
 
 	@Test
 	void describesAGet() {
-		Tm1Request<JsonNode> get = Tm1Request.get(ODataPath.of("Cubes").key("Sales"), ODataQuery.select("Name"), JsonNode.class);
+		Tm1Request<JsonNode> get = Tm1Request.get(ODataPath.of("Cubes").key("Sales"), ODataQuery.none().select("Name"), JsonNode.class);
 		assertThat(get.method()).isEqualTo(HttpMethod.GET);
 		assertThat(get.relativeUri()).isEqualTo("Cubes('Sales')?$select=Name");
 		assertThat(get.response()).isEqualTo(Tm1Request.Response.SINGLE);
