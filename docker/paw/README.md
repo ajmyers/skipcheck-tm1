@@ -63,7 +63,7 @@ All are environment variables; `./paw-local.sh help` lists them too.
 | `PAW_TM1WEB_URL` | | TM1 Web, as PAW sees it, e.g. `http://tm1-web:9510` |
 | `PAW_HTTP_PORT` / `PAW_HTTPS_PORT` | `8800` / `8843` | Host ports |
 | `PAW_JVM_ARGS` | IBM's `-Xmx4096m -Xms4096m` | JVM options of `prism-platform`, the largest service |
-| `PAW_WAIT` | `600` | Seconds `up` waits for PAW to answer |
+| `PAW_WAIT` | `600` | Seconds `up` waits for PAW to answer; `0` to not wait |
 
 The URLs are as PAW's containers see them, so they use container names, not
 `localhost`.

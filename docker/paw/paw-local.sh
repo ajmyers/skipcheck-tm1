@@ -39,7 +39,7 @@
 #   PAW_HTTPS_PORT           Host port for PAW over https. Default: 8843
 #   PAW_JVM_ARGS             JVM options of prism-platform, the largest service.
 #                            Default: IBM's (-Xmx4096m -Xms4096m)
-#   PAW_WAIT                 Seconds "up" waits for PAW. Default: 600
+#   PAW_WAIT                 Seconds "up" waits for PAW; 0 to not wait. Default: 600
 set -euo pipefail
 
 die()  { printf 'paw-local: %s\n' "$*" >&2; exit 1; }
@@ -220,6 +220,10 @@ paw_sh() {
 
 wait_for_paw() {
 	local url="http://localhost:$PAW_HTTP_PORT" waited=0 code
+	if [ "$PAW_WAIT" = 0 ]; then
+		info "PAW is starting: $url (not waiting, PAW_WAIT=0)"
+		return
+	fi
 	info "waiting for PAW at $url (up to ${PAW_WAIT}s)"
 	while :; do
 		code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 "$url/login" || true)
