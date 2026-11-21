@@ -127,3 +127,4 @@ jobs:
           if ($rc -ne 1) { throw "expected exit 1, got $rc" }
           if (-not $out.Contains('Docker is running Windows containers')) { throw 'expected the Windows-containers check to stop it' }
           if (-not $out.Contains('made by Andrew Myers')) { throw 'banner missing' }
+          exit 0   # the step would otherwise end with the expected exit 1 left in $LASTEXITCODE
