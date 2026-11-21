@@ -54,6 +54,23 @@ started, the container reads the server's version (`getTm1Version()`). With
 `withExpectedVersion`, it fails to start on a mismatch, before any test runs against the wrong
 TM1.
 
+## Examples
+
+Each of these is a real test in [`src/test/java/.../examples`](src/test/java/net/ajmyers/tm1/testcontainers/examples),
+run on every build where TM1 is configured, so they always work as written.
+
+| You want to... | Example |
+|---|---|
+| Share one server across all your tests: injected into a test method, a constructor, or a static `@BeforeAll` that sets up a client once per class | [`SharedServerExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/SharedServerExampleTest.java) |
+| Give one test class its own server, with IBM's SData sample to read | [`SampleDatabaseExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/SampleDatabaseExampleTest.java) |
+| Run your own database (a fixture model in `src/test/resources`) | [`OwnDatabaseExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/OwnDatabaseExampleTest.java) |
+| Require one TM1 version, or skip tests on versions without a feature | [`PinnedVersionExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/PinnedVersionExampleTest.java) |
+| Run two servers at once, e.g. to test a migration or comparison | [`TwoServersExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/TwoServersExampleTest.java) |
+| Choose where TM1 comes from in code: install folder, bundle, download link, Docker volume or private image | [`ExplicitSourceExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/ExplicitSourceExampleTest.java) |
+| Skip the extension: plain assumptions and a throwaway server, e.g. for a test that damages its server | [`WithoutTheExtensionExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/WithoutTheExtensionExampleTest.java) |
+
+Spring Boot tests will connect with `@ServiceConnection` once #15 lands.
+
 ## Telling it where TM1 is
 
 Set **one** of these, as an environment variable or a system property with the same name.
