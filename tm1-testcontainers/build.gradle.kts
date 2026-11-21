@@ -22,8 +22,12 @@ dependencies {
 	api(libs.junit.jupiter.api)
 }
 
-// The default image tag follows the library version, so record it in the jar
+// The default image tag follows the library version, so record it in the jar.
+// PawContainer runs docker/paw/paw-local.sh in its runner container, so ship it too.
 tasks.processResources {
+	from(rootProject.file("docker/paw/paw-local.sh")) {
+		into("net/ajmyers/tm1/testcontainers")
+	}
 	val version = project.version.toString()
 	inputs.property("version", version)
 	filesMatching("**/tm1-testcontainers.properties") {
