@@ -15,3 +15,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "tm1-pa-developer-tools"
+
+// Published libraries (Maven Central)
+include("tm1-client")
