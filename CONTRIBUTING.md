@@ -75,7 +75,7 @@ accessors are fluent (`status()`, not `getStatus()`) to match records.
 |---|---|
 | `@RequiredArgsConstructor` | Constructor injection of services and components |
 | `@Getter` on fields | Accessors on classes that can't be records, such as exceptions and container subclasses. Put the Javadoc on the field; delombok copies it to the accessor. |
-| `@Builder` | Options and configuration with many optional settings, including on records |
+| `@Builder` | Options and configuration with many optional settings, on types that aren't public API. A public builder is written by hand, since the Javadoc rule needs every public method documented and Lombok's generated builder has nowhere to carry it (see `Tm1Timeouts`). |
 | `@With` | Copy-on-change of immutable values, including on records |
 | `@Slf4j` | Logging (see below) |
 
