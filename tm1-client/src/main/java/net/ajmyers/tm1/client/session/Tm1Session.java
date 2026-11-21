@@ -1,8 +1,6 @@
 package net.ajmyers.tm1.client.session;
 
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -14,6 +12,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import io.micrometer.observation.ObservationRegistry;
 import io.netty.channel.ChannelOption;
 import net.ajmyers.tm1.client.Tm1Request;
+import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -214,7 +213,7 @@ public final class Tm1Session {
 
 		private @Nullable String baseUrl;
 
-		private @Nullable String authorization;
+		private @Nullable Tm1Authenticator authenticator;
 
 		private @Nullable String sessionContext;
 
@@ -252,16 +251,24 @@ public final class Tm1Session {
 		}
 
 		/**
-		 * Basic authentication, for TM1 security modes 1 and 2.
+		 * Basic authentication, for TM1 security modes 1 and 2: shorthand for
+		 * {@code authenticator(Tm1Authenticator.basic(user, password))}.
 		 * @param user the TM1 user name
 		 * @param password the password; {@code null} counts as empty
 		 * @return this builder
 		 */
-		public Builder basicAuth(String user, String password) {
-			Objects.requireNonNull(user, "user");
-			String credentials = user + ":" + (password == null ? "" : password);
-			this.authorization = "Basic "
-					+ Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+		public Builder basicAuth(String user, @Nullable String password) {
+			return authenticator(Tm1Authenticator.basic(user, password));
+		}
+
+		/**
+		 * How to log in: TM1's own security, CAM, or credentials of your own. Asked for
+		 * credentials on every login.
+		 * @param authenticator supplies the credentials
+		 * @return this builder
+		 */
+		public Builder authenticator(Tm1Authenticator authenticator) {
+			this.authenticator = Objects.requireNonNull(authenticator, "authenticator");
 			return this;
 		}
 
@@ -365,15 +372,15 @@ public final class Tm1Session {
 			if (baseUrl == null) {
 				throw new IllegalStateException("baseUrl is required");
 			}
-			if (authorization == null) {
-				throw new IllegalStateException("credentials are required: call basicAuth");
+			if (authenticator == null) {
+				throw new IllegalStateException("credentials are required: call basicAuth or authenticator");
 			}
 			ClientHttpConnector http = connector != null ? connector : nettyConnector(timeouts);
 			WebClient web = (webClient != null ? webClient : WebClient.builder()).clientConnector(http)
 				.observationRegistry(observations)
 				.build();
 			ObjectMapper json = mapper != null ? mapper : JsonMapper.builder().build();
-			return new Tm1Session(new Connection(web, baseUrl, authorization, sessionContext, timeouts, classifier,
+			return new Tm1Session(new Connection(web, baseUrl, authenticator, sessionContext, timeouts, classifier,
 					json, observations));
 		}
 

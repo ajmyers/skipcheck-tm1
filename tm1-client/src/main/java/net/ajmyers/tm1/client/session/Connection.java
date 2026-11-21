@@ -20,6 +20,7 @@ import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import net.ajmyers.tm1.client.Tm1Request;
+import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.ODataError;
 import net.ajmyers.tm1.client.error.Tm1ApiException;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
@@ -60,7 +61,7 @@ final class Connection {
 
 	private final String root;
 
-	private final String authorization;
+	private final Tm1Authenticator authenticator;
 
 	private final @Nullable String sessionContext;
 
@@ -84,11 +85,12 @@ final class Connection {
 	/** What {@link #close()} returns, once called. Guarded by this. */
 	private @Nullable Mono<Void> closing;
 
-	Connection(WebClient web, String root, String authorization, @Nullable String sessionContext, Tm1Timeouts timeouts,
-			Tm1ErrorClassifier classifier, ObjectMapper mapper, ObservationRegistry observations) {
+	Connection(WebClient web, String root, Tm1Authenticator authenticator, @Nullable String sessionContext,
+			Tm1Timeouts timeouts, Tm1ErrorClassifier classifier, ObjectMapper mapper,
+			ObservationRegistry observations) {
 		this.web = Objects.requireNonNull(web, "web");
 		this.root = Objects.requireNonNull(root, "root");
-		this.authorization = Objects.requireNonNull(authorization, "authorization");
+		this.authenticator = Objects.requireNonNull(authenticator, "authenticator");
 		this.sessionContext = sessionContext;
 		this.timeouts = Objects.requireNonNull(timeouts, "timeouts");
 		this.classifier = Objects.requireNonNull(classifier, "classifier");
@@ -310,7 +312,21 @@ final class Connection {
 
 	private Mono<LoggedIn> login(@Nullable String seedCookie, String reason) {
 		URI uri = uri(LOGIN_PATH);
-		Mono<LoggedIn> login = Mono.defer(() -> {
+		// The authenticator's own failures (say, a passport it couldn't get) reach the
+		// caller
+		// unchanged; only the login request's are mapped
+		Mono<LoggedIn> login = authenticator.authorization()
+			.switchIfEmpty(Mono.error(() -> new IllegalStateException(
+					"The authenticator " + authenticator.describe() + " supplied no credentials")))
+			.flatMap(authorization -> sendLogin(uri, authorization, seedCookie));
+		return observe("tm1.session.login", "tm1 login", reason, login)
+			.doOnNext(session -> log.info("Logged in to TM1 at {} as {} (session {}, {})", root,
+					authenticator.describe(), session.sessionId(), reason))
+			.doOnError(e -> log.debug("Login to TM1 at {} failed", root, e));
+	}
+
+	private Mono<LoggedIn> sendLogin(URI uri, String authorization, @Nullable String seedCookie) {
+		return Mono.defer(() -> {
 			WebClient.RequestHeadersSpec<?> spec = web.get().uri(uri).headers(h -> {
 				odataHeaders(h, false);
 				h.set(HttpHeaders.AUTHORIZATION, authorization);
@@ -337,9 +353,6 @@ final class Connection {
 				return response.bodyToMono(byte[].class).map(body -> loggedIn(value, body, uri));
 			});
 		}).onErrorMap(e -> Transport.map(e, "GET", uri.toString(), true));
-		return observe("tm1.session.login", "tm1 login", reason, login)
-			.doOnNext(session -> log.info("Logged in to TM1 at {} (session {}, {})", root, session.sessionId(), reason))
-			.doOnError(e -> log.debug("Login to TM1 at {} failed", root, e));
 	}
 
 	private LoggedIn loggedIn(@Nullable String cookie, byte[] body, URI uri) {
