@@ -17,10 +17,31 @@ RunningInBackground=T
 # Security: 1 = native TM1 users (a new database has user "Admin" with a blank password)
 IntegratedSecurityMode=1
 
-# Handy defaults for development
-EnableTIDebugging=T
-EnableNewHierarchyCreation=T
+# Modelling behaviour: match common production settings, so models behave in
+# tests the way they do in production.
 AllowSeparateNandCRules=T
+ForceReevaluationOfFeedersForFedCellsOnDataChange=T
+ParallelInteraction=T
+EnableNewHierarchyCreation=T
+
+# Development
+EnableTIDebugging=T
+
+# Faster startup for larger test models: load cubes and compute feeders on several threads
+MTCubeLoad=T
+MTFeeders=T
+MTFeeders.AtStartup=T
+
+# Diagnostics: event log (tm1event.log) entries for threads running or waiting longer
+# than these thresholds, in seconds (3000 s = 50 minutes, 50 s)
+EventLogging=T
+EventThreshold.ThreadRunningTime=3000
+EventThreshold.ThreadWaitingTime=50
+
+# Off by default for a dev/test server; turn on to match production more closely.
 PersistentFeeders=F
 AuditLogOn=F
 ServerLogging=F
+#TopLogging=T                 # periodic thread snapshots to tm1top.log
+#EnableSandboxDimension=T     # exposes sandboxes as a }Sandboxes dimension in MDX
+#HTTPSessionTimeoutMinutes=60 # REST session timeout (default 20)
