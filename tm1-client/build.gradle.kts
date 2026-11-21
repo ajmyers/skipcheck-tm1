@@ -32,5 +32,7 @@ dependencies {
 	testImplementation(libs.reactor.test)
 	testImplementation(libs.hamcrest)
 	testImplementation(libs.micrometer.observation.test)
+	// ArchitectureTest: rules over the compiled library code
+	testImplementation(libs.archunit)
 	testRuntimeOnly(libs.slf4j.simple)
 }

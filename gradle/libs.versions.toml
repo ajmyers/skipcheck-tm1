@@ -11,6 +11,7 @@ maven-publish = "0.37.0"
 lombok = "1.18.48"
 freefair-lombok = "9.8.3"
 spring-javaformat = "0.0.48"
+archunit = "1.5.1"
 testcontainers = "2.0.5"
 # Keep reactor in step with what spring-webflux brings in
 reactor = "3.9.0"
@@ -42,6 +43,7 @@ junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 hamcrest = { module = "org.hamcrest:hamcrest", version.ref = "hamcrest" }
+archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
 testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 
 # Gradle plugins, as dependencies of build-logic

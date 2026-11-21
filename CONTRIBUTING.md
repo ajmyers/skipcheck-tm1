@@ -44,6 +44,11 @@ what you stage, so you rarely need to (skip it once with `SKIP_FORMAT_HOOK=1`). 
 fails on unused imports, imports out of order (static, `java`/`javax`, `org`, then the rest) and
 fully qualified type names in code; `format` fixes all but the last.
 
+**Architecture rules are tests.** `ArchitectureTest` in `tm1-client` checks the compiled library:
+it never blocks or calls a bare `subscribe()`, builds request URIs instead of using URI templates,
+logs only through SLF4J, and keeps the `odata` package free of TM1. Each rule's `because` says
+why. If one fails, fix the code; change a rule only with a reason in the commit.
+
 **Value types are records.** Immutable data (requests, results, model types) is a Java
 record. Records already remove the boilerplate of constructors, accessors, `equals`,
 `hashCode` and `toString`.
