@@ -3,9 +3,11 @@ package net.ajmyers.tm1.client.session;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -51,6 +53,10 @@ final class Connection {
 	static final String COOKIE = "TM1SessionId";
 	static final String SESSION_CONTEXT = "TM1-SessionContext";
 
+	static final String IMPERSONATE = "TM1-Impersonate";
+
+	private static final long NOT_REFUSED = Long.MIN_VALUE;
+
 	private static final String LOGIN_PATH = "ActiveSession?$select=ID";
 
 	private static final String CLOSE_PATH = "ActiveSession/tm1.Close";
@@ -64,6 +70,10 @@ final class Connection {
 	private final Tm1Authenticator authenticator;
 
 	private final @Nullable String sessionContext;
+
+	private final @Nullable String impersonate;
+
+	private final LongSupplier nanoTime;
 
 	private final Tm1Timeouts timeouts;
 
@@ -86,12 +96,14 @@ final class Connection {
 	private @Nullable Mono<Void> closing;
 
 	Connection(WebClient web, String root, Tm1Authenticator authenticator, @Nullable String sessionContext,
-			Tm1Timeouts timeouts, Tm1ErrorClassifier classifier, ObjectMapper mapper,
-			ObservationRegistry observations) {
+			@Nullable String impersonate, Tm1Timeouts timeouts, Tm1ErrorClassifier classifier, ObjectMapper mapper,
+			ObservationRegistry observations, LongSupplier nanoTime) {
 		this.web = Objects.requireNonNull(web, "web");
 		this.root = Objects.requireNonNull(root, "root");
 		this.authenticator = Objects.requireNonNull(authenticator, "authenticator");
 		this.sessionContext = sessionContext;
+		this.impersonate = impersonate;
+		this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
 		this.timeouts = Objects.requireNonNull(timeouts, "timeouts");
 		this.classifier = Objects.requireNonNull(classifier, "classifier");
 		this.mapper = Objects.requireNonNull(mapper, "mapper");
@@ -156,7 +168,7 @@ final class Connection {
 		if (closed) {
 			throw new Tm1SessionClosedException(root);
 		}
-		if (attempt == null) {
+		if (attempt == null || (attempt.refusedAt != NOT_REFUSED && !attempt.refusedRecently())) {
 			attempt = new Attempt(null, "initial");
 		}
 		return attempt;
@@ -172,18 +184,44 @@ final class Connection {
 		if (closed) {
 			throw new Tm1SessionClosedException(root);
 		}
-		if (attempt == expired || attempt == null) {
+		if (attempt != null && attempt.refusedRecently()) {
+			return attempt;
+		}
+		if (attempt == expired || attempt == null || attempt.refusedAt != NOT_REFUSED) {
 			log.info("TM1 session at {} expired or was closed on the server; logging in again", root);
 			attempt = new Attempt(seedCookie, "relogin");
 		}
 		return attempt;
 	}
 
-	/** Forgets a login that failed, so the next request tries again. */
-	private synchronized void forget(Attempt failed) {
-		if (attempt == failed) {
+	/**
+	 * Handles a failed login. One TM1 refused (400, 401 or 403: wrong credentials, an
+	 * unknown or disabled user, impersonation not allowed) is kept for
+	 * {@link Tm1Timeouts#refusedLogin()}, so requests meanwhile fail at once with the
+	 * same error: each login attempt leaves a session behind on TM1, and retrying a
+	 * refusal at once would pile them up (plan §16.8). Any other failure, such as TM1
+	 * being unreachable, is forgotten, so the next request tries again.
+	 */
+	private synchronized void failed(Attempt failed, Throwable error) {
+		if (attempt != failed) {
+			return;
+		}
+		if (isRefusal(error) && !timeouts.refusedLogin().isZero()) {
+			failed.refusedAt = nanoTime.getAsLong();
+			log.warn("TM1 at {} refused the login as {}{}; not trying again for {}", root, authenticator.describe(),
+					impersonate == null ? "" : " impersonating a user", timeouts.refusedLogin());
+		}
+		else {
 			attempt = null;
 		}
+	}
+
+	private static boolean isRefusal(Throwable error) {
+		if (!(error instanceof Tm1ApiException api)) {
+			return false;
+		}
+		int status = api.status();
+		return status == 400 || status == 401 || status == 403;
 	}
 
 	private <T> Flux<T> page(Tm1Request<T> request, URI uri) {
@@ -330,6 +368,12 @@ final class Connection {
 			WebClient.RequestHeadersSpec<?> spec = web.get().uri(uri).headers(h -> {
 				odataHeaders(h, false);
 				h.set(HttpHeaders.AUTHORIZATION, authorization);
+				if (impersonate != null) {
+					// At login only: TM1 decides the identity then and ignores the header
+					// on later
+					// requests (Tm1ImpersonationBehaviorTest)
+					h.set(IMPERSONATE, impersonate);
+				}
 				if (sessionContext != null) {
 					h.set(SESSION_CONTEXT, sessionContext);
 				}
@@ -341,18 +385,42 @@ final class Connection {
 			return spec.exchangeToMono(response -> {
 				int status = response.statusCode().value();
 				if (status == 401) {
+					// TM1 answers a disabled impersonated user exactly like wrong
+					// credentials
+					ODataError why = impersonate == null ? null
+							: new ODataError("", "The credentials were refused, or the user being impersonated ("
+									+ impersonate + ") is disabled", null, List.of(), null);
 					return response.releaseBody()
-						.then(Mono.error(Tm1ApiException.of(401, Tm1ErrorKind.CREDENTIAL_REJECTED, null, "GET",
-								uri.toString())));
+						.then(Mono.error(
+								Tm1ApiException.of(401, Tm1ErrorKind.CREDENTIAL_REJECTED, why, "GET", uri.toString())));
 				}
 				if (status >= 400) {
-					return error(response, "GET", uri);
+					return errorOf(response, "GET", uri).flatMap(e -> Mono.error(impersonationError(e, uri)));
 				}
 				String cookie = cookie(response);
 				String value = cookie != null ? cookie : seedCookie;
 				return response.bodyToMono(byte[].class).map(body -> loggedIn(value, body, uri));
 			});
 		}).onErrorMap(e -> Transport.map(e, "GET", uri.toString(), true));
+	}
+
+	/**
+	 * A login that impersonates and gets a 400 or 403 was refused for the impersonation:
+	 * the user doesn't exist (400), or the logged-in user may not impersonate them (403).
+	 * The classifier recognizes TM1 11.8's messages; this keeps the kind right if another
+	 * version words them differently.
+	 */
+	private Throwable impersonationError(Throwable error, URI uri) {
+		if (impersonate == null || !(error instanceof Tm1ApiException api)) {
+			return error;
+		}
+		if (api.status() == 400 && api.kind() != Tm1ErrorKind.UNKNOWN_USER) {
+			return Tm1ApiException.of(400, Tm1ErrorKind.UNKNOWN_USER, api.error(), "GET", uri.toString());
+		}
+		if (api.status() == 403 && api.kind() != Tm1ErrorKind.IMPERSONATION_REFUSED) {
+			return Tm1ApiException.of(403, Tm1ErrorKind.IMPERSONATION_REFUSED, api.error(), "GET", uri.toString());
+		}
+		return error;
 	}
 
 	private LoggedIn loggedIn(@Nullable String cookie, byte[] body, URI uri) {
@@ -486,11 +554,25 @@ final class Connection {
 
 		final Mono<LoggedIn> login;
 
+		/** When TM1 refused this login ({@link System#nanoTime()} scale), or never. */
+		volatile long refusedAt = NOT_REFUSED;
+
 		Attempt(@Nullable String seedCookie, String reason) {
 			// cache(): concurrent requests share one login. A failed login is forgotten,
-			// so the next
-			// request tries again rather than getting the cached failure forever.
-			this.login = Mono.defer(() -> login(seedCookie, reason)).doOnError(e -> forget(this)).cache();
+			// so
+			// the next request tries again, unless TM1 refused it: then it's kept for a
+			// while
+			// (see failed()).
+			this.login = Mono.defer(() -> login(seedCookie, reason)).doOnError(e -> failed(this, e)).cache();
+		}
+
+		/**
+		 * Whether TM1 refused this login recently enough that it shouldn't be tried
+		 * again.
+		 */
+		boolean refusedRecently() {
+			long at = refusedAt;
+			return at != NOT_REFUSED && nanoTime.getAsLong() - at < timeouts.refusedLogin().toNanos();
 		}
 
 		/**

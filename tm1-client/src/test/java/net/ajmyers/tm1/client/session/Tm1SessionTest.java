@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -73,10 +74,13 @@ class Tm1SessionTest {
 	}
 
 	@Test
-	void reportsRefusedCredentialsAndTriesAgainOnTheNextRequest() {
+	void reportsRefusedCredentialsAndCanTryAgainOnTheNextRequest() {
 		tm1.onEach(FakeTm1.LOGIN, r -> Mono.just(FakeTm1.status(401, "TM1SessionId=anon; Path=/api/")),
 				r -> Mono.just(FakeTm1.json(200, "{\"ID\":2}", "TM1SessionId=ok; Path=/api/")));
-		Tm1Session session = tm1.session();
+		// With the refused-login back-off off; Tm1SessionImpersonationTest covers the
+		// back-off
+		Tm1Session session = tm1
+			.session(Tm1Session.builder().timeouts(Tm1Timeouts.builder().refusedLogin(Duration.ZERO).build()));
 
 		StepVerifier.create(session.execute(SERVER))
 			.expectErrorSatisfies(e -> assertThat(e).isInstanceOfSatisfying(Tm1AuthenticationException.class,

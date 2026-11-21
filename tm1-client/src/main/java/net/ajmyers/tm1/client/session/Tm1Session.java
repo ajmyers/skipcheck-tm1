@@ -3,6 +3,7 @@ package net.ajmyers.tm1.client.session;
 import java.net.URI;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.LongSupplier;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.client.reactive.ClientHttpConnector;
@@ -217,6 +218,10 @@ public final class Tm1Session {
 
 		private @Nullable String sessionContext;
 
+		private @Nullable String impersonate;
+
+		private LongSupplier nanoTime = System::nanoTime;
+
 		private Tm1Timeouts timeouts = Tm1Timeouts.DEFAULTS;
 
 		private Tm1ErrorClassifier classifier = Tm1ErrorClassifier.defaults();
@@ -296,6 +301,33 @@ public final class Tm1Session {
 		}
 
 		/**
+		 * Logs in as {@code user} rather than as the credentials' own user, with TM1's
+		 * {@code TM1-Impersonate}. The credentials must be an administrator's or a data
+		 * administrator's, and nobody can impersonate an administrator. TM1 decides the
+		 * identity at login and keeps it for the session, so one session is one identity;
+		 * for many users, use one session per user.
+		 *
+		 * <p>
+		 * A refused login fails with
+		 * {@link net.ajmyers.tm1.client.error.Tm1ErrorKind#UNKNOWN_USER} (no such user),
+		 * {@link net.ajmyers.tm1.client.error.Tm1ErrorKind#IMPERSONATION_REFUSED} (not
+		 * allowed), or
+		 * {@link net.ajmyers.tm1.client.error.Tm1ErrorKind#CREDENTIAL_REJECTED} (wrong
+		 * credentials, or the user is disabled: TM1 answers both alike). The client never
+		 * falls back to another identity.
+		 * @param user the TM1 user to act as; matched ignoring case and spaces, as TM1
+		 * does
+		 * @return this builder
+		 * @throws IllegalArgumentException if {@code user} is blank, which TM1 would take
+		 * as no impersonation at all, or has characters other than printable ASCII, which
+		 * TM1 can't match through the header
+		 */
+		public Builder impersonate(String user) {
+			this.impersonate = UserNames.checkImpersonated(user);
+			return this;
+		}
+
+		/**
 		 * Timeouts by kind of work; {@link Tm1Timeouts#DEFAULTS} unless set.
 		 * @param timeouts the timeouts
 		 * @return this builder
@@ -363,6 +395,12 @@ public final class Tm1Session {
 			return this;
 		}
 
+		/** The clock for remembering refused logins; for tests and the pool. */
+		Builder nanoTime(LongSupplier nanoTime) {
+			this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
+			return this;
+		}
+
 		/**
 		 * The session. Nothing is sent to TM1 until the first request.
 		 * @return a new session
@@ -380,8 +418,8 @@ public final class Tm1Session {
 				.observationRegistry(observations)
 				.build();
 			ObjectMapper json = mapper != null ? mapper : JsonMapper.builder().build();
-			return new Tm1Session(new Connection(web, baseUrl, authenticator, sessionContext, timeouts, classifier,
-					json, observations));
+			return new Tm1Session(new Connection(web, baseUrl, authenticator, sessionContext, impersonate, timeouts,
+					classifier, json, observations, nanoTime));
 		}
 
 		private static ClientHttpConnector nettyConnector(Tm1Timeouts timeouts) {

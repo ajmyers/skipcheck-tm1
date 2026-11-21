@@ -138,6 +138,16 @@ public final class Tm1Client {
 		}
 
 		/**
+		 * See {@link Tm1Session.Builder#impersonate}.
+		 * @param user the TM1 user to act as
+		 * @return this builder
+		 */
+		public Builder impersonate(String user) {
+			session.impersonate(user);
+			return this;
+		}
+
+		/**
 		 * See {@link Tm1Session.Builder#sessionContext}.
 		 * @param sessionContext the session context sent to TM1
 		 * @return this builder
