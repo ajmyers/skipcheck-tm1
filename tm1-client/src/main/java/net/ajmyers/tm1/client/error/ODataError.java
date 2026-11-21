@@ -1,0 +1,55 @@
+package net.ajmyers.tm1.client.error;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import tools.jackson.databind.JsonNode;
+
+/**
+ * An OData error response body: {@code {"error":{"code":"278","message":"..."}}}.
+ *
+ * <p>TM1 uses code {@code 278} for most errors (not found, bad request, precondition failed and
+ * not implemented alike), so the code alone rarely identifies an error. See
+ * {@link Tm1ErrorClassifier}.
+ *
+ * @param code the error code, as text
+ * @param message the message
+ * @param target what the error applies to, or {@code null}
+ * @param details further errors, possibly empty
+ * @param innerError service-specific detail, or {@code null}
+ */
+public record ODataError(String code, String message, String target, List<ODataError> details, JsonNode innerError) {
+
+	public ODataError {
+		code = code == null ? "" : code;
+		message = message == null ? "" : message;
+		details = List.copyOf(details);
+	}
+
+	/** Reads an error from a response body, if it is one: either {@code {"error":{...}}} or the inner object. */
+	public static ODataError from(JsonNode body) {
+		if (body == null || !body.isObject()) {
+			return null;
+		}
+		JsonNode error = body.has("error") ? body.get("error") : body;
+		if (!error.isObject() || !(error.has("code") || error.has("message"))) {
+			return null;
+		}
+		List<ODataError> details = new ArrayList<>();
+		JsonNode d = error.get("details");
+		if (d != null && d.isArray()) {
+			for (JsonNode item : d) {
+				ODataError detail = from(item);
+				if (detail != null) {
+					details.add(detail);
+				}
+			}
+		}
+		return new ODataError(text(error, "code"), text(error, "message"), text(error, "target"), details, error.get("innererror"));
+	}
+
+	private static String text(JsonNode node, String field) {
+		JsonNode value = node.get(field);
+		return value == null || value.isNull() ? null : value.asString();
+	}
+}

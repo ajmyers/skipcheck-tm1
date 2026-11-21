@@ -1,0 +1,100 @@
+package net.ajmyers.tm1.client.error;
+
+import java.util.Objects;
+
+/**
+ * TM1 answered with an error status. Carries the status, the parsed OData error and what it
+ * means ({@link #kind()}). The subclass follows from the kind first and the status second, so a
+ * "not found" TM1 reports as a 400 is still a {@link Tm1NotFoundException}.
+ */
+public sealed class Tm1ApiException extends Tm1Exception permits Tm1BadRequestException, Tm1AuthenticationException, Tm1ForbiddenException,
+		Tm1NotFoundException, Tm1ConflictException, Tm1PreconditionFailedException, Tm1NotImplementedException, Tm1ServerException {
+
+	private static final long serialVersionUID = 1L;
+
+	private final int status;
+	private final Tm1ErrorKind kind;
+	private final transient ODataError error;
+
+	protected Tm1ApiException(int status, Tm1ErrorKind kind, ODataError error, String method, String url) {
+		super(message(status, error, method, url), method, url, null);
+		this.status = status;
+		this.kind = Objects.requireNonNull(kind, "kind");
+		this.error = error;
+	}
+
+	/**
+	 * The exception for an error response, classified with {@code classifier}.
+	 *
+	 * @param error the parsed error body, or {@code null} if the body wasn't an OData error
+	 */
+	public static Tm1ApiException of(int status, ODataError error, String method, String url, Tm1ErrorClassifier classifier) {
+		Tm1ErrorKind kind = classifier.classify(status, error);
+		return of(status, kind, error, method, url);
+	}
+
+	/** The exception for an error response whose kind is already known. */
+	public static Tm1ApiException of(int status, Tm1ErrorKind kind, ODataError error, String method, String url) {
+		switch (kind) {
+			case NOT_FOUND:
+				return new Tm1NotFoundException(status, kind, error, method, url);
+			case ALREADY_EXISTS:
+			case LOCKED:
+			case IN_USE:
+			case CONFLICT:
+				return new Tm1ConflictException(status, kind, error, method, url);
+			case PRECONDITION_FAILED:
+				return new Tm1PreconditionFailedException(status, kind, error, method, url);
+			case UNAUTHENTICATED:
+			case CREDENTIAL_REJECTED:
+				return new Tm1AuthenticationException(status, kind, error, method, url);
+			case FORBIDDEN:
+			case NO_READ_RIGHTS:
+			case IMPERSONATION_REFUSED:
+				return new Tm1ForbiddenException(status, kind, error, method, url);
+			case NOT_IMPLEMENTED:
+				return new Tm1NotImplementedException(status, kind, error, method, url);
+			default:
+				if (status >= 500) {
+					return new Tm1ServerException(status, kind, error, method, url);
+				}
+				if (status >= 400) {
+					return new Tm1BadRequestException(status, kind, error, method, url);
+				}
+				return new Tm1ApiException(status, kind, error, method, url);
+		}
+	}
+
+	/** The HTTP status. */
+	public int status() {
+		return status;
+	}
+
+	/** What the error means. */
+	public Tm1ErrorKind kind() {
+		return kind;
+	}
+
+	/** The OData error body, or {@code null} if the response didn't have one. */
+	public ODataError error() {
+		return error;
+	}
+
+	/** True for statuses where trying again later may work: 429, 502, 503 and 504. */
+	@Override
+	public boolean isRetryable() {
+		return status == 429 || status == 502 || status == 503 || status == 504;
+	}
+
+	/** False for client errors (4xx), which TM1 rejected; true for server errors, except 501. */
+	@Override
+	public boolean mayHaveApplied() {
+		return status >= 500 && status != 501;
+	}
+
+	private static String message(int status, ODataError error, String method, String url) {
+		String detail = error == null || error.message().isEmpty() ? "" : ": " + error.message();
+		String code = error == null || error.code().isEmpty() ? "" : " [code " + error.code() + "]";
+		return "TM1 returned " + status + detail + code + describe(method, url);
+	}
+}

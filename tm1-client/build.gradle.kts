@@ -14,7 +14,8 @@ mavenPublishing {
 dependencies {
 	// RestClient is part of the public API (Tm1Client.Builder accepts one)
 	api(libs.spring.web)
-	implementation(libs.jackson.databind)
+	// Jackson 3: JsonNode appears in the API (ODataError), and payloads are decoded with it
+	api(libs.jackson.databind)
 
 	// End-to-end tests against a real TM1 (skipped when none is configured)
 	testImplementation(project(":tm1-testcontainers"))
