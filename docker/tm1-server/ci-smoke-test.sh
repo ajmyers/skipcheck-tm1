@@ -66,13 +66,13 @@ grep -q "download failed: http://127.0.0.1:9/tm1server-bundle.tar.gz" <<<"$out" 
 ! grep -q "SECRET123" <<<"$out" || fail "bundle URL credentials were printed: $out"
 pass "unreachable bundle URL fails cleanly without printing credentials"
 
-# 8. The setup script shows the same banner as the image (it embeds a copy)
+# 8. The setup scripts show the same banner as the image (each embeds a copy)
 while IFS= read -r line; do
   [ -n "$line" ] || continue
-  for script in setup.sh; do
+  for script in setup.sh setup.ps1; do
     grep -qF -- "$line" "$here/$script" || fail "$script's banner differs from docker/banner.txt, at: $line"
   done
 done <"$here/docker/banner.txt"
-pass "setup.sh shows docker/banner.txt"
+pass "setup.sh and setup.ps1 show docker/banner.txt"
 
 echo "All smoke tests passed."
