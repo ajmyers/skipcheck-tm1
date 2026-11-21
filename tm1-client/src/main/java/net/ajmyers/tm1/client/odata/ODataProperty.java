@@ -9,46 +9,86 @@ import java.util.Objects;
  */
 public interface ODataProperty {
 
-	/** The path, with {@code /} between segments. */
+	/**
+	 * The path, with {@code /} between segments.
+	 * @return the path, unencoded
+	 */
 	String path();
 
-	/** A property path from text. */
+	/**
+	 * A property path from text.
+	 * @param path the path, with {@code /} between segments
+	 * @return the property
+	 */
 	static ODataProperty of(String path) {
 		Objects.requireNonNull(path, "path");
 		return () -> path;
 	}
 
-	/** {@code this eq value}. */
+	/**
+	 * {@code this eq value}.
+	 * @param value the value to compare with, written as an OData literal
+	 * ({@link ODataLiterals#of}); {@code null} isn't allowed, use {@link #isNull()}
+	 * @return the comparison
+	 */
 	default Filter eq(Object value) {
 		return Filter.compare(this, "eq", value);
 	}
 
-	/** {@code this ne value}. */
+	/**
+	 * {@code this ne value}.
+	 * @param value the value to compare with, written as an OData literal
+	 * ({@link ODataLiterals#of}); {@code null} isn't allowed, use {@link #isNull()}
+	 * @return the comparison
+	 */
 	default Filter ne(Object value) {
 		return Filter.compare(this, "ne", value);
 	}
 
-	/** {@code this gt value}. */
+	/**
+	 * {@code this gt value}.
+	 * @param value the value to compare with, written as an OData literal
+	 * ({@link ODataLiterals#of}); {@code null} isn't allowed, use {@link #isNull()}
+	 * @return the comparison
+	 */
 	default Filter gt(Object value) {
 		return Filter.compare(this, "gt", value);
 	}
 
-	/** {@code this ge value}. */
+	/**
+	 * {@code this ge value}.
+	 * @param value the value to compare with, written as an OData literal
+	 * ({@link ODataLiterals#of}); {@code null} isn't allowed, use {@link #isNull()}
+	 * @return the comparison
+	 */
 	default Filter ge(Object value) {
 		return Filter.compare(this, "ge", value);
 	}
 
-	/** {@code this lt value}. */
+	/**
+	 * {@code this lt value}.
+	 * @param value the value to compare with, written as an OData literal
+	 * ({@link ODataLiterals#of}); {@code null} isn't allowed, use {@link #isNull()}
+	 * @return the comparison
+	 */
 	default Filter lt(Object value) {
 		return Filter.compare(this, "lt", value);
 	}
 
-	/** {@code this le value}. */
+	/**
+	 * {@code this le value}.
+	 * @param value the value to compare with, written as an OData literal
+	 * ({@link ODataLiterals#of}); {@code null} isn't allowed, use {@link #isNull()}
+	 * @return the comparison
+	 */
 	default Filter le(Object value) {
 		return Filter.compare(this, "le", value);
 	}
 
-	/** {@code this eq null}. */
+	/**
+	 * {@code this eq null}.
+	 * @return the comparison
+	 */
 	default Filter isNull() {
 		return Filter.compare(this, "eq", null);
 	}

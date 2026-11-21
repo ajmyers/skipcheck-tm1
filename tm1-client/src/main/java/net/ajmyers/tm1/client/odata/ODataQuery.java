@@ -69,7 +69,10 @@ public final class ODataQuery {
 		this.aliases = Collections.unmodifiableMap(aliases);
 	}
 
-	/** No options: the server's default response. */
+	/**
+	 * No options: the server's default response.
+	 * @return the empty query
+	 */
 	public static ODataQuery none() {
 		return EMPTY;
 	}
@@ -78,6 +81,8 @@ public final class ODataQuery {
 	 * Adds properties to {@code $select}. Like every option here it's an instance method,
 	 * so it works the same at the top level and inside
 	 * {@link #expand(String, UnaryOperator)}.
+	 * @param properties the property paths, added after any already selected
+	 * @return a new query
 	 */
 	public ODataQuery select(String... properties) {
 		List<String> next = new ArrayList<>(select);
@@ -87,7 +92,11 @@ public final class ODataQuery {
 		return with(List.copyOf(next), expand, filter, orderBy, top, skip, count, custom, aliases);
 	}
 
-	/** Adds properties to {@code $select}. */
+	/**
+	 * Adds properties to {@code $select}.
+	 * @param properties the properties, added after any already selected
+	 * @return a new query
+	 */
 	public ODataQuery select(ODataProperty... properties) {
 		String[] paths = new String[properties.length];
 		for (int i = 0; i < properties.length; i++) {
@@ -96,7 +105,11 @@ public final class ODataQuery {
 		return select(paths);
 	}
 
-	/** Expands a navigation property with no nested options. */
+	/**
+	 * Expands a navigation property with no nested options.
+	 * @param navigation the navigation property's name
+	 * @return a new query
+	 */
 	public ODataQuery expand(String navigation) {
 		return expand(navigation, q -> q);
 	}
@@ -104,6 +117,10 @@ public final class ODataQuery {
 	/**
 	 * Expands a navigation property, with nested options:
 	 * {@code expand("Hierarchies", h -> h.select("Name"))}.
+	 * @param navigation the navigation property's name
+	 * @param options adds the nested options to the query it's given: the empty query, or
+	 * the nested options so far if {@code navigation} is already expanded
+	 * @return a new query
 	 */
 	public ODataQuery expand(String navigation, UnaryOperator<ODataQuery> options) {
 		Objects.requireNonNull(navigation, "navigation");
@@ -112,23 +129,40 @@ public final class ODataQuery {
 		return with(select, next, filter, orderBy, top, skip, count, custom, aliases);
 	}
 
-	/** Sets {@code $filter}. */
+	/**
+	 * Sets {@code $filter}.
+	 * @param filter the filter, replacing any set before
+	 * @return a new query
+	 */
 	public ODataQuery filter(Filter filter) {
 		return with(select, expand, Objects.requireNonNull(filter, "filter"), orderBy, top, skip, count, custom,
 				aliases);
 	}
 
-	/** Adds an ascending {@code $orderby} key. */
+	/**
+	 * Adds an ascending {@code $orderby} key.
+	 * @param property the property path, after any keys already added
+	 * @return a new query
+	 */
 	public ODataQuery orderBy(String property) {
 		return order(property, "");
 	}
 
-	/** Adds a descending {@code $orderby} key. */
+	/**
+	 * Adds a descending {@code $orderby} key.
+	 * @param property the property path, after any keys already added
+	 * @return a new query
+	 */
 	public ODataQuery orderByDescending(String property) {
 		return order(property, " desc");
 	}
 
-	/** Sets {@code $top}: at most this many items. */
+	/**
+	 * Sets {@code $top}: at most this many items.
+	 * @param n the maximum number of items, zero or more
+	 * @return a new query
+	 * @throws IllegalArgumentException if {@code n} is negative
+	 */
 	public ODataQuery top(int n) {
 		if (n < 0) {
 			throw new IllegalArgumentException("$top can't be negative: " + n);
@@ -136,7 +170,12 @@ public final class ODataQuery {
 		return with(select, expand, filter, orderBy, n, skip, count, custom, aliases);
 	}
 
-	/** Sets {@code $skip}: skip this many items first. */
+	/**
+	 * Sets {@code $skip}: skip this many items first.
+	 * @param n the number of items to skip, zero or more
+	 * @return a new query
+	 * @throws IllegalArgumentException if {@code n} is negative
+	 */
 	public ODataQuery skip(int n) {
 		if (n < 0) {
 			throw new IllegalArgumentException("$skip can't be negative: " + n);
@@ -144,7 +183,10 @@ public final class ODataQuery {
 		return with(select, expand, filter, orderBy, top, n, count, custom, aliases);
 	}
 
-	/** Sets {@code $count=true}: include the total number of matching items. */
+	/**
+	 * Sets {@code $count=true}: include the total number of matching items.
+	 * @return a new query
+	 */
 	public ODataQuery withCount() {
 		return with(select, expand, filter, orderBy, top, skip, true, custom, aliases);
 	}
@@ -152,6 +194,10 @@ public final class ODataQuery {
 	/**
 	 * Sets a custom query option, such as TM1's {@code !sandbox}. Custom options must not
 	 * start with {@code $} or {@code @}. Setting one again replaces it.
+	 * @param name the option's name, e.g. {@code !sandbox}
+	 * @param value the option's value, unencoded
+	 * @return a new query
+	 * @throws IllegalArgumentException if {@code name} isn't a valid custom option name
 	 */
 	public ODataQuery option(String name, String value) {
 		if (name == null || !CUSTOM.matcher(name).matches()) {
@@ -165,6 +211,9 @@ public final class ODataQuery {
 	/**
 	 * Defines a parameter alias for a function call: {@code @p=<literal or JSON>},
 	 * written as given.
+	 * @param alias the alias, as used in the function call
+	 * @param literalOrJson the alias's value, an OData literal or JSON, unencoded
+	 * @return a new query
 	 */
 	public ODataQuery alias(ODataPath.Alias alias, String literalOrJson) {
 		Map<String, String> next = new LinkedHashMap<>(aliases);
@@ -172,7 +221,10 @@ public final class ODataQuery {
 		return with(select, expand, filter, orderBy, top, skip, count, custom, next);
 	}
 
-	/** True if this query has no options. */
+	/**
+	 * True if this query has no options.
+	 * @return {@code true} if there are no options
+	 */
 	public boolean isEmpty() {
 		return toQueryString().isEmpty();
 	}
@@ -180,6 +232,7 @@ public final class ODataQuery {
 	/**
 	 * The encoded query string, without a leading {@code ?}; empty if there are no
 	 * options.
+	 * @return the encoded query string, or an empty string
 	 */
 	public String toQueryString() {
 		List<String> parts = new ArrayList<>();
@@ -211,7 +264,11 @@ public final class ODataQuery {
 		return toQueryString().hashCode();
 	}
 
-	/** The custom option's value, e.g. the current {@code !sandbox}, if set. */
+	/**
+	 * The custom option's value, e.g. the current {@code !sandbox}, if set.
+	 * @param name the option's name
+	 * @return the option's value, unencoded, or {@code null} if it isn't set
+	 */
 	public @Nullable String option(String name) {
 		return custom.get(name);
 	}

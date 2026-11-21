@@ -36,6 +36,9 @@ public final class ODataJson {
 	/**
 	 * A single-valued binding, for a request body:
 	 * {@code "Subset@odata.bind": "Dimensions('d')/Hierarchies('h')/Subsets('s')"}.
+	 * @param navigation the navigation property's name
+	 * @param target the entity to bind to
+	 * @return a one-entry map, to merge into the request body
 	 */
 	public static Map<String, Object> bind(String navigation, ODataPath target) {
 		return Map.of(navigation + BIND_SUFFIX, target.toString());
@@ -45,6 +48,9 @@ public final class ODataJson {
 	 * A collection-valued binding:
 	 * {@code "Dimensions@odata.bind": ["Dimensions('a')", ...]}. In OData 4.0, which TM1
 	 * speaks, this is the only way to link to existing entities.
+	 * @param navigation the navigation property's name
+	 * @param targets the entities to bind to
+	 * @return a one-entry map, to merge into the request body
 	 */
 	public static Map<String, Object> bind(String navigation, List<ODataPath> targets) {
 		return Map.of(navigation + BIND_SUFFIX, targets.stream().map(ODataPath::toString).toList());

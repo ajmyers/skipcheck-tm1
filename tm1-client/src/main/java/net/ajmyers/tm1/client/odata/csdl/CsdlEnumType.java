@@ -17,6 +17,7 @@ import org.jspecify.annotations.Nullable;
 public record CsdlEnumType(String name, String underlyingType, boolean flags, List<Member> members,
 		List<CsdlAnnotation> annotations) {
 
+	/** Validates and copies the components. */
 	public CsdlEnumType {
 		Objects.requireNonNull(name, "name");
 		Objects.requireNonNull(underlyingType, "underlyingType");
@@ -33,6 +34,7 @@ public record CsdlEnumType(String name, String underlyingType, boolean flags, Li
 	 * @param annotations its annotations
 	 */
 	public record Member(String name, @Nullable Long value, List<CsdlAnnotation> annotations) {
+		/** Validates and copies the components. */
 		public Member {
 			Objects.requireNonNull(name, "name");
 			annotations = List.copyOf(annotations);

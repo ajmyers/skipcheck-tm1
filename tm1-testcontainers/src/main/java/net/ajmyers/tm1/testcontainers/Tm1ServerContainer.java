@@ -99,12 +99,17 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	/**
 	 * A container on the default {@code tm1-server} image (or {@code TM1_SERVER_IMAGE}),
 	 * getting TM1 from {@code source}.
+	 * @param source where TM1 comes from
 	 */
 	public Tm1ServerContainer(Tm1Source source) {
 		this(defaultImage(source), source);
 	}
 
-	/** A container on {@code image}, which must be {@code tm1-server} or built on it. */
+	/**
+	 * A container on {@code image}, which must be {@code tm1-server} or built on it.
+	 * @param image the image to run
+	 * @param source where TM1 comes from
+	 */
 	@SuppressWarnings("this-escape") // configuring in the constructor is the
 										// Testcontainers pattern
 	public Tm1ServerContainer(DockerImageName image, Tm1Source source) {
@@ -140,6 +145,7 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	 * {@code ~/.testcontainers.properties}), it keeps running between test runs, so tests
 	 * start instantly, and objects tests leave behind stay too. Otherwise reuse has no
 	 * effect.
+	 * @return the started shared container
 	 * @throws IllegalStateException if no source is configured
 	 */
 	public static synchronized Tm1ServerContainer shared() {
@@ -156,6 +162,9 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	/**
 	 * Seeds an empty database with objects. The default is {@link Tm1Seed#EMPTY}, which
 	 * seeds nothing.
+	 * @param seed the objects to seed; also sets {@linkplain #withCredentials
+	 * credentials} to the seed's login
+	 * @return this container
 	 */
 	public Tm1ServerContainer withSeed(Tm1Seed seed) {
 		withEnv("TM1_SEED", seed.value());
@@ -166,6 +175,9 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	 * Copies a TM1 database (a folder of {@code .cub}, {@code .dim}, {@code .pro} and so
 	 * on) into the container before it starts. Any seed is ignored, since the database
 	 * isn't empty. Set {@link #withCredentials} to a login the database has.
+	 * @param dataDir the database folder on the host
+	 * @return this container
+	 * @throws IllegalArgumentException if {@code dataDir} isn't a folder
 	 */
 	public Tm1ServerContainer withData(Path dataDir) {
 		if (!Files.isDirectory(dataDir)) {
@@ -174,20 +186,32 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		return withCopyFileToContainer(MountableFile.forHostPath(dataDir), "/tm1/data/");
 	}
 
-	/** The login tests should use. The default is {@code admin} with no password. */
+	/**
+	 * The login tests should use. The default is {@code admin} with no password.
+	 * @param username the TM1 user name
+	 * @param password the password; empty for none
+	 * @return this container
+	 */
 	public Tm1ServerContainer withCredentials(String username, String password) {
 		this.username = Objects.requireNonNull(username, "username");
 		this.password = Objects.requireNonNull(password, "password");
 		return self();
 	}
 
-	/** Fails startup unless the server reports exactly this version. */
+	/**
+	 * Fails startup unless the server reports exactly this version.
+	 * @param version the version the server must report
+	 * @return this container
+	 */
 	public Tm1ServerContainer withExpectedVersion(Tm1Version version) {
 		this.expectedVersion = Objects.requireNonNull(version, "version");
 		return self();
 	}
 
-	/** Where TM1 comes from. */
+	/**
+	 * Where TM1 comes from.
+	 * @return the source
+	 */
 	public Tm1Source getSource() {
 		return source;
 	}
@@ -195,20 +219,33 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	/**
 	 * The REST API's service root as seen from the host, e.g.
 	 * {@code http://localhost:54321/api/v1/}.
+	 * @return the service root, ending in {@code /}
 	 */
 	public String getRestUrl() {
 		return "http://" + getHost() + ":" + getMappedPort(REST_PORT) + "/api/v1/";
 	}
 
+	/**
+	 * The TM1 user name tests should log in as; {@code admin} unless set.
+	 * @return the user name
+	 */
 	public String getUsername() {
 		return username;
 	}
 
+	/**
+	 * The password for {@link #getUsername()}; empty unless set.
+	 * @return the password, empty for none
+	 */
 	public String getPassword() {
 		return password;
 	}
 
-	/** The version the running server reports. Only available once started. */
+	/**
+	 * The version the running server reports. Only available once started.
+	 * @return the server's version
+	 * @throws IllegalStateException if the container isn't started yet
+	 */
 	public Tm1Version getTm1Version() {
 		if (version == null) {
 			throw new IllegalStateException("The container isn't started yet");

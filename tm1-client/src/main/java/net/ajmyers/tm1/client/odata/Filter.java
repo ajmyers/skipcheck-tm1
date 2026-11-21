@@ -37,38 +37,71 @@ public final class Filter {
 		this.expression = expression;
 	}
 
-	/** An expression written by hand, used as is. */
+	/**
+	 * An expression written by hand, used as is.
+	 * @param expression the expression, unencoded
+	 * @return the filter
+	 */
 	public static Filter raw(String expression) {
 		Objects.requireNonNull(expression, "expression");
 		return new Filter(expression);
 	}
 
-	/** All of the given filters. */
+	/**
+	 * All of the given filters.
+	 * @param filters the filters, at least one
+	 * @return the filters joined with {@code and}, or the filter itself if there's only
+	 * one
+	 */
 	public static Filter and(Filter... filters) {
 		return join("and", filters);
 	}
 
-	/** Any of the given filters. */
+	/**
+	 * Any of the given filters.
+	 * @param filters the filters, at least one
+	 * @return the filters joined with {@code or}, or the filter itself if there's only
+	 * one
+	 */
 	public static Filter or(Filter... filters) {
 		return join("or", filters);
 	}
 
-	/** {@code not filter}. */
+	/**
+	 * {@code not filter}.
+	 * @param filter the filter to negate
+	 * @return the negated filter
+	 */
 	public static Filter not(Filter filter) {
 		return new Filter("not(" + filter.expression + ")");
 	}
 
-	/** {@code startswith(property,'prefix')}. */
+	/**
+	 * {@code startswith(property,'prefix')}.
+	 * @param property the string property to test
+	 * @param prefix the text it must start with
+	 * @return the filter
+	 */
 	public static Filter startsWith(ODataProperty property, String prefix) {
 		return function("startswith", property, prefix);
 	}
 
-	/** {@code endswith(property,'suffix')}. */
+	/**
+	 * {@code endswith(property,'suffix')}.
+	 * @param property the string property to test
+	 * @param suffix the text it must end with
+	 * @return the filter
+	 */
 	public static Filter endsWith(ODataProperty property, String suffix) {
 		return function("endswith", property, suffix);
 	}
 
-	/** {@code contains(property,'text')}. */
+	/**
+	 * {@code contains(property,'text')}.
+	 * @param property the string property to test
+	 * @param text the text it must contain
+	 * @return the filter
+	 */
 	public static Filter contains(ODataProperty property, String text) {
 		return function("contains", property, text);
 	}
@@ -77,6 +110,11 @@ public final class Filter {
 	 * {@code collection/any(v:condition)}: true if any member of a collection matches.
 	 * The lambda receives the range variable, from which to build paths
 	 * ({@code v.nav("Name")}).
+	 * @param collectionPath the path to the collection, e.g. {@code Hierarchies}, used as
+	 * is
+	 * @param variable the range variable's name, an OData identifier
+	 * @param condition builds the condition from the range variable
+	 * @return the filter
 	 */
 	public static Filter any(String collectionPath, String variable, Function<Variable, Filter> condition) {
 		return lambda("any", collectionPath, variable, condition);
@@ -84,6 +122,11 @@ public final class Filter {
 
 	/**
 	 * {@code collection/all(v:condition)}: true if every member of a collection matches.
+	 * @param collectionPath the path to the collection, e.g. {@code Hierarchies}, used as
+	 * is
+	 * @param variable the range variable's name, an OData identifier
+	 * @param condition builds the condition from the range variable
+	 * @return the filter
 	 */
 	public static Filter all(String collectionPath, String variable, Function<Variable, Filter> condition) {
 		return lambda("all", collectionPath, variable, condition);
@@ -92,6 +135,10 @@ public final class Filter {
 	/**
 	 * {@code property in (a,b,c)}. Not every TM1 version supports {@code in}; {@link #or}
 	 * of {@code eq}s always works.
+	 * @param property the property to test
+	 * @param values the values, at least one, written as OData literals
+	 * ({@link ODataLiterals#of})
+	 * @return the filter
 	 */
 	public static Filter in(ODataProperty property, Object... values) {
 		if (values.length == 0) {
@@ -130,12 +177,19 @@ public final class Filter {
 			this.name = name;
 		}
 
-		/** A path through the variable: {@code v/Name}. */
+		/**
+		 * A path through the variable: {@code v/Name}.
+		 * @param path the path from the variable, with {@code /} between segments
+		 * @return the property path
+		 */
 		public ODataProperty nav(String path) {
 			return ODataProperty.of(name + "/" + path);
 		}
 
-		/** The variable itself, for collections of primitive values: {@code v eq 'x'}. */
+		/**
+		 * The variable itself, for collections of primitive values: {@code v eq 'x'}.
+		 * @return the variable as a property path
+		 */
 		public ODataProperty self() {
 			return ODataProperty.of(name);
 		}

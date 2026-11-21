@@ -34,6 +34,8 @@ public final class Tm1Version implements Comparable<Tm1Version> {
 
 	/**
 	 * Parses a version such as {@code 11.8.03500.6}. Surrounding whitespace is ignored.
+	 * @param text the version text
+	 * @return the version
 	 * @throws IllegalArgumentException if the text isn't dot-separated numbers
 	 */
 	public static Tm1Version parse(String text) {
@@ -57,12 +59,20 @@ public final class Tm1Version implements Comparable<Tm1Version> {
 		return new Tm1Version(trimmed, parts);
 	}
 
-	/** True if this version is the same as or newer than {@code other}. */
+	/**
+	 * True if this version is the same as or newer than {@code other}.
+	 * @param other the version to compare with
+	 * @return {@code true} if this version is equal to or newer than {@code other}
+	 */
 	public boolean isAtLeast(Tm1Version other) {
 		return compareTo(other) >= 0;
 	}
 
-	/** True if this version is older than {@code other}. */
+	/**
+	 * True if this version is older than {@code other}.
+	 * @param other the version to compare with
+	 * @return {@code true} if this version is older than {@code other}
+	 */
 	public boolean isBefore(Tm1Version other) {
 		return compareTo(other) < 0;
 	}

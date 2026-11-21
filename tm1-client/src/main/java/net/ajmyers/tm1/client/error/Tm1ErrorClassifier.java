@@ -45,12 +45,19 @@ public final class Tm1ErrorClassifier {
 		this.rules = List.copyOf(rules);
 	}
 
-	/** The rules this client knows about. */
+	/**
+	 * The rules this client knows about.
+	 * @return the default classifier
+	 */
 	public static Tm1ErrorClassifier defaults() {
 		return DEFAULTS;
 	}
 
-	/** A classifier trying {@code rule} before these rules. */
+	/**
+	 * A classifier trying {@code rule} before these rules.
+	 * @param rule the rule to try first
+	 * @return a new classifier; this one is unchanged
+	 */
 	public Tm1ErrorClassifier withRule(Rule rule) {
 		List<Rule> next = new ArrayList<>();
 		next.add(Objects.requireNonNull(rule, "rule"));
@@ -61,6 +68,10 @@ public final class Tm1ErrorClassifier {
 	/**
 	 * Classifies an error response; {@code error} may be null if the body wasn't an OData
 	 * error.
+	 * @param status the HTTP status
+	 * @param error the parsed error body, or {@code null}
+	 * @return the first matching rule's kind, or else the kind for the status
+	 * ({@link Tm1ErrorKind#OTHER} if it has none)
 	 */
 	public Tm1ErrorKind classify(int status, @Nullable ODataError error) {
 		for (Rule rule : rules) {
@@ -91,6 +102,7 @@ public final class Tm1ErrorClassifier {
 	 */
 	public record Rule(@Nullable Integer status, @Nullable String code, @Nullable Pattern message, Tm1ErrorKind kind) {
 
+		/** Checks that the rule has a kind and at least one condition. */
 		public Rule {
 			Objects.requireNonNull(kind, "kind");
 			if (status == null && code == null && message == null) {
@@ -98,12 +110,22 @@ public final class Tm1ErrorClassifier {
 			}
 		}
 
-		/** A rule matching a message pattern, case-insensitively. */
+		/**
+		 * A rule matching a message pattern, case-insensitively.
+		 * @param regex the pattern to find anywhere in the message
+		 * @param kind the kind to report on a match
+		 * @return the rule
+		 */
 		public static Rule message(String regex, Tm1ErrorKind kind) {
 			return new Rule(null, null, Pattern.compile(regex, Pattern.CASE_INSENSITIVE), kind);
 		}
 
-		/** A rule matching an error code. */
+		/**
+		 * A rule matching an error code.
+		 * @param code the error code to match exactly, such as {@code "248"}
+		 * @param kind the kind to report on a match
+		 * @return the rule
+		 */
 		public static Rule code(String code, Tm1ErrorKind kind) {
 			return new Rule(null, code, null, kind);
 		}

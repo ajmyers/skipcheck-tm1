@@ -30,15 +30,24 @@ public final class Tm1TransportException extends Tm1Exception {
 
 	}
 
-	/** How far the request got. */
+	/**
+	 * How far the request got.
+	 * @return the phase the request failed in
+	 */
 	@Getter
 	private final Phase phase;
 
+	/** Whether the request is safe to repeat. */
 	private final boolean idempotent;
 
 	/**
+	 * Creates an exception for a request that got no complete response.
+	 * @param phase how far the request got
 	 * @param idempotent whether the request is safe to repeat (GET, PUT, DELETE), which
 	 * makes a response-phase failure retryable
+	 * @param method the request's HTTP method
+	 * @param url the request's URL, without credentials
+	 * @param cause the underlying failure, or {@code null}
 	 */
 	public Tm1TransportException(Phase phase, boolean idempotent, String method, String url,
 			@Nullable Throwable cause) {

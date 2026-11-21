@@ -33,13 +33,29 @@ public record CsdlRevision(@Nullable String version, Kind kind, @Nullable String
 	 */
 	public enum Kind {
 
-		ADDED, MODIFIED, DEPRECATED, UNKNOWN
+		/** {@code Core.RevisionKind/Added}. */
+		ADDED,
+
+		/** {@code Core.RevisionKind/Modified}. */
+		MODIFIED,
+
+		/** {@code Core.RevisionKind/Deprecated}. */
+		DEPRECATED,
+
+		/**
+		 * Missing, or a kind this client doesn't know; see
+		 * {@link CsdlRevision#rawKind()}.
+		 */
+		UNKNOWN
 
 	}
 
 	/**
 	 * Reads the {@code Core.Revisions} records from an element's annotations, in document
 	 * order.
+	 * @param annotations the element's annotations
+	 * @return the revisions, or an empty list if there's no {@code Core.Revisions}
+	 * collection
 	 */
 	public static List<CsdlRevision> of(List<CsdlAnnotation> annotations) {
 		Optional<CsdlAnnotation> revisions = CsdlAnnotation.find(annotations, TERM);
@@ -57,7 +73,12 @@ public record CsdlRevision(@Nullable String version, Kind kind, @Nullable String
 		return List.copyOf(result);
 	}
 
-	/** The version this element was first added in, if its revisions say. */
+	/**
+	 * The version this element was first added in, if its revisions say.
+	 * @param annotations the element's annotations
+	 * @return the schema version of the first {@code Added} revision with a version, or
+	 * empty
+	 */
 	public static Optional<String> addedIn(List<CsdlAnnotation> annotations) {
 		return of(annotations).stream()
 			.filter(r -> r.kind() == Kind.ADDED && r.version() != null)
@@ -65,7 +86,12 @@ public record CsdlRevision(@Nullable String version, Kind kind, @Nullable String
 			.findFirst();
 	}
 
-	/** The version this element was deprecated in, if its revisions say. */
+	/**
+	 * The version this element was deprecated in, if its revisions say.
+	 * @param annotations the element's annotations
+	 * @return the schema version of the first {@code Deprecated} revision with a version,
+	 * or empty
+	 */
 	public static Optional<String> deprecatedIn(List<CsdlAnnotation> annotations) {
 		return of(annotations).stream()
 			.filter(r -> r.kind() == Kind.DEPRECATED && r.version() != null)

@@ -17,6 +17,8 @@ public final class ODataLiterals {
 
 	/**
 	 * A string literal: single-quoted, with single quotes doubled ({@code 'O''Neil'}).
+	 * @param value the text
+	 * @return the quoted literal, not yet percent-encoded
 	 */
 	public static String string(String value) {
 		Objects.requireNonNull(value, "value");
@@ -26,6 +28,9 @@ public final class ODataLiterals {
 	/**
 	 * An enumeration literal in OData 4.0 form, with its type:
 	 * {@code ibm.tm1.api.v1.ElementType'Numeric'}.
+	 * @param qualifiedType the enumeration type's namespace-qualified name
+	 * @param member the member's name
+	 * @return the literal, not yet percent-encoded
 	 */
 	public static String enumMember(String qualifiedType, String member) {
 		Objects.requireNonNull(qualifiedType, "qualifiedType");
@@ -36,6 +41,8 @@ public final class ODataLiterals {
 	 * A literal for a Java value: strings are quoted, numbers and booleans written as is,
 	 * {@code null} as {@code null}. Use {@link Raw} for an already-formed literal, such
 	 * as an enum member or a date.
+	 * @param value the value, or {@code null}
+	 * @return the literal, not yet percent-encoded
 	 * @throws IllegalArgumentException for types with no unambiguous literal form
 	 */
 	public static String of(@Nullable Object value) {
@@ -75,8 +82,11 @@ public final class ODataLiterals {
 	/**
 	 * A literal written exactly as given, such as
 	 * {@code ibm.tm1.api.v1.ElementType'Numeric'} or {@code 2026-11-21}.
+	 *
+	 * @param literal the literal, exactly as it should appear before percent-encoding
 	 */
 	public record Raw(String literal) {
+		/** Checks that the literal isn't null. */
 		public Raw {
 			Objects.requireNonNull(literal, "literal");
 		}

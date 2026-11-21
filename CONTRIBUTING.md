@@ -10,7 +10,9 @@ contribution be distributed under both licenses, and you keep the copyright to y
 
 1. Every change starts with a GitHub issue that records the what, the why, the how, and any context.
 2. Work on a branch named after the issue, e.g. `gh issue develop 12 --checkout`.
-3. Before opening a PR, run `./gradlew build`.
+3. Before opening a PR, run `./gradlew build`. Every commit must build on its own: the pre-push
+   hook builds each commit you push that the remote doesn't have yet, in a temporary worktree, and
+   refuses the push if one fails. It skips TM1 tests (as CI does), so run those by hand.
 
 ## Commit and PR messages
 
@@ -46,6 +48,11 @@ fully qualified type names in code; `format` fixes all but the last. In a Javado
 write `@` as `&#64;` inside `<pre class="code">`, as Spring does: the formatter takes an `@` at
 the start of a line for a block tag and breaks the comment, which the check also reports.
 
+**Public API needs Javadoc.** In the published libraries, every public class, method, constructor
+and record component is documented, with `@param` and `@return`. `./gradlew build` runs Javadoc
+and fails on any gap. For a Lombok `@Getter`, put the `@return` line in the field's Javadoc;
+Lombok copies it onto the accessor.
+
 **Error Prone and NullAway check every compile.** Their findings are errors. Library packages
 are `@NullMarked` (JSpecify): nothing is null unless declared `@Nullable`, and NullAway checks
 that at compile time, so a nullable field, parameter or return gets `@Nullable` where it's
@@ -68,7 +75,7 @@ accessors are fluent (`status()`, not `getStatus()`) to match records.
 |---|---|
 | `@RequiredArgsConstructor` | Constructor injection of services and components |
 | `@Getter` on fields | Accessors on classes that can't be records, such as exceptions and container subclasses. Put the Javadoc on the field; delombok copies it to the accessor. |
-| `@Builder` | Options and configuration with many optional settings, including on records |
+| `@Builder` | Options and configuration with many optional settings, on types that aren't public API. A public builder is written by hand, since the Javadoc rule needs every public method documented and Lombok's generated builder has nowhere to carry it (see `Tm1Timeouts`). |
 | `@With` | Copy-on-change of immutable values, including on records |
 | `@Slf4j` | Logging (see below) |
 

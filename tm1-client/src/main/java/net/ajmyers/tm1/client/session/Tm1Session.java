@@ -65,7 +65,10 @@ public final class Tm1Session {
 		this.sandbox = sandbox;
 	}
 
-	/** A builder for a session on one TM1 server. */
+	/**
+	 * A builder for a session on one TM1 server.
+	 * @return a new builder
+	 */
 	public static Builder builder() {
 		return new Builder();
 	}
@@ -78,6 +81,10 @@ public final class Tm1Session {
 	 * <p>
 	 * TM1's errors arrive as {@link net.ajmyers.tm1.client.error.Tm1ApiException},
 	 * failures below HTTP as {@link net.ajmyers.tm1.client.error.Tm1TransportException}.
+	 * @param <T> the type the response is read as
+	 * @param request the request to send; not a collection request
+	 * @return the response, empty for {@link Tm1Request.Response#NONE}, or an
+	 * {@link IllegalArgumentException} for a collection request
 	 */
 	public <T> Mono<T> execute(Tm1Request<T> request) {
 		Objects.requireNonNull(request, "request");
@@ -92,6 +99,10 @@ public final class Tm1Session {
 	 * Sends a {@link Tm1Request.Response#COLLECTION} request and streams its items as
 	 * they're decoded, never holding the whole response. Follows {@code @odata.nextLink}
 	 * if TM1 pages.
+	 * @param <T> the type of each item
+	 * @param request the collection request to send
+	 * @return the items, or an {@link IllegalArgumentException} for a request that isn't
+	 * a collection request
 	 */
 	public <T> Flux<T> stream(Tm1Request<T> request) {
 		Objects.requireNonNull(request, "request");
@@ -113,6 +124,9 @@ public final class Tm1Session {
 	 * another caller's requests (plan §5). TM1 evaluates {@code NON EMPTY} and filters in
 	 * the request's sandbox, so every request of an operation needs it, cellset reads and
 	 * deletes included (plan §16.3); a service given this view gets that for free.
+	 * @param name the sandbox's name; not blank
+	 * @return a view of this session in that sandbox
+	 * @throws IllegalArgumentException if {@code name} is blank
 	 */
 	public Tm1Session withSandbox(String name) {
 		Objects.requireNonNull(name, "name");
@@ -122,22 +136,34 @@ public final class Tm1Session {
 		return new Tm1Session(connection, name);
 	}
 
-	/** A view of this session whose requests run outside any sandbox, in base data. */
+	/**
+	 * A view of this session whose requests run outside any sandbox, in base data.
+	 * @return the view, or this session if it has no sandbox
+	 */
 	public Tm1Session withoutSandbox() {
 		return sandbox == null ? this : new Tm1Session(connection, null);
 	}
 
-	/** The sandbox this view's requests run in, if any. */
+	/**
+	 * The sandbox this view's requests run in, if any.
+	 * @return the sandbox's name, or empty for base data
+	 */
 	public Optional<String> sandbox() {
 		return Optional.ofNullable(sandbox);
 	}
 
-	/** Logs in now, rather than on the first request, and completes with this session. */
+	/**
+	 * Logs in now, rather than on the first request, and completes with this session.
+	 * @return this session, once logged in
+	 */
 	public Mono<Tm1Session> connect() {
 		return connection.session().thenReturn(this);
 	}
 
-	/** The TM1 session's ID, as listed in {@code Sessions}. Logs in first if needed. */
+	/**
+	 * The TM1 session's ID, as listed in {@code Sessions}. Logs in first if needed.
+	 * @return the session ID
+	 */
 	public Mono<Long> sessionId() {
 		return connection.session().map(LoggedIn::sessionId);
 	}
@@ -147,17 +173,24 @@ public final class Tm1Session {
 	 * close that races the first request can't leave a session open. If no login ever
 	 * started, nothing is sent. Afterwards every request fails with
 	 * {@link Tm1SessionClosedException}. Calling it again returns the same result.
+	 * @return completes once the session is closed
 	 */
 	public Mono<Void> close() {
 		return connection.close();
 	}
 
-	/** Whether {@link #close()} has been called. */
+	/**
+	 * Whether {@link #close()} has been called.
+	 * @return {@code true} once closed
+	 */
 	public boolean isClosed() {
 		return connection.isClosed();
 	}
 
-	/** The service root, such as {@code http://localhost:8010/api/v1/}. */
+	/**
+	 * The service root, such as {@code http://localhost:8010/api/v1/}.
+	 * @return the service root, always ending in {@code /}
+	 */
 	public String serviceRoot() {
 		return connection.root();
 	}
@@ -203,6 +236,10 @@ public final class Tm1Session {
 		/**
 		 * The service root, such as {@code http://localhost:8010/api/v1/}. A missing
 		 * trailing {@code /} is added.
+		 * @param baseUrl an absolute URL with no query or fragment
+		 * @return this builder
+		 * @throws IllegalArgumentException if {@code baseUrl} isn't absolute or has a
+		 * query or fragment
 		 */
 		public Builder baseUrl(String baseUrl) {
 			String url = Objects.requireNonNull(baseUrl, "baseUrl");
@@ -214,7 +251,12 @@ public final class Tm1Session {
 			return this;
 		}
 
-		/** Basic authentication, for TM1 security modes 1 and 2. */
+		/**
+		 * Basic authentication, for TM1 security modes 1 and 2.
+		 * @param user the TM1 user name
+		 * @param password the password; {@code null} counts as empty
+		 * @return this builder
+		 */
 		public Builder basicAuth(String user, String password) {
 			Objects.requireNonNull(user, "user");
 			String credentials = user + ":" + (password == null ? "" : password);
@@ -231,6 +273,10 @@ public final class Tm1Session {
 		 * It's a setting of the session, not of a view: TM1 keeps one label per session
 		 * and the last request to send one wins, so views sharing a session can't each
 		 * have their own. A different label needs a different session.
+		 * @param sessionContext the label, at most 250 characters
+		 * @return this builder
+		 * @throws IllegalArgumentException if {@code sessionContext} is longer than 250
+		 * characters
 		 */
 		public Builder sessionContext(String sessionContext) {
 			Objects.requireNonNull(sessionContext, "sessionContext");
@@ -242,7 +288,11 @@ public final class Tm1Session {
 			return this;
 		}
 
-		/** Timeouts by kind of work; {@link Tm1Timeouts#DEFAULTS} unless set. */
+		/**
+		 * Timeouts by kind of work; {@link Tm1Timeouts#DEFAULTS} unless set.
+		 * @param timeouts the timeouts
+		 * @return this builder
+		 */
 		public Builder timeouts(Tm1Timeouts timeouts) {
 			this.timeouts = Objects.requireNonNull(timeouts, "timeouts");
 			return this;
@@ -251,6 +301,8 @@ public final class Tm1Session {
 		/**
 		 * How error responses are classified; {@link Tm1ErrorClassifier#defaults()}
 		 * unless set.
+		 * @param classifier the classifier
+		 * @return this builder
 		 */
 		public Builder errorClassifier(Tm1ErrorClassifier classifier) {
 			this.classifier = Objects.requireNonNull(classifier, "classifier");
@@ -260,6 +312,8 @@ public final class Tm1Session {
 		/**
 		 * The mapper for request and response bodies; a plain {@link JsonMapper} unless
 		 * set.
+		 * @param mapper the mapper
+		 * @return this builder
 		 */
 		public Builder jsonMapper(ObjectMapper mapper) {
 			this.mapper = Objects.requireNonNull(mapper, "mapper");
@@ -270,6 +324,8 @@ public final class Tm1Session {
 		 * Where observations go: the session's own ({@code tm1.session.login},
 		 * {@code tm1.session.close}) and WebClient's per request
 		 * ({@code http.client.requests}). None are recorded unless set.
+		 * @param observations the registry
+		 * @return this builder
 		 */
 		public Builder observationRegistry(ObservationRegistry observations) {
 			this.observations = Objects.requireNonNull(observations, "observations");
@@ -280,6 +336,8 @@ public final class Tm1Session {
 		 * A {@link WebClient.Builder} to start from, such as Spring Boot's, so its
 		 * customizations apply. It's copied, not changed. The connector is still set as
 		 * described in {@link #connector}.
+		 * @param webClient the builder to copy
+		 * @return this builder
 		 */
 		public Builder webClient(WebClient.Builder webClient) {
 			this.webClient = Objects.requireNonNull(webClient, "webClient").clone();
@@ -290,13 +348,19 @@ public final class Tm1Session {
 		 * The HTTP connector. Unless set, a Reactor Netty connector with gzip and the
 		 * {@linkplain Tm1Timeouts#connect() connect timeout}. With another connector,
 		 * connect and request timeouts are that connector's own settings.
+		 * @param connector the connector
+		 * @return this builder
 		 */
 		public Builder connector(ClientHttpConnector connector) {
 			this.connector = Objects.requireNonNull(connector, "connector");
 			return this;
 		}
 
-		/** The session. Nothing is sent to TM1 until the first request. */
+		/**
+		 * The session. Nothing is sent to TM1 until the first request.
+		 * @return a new session
+		 * @throws IllegalStateException if the base URL or credentials aren't set
+		 */
 		public Tm1Session build() {
 			if (baseUrl == null) {
 				throw new IllegalStateException("baseUrl is required");
