@@ -10,7 +10,9 @@ contribution be distributed under both licenses, and you keep the copyright to y
 
 1. Every change starts with a GitHub issue that records the what, the why, the how, and any context.
 2. Work on a branch named after the issue, e.g. `gh issue develop 12 --checkout`.
-3. Before opening a PR, run `./gradlew build`.
+3. Before opening a PR, run `./gradlew build`. Every commit must build on its own: the pre-push
+   hook builds each commit you push that the remote doesn't have yet, in a temporary worktree, and
+   refuses the push if one fails. It skips TM1 tests (as CI does), so run those by hand.
 
 ## Commit and PR messages
 

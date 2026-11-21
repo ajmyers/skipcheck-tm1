@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+#
+# Builds every commit this push would send that the remote doesn't have yet, one at a time and
+# oldest first, and refuses the push if one doesn't build. That's the rule "every commit builds on
+# its own" (CONTRIBUTING.md), checked rather than remembered.
+#
+# - Commits are built in one temporary worktree, so the working tree, index and stash are never
+#   touched, and uncommitted changes can't make a commit look like it builds.
+# - It runs ./gradlew build, the same as CI: compile, checks, tests, Javadoc. TM1 tests are skipped
+#   (TM1_* settings are cleared), as in CI, since they take minutes per commit; run them by hand.
+# - Branch deletions push nothing and are let through. CI skips the hook.
+#
+# Enabled with the other hooks: git config core.hooksPath .githooks
+
+warn() { echo "[pre-push] $*" >&2; }
+
+[[ -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" ]] && exit 0
+
+# Git runs hooks with GIT_DIR (and sometimes GIT_INDEX_FILE) set, which overrides `git -C`: a
+# checkout meant for the build worktree would act on this repository's index instead. Hooks run
+# from the top of the working tree, so git finds the repository without them.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_PREFIX
+
+remote="$1"
+zero="0000000000000000000000000000000000000000"
+
+commits=()
+while read -r local_ref local_sha remote_ref remote_sha; do
+	[[ "$local_sha" == "$zero" ]] && continue
+	# Only what the remote lacks: everything after the remote's tip of this branch, or, for a new
+	# branch (or a remote tip we don't have), everything not on any of the remote's branches
+	if [[ "$remote_sha" != "$zero" ]] && git cat-file -e "$remote_sha^{commit}" 2> /dev/null; then
+		range=("$remote_sha..$local_sha")
+	else
+		range=("$local_sha" --not --remotes="$remote/*")
+	fi
+	while IFS= read -r commit; do
+		commits+=("$commit")
+	done < <(git rev-list --reverse --topo-order "${range[@]}")
+done
+
+# The same commit can be reached through two pushed refs
+unique=()
+for commit in "${commits[@]}"; do
+	[[ " ${unique[*]} " == *" $commit "* ]] || unique+=("$commit")
+done
+[[ ${#unique[@]} -eq 0 ]] && exit 0
+
+worktree="$(mktemp -d "${TMPDIR:-/tmp}/pre-push.XXXXXX")"
+cleanup() {
+	git worktree remove --force "$worktree" > /dev/null 2>&1 || rm -rf "$worktree"
+}
+trap cleanup EXIT
+git worktree add -q --detach "$worktree" "${unique[0]}" || { warn "couldn't create a worktree to build in"; exit 1; }
+
+unset TM1_PRIVATE_IMAGE TM1_HOME_DIR TM1_INSTALL_VOLUME TM1_BUNDLE_DIR TM1_BUNDLE TM1_BUNDLE_URL TM1_BUNDLE_SHA256 TM1_SERVER_IMAGE
+
+warn "building ${#unique[@]} commit(s) before pushing to $remote"
+n=0
+for commit in "${unique[@]}"; do
+	n=$((n + 1))
+	subject="$(git log -1 --format='%h %s' "$commit")"
+	git -C "$worktree" checkout -q --detach "$commit" || { warn "couldn't check out $subject"; exit 1; }
+	start=$SECONDS
+	if ! (cd "$worktree" && ./gradlew build -q --console=plain > build.log 2>&1); then
+		warn "commit $n of ${#unique[@]} doesn't build: $subject"
+		grep -v -i -E 'deprecat|incubating|warning-mode|docs.gradle.org' "$worktree/build.log" | tail -30 >&2
+		warn "push refused. Fix that commit (an interactive rebase, or a fixup commit), then push again."
+		exit 1
+	fi
+	warn "  ok ($((SECONDS - start)) s) $subject"
+done
+exit 0
