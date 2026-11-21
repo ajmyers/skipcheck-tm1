@@ -220,7 +220,10 @@ by every service and every concurrent subscriber.
 - **Per-user sessions.** A single session suits service accounts. Apps acting **on behalf of
   users** need one session per identity. The identity-keyed `Tm1SessionPool` (step 4, #31;
   §16.1) provides them, with bounded lifetimes and close-on-evict. It takes the place of the
-  `Tm1SessionFactory` this plan first described.
+  `Tm1SessionFactory` this plan first described. A `Tm1Identity` is the service account,
+  impersonating a user (`TM1-Impersonate`, sent at login only), or a user's own credentials.
+  Credentials come from the `Tm1Authenticator` SPI (Basic, `CAMNamespace`, `CAMPassport`),
+  asked on every login so passports can be refreshed.
 - **Raw escape hatch.** `session.execute(Tm1Request)` and `session.stream(Tm1Request)` send
   any request (path, query, body), returning `JsonNode` or a chosen type. They're for anything
   not yet modeled, and for endpoints that only exist on newer servers.
@@ -511,7 +514,7 @@ can with it). So version handling is built in full, but proven as follows:
   automatically.
 - **Version-range pinning** (`@Tm1Version(atLeast…, below…)`) comes with the first
   version-specific test, since its skip logic can be tested on one server. Running every test
-  once per version (the matrix in #14) waits for a second version.
+  once per version (the matrix, #45) waits for a second version.
 - **The README states the tested version.** Users with other versions can run the TM1 tests
   and report what fails.
 
@@ -642,6 +645,19 @@ of it is assumed for other versions.
   "user does not exist" (400), recognized by message, since TM1 offers nothing better. The
   client **never falls back to another identity by itself**. Falling back to an admin identity
   is a privilege escalation, and that policy belongs to the caller.
+- **What 11.8.03500.6 does, probed in step 4 (#31)** and pinned by `Tm1ImpersonationBehaviorTest`:
+  - Impersonation is decided at login. The header on later requests is ignored, so on this
+    version a live session can't switch users; one identity is one session either way.
+  - Nobody can impersonate an administrator, not even another administrator (403, "insufficient
+    rights"). Only administrators and data administrators can impersonate (403 otherwise).
+  - An unknown user is a 400. A **disabled** user is a 401, the same as wrong credentials.
+  - An **empty** header means no impersonation: the session runs as the logged-in admin. The
+    client refuses blank names, and names that aren't printable ASCII, which TM1 can't match
+    through the header.
+  - The errors are plain text, not OData JSON. Every refused login leaves a session with no user
+    behind, so the client remembers refusals (`Tm1Timeouts.refusedLogin`, 30 s) rather than
+    retrying at once.
+  - User names match ignoring case and spaces, so `Tm1Identity` compares them that way.
 - **Never open a session just to close it.** If no login happened, `close()` does nothing.
 - **Find the session cookie by name** (`TM1SessionId`) in the full `Set-Cookie` list, not by
   taking the first one. On a retry, **replace** the cookie header, never append to it.

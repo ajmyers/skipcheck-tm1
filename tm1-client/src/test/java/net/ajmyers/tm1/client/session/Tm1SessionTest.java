@@ -5,11 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -17,6 +19,7 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 import io.micrometer.observation.tck.TestObservationRegistry;
 import io.micrometer.observation.tck.TestObservationRegistryAssert;
 import net.ajmyers.tm1.client.Tm1Request;
+import net.ajmyers.tm1.client.error.Tm1ApiException;
 import net.ajmyers.tm1.client.error.Tm1AuthenticationException;
 import net.ajmyers.tm1.client.error.Tm1ErrorKind;
 import net.ajmyers.tm1.client.error.Tm1NotFoundException;
@@ -71,10 +74,13 @@ class Tm1SessionTest {
 	}
 
 	@Test
-	void reportsRefusedCredentialsAndTriesAgainOnTheNextRequest() {
+	void reportsRefusedCredentialsAndCanTryAgainOnTheNextRequest() {
 		tm1.onEach(FakeTm1.LOGIN, r -> Mono.just(FakeTm1.status(401, "TM1SessionId=anon; Path=/api/")),
 				r -> Mono.just(FakeTm1.json(200, "{\"ID\":2}", "TM1SessionId=ok; Path=/api/")));
-		Tm1Session session = tm1.session();
+		// With the refused-login back-off off; Tm1SessionImpersonationTest covers the
+		// back-off
+		Tm1Session session = tm1
+			.session(Tm1Session.builder().timeouts(Tm1Timeouts.builder().refusedLogin(Duration.ZERO).build()));
 
 		StepVerifier.create(session.execute(SERVER))
 			.expectErrorSatisfies(e -> assertThat(e).isInstanceOfSatisfying(Tm1AuthenticationException.class,
@@ -99,6 +105,21 @@ class Tm1SessionTest {
 				assertThat(n.error().code()).isEqualTo("278");
 				assertThat(n.url()).isEqualTo(FakeTm1.ROOT + "Cubes('Nope')");
 			}))
+			.verify();
+	}
+
+	@Test
+	void readsAPlainTextErrorBodyAsTheMessage() {
+		tm1.on("GET Cubes('x')",
+				r -> Mono.just(ClientResponse.create(HttpStatus.BAD_REQUEST)
+					.header(HttpHeaders.CONTENT_TYPE, "text/plain")
+					.body("Error: Bad Request\r\nSomething TM1 says in plain text.\r\n")
+					.build()));
+		StepVerifier
+			.create(tm1.session()
+				.execute(Tm1Request.get(ODataPath.of("Cubes").key("x"), ODataQuery.none(), JsonNode.class)))
+			.expectErrorSatisfies(e -> assertThat(e).isInstanceOfSatisfying(Tm1ApiException.class,
+					a -> assertThat(a.error().message()).isEqualTo("Something TM1 says in plain text.")))
 			.verify();
 	}
 
@@ -212,6 +233,8 @@ class Tm1SessionTest {
 		assertThat(closes).hasSize(1);
 		assertThat(FakeTm1.cookie(closes.get(0))).isEqualTo("c1");
 		assertThat(closes.get(0).headers().getContentType()).hasToString("application/json");
+		assertThat(closes.get(0).headers().getFirst(HttpHeaders.CONNECTION)).as("not reused after a close")
+			.isEqualTo("close");
 		StepVerifier.create(session.execute(SERVER)).expectError(Tm1SessionClosedException.class).verify();
 		assertThat(tm1.requests(FakeTm1.LOGIN)).as("a closed session doesn't log in again").hasSize(1);
 	}
