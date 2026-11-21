@@ -75,6 +75,23 @@ jobs:
           grep -q 'Not applied, because .env already exists: TM1_SERVER_IMAGE=other:1' <<<"$out"
         shell: bash
 
+      - name: setup.ps1 passes no double quotes to docker
+        # Windows PowerShell 5.1 mangles double quotes inside native-command arguments
+        # (pwsh 7.3+ doesn't), so a docker template like {{index .Labels "x"}} breaks only
+        # on 5.1. CI's Windows runners can't run Linux containers to catch it, so check
+        # every Docker/DockerOk call in the source with PowerShell's own parser.
+        shell: pwsh
+        run: |
+          $tokens = $null; $errors = $null
+          $ast = [System.Management.Automation.Language.Parser]::ParseFile("$PWD/setup.ps1", [ref]$tokens, [ref]$errors)
+          $bad = $ast.FindAll({ param($n)
+              $n -is [System.Management.Automation.Language.CommandAst] -and
+              $n.GetCommandName() -in 'Docker', 'DockerOk' -and
+              ($n.CommandElements | Select-Object -Skip 1 | Where-Object { $_.PSObject.Properties['Value'] -and ([string]$_.Value).Contains('"') })
+            }, $true)
+          foreach ($b in $bad) { Write-Host "::error file=docker/tm1-server/setup.ps1,line=$($b.Extent.StartLineNumber)::docker argument contains a double quote; Windows PowerShell 5.1 mangles these" }
+          if ($bad) { exit 1 }
+
       - name: setup.ps1 (pwsh)
         shell: pwsh
         run: |
