@@ -76,7 +76,11 @@ public final class Tm1Session {
 	 * below HTTP as {@link net.ajmyers.tm1.client.error.Tm1TransportException}.
 	 */
 	public <T> Mono<T> execute(Tm1Request<T> request) {
-		return connection.execute(inSandbox(Objects.requireNonNull(request, "request")));
+		Objects.requireNonNull(request, "request");
+		if (request.response() == Tm1Request.Response.COLLECTION) {
+			return Mono.error(new IllegalArgumentException("Collection requests are streamed: use stream() for " + request));
+		}
+		return connection.execute(inSandbox(request));
 	}
 
 	/**

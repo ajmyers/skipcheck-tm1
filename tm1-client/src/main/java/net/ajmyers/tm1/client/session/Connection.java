@@ -380,7 +380,12 @@ final class Connection {
 		if (body instanceof Map<?, ?> map && map.isEmpty()) {
 			return EMPTY_OBJECT;
 		}
-		return mapper.writeValueAsBytes(body);
+		try {
+			return mapper.writeValueAsBytes(body);
+		}
+		catch (JacksonException e) {
+			throw new IllegalArgumentException("The request body can't be written as JSON: " + body.getClass().getName(), e);
+		}
 	}
 
 	/**
