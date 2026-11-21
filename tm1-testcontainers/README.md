@@ -142,6 +142,61 @@ TM1 Web's browser API is internal to IBM (DWR), so this module doesn't wrap it: 
 Web with a browser tool such as Playwright or Selenium, or its URL API. This module's own
 tests use a small DWR client to prove TM1 Web can list and log on to the server.
 
+## Planning Analytics Workspace
+
+`PawContainer` runs IBM Planning Analytics Workspace (PAW) Local against a TM1 server.
+IBM ships PAW Local as Docker images in `ipa_workspace_local_<release>.<build>.zip`.
+`PawContainer` uses them as they are, through [`docker/paw`](../docker/paw/README.md)'s
+`paw-local.sh`, run inside a small Linux container. So it works the same on Windows, macOS and
+Linux, and the host needs only Docker. Users log on to PAW as users of the TM1 server.
+
+`@RequiresPaw` works like `@RequiresTm1` (it includes it). It skips tests unless the zip is
+configured **and** IBM's license is accepted, and injects one shared PAW wired to the shared
+TM1 server:
+
+```java
+@RequiresPaw
+class WorkspaceTest {
+
+    @Test
+    void opensPaw(PawContainer paw, Tm1ServerContainer tm1) {
+        String url = paw.getUrl();   // http://localhost:54321/
+    }
+}
+```
+
+| Setting | What |
+|---|---|
+| `PAW_ZIP` | IBM's `ipa_workspace_local_*.zip` |
+| `PAW_BUNDLE_DIR` | A folder holding it; the newest one is used |
+| `PAW_ACCEPT_LICENSE=true` | You accept IBM's license for PAW (`licenses/LA_en` in the zip). Or call `acceptLicense()`. |
+
+Each is read as a system property, then an environment variable.
+
+Without the extension:
+
+```java
+try (var tm1 = new Tm1ServerContainer(tm1Source);
+     var paw = new PawContainer(new PawSource(zip)).withTm1Server(tm1).acceptLicense()) {
+    paw.start();   // starts tm1 first
+}
+```
+
+Things to know:
+
+- **Heavy.** PAW is about 30 containers and needs about 15 GB of memory; give Docker Desktop
+  well over that. The first start loads about 8 GB of images, which takes a few minutes. After
+  that, a start takes about a minute, or seconds if PAW is still running.
+- **One PAW per Docker daemon.** IBM gives every container a fixed name. The shared PAW is never
+  stopped, so the next test run reuses it. `stop()` removes the PAW containers and keeps PAW's
+  data. IBM's containers carry no Testcontainers labels, so Ryuk can't remove them; stop them
+  with `./paw-local.sh down` in `docker/paw`.
+- **Ready means TM1 works through PAW.** `start()` waits until a logon and a TM1 REST call
+  through PAW succeed, not just until the logon page answers.
+- PAW's files (the unpacked zip and its secrets) live in the Docker volume `tm1-paw-home`.
+  Don't run `paw-local.sh` by hand with a different `PAW_HOME` against the same PAW data:
+  the secrets wouldn't match. `paw-local.sh` stops and says so.
+
 ## Faster local runs
 
 The shared container is marked reusable. If you turn on Testcontainers reuse, it keeps
