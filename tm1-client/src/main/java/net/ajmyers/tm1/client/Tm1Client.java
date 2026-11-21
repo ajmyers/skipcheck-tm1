@@ -6,6 +6,7 @@ import org.springframework.http.client.reactive.ClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import io.micrometer.observation.ObservationRegistry;
+import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
 import net.ajmyers.tm1.client.session.Tm1Session;
 import net.ajmyers.tm1.client.session.Tm1Timeouts;
@@ -123,6 +124,26 @@ public final class Tm1Client {
 		 */
 		public Builder basicAuth(String user, String password) {
 			session.basicAuth(user, password);
+			return this;
+		}
+
+		/**
+		 * See {@link Tm1Session.Builder#authenticator}.
+		 * @param authenticator supplies the credentials for each login
+		 * @return this builder
+		 */
+		public Builder authenticator(Tm1Authenticator authenticator) {
+			session.authenticator(authenticator);
+			return this;
+		}
+
+		/**
+		 * See {@link Tm1Session.Builder#impersonate}.
+		 * @param user the TM1 user to act as
+		 * @return this builder
+		 */
+		public Builder impersonate(String user) {
+			session.impersonate(user);
 			return this;
 		}
 

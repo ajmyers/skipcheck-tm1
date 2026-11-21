@@ -25,22 +25,32 @@ import org.jspecify.annotations.Nullable;
  * is an idle timeout, not a limit on the whole response, so a large collection that keeps
  * streaming isn't cut off. Default 10 min.
  * @param close how long to wait for TM1 to close the session. Default 5 s.
+ * @param refusedLogin how long a login TM1 refused (wrong credentials, an unknown or
+ * disabled user, impersonation not allowed) is remembered. Until then, requests fail at
+ * once with the same error instead of logging in again: every attempt leaves a session
+ * behind on TM1, so retrying a refusal at once would pile them up. Zero turns this off.
+ * Default 30 s.
  */
-public record Tm1Timeouts(Duration connect, Duration login, Duration request, Duration close) {
+public record Tm1Timeouts(Duration connect, Duration login, Duration request, Duration close, Duration refusedLogin) {
 
 	/** The defaults. */
 	public static final Tm1Timeouts DEFAULTS = new Tm1Timeouts(Duration.ofSeconds(10), Duration.ofSeconds(30),
-			Duration.ofMinutes(10), Duration.ofSeconds(5));
+			Duration.ofMinutes(10), Duration.ofSeconds(5), Duration.ofSeconds(30));
 
 	/**
-	 * Checks that every timeout is set and positive.
-	 * @throws IllegalArgumentException if a timeout is zero or negative
+	 * Checks that every timeout is set and positive (or, for {@code refusedLogin}, not
+	 * negative).
+	 * @throws IllegalArgumentException if a timeout is out of range
 	 */
 	public Tm1Timeouts {
 		positive(connect, "connect");
 		positive(login, "login");
 		positive(request, "request");
 		positive(close, "close");
+		Objects.requireNonNull(refusedLogin, "refusedLogin");
+		if (refusedLogin.isNegative()) {
+			throw new IllegalArgumentException("refusedLogin must not be negative: " + refusedLogin);
+		}
 	}
 
 	/**
@@ -80,11 +90,14 @@ public record Tm1Timeouts(Duration connect, Duration login, Duration request, Du
 
 		private Duration close;
 
+		private Duration refusedLogin;
+
 		private Builder(Tm1Timeouts start) {
 			this.connect = start.connect();
 			this.login = start.login();
 			this.request = start.request();
 			this.close = start.close();
+			this.refusedLogin = start.refusedLogin();
 		}
 
 		/**
@@ -128,12 +141,23 @@ public record Tm1Timeouts(Duration connect, Duration login, Duration request, Du
 		}
 
 		/**
+		 * Sets how long a refused login is remembered.
+		 * @param refusedLogin how long requests fail at once after TM1 refused a login;
+		 * zero to log in again straight away
+		 * @return this builder
+		 */
+		public Builder refusedLogin(Duration refusedLogin) {
+			this.refusedLogin = Objects.requireNonNull(refusedLogin, "refusedLogin");
+			return this;
+		}
+
+		/**
 		 * The timeouts.
 		 * @return the timeouts, with unset values at their defaults
 		 * @throws IllegalArgumentException if a timeout is zero or negative
 		 */
 		public Tm1Timeouts build() {
-			return new Tm1Timeouts(connect, login, request, close);
+			return new Tm1Timeouts(connect, login, request, close, refusedLogin);
 		}
 
 	}

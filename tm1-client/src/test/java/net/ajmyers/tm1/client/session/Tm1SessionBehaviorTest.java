@@ -85,22 +85,22 @@ class Tm1SessionBehaviorTest {
 	void opensASessionOnEvery401AndLogsThatSessionInWhenItsCookieIsSentWithCredentials() {
 		String admin = tm1.login();
 		try {
-			int before = tm1.sessionCount(admin);
+			int before = tm1.allSessionCount(admin);
 			HttpResponse<String> anonymous = tm1.send(tm1.request("GET", "ActiveSession?$select=ID"));
 			assertThat(anonymous.statusCode()).isEqualTo(401);
 			assertThat(anonymous.headers().firstValue("WWW-Authenticate")).hasValue("Basic realm=\"TM1\"");
 			String cookie = RawTm1.cookie(anonymous).orElseThrow();
-			assertThat(tm1.sessionCount(admin)).as("sessions after one 401").isEqualTo(before + 1);
+			assertThat(tm1.allSessionCount(admin)).as("sessions after one 401").isEqualTo(before + 1);
 
 			HttpResponse<String> login = tm1
 				.send(tm1.request("GET", "ActiveSession?$select=ID").cookie(cookie).basic());
 			assertThat(login.statusCode()).isEqualTo(200);
 			assertThat(RawTm1.cookie(login)).as("no new cookie: the same session was logged in").isEmpty();
-			assertThat(tm1.sessionCount(admin)).as("sessions after logging in with the 401's cookie")
+			assertThat(tm1.allSessionCount(admin)).as("sessions after logging in with the 401's cookie")
 				.isEqualTo(before + 1);
 
 			tm1.close(cookie);
-			assertThat(tm1.sessionCount(admin)).isEqualTo(before);
+			assertThat(tm1.allSessionCount(admin)).isEqualTo(before);
 		}
 		finally {
 			tm1.close(admin);
@@ -116,10 +116,10 @@ class Tm1SessionBehaviorTest {
 	void opensASessionForAnAnonymousReadOfServer() {
 		String admin = tm1.login();
 		try {
-			int before = tm1.sessionCount(admin);
+			int before = tm1.allSessionCount(admin);
 			HttpResponse<String> server = tm1.send(tm1.request("GET", "Server?$select=Name"));
 			assertThat(server.statusCode()).isEqualTo(200);
-			assertThat(tm1.sessionCount(admin)).isEqualTo(before + 1);
+			assertThat(tm1.allSessionCount(admin)).isEqualTo(before + 1);
 			String cookie = RawTm1.cookie(server).orElseThrow();
 			tm1.send(tm1.request("GET", "ActiveSession?$select=ID").cookie(cookie).basic());
 			tm1.close(cookie);
