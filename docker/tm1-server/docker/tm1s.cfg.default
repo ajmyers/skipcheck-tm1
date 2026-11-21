@@ -26,6 +26,9 @@ EnableNewHierarchyCreation=T
 
 # Development
 EnableTIDebugging=T
+# Sandboxes as a virtual "Sandboxes" dimension. TM1 adds it as the first dimension
+# of every cube, so MDX and views can address sandboxes directly.
+EnableSandboxDimension=T
 
 # Faster startup for larger test models: load cubes and compute feeders on several threads
 MTCubeLoad=T
@@ -43,5 +46,4 @@ PersistentFeeders=F
 AuditLogOn=F
 ServerLogging=F
 #TopLogging=T                 # periodic thread snapshots to tm1top.log
-#EnableSandboxDimension=T     # exposes sandboxes as a }Sandboxes dimension in MDX
 #HTTPSessionTimeoutMinutes=60 # REST session timeout (default 20)
