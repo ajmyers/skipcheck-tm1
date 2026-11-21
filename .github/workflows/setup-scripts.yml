@@ -10,7 +10,8 @@
 #            under pwsh, against the same cases
 #   windows: setup.ps1 under Windows PowerShell 5.1 and pwsh. GitHub's Windows
 #            runners run Docker in Windows-containers mode, so the script must stop
-#            at that check with its fix.
+#            at that check with its fix (or at "Docker isn't running", when the
+#            runner's Docker service hasn't started yet).
 name: Setup scripts
 
 on:
@@ -75,6 +76,23 @@ jobs:
           grep -q 'Not applied, because .env already exists: TM1_SERVER_IMAGE=other:1' <<<"$out"
         shell: bash
 
+      - name: setup.ps1 passes no double quotes to docker
+        # Windows PowerShell 5.1 mangles double quotes inside native-command arguments
+        # (pwsh 7.3+ doesn't), so a docker template like {{index .Labels "x"}} breaks only
+        # on 5.1. CI's Windows runners can't run Linux containers to catch it, so check
+        # every Docker/DockerOk call in the source with PowerShell's own parser.
+        shell: pwsh
+        run: |
+          $tokens = $null; $errors = $null
+          $ast = [System.Management.Automation.Language.Parser]::ParseFile("$PWD/setup.ps1", [ref]$tokens, [ref]$errors)
+          $bad = $ast.FindAll({ param($n)
+              $n -is [System.Management.Automation.Language.CommandAst] -and
+              $n.GetCommandName() -in 'Docker', 'DockerOk' -and
+              ($n.CommandElements | Select-Object -Skip 1 | Where-Object { $_.PSObject.Properties['Value'] -and ([string]$_.Value).Contains('"') })
+            }, $true)
+          foreach ($b in $bad) { Write-Host "::error file=docker/tm1-server/setup.ps1,line=$($b.Extent.StartLineNumber)::docker argument contains a double quote; Windows PowerShell 5.1 mangles these" }
+          if ($bad) { exit 1 }
+
       - name: setup.ps1 (pwsh)
         shell: pwsh
         run: |
@@ -125,6 +143,10 @@ jobs:
           $rc = $LASTEXITCODE
           Write-Host $out
           if ($rc -ne 1) { throw "expected exit 1, got $rc" }
-          if (-not $out.Contains('Docker is running Windows containers')) { throw 'expected the Windows-containers check to stop it' }
+          # Either Docker check may stop it: GitHub's runners use Windows containers, and
+          # their Docker service sometimes hasn't started yet.
+          if (-not ($out.Contains('Docker is running Windows containers') -or $out.Contains("Docker isn't running"))) {
+            throw 'expected a Docker check (Windows containers, or not running) to stop it'
+          }
           if (-not $out.Contains('made by Andrew Myers')) { throw 'banner missing' }
           exit 0   # the step would otherwise end with the expected exit 1 left in $LASTEXITCODE
