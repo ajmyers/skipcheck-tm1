@@ -49,8 +49,8 @@ public final class ODataLiterals {
 		if (value == null) {
 			return "null";
 		}
-		if (value instanceof Raw raw) {
-			return raw.literal();
+		if (value instanceof ODataLiteral literal) {
+			return literal.odataLiteral();
 		}
 		if (value instanceof CharSequence text) {
 			return string(text.toString());
@@ -85,10 +85,15 @@ public final class ODataLiterals {
 	 *
 	 * @param literal the literal, exactly as it should appear before percent-encoding
 	 */
-	public record Raw(String literal) {
+	public record Raw(String literal) implements ODataLiteral {
 		/** Checks that the literal isn't null. */
 		public Raw {
 			Objects.requireNonNull(literal, "literal");
+		}
+
+		@Override
+		public String odataLiteral() {
+			return literal;
 		}
 	}
 

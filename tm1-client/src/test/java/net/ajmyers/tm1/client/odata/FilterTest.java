@@ -63,4 +63,10 @@ class FilterTest {
 		assertThat(ODataLiterals.of(12L)).isEqualTo("12");
 	}
 
+	@Test
+	void writesAValueThatKnowsItsOwnLiteral() {
+		ODataLiteral numeric = () -> "ibm.tm1.api.v1.ElementType'Numeric'";
+		assertThat(ODataProperty.of("Type").eq(numeric)).hasToString("(Type eq ibm.tm1.api.v1.ElementType'Numeric')");
+	}
+
 }

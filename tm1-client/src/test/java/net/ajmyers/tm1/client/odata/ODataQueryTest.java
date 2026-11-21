@@ -147,4 +147,20 @@ class ODataQueryTest {
 		return out;
 	}
 
+	@Test
+	void takesPropertiesForExpandAndOrderBy() {
+		ODataProperty dimensions = ODataProperty.of("Dimensions");
+		ODataProperty name = ODataProperty.of("Name");
+		assertThat(ODataQuery.none()
+			.expand(dimensions, d -> d.select(name))
+			.expand(ODataProperty.of("Views"))
+			.orderBy(name)
+			.orderByDescending(ODataProperty.of("LastDataUpdate")))
+			.isEqualTo(ODataQuery.none()
+				.expand("Dimensions", d -> d.select("Name"))
+				.expand("Views")
+				.orderBy("Name")
+				.orderByDescending("LastDataUpdate"));
+	}
+
 }
