@@ -462,6 +462,30 @@ the generated operation catalog or an `@Tm1Endpoint("…")` annotation) or appea
 check, run only when a server is present, diffs the live server's `$metadata` against the
 snapshot and reports drift. That's how we notice a new TM1 version's additions.
 
+
+### 12.4 Testing version differences with one TM1 version
+
+Only TM1 11.8.03500.6 (PA 2.1.19) is available for now (decided 2026-11-21: do the best we
+can with it). So version handling is built in full, but proven as follows:
+
+- **Approximate older schemas.** `Core.Revisions` records when each element was added or
+  deprecated. A test fixture removes everything added after version *X* from the snapshot,
+  giving an approximate `$metadata` for *X*. Capability checks (§9, mechanism 1) are tested
+  against these, e.g. `Cube.Reserve` fails fast on an approximate 11.8.20 and works on 11.8.35.
+  This captures added and deprecated elements, not changes in behavior.
+- **Version branches** (§9, mechanism 2) take a `Tm1Version`, so they're unit-tested with any
+  version and no server.
+- **The quirk suite** (§16.7) pins how 11.8.03500.6 actually behaves. On another version, its
+  failures are the list of differences.
+- **Metadata drift report:** when TM1 tests run, the live `$metadata` is diffed against the
+  snapshot and the differences are reported, so any other version shows its API changes
+  automatically.
+- **Version-range pinning** (`@Tm1Version(atLeast…, below…)`) comes with the first
+  version-specific test, since its skip logic can be tested on one server. Running every test
+  once per version (the matrix in #14) waits for a second version.
+- **The README states the tested version.** Users with other versions can run the TM1 tests
+  and report what fails.
+
 ---
 
 ## 13. Your question 7: what else is missing
