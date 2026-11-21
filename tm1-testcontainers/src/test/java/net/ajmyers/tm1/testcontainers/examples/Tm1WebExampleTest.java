@@ -33,7 +33,17 @@ class Tm1WebExampleTest {
 			// TM1 Web drives a browser; Tm1WebSession stands in for one here
 			var session = new Tm1WebSession(web);
 			assertThat(session.servers(web.getAdminHost())).containsExactly("tm1");
-			assertThat(session.login(web.getAdminHost(), "tm1", tm1.getUsername(), tm1.getPassword())).isNotBlank();
+			String tm1SessionId = session.login(web.getAdminHost(), "tm1", tm1.getUsername(), tm1.getPassword());
+			assertThat(tm1SessionId).isNotBlank();
+
+			// What a universal report does: evaluate MDX through TM1 Web's evalservice
+			String serviceRoot = "http://" + tm1.getContainerInfo().getConfig().getHostName() + ":"
+					+ Tm1ServerContainer.REST_PORT;
+			assertThat(
+					session.evaluateMdx(serviceRoot, "tm1", tm1SessionId,
+							"SELECT {[Model].[Model].Members} ON 0 FROM [SalesCube] WHERE ([Actvsbud].[Actual], "
+									+ "[Region].[World], [Account1].[Sales], [Month].[Year])"))
+				.contains("\"success\":true");
 		}
 	}
 

@@ -99,6 +99,34 @@ public final class Tm1WebSession {
 		return matcher.group(1);
 	}
 
+	/**
+	 * Evaluates MDX through TM1 Web's evalservice, as a universal report does: the
+	 * evalservice calls TM1's REST API at {@code serviceRoot} with the TM1 session from
+	 * {@link #login}.
+	 * @param serviceRoot the TM1 server's REST address as TM1 Web sees it, the
+	 * {@code Host} it registered with the Admin Server, e.g. {@code http://tm1:8010}
+	 * @param server the TM1 server's name
+	 * @param tm1SessionId the TM1 session ID {@link #login} returned
+	 * @param mdx the MDX to evaluate
+	 * @return the evalservice's JSON response, which reports {@code "success":true} when
+	 * the cellset came back
+	 */
+	public String evaluateMdx(String serviceRoot, String server, String tm1SessionId, String mdx) {
+		String token = "{\"host\":" + json(serviceRoot) + ",\"type\":\"tm1\",\"id\":" + json(tm1SessionId) + "}";
+		String mapping = "{\"server\":" + json(server) + ",\"host\":" + json(serviceRoot) + ",\"datasource\":"
+				+ json(server) + "}";
+		String entry = "{\"type\":\"mdx\",\"id\":\"1\",\"server\":" + json(server) + ",\"args\":[" + json(mdx) + "]}";
+		String body = "{\"tokens\":[" + token + "],\"mappings\":[" + mapping + "],\"workEntries\":[" + entry + "]}";
+		return send(HttpRequest.newBuilder(base.resolve("/evalservice/batch"))
+			.header("Content-Type", "application/json")
+			.POST(HttpRequest.BodyPublishers.ofString(body))
+			.build()).body();
+	}
+
+	private static String json(String value) {
+		return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+	}
+
 	private String call(String script, String method, String... params) {
 		batch++;
 		StringBuilder body = new StringBuilder();

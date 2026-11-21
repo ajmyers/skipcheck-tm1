@@ -196,10 +196,18 @@ public class Tm1WebContainer extends GenericContainer<Tm1WebContainer> {
 			throw new IllegalStateException("The TM1 server isn't running; it should have started first");
 		}
 		Network network = tm1.getNetwork();
+		String address = addressOn(tm1, network);
 		if (network != null) {
 			withNetwork(network);
 		}
-		withEnv("TM1_ADMIN_HOST", addressOn(tm1, network));
+		else {
+			// TM1 registers with the Admin Server as http://<its hostname>:8010, and TM1
+			// Web's evalservice (universal reports) calls that URL. Docker's DNS resolves
+			// hostnames on networks it creates, but not on the default bridge, so name it
+			// here.
+			withExtraHost(tm1.getContainerInfo().getConfig().getHostName(), address);
+		}
+		withEnv("TM1_ADMIN_HOST", address);
 	}
 
 	@Override
