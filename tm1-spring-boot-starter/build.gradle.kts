@@ -24,4 +24,6 @@ dependencies {
 	testImplementation(libs.spring.boot.test)
 	testImplementation(libs.spring.boot.webclient)
 	testImplementation(libs.micrometer.core)
+	// ArchitectureTest: rules over the compiled starter
+	testImplementation(libs.archunit)
 }
