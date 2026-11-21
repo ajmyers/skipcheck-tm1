@@ -26,6 +26,8 @@ tasks.withType<Test>().configureEach {
 	for (name in listOf(
 		"TM1_PRIVATE_IMAGE", "TM1_HOME_DIR", "TM1_INSTALL_VOLUME", "TM1_BUNDLE_DIR",
 		"TM1_BUNDLE", "TM1_BUNDLE_URL", "TM1_BUNDLE_SHA256", "TM1_SERVER_IMAGE",
+		// Opt-in switches for tests that write files (see tm1-client's metadata tests)
+		"TM1_UPDATE_METADATA_SNAPSHOT",
 	)) {
 		inputs.property(name, providers.environmentVariable(name).orElse(""))
 	}

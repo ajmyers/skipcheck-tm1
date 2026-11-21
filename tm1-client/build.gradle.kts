@@ -16,6 +16,8 @@ dependencies {
 	api(libs.spring.web)
 	implementation(libs.jackson.databind)
 
+	// End-to-end tests against a real TM1 (skipped when none is configured)
+	testImplementation(project(":tm1-testcontainers"))
 	testImplementation(libs.spring.test)
 	testImplementation(libs.hamcrest)
 }
