@@ -174,8 +174,7 @@ the dependency footprint at Spring WebFlux plus Jackson.
 ```
 
 **Packages** (`net.ajmyers.tm1.client`, proposed):
-`odata` (+ `odata.query`; the CSDL reader is its own module, `tm1-csdl`, package `net.ajmyers.tm1.csdl`, since phase 1), `session`, `auth`, `version`, `model` (generated, split
-by area), `service` (one subpackage per area), `error`.
+`odata` (+ `odata.query`; the CSDL reader is its own module, `tm1-csdl`, package `net.ajmyers.tm1.csdl`, since phase 1), `session`, `auth`, `version`, `model` (generated; one package for now, split by area later if it gets unwieldy), `service` (one subpackage per area), `error`.
 
 ---
 
@@ -337,6 +336,13 @@ CSDL parser:
 - **An operation catalog:** one descriptor per action and function, holding its name, binding,
   parameters and return type. Hand-written service methods refer to these descriptors, which
   feeds the coverage gate (§12.3).
+
+**How it's built (phase 1).** `tm1-codegen`, an unpublished build tool, reads the snapshot with
+`tm1-csdl` and writes Java with JavaPoet. `tm1-client`'s `generateModel` task runs it into
+`build/generated`, which is compiled and published with the hand-written code but never
+committed. The first step (#63) generates enums (with an `UNKNOWN` fallback) and records for the
+99 types outside inheritance hierarchies; hierarchies (#64), field constants and patch builders
+(#65), and the operation catalog with revision annotations (#66) follow.
 
 **Services stay hand-written.** Their names, parameter order and grouping are API design that
 a generator would do badly. Generating them is still possible later.
