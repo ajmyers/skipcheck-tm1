@@ -12,7 +12,8 @@ AdminHost=localhost
 PortNumber=12345
 ClientMessagePortNumber=12346
 HTTPPortNumber=8010
-UseSSL=T
+# Plain HTTP by default (no IBM self-signed certificates). Set T to use SSL.
+UseSSL=F
 IPVersion=ipv4
 RunningInBackground=T
 

@@ -25,7 +25,7 @@
 # Environment (all optional). The named TM1_* settings seed a newly created tm1s.cfg;
 # for an existing tm1s.cfg they are applied only if explicitly set.
 #   TM1_SERVER_NAME     ServerName                             (default: tm1)
-#   TM1_USE_SSL         UseSSL, T/F                            (default: T)
+#   TM1_USE_SSL         UseSSL, T/F                            (default: F, plain HTTP)
 #   TM1_CFG_<Param>     Any tm1s.cfg parameter, e.g. TM1_CFG_EnableTIDebugging=T
 #   TM1_SEED            empty | sdata | 24retail - objects to put in an EMPTY /tm1/data
 #   TM1_ADMIN_HOST      host of a separate Admin Server (e.g. a container running
@@ -176,7 +176,7 @@ apply_named() {  # apply_named Key EnvVar Default
   fi
 }
 apply_named ServerName     TM1_SERVER_NAME tm1
-apply_named UseSSL         TM1_USE_SSL     T
+apply_named UseSSL         TM1_USE_SSL     F
 # Generic passthrough: TM1_CFG_Foo=bar -> Foo=bar
 while IFS='=' read -r name value; do
   [[ $name == TM1_CFG_* ]] || continue
@@ -265,7 +265,7 @@ touch "$LOGS/tm1server.log"
 tail -n 0 -F "$LOGS/tm1server.log" 2>/dev/null &
 TAIL_PID=$!
 
-log "Starting TM1 Server '$SERVER_NAME' (REST on ${HTTP_PORT:-none}, SSL=${USE_SSL:-T})"
+log "Starting TM1 Server '$SERVER_NAME' (REST on ${HTTP_PORT:-none}, SSL=${USE_SSL:-F})"
 # tm1s.exe daemonizes: the launcher exits 0 and the real server keeps running.
 ./tm1s.exe -w -z"$RUN_CONF"
 TM1_PID=$(daemon_pid "^\./tm1s\.exe -w -z$RUN_CONF\$" || true)

@@ -62,26 +62,28 @@ image, set `TM1_SERVER_IMAGE=ghcr.io/ajmyers/tm1-server:latest` in `.env` and ru
 `docker compose pull`. Then `cp .env.example .env` and set `TM1_HOME_DIR`:
 
 ```sh
-docker compose up -d                      # Admin Server + empty database "tm1" -> https://localhost:8010
-docker compose --profile samples up -d    # adds IBM's SData sample             -> https://localhost:8011
+docker compose up -d                      # Admin Server + empty database "tm1" -> http://localhost:8010
+docker compose --profile samples up -d    # adds IBM's SData sample             -> http://localhost:8011
 docker compose logs -f tm1                # server message log
 docker compose stop                       # clean shutdown (TM1 saves on SIGINT)
 ```
 
 | Container | What | Address | Login |
 |-----------|------|---------|-------|
-| `tm1-admin` | Admin Server, shared by every TM1 server | http://localhost:5895/api/v1/Servers, https://localhost:5898 | – |
-| `tm1` | TM1 server, empty database | https://localhost:8010/api/v1/ | `admin`, blank password |
-| `tm1-sdata` | TM1 server, IBM's SData sample | https://localhost:8011/api/v1/ | `admin` / `apple` |
+| `tm1-admin` | Admin Server, shared by every TM1 server | http://localhost:5895/api/v1/Servers | – |
+| `tm1` | TM1 server, empty database | http://localhost:8010/api/v1/ | `admin`, blank password |
+| `tm1-sdata` | TM1 server, IBM's SData sample | http://localhost:8011/api/v1/ | `admin` / `apple` |
 
 Like a real deployment, one Admin Server serves every TM1 server: the servers
 register with `tm1-admin` through `TM1_ADMIN_HOST` (see [Roles](#roles)).
 
-The REST API uses IBM's built-in self-signed certificate, so either turn off
-certificate verification in your client or set `TM1_USE_SSL=F` to use plain http.
+The REST API is plain HTTP by default (`UseSSL=F`), so there are no certificates to
+deal with. To use SSL, set `TM1_USE_SSL=T` or `UseSSL=T` in your own `tm1s.cfg`. TM1
+then serves HTTPS only, using IBM's self-signed certificate unless you configure
+your own.
 
 ```sh
-curl -sk -u admin: 'https://localhost:8010/api/v1/Configuration/ProductVersion/$value'
+curl -u admin: 'http://localhost:8010/api/v1/Configuration/ProductVersion/$value'
 ```
 
 ## Getting a `tm1_64` directory
@@ -148,7 +150,7 @@ ports, so parallel test runs never collide.
 | Variable | Default | |
 |----------|---------|-|
 | `TM1_SERVER_NAME` | `tm1` | `ServerName` |
-| `TM1_USE_SSL` | `T` | `UseSSL` |
+| `TM1_USE_SSL` | `F` | `UseSSL`. Plain HTTP by default; `T` switches TM1 to HTTPS only. |
 | `TM1_CFG_<Param>` | | Any `tm1s.cfg` parameter, e.g. `TM1_CFG_MaximumCubeLoadThreads=4` (enforced settings still win) |
 | `TM1_SEED` | `empty` | `empty`, `sdata` or `24retail`. Objects to copy into an **empty** `/tm1/data`, taken from the samples in your install. |
 | `TM1_ADMIN_HOST` | | Host of a separate Admin Server (e.g. a container running `admin`). Sets `AdminHost` and turns the embedded Admin Server off. |
@@ -175,7 +177,7 @@ its own Admin Server together.
 **Several TM1 servers:** run one container with `admin`, and give each TM1
 server `TM1_ADMIN_HOST=<that container's name>`, all on the same Docker network.
 This is what `compose.yaml` does. TM1 servers register under their in-network
-names (e.g. `https://tm1:8010`), so the addresses the Admin Server lists work
+names (e.g. `http://tm1:8010`), so the addresses the Admin Server lists work
 from other containers on the network (TM1 Web, PAW), not from your machine.
 From your machine, use each server's published port.
 
