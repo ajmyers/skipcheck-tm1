@@ -121,8 +121,10 @@ public sealed interface Tm1Source {
 	}
 
 	/**
-	 * A download link for IBM's bundle, such as a pre-signed S3, R2 or GCS URL. Pre-signed links
-	 * carry credentials in the query string, so it's never logged.
+	 * A download link for IBM's bundle, such as a pre-signed S3, R2 or GCS URL. Links can carry
+	 * credentials in the query string (pre-signed links) or the user-info part
+	 * ({@code https://user:token@host/...}, common with artifact repositories), so neither is ever
+	 * logged.
 	 *
 	 * @param sha256 the bundle's SHA-256, checked before installing; {@code null} to skip
 	 */
@@ -136,7 +138,9 @@ public sealed interface Tm1Source {
 
 		@Override
 		public String describe() {
-			return "bundle URL " + url.getScheme() + "://" + url.getRawAuthority() + url.getRawPath();
+			// Host and port only: the authority would include any user:password@
+			return "bundle URL " + url.getScheme() + "://" + url.getHost() + (url.getPort() == -1 ? "" : ":" + url.getPort())
+					+ url.getRawPath();
 		}
 	}
 

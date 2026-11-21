@@ -69,6 +69,14 @@ class Tm1SourceTest {
 	}
 
 	@Test
+	void neverDescribesCredentialsInAUrl() {
+		Tm1Source url = new Tm1Source.BundleUrl(URI.create("https://ci-user:s3cr3t@artifacts.example.com:8443/tm1/b.tar.gz"), null);
+		assertThat(url.describe()).isEqualTo("bundle URL https://artifacts.example.com:8443/tm1/b.tar.gz")
+			.doesNotContain("ci-user")
+			.doesNotContain("s3cr3t");
+	}
+
+	@Test
 	void tagsSnapshotsWithEdge() {
 		assertThat(Tm1ServerContainer.imageTag("0.1.0-SNAPSHOT")).isEqualTo("edge");
 		assertThat(Tm1ServerContainer.imageTag("0.1.0")).isEqualTo("0.1.0");
