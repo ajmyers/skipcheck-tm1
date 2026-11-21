@@ -84,4 +84,37 @@ class GeneratedModelTm1Test {
 		}
 	}
 
+	@Test
+	void queriesWithFieldConstantsAndEnumLiterals(Tm1ServerContainer tm1) {
+		Tm1Session session = Tm1Session.builder()
+			.baseUrl(tm1.getRestUrl())
+			.basicAuth(tm1.getUsername(), tm1.getPassword())
+			.build();
+		ODataPath elements = ODataPath.of("Dimensions")
+			.key("}Groups")
+			.nav("Hierarchies")
+			.key("}Groups")
+			.nav("Elements");
+		try {
+			List<Element> all = session
+				.stream(Tm1Request.list(elements,
+						ODataQuery.none().select(Element.NAME, Element.TYPE).orderBy(Element.NAME), Element.class))
+				.collectList()
+				.block(WAIT);
+			assertThat(all).isNotEmpty().extracting(Element::name).isSorted();
+			ElementType type = all.get(0).type();
+			assertThat(type).isNotNull().isNotEqualTo(ElementType.UNKNOWN);
+
+			List<Element> filtered = session
+				.stream(Tm1Request.list(elements, ODataQuery.none().filter(Element.TYPE.eq(type)), Element.class))
+				.collectList()
+				.block(WAIT);
+			assertThat(filtered).hasSize((int) all.stream().filter(e -> e.type() == type).count())
+				.allSatisfy(e -> assertThat(e.type()).isEqualTo(type));
+		}
+		finally {
+			session.close().block(WAIT);
+		}
+	}
+
 }

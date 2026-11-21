@@ -11,6 +11,8 @@ dependencies {
 	// The generated sources compile against these; the tests compile them
 	testImplementation(libs.jackson.databind)
 	testImplementation(libs.jspecify)
+	// ODataProperty and ODataLiteral, which the generated sources use
+	testImplementation(project(":tm1-client"))
 }
 
 tasks.test {

@@ -88,6 +88,12 @@ public final class ModelGenerator {
 
 	private static final ClassName JSON_SUB_TYPES = ClassName.get("com.fasterxml.jackson.annotation", "JsonSubTypes");
 
+	private static final ClassName ODATA_PROPERTY = ClassName.get("net.ajmyers.tm1.client.odata", "ODataProperty");
+
+	private static final ClassName ODATA_LITERAL = ClassName.get("net.ajmyers.tm1.client.odata", "ODataLiteral");
+
+	private static final ClassName ODATA_LITERALS = ClassName.get("net.ajmyers.tm1.client.odata", "ODataLiterals");
+
 	private static final ClassName JSON_NODE = ClassName.get("tools.jackson.databind", "JsonNode");
 
 	private static final Set<String> KEYWORDS = Set.of("abstract", "assert", "boolean", "break", "byte", "case",
@@ -200,6 +206,21 @@ public final class ModelGenerator {
 						"The value as TM1 writes it.\n@return the value, or {@code null} for the fallback constant\n")
 				.addStatement("return json")
 				.build())
+			.addSuperinterface(ODATA_LITERAL)
+			.addMethod(MethodSpec.methodBuilder("odataLiteral")
+				.addModifiers(Modifier.PUBLIC)
+				.addAnnotation(Override.class)
+				.returns(String.class)
+				.addJavadoc(
+						"The value as an OData literal, for filters: {@code $L'$L'}.\n@return the literal\n@throws IllegalStateException for {@code $L}, which has none\n",
+						enumQualified(type), type.members().isEmpty() ? "Value" : type.members().get(0).name(),
+						fallback)
+				.beginControlFlow("if (json == null)")
+				.addStatement("throw new IllegalStateException($S)",
+						fallback + " stands for a value this client doesn't know, and has no literal")
+				.endControlFlow()
+				.addStatement("return $T.enumMember($S, json)", ODATA_LITERALS, enumQualified(type))
+				.build())
 			.addMethod(MethodSpec.methodBuilder("fromJson")
 				.addModifiers(Modifier.PUBLIC, Modifier.STATIC)
 				.addAnnotation(AnnotationSpec.builder(JSON_CREATOR)
@@ -259,9 +280,10 @@ public final class ModelGenerator {
 				+ (type instanceof CsdlEntityType ? "entity" : "complex") + " type of the TM1 REST API.");
 		TypeSpec.Builder spec = recordSpec(ClassName.get(PACKAGE, javaTypeName(type.name())),
 				head + kindNote(type, root), type instanceof CsdlEntityType, components(type));
+		spec.addFields(constants(type));
 		if (root != null) {
-			// Asked for by name, it reads without @odata.type too (as a cast path returns
-			// it)
+			// Asked for by name, it reads without @odata.type too, as a cast path returns
+			// it
 			ClassName self = ClassName.get(PACKAGE, javaTypeName(type.name()));
 			spec.addSuperinterface(ClassName.get(PACKAGE, javaTypeName(root.name())))
 				.addAnnotation(AnnotationSpec.builder(JSON_TYPE_INFO)
@@ -338,6 +360,7 @@ public final class ModelGenerator {
 			known.addMember("value", "$L", entry.build());
 		}
 		spec.addAnnotation(known.build());
+		spec.addFields(constants(root));
 		subtypes.forEach(t -> spec.addPermittedSubclass(ClassName.get(PACKAGE, javaTypeName(t.name()))));
 		spec.addPermittedSubclass(fallback);
 
@@ -378,6 +401,45 @@ public final class ModelGenerator {
 		}
 		spec.addType(nested.build());
 		return spec.build();
+	}
+
+	/**
+	 * Field constants for a type's own properties, for queries: {@code Cube.NAME}. A
+	 * subtype's inherited ones are its root interface's.
+	 */
+	private List<FieldSpec> constants(CsdlStructuredType type) {
+		Set<String> names = new HashSet<>();
+		List<FieldSpec> fields = new ArrayList<>();
+		for (CsdlProperty property : type.properties()) {
+			if (javaType(property.type()).isPresent()) {
+				fields.add(constant(unique(constantName(property.name()), names), property.name(),
+						paramText(property.annotations(), property.name())));
+			}
+		}
+		for (CsdlNavigationProperty navigation : type.navigationProperties()) {
+			if (javaType(navigation.type()).isPresent()) {
+				fields.add(constant(unique(constantName(navigation.name()), names), navigation.name(),
+						paramText(navigation.annotations(), navigation.name())
+								+ " (a navigation property, for {@code $expand})"));
+			}
+		}
+		return fields;
+	}
+
+	private static FieldSpec constant(String name, String property, String doc) {
+		return FieldSpec.builder(ODATA_PROPERTY, name, Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+			.initializer("$T.of($S)", ODATA_PROPERTY, property)
+			.addJavadoc("{@code $L}, for queries: $L\n", property, doc)
+			.build();
+	}
+
+	private String enumQualified(CsdlEnumType type) {
+		return metadata.schemas()
+			.stream()
+			.filter(s -> s.enumTypes().contains(type))
+			.findFirst()
+			.map(s -> s.namespace() + "." + type.name())
+			.orElse(type.name());
 	}
 
 	private String typeId(CsdlStructuredType type) {

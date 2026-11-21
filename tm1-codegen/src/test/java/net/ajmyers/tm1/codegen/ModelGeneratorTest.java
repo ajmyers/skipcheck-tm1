@@ -80,13 +80,17 @@ class ModelGeneratorTest {
 			.as("TM1 already has Unknown, so the fallback is UNRECOGNIZED")
 			.contains("UNRECOGNIZED((String) null)")
 			.contains("@JsonCreator(mode = JsonCreator.Mode.DELEGATING)")
-			.contains("@JsonValue");
+			.contains("@JsonValue")
+			.contains("enum CubeKind implements ODataLiteral")
+			.contains("return ODataLiterals.enumMember(\"ibm.tm1.api.v1.CubeKind\", json);");
 	}
 
 	@Test
 	void generatesRecordsWithNullableComponentsNamedAfterTm1Properties() {
 		String cube = source(sample(), "Cube");
 		assertThat(cube).contains("@JsonIgnoreProperties(ignoreUnknown = true)")
+			.contains("public static final ODataProperty NAME = ODataProperty.of(\"Name\");")
+			.contains("public static final ODataProperty VIEWS = ODataProperty.of(\"Views\");")
 			.contains("public record Cube(")
 			.contains("@JsonProperty(\"@odata.etag\") @Nullable String etag")
 			.contains("@JsonProperty(\"Name\") @Nullable String name")
