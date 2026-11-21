@@ -109,6 +109,13 @@ The container port is fixed; map it to any host port with `-p <host>:9510`.
 - **Admin Server discovery.** TM1 servers register with the Admin Server under their
   container addresses, which other containers on the same Docker network can reach.
   So TM1 Web needs no extra mapping, as long as it's on that network.
+- **Universal reports** run through the evalservice, which calls TM1's REST API at the
+  `Host` each server registered: `http://<its hostname>:8010`. That name has to
+  resolve inside the TM1 Web container. It does on a network you create
+  (`docker network create`, or compose), but not on Docker's default bridge network;
+  there, add `--add-host <tm1 hostname>:<tm1 ip>`. Checked by sending the evalservice
+  an MDX request directly; rendering a universal report workbook in the browser
+  hasn't been tested (it needs a workbook made with the Excel add-in).
 - **Native TM1 security only, for now.** CAM security needs a Cognos server; see
   [#44](https://github.com/ajmyers/tm1-pa-developer-tools/issues/44).
 - **HTTP only.** IBM's `server.xml` is used as-is, so HTTPS on 9513 isn't set up.
