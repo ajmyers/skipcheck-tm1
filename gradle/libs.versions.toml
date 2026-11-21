@@ -8,6 +8,7 @@ assertj = "3.27.7"
 hamcrest = "3.0"
 spring-dependency-management = "1.1.7"
 maven-publish = "0.37.0"
+testcontainers = "2.0.5"
 
 [libraries]
 spring-web = { module = "org.springframework:spring-web", version.ref = "spring-framework" }
@@ -20,9 +21,11 @@ spring-boot-test = { module = "org.springframework.boot:spring-boot-test", versi
 
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 hamcrest = { module = "org.hamcrest:hamcrest", version.ref = "hamcrest" }
+testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 
 # Gradle plugins, as dependencies of build-logic
 gradle-plugin-spring-boot = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "spring-boot" }
