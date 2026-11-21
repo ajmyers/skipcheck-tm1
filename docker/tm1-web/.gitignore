@@ -1,0 +1,10 @@
+# Your IBM bundles and installs: never commit IBM software
+bundles/
+tm1web/
+*.tar.gz
+*.zip
+*.bin
+# Logs and config from local runs
+tm1-web-files/
+# Machine-specific settings
+.env

@@ -85,6 +85,7 @@ copy it into any folder. It uses the published image; to use your own build, set
 ```sh
 docker compose up -d                      # Admin Server + empty database "tm1" -> http://localhost:8010
 docker compose --profile samples up -d    # adds IBM's SData sample             -> http://localhost:8011
+docker compose --profile web up -d        # adds TM1 Web (see ../tm1-web)       -> http://localhost:9510/tm1web/
 docker compose ps                         # wait for (healthy)
 docker compose logs -f tm1                # server message log
 docker compose stop                       # clean shutdown (TM1 saves on SIGINT)
@@ -95,6 +96,7 @@ docker compose stop                       # clean shutdown (TM1 saves on SIGINT)
 | `tm1-admin` | Admin Server, shared by every TM1 server | http://localhost:5895/api/v1/Servers | – |
 | `tm1` | TM1 server, empty database | http://localhost:8010/api/v1/ | `admin`, blank password |
 | `tm1-sdata` | TM1 server, IBM's SData sample | http://localhost:8011/api/v1/ | `admin` / `apple` |
+| `tm1-web` | [TM1 Web](../tm1-web/README.md), listing every server registered with `tm1-admin` (`web` profile; needs a `tm1web-*_bundle.tar.gz` in the bundles folder) | http://localhost:9510/tm1web/ | as for each server |
 
 **TM1 source.** With no settings, compose installs TM1 from the bundle in
 [`bundles/`](bundles/README.md) into the Docker volume `tm1-server_tm1-install` on
