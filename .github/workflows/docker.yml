@@ -58,6 +58,11 @@ jobs:
             platforms: linux/amd64   # TM1 Server is x86-64 only
             gradle-task: ''          # plain Dockerfile, nothing to build with Gradle first
             publish-var: PUBLISH_DOCKER_TM1_SERVER
+          - image: cognos-server
+            context: docker/cognos-server
+            platforms: linux/amd64   # Cognos Analytics for Linux is x86-64 only
+            gradle-task: ''
+            publish-var: PUBLISH_DOCKER_COGNOS_SERVER
           # Example for a Spring Boot tool (Dockerfile in tools/foo copies build/libs/*.jar):
           # - image: tm1-foo
           #   context: tools/foo
