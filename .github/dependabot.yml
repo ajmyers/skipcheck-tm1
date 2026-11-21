@@ -1,0 +1,23 @@
+# Weekly version updates, grouped so each ecosystem opens one PR per week.
+# Dependabot PRs are exempt from the "link an issue" rule (see pr-conventions.yml).
+version: 2
+updates:
+  # Covers gradle/libs.versions.toml, which also pins the build-logic plugins.
+  # Keep spring-framework and jackson aligned with what spring-boot manages.
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      gradle:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns: ["*"]

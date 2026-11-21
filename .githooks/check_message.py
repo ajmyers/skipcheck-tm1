@@ -4,6 +4,7 @@
 Usage:
     check_message.py commit <file>   # commit message file, as given to the commit-msg hook
     check_message.py pr <file>       # PR title on line 1, a blank line, then the description
+    check_message.py pr --no-issue <file>   # generated PRs (Dependabot): title rules only
 
 Expected commit message:
 
@@ -95,10 +96,12 @@ def check_commit(lines):
     return errors
 
 
-def check_pr(lines):
+def check_pr(lines, require_issue=True):
     errors = []
     title = lines[0] if lines else ""
     check_title(title, errors)
+    if not require_issue:
+        return errors
     body = "\n".join(lines[1:])
     if not PR_LINK.search(body):
         errors.append("Link the issue in the description: 'Closes #N' (completes it) or 'Part of #N'.")
@@ -109,12 +112,15 @@ def check_pr(lines):
 
 
 def main(argv):
-    if len(argv) != 3 or argv[1] not in ("commit", "pr"):
+    args = argv[1:]
+    require_issue = "--no-issue" not in args
+    args = [a for a in args if a != "--no-issue"]
+    if len(args) != 2 or args[0] not in ("commit", "pr") or (args[0] == "commit" and not require_issue):
         print(__doc__, file=sys.stderr)
         return 2
-    mode, path = argv[1], argv[2]
+    mode, path = args
     lines = read_lines(path, strip_comments=(mode == "commit"))
-    errors = check_commit(lines) if mode == "commit" else check_pr(lines)
+    errors = check_commit(lines) if mode == "commit" else check_pr(lines, require_issue)
     if errors:
         what = "Commit message" if mode == "commit" else "PR title/description"
         print(f"{what} doesn't follow the conventions:", file=sys.stderr)
