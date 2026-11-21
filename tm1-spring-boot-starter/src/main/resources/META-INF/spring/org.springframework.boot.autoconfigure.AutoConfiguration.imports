@@ -1,0 +1,2 @@
+net.ajmyers.tm1.spring.boot.autoconfigure.Tm1ConnectionDetailsAutoConfiguration
+net.ajmyers.tm1.spring.boot.autoconfigure.Tm1AutoConfiguration
