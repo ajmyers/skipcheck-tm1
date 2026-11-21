@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Works out a {@link Tm1ErrorKind} from an error response.
  *
@@ -60,7 +62,7 @@ public final class Tm1ErrorClassifier {
 	 * Classifies an error response; {@code error} may be null if the body wasn't an OData
 	 * error.
 	 */
-	public Tm1ErrorKind classify(int status, ODataError error) {
+	public Tm1ErrorKind classify(int status, @Nullable ODataError error) {
 		for (Rule rule : rules) {
 			if (rule.matches(status, error)) {
 				return rule.kind();
@@ -87,7 +89,7 @@ public final class Tm1ErrorClassifier {
 	 * @param message a pattern to find in the message, or {@code null} for any
 	 * @param kind the kind to report on a match
 	 */
-	public record Rule(Integer status, String code, Pattern message, Tm1ErrorKind kind) {
+	public record Rule(@Nullable Integer status, @Nullable String code, @Nullable Pattern message, Tm1ErrorKind kind) {
 
 		public Rule {
 			Objects.requireNonNull(kind, "kind");
@@ -106,7 +108,7 @@ public final class Tm1ErrorClassifier {
 			return new Rule(null, code, null, kind);
 		}
 
-		boolean matches(int actualStatus, ODataError error) {
+		boolean matches(int actualStatus, @Nullable ODataError error) {
 			if (status != null && status != actualStatus) {
 				return false;
 			}

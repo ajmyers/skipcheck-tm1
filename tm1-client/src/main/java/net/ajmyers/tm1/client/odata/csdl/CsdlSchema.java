@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A CSDL schema: one namespace of types and operations.
  *
@@ -20,9 +22,9 @@ import java.util.Objects;
  * @param externalAnnotations annotations in {@code Annotations} elements, by their
  * {@code Target}
  */
-public record CsdlSchema(String namespace, String alias, List<CsdlEntityType> entityTypes,
+public record CsdlSchema(String namespace, @Nullable String alias, List<CsdlEntityType> entityTypes,
 		List<CsdlComplexType> complexTypes, List<CsdlEnumType> enumTypes, List<CsdlOperation> operations,
-		CsdlEntityContainer entityContainer, List<CsdlAnnotation> annotations,
+		@Nullable CsdlEntityContainer entityContainer, List<CsdlAnnotation> annotations,
 		Map<String, List<CsdlAnnotation>> externalAnnotations) {
 
 	public CsdlSchema {

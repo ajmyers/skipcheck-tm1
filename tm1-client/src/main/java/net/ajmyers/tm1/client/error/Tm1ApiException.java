@@ -2,6 +2,8 @@ package net.ajmyers.tm1.client.error;
 
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 
 /**
@@ -25,9 +27,9 @@ public sealed class Tm1ApiException extends Tm1Exception
 
 	/** The OData error body, or {@code null} if the response didn't have one. */
 	@Getter
-	private final transient ODataError error;
+	private final transient @Nullable ODataError error;
 
-	protected Tm1ApiException(int status, Tm1ErrorKind kind, ODataError error, String method, String url) {
+	protected Tm1ApiException(int status, Tm1ErrorKind kind, @Nullable ODataError error, String method, String url) {
 		super(message(status, error, method, url), method, url, null);
 		this.status = status;
 		this.kind = Objects.requireNonNull(kind, "kind");
@@ -39,14 +41,15 @@ public sealed class Tm1ApiException extends Tm1Exception
 	 * @param error the parsed error body, or {@code null} if the body wasn't an OData
 	 * error
 	 */
-	public static Tm1ApiException of(int status, ODataError error, String method, String url,
+	public static Tm1ApiException of(int status, @Nullable ODataError error, String method, String url,
 			Tm1ErrorClassifier classifier) {
 		Tm1ErrorKind kind = classifier.classify(status, error);
 		return of(status, kind, error, method, url);
 	}
 
 	/** The exception for an error response whose kind is already known. */
-	public static Tm1ApiException of(int status, Tm1ErrorKind kind, ODataError error, String method, String url) {
+	public static Tm1ApiException of(int status, Tm1ErrorKind kind, @Nullable ODataError error, String method,
+			String url) {
 		switch (kind) {
 			case NOT_FOUND -> {
 				return new Tm1NotFoundException(status, kind, error, method, url);
@@ -93,7 +96,7 @@ public sealed class Tm1ApiException extends Tm1Exception
 		return status >= 500 && status != 501;
 	}
 
-	private static String message(int status, ODataError error, String method, String url) {
+	private static String message(int status, @Nullable ODataError error, String method, String url) {
 		String detail = error == null || error.message().isEmpty() ? "" : ": " + error.message();
 		String code = error == null || error.code().isEmpty() ? "" : " [code " + error.code() + "]";
 		return "TM1 returned " + status + detail + code + describe(method, url);

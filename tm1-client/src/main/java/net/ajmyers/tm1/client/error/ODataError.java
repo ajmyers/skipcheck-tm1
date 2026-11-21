@@ -2,6 +2,9 @@ package net.ajmyers.tm1.client.error;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+
+import org.jspecify.annotations.Nullable;
 
 import tools.jackson.databind.JsonNode;
 
@@ -19,7 +22,8 @@ import tools.jackson.databind.JsonNode;
  * @param details further errors, possibly empty
  * @param innerError service-specific detail, or {@code null}
  */
-public record ODataError(String code, String message, String target, List<ODataError> details, JsonNode innerError) {
+public record ODataError(String code, String message, @Nullable String target, List<ODataError> details,
+		@Nullable JsonNode innerError) {
 
 	public ODataError {
 		code = code == null ? "" : code;
@@ -31,7 +35,7 @@ public record ODataError(String code, String message, String target, List<ODataE
 	 * Reads an error from a response body, if it is one: either {@code {"error":{...}}}
 	 * or the inner object.
 	 */
-	public static ODataError from(JsonNode body) {
+	public static @Nullable ODataError from(@Nullable JsonNode body) {
 		if (body == null || !body.isObject()) {
 			return null;
 		}
@@ -49,11 +53,12 @@ public record ODataError(String code, String message, String target, List<ODataE
 				}
 			}
 		}
-		return new ODataError(text(error, "code"), text(error, "message"), text(error, "target"), details,
+		return new ODataError(Objects.requireNonNullElse(text(error, "code"), ""),
+				Objects.requireNonNullElse(text(error, "message"), ""), text(error, "target"), details,
 				error.get("innererror"));
 	}
 
-	private static String text(JsonNode node, String field) {
+	private static @Nullable String text(JsonNode node, String field) {
 		JsonNode value = node.get(field);
 		return value == null || value.isNull() ? null : value.asString();
 	}

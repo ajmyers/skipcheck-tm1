@@ -3,6 +3,8 @@ package net.ajmyers.tm1.client.odata.csdl;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * An entity type: a structured type with a key, such as {@code Cube}.
  *
@@ -17,8 +19,9 @@ import java.util.Objects;
  * @param navigationProperties its own navigation properties
  * @param annotations its annotations
  */
-public record CsdlEntityType(String name, String baseType, boolean isAbstract, boolean openType, boolean hasStream,
-		List<String> key, List<CsdlProperty> properties, List<CsdlNavigationProperty> navigationProperties,
+public record CsdlEntityType(String name, @Nullable String baseType, boolean isAbstract, boolean openType,
+		boolean hasStream, List<String> key, List<CsdlProperty> properties,
+		List<CsdlNavigationProperty> navigationProperties,
 		List<CsdlAnnotation> annotations) implements CsdlStructuredType {
 
 	public CsdlEntityType {

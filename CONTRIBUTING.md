@@ -46,6 +46,11 @@ fully qualified type names in code; `format` fixes all but the last. In a Javado
 write `@` as `&#64;` inside `<pre class="code">`, as Spring does: the formatter takes an `@` at
 the start of a line for a block tag and breaks the comment, which the check also reports.
 
+**Error Prone and NullAway check every compile.** Their findings are errors. Library packages
+are `@NullMarked` (JSpecify): nothing is null unless declared `@Nullable`, and NullAway checks
+that at compile time, so a nullable field, parameter or return gets `@Nullable` where it's
+declared. Lombok copies it onto the accessors it generates. Tests aren't null-checked.
+
 **Architecture rules are tests.** `ArchitectureTest` in `tm1-client` checks the compiled library:
 it never blocks or calls a bare `subscribe()`, builds request URIs instead of using URI templates,
 logs only through SLF4J, and keeps the `odata` package free of TM1. Each rule's `because` says

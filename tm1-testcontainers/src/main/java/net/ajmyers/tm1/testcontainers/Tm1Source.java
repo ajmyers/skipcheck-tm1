@@ -7,6 +7,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Where a {@link Tm1ServerContainer} gets TM1 Server from.
  *
@@ -112,7 +114,7 @@ public sealed interface Tm1Source {
 	 * @param file the bundle's file name within {@code dir}, or {@code null} for the
 	 * newest one
 	 */
-	record Bundle(Path dir, String file) implements Tm1Source {
+	record Bundle(Path dir, @Nullable String file) implements Tm1Source {
 		public Bundle {
 			Objects.requireNonNull(dir, "dir");
 			dir = dir.toAbsolutePath().normalize();
@@ -142,7 +144,7 @@ public sealed interface Tm1Source {
 	 *
 	 * @param sha256 the bundle's SHA-256, checked before installing; {@code null} to skip
 	 */
-	record BundleUrl(URI url, String sha256) implements Tm1Source {
+	record BundleUrl(URI url, @Nullable String sha256) implements Tm1Source {
 		public BundleUrl {
 			Objects.requireNonNull(url, "url");
 			if (sha256 != null && sha256.isBlank()) {
@@ -176,8 +178,8 @@ public sealed interface Tm1Source {
 	 * folder that doesn't exist. A wrong setting fails rather than silently skipping the
 	 * tests.
 	 */
-	static Optional<Tm1Source> discover(Function<String, String> lookup) {
-		Function<String, String> get = name -> {
+	static Optional<Tm1Source> discover(Function<String, @Nullable String> lookup) {
+		Function<String, @Nullable String> get = name -> {
 			String value = lookup.apply(name);
 			return value == null || value.isBlank() ? null : value.strip();
 		};

@@ -3,6 +3,8 @@ package net.ajmyers.tm1.client.odata.csdl;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * An enumeration type, such as {@code ElementType}.
  *
@@ -30,7 +32,7 @@ public record CsdlEnumType(String name, String underlyingType, boolean flags, Li
 	 * non-flags enums)
 	 * @param annotations its annotations
 	 */
-	public record Member(String name, Long value, List<CsdlAnnotation> annotations) {
+	public record Member(String name, @Nullable Long value, List<CsdlAnnotation> annotations) {
 		public Member {
 			Objects.requireNonNull(name, "name");
 			annotations = List.copyOf(annotations);

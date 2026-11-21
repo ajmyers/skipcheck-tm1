@@ -3,6 +3,8 @@ package net.ajmyers.tm1.client.odata.csdl;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A navigation property: a link from one entity (or complex) type to an entity or a
  * collection of them, such as {@code Cube/Views}.
@@ -15,7 +17,7 @@ import java.util.Objects;
  * property
  * @param annotations its annotations, in document order
  */
-public record CsdlNavigationProperty(String name, CsdlTypeRef type, boolean nullable, String partner,
+public record CsdlNavigationProperty(String name, CsdlTypeRef type, boolean nullable, @Nullable String partner,
 		boolean containsTarget, List<CsdlAnnotation> annotations) {
 
 	public CsdlNavigationProperty {

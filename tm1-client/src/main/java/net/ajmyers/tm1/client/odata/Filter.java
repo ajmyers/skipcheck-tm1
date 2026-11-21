@@ -5,6 +5,8 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A {@code $filter} expression, built from {@link ODataProperty} comparisons and the
  * canonical functions TM1 supports:
@@ -99,7 +101,7 @@ public final class Filter {
 				+ Arrays.stream(values).map(ODataLiterals::of).collect(Collectors.joining(",")) + "))");
 	}
 
-	static Filter compare(ODataProperty property, String operator, Object value) {
+	static Filter compare(ODataProperty property, String operator, @Nullable Object value) {
 		return new Filter("(" + property.path() + " " + operator + " " + ODataLiterals.of(value) + ")");
 	}
 

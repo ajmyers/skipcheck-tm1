@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * One record of a {@code Core.Revisions} annotation: the schema version in which a model
  * element was added, modified or deprecated.
@@ -19,7 +21,8 @@ import java.util.Optional;
  * this client doesn't know
  * @param description the reason given, or {@code null}
  */
-public record CsdlRevision(String version, Kind kind, String rawKind, String description) {
+public record CsdlRevision(@Nullable String version, Kind kind, @Nullable String rawKind,
+		@Nullable String description) {
 
 	/** The term holding revisions. */
 	public static final String TERM = "Core.Revisions";
@@ -70,12 +73,12 @@ public record CsdlRevision(String version, Kind kind, String rawKind, String des
 			.findFirst();
 	}
 
-	private static String text(CsdlValue.Record record, String property) {
+	private static @Nullable String text(CsdlValue.Record record, String property) {
 		CsdlValue value = record.properties().get(property);
 		return value == null ? null : value.asText().orElse(null);
 	}
 
-	private static Kind kindOf(String raw) {
+	private static Kind kindOf(@Nullable String raw) {
 		if (raw == null) {
 			return Kind.UNKNOWN;
 		}

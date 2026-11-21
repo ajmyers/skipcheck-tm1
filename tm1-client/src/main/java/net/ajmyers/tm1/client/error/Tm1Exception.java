@@ -1,5 +1,7 @@
 package net.ajmyers.tm1.client.error;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 
 /**
@@ -21,13 +23,13 @@ public abstract sealed class Tm1Exception extends RuntimeException
 
 	/** The request's HTTP method, or {@code null} if not known. */
 	@Getter
-	private final String method;
+	private final @Nullable String method;
 
 	/** The request's URL, never including credentials, or {@code null} if not known. */
 	@Getter
-	private final String url;
+	private final @Nullable String url;
 
-	protected Tm1Exception(String message, String method, String url, Throwable cause) {
+	protected Tm1Exception(String message, @Nullable String method, @Nullable String url, @Nullable Throwable cause) {
 		super(message, cause);
 		this.method = method;
 		this.url = url;
@@ -47,7 +49,7 @@ public abstract sealed class Tm1Exception extends RuntimeException
 	 */
 	public abstract boolean mayHaveApplied();
 
-	static String describe(String method, String url) {
+	static String describe(@Nullable String method, @Nullable String url) {
 		return method == null ? "" : " (" + method + " " + url + ")";
 	}
 

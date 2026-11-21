@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 
 import net.ajmyers.tm1.client.odata.ODataPath;
@@ -54,16 +55,16 @@ public final class Tm1Request<T> {
 
 	private final Map<String, String> headers;
 
-	private final Object body;
+	private final @Nullable Object body;
 
 	private final Response response;
 
 	private final Class<T> type;
 
-	private final Duration timeout;
+	private final @Nullable Duration timeout;
 
-	private Tm1Request(HttpMethod method, ODataPath path, ODataQuery query, Map<String, String> headers, Object body,
-			Response response, Class<T> type, Duration timeout) {
+	private Tm1Request(HttpMethod method, ODataPath path, ODataQuery query, Map<String, String> headers,
+			@Nullable Object body, Response response, Class<T> type, @Nullable Duration timeout) {
 		this.method = Objects.requireNonNull(method, "method");
 		this.path = Objects.requireNonNull(path, "path");
 		this.query = Objects.requireNonNull(query, "query");
@@ -95,7 +96,7 @@ public final class Tm1Request<T> {
 	 * (an empty object if there are no parameters), since TM1 refuses an action without a
 	 * JSON content type. With {@code Void.class} the response is ignored.
 	 */
-	public static <T> Tm1Request<T> post(ODataPath path, Object body, Class<T> type) {
+	public static <T> Tm1Request<T> post(ODataPath path, @Nullable Object body, Class<T> type) {
 		return new Tm1Request<>(HttpMethod.POST, path, ODataQuery.none(), Map.of(), body == null ? Map.of() : body,
 				responseFor(type), type, null);
 	}
@@ -164,7 +165,7 @@ public final class Tm1Request<T> {
 	}
 
 	/** The body, serialized as JSON when sent, or {@code null} for none. */
-	public Object body() {
+	public @Nullable Object body() {
 		return body;
 	}
 

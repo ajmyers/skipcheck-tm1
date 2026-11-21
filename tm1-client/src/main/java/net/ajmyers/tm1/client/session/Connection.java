@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
@@ -60,7 +61,7 @@ final class Connection {
 
 	private final String authorization;
 
-	private final String sessionContext;
+	private final @Nullable String sessionContext;
 
 	private final Tm1Timeouts timeouts;
 
@@ -74,15 +75,15 @@ final class Connection {
 	 * The current login, or null if none has started (or the last one failed). Guarded by
 	 * this.
 	 */
-	private Attempt attempt;
+	private @Nullable Attempt attempt;
 
 	/** Set once by {@link #close()}. Guarded by this. */
 	private boolean closed;
 
 	/** What {@link #close()} returns, once called. Guarded by this. */
-	private Mono<Void> closing;
+	private @Nullable Mono<Void> closing;
 
-	Connection(WebClient web, String root, String authorization, String sessionContext, Tm1Timeouts timeouts,
+	Connection(WebClient web, String root, String authorization, @Nullable String sessionContext, Tm1Timeouts timeouts,
 			Tm1ErrorClassifier classifier, ObjectMapper mapper, ObservationRegistry observations) {
 		this.web = Objects.requireNonNull(web, "web");
 		this.root = Objects.requireNonNull(root, "root");
@@ -164,7 +165,7 @@ final class Connection {
 	 * one. TM1 opened a session along with the 401, so the new login logs that one in (by
 	 * sending its cookie) rather than opening another.
 	 */
-	private synchronized Attempt relogin(Attempt expired, String seedCookie) {
+	private synchronized Attempt relogin(Attempt expired, @Nullable String seedCookie) {
 		if (closed) {
 			throw new Tm1SessionClosedException(root);
 		}
@@ -300,7 +301,7 @@ final class Connection {
 
 	// Login and close
 
-	private Mono<LoggedIn> login(String seedCookie, String reason) {
+	private Mono<LoggedIn> login(@Nullable String seedCookie, String reason) {
 		URI uri = uri(LOGIN_PATH);
 		Mono<LoggedIn> login = Mono.defer(() -> {
 			WebClient.RequestHeadersSpec<?> spec = web.get().uri(uri).headers(h -> {
@@ -334,7 +335,7 @@ final class Connection {
 			.doOnError(e -> log.debug("Login to TM1 at {} failed", root, e));
 	}
 
-	private LoggedIn loggedIn(String cookie, byte[] body, URI uri) {
+	private LoggedIn loggedIn(@Nullable String cookie, byte[] body, URI uri) {
 		if (cookie == null) {
 			throw new Tm1ProtocolException("TM1 accepted the login but set no " + COOKIE + " cookie", null, "GET",
 					uri.toString(), null);
@@ -424,7 +425,7 @@ final class Connection {
 	 * {@code tm1.Close} sends) doesn't count. Parsed from the headers rather than through
 	 * the connector's cookie support, so it works the same with any connector.
 	 */
-	static String cookie(ClientResponse response) {
+	static @Nullable String cookie(ClientResponse response) {
 		for (String header : response.headers().header(HttpHeaders.SET_COOKIE)) {
 			String[] parts = header.split(";", -1);
 			int eq = parts[0].indexOf('=');
@@ -465,7 +466,7 @@ final class Connection {
 
 		final Mono<LoggedIn> login;
 
-		Attempt(String seedCookie, String reason) {
+		Attempt(@Nullable String seedCookie, String reason) {
 			// cache(): concurrent requests share one login. A failed login is forgotten,
 			// so the next
 			// request tries again rather than getting the cached failure forever.
@@ -491,9 +492,9 @@ final class Connection {
 		private static final long serialVersionUID = 1L;
 
 		/** The cookie of the session TM1 opened along with the 401, or null. */
-		final transient String cookie;
+		final transient @Nullable String cookie;
 
-		Expired(String cookie) {
+		Expired(@Nullable String cookie) {
 			super("TM1 session expired", null, false, false);
 			this.cookie = cookie;
 		}

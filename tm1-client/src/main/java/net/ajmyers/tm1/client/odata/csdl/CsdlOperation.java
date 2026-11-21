@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * An action or a function. Actions may change data and are invoked with POST; functions
  * don't, and are invoked with GET. A bound operation's first parameter is its binding
@@ -20,8 +22,8 @@ import java.util.Optional;
  * @param returnNullable whether the return value may be null
  * @param annotations its annotations
  */
-public record CsdlOperation(Kind kind, String name, boolean bound, boolean composable, String entitySetPath,
-		List<CsdlParameter> parameters, CsdlTypeRef returnType, boolean returnNullable,
+public record CsdlOperation(Kind kind, String name, boolean bound, boolean composable, @Nullable String entitySetPath,
+		List<CsdlParameter> parameters, @Nullable CsdlTypeRef returnType, boolean returnNullable,
 		List<CsdlAnnotation> annotations) {
 
 	/** Action or function. */

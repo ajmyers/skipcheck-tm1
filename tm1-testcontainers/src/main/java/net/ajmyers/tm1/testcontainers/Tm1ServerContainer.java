@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 
+import org.jspecify.annotations.Nullable;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
@@ -81,7 +82,7 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 
 	private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
-	private static Tm1ServerContainer shared;
+	private static @Nullable Tm1ServerContainer shared;
 
 	private final Tm1Source source;
 
@@ -91,9 +92,9 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 
 	private String password = "";
 
-	private Tm1Version expectedVersion;
+	private @Nullable Tm1Version expectedVersion;
 
-	private Tm1Version version;
+	private @Nullable Tm1Version version;
 
 	/**
 	 * A container on the default {@code tm1-server} image (or {@code TM1_SERVER_IMAGE}),
@@ -114,7 +115,7 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		// TM1 Server only exists for x86-64. On Apple Silicon this runs under Rosetta.
 		withCreateContainerCmdModifier(cmd -> cmd.withPlatform("linux/amd64"));
 		withCreateContainerCmdModifier(cmd -> {
-			HostConfig host = cmd.getHostConfig();
+			HostConfig host = Objects.requireNonNull(cmd.getHostConfig(), "hostConfig");
 			List<Bind> all = new ArrayList<>(host.getBinds() == null ? List.of() : Arrays.asList(host.getBinds()));
 			all.addAll(binds);
 			host.withBinds(all);

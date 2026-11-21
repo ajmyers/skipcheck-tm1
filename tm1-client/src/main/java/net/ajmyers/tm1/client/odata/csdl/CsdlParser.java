@@ -14,6 +14,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.jspecify.annotations.Nullable;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -98,7 +99,7 @@ public final class CsdlParser {
 				}
 			}
 		}
-		return new CsdlSchema(required(e, "Namespace"), attr(e, "Alias", null), entityTypes, complexTypes, enumTypes,
+		return new CsdlSchema(required(e, "Namespace"), optionalAttr(e, "Alias"), entityTypes, complexTypes, enumTypes,
 				operations, container, annotations(e), external);
 	}
 
@@ -109,13 +110,13 @@ public final class CsdlParser {
 				key.add(required(ref, "Name"));
 			}
 		}
-		return new CsdlEntityType(required(e, "Name"), attr(e, "BaseType", null), bool(e, "Abstract", false),
+		return new CsdlEntityType(required(e, "Name"), optionalAttr(e, "BaseType"), bool(e, "Abstract", false),
 				bool(e, "OpenType", false), bool(e, "HasStream", false), key, properties(e), navigationProperties(e),
 				annotations(e));
 	}
 
 	private static CsdlComplexType complexType(Element e) {
-		return new CsdlComplexType(required(e, "Name"), attr(e, "BaseType", null), bool(e, "Abstract", false),
+		return new CsdlComplexType(required(e, "Name"), optionalAttr(e, "BaseType"), bool(e, "Abstract", false),
 				bool(e, "OpenType", false), properties(e), navigationProperties(e), annotations(e));
 	}
 
@@ -123,7 +124,7 @@ public final class CsdlParser {
 		List<CsdlProperty> result = new ArrayList<>();
 		for (Element p : children(e, "Property")) {
 			result.add(new CsdlProperty(required(p, "Name"), CsdlTypeRef.parse(required(p, "Type")),
-					bool(p, "Nullable", true), attr(p, "DefaultValue", null), annotations(p)));
+					bool(p, "Nullable", true), optionalAttr(p, "DefaultValue"), annotations(p)));
 		}
 		return result;
 	}
@@ -132,7 +133,7 @@ public final class CsdlParser {
 		List<CsdlNavigationProperty> result = new ArrayList<>();
 		for (Element p : children(e, "NavigationProperty")) {
 			result.add(new CsdlNavigationProperty(required(p, "Name"), CsdlTypeRef.parse(required(p, "Type")),
-					bool(p, "Nullable", true), attr(p, "Partner", null), bool(p, "ContainsTarget", false),
+					bool(p, "Nullable", true), optionalAttr(p, "Partner"), bool(p, "ContainsTarget", false),
 					annotations(p)));
 		}
 		return result;
@@ -141,7 +142,7 @@ public final class CsdlParser {
 	private static CsdlEnumType enumType(Element e) {
 		List<CsdlEnumType.Member> members = new ArrayList<>();
 		for (Element m : children(e, "Member")) {
-			String value = attr(m, "Value", null);
+			String value = optionalAttr(m, "Value");
 			Long parsed;
 			try {
 				parsed = value == null ? null : Long.valueOf(value.strip());
@@ -169,7 +170,7 @@ public final class CsdlParser {
 			returnNullable = bool(r, "Nullable", true);
 		}
 		return new CsdlOperation(kind, required(e, "Name"), bool(e, "IsBound", false), bool(e, "IsComposable", false),
-				attr(e, "EntitySetPath", null), parameters, returnType, returnNullable, annotations(e));
+				optionalAttr(e, "EntitySetPath"), parameters, returnType, returnNullable, annotations(e));
 	}
 
 	private static CsdlEntityContainer container(Element e) {
@@ -184,9 +185,9 @@ public final class CsdlParser {
 				case "Singleton" -> singletons.add(new CsdlEntityContainer.Singleton(required(child, "Name"),
 						required(child, "Type"), bindings(child), annotations(child)));
 				case "ActionImport" -> actions.add(new CsdlEntityContainer.ActionImport(required(child, "Name"),
-						required(child, "Action"), attr(child, "EntitySet", null), annotations(child)));
+						required(child, "Action"), optionalAttr(child, "EntitySet"), annotations(child)));
 				case "FunctionImport" -> functions.add(new CsdlEntityContainer.FunctionImport(required(child, "Name"),
-						required(child, "Function"), attr(child, "EntitySet", null), annotations(child)));
+						required(child, "Function"), optionalAttr(child, "EntitySet"), annotations(child)));
 				default -> {
 					// Annotations are read below
 				}
@@ -206,7 +207,7 @@ public final class CsdlParser {
 	private static List<CsdlAnnotation> annotations(Element e) {
 		List<CsdlAnnotation> result = new ArrayList<>();
 		for (Element a : children(e, "Annotation")) {
-			result.add(new CsdlAnnotation(required(a, "Term"), attr(a, "Qualifier", null), value(a)));
+			result.add(new CsdlAnnotation(required(a, "Term"), optionalAttr(a, "Qualifier"), value(a)));
 		}
 		return result;
 	}
@@ -277,6 +278,11 @@ public final class CsdlParser {
 
 	private static String attr(Element e, String name, String fallback) {
 		return e.hasAttribute(name) ? e.getAttribute(name) : fallback;
+	}
+
+	/** An optional attribute: its value, or null if it isn't there. */
+	private static @Nullable String optionalAttr(Element e, String name) {
+		return e.hasAttribute(name) ? e.getAttribute(name) : null;
 	}
 
 	private static String required(Element e, String name) {

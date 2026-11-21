@@ -9,6 +9,8 @@ import java.util.Objects;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * OData query options: {@code $select}, {@code $expand} (with nested options),
  * {@code $filter}, {@code $orderby}, {@code $top}, {@code $skip}, {@code $count}, custom
@@ -39,22 +41,23 @@ public final class ODataQuery {
 
 	private final Map<String, ODataQuery> expand;
 
-	private final Filter filter;
+	private final @Nullable Filter filter;
 
 	private final List<String> orderBy;
 
-	private final Integer top;
+	private final @Nullable Integer top;
 
-	private final Integer skip;
+	private final @Nullable Integer skip;
 
-	private final Boolean count;
+	private final @Nullable Boolean count;
 
 	private final Map<String, String> custom;
 
 	private final Map<String, String> aliases;
 
-	private ODataQuery(List<String> select, Map<String, ODataQuery> expand, Filter filter, List<String> orderBy,
-			Integer top, Integer skip, Boolean count, Map<String, String> custom, Map<String, String> aliases) {
+	private ODataQuery(List<String> select, Map<String, ODataQuery> expand, @Nullable Filter filter,
+			List<String> orderBy, @Nullable Integer top, @Nullable Integer skip, @Nullable Boolean count,
+			Map<String, String> custom, Map<String, String> aliases) {
 		this.select = select;
 		this.expand = Collections.unmodifiableMap(expand);
 		this.filter = filter;
@@ -209,7 +212,7 @@ public final class ODataQuery {
 	}
 
 	/** The custom option's value, e.g. the current {@code !sandbox}, if set. */
-	public String option(String name) {
+	public @Nullable String option(String name) {
 		return custom.get(name);
 	}
 
@@ -261,9 +264,9 @@ public final class ODataQuery {
 		return with(select, expand, filter, List.copyOf(next), top, skip, count, custom, aliases);
 	}
 
-	private static ODataQuery with(List<String> select, Map<String, ODataQuery> expand, Filter filter,
-			List<String> orderBy, Integer top, Integer skip, Boolean count, Map<String, String> custom,
-			Map<String, String> aliases) {
+	private static ODataQuery with(List<String> select, Map<String, ODataQuery> expand, @Nullable Filter filter,
+			List<String> orderBy, @Nullable Integer top, @Nullable Integer skip, @Nullable Boolean count,
+			Map<String, String> custom, Map<String, String> aliases) {
 		return new ODataQuery(select, new LinkedHashMap<>(expand), filter, orderBy, top, skip, count,
 				new LinkedHashMap<>(custom), new LinkedHashMap<>(aliases));
 	}

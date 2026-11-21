@@ -14,5 +14,11 @@
  * its namespace ({@code ibm.tm1.api.v1.Cube}) or by its schema's alias
  * ({@code tm1.Cube}); use
  * {@link net.ajmyers.tm1.client.odata.csdl.CsdlDocument#qualify(String)} to compare them.
+ *
+ * <p>
+ * Everything here is non-null unless marked {@link org.jspecify.annotations.Nullable}.
  */
+@NullMarked
 package net.ajmyers.tm1.client.odata.csdl;
+
+import org.jspecify.annotations.NullMarked;

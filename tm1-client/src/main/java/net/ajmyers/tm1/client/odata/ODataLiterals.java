@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * OData literals, as they appear in keys, function parameters and {@code $filter}, before
  * percent-encoding.
@@ -36,7 +38,7 @@ public final class ODataLiterals {
 	 * as an enum member or a date.
 	 * @throws IllegalArgumentException for types with no unambiguous literal form
 	 */
-	public static String of(Object value) {
+	public static String of(@Nullable Object value) {
 		if (value == null) {
 			return "null";
 		}

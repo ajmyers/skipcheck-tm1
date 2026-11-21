@@ -1,4 +1,5 @@
 // Baseline for every Java subproject: toolchain, compiler flags, JUnit
+import net.ltgt.gradle.errorprone.CheckSeverity
 import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
@@ -26,6 +27,10 @@ tasks.withType<JavaCompile>().configureEach {
 	options.errorprone {
 		// Lombok's generated code is Lombok's business
 		disableWarningsInGeneratedCode = true
+		// NullAway: in @NullMarked packages, nothing is null unless declared @Nullable (JSpecify)
+		option("NullAway:OnlyNullMarked", "true")
+		option("NullAway:JSpecifyMode", "true")
+		check("NullAway", if (name.contains("Test")) CheckSeverity.OFF else CheckSeverity.ERROR)
 	}
 	options.encoding = "UTF-8"
 	options.compilerArgs.addAll(listOf("-parameters", "-Xlint:all,-serial,-processing,-options"))
@@ -79,6 +84,7 @@ tasks.withType<Test>().configureEach {
 
 dependencies {
 	"errorprone"(libs.findLibrary("errorprone-core").get())
+	"errorprone"(libs.findLibrary("nullaway").get())
 	"testImplementation"(platform(libs.findLibrary("junit-bom").get()))
 	"testImplementation"(libs.findLibrary("junit-jupiter").get())
 	"testImplementation"(libs.findLibrary("assertj-core").get())

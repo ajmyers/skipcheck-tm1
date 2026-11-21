@@ -1,5 +1,7 @@
 package net.ajmyers.tm1.client.error;
 
+import org.jspecify.annotations.Nullable;
+
 import lombok.Getter;
 
 /**
@@ -38,7 +40,8 @@ public final class Tm1TransportException extends Tm1Exception {
 	 * @param idempotent whether the request is safe to repeat (GET, PUT, DELETE), which
 	 * makes a response-phase failure retryable
 	 */
-	public Tm1TransportException(Phase phase, boolean idempotent, String method, String url, Throwable cause) {
+	public Tm1TransportException(Phase phase, boolean idempotent, String method, String url,
+			@Nullable Throwable cause) {
 		super((phase == Phase.CONNECT ? "Couldn't send the request to TM1" : "No complete response from TM1")
 				+ describe(method, url)
 				+ (cause == null || cause.getMessage() == null ? "" : ": " + cause.getMessage()), method, url, cause);

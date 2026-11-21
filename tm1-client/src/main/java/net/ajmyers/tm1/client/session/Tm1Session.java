@@ -6,6 +6,7 @@ import java.util.Base64;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.client.reactive.ClientHttpConnector;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -53,13 +54,13 @@ public final class Tm1Session {
 
 	private final Connection connection;
 
-	private final String sandbox;
+	private final @Nullable String sandbox;
 
 	Tm1Session(Connection connection) {
 		this(connection, null);
 	}
 
-	private Tm1Session(Connection connection, String sandbox) {
+	private Tm1Session(Connection connection, @Nullable String sandbox) {
 		this.connection = Objects.requireNonNull(connection, "connection");
 		this.sandbox = sandbox;
 	}
@@ -178,23 +179,23 @@ public final class Tm1Session {
 	 */
 	public static final class Builder {
 
-		private String baseUrl;
+		private @Nullable String baseUrl;
 
-		private String authorization;
+		private @Nullable String authorization;
 
-		private String sessionContext;
+		private @Nullable String sessionContext;
 
 		private Tm1Timeouts timeouts = Tm1Timeouts.DEFAULTS;
 
 		private Tm1ErrorClassifier classifier = Tm1ErrorClassifier.defaults();
 
-		private ObjectMapper mapper;
+		private @Nullable ObjectMapper mapper;
 
 		private ObservationRegistry observations = ObservationRegistry.NOOP;
 
-		private WebClient.Builder webClient;
+		private WebClient.@Nullable Builder webClient;
 
-		private ClientHttpConnector connector;
+		private @Nullable ClientHttpConnector connector;
 
 		private Builder() {
 		}

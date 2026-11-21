@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 
@@ -141,15 +142,15 @@ public final class ODataCollectionDecoder {
 
 		private boolean finished;
 
-		private String field;
+		private @Nullable String field;
 
 		private boolean inValue;
 
-		private TokenBuffer current;
+		private @Nullable TokenBuffer current;
 
 		private int currentDepth;
 
-		private String currentControl;
+		private @Nullable String currentControl;
 
 		State(ObjectReader itemReader, String method, String url) {
 			this.itemReader = itemReader;
@@ -257,15 +258,21 @@ public final class ODataCollectionDecoder {
 		 * Starts collecting one value (an item or a control property), which may be a
 		 * single token.
 		 */
-		private void begin(JsonToken token, String control) {
-			current = TokenBuffer.forBuffering(parser, parser.objectReadContext());
-			current.copyCurrentEvent(parser);
+		private void begin(JsonToken token, @Nullable String control) {
+			TokenBuffer buffer = TokenBuffer.forBuffering(parser, parser.objectReadContext());
+			buffer.copyCurrentEvent(parser);
+			current = buffer;
 			currentControl = control;
 			currentDepth = token.isStructStart() ? 1 : 0;
 		}
 
+		/** The value being collected; only called while one is. */
+		private TokenBuffer buffering() {
+			return Objects.requireNonNull(current, "current");
+		}
+
 		private void collect(JsonToken token, List<Event<T>> events) {
-			current.copyCurrentEvent(parser);
+			buffering().copyCurrentEvent(parser);
 			if (token.isStructStart()) {
 				currentDepth++;
 			}
@@ -278,7 +285,7 @@ public final class ODataCollectionDecoder {
 		}
 
 		private T readItem() {
-			try (JsonParser item = current.asParser(parser.objectReadContext())) {
+			try (JsonParser item = buffering().asParser(parser.objectReadContext())) {
 				return itemReader.readValue(item);
 			}
 			finally {
@@ -288,13 +295,13 @@ public final class ODataCollectionDecoder {
 
 		private Event<T> control() {
 			JsonNode value;
-			try (JsonParser p = current.asParser(parser.objectReadContext())) {
+			try (JsonParser p = buffering().asParser(parser.objectReadContext())) {
 				value = nodeReader.readValue(p);
 			}
 			finally {
 				current = null;
 			}
-			String name = currentControl;
+			String name = Objects.requireNonNull(currentControl, "currentControl");
 			if ("error".equals(name)) {
 				ODataError error = ODataError.from(value);
 				throw new Tm1ProtocolException(
