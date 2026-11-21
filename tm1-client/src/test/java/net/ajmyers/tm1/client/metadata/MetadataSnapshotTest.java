@@ -4,12 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-import net.ajmyers.tm1.client.odata.csdl.CsdlAnnotation;
-import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
-import net.ajmyers.tm1.client.odata.csdl.CsdlEntityContainer;
-import net.ajmyers.tm1.client.odata.csdl.CsdlOperation;
-import net.ajmyers.tm1.client.odata.csdl.CsdlRevision;
-import net.ajmyers.tm1.client.odata.csdl.CsdlSchema;
+import net.ajmyers.tm1.csdl.CsdlAnnotation;
+import net.ajmyers.tm1.csdl.CsdlDocument;
+import net.ajmyers.tm1.csdl.CsdlEntityContainer;
+import net.ajmyers.tm1.csdl.CsdlOperation;
+import net.ajmyers.tm1.csdl.CsdlRevision;
+import net.ajmyers.tm1.csdl.CsdlSchema;
 
 /**
  * Checks the committed snapshot parses into the API surface measured from the live

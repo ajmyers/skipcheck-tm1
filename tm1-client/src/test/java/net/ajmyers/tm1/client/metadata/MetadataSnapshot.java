@@ -5,8 +5,8 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
-import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
-import net.ajmyers.tm1.client.odata.csdl.CsdlParser;
+import net.ajmyers.tm1.csdl.CsdlDocument;
+import net.ajmyers.tm1.csdl.CsdlParser;
 
 /**
  * The committed snapshot of TM1's {@code $metadata}: the response exactly as the server

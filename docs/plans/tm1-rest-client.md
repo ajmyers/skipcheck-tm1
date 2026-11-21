@@ -174,7 +174,7 @@ the dependency footprint at Spring WebFlux plus Jackson.
 ```
 
 **Packages** (`net.ajmyers.tm1.client`, proposed):
-`odata` (+ `odata.csdl`, `odata.query`), `session`, `auth`, `version`, `model` (generated, split
+`odata` (+ `odata.query`; the CSDL reader is its own module, `tm1-csdl`, package `net.ajmyers.tm1.csdl`, since phase 1), `session`, `auth`, `version`, `model` (generated, split
 by area), `service` (one subpackage per area), `error`.
 
 ---

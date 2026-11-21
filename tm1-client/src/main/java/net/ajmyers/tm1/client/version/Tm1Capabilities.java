@@ -7,11 +7,11 @@ import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 import net.ajmyers.tm1.client.error.Tm1UnsupportedOperationException;
-import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
-import net.ajmyers.tm1.client.odata.csdl.CsdlEntityContainer;
-import net.ajmyers.tm1.client.odata.csdl.CsdlNavigationProperty;
-import net.ajmyers.tm1.client.odata.csdl.CsdlProperty;
-import net.ajmyers.tm1.client.odata.csdl.CsdlStructuredType;
+import net.ajmyers.tm1.csdl.CsdlDocument;
+import net.ajmyers.tm1.csdl.CsdlEntityContainer;
+import net.ajmyers.tm1.csdl.CsdlNavigationProperty;
+import net.ajmyers.tm1.csdl.CsdlProperty;
+import net.ajmyers.tm1.csdl.CsdlStructuredType;
 
 /**
  * What a connected TM1 server supports, read from its own {@code $metadata}: the way

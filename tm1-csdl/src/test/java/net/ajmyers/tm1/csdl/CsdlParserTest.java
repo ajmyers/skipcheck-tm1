@@ -1,4 +1,4 @@
-package net.ajmyers.tm1.client.odata.csdl;
+package net.ajmyers.tm1.csdl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

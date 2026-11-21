@@ -12,13 +12,13 @@
  * <p>
  * Names are kept as written in the document. A type or operation can be referred to by
  * its namespace ({@code ibm.tm1.api.v1.Cube}) or by its schema's alias
- * ({@code tm1.Cube}); use
- * {@link net.ajmyers.tm1.client.odata.csdl.CsdlDocument#qualify(String)} to compare them.
+ * ({@code tm1.Cube}); use {@link net.ajmyers.tm1.csdl.CsdlDocument#qualify(String)} to
+ * compare them.
  *
  * <p>
  * Everything here is non-null unless marked {@link org.jspecify.annotations.Nullable}.
  */
 @NullMarked
-package net.ajmyers.tm1.client.odata.csdl;
+package net.ajmyers.tm1.csdl;
 
 import org.jspecify.annotations.NullMarked;

@@ -3,12 +3,12 @@ package net.ajmyers.tm1.client.metadata;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 
-import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
-import net.ajmyers.tm1.client.odata.csdl.CsdlEntityContainer;
-import net.ajmyers.tm1.client.odata.csdl.CsdlOperation;
-import net.ajmyers.tm1.client.odata.csdl.CsdlSchema;
-import net.ajmyers.tm1.client.odata.csdl.CsdlStructuredType;
-import net.ajmyers.tm1.client.odata.csdl.CsdlTypeRef;
+import net.ajmyers.tm1.csdl.CsdlDocument;
+import net.ajmyers.tm1.csdl.CsdlEntityContainer;
+import net.ajmyers.tm1.csdl.CsdlOperation;
+import net.ajmyers.tm1.csdl.CsdlSchema;
+import net.ajmyers.tm1.csdl.CsdlStructuredType;
+import net.ajmyers.tm1.csdl.CsdlTypeRef;
 
 /**
  * Every endpoint a document defines, as stable, readable IDs: the unit the coverage gate
