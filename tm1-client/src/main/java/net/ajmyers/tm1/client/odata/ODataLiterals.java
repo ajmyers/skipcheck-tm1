@@ -13,7 +13,9 @@ public final class ODataLiterals {
 	private ODataLiterals() {
 	}
 
-	/** A string literal: single-quoted, with single quotes doubled ({@code 'O''Neil'}). */
+	/**
+	 * A string literal: single-quoted, with single quotes doubled ({@code 'O''Neil'}).
+	 */
 	public static String string(String value) {
 		Objects.requireNonNull(value, "value");
 		return "'" + value.replace("'", "''") + "'";
@@ -30,9 +32,8 @@ public final class ODataLiterals {
 
 	/**
 	 * A literal for a Java value: strings are quoted, numbers and booleans written as is,
-	 * {@code null} as {@code null}. Use {@link Raw} for an already-formed literal, such as an
-	 * enum member or a date.
-	 *
+	 * {@code null} as {@code null}. Use {@link Raw} for an already-formed literal, such
+	 * as an enum member or a date.
 	 * @throws IllegalArgumentException for types with no unambiguous literal form
 	 */
 	public static String of(Object value) {
@@ -51,7 +52,8 @@ public final class ODataLiterals {
 		if (value instanceof BigDecimal decimal) {
 			return decimal.toPlainString();
 		}
-		if (value instanceof Integer || value instanceof Long || value instanceof Short || value instanceof Byte || value instanceof BigInteger) {
+		if (value instanceof Integer || value instanceof Long || value instanceof Short || value instanceof Byte
+				|| value instanceof BigInteger) {
 			return value.toString();
 		}
 		if (value instanceof Double || value instanceof Float) {
@@ -64,13 +66,18 @@ public final class ODataLiterals {
 			}
 			return new BigDecimal(value.toString()).stripTrailingZeros().toPlainString();
 		}
-		throw new IllegalArgumentException("No OData literal for " + value.getClass().getName() + "; pass ODataLiterals.Raw for a preformed literal");
+		throw new IllegalArgumentException("No OData literal for " + value.getClass().getName()
+				+ "; pass ODataLiterals.Raw for a preformed literal");
 	}
 
-	/** A literal written exactly as given, such as {@code ibm.tm1.api.v1.ElementType'Numeric'} or {@code 2026-11-21}. */
+	/**
+	 * A literal written exactly as given, such as
+	 * {@code ibm.tm1.api.v1.ElementType'Numeric'} or {@code 2026-11-21}.
+	 */
 	public record Raw(String literal) {
 		public Raw {
 			Objects.requireNonNull(literal, "literal");
 		}
 	}
+
 }

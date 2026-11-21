@@ -25,4 +25,5 @@ public sealed interface CsdlStructuredType permits CsdlEntityType, CsdlComplexTy
 
 	/** Its annotations, in document order. */
 	List<CsdlAnnotation> annotations();
+
 }

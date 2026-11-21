@@ -21,20 +21,26 @@ import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.util.TokenBuffer;
 
 /**
- * Decodes an OData collection response, {@code {"@odata.context":..., "value":[...]}}, item by
- * item as the bytes arrive, without ever holding the whole response.
+ * Decodes an OData collection response, {@code {"@odata.context":..., "value":[...]}},
+ * item by item as the bytes arrive, without ever holding the whole response.
  *
- * <p>TM1 doesn't page its responses ({@code odata.maxpagesize} is ignored), so a collection such
- * as a large dimension's elements arrives as one body of any size. This decoder feeds Jackson's
- * non-blocking parser with each buffer as it comes, and emits each item of {@code value} as soon
- * as it's complete. Demand is respected: buffers are only requested as items are consumed.
+ * <p>
+ * TM1 doesn't page its responses ({@code odata.maxpagesize} is ignored), so a collection
+ * such as a large dimension's elements arrives as one body of any size. This decoder
+ * feeds Jackson's non-blocking parser with each buffer as it comes, and emits each item
+ * of {@code value} as soon as it's complete. Demand is respected: buffers are only
+ * requested as items are consumed.
  *
- * <p>Top-level control information ({@code @odata.nextLink}, {@code @odata.count},
- * {@code @odata.deltaLink} and so on) is emitted as {@link Event.Control} events, wherever it
- * appears in the body. {@link #follow} uses {@code @odata.nextLink} to fetch further pages.
+ * <p>
+ * Top-level control information ({@code @odata.nextLink}, {@code @odata.count},
+ * {@code @odata.deltaLink} and so on) is emitted as {@link Event.Control} events,
+ * wherever it appears in the body. {@link #follow} uses {@code @odata.nextLink} to fetch
+ * further pages.
  *
- * <p>A body that turns out to be an error, or that ends before the collection is complete, fails
- * with a {@link Tm1ProtocolException}, even if items were already emitted (OData Part 1 §9.5).
+ * <p>
+ * A body that turns out to be an error, or that ends before the collection is complete,
+ * fails with a {@link Tm1ProtocolException}, even if items were already emitted (OData
+ * Part 1 §9.5).
  */
 public final class ODataCollectionDecoder {
 
@@ -48,21 +54,24 @@ public final class ODataCollectionDecoder {
 		record Item<T>(T value) implements Event<T> {
 		}
 
-		/** A top-level property other than {@code value}, such as {@code @odata.nextLink}. */
+		/**
+		 * A top-level property other than {@code value}, such as {@code @odata.nextLink}.
+		 */
 		record Control<T>(String name, JsonNode value) implements Event<T> {
 		}
+
 	}
 
 	/**
 	 * Decodes one response body.
-	 *
 	 * @param body the response body; each buffer is released once read
 	 * @param mapper the mapper to read items with
 	 * @param itemType the type to read each item as
 	 * @param method the request's method, for error messages
 	 * @param url the request's URL, for error messages
 	 */
-	public static <T> Flux<Event<T>> decode(Flux<DataBuffer> body, ObjectMapper mapper, Class<T> itemType, String method, String url) {
+	public static <T> Flux<Event<T>> decode(Flux<DataBuffer> body, ObjectMapper mapper, Class<T> itemType,
+			String method, String url) {
 		Objects.requireNonNull(mapper, "mapper");
 		Objects.requireNonNull(itemType, "itemType");
 		return Flux.defer(() -> {
@@ -72,10 +81,12 @@ public final class ODataCollectionDecoder {
 	}
 
 	/**
-	 * Just the items of one response body. Null members (possible in a collection of primitive
-	 * values) are skipped, since a Reactor stream can't carry nulls; use {@link #decode} to see them.
+	 * Just the items of one response body. Null members (possible in a collection of
+	 * primitive values) are skipped, since a Reactor stream can't carry nulls; use
+	 * {@link #decode} to see them.
 	 */
-	public static <T> Flux<T> items(Flux<DataBuffer> body, ObjectMapper mapper, Class<T> itemType, String method, String url) {
+	public static <T> Flux<T> items(Flux<DataBuffer> body, ObjectMapper mapper, Class<T> itemType, String method,
+			String url) {
 		Flux<Event<T>> events = decode(body, mapper, itemType, method, url);
 		return events.<T>handle((event, sink) -> {
 			if (event instanceof Event.Item<T> item && item.value() != null) {
@@ -85,13 +96,13 @@ public final class ODataCollectionDecoder {
 	}
 
 	/**
-	 * The items of a collection across all its pages: decodes {@code firstPage}, then, if it
-	 * had an {@code @odata.nextLink}, the page {@code fetch} returns for that link, and so on.
-	 * Next links are opaque: they're passed to {@code fetch} exactly as received (OData Part 1
-	 * §11.2.6.7).
+	 * The items of a collection across all its pages: decodes {@code firstPage}, then, if
+	 * it had an {@code @odata.nextLink}, the page {@code fetch} returns for that link,
+	 * and so on. Next links are opaque: they're passed to {@code fetch} exactly as
+	 * received (OData Part 1 §11.2.6.7).
 	 */
-	public static <T> Flux<T> follow(Flux<DataBuffer> firstPage, Function<String, Flux<DataBuffer>> fetch, ObjectMapper mapper, Class<T> itemType,
-			String method, String url) {
+	public static <T> Flux<T> follow(Flux<DataBuffer> firstPage, Function<String, Flux<DataBuffer>> fetch,
+			ObjectMapper mapper, Class<T> itemType, String method, String url) {
 		return Flux.defer(() -> {
 			String[] next = new String[1];
 			Flux<Event<T>> events = decode(firstPage, mapper, itemType, method, url);
@@ -99,31 +110,47 @@ public final class ODataCollectionDecoder {
 				if (event instanceof Event.Item<T> item && item.value() != null) {
 					sink.next(item.value());
 				}
-				else if (event instanceof Event.Control<T> control && ODataJson.NEXT_LINK.equals(control.name()) && control.value().isString()) {
+				else if (event instanceof Event.Control<T> control && ODataJson.NEXT_LINK.equals(control.name())
+						&& control.value().isString()) {
 					next[0] = control.value().asString();
 				}
 			});
-			return page.concatWith(Flux.defer(() -> next[0] == null ? Flux.empty() : follow(fetch.apply(next[0]), fetch, mapper, itemType, method, next[0])));
+			return page.concatWith(Flux.defer(() -> next[0] == null ? Flux.empty()
+					: follow(fetch.apply(next[0]), fetch, mapper, itemType, method, next[0])));
 		});
 	}
 
-	/** Parser state for one body: where we are in the JSON, and the item being collected. */
+	/**
+	 * Parser state for one body: where we are in the JSON, and the item being collected.
+	 */
 	private static final class State<T> {
 
 		private final ObjectReader itemReader;
+
 		private final ObjectReader nodeReader;
+
 		private final String method;
+
 		private final String url;
+
 		private final JsonParser parser;
+
 		private final ByteArrayFeeder feeder;
 
 		private int depth;
+
 		private boolean started;
+
 		private boolean finished;
+
 		private String field;
+
 		private boolean inValue;
+
 		private TokenBuffer current;
+
 		private int currentDepth;
+
 		private String currentControl;
 
 		State(ObjectReader itemReader, String method, String url) {
@@ -149,7 +176,8 @@ public final class ODataCollectionDecoder {
 				return drain();
 			}
 			catch (JacksonException e) {
-				throw new Tm1ProtocolException("TM1 sent malformed JSON: " + e.getOriginalMessage(), null, method, url, e);
+				throw new Tm1ProtocolException("TM1 sent malformed JSON: " + e.getOriginalMessage(), null, method, url,
+						e);
 			}
 		}
 
@@ -158,15 +186,17 @@ public final class ODataCollectionDecoder {
 				feeder.endOfInput();
 				List<Event<T>> events = drain();
 				if (!finished) {
-					throw new Tm1ProtocolException(started ? "The response ended before the collection was complete" : "The response was empty", null,
-							method, url, null);
+					throw new Tm1ProtocolException(started ? "The response ended before the collection was complete"
+							: "The response was empty", null, method, url, null);
 				}
 				return events;
 			}
 			catch (JacksonException e) {
-				// Input ran out partway through a token: the response was cut short, e.g. a dropped connection
-				throw new Tm1ProtocolException("The response ended before the collection was complete (" + e.getOriginalMessage() + ")", null, method,
-						url, e);
+				// Input ran out partway through a token: the response was cut short, e.g.
+				// a dropped connection
+				throw new Tm1ProtocolException(
+						"The response ended before the collection was complete (" + e.getOriginalMessage() + ")", null,
+						method, url, e);
 			}
 		}
 
@@ -185,7 +215,8 @@ public final class ODataCollectionDecoder {
 		private void handle(JsonToken token, List<Event<T>> events) {
 			if (!started) {
 				if (token != JsonToken.START_OBJECT) {
-					throw new Tm1ProtocolException("Expected a JSON object with a 'value' array, got " + token, null, method, url, null);
+					throw new Tm1ProtocolException("Expected a JSON object with a 'value' array, got " + token, null,
+							method, url, null);
 				}
 				started = true;
 				depth = 1;
@@ -228,7 +259,10 @@ public final class ODataCollectionDecoder {
 			}
 		}
 
-		/** Starts collecting one value (an item or a control property), which may be a single token. */
+		/**
+		 * Starts collecting one value (an item or a control property), which may be a
+		 * single token.
+		 */
 		private void begin(JsonToken token, String control) {
 			current = TokenBuffer.forBuffering(parser, parser.objectReadContext());
 			current.copyCurrentEvent(parser);
@@ -269,10 +303,13 @@ public final class ODataCollectionDecoder {
 			String name = currentControl;
 			if ("error".equals(name)) {
 				ODataError error = ODataError.from(value);
-				throw new Tm1ProtocolException("TM1 reported an error in the response" + (error == null ? "" : ": " + error.message()), error, method,
-						url, null);
+				throw new Tm1ProtocolException(
+						"TM1 reported an error in the response" + (error == null ? "" : ": " + error.message()), error,
+						method, url, null);
 			}
 			return new Event.Control<>(name, value);
 		}
+
 	}
+
 }

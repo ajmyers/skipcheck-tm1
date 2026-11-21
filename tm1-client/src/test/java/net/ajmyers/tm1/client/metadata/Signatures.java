@@ -15,8 +15,8 @@ import net.ajmyers.tm1.client.odata.csdl.CsdlStructuredType;
 
 /**
  * A document's API surface as a sorted set of one-line signatures, such as
- * {@code Property ibm.tm1.api.v1.Cube/Name: Edm.String}. Diffing two sets shows what an API
- * version added or removed, in a form that's easy to read in a report.
+ * {@code Property ibm.tm1.api.v1.Cube/Name: Edm.String}. Diffing two sets shows what an
+ * API version added or removed, in a form that's easy to read in a report.
  */
 final class Signatures {
 
@@ -36,10 +36,13 @@ final class Signatures {
 			for (CsdlOperation op : schema.operations()) {
 				StringBuilder params = new StringBuilder();
 				for (CsdlParameter p : op.parameters()) {
-					params.append(params.length() == 0 ? "" : ", ").append(p.name()).append(": ").append(doc.qualify(p.type().name()));
+					params.append(params.length() == 0 ? "" : ", ")
+						.append(p.name())
+						.append(": ")
+						.append(doc.qualify(p.type().name()));
 				}
-				out.add((op.kind() == CsdlOperation.Kind.ACTION ? "Action " : "Function ") + ns + op.name() + "(" + params + ")"
-						+ (op.returnType() == null ? "" : ": " + op.returnType()));
+				out.add((op.kind() == CsdlOperation.Kind.ACTION ? "Action " : "Function ") + ns + op.name() + "("
+						+ params + ")" + (op.returnType() == null ? "" : ": " + op.returnType()));
 			}
 		}
 		doc.entityContainer().ifPresent(c -> container(out, doc, c));
@@ -62,4 +65,5 @@ final class Signatures {
 		c.actionImports().forEach(a -> out.add("ActionImport " + a.name() + ": " + doc.qualify(a.action())));
 		c.functionImports().forEach(f -> out.add("FunctionImport " + f.name() + ": " + doc.qualify(f.function())));
 	}
+
 }

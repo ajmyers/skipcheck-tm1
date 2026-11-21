@@ -5,13 +5,16 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * The value of a CSDL annotation: a constant, a collection or a record. Expression kinds the
- * client doesn't interpret (paths, {@code If}, {@code Apply} and so on) are kept as
+ * The value of a CSDL annotation: a constant, a collection or a record. Expression kinds
+ * the client doesn't interpret (paths, {@code If}, {@code Apply} and so on) are kept as
  * {@link Other}, with their element name.
  */
 public sealed interface CsdlValue {
 
-	/** A {@code String}, {@code Bool}, {@code Int}, {@code Decimal}, {@code EnumMember} or other constant, as written. */
+	/**
+	 * A {@code String}, {@code Bool}, {@code Int}, {@code Decimal}, {@code EnumMember} or
+	 * other constant, as written.
+	 */
 	record Constant(String kind, String text) implements CsdlValue {
 	}
 
@@ -29,7 +32,11 @@ public sealed interface CsdlValue {
 		}
 	}
 
-	/** An annotation with no value, such as {@code <Annotation Term="Core.ConventionalIDs"/>}, which means true for a Boolean term. */
+	/**
+	 * An annotation with no value, such as
+	 * {@code <Annotation Term="Core.ConventionalIDs"/>}, which means true for a Boolean
+	 * term.
+	 */
 	record Empty() implements CsdlValue {
 	}
 
@@ -41,4 +48,5 @@ public sealed interface CsdlValue {
 	default Optional<String> asText() {
 		return this instanceof Constant constant ? Optional.of(constant.text()) : Optional.empty();
 	}
+
 }

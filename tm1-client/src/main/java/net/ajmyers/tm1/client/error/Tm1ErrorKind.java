@@ -1,8 +1,9 @@
 package net.ajmyers.tm1.client.error;
 
 /**
- * What a TM1 error means, as worked out by {@link Tm1ErrorClassifier}. More specific than the
- * HTTP status, since TM1 reports many different failures with the same status and code.
+ * What a TM1 error means, as worked out by {@link Tm1ErrorClassifier}. More specific than
+ * the HTTP status, since TM1 reports many different failures with the same status and
+ * code.
  */
 public enum Tm1ErrorKind {
 
@@ -24,13 +25,19 @@ public enum Tm1ErrorKind {
 	CREDENTIAL_REJECTED,
 	/** Not allowed (403). */
 	FORBIDDEN,
-	/** The user has no read rights to the object (TM1 code 65), e.g. a new grant not seen by a held session yet. */
+	/**
+	 * The user has no read rights to the object (TM1 code 65), e.g. a new grant not seen
+	 * by a held session yet.
+	 */
 	NO_READ_RIGHTS,
 	/** TM1 refused to impersonate the user (for example, an administrator). */
 	IMPERSONATION_REFUSED,
 	/** The user to impersonate doesn't exist. */
 	UNKNOWN_USER,
-	/** A cell write was refused: text in a numeric cell, a consolidated or rule-calculated cell, or no rights. */
+	/**
+	 * A cell write was refused: text in a numeric cell, a consolidated or rule-calculated
+	 * cell, or no rights.
+	 */
 	DATA_SPREAD_FAILED,
 	/** An element unique name in the request is invalid (TM1 code 248). */
 	INVALID_UNIQUE_NAME,
@@ -40,4 +47,5 @@ public enum Tm1ErrorKind {
 	NOT_IMPLEMENTED,
 	/** Anything else. */
 	OTHER
+
 }

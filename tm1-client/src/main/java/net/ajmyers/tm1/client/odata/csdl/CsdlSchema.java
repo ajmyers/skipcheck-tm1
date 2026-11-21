@@ -17,10 +17,12 @@ import java.util.Objects;
  * @param operations its actions and functions, overloads included
  * @param entityContainer its entity container, or {@code null}
  * @param annotations annotations on the schema itself, e.g. {@code Core.SchemaVersion}
- * @param externalAnnotations annotations in {@code Annotations} elements, by their {@code Target}
+ * @param externalAnnotations annotations in {@code Annotations} elements, by their
+ * {@code Target}
  */
-public record CsdlSchema(String namespace, String alias, List<CsdlEntityType> entityTypes, List<CsdlComplexType> complexTypes,
-		List<CsdlEnumType> enumTypes, List<CsdlOperation> operations, CsdlEntityContainer entityContainer, List<CsdlAnnotation> annotations,
+public record CsdlSchema(String namespace, String alias, List<CsdlEntityType> entityTypes,
+		List<CsdlComplexType> complexTypes, List<CsdlEnumType> enumTypes, List<CsdlOperation> operations,
+		CsdlEntityContainer entityContainer, List<CsdlAnnotation> annotations,
 		Map<String, List<CsdlAnnotation>> externalAnnotations) {
 
 	public CsdlSchema {

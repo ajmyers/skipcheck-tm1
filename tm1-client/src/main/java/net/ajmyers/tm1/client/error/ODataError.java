@@ -8,8 +8,9 @@ import tools.jackson.databind.JsonNode;
 /**
  * An OData error response body: {@code {"error":{"code":"278","message":"..."}}}.
  *
- * <p>TM1 uses code {@code 278} for most errors (not found, bad request, precondition failed and
- * not implemented alike), so the code alone rarely identifies an error. See
+ * <p>
+ * TM1 uses code {@code 278} for most errors (not found, bad request, precondition failed
+ * and not implemented alike), so the code alone rarely identifies an error. See
  * {@link Tm1ErrorClassifier}.
  *
  * @param code the error code, as text
@@ -26,7 +27,10 @@ public record ODataError(String code, String message, String target, List<ODataE
 		details = List.copyOf(details);
 	}
 
-	/** Reads an error from a response body, if it is one: either {@code {"error":{...}}} or the inner object. */
+	/**
+	 * Reads an error from a response body, if it is one: either {@code {"error":{...}}}
+	 * or the inner object.
+	 */
 	public static ODataError from(JsonNode body) {
 		if (body == null || !body.isObject()) {
 			return null;
@@ -45,7 +49,8 @@ public record ODataError(String code, String message, String target, List<ODataE
 				}
 			}
 		}
-		return new ODataError(text(error, "code"), text(error, "message"), text(error, "target"), details, error.get("innererror"));
+		return new ODataError(text(error, "code"), text(error, "message"), text(error, "target"), details,
+				error.get("innererror"));
 	}
 
 	private static String text(JsonNode node, String field) {

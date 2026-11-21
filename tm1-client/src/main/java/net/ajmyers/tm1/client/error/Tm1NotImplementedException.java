@@ -8,4 +8,5 @@ public final class Tm1NotImplementedException extends Tm1ApiException {
 	Tm1NotImplementedException(int status, Tm1ErrorKind kind, ODataError error, String method, String url) {
 		super(status, kind, error, method, url);
 	}
+
 }

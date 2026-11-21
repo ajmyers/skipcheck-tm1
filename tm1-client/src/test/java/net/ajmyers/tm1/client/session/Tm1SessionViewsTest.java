@@ -15,10 +15,11 @@ import tools.jackson.databind.JsonNode;
 /** Sandbox views and the session context label. */
 class Tm1SessionViewsTest {
 
-	private static final Tm1Request<JsonNode> CUBE = Tm1Request.get(ODataPath.of("Cubes").key("Sales"), ODataQuery.none().select("Name"),
-			JsonNode.class);
+	private static final Tm1Request<JsonNode> CUBE = Tm1Request.get(ODataPath.of("Cubes").key("Sales"),
+			ODataQuery.none().select("Name"), JsonNode.class);
 
-	private final FakeTm1 tm1 = new FakeTm1().on("GET Cubes('Sales')?$select=Name", r -> Mono.just(FakeTm1.json(200, "{}")))
+	private final FakeTm1 tm1 = new FakeTm1()
+		.on("GET Cubes('Sales')?$select=Name", r -> Mono.just(FakeTm1.json(200, "{}")))
 		.on("GET Cubes('Sales')?$select=Name&!sandbox=What-if%201", r -> Mono.just(FakeTm1.json(200, "{}")))
 		.on("GET Cubes('Sales')?$select=Name&!sandbox=Mine", r -> Mono.just(FakeTm1.json(200, "{}")));
 
@@ -27,7 +28,9 @@ class Tm1SessionViewsTest {
 		Tm1Session base = tm1.session();
 		Tm1Session whatIf = base.withSandbox("What-if 1");
 
-		StepVerifier.create(whatIf.execute(CUBE).then(base.execute(CUBE)).then(whatIf.withoutSandbox().execute(CUBE))).expectNextCount(1).verifyComplete();
+		StepVerifier.create(whatIf.execute(CUBE).then(base.execute(CUBE)).then(whatIf.withoutSandbox().execute(CUBE)))
+			.expectNextCount(1)
+			.verifyComplete();
 
 		assertThat(tm1.requests("GET Cubes('Sales')?$select=Name&!sandbox=What-if%201")).hasSize(1);
 		assertThat(tm1.requests("GET Cubes('Sales')?$select=Name")).hasSize(2);
@@ -40,7 +43,9 @@ class Tm1SessionViewsTest {
 	@Test
 	void keepsASandboxTheRequestSetsItself() {
 		Tm1Session whatIf = tm1.session().withSandbox("What-if 1");
-		StepVerifier.create(whatIf.execute(CUBE.withQuery(CUBE.query().option("!sandbox", "Mine")))).expectNextCount(1).verifyComplete();
+		StepVerifier.create(whatIf.execute(CUBE.withQuery(CUBE.query().option("!sandbox", "Mine"))))
+			.expectNextCount(1)
+			.verifyComplete();
 		assertThat(tm1.requests("GET Cubes('Sales')?$select=Name&!sandbox=Mine")).hasSize(1);
 	}
 
@@ -58,8 +63,10 @@ class Tm1SessionViewsTest {
 		Tm1Session session = tm1.session(Tm1Session.builder().sessionContext("planning-app"));
 		StepVerifier.create(session.execute(CUBE)).expectNextCount(1).verifyComplete();
 
-		assertThat(tm1.requests(FakeTm1.LOGIN).get(0).headers().getFirst("TM1-SessionContext")).isEqualTo("planning-app");
-		assertThat(tm1.requests("GET Cubes('Sales')?$select=Name").get(0).headers().getFirst("TM1-SessionContext")).isNull();
+		assertThat(tm1.requests(FakeTm1.LOGIN).get(0).headers().getFirst("TM1-SessionContext"))
+			.isEqualTo("planning-app");
+		assertThat(tm1.requests("GET Cubes('Sales')?$select=Name").get(0).headers().getFirst("TM1-SessionContext"))
+			.isNull();
 	}
 
 	@Test
@@ -67,4 +74,5 @@ class Tm1SessionViewsTest {
 		assertThatIllegalArgumentException().isThrownBy(() -> tm1.session().withSandbox(" "));
 		assertThatIllegalArgumentException().isThrownBy(() -> Tm1Session.builder().sessionContext("x".repeat(251)));
 	}
+
 }

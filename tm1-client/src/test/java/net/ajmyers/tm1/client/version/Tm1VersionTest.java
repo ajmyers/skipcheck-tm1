@@ -42,6 +42,8 @@ class Tm1VersionTest {
 	@ParameterizedTest
 	@ValueSource(strings = { "", "11.", ".8", "11..8", "v11.8", "11.8-beta", "99999999999" })
 	void rejectsNonVersions(String text) {
-		assertThatIllegalArgumentException().isThrownBy(() -> Tm1Version.parse(text)).withMessageContaining("Not a TM1 version");
+		assertThatIllegalArgumentException().isThrownBy(() -> Tm1Version.parse(text))
+			.withMessageContaining("Not a TM1 version");
 	}
+
 }

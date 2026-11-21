@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 class FilterTest {
 
 	private static final ODataProperty NAME = ODataProperty.of("Name");
+
 	private static final ODataProperty LEVEL = ODataProperty.of("Level");
 
 	@Test
@@ -20,7 +21,8 @@ class FilterTest {
 		assertThat(ODataProperty.of("Value").gt(2.5d)).hasToString("(Value gt 2.5)");
 		assertThat(ODataProperty.of("Active").eq(true)).hasToString("(Active eq true)");
 		assertThat(ODataProperty.of("Parent").isNull()).hasToString("(Parent eq null)");
-		assertThat(ODataProperty.of("Type").eq(new ODataLiterals.Raw(ODataLiterals.enumMember("ibm.tm1.api.v1.ElementType", "Numeric"))))
+		assertThat(ODataProperty.of("Type")
+			.eq(new ODataLiterals.Raw(ODataLiterals.enumMember("ibm.tm1.api.v1.ElementType", "Numeric"))))
 			.hasToString("(Type eq ibm.tm1.api.v1.ElementType'Numeric')");
 	}
 
@@ -40,7 +42,8 @@ class FilterTest {
 
 	@Test
 	void writesLambdas() {
-		assertThat(Filter.any("Hierarchies", "h", h -> h.nav("Name").eq("}Clients"))).hasToString("Hierarchies/any(h:(h/Name eq '}Clients'))");
+		assertThat(Filter.any("Hierarchies", "h", h -> h.nav("Name").eq("}Clients")))
+			.hasToString("Hierarchies/any(h:(h/Name eq '}Clients'))");
 		assertThat(Filter.all("Tags", "t", t -> t.self().ne("x"))).hasToString("Tags/all(t:(t ne 'x'))");
 	}
 
@@ -59,4 +62,5 @@ class FilterTest {
 		assertThat(ODataLiterals.of(1e-7)).isEqualTo("0.0000001");
 		assertThat(ODataLiterals.of(12L)).isEqualTo("12");
 	}
+
 }

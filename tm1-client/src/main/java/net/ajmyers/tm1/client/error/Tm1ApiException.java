@@ -5,12 +5,13 @@ import java.util.Objects;
 import lombok.Getter;
 
 /**
- * TM1 answered with an error status. Carries the status, the parsed OData error and what it
- * means ({@link #kind()}). The subclass follows from the kind first and the status second, so a
- * "not found" TM1 reports as a 400 is still a {@link Tm1NotFoundException}.
+ * TM1 answered with an error status. Carries the status, the parsed OData error and what
+ * it means ({@link #kind()}). The subclass follows from the kind first and the status
+ * second, so a "not found" TM1 reports as a 400 is still a {@link Tm1NotFoundException}.
  */
-public sealed class Tm1ApiException extends Tm1Exception permits Tm1BadRequestException, Tm1AuthenticationException, Tm1ForbiddenException,
-		Tm1NotFoundException, Tm1ConflictException, Tm1PreconditionFailedException, Tm1NotImplementedException, Tm1ServerException {
+public sealed class Tm1ApiException extends Tm1Exception
+		permits Tm1BadRequestException, Tm1AuthenticationException, Tm1ForbiddenException, Tm1NotFoundException,
+		Tm1ConflictException, Tm1PreconditionFailedException, Tm1NotImplementedException, Tm1ServerException {
 
 	private static final long serialVersionUID = 1L;
 
@@ -35,10 +36,11 @@ public sealed class Tm1ApiException extends Tm1Exception permits Tm1BadRequestEx
 
 	/**
 	 * The exception for an error response, classified with {@code classifier}.
-	 *
-	 * @param error the parsed error body, or {@code null} if the body wasn't an OData error
+	 * @param error the parsed error body, or {@code null} if the body wasn't an OData
+	 * error
 	 */
-	public static Tm1ApiException of(int status, ODataError error, String method, String url, Tm1ErrorClassifier classifier) {
+	public static Tm1ApiException of(int status, ODataError error, String method, String url,
+			Tm1ErrorClassifier classifier) {
 		Tm1ErrorKind kind = classifier.classify(status, error);
 		return of(status, kind, error, method, url);
 	}
@@ -81,7 +83,10 @@ public sealed class Tm1ApiException extends Tm1Exception permits Tm1BadRequestEx
 		return status == 429 || status == 502 || status == 503 || status == 504;
 	}
 
-	/** False for client errors (4xx), which TM1 rejected; true for server errors, except 501. */
+	/**
+	 * False for client errors (4xx), which TM1 rejected; true for server errors, except
+	 * 501.
+	 */
 	@Override
 	public boolean mayHaveApplied() {
 		return status >= 500 && status != 501;
@@ -92,4 +97,5 @@ public sealed class Tm1ApiException extends Tm1Exception permits Tm1BadRequestEx
 		String code = error == null || error.code().isEmpty() ? "" : " [code " + error.code() + "]";
 		return "TM1 returned " + status + detail + code + describe(method, url);
 	}
+
 }

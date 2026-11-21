@@ -20,10 +20,10 @@ import reactor.core.publisher.Mono;
  * A stand-in for TM1 behind WebClient, for unit tests of the session: answers requests by
  * {@code METHOD path?query} with canned responses, and records every request.
  *
- * <p>Unless told otherwise, a login ({@code GET ActiveSession?$select=ID}) succeeds with cookie
- * {@code c1} and session ID 1, the next with {@code c2} and 2, and so on (a login that sends a
- * cookie keeps it, as with TM1), and {@code tm1.Close}
- * answers 204.
+ * <p>
+ * Unless told otherwise, a login ({@code GET ActiveSession?$select=ID}) succeeds with
+ * cookie {@code c1} and session ID 1, the next with {@code c2} and 2, and so on (a login
+ * that sends a cookie keeps it, as with TM1), and {@code tm1.Close} answers 204.
  */
 final class FakeTm1 implements ExchangeFunction {
 
@@ -32,7 +32,9 @@ final class FakeTm1 implements ExchangeFunction {
 	static final String CLOSE = "POST ActiveSession/tm1.Close";
 
 	private final Map<String, List<Function<ClientRequest, Mono<ClientResponse>>>> handlers = new ConcurrentHashMap<>();
+
 	private final List<ClientRequest> requests = new CopyOnWriteArrayList<>();
+
 	private int logins;
 
 	FakeTm1() {
@@ -41,7 +43,8 @@ final class FakeTm1 implements ExchangeFunction {
 			synchronized (this) {
 				n = ++logins;
 			}
-			// Like TM1: a login that sends a cookie logs that session in, and sets no new cookie
+			// Like TM1: a login that sends a cookie logs that session in, and sets no new
+			// cookie
 			return Mono.just(cookie(request) != null ? json(200, "{\"ID\":" + n + "}")
 					: json(200, "{\"ID\":" + n + "}", "TM1SessionId=c" + n + "; Path=/api/; HttpOnly"));
 		});
@@ -54,7 +57,10 @@ final class FakeTm1 implements ExchangeFunction {
 		return this;
 	}
 
-	/** Answers {@code key} with each handler once, in order, then keeps using the last one. */
+	/**
+	 * Answers {@code key} with each handler once, in order, then keeps using the last
+	 * one.
+	 */
 	@SafeVarargs
 	final FakeTm1 onEach(String key, Function<ClientRequest, Mono<ClientResponse>>... answers) {
 		List<Function<ClientRequest, Mono<ClientResponse>>> list = new ArrayList<>();
@@ -70,7 +76,10 @@ final class FakeTm1 implements ExchangeFunction {
 	}
 
 	Tm1Session session(Tm1Session.Builder builder) {
-		return builder.baseUrl(ROOT).basicAuth("admin", "apple").webClient(WebClient.builder().exchangeFunction(this)).build();
+		return builder.baseUrl(ROOT)
+			.basicAuth("admin", "apple")
+			.webClient(WebClient.builder().exchangeFunction(this))
+			.build();
 	}
 
 	@Override
@@ -112,7 +121,8 @@ final class FakeTm1 implements ExchangeFunction {
 	}
 
 	static ClientResponse json(int status, String body, String... setCookies) {
-		ClientResponse.Builder builder = ClientResponse.create(HttpStatus.valueOf(status)).header(HttpHeaders.CONTENT_TYPE, "application/json");
+		ClientResponse.Builder builder = ClientResponse.create(HttpStatus.valueOf(status))
+			.header(HttpHeaders.CONTENT_TYPE, "application/json");
 		for (String cookie : setCookies) {
 			builder.header(HttpHeaders.SET_COOKIE, cookie);
 		}
@@ -130,4 +140,5 @@ final class FakeTm1 implements ExchangeFunction {
 	static ClientResponse text(String body) {
 		return ClientResponse.create(HttpStatus.OK).header(HttpHeaders.CONTENT_TYPE, "text/plain").body(body).build();
 	}
+
 }

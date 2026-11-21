@@ -14,8 +14,9 @@ import java.util.Objects;
  * @param navigationProperties its own navigation properties
  * @param annotations its annotations
  */
-public record CsdlComplexType(String name, String baseType, boolean isAbstract, boolean openType, List<CsdlProperty> properties,
-		List<CsdlNavigationProperty> navigationProperties, List<CsdlAnnotation> annotations) implements CsdlStructuredType {
+public record CsdlComplexType(String name, String baseType, boolean isAbstract, boolean openType,
+		List<CsdlProperty> properties, List<CsdlNavigationProperty> navigationProperties,
+		List<CsdlAnnotation> annotations) implements CsdlStructuredType {
 
 	public CsdlComplexType {
 		Objects.requireNonNull(name, "name");

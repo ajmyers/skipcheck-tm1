@@ -25,9 +25,10 @@ import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
  *     ./gradlew :tm1-client:test --tests '*MetadataSnapshotUpdateTest'
  * }</pre>
  *
- * <p>It writes {@code src/test/resources/metadata/tm1-schema-<version>.xml}. For a new schema
- * version, also update {@link MetadataSnapshot#VERSION}, then triage the new endpoints the
- * coverage gate reports.
+ * <p>
+ * It writes {@code src/test/resources/metadata/tm1-schema-<version>.xml}. For a new
+ * schema version, also update {@link MetadataSnapshot#VERSION}, then triage the new
+ * endpoints the coverage gate reports.
  */
 @RequiresTm1
 @EnabledIfEnvironmentVariable(named = "TM1_UPDATE_METADATA_SNAPSHOT", matches = "true")
@@ -36,7 +37,8 @@ class MetadataSnapshotUpdateTest {
 	@Test
 	void writesTheSnapshot(Tm1ServerContainer tm1) throws Exception {
 		String live = HttpClient.newHttpClient()
-			.send(HttpRequest.newBuilder(URI.create(tm1.getRestUrl() + "$metadata")).build(), HttpResponse.BodyHandlers.ofString())
+			.send(HttpRequest.newBuilder(URI.create(tm1.getRestUrl() + "$metadata")).build(),
+					HttpResponse.BodyHandlers.ofString())
 			.body();
 		String version = CsdlParser.parse(live).schemaVersion().orElseThrow();
 
@@ -46,4 +48,5 @@ class MetadataSnapshotUpdateTest {
 		Files.writeString(file, live, StandardCharsets.UTF_8);
 		assertThat(file).exists();
 	}
+
 }

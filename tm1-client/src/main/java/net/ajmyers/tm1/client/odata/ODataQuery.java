@@ -10,9 +10,10 @@ import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 
 /**
- * OData query options: {@code $select}, {@code $expand} (with nested options), {@code $filter},
- * {@code $orderby}, {@code $top}, {@code $skip}, {@code $count}, custom options such as TM1's
- * {@code !sandbox}, and parameter aliases. Immutable: each method returns a new query.
+ * OData query options: {@code $select}, {@code $expand} (with nested options),
+ * {@code $filter}, {@code $orderby}, {@code $top}, {@code $skip}, {@code $count}, custom
+ * options such as TM1's {@code !sandbox}, and parameter aliases. Immutable: each method
+ * returns a new query.
  *
  * <pre>{@code
  * ODataQuery.none().select("Name", "Type")
@@ -22,28 +23,38 @@ import java.util.regex.Pattern;
  *     // $select=Name,Type&$expand=Hierarchies($select=Name;$top=5)&$filter=startswith(Name,'Q')   (then encoded)
  * }</pre>
  *
- * <p>Options are written in a fixed order, lowercase with {@code $} as OData 4.0 requires, and
- * each value is percent-encoded once by {@link #toQueryString()}. Nested options inside
- * {@code $expand} are separated by {@code ;}.
+ * <p>
+ * Options are written in a fixed order, lowercase with {@code $} as OData 4.0 requires,
+ * and each value is percent-encoded once by {@link #toQueryString()}. Nested options
+ * inside {@code $expand} are separated by {@code ;}.
  */
 public final class ODataQuery {
 
-	private static final ODataQuery EMPTY = new ODataQuery(List.of(), new LinkedHashMap<>(), null, List.of(), null, null, null, new LinkedHashMap<>(),
-			new LinkedHashMap<>());
+	private static final ODataQuery EMPTY = new ODataQuery(List.of(), new LinkedHashMap<>(), null, List.of(), null,
+			null, null, new LinkedHashMap<>(), new LinkedHashMap<>());
+
 	private static final Pattern CUSTOM = Pattern.compile("[A-Za-z!][A-Za-z0-9_\\-.!]*");
 
 	private final List<String> select;
+
 	private final Map<String, ODataQuery> expand;
+
 	private final Filter filter;
+
 	private final List<String> orderBy;
+
 	private final Integer top;
+
 	private final Integer skip;
+
 	private final Boolean count;
+
 	private final Map<String, String> custom;
+
 	private final Map<String, String> aliases;
 
-	private ODataQuery(List<String> select, Map<String, ODataQuery> expand, Filter filter, List<String> orderBy, Integer top, Integer skip,
-			Boolean count, Map<String, String> custom, Map<String, String> aliases) {
+	private ODataQuery(List<String> select, Map<String, ODataQuery> expand, Filter filter, List<String> orderBy,
+			Integer top, Integer skip, Boolean count, Map<String, String> custom, Map<String, String> aliases) {
 		this.select = select;
 		this.expand = Collections.unmodifiableMap(expand);
 		this.filter = filter;
@@ -61,8 +72,9 @@ public final class ODataQuery {
 	}
 
 	/**
-	 * Adds properties to {@code $select}. Like every option here it's an instance method, so it
-	 * works the same at the top level and inside {@link #expand(String, UnaryOperator)}.
+	 * Adds properties to {@code $select}. Like every option here it's an instance method,
+	 * so it works the same at the top level and inside
+	 * {@link #expand(String, UnaryOperator)}.
 	 */
 	public ODataQuery select(String... properties) {
 		List<String> next = new ArrayList<>(select);
@@ -86,7 +98,10 @@ public final class ODataQuery {
 		return expand(navigation, q -> q);
 	}
 
-	/** Expands a navigation property, with nested options: {@code expand("Hierarchies", h -> h.select("Name"))}. */
+	/**
+	 * Expands a navigation property, with nested options:
+	 * {@code expand("Hierarchies", h -> h.select("Name"))}.
+	 */
 	public ODataQuery expand(String navigation, UnaryOperator<ODataQuery> options) {
 		Objects.requireNonNull(navigation, "navigation");
 		Map<String, ODataQuery> next = new LinkedHashMap<>(expand);
@@ -96,7 +111,8 @@ public final class ODataQuery {
 
 	/** Sets {@code $filter}. */
 	public ODataQuery filter(Filter filter) {
-		return with(select, expand, Objects.requireNonNull(filter, "filter"), orderBy, top, skip, count, custom, aliases);
+		return with(select, expand, Objects.requireNonNull(filter, "filter"), orderBy, top, skip, count, custom,
+				aliases);
 	}
 
 	/** Adds an ascending {@code $orderby} key. */
@@ -131,8 +147,8 @@ public final class ODataQuery {
 	}
 
 	/**
-	 * Sets a custom query option, such as TM1's {@code !sandbox}. Custom options must not start
-	 * with {@code $} or {@code @}. Setting one again replaces it.
+	 * Sets a custom query option, such as TM1's {@code !sandbox}. Custom options must not
+	 * start with {@code $} or {@code @}. Setting one again replaces it.
 	 */
 	public ODataQuery option(String name, String value) {
 		if (name == null || !CUSTOM.matcher(name).matches()) {
@@ -143,7 +159,10 @@ public final class ODataQuery {
 		return with(select, expand, filter, orderBy, top, skip, count, next, aliases);
 	}
 
-	/** Defines a parameter alias for a function call: {@code @p=<literal or JSON>}, written as given. */
+	/**
+	 * Defines a parameter alias for a function call: {@code @p=<literal or JSON>},
+	 * written as given.
+	 */
 	public ODataQuery alias(ODataPath.Alias alias, String literalOrJson) {
 		Map<String, String> next = new LinkedHashMap<>(aliases);
 		next.put(alias.name(), Objects.requireNonNull(literalOrJson, "literalOrJson"));
@@ -155,7 +174,10 @@ public final class ODataQuery {
 		return toQueryString().isEmpty();
 	}
 
-	/** The encoded query string, without a leading {@code ?}; empty if there are no options. */
+	/**
+	 * The encoded query string, without a leading {@code ?}; empty if there are no
+	 * options.
+	 */
 	public String toQueryString() {
 		List<String> parts = new ArrayList<>();
 		for (Map.Entry<String, String> option : systemOptions().entrySet()) {
@@ -239,9 +261,11 @@ public final class ODataQuery {
 		return with(select, expand, filter, List.copyOf(next), top, skip, count, custom, aliases);
 	}
 
-	private static ODataQuery with(List<String> select, Map<String, ODataQuery> expand, Filter filter, List<String> orderBy, Integer top,
-			Integer skip, Boolean count, Map<String, String> custom, Map<String, String> aliases) {
-		return new ODataQuery(select, new LinkedHashMap<>(expand), filter, orderBy, top, skip, count, new LinkedHashMap<>(custom),
-				new LinkedHashMap<>(aliases));
+	private static ODataQuery with(List<String> select, Map<String, ODataQuery> expand, Filter filter,
+			List<String> orderBy, Integer top, Integer skip, Boolean count, Map<String, String> custom,
+			Map<String, String> aliases) {
+		return new ODataQuery(select, new LinkedHashMap<>(expand), filter, orderBy, top, skip, count,
+				new LinkedHashMap<>(custom), new LinkedHashMap<>(aliases));
 	}
+
 }

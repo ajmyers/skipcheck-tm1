@@ -22,46 +22,69 @@ class ODataQueryTest {
 
 	@Test
 	void writesOptionsInAFixedOrder() {
-		ODataQuery query = ODataQuery.none().top(10).withCount().orderBy("Name").skip(5).filter(Filter.raw("Level eq 0")).expand("Hierarchies")
+		ODataQuery query = ODataQuery.none()
+			.top(10)
+			.withCount()
+			.orderBy("Name")
+			.skip(5)
+			.filter(Filter.raw("Level eq 0"))
+			.expand("Hierarchies")
 			.select("Name", "Type");
-		assertThat(query).hasToString("$select=Name,Type&$expand=Hierarchies&$filter=Level eq 0&$orderby=Name&$top=10&$skip=5&$count=true");
+		assertThat(query).hasToString(
+				"$select=Name,Type&$expand=Hierarchies&$filter=Level eq 0&$orderby=Name&$top=10&$skip=5&$count=true");
 	}
 
 	@Test
 	void nestsExpandOptionsWithSemicolons() {
-		ODataQuery query = ODataQuery.none().select("Name")
+		ODataQuery query = ODataQuery.none()
+			.select("Name")
 			.expand("Hierarchies", h -> h.select("Name").expand("Elements", e -> e.select("Name").top(1)))
 			.expand("Cube");
-		assertThat(query).hasToString("$select=Name&$expand=Hierarchies($select=Name;$expand=Elements($select=Name;$top=1)),Cube");
+		assertThat(query)
+			.hasToString("$select=Name&$expand=Hierarchies($select=Name;$expand=Elements($select=Name;$top=1)),Cube");
 		// '=' inside a nested option is encoded; TM1 accepts it
-		assertThat(query.toQueryString()).isEqualTo("$select=Name&$expand=Hierarchies($select%3DName;$expand%3DElements($select%3DName;$top%3D1)),Cube");
+		assertThat(query.toQueryString()).isEqualTo(
+				"$select=Name&$expand=Hierarchies($select%3DName;$expand%3DElements($select%3DName;$top%3D1)),Cube");
 	}
 
 	@Test
 	void appliesNestedOptionsInAnyOrder() {
-		// select() is an instance method, so in a nested expand it adds to that expand's options
+		// select() is an instance method, so in a nested expand it adds to that expand's
+		// options
 		ODataQuery query = ODataQuery.none().expand("Hierarchies", h -> h.top(1).select("Name").orderBy("Name"));
 		assertThat(query).hasToString("$expand=Hierarchies($select=Name;$orderby=Name;$top=1)");
 	}
 
 	@Test
 	void mergesRepeatedExpandsOfOneNavigation() {
-		ODataQuery query = ODataQuery.none().expand("Hierarchies", h -> h.select("Name")).expand("Hierarchies", h -> h.top(2));
+		ODataQuery query = ODataQuery.none()
+			.expand("Hierarchies", h -> h.select("Name"))
+			.expand("Hierarchies", h -> h.top(2));
 		assertThat(query).hasToString("$expand=Hierarchies($select=Name;$top=2)");
 	}
 
 	@Test
 	void ordersDescending() {
-		assertThat(ODataQuery.none().orderByDescending("TimeStamp").orderBy("ID")).hasToString("$orderby=TimeStamp desc,ID");
+		assertThat(ODataQuery.none().orderByDescending("TimeStamp").orderBy("ID"))
+			.hasToString("$orderby=TimeStamp desc,ID");
 	}
 
 	@Test
 	void encodesEachValueOnce() {
-		ODataQuery query = ODataQuery.none().filter(ODataProperty.of("Name").eq("a&b=c+d #e%f")).option("!sandbox", "What if & more");
+		ODataQuery query = ODataQuery.none()
+			.filter(ODataProperty.of("Name").eq("a&b=c+d #e%f"))
+			.option("!sandbox", "What if & more");
 		String encoded = query.toQueryString();
-		assertThat(encoded).doesNotContain(" ").doesNotContain("+").contains("%26").contains("%3D").contains("%2B").contains("%23").contains("%25");
+		assertThat(encoded).doesNotContain(" ")
+			.doesNotContain("+")
+			.contains("%26")
+			.contains("%3D")
+			.contains("%2B")
+			.contains("%23")
+			.contains("%25");
 		Map<String, String> back = parse(encoded);
-		assertThat(back).containsEntry("$filter", "(Name eq 'a&b=c+d #e%f')").containsEntry("!sandbox", "What if & more");
+		assertThat(back).containsEntry("$filter", "(Name eq 'a&b=c+d #e%f')")
+			.containsEntry("!sandbox", "What if & more");
 	}
 
 	@Test
@@ -74,10 +97,14 @@ class ODataQueryTest {
 			for (int j = 0, n = 1 + random.nextInt(10); j < n; j++) {
 				v.appendCodePoint(cps[random.nextInt(cps.length)]);
 			}
-			String encoded = ODataQuery.none().filter(ODataProperty.of("Name").eq(v.toString())).option("!sandbox", v.toString()).toQueryString();
+			String encoded = ODataQuery.none()
+				.filter(ODataProperty.of("Name").eq(v.toString()))
+				.option("!sandbox", v.toString())
+				.toQueryString();
 			assertThat(URI.create("http://tm1/api/v1/Cubes?" + encoded)).isNotNull();
 			Map<String, String> back = parse(encoded);
-			assertThat(back.get("$filter")).as(v.toString()).isEqualTo("(Name eq " + ODataLiterals.string(v.toString()) + ")");
+			assertThat(back.get("$filter")).as(v.toString())
+				.isEqualTo("(Name eq " + ODataLiterals.string(v.toString()) + ")");
 			assertThat(back.get("!sandbox")).as(v.toString()).isEqualTo(v.toString());
 		}
 	}
@@ -106,13 +133,18 @@ class ODataQueryTest {
 		assertThat(base.option("!sandbox")).isNull();
 	}
 
-	/** Splits and decodes a query string once, as a server would. No '+' is ever sent, so URLDecoder's '+' rule doesn't matter. */
+	/**
+	 * Splits and decodes a query string once, as a server would. No '+' is ever sent, so
+	 * URLDecoder's '+' rule doesn't matter.
+	 */
 	private static Map<String, String> parse(String query) {
 		Map<String, String> out = new LinkedHashMap<>();
 		for (String part : query.split("&")) {
 			int eq = part.indexOf('=');
-			out.put(URLDecoder.decode(part.substring(0, eq), StandardCharsets.UTF_8), URLDecoder.decode(part.substring(eq + 1), StandardCharsets.UTF_8));
+			out.put(URLDecoder.decode(part.substring(0, eq), StandardCharsets.UTF_8),
+					URLDecoder.decode(part.substring(eq + 1), StandardCharsets.UTF_8));
 		}
 		return out;
 	}
+
 }

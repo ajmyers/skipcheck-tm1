@@ -20,9 +20,11 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Bare HTTP to TM1, for tests that pin how TM1 itself behaves, independent of the client.
  *
- * <p>Uses the JDK client with no cookie handler, so a request carries exactly the credentials
- * and cookie it's given. That matters: a request with Basic credentials and no cookie silently
- * opens a new TM1 session, which would hide what a cookie-only request does.
+ * <p>
+ * Uses the JDK client with no cookie handler, so a request carries exactly the
+ * credentials and cookie it's given. That matters: a request with Basic credentials and
+ * no cookie silently opens a new TM1 session, which would hide what a cookie-only request
+ * does.
  */
 final class RawTm1 {
 
@@ -31,15 +33,20 @@ final class RawTm1 {
 	private static final String COOKIE = "TM1SessionId";
 
 	private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+
 	private final String root;
+
 	private final String basic;
 
 	RawTm1(Tm1ServerContainer tm1) {
 		this.root = tm1.getRestUrl();
-		this.basic = "Basic " + Base64.getEncoder().encodeToString((tm1.getUsername() + ":" + tm1.getPassword()).getBytes(StandardCharsets.UTF_8));
+		this.basic = "Basic " + Base64.getEncoder()
+			.encodeToString((tm1.getUsername() + ":" + tm1.getPassword()).getBytes(StandardCharsets.UTF_8));
 	}
 
-	/** Logs in with Basic credentials and no cookie, and returns the new session's cookie. */
+	/**
+	 * Logs in with Basic credentials and no cookie, and returns the new session's cookie.
+	 */
 	String login() {
 		return cookie(send(request("GET", "ActiveSession?$select=ID").basic())).orElseThrow();
 	}
@@ -54,14 +61,17 @@ final class RawTm1 {
 		send(request("POST", "ActiveSession/tm1.Close").cookie(cookie).body("{}"));
 	}
 
-	/** Kills another session by ID, through {@code Sessions(id)/tm1.Close}, from {@code admin}'s session. */
+	/**
+	 * Kills another session by ID, through {@code Sessions(id)/tm1.Close}, from
+	 * {@code admin}'s session.
+	 */
 	int kill(String admin, long id) {
 		return send(request("POST", "Sessions(" + id + ")/tm1.Close").cookie(admin).body("{}")).statusCode();
 	}
 
 	/**
-	 * Waits until session {@code id} is no longer listed, since TM1 takes a few seconds to drop a
-	 * closed session. Whether it went within {@code timeout}.
+	 * Waits until session {@code id} is no longer listed, since TM1 takes a few seconds
+	 * to drop a closed session. Whether it went within {@code timeout}.
 	 */
 	boolean awaitGone(String admin, long id, Duration timeout) {
 		long deadline = System.nanoTime() + timeout.toNanos();
@@ -74,7 +84,9 @@ final class RawTm1 {
 		return true;
 	}
 
-	/** Waits until TM1 lists {@code expected} sessions, and returns the last count seen. */
+	/**
+	 * Waits until TM1 lists {@code expected} sessions, and returns the last count seen.
+	 */
 	int awaitSessionCount(String admin, int expected, Duration timeout) {
 		long deadline = System.nanoTime() + timeout.toNanos();
 		int count = sessionCount(admin);
@@ -123,19 +135,30 @@ final class RawTm1 {
 
 	/** The {@code TM1SessionId} cookie a response sets, as {@code name=value}. */
 	static Optional<String> cookie(HttpResponse<?> response) {
-		return response.headers().allValues("set-cookie").stream().filter(c -> c.startsWith(COOKIE + "=")).map(c -> c.split(";", 2)[0]).findFirst();
+		return response.headers()
+			.allValues("set-cookie")
+			.stream()
+			.filter(c -> c.startsWith(COOKIE + "="))
+			.map(c -> c.split(";", 2)[0])
+			.findFirst();
 	}
 
 	static JsonNode json(HttpResponse<String> response) {
 		return JSON.readTree(response.body());
 	}
 
-	/** One request: method, path relative to the service root, and optional credentials, cookie, headers and JSON body. */
+	/**
+	 * One request: method, path relative to the service root, and optional credentials,
+	 * cookie, headers and JSON body.
+	 */
 	final class Request {
 
 		private final String method;
+
 		private final String path;
+
 		private final Map<String, String> headers = new LinkedHashMap<>();
+
 		private String body;
 
 		private Request(String method, String path) {
@@ -164,12 +187,17 @@ final class RawTm1 {
 		private HttpRequest build() {
 			HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(root + path));
 			headers.forEach(builder::header);
-			return builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body)).build();
+			return builder
+				.method(method,
+						body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body))
+				.build();
 		}
 
 		@Override
 		public String toString() {
 			return method + " " + path;
 		}
+
 	}
+
 }

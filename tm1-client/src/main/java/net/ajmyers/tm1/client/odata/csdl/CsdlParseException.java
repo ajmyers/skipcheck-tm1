@@ -12,4 +12,5 @@ public class CsdlParseException extends RuntimeException {
 	public CsdlParseException(String message, Throwable cause) {
 		super(message, cause);
 	}
+
 }

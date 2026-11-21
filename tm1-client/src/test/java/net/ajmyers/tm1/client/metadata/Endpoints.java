@@ -15,14 +15,17 @@ import net.ajmyers.tm1.client.odata.csdl.CsdlTypeRef;
  * counts. An endpoint is anything a client calls or navigates to:
  *
  * <ul>
- *   <li>{@code EntitySet Cubes}, {@code Singleton Server}: top-level resources
- *   <li>{@code ActionImport ExecuteMDX}, {@code FunctionImport TailMessageLog}: unbound operations
- *   <li>{@code Action Cube/Reserve}, {@code Function Cube/DimensionsStorageOrder}: bound
- *       operations, by binding type ({@code Collection(Cube)/...} when bound to a collection)
- *   <li>{@code Navigation Cube/Views}: navigation properties, including those of complex types
+ * <li>{@code EntitySet Cubes}, {@code Singleton Server}: top-level resources
+ * <li>{@code ActionImport ExecuteMDX}, {@code FunctionImport TailMessageLog}: unbound
+ * operations
+ * <li>{@code Action Cube/Reserve}, {@code Function Cube/DimensionsStorageOrder}: bound
+ * operations, by binding type ({@code Collection(Cube)/...} when bound to a collection)
+ * <li>{@code Navigation Cube/Views}: navigation properties, including those of complex
+ * types
  * </ul>
  *
- * <p>Type names are written without a namespace, since TM1's API has one.
+ * <p>
+ * Type names are written without a namespace, since TM1's API has one.
  */
 final class Endpoints {
 
@@ -60,4 +63,5 @@ final class Endpoints {
 	private static String simple(String qualifiedName) {
 		return qualifiedName.substring(qualifiedName.lastIndexOf('.') + 1);
 	}
+
 }

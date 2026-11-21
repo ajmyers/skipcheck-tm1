@@ -8,7 +8,8 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * A resource path relative to the service root, built from segments and encoded as it's built:
+ * A resource path relative to the service root, built from segments and encoded as it's
+ * built:
  *
  * <pre>{@code
  * ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements").key("O'Neil")
@@ -17,13 +18,15 @@ import java.util.regex.Pattern;
  *     // Cubes('Sales')/tm1.Reserve
  * }</pre>
  *
- * <p>Names (entity sets, navigation properties, operations, type casts) must be OData
- * identifiers, optionally qualified; they're checked, never encoded. Key values can be any
- * text: they're written as string literals and percent-encoded. Paths are immutable.
+ * <p>
+ * Names (entity sets, navigation properties, operations, type casts) must be OData
+ * identifiers, optionally qualified; they're checked, never encoded. Key values can be
+ * any text: they're written as string literals and percent-encoded. Paths are immutable.
  */
 public final class ODataPath {
 
 	private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
 	private static final Pattern QUALIFIED = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*");
 
 	private final List<String> segments;
@@ -32,7 +35,10 @@ public final class ODataPath {
 		this.segments = segments;
 	}
 
-	/** A path starting at an entity set, singleton or operation import, e.g. {@code Cubes}. */
+	/**
+	 * A path starting at an entity set, singleton or operation import, e.g.
+	 * {@code Cubes}.
+	 */
 	public static ODataPath of(String name) {
 		return new ODataPath(List.of(identifier(name)));
 	}
@@ -50,7 +56,10 @@ public final class ODataPath {
 		return appendToLast("(" + ODataEncoding.pathValue(ODataLiterals.of(value)) + ")");
 	}
 
-	/** Adds a compound key, in the order given: {@code (ParentName='Total',ComponentName='Q1')}. */
+	/**
+	 * Adds a compound key, in the order given:
+	 * {@code (ParentName='Total',ComponentName='Q1')}.
+	 */
 	public ODataPath key(Map<String, ?> parts) {
 		if (parts.isEmpty()) {
 			throw new IllegalArgumentException("A compound key needs at least one part");
@@ -60,8 +69,10 @@ public final class ODataPath {
 			if (key.length() > 1) {
 				key.append(',');
 			}
-			key.append(identifier(name)).append('=').append(value instanceof CharSequence text ? encodedString(text.toString())
-					: ODataEncoding.pathValue(ODataLiterals.of(value)));
+			key.append(identifier(name))
+				.append('=')
+				.append(value instanceof CharSequence text ? encodedString(text.toString())
+						: ODataEncoding.pathValue(ODataLiterals.of(value)));
 		});
 		return appendToLast(key.append(')').toString());
 	}
@@ -76,15 +87,18 @@ public final class ODataPath {
 		return append(qualified(qualifiedType));
 	}
 
-	/** Adds a bound action segment, e.g. {@code tm1.Reserve}. Actions are invoked with POST. */
+	/**
+	 * Adds a bound action segment, e.g. {@code tm1.Reserve}. Actions are invoked with
+	 * POST.
+	 */
 	public ODataPath action(String qualifiedName) {
 		return append(qualified(qualifiedName));
 	}
 
 	/**
 	 * Adds a bound function call with literal parameters, e.g.
-	 * {@code tm1.GetPartition(Begin=0,End=99)}. Use parameter aliases (in {@link ODataQuery})
-	 * for complex or collection parameters.
+	 * {@code tm1.GetPartition(Begin=0,End=99)}. Use parameter aliases (in
+	 * {@link ODataQuery}) for complex or collection parameters.
 	 */
 	public ODataPath function(String qualifiedName, Map<String, ?> parameters) {
 		StringBuilder call = new StringBuilder(qualified(qualifiedName)).append('(');
@@ -95,7 +109,8 @@ public final class ODataPath {
 			}
 			first = false;
 			Object value = p.getValue();
-			call.append(identifier(p.getKey())).append('=')
+			call.append(identifier(p.getKey()))
+				.append('=')
 				.append(value instanceof Alias alias ? alias.name() : ODataEncoding.pathValue(ODataLiterals.of(value)));
 		}
 		return append(call.append(')').toString());
@@ -167,7 +182,8 @@ public final class ODataPath {
 
 	private static String identifier(String name) {
 		if (name == null || !IDENTIFIER.matcher(name).matches()) {
-			throw new IllegalArgumentException("Not an OData identifier: '" + name + "'. Key values go in key(), not in a segment name.");
+			throw new IllegalArgumentException(
+					"Not an OData identifier: '" + name + "'. Key values go in key(), not in a segment name.");
 		}
 		return name;
 	}
@@ -178,4 +194,5 @@ public final class ODataPath {
 		}
 		return name;
 	}
+
 }

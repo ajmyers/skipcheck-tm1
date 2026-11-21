@@ -3,9 +3,9 @@ package net.ajmyers.tm1.client.odata;
 import java.util.Objects;
 
 /**
- * A property path for queries, such as {@code Name} or {@code Hierarchy/Name}. The generated
- * model (phase 1) provides constants implementing this, so queries are checked by the compiler;
- * {@link #of} works for any path.
+ * A property path for queries, such as {@code Name} or {@code Hierarchy/Name}. The
+ * generated model (phase 1) provides constants implementing this, so queries are checked
+ * by the compiler; {@link #of} works for any path.
  */
 public interface ODataProperty {
 
@@ -52,4 +52,5 @@ public interface ODataProperty {
 	default Filter isNull() {
 		return Filter.compare(this, "eq", null);
 	}
+
 }

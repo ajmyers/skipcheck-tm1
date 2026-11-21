@@ -12,7 +12,8 @@ import java.util.Objects;
  * @param members its members, in document order (which must be kept)
  * @param annotations its annotations
  */
-public record CsdlEnumType(String name, String underlyingType, boolean flags, List<Member> members, List<CsdlAnnotation> annotations) {
+public record CsdlEnumType(String name, String underlyingType, boolean flags, List<Member> members,
+		List<CsdlAnnotation> annotations) {
 
 	public CsdlEnumType {
 		Objects.requireNonNull(name, "name");
@@ -25,7 +26,8 @@ public record CsdlEnumType(String name, String underlyingType, boolean flags, Li
 	 * A member of an enumeration.
 	 *
 	 * @param name the member's name
-	 * @param value its value, or {@code null} if not given (then its position, for non-flags enums)
+	 * @param value its value, or {@code null} if not given (then its position, for
+	 * non-flags enums)
 	 * @param annotations its annotations
 	 */
 	public record Member(String name, Long value, List<CsdlAnnotation> annotations) {

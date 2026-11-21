@@ -8,12 +8,15 @@ import java.util.Optional;
  * One record of a {@code Core.Revisions} annotation: the schema version in which a model
  * element was added, modified or deprecated.
  *
- * <p>TM1 annotates most of its API this way, back to 10.2.2. The versions are schema versions
- * (as in {@code Core.SchemaVersion}, e.g. {@code 11.8.35}), not server build numbers.
+ * <p>
+ * TM1 annotates most of its API this way, back to 10.2.2. The versions are schema
+ * versions (as in {@code Core.SchemaVersion}, e.g. {@code 11.8.35}), not server build
+ * numbers.
  *
  * @param version the schema version, or {@code null} if the record has none
  * @param kind the kind of revision
- * @param rawKind the kind as written, e.g. {@code Core.RevisionKind/Added}, for kinds this client doesn't know
+ * @param rawKind the kind as written, e.g. {@code Core.RevisionKind/Added}, for kinds
+ * this client doesn't know
  * @param description the reason given, or {@code null}
  */
 public record CsdlRevision(String version, Kind kind, String rawKind, String description) {
@@ -21,12 +24,20 @@ public record CsdlRevision(String version, Kind kind, String rawKind, String des
 	/** The term holding revisions. */
 	public static final String TERM = "Core.Revisions";
 
-	/** The kinds of revision in the Core vocabulary, plus {@link #UNKNOWN} for anything else. */
+	/**
+	 * The kinds of revision in the Core vocabulary, plus {@link #UNKNOWN} for anything
+	 * else.
+	 */
 	public enum Kind {
+
 		ADDED, MODIFIED, DEPRECATED, UNKNOWN
+
 	}
 
-	/** Reads the {@code Core.Revisions} records from an element's annotations, in document order. */
+	/**
+	 * Reads the {@code Core.Revisions} records from an element's annotations, in document
+	 * order.
+	 */
 	public static List<CsdlRevision> of(List<CsdlAnnotation> annotations) {
 		Optional<CsdlAnnotation> revisions = CsdlAnnotation.find(annotations, TERM);
 		if (revisions.isEmpty() || !(revisions.get().value() instanceof CsdlValue.Collection collection)) {
@@ -45,12 +56,18 @@ public record CsdlRevision(String version, Kind kind, String rawKind, String des
 
 	/** The version this element was first added in, if its revisions say. */
 	public static Optional<String> addedIn(List<CsdlAnnotation> annotations) {
-		return of(annotations).stream().filter(r -> r.kind() == Kind.ADDED && r.version() != null).map(CsdlRevision::version).findFirst();
+		return of(annotations).stream()
+			.filter(r -> r.kind() == Kind.ADDED && r.version() != null)
+			.map(CsdlRevision::version)
+			.findFirst();
 	}
 
 	/** The version this element was deprecated in, if its revisions say. */
 	public static Optional<String> deprecatedIn(List<CsdlAnnotation> annotations) {
-		return of(annotations).stream().filter(r -> r.kind() == Kind.DEPRECATED && r.version() != null).map(CsdlRevision::version).findFirst();
+		return of(annotations).stream()
+			.filter(r -> r.kind() == Kind.DEPRECATED && r.version() != null)
+			.map(CsdlRevision::version)
+			.findFirst();
 	}
 
 	private static String text(CsdlValue.Record record, String property) {

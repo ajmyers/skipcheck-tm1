@@ -23,7 +23,8 @@ import org.xml.sax.SAXException;
 /**
  * Parses CSDL XML ({@code $metadata}) into a {@link CsdlDocument}.
  *
- * <p>The parser is hardened for documents from servers you may not control: DOCTYPE
+ * <p>
+ * The parser is hardened for documents from servers you may not control: DOCTYPE
  * declarations are refused, so external entities and entity expansion can't apply. It's
  * lenient about content instead. Unknown elements, attributes and annotation terms are
  * ignored or kept as data, as the CSDL specification asks of clients.
@@ -36,8 +37,9 @@ public final class CsdlParser {
 	/** The {@code edm} namespace of OData 4.0 and 4.01. */
 	public static final String EDM_NAMESPACE = "http://docs.oasis-open.org/odata/ns/edm";
 
-	private static final Set<String> CONSTANT_KINDS = Set.of("String", "Bool", "Int", "Decimal", "Float", "Date", "DateTimeOffset", "TimeOfDay",
-			"Duration", "Guid", "Binary", "EnumMember", "Path", "PropertyPath", "NavigationPropertyPath", "AnnotationPath", "ModelElementPath");
+	private static final Set<String> CONSTANT_KINDS = Set.of("String", "Bool", "Int", "Decimal", "Float", "Date",
+			"DateTimeOffset", "TimeOfDay", "Duration", "Guid", "Binary", "EnumMember", "Path", "PropertyPath",
+			"NavigationPropertyPath", "AnnotationPath", "ModelElementPath");
 
 	private CsdlParser() {
 	}
@@ -49,7 +51,6 @@ public final class CsdlParser {
 
 	/**
 	 * Parses a CSDL document. The stream isn't closed.
-	 *
 	 * @throws CsdlParseException if it isn't well-formed XML, or not a CSDL document
 	 */
 	public static CsdlDocument parse(InputStream xml) {
@@ -64,7 +65,8 @@ public final class CsdlParser {
 			throw new CsdlParseException("Couldn't read the CSDL document: " + e.getMessage(), e);
 		}
 		if (!"Edmx".equals(root.getLocalName()) || !EDMX_NAMESPACE.equals(root.getNamespaceURI())) {
-			throw new CsdlParseException("Not a CSDL document: the root element is " + root.getTagName() + ", not edmx:Edmx");
+			throw new CsdlParseException(
+					"Not a CSDL document: the root element is " + root.getTagName() + ", not edmx:Edmx");
 		}
 		List<CsdlSchema> schemas = new ArrayList<>();
 		for (Element dataServices : children(root, "DataServices")) {
@@ -103,14 +105,15 @@ public final class CsdlParser {
 					container = container(child);
 					break;
 				case "Annotations":
-					external.computeIfAbsent(required(child, "Target"), t -> new ArrayList<>()).addAll(annotations(child));
+					external.computeIfAbsent(required(child, "Target"), t -> new ArrayList<>())
+						.addAll(annotations(child));
 					break;
 				default:
 					// TypeDefinition, Term and anything newer: not used by the client
 			}
 		}
-		return new CsdlSchema(required(e, "Namespace"), attr(e, "Alias", null), entityTypes, complexTypes, enumTypes, operations, container,
-				annotations(e), external);
+		return new CsdlSchema(required(e, "Namespace"), attr(e, "Alias", null), entityTypes, complexTypes, enumTypes,
+				operations, container, annotations(e), external);
 	}
 
 	private static CsdlEntityType entityType(Element e) {
@@ -120,20 +123,21 @@ public final class CsdlParser {
 				key.add(required(ref, "Name"));
 			}
 		}
-		return new CsdlEntityType(required(e, "Name"), attr(e, "BaseType", null), bool(e, "Abstract", false), bool(e, "OpenType", false),
-				bool(e, "HasStream", false), key, properties(e), navigationProperties(e), annotations(e));
+		return new CsdlEntityType(required(e, "Name"), attr(e, "BaseType", null), bool(e, "Abstract", false),
+				bool(e, "OpenType", false), bool(e, "HasStream", false), key, properties(e), navigationProperties(e),
+				annotations(e));
 	}
 
 	private static CsdlComplexType complexType(Element e) {
-		return new CsdlComplexType(required(e, "Name"), attr(e, "BaseType", null), bool(e, "Abstract", false), bool(e, "OpenType", false),
-				properties(e), navigationProperties(e), annotations(e));
+		return new CsdlComplexType(required(e, "Name"), attr(e, "BaseType", null), bool(e, "Abstract", false),
+				bool(e, "OpenType", false), properties(e), navigationProperties(e), annotations(e));
 	}
 
 	private static List<CsdlProperty> properties(Element e) {
 		List<CsdlProperty> result = new ArrayList<>();
 		for (Element p : children(e, "Property")) {
-			result.add(new CsdlProperty(required(p, "Name"), CsdlTypeRef.parse(required(p, "Type")), bool(p, "Nullable", true),
-					attr(p, "DefaultValue", null), annotations(p)));
+			result.add(new CsdlProperty(required(p, "Name"), CsdlTypeRef.parse(required(p, "Type")),
+					bool(p, "Nullable", true), attr(p, "DefaultValue", null), annotations(p)));
 		}
 		return result;
 	}
@@ -141,8 +145,9 @@ public final class CsdlParser {
 	private static List<CsdlNavigationProperty> navigationProperties(Element e) {
 		List<CsdlNavigationProperty> result = new ArrayList<>();
 		for (Element p : children(e, "NavigationProperty")) {
-			result.add(new CsdlNavigationProperty(required(p, "Name"), CsdlTypeRef.parse(required(p, "Type")), bool(p, "Nullable", true),
-					attr(p, "Partner", null), bool(p, "ContainsTarget", false), annotations(p)));
+			result.add(new CsdlNavigationProperty(required(p, "Name"), CsdlTypeRef.parse(required(p, "Type")),
+					bool(p, "Nullable", true), attr(p, "Partner", null), bool(p, "ContainsTarget", false),
+					annotations(p)));
 		}
 		return result;
 	}
@@ -156,17 +161,20 @@ public final class CsdlParser {
 				parsed = value == null ? null : Long.valueOf(value.strip());
 			}
 			catch (NumberFormatException ex) {
-				throw new CsdlParseException("Enum member " + required(m, "Name") + " has a non-integer Value: " + value, ex);
+				throw new CsdlParseException(
+						"Enum member " + required(m, "Name") + " has a non-integer Value: " + value, ex);
 			}
 			members.add(new CsdlEnumType.Member(required(m, "Name"), parsed, annotations(m)));
 		}
-		return new CsdlEnumType(required(e, "Name"), attr(e, "UnderlyingType", "Edm.Int32"), bool(e, "IsFlags", false), members, annotations(e));
+		return new CsdlEnumType(required(e, "Name"), attr(e, "UnderlyingType", "Edm.Int32"), bool(e, "IsFlags", false),
+				members, annotations(e));
 	}
 
 	private static CsdlOperation operation(Element e, CsdlOperation.Kind kind) {
 		List<CsdlParameter> parameters = new ArrayList<>();
 		for (Element p : children(e, "Parameter")) {
-			parameters.add(new CsdlParameter(required(p, "Name"), CsdlTypeRef.parse(required(p, "Type")), bool(p, "Nullable", true), annotations(p)));
+			parameters.add(new CsdlParameter(required(p, "Name"), CsdlTypeRef.parse(required(p, "Type")),
+					bool(p, "Nullable", true), annotations(p)));
 		}
 		CsdlTypeRef returnType = null;
 		boolean returnNullable = true;
@@ -186,20 +194,20 @@ public final class CsdlParser {
 		for (Element child : elements(e)) {
 			switch (child.getLocalName()) {
 				case "EntitySet":
-					sets.add(new CsdlEntityContainer.EntitySet(required(child, "Name"), required(child, "EntityType"), bindings(child),
-							annotations(child)));
+					sets.add(new CsdlEntityContainer.EntitySet(required(child, "Name"), required(child, "EntityType"),
+							bindings(child), annotations(child)));
 					break;
 				case "Singleton":
-					singletons.add(new CsdlEntityContainer.Singleton(required(child, "Name"), required(child, "Type"), bindings(child),
-							annotations(child)));
+					singletons.add(new CsdlEntityContainer.Singleton(required(child, "Name"), required(child, "Type"),
+							bindings(child), annotations(child)));
 					break;
 				case "ActionImport":
-					actions.add(new CsdlEntityContainer.ActionImport(required(child, "Name"), required(child, "Action"), attr(child, "EntitySet", null),
-							annotations(child)));
+					actions.add(new CsdlEntityContainer.ActionImport(required(child, "Name"), required(child, "Action"),
+							attr(child, "EntitySet", null), annotations(child)));
 					break;
 				case "FunctionImport":
-					functions.add(new CsdlEntityContainer.FunctionImport(required(child, "Name"), required(child, "Function"),
-							attr(child, "EntitySet", null), annotations(child)));
+					functions.add(new CsdlEntityContainer.FunctionImport(required(child, "Name"),
+							required(child, "Function"), attr(child, "EntitySet", null), annotations(child)));
 					break;
 				default:
 					// Annotations are read below
@@ -224,7 +232,10 @@ public final class CsdlParser {
 		return result;
 	}
 
-	/** An annotation's or property value's value: an attribute shorthand, or its first expression child. */
+	/**
+	 * An annotation's or property value's value: an attribute shorthand, or its first
+	 * expression child.
+	 */
 	private static CsdlValue value(Element e) {
 		for (String kind : CONSTANT_KINDS) {
 			if (e.hasAttribute(kind)) {
@@ -317,4 +328,5 @@ public final class CsdlParser {
 			throw new IllegalStateException("The JDK's XML parser doesn't support secure processing", e);
 		}
 	}
+
 }

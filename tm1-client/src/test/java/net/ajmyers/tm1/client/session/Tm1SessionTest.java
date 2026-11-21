@@ -31,9 +31,11 @@ import tools.jackson.databind.JsonNode;
 
 class Tm1SessionTest {
 
-	private static final Tm1Request<JsonNode> SERVER = Tm1Request.get(ODataPath.of("Server"), ODataQuery.none().select("Name"), JsonNode.class);
+	private static final Tm1Request<JsonNode> SERVER = Tm1Request.get(ODataPath.of("Server"),
+			ODataQuery.none().select("Name"), JsonNode.class);
 
-	private final FakeTm1 tm1 = new FakeTm1().on("GET Server?$select=Name", r -> Mono.just(FakeTm1.json(200, "{\"Name\":\"tm1\"}")));
+	private final FakeTm1 tm1 = new FakeTm1().on("GET Server?$select=Name",
+			r -> Mono.just(FakeTm1.json(200, "{\"Name\":\"tm1\"}")));
 
 	@Test
 	void logsInOnceForConcurrentFirstRequestsAndSendsOnlyTheCookieAfterwards() {
@@ -60,7 +62,8 @@ class Tm1SessionTest {
 
 	@Test
 	void findsTheSessionCookieByNameAmongOthers() {
-		tm1.on(FakeTm1.LOGIN, r -> Mono.just(FakeTm1.json(200, "{\"ID\":3}", "other=1; Path=/", "TM1SessionId=right; Path=/api/; HttpOnly", "more=2")));
+		tm1.on(FakeTm1.LOGIN, r -> Mono.just(FakeTm1.json(200, "{\"ID\":3}", "other=1; Path=/",
+				"TM1SessionId=right; Path=/api/; HttpOnly", "more=2")));
 		Tm1Session session = tm1.session();
 		StepVerifier.create(session.execute(SERVER)).expectNextCount(1).verifyComplete();
 		assertThat(FakeTm1.cookie(tm1.requests("GET Server?$select=Name").get(0))).isEqualTo("right");
@@ -87,7 +90,9 @@ class Tm1SessionTest {
 		tm1.on("GET Cubes('Nope')", r -> Mono.just(FakeTm1.json(404,
 				"{\"error\":{\"code\":\"278\",\"message\":\"'Nope' can not be found in collection of type 'Cube'.\"}}")));
 		Tm1Session session = tm1.session();
-		StepVerifier.create(session.execute(Tm1Request.get(ODataPath.of("Cubes").key("Nope"), ODataQuery.none(), JsonNode.class)))
+		StepVerifier
+			.create(session
+				.execute(Tm1Request.get(ODataPath.of("Cubes").key("Nope"), ODataQuery.none(), JsonNode.class)))
 			.expectErrorSatisfies(e -> assertThat(e).isInstanceOfSatisfying(Tm1NotFoundException.class, n -> {
 				assertThat(n.status()).isEqualTo(404);
 				assertThat(n.error().code()).isEqualTo("278");
@@ -102,13 +107,20 @@ class Tm1SessionTest {
 		tm1.on("POST Cubes('Sales')/tm1.Lock", r -> Mono.just(FakeTm1.status(204)));
 		Tm1Session session = tm1.session();
 
-		StepVerifier.create(session.execute(Tm1Request.text(ODataPath.of("Configuration").nav("ProductVersion").value())))
+		StepVerifier
+			.create(session.execute(Tm1Request.text(ODataPath.of("Configuration").nav("ProductVersion").value())))
 			.expectNext("11.8.03500.6")
 			.verifyComplete();
-		StepVerifier.create(session.execute(Tm1Request.post(ODataPath.of("Cubes").key("Sales").action("tm1.Lock"), null, Void.class))).verifyComplete();
+		StepVerifier
+			.create(session
+				.execute(Tm1Request.post(ODataPath.of("Cubes").key("Sales").action("tm1.Lock"), null, Void.class)))
+			.verifyComplete();
 
-		assertThat(tm1.requests("GET Configuration/ProductVersion/$value").get(0).headers().getFirst(HttpHeaders.ACCEPT)).startsWith("text/plain");
-		assertThat(tm1.requests("POST Cubes('Sales')/tm1.Lock").get(0).headers().getContentType()).hasToString("application/json");
+		assertThat(
+				tm1.requests("GET Configuration/ProductVersion/$value").get(0).headers().getFirst(HttpHeaders.ACCEPT))
+			.startsWith("text/plain");
+		assertThat(tm1.requests("POST Cubes('Sales')/tm1.Lock").get(0).headers().getContentType())
+			.hasToString("application/json");
 	}
 
 	@Test
@@ -118,8 +130,10 @@ class Tm1SessionTest {
 		tm1.on("GET Dimensions?$skiptoken=2", r -> Mono.just(FakeTm1.json(200, "{\"value\":[{\"Name\":\"c\"}]}")));
 		Tm1Session session = tm1.session();
 
-		StepVerifier.create(session.stream(Tm1Request.list(ODataPath.of("Dimensions"), ODataQuery.none().select("Name"), JsonNode.class))
-			.map(d -> d.get("Name").asString()))
+		StepVerifier
+			.create(session
+				.stream(Tm1Request.list(ODataPath.of("Dimensions"), ODataQuery.none().select("Name"), JsonNode.class))
+				.map(d -> d.get("Name").asString()))
 			.expectNext("a", "b", "c")
 			.verifyComplete();
 	}
@@ -131,8 +145,8 @@ class Tm1SessionTest {
 
 	@Test
 	void mapsConnectFailuresAndOtherTransportFailures() {
-		tm1.on("GET Server?$select=Name", r -> Mono.error(new WebClientRequestException(new ConnectException("refused"), HttpMethod.GET,
-				URI.create(FakeTm1.ROOT + "Server"), new HttpHeaders())));
+		tm1.on("GET Server?$select=Name", r -> Mono.error(new WebClientRequestException(new ConnectException("refused"),
+				HttpMethod.GET, URI.create(FakeTm1.ROOT + "Server"), new HttpHeaders())));
 		tm1.on("POST Processes('p')/tm1.ExecuteWithReturn", r -> Mono.error(new IOException("Connection reset")));
 		Tm1Session session = tm1.session();
 
@@ -142,7 +156,9 @@ class Tm1SessionTest {
 				assertThat(t.mayHaveApplied()).isFalse();
 			}))
 			.verify();
-		StepVerifier.create(session.execute(Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.ExecuteWithReturn"), null, Void.class)))
+		StepVerifier
+			.create(session.execute(Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.ExecuteWithReturn"),
+					null, Void.class)))
 			.expectErrorSatisfies(e -> assertThat(e).isInstanceOfSatisfying(Tm1TransportException.class, t -> {
 				assertThat(t.phase()).isEqualTo(Tm1TransportException.Phase.RESPONSE);
 				assertThat(t.mayHaveApplied()).isTrue();
@@ -183,7 +199,9 @@ class Tm1SessionTest {
 		tm1.on(FakeTm1.LOGIN, r -> login.asMono());
 		Tm1Session session = tm1.session();
 
-		Disposable first = session.execute(SERVER).subscribe(v -> { }, e -> { });
+		Disposable first = session.execute(SERVER).subscribe(v -> {
+		}, e -> {
+		});
 		StepVerifier.create(session.close())
 			.then(() -> assertThat(tm1.requests(FakeTm1.CLOSE)).isEmpty())
 			.then(() -> login.tryEmitValue(FakeTm1.json(200, "{\"ID\":5}", "TM1SessionId=late; Path=/api/")))
@@ -227,6 +245,10 @@ class Tm1SessionTest {
 			.hasLowCardinalityKeyValue("tm1.reason", "initial")
 			.hasBeenStarted()
 			.hasBeenStopped();
-		TestObservationRegistryAssert.assertThat(registry).hasObservationWithNameEqualTo("tm1.session.close").that().hasBeenStopped();
+		TestObservationRegistryAssert.assertThat(registry)
+			.hasObservationWithNameEqualTo("tm1.session.close")
+			.that()
+			.hasBeenStopped();
 	}
+
 }

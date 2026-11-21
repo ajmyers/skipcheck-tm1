@@ -8,4 +8,5 @@ public final class Tm1ForbiddenException extends Tm1ApiException {
 	Tm1ForbiddenException(int status, Tm1ErrorKind kind, ODataError error, String method, String url) {
 		super(status, kind, error, method, url);
 	}
+
 }
