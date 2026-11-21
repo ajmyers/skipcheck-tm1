@@ -10,6 +10,7 @@ Java libraries and tools for the **IBM Planning Analytics (TM1) REST API**.
 | [`tm1-bom`](tm1-bom) | Keeps the module versions aligned. |
 | [`tools/`](tools) | Applications built on the libraries (not published). |
 | [`docker/tm1-server`](docker/tm1-server) | Docker image for TM1 Server, for local development and tests. You supply your own licensed TM1; no IBM software is included. **[Getting started](docker/tm1-server/GETTING-STARTED.md)** |
+| [`docker/paw`](docker/paw) | Runs IBM's Planning Analytics Workspace Local images from your own PAW zip, next to `tm1-server`. No IBM software is included. |
 
 Requires Java 17+.
 
