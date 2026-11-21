@@ -20,3 +20,6 @@ rootProject.name = "tm1-pa-developer-tools"
 include("tm1-client")
 include("tm1-spring-boot-starter")
 include("tm1-bom")
+
+// Tools built on the libraries (not published)
+include("tools:example")
