@@ -3,10 +3,11 @@
 # tm1-server: a runtime for IBM Planning Analytics / TM1 Server on Linux x86-64.
 #
 # A thin runtime shell: OS libraries + an entrypoint. It contains NO IBM software.
-# You mount your own:
-#   /opt/ibm/cognos/tm1_64   licensed TM1 Server install (bin64/tm1s.exe, ...)
+# You mount your own licensed TM1 Server install (required):
+#   /opt/ibm/cognos/tm1_64   bin64/tm1s.exe, ...
+# and optionally, to keep them outside the container:
 #   /tm1/config              tm1s.cfg + tm1s-log.properties (defaults created if absent)
-#   /tm1/data                database directory
+#   /tm1/data                database directory (a new database if empty)
 #   /tm1/logs                log directory
 # See README.md.
 
@@ -33,7 +34,11 @@ COPY docker/healthcheck.sh /usr/local/bin/tm1-healthcheck
 COPY docker/tm1s-log.properties docker/tm1s.cfg.default /usr/local/lib/tm1-server/
 RUN chmod 755 /usr/local/bin/tm1-*
 
-VOLUME ["/opt/ibm/cognos/tm1_64", "/tm1/config", "/tm1/data", "/tm1/logs"]
+# Deliberately no VOLUME: a VOLUME instruction makes Docker create an anonymous
+# volume for every path that isn't mounted, and those outlive the container. Without
+# it, unmounted config/data/logs live in the container's own filesystem and go away
+# with the container: a disposable TM1, which is what tests want.
+RUN mkdir -p /tm1/config /tm1/data /tm1/logs
 # 12345 = TM1 server (legacy API), 8010 = TM1 REST API, 5895/5898 = Admin server REST http/https
 EXPOSE 12345 8010 5895 5898 5495 5498
 

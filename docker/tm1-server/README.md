@@ -10,12 +10,23 @@ built for local development and integration tests of TM1 client libraries.
 
 ## What you mount
 
-| Container path            | What                                              | Notes |
-|---------------------------|---------------------------------------------------|-------|
-| `/opt/ibm/cognos/tm1_64`  | Your TM1 Server install (the folder with `bin64/`) | Can be read-only (`:ro`) |
-| `/tm1/config`             | `tm1s.cfg` and `tm1s-log.properties`              | Defaults are created if missing. See [Configuration](#configuration). |
-| `/tm1/data`               | The TM1 database (cubes, dimensions, processes, ...) | A new database is created if the folder is empty |
-| `/tm1/logs`               | `tm1server.log`, `tm1s.log`, `tm1event.log`, process error logs | Set as `LoggingDirectory` |
+| Container path            | What                                              | Required? | Notes |
+|---------------------------|---------------------------------------------------|-----------|-------|
+| `/opt/ibm/cognos/tm1_64`  | Your TM1 Server install (the folder with `bin64/`) | **Yes** | Can be read-only (`:ro`) |
+| `/tm1/config`             | `tm1s.cfg` and `tm1s-log.properties`              | No | Defaults are created if missing. See [Configuration](#configuration). |
+| `/tm1/data`               | The TM1 database (cubes, dimensions, processes, ...) | No | A new database is created if the folder is empty |
+| `/tm1/logs`               | `tm1server.log`, `tm1s.log`, `tm1event.log`, process error logs | No | Set as `LoggingDirectory` |
+
+**Anything you don't mount stays inside the container.** It survives
+`docker stop` / `docker start`, but is deleted with the container: no leftover
+Docker volumes. Mounting only the TM1 install gives a disposable TM1 server with
+the default config and an empty database, which is what tests want:
+
+```sh
+docker run --rm -p 8010:8010 -v /path/to/tm1_64:/opt/ibm/cognos/tm1_64:ro ghcr.io/ajmyers/tm1-server
+```
+
+Mount a folder to keep it, or to bring your own `tm1s.cfg` or database.
 
 ```sh
 docker run -d --name tm1 -p 8010:8010 \
