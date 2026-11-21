@@ -73,6 +73,8 @@ Running:
 Each option can also be set in the environment as TM1_SETUP_<NAME>, with the name
 in upper case and - as _: TM1_SETUP_BUNDLE, TM1_SETUP_FILES_DIR, TM1_SETUP_SAMPLES=1,
 TM1_SETUP_YES=1, ... Flags win over the environment.
+
+Build the command for your choices at https://ajmyers.net/tm1/
 EOF
 }
 
