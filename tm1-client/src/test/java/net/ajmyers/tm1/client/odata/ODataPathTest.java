@@ -16,6 +16,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 class ODataPathTest {
 
 	@Test
+	void addressesTheMetadataDocument() {
+		assertThat(ODataPath.metadata()).hasToString("$metadata");
+		assertThatIllegalStateException().isThrownBy(() -> ODataPath.metadata().key("x"));
+	}
+
+	@Test
 	void buildsNestedPaths() {
 		assertThat(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements"))
 			.hasToString("Dimensions('Region')/Hierarchies('Region')/Elements");
