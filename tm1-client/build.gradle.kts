@@ -14,6 +14,11 @@ mavenPublishing {
 dependencies {
 	// The API is reactive: WebClient, Reactor's Mono and Flux, and Spring's DataBuffer
 	api(libs.spring.webflux)
+	// The default HTTP connector (plan Q4): pool control and per-request response timeouts
+	api(libs.reactor.netty.http)
+	// ReactorClientHttpConnector implements SmartLifecycle, but spring-webflux declares spring-context
+	// optional: without it, a standalone client fails at runtime with NoClassDefFoundError
+	implementation(libs.spring.context)
 	// Jackson 3: payloads are decoded with it, and JsonNode appears in the API
 	api(libs.jackson.databind)
 	// Logging through SLF4J (Lombok's @Slf4j); the application picks the backend
@@ -27,4 +32,5 @@ dependencies {
 	testImplementation(libs.reactor.test)
 	testImplementation(libs.hamcrest)
 	testImplementation(libs.micrometer.observation.test)
+	testRuntimeOnly(libs.slf4j.simple)
 }
