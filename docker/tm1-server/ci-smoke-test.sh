@@ -51,7 +51,17 @@ set +e
 out=$(run -v "$(mktemp -d):/ibm:ro" "$image" install 2>&1); rc=$?
 set -e
 [ "$rc" -eq 2 ] || fail "expected exit 2 from install without a bundle, got $rc: $out"
-grep -q "no tm1server-" <<<"$out" || fail "missing install error text: $out"
+grep -q "no bundle found" <<<"$out" || fail "missing install error text: $out"
 pass "install without a bundle fails with help text"
+
+# 7. Bundle URL that can't be downloaded: exits 2, and never prints the query
+#    string (pre-signed URLs carry credentials there)
+set +e
+out=$(run -e TM1_BUNDLE_URL='http://127.0.0.1:9/tm1server-bundle.tar.gz?X-Amz-Signature=SECRET123' "$image" 2>&1); rc=$?
+set -e
+[ "$rc" -eq 2 ] || fail "expected exit 2 for an unreachable bundle URL, got $rc: $out"
+grep -q "download failed: http://127.0.0.1:9/tm1server-bundle.tar.gz" <<<"$out" || fail "missing download error: $out"
+! grep -q "SECRET123" <<<"$out" || fail "bundle URL credentials were printed: $out"
+pass "unreachable bundle URL fails cleanly without printing credentials"
 
 echo "All smoke tests passed."

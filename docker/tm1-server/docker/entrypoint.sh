@@ -1,6 +1,17 @@
 #!/bin/bash
-# tm1-server entrypoint. The container is a thin runtime shell: you mount
-#   /opt/ibm/cognos/tm1_64   your TM1 Server install (must contain bin64/tm1s.exe)
+# tm1-server entrypoint. The container is a thin runtime shell around your own TM1.
+#
+# Where TM1 comes from (first match wins):
+#   1. a TM1 install at /opt/ibm/cognos/tm1_64: a mounted folder, a named volume
+#      already holding an install, or a private image with TM1 built in
+#   2. a bundle, installed on first start: TM1_BUNDLE_URL (download), TM1_BUNDLE, or
+#      the newest tm1server bundle mounted at /ibm. An empty volume mounted at
+#      /opt/ibm/cognos/tm1_64 is installed into directly; otherwise the install
+#      goes to a cache in /tm1/cache (mount a volume there to keep it between
+#      containers), one folder per bundle.
+#   3. `install -` with a bundle piped in on stdin (docker run -i)
+#
+# Optional mounts (unmounted ones live inside the container and are removed with it):
 #   /tm1/config              tm1s.cfg + tm1s-log.properties (created with defaults if absent)
 #   /tm1/data                the TM1 database (cubes, dimensions, processes, ...)
 #   /tm1/logs                TM1 logs (LoggingDirectory)
@@ -18,8 +29,8 @@
 #                    TM1_ADMIN_HOST points at a separate one)
 #   admin            run only the TM1 Admin Server, for TM1 servers in other
 #                    containers to register with (they set TM1_ADMIN_HOST)
-#   install          one-off helper: unpack an IBM bundle mounted at /ibm into
-#                    /opt/ibm/cognos/tm1_64 (see README) and exit
+#   install [SOURCE] install TM1 from a bundle into /opt/ibm/cognos/tm1_64 and exit;
+#                    SOURCE is a URL, a file, or - for stdin (see tm1-install --help)
 #   <anything else>  exec'd as-is (e.g. bash)
 #
 # Environment (all optional). The named TM1_* settings seed a newly created tm1s.cfg;
@@ -64,20 +75,47 @@ daemon_pid() {  # daemon_pid <pgrep -f pattern>
   return 1
 }
 
+# ---- find or install TM1 ----------------------------------------------------
+have_bundle() {
+  [ -n "${TM1_BUNDLE_URL:-}" ] || [ -n "${TM1_BUNDLE:-}" ] && return 0
+  compgen -G "${TM1_BUNDLE_DIR:-/ibm}/tm1server-*_bundle.tar.gz" >/dev/null \
+    || compgen -G "${TM1_BUNDLE_DIR:-/ibm}/tm1server-*-linuxi38664h.zip" >/dev/null
+}
+if [ ! -x "$BIN/tm1s.exe" ] && have_bundle; then
+  if mountpoint -q "$TM1_HOME"; then
+    # A volume (or folder) is mounted there without an install: install into it, so
+    # it's filled once and reused.
+    log "No TM1 install in the volume at $TM1_HOME - installing from the bundle"
+    /usr/local/bin/tm1-install --target "$TM1_HOME" || exit $?
+  else
+    CACHE=${TM1_CACHE:-/tm1/cache}
+    key=$(/usr/local/bin/tm1-install --print-key) || exit $?
+    /usr/local/bin/tm1-install --target "$CACHE/$key" || exit $?
+    rm -rf "$TM1_HOME"
+    mkdir -p "$(dirname "$TM1_HOME")"
+    ln -s "$CACHE/$key" "$TM1_HOME"
+    log "Using TM1 from $CACHE/$key"
+  fi
+fi
+
 EXE=tm1s.exe; [ "$ROLE" = admin ] && EXE=tm1admsrv.exe
 if [ ! -x "$BIN/$EXE" ]; then
   cat >&2 <<MSG
 [tm1-entrypoint] ERROR: $BIN/$EXE not found.
 
-  tm1-server does not include IBM software. Mount your own licensed TM1 Server
-  install directory (the one containing bin64/) at $TM1_HOME, e.g.
+  tm1-server does not include IBM software. Give it your own licensed TM1 in
+  one of these ways:
 
-      -v /path/to/tm1_64:$TM1_HOME
+    Mount an installed TM1 (the folder with bin64/):
+      -v /path/to/tm1_64:$TM1_HOME:ro
+    Mount the folder with your IBM bundle (installed on first start):
+      -v /path/to/ibm-downloads:/ibm:ro
+    Download the bundle (e.g. a pre-signed S3 link; installed on first start):
+      -e TM1_BUNDLE_URL=https://...
+    Pipe a bundle into a volume, then mount that volume:
+      cat bundle.tar.gz | docker run -i --rm -v tm1:$TM1_HOME tm1-server install -
 
-  No Linux install yet? Unpack one from your IBM bundle with:
-
-      docker run --rm -v /path/to/ibm-downloads:/ibm:ro \\
-                      -v /path/to/tm1_64:$TM1_HOME tm1-server install
+  To keep a bundle install between containers, also mount a volume at /tm1/cache.
 MSG
   exit 2
 fi

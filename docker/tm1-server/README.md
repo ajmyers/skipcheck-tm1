@@ -10,12 +10,17 @@ built for local development and integration tests of TM1 client libraries.
 
 ## What you mount
 
-| Container path            | What                                              | Required? | Notes |
-|---------------------------|---------------------------------------------------|-----------|-------|
-| `/opt/ibm/cognos/tm1_64`  | Your TM1 Server install (the folder with `bin64/`) | **Yes** | Can be read-only (`:ro`) |
-| `/tm1/config`             | `tm1s.cfg` and `tm1s-log.properties`              | No | Defaults are created if missing. See [Configuration](#configuration). |
-| `/tm1/data`               | The TM1 database (cubes, dimensions, processes, ...) | No | A new database is created if the folder is empty |
-| `/tm1/logs`               | `tm1server.log`, `tm1s.log`, `tm1event.log`, process error logs | No | Set as `LoggingDirectory` |
+TM1 itself comes from one of [six sources](#getting-tm1-into-the-container); the
+simplest is mounting an installed `tm1_64` folder. Everything else is optional:
+
+| Container path            | What                                              | Notes |
+|---------------------------|---------------------------------------------------|-------|
+| `/opt/ibm/cognos/tm1_64`  | Your TM1 Server install (the folder with `bin64/`) | One of the TM1 sources. Can be read-only (`:ro`). |
+| `/ibm`                    | A folder holding your IBM bundle                  | One of the TM1 sources. Installed on first start. |
+| `/tm1/cache`              | Where bundle installs are kept                    | Mount a volume to reuse installs across containers |
+| `/tm1/config`             | `tm1s.cfg` and `tm1s-log.properties`              | Defaults are created if missing. See [Configuration](#configuration). |
+| `/tm1/data`               | The TM1 database (cubes, dimensions, processes, ...) | A new database is created if the folder is empty |
+| `/tm1/logs`               | `tm1server.log`, `tm1s.log`, `tm1event.log`, process error logs | Set as `LoggingDirectory` |
 
 **Anything you don't mount stays inside the container.** It survives
 `docker stop` / `docker start`, but is deleted with the container: no leftover
@@ -86,26 +91,67 @@ your own.
 curl -u admin: 'http://localhost:8010/api/v1/Configuration/ProductVersion/$value'
 ```
 
-## Getting a `tm1_64` directory
+## Getting TM1 into the container
 
-If you already have TM1 Server installed on Linux, mount its `tm1_64` directory.
-It is usually `/opt/ibm/cognos/tm1_64`, and you can copy it to your machine.
+The image contains no IBM software, so it needs your licensed TM1 Server for Linux
+(`linuxi38664h`). It looks in this order and uses the first it finds:
 
-If you only have the IBM download, `tm1server-<ver>-linuxi38664h_bundle.tar.gz`,
-the image includes an optional one-off helper that unpacks it. It reads the
-bundle's manifest and extracts the TM1 Server, Admin Server, Tools and Samples
-components, which is the same result IBM's installer produces. This also works
-on macOS, where IBM's installer won't run.
+| # | Source | How | Start time |
+|---|--------|-----|------------|
+| 1 | **An installed `tm1_64` folder** | `-v /path/to/tm1_64:/opt/ibm/cognos/tm1_64:ro` | ~3 s |
+| 2 | **Your IBM bundle, mounted** | `-v /path/to/ibm-downloads:/ibm:ro` (optionally `-e TM1_BUNDLE=<file name>`) | ~15 s on first start, then ~5 s with a cache volume |
+| 3 | **A download URL** | `-e TM1_BUNDLE_URL=https://...`, e.g. a pre-signed S3, R2 or GCS link | download + ~15 s, then ~5 s with a cache volume |
+| 4 | **A bundle piped in from your machine** | `... \| docker run -i --rm -v tm1:/opt/ibm/cognos/tm1_64 tm1-server install -`, then mount the `tm1` volume | ~3 s once filled |
+| 5 | **A private image with TM1 built in** | see [`examples/private-image`](examples/private-image/Dockerfile) | ~3 s, nothing to install |
+| 6 | **A named Docker volume** | mount a volume at `/opt/ibm/cognos/tm1_64`: if it's empty and a bundle is available (2 or 3), TM1 is installed into it on first start | ~3 s once filled |
+
+**How bundles are installed.** A bundle is IBM's
+`tm1server-<ver>-linuxi38664h_bundle.tar.gz` (or the repository zip inside it).
+Rather than run IBM's installer, the container follows the bundle's manifest and
+unpacks the TM1 Server, Admin Server, Tools and Samples components. That's the
+same result as the installer, and it also works where the installer can't run
+(e.g. macOS).
+
+**Caching.** Without a mounted install, a bundle is installed into
+`/tm1/cache/<key>`, one folder per bundle. The key comes from the file's name,
+size and date, or for URLs from `TM1_BUNDLE_SHA256` or the URL without its query
+string. Mount a volume at `/tm1/cache` and every container after the first
+reuses the install. Several containers can share one cache; installs are locked.
+Remove the volume to clear it.
+
+**Downloads (3)** are verified when `TM1_BUNDLE_SHA256` is set. Logs show URLs
+without their query string, since pre-signed links carry credentials there. Any
+`curl` URL works, including `file://`. There's no built-in `s3://`: use a
+pre-signed link, or pipe the file in (4), so no cloud tools or keys go into the
+container.
+
+**Piping (4)** works with anything that can write a file to stdout, using your
+machine's own credentials:
 
 ```sh
-docker run --rm \
-  -v /path/to/ibm-downloads:/ibm:ro \
-  -v /path/to/tm1_64:/opt/ibm/cognos/tm1_64 \
-  ghcr.io/ajmyers/tm1-server install
+aws s3 cp s3://my-bucket/tm1server-2.1.19-...-linuxi38664h_bundle.tar.gz - \
+  | docker run -i --rm -v tm1-2.1.19:/opt/ibm/cognos/tm1_64 ghcr.io/ajmyers/tm1-server install -
+docker run -d -p 8010:8010 -v tm1-2.1.19:/opt/ibm/cognos/tm1_64:ro ghcr.io/ajmyers/tm1-server
 ```
 
-Set `-e TM1_BUNDLE=<file name>` to pick a specific bundle (by default it uses the
-newest one). Tested with TM1 Server 2.1.19 (11.8.03500.6).
+Streaming straight into the install isn't possible: the bundle is a `.tar.gz` that
+contains a `.zip`, and a zip can't be unpacked until it has been fully received.
+
+**Private images (5)** are the fastest option for CI. Build on top of
+`tm1-server` with your bundle, and push the result **only to a private registry**,
+because it contains IBM software licensed to you:
+
+```sh
+docker build --platform linux/amd64 \
+  --build-context ibm=/path/to/folder-with-just-the-bundle \
+  -t registry.example.com/private/tm1-server:2.1.19 examples/private-image
+```
+
+The `install` command installs from any source into `/opt/ibm/cognos/tm1_64` (or
+`--target DIR`) and exits: `install [URL | file | -]`. Run
+`docker run --rm ghcr.io/ajmyers/tm1-server install --help` for details.
+
+Tested with TM1 Server 2.1.19 (11.8.03500.6).
 
 ## Configuration
 
@@ -149,6 +195,11 @@ ports, so parallel test runs never collide.
 
 | Variable | Default | |
 |----------|---------|-|
+| `TM1_BUNDLE_URL` | | URL of a bundle to download and install (source 3) |
+| `TM1_BUNDLE` | newest in `/ibm` | Bundle file name in `/ibm`, or an absolute path (source 2) |
+| `TM1_BUNDLE_SHA256` | | Expected SHA-256 of the bundle. Verified before installing. |
+| `TM1_BUNDLE_DIR` | `/ibm` | Where to look for bundle files |
+| `TM1_CACHE` | `/tm1/cache` | Where bundle installs are kept |
 | `TM1_SERVER_NAME` | `tm1` | `ServerName` |
 | `TM1_USE_SSL` | `F` | `UseSSL`. Plain HTTP by default; `T` switches TM1 to HTTPS only. |
 | `TM1_CFG_<Param>` | | Any `tm1s.cfg` parameter, e.g. `TM1_CFG_MaximumCubeLoadThreads=4` (enforced settings still win) |
@@ -167,7 +218,7 @@ One image runs either piece of a TM1 deployment, chosen by the command:
 |---------|------|--------------|
 | `start` (default) | One TM1 server. Also an embedded Admin Server, unless `TM1_ADMIN_HOST` points at a separate one. | `GET /api/v1/$metadata` on 8010 returns 200 (no login needed) |
 | `admin` | Only the Admin Server, on ports 5895/5898 (REST) and 5495/5498 (legacy clients) | `GET /api/v1/Servers` on 5895 returns 200 |
-| `install` | The one-off bundle unpacker ([above](#getting-a-tm1_64-directory)) | – |
+| `install [SOURCE]` | Installs TM1 from a bundle and exits ([above](#getting-tm1-into-the-container)) | – |
 
 Anything else is run as-is (e.g. `docker run --rm -it ... tm1-server bash`).
 
