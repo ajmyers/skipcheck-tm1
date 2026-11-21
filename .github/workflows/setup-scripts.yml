@@ -1,0 +1,129 @@
+# Tests the tm1-server setup scripts (docker/tm1-server/setup.sh and setup.ps1).
+#
+# CI has no IBM software, so TM1 can't start here. These jobs test everything up to
+# "docker compose up": options, the checks, the fail-fast errors when there's no
+# terminal, and the folder and .env a --no-start run leaves behind, using a fake
+# bundle (a tiny gzip file with the IBM file name). The full start is tested by
+# hand with a real bundle.
+#
+#   linux:   setup.sh under dash (Ubuntu's /bin/sh, so it stays POSIX) and setup.ps1
+#            under pwsh, against the same cases
+#   windows: setup.ps1 under Windows PowerShell 5.1 and pwsh. GitHub's Windows
+#            runners run Docker in Windows-containers mode, so the script must stop
+#            at that check with its fix.
+name: Setup scripts
+
+on:
+  push:
+    branches: [master]
+    paths: ['docker/tm1-server/**', '.github/workflows/setup-scripts.yml']
+  pull_request:
+    paths: ['docker/tm1-server/**', '.github/workflows/setup-scripts.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: docker/tm1-server
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fake bundle
+        run: |
+          mkdir -p "$RUNNER_TEMP/dl"
+          echo fake | gzip > "$RUNNER_TEMP/dl/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz"
+          echo fake > "$RUNNER_TEMP/dl/tm1server-0.0.0-1-win64_bundle.zip"
+
+      - name: setup.sh
+        run: |
+          set -u
+          dl=$RUNNER_TEMP/dl; t=$RUNNER_TEMP/sh
+          expect_fail() {  # expect_fail TEXT -- COMMAND...: fails with exit 1 and prints TEXT
+            text=$1; shift 2
+            set +e; out=$("$@" 2>&1); rc=$?; set -e
+            echo "$out" | tail -4
+            [ "$rc" = 1 ] || { echo "::error::expected exit 1, got $rc: $*"; exit 1; }
+            grep -qF -- "$text" <<<"$out" || { echo "::error::expected '$text' from: $*"; exit 1; }
+          }
+          sh setup.sh --help | grep -q -- '--bundle FILE'
+          expect_fail 'No TM1 source given' -- sh setup.sh --dir "$t"
+          expect_fail 'Unknown option: --frob' -- sh setup.sh --frob
+          expect_fail 'Choose one TM1 source' -- sh setup.sh --bundle x --url https://x
+          expect_fail "isn't the Linux TM1 Server download" -- sh setup.sh --dir "$t" --bundle "$dl/tm1server-0.0.0-1-win64_bundle.zip"
+          expect_fail 'must start with https://' -- sh setup.sh --dir "$t" --url ftp://x
+          expect_fail "there's no bin64/tm1s.exe" -- sh setup.sh --dir "$t" --tm1-home "$dl"
+          # A run that sets everything up
+          sh setup.sh --dir "$t" --bundle "$dl/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz" \
+            --image ghcr.io/ajmyers/tm1-server:edge --files-dir "$t/files" --samples --base-url "$PWD" --no-start
+          test -f "$t/compose.yaml" && test -f "$t/.env.example"
+          test -f "$t/bundles/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz"
+          grep -qx "TM1_SERVER_IMAGE='ghcr.io/ajmyers/tm1-server:edge'" "$t/.env"
+          grep -qx "TM1_FILES_DIR='$t/files'" "$t/.env"
+          grep -qx "COMPOSE_PROFILES='samples'" "$t/.env"
+          (cd "$t" && docker compose config --images | grep -qx 'ghcr.io/ajmyers/tm1-server:edge')
+          # A rerun keeps it all, and says so
+          out=$(sh setup.sh --dir "$t" --image other:1 --base-url "$PWD" --no-start 2>&1)
+          echo "$out"
+          grep -q 'Kept the existing .env' <<<"$out"
+          grep -q 'Not applied, because .env already exists: TM1_SERVER_IMAGE=other:1' <<<"$out"
+        shell: bash
+
+      - name: setup.ps1 (pwsh)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dl = "$env:RUNNER_TEMP/dl"; $t = "$env:RUNNER_TEMP/ps"
+          function Expect-Fail([string]$Text, [string[]]$ScriptArgs) {
+            $out = (& pwsh -NoProfile -File ./setup.ps1 @ScriptArgs 2>&1 | Out-String)
+            $rc = $LASTEXITCODE
+            Write-Host ($out.Trim() -split "`n" | Select-Object -Last 4 | Out-String)
+            if ($rc -ne 1) { throw "expected exit 1, got $rc for $ScriptArgs" }
+            if (-not $out.Contains($Text)) { throw "expected '$Text' for $ScriptArgs" }
+          }
+          if (-not ((pwsh -NoProfile -File ./setup.ps1 -Help | Out-String).Contains('-Bundle FILE'))) { throw 'help' }
+          Expect-Fail 'No TM1 source given' @('-Dir', $t)
+          Expect-Fail 'Choose one TM1 source' @('-Bundle', 'x', '-Url', 'https://x')
+          Expect-Fail "isn't the Linux TM1 Server download" @('-Dir', $t, '-Bundle', "$dl/tm1server-0.0.0-1-win64_bundle.zip")
+          Expect-Fail 'must start with https://' @('-Dir', $t, '-Url', 'ftp://x')
+          pwsh -NoProfile -File ./setup.ps1 -Dir $t -Bundle "$dl/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz" -Image ghcr.io/ajmyers/tm1-server:edge -Samples -BaseUrl $PWD -NoStart
+          if ($LASTEXITCODE -ne 0) { throw "setup.ps1 failed: $LASTEXITCODE" }
+          $envText = Get-Content -Raw "$t/.env"
+          if (-not $envText.Contains("TM1_SERVER_IMAGE='ghcr.io/ajmyers/tm1-server:edge'")) { throw '.env image' }
+          if (-not $envText.Contains("COMPOSE_PROFILES='samples'")) { throw '.env profile' }
+          $bytes = [IO.File]::ReadAllBytes("$t/.env")
+          if ($bytes[0] -eq 0xEF) { throw '.env has a byte-order mark' }
+          if (-not (Test-Path "$t/bundles/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz")) { throw 'bundle not copied' }
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: docker/tm1-server
+    env:
+      CI: 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]   # Windows PowerShell 5.1, PowerShell 7
+    steps:
+      - uses: actions/checkout@v5
+      - name: setup.ps1 under ${{ matrix.shell }}
+        shell: pwsh
+        run: |
+          $exe = '${{ matrix.shell }}'
+          $help = (& $exe -NoProfile -File ./setup.ps1 -Help | Out-String)
+          if (-not $help.Contains('-Bundle FILE')) { throw "help failed: $help" }
+          $out = (& $exe -NoProfile -File ./setup.ps1 -Dir "$env:RUNNER_TEMP\t" -Bundle x 2>&1 | Out-String)
+          $rc = $LASTEXITCODE
+          Write-Host $out
+          if ($rc -ne 1) { throw "expected exit 1, got $rc" }
+          if (-not $out.Contains('Docker is running Windows containers')) { throw 'expected the Windows-containers check to stop it' }
+          if (-not $out.Contains('made by Andrew Myers')) { throw 'banner missing' }
