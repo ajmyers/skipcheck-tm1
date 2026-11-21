@@ -11,6 +11,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
@@ -85,14 +86,15 @@ final class RawTm1 {
 	}
 
 	/**
-	 * Waits until TM1 lists {@code expected} sessions, and returns the last count seen.
+	 * Waits until TM1 lists {@code expected} sessions labelled {@code context}, and
+	 * returns the last count seen.
 	 */
-	int awaitSessionCount(String admin, int expected, Duration timeout) {
+	int awaitSessionCount(String admin, String context, int expected, Duration timeout) {
 		long deadline = System.nanoTime() + timeout.toNanos();
-		int count = sessionCount(admin);
+		int count = sessionCount(admin, context);
 		while (count != expected && System.nanoTime() < deadline) {
 			pause();
-			count = sessionCount(admin);
+			count = sessionCount(admin, context);
 		}
 		return count;
 	}
@@ -130,8 +132,32 @@ final class RawTm1 {
 		return "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
 	}
 
-	/** How many sessions TM1 has open, seen from {@code admin}'s session. */
-	int sessionCount(String admin) {
+	/**
+	 * How many sessions labelled {@code context} (their {@code TM1-SessionContext}) TM1
+	 * has open, seen from {@code admin}'s session. Leak checks count a label unique to
+	 * the test: the server is shared, so the total moves for reasons the test doesn't
+	 * control (closed sessions TM1 lists for a few seconds more, sessions every 401 and
+	 * anonymous read opens).
+	 */
+	int sessionCount(String admin, String context) {
+		int count = 0;
+		for (JsonNode session : json(send(request("GET", "Sessions?$select=ID,Context").cookie(admin))).get("value")) {
+			if (context.equals(session.path("Context").asString(""))) {
+				count++;
+			}
+		}
+		return count;
+	}
+
+	/** A label unique to one test, for {@link #sessionCount(String, String)}. */
+	static String uniqueContext() {
+		return "test-" + UUID.randomUUID();
+	}
+
+	/**
+	 * How many sessions TM1 has open, those with no user included, for tests about those.
+	 */
+	int allSessionCount(String admin) {
 		return json(send(request("GET", "Sessions?$select=ID").cookie(admin))).get("value").size();
 	}
 
@@ -139,7 +165,27 @@ final class RawTm1 {
 		return new Request(method, path);
 	}
 
+	/**
+	 * Sends a request. A GET or DELETE whose reused connection turns out to be closed,
+	 * with no response at all, is sent once more: TM1 now and then closes a kept-alive
+	 * connection, and the JDK client already retries a GET that way, but not other
+	 * methods.
+	 */
 	HttpResponse<String> send(Request request) {
+		try {
+			return sendOnce(request);
+		}
+		catch (IllegalStateException e) {
+			boolean noResponse = e.getCause() instanceof IOException io
+					&& String.valueOf(io.getMessage()).contains("received no bytes");
+			if (noResponse && (request.method.equals("GET") || request.method.equals("DELETE"))) {
+				return sendOnce(request);
+			}
+			throw e;
+		}
+	}
+
+	private HttpResponse<String> sendOnce(Request request) {
 		try {
 			return http.send(request.build(), HttpResponse.BodyHandlers.ofString());
 		}

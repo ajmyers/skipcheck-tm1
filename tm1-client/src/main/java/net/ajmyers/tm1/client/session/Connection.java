@@ -444,9 +444,13 @@ final class Connection {
 
 	private Mono<Void> sendClose(LoggedIn session) {
 		URI uri = uri(CLOSE_PATH);
-		Mono<Void> close = web.post()
-			.uri(uri)
-			.headers(h -> odataHeaders(h, false))
+		Mono<Void> close = web.post().uri(uri).headers(h -> {
+			odataHeaders(h, false);
+			// TM1 sometimes drops the connection that carried a close, so the next
+			// request to
+			// reuse it gets no response at all. Don't put it back in the pool.
+			h.set(HttpHeaders.CONNECTION, "close");
+		})
 			.cookie(COOKIE, session.cookie())
 			.httpRequest(r -> responseTimeout(r.getNativeRequest(), timeouts.close()))
 			.contentType(MediaType.APPLICATION_JSON)

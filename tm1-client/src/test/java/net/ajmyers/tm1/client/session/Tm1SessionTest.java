@@ -233,6 +233,8 @@ class Tm1SessionTest {
 		assertThat(closes).hasSize(1);
 		assertThat(FakeTm1.cookie(closes.get(0))).isEqualTo("c1");
 		assertThat(closes.get(0).headers().getContentType()).hasToString("application/json");
+		assertThat(closes.get(0).headers().getFirst(HttpHeaders.CONNECTION)).as("not reused after a close")
+			.isEqualTo("close");
 		StepVerifier.create(session.execute(SERVER)).expectError(Tm1SessionClosedException.class).verify();
 		assertThat(tm1.requests(FakeTm1.LOGIN)).as("a closed session doesn't log in again").hasSize(1);
 	}

@@ -86,11 +86,11 @@ class Tm1SessionImpersonationTm1Test {
 	void doesntLogInAgainWhileARefusalIsRemembered() {
 		Tm1Session session = session("zz_nobody");
 		assertThat(kindOf(session)).isEqualTo(Tm1ErrorKind.UNKNOWN_USER);
-		int after = raw.sessionCount(admin);
+		int after = raw.allSessionCount(admin);
 		for (int i = 0; i < 5; i++) {
 			assertThat(kindOf(session)).isEqualTo(Tm1ErrorKind.UNKNOWN_USER);
 		}
-		assertThat(raw.sessionCount(admin)).isEqualTo(after);
+		assertThat(raw.allSessionCount(admin)).isEqualTo(after);
 	}
 
 	private Tm1Session session(String user) {

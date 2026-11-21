@@ -37,19 +37,25 @@ class Tm1SessionPoolTm1Test {
 
 	private String bob;
 
+	private String context;
+
 	private Tm1SessionPool pool;
 
 	@BeforeEach
 	void setUp(Tm1ServerContainer server) {
 		raw = new RawTm1(server);
 		admin = raw.login();
+		context = RawTm1.uniqueContext();
 		String run = UUID.randomUUID().toString().substring(0, 6);
 		alice = "zz_alice_" + run;
 		bob = "zz_bob_" + run;
 		raw.createUser(admin, alice, "a");
 		raw.createUser(admin, bob, "b");
-		pool = Tm1SessionPool.builder(
-				Tm1Session.builder().baseUrl(server.getRestUrl()).basicAuth(server.getUsername(), server.getPassword()))
+		pool = Tm1SessionPool
+			.builder(Tm1Session.builder()
+				.baseUrl(server.getRestUrl())
+				.basicAuth(server.getUsername(), server.getPassword())
+				.sessionContext(context))
 			.idleTimeout(Duration.ofSeconds(1))
 			.closeGrace(Duration.ZERO)
 			.sweepInterval(Duration.ofHours(1))
@@ -88,11 +94,10 @@ class Tm1SessionPoolTm1Test {
 
 	@Test
 	void leavesNoSessionBehindWhenClosed() {
-		int before = raw.sessionCount(admin);
 		name(pool.session(Tm1Identity.impersonating(alice)));
 		name(pool.session(Tm1Identity.impersonating(bob)));
 		pool.close().block(WAIT);
-		assertThat(raw.awaitSessionCount(admin, before, WAIT)).isEqualTo(before);
+		assertThat(raw.awaitSessionCount(admin, context, 0, WAIT)).isZero();
 	}
 
 	/** Asking for an administrator fails; nothing runs as the pool's own user instead. */

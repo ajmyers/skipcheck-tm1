@@ -40,11 +40,14 @@ class Tm1SessionTm1Test {
 
 	private String admin;
 
+	private String context;
+
 	@BeforeEach
 	void connect(Tm1ServerContainer server) {
 		this.server = server;
 		this.raw = new RawTm1(server);
 		this.admin = raw.login();
+		this.context = RawTm1.uniqueContext();
 	}
 
 	@AfterEach
@@ -54,36 +57,33 @@ class Tm1SessionTm1Test {
 
 	@Test
 	void readsTheServerAndClosesItsSessionLeavingNoneBehind() {
-		int before = raw.sessionCount(admin);
 		Tm1Session session = session();
 
 		JsonNode tm1 = session.execute(SERVER).block(WAIT);
 		assertThat(tm1.get("ProductVersion").asString()).isEqualTo(server.getTm1Version().toString());
 		long id = session.sessionId().block(WAIT);
-		assertThat(raw.sessionCount(admin)).isEqualTo(before + 1);
+		assertThat(raw.sessionCount(admin, context)).isEqualTo(1);
 
 		session.close().block(WAIT);
 		assertThat(raw.awaitGone(admin, id, WAIT)).isTrue();
-		assertThat(raw.awaitSessionCount(admin, before, WAIT)).isEqualTo(before);
+		assertThat(raw.awaitSessionCount(admin, context, 0, WAIT)).isZero();
 	}
 
 	@Test
 	void sharesOneLoginBetweenConcurrentFirstRequests() {
-		int before = raw.sessionCount(admin);
 		Tm1Session session = session();
 		List<JsonNode> results = Flux.range(0, 8).flatMap(i -> session.execute(SERVER)).collectList().block(WAIT);
 		assertThat(results).hasSize(8);
-		assertThat(raw.sessionCount(admin)).isEqualTo(before + 1);
+		assertThat(raw.sessionCount(admin, context)).isEqualTo(1);
 		session.close().block(WAIT);
-		assertThat(raw.awaitSessionCount(admin, before, WAIT)).isEqualTo(before);
+		assertThat(raw.awaitSessionCount(admin, context, 0, WAIT)).isZero();
 	}
 
 	@Test
 	void leavesNoSessionWhenCloseRacesTheFirstRequest() {
-		int before = raw.sessionCount(admin);
 		Tm1Session session = session();
 		Mono.when(session.execute(SERVER).onErrorResume(e -> Mono.empty()), session.close()).block(WAIT);
-		assertThat(raw.awaitSessionCount(admin, before, WAIT)).isEqualTo(before);
+		assertThat(raw.awaitSessionCount(admin, context, 0, WAIT)).isZero();
 	}
 
 	/**
@@ -94,7 +94,6 @@ class Tm1SessionTm1Test {
 	 */
 	@Test
 	void logsInAgainAfterItsSessionIsKilledAndRunsThePostOnce() {
-		int before = raw.sessionCount(admin);
 		Tm1Session session = session();
 		String name = "zz_session_" + UUID.randomUUID().toString().substring(0, 8);
 		try {
@@ -114,7 +113,7 @@ class Tm1SessionTm1Test {
 			raw.send(raw.request("DELETE", "Dimensions('" + name + "')").cookie(admin));
 			session.close().block(WAIT);
 		}
-		assertThat(raw.awaitSessionCount(admin, before, WAIT)).isEqualTo(before);
+		assertThat(raw.awaitSessionCount(admin, context, 0, WAIT)).isZero();
 	}
 
 	@Test
@@ -193,10 +192,15 @@ class Tm1SessionTm1Test {
 		}
 	}
 
+	/**
+	 * A session labelled with this test's context, so the leak checks count only its
+	 * sessions.
+	 */
 	private Tm1Session session() {
 		return Tm1Session.builder()
 			.baseUrl(server.getRestUrl())
 			.basicAuth(server.getUsername(), server.getPassword())
+			.sessionContext(context)
 			.build();
 	}
 
