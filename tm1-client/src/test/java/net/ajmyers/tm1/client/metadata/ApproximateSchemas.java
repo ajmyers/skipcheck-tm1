@@ -4,18 +4,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
-import net.ajmyers.tm1.client.odata.csdl.CsdlAnnotation;
-import net.ajmyers.tm1.client.odata.csdl.CsdlComplexType;
-import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
-import net.ajmyers.tm1.client.odata.csdl.CsdlEntityContainer;
-import net.ajmyers.tm1.client.odata.csdl.CsdlEntityType;
-import net.ajmyers.tm1.client.odata.csdl.CsdlEnumType;
-import net.ajmyers.tm1.client.odata.csdl.CsdlOperation;
-import net.ajmyers.tm1.client.odata.csdl.CsdlParameter;
-import net.ajmyers.tm1.client.odata.csdl.CsdlRevision;
-import net.ajmyers.tm1.client.odata.csdl.CsdlSchema;
-import net.ajmyers.tm1.client.odata.csdl.CsdlValue;
 import net.ajmyers.tm1.client.version.Tm1Version;
+import net.ajmyers.tm1.csdl.CsdlAnnotation;
+import net.ajmyers.tm1.csdl.CsdlComplexType;
+import net.ajmyers.tm1.csdl.CsdlDocument;
+import net.ajmyers.tm1.csdl.CsdlEntityContainer;
+import net.ajmyers.tm1.csdl.CsdlEntityType;
+import net.ajmyers.tm1.csdl.CsdlEnumType;
+import net.ajmyers.tm1.csdl.CsdlOperation;
+import net.ajmyers.tm1.csdl.CsdlParameter;
+import net.ajmyers.tm1.csdl.CsdlRevision;
+import net.ajmyers.tm1.csdl.CsdlSchema;
+import net.ajmyers.tm1.csdl.CsdlValue;
 
 /**
  * Approximate {@code $metadata} for older TM1 schema versions, made from a newer

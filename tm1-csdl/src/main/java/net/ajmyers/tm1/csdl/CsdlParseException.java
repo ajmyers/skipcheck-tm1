@@ -1,4 +1,4 @@
-package net.ajmyers.tm1.client.odata.csdl;
+package net.ajmyers.tm1.csdl;
 
 /** A CSDL document couldn't be parsed: it's malformed, or not CSDL. */
 public class CsdlParseException extends RuntimeException {

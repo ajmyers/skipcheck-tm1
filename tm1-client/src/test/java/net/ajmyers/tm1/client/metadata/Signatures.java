@@ -3,15 +3,15 @@ package net.ajmyers.tm1.client.metadata;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 
-import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
-import net.ajmyers.tm1.client.odata.csdl.CsdlEntityContainer;
-import net.ajmyers.tm1.client.odata.csdl.CsdlEnumType;
-import net.ajmyers.tm1.client.odata.csdl.CsdlNavigationProperty;
-import net.ajmyers.tm1.client.odata.csdl.CsdlOperation;
-import net.ajmyers.tm1.client.odata.csdl.CsdlParameter;
-import net.ajmyers.tm1.client.odata.csdl.CsdlProperty;
-import net.ajmyers.tm1.client.odata.csdl.CsdlSchema;
-import net.ajmyers.tm1.client.odata.csdl.CsdlStructuredType;
+import net.ajmyers.tm1.csdl.CsdlDocument;
+import net.ajmyers.tm1.csdl.CsdlEntityContainer;
+import net.ajmyers.tm1.csdl.CsdlEnumType;
+import net.ajmyers.tm1.csdl.CsdlNavigationProperty;
+import net.ajmyers.tm1.csdl.CsdlOperation;
+import net.ajmyers.tm1.csdl.CsdlParameter;
+import net.ajmyers.tm1.csdl.CsdlProperty;
+import net.ajmyers.tm1.csdl.CsdlSchema;
+import net.ajmyers.tm1.csdl.CsdlStructuredType;
 
 /**
  * A document's API surface as a sorted set of one-line signatures, such as

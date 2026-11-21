@@ -12,6 +12,8 @@ mavenPublishing {
 }
 
 dependencies {
+	// The $metadata reader: Tm1Capabilities exposes its CsdlDocument
+	api(project(":tm1-csdl"))
 	// Nullness annotations in the API (@NullMarked packages, @Nullable), as Spring 7 uses
 	api(libs.jspecify)
 	// The API is reactive: WebClient, Reactor's Mono and Flux, and Spring's DataBuffer
