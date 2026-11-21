@@ -12,6 +12,9 @@ image.
 testImplementation("net.ajmyers.tm1:tm1-testcontainers:<version>")
 ```
 
+Tested with TM1 Server 11.8.03500.6 (Planning Analytics 2.1.19), the only version we've had
+to test with. If you run it with another version, please open an issue saying how it went.
+
 ## Writing a test
 
 ```java

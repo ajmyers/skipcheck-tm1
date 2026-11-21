@@ -1,0 +1,44 @@
+package net.ajmyers.tm1.client.odata.csdl;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * The value of a CSDL annotation: a constant, a collection or a record. Expression kinds the
+ * client doesn't interpret (paths, {@code If}, {@code Apply} and so on) are kept as
+ * {@link Other}, with their element name.
+ */
+public sealed interface CsdlValue {
+
+	/** A {@code String}, {@code Bool}, {@code Int}, {@code Decimal}, {@code EnumMember} or other constant, as written. */
+	record Constant(String kind, String text) implements CsdlValue {
+	}
+
+	/** A {@code Collection} of values, in document order. */
+	record Collection(List<CsdlValue> items) implements CsdlValue {
+		public Collection {
+			items = List.copyOf(items);
+		}
+	}
+
+	/** A {@code Record}: property values by name, in document order. */
+	record Record(Map<String, CsdlValue> properties) implements CsdlValue {
+		public Record {
+			properties = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(properties));
+		}
+	}
+
+	/** An annotation with no value, such as {@code <Annotation Term="Core.ConventionalIDs"/>}, which means true for a Boolean term. */
+	record Empty() implements CsdlValue {
+	}
+
+	/** An expression the client doesn't interpret, kept by element name. */
+	record Other(String kind) implements CsdlValue {
+	}
+
+	/** This value's text if it's a constant. */
+	default Optional<String> asText() {
+		return this instanceof Constant constant ? Optional.of(constant.text()) : Optional.empty();
+	}
+}
