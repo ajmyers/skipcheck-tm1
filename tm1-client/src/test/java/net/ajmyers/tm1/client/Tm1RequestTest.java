@@ -17,7 +17,8 @@ class Tm1RequestTest {
 
 	@Test
 	void describesAGet() {
-		Tm1Request<JsonNode> get = Tm1Request.get(ODataPath.of("Cubes").key("Sales"), ODataQuery.none().select("Name"), JsonNode.class);
+		Tm1Request<JsonNode> get = Tm1Request.get(ODataPath.of("Cubes").key("Sales"), ODataQuery.none().select("Name"),
+				JsonNode.class);
 		assertThat(get.method()).isEqualTo(HttpMethod.GET);
 		assertThat(get.relativeUri()).isEqualTo("Cubes('Sales')?$select=Name");
 		assertThat(get.response()).isEqualTo(Tm1Request.Response.SINGLE);
@@ -27,7 +28,8 @@ class Tm1RequestTest {
 
 	@Test
 	void givesActionsAJsonBodyEvenWithoutParameters() {
-		Tm1Request<Void> reserve = Tm1Request.post(ODataPath.of("Cubes").key("Sales").action("tm1.Reserve"), null, Void.class);
+		Tm1Request<Void> reserve = Tm1Request.post(ODataPath.of("Cubes").key("Sales").action("tm1.Reserve"), null,
+				Void.class);
 		assertThat(reserve.body()).isEqualTo(Map.of());
 		assertThat(reserve.response()).isEqualTo(Tm1Request.Response.NONE);
 		assertThat(reserve.isIdempotent()).isFalse();
@@ -35,7 +37,8 @@ class Tm1RequestTest {
 
 	@Test
 	void describesOtherKinds() {
-		assertThat(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), JsonNode.class).response()).isEqualTo(Tm1Request.Response.COLLECTION);
+		assertThat(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), JsonNode.class).response())
+			.isEqualTo(Tm1Request.Response.COLLECTION);
 		assertThat(Tm1Request.text(ODataPath.of("Dimensions").count()).response()).isEqualTo(Tm1Request.Response.TEXT);
 		assertThat(Tm1Request.patch(ODataPath.of("Cubes").key("x"), Map.of("Rules", "")).isIdempotent()).isFalse();
 		assertThat(Tm1Request.delete(ODataPath.of("Cubes").key("x")).isIdempotent()).isTrue();
@@ -52,11 +55,13 @@ class Tm1RequestTest {
 
 	@Test
 	void carriesItsOwnTimeoutThroughCopies() {
-		Tm1Request<Void> run = Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.ExecuteWithReturn"), null, Void.class);
+		Tm1Request<Void> run = Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.ExecuteWithReturn"), null,
+				Void.class);
 		assertThat(run.timeout()).isEmpty();
 		Tm1Request<Void> slow = run.withTimeout(Duration.ofHours(2)).withHeader("Prefer", "respond-async");
 		assertThat(slow.timeout()).hasValue(Duration.ofHours(2));
 		assertThat(run.timeout()).isEmpty();
 		assertThatIllegalArgumentException().isThrownBy(() -> run.withTimeout(Duration.ZERO));
 	}
+
 }

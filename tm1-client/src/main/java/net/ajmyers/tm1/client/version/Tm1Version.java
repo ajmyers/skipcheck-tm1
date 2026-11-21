@@ -7,19 +7,24 @@ import java.util.regex.Pattern;
 /**
  * A TM1 server version, as reported by {@code /api/v1/Configuration/ProductVersion}.
  *
- * <p>TM1 reports versions as dot-separated numbers, such as {@code 11.8.03500.6}. Each part is
- * compared numerically, so {@code 11.8.03500.6} equals {@code 11.8.3500.6}, and a shorter version
- * is treated as if padded with zeros: {@code 11.8} equals {@code 11.8.0.0}. {@link #toString()}
- * returns the text exactly as parsed, leading zeros included.
+ * <p>
+ * TM1 reports versions as dot-separated numbers, such as {@code 11.8.03500.6}. Each part
+ * is compared numerically, so {@code 11.8.03500.6} equals {@code 11.8.3500.6}, and a
+ * shorter version is treated as if padded with zeros: {@code 11.8} equals
+ * {@code 11.8.0.0}. {@link #toString()} returns the text exactly as parsed, leading zeros
+ * included.
  *
- * <p>This is the TM1 server build number, not the Planning Analytics release number (such as
- * {@code 2.1.19}) or the REST API schema version in {@code $metadata} (such as {@code 11.8.35}).
+ * <p>
+ * This is the TM1 server build number, not the Planning Analytics release number (such as
+ * {@code 2.1.19}) or the REST API schema version in {@code $metadata} (such as
+ * {@code 11.8.35}).
  */
 public final class Tm1Version implements Comparable<Tm1Version> {
 
 	private static final Pattern FORMAT = Pattern.compile("\\d+(\\.\\d+)*");
 
 	private final String text;
+
 	private final int[] parts;
 
 	private Tm1Version(String text, int[] parts) {
@@ -29,23 +34,24 @@ public final class Tm1Version implements Comparable<Tm1Version> {
 
 	/**
 	 * Parses a version such as {@code 11.8.03500.6}. Surrounding whitespace is ignored.
-	 *
 	 * @throws IllegalArgumentException if the text isn't dot-separated numbers
 	 */
 	public static Tm1Version parse(String text) {
 		Objects.requireNonNull(text, "text");
 		String trimmed = text.strip();
 		if (!FORMAT.matcher(trimmed).matches()) {
-			throw new IllegalArgumentException("Not a TM1 version: '" + text + "' (expected numbers separated by dots, like 11.8.03500.6)");
+			throw new IllegalArgumentException(
+					"Not a TM1 version: '" + text + "' (expected numbers separated by dots, like 11.8.03500.6)");
 		}
-		String[] split = trimmed.split("\\.");
+		String[] split = trimmed.split("\\.", -1);
 		int[] parts = new int[split.length];
 		for (int i = 0; i < split.length; i++) {
 			try {
 				parts[i] = Integer.parseInt(split[i]);
 			}
 			catch (NumberFormatException e) {
-				throw new IllegalArgumentException("Not a TM1 version: '" + text + "' (part '" + split[i] + "' is too large)", e);
+				throw new IllegalArgumentException(
+						"Not a TM1 version: '" + text + "' (part '" + split[i] + "' is too large)", e);
 			}
 		}
 		return new Tm1Version(trimmed, parts);
@@ -93,4 +99,5 @@ public final class Tm1Version implements Comparable<Tm1Version> {
 	public String toString() {
 		return text;
 	}
+
 }

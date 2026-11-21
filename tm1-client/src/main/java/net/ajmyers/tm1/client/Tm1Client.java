@@ -13,8 +13,9 @@ import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The client for one TM1 server: one {@link Tm1Session}, and every service built on it (plan §6).
- * Services arrive with the endpoint phases; until then, {@link #session()} sends any request.
+ * The client for one TM1 server: one {@link Tm1Session}, and every service built on it
+ * (plan §6). Services arrive with the endpoint phases; until then, {@link #session()}
+ * sends any request.
  *
  * <pre>{@code
  * Tm1Client tm1 = Tm1Client.builder()
@@ -41,7 +42,10 @@ public final class Tm1Client {
 		return new Builder();
 	}
 
-	/** A client over an existing session, such as one from a session pool or a Spring bean. */
+	/**
+	 * A client over an existing session, such as one from a session pool or a Spring
+	 * bean.
+	 */
 	public static Tm1Client of(Tm1Session session) {
 		return new Tm1Client(session);
 	}
@@ -51,7 +55,10 @@ public final class Tm1Client {
 		return session;
 	}
 
-	/** A client whose services all run in sandbox {@code name}, sharing this client's session. */
+	/**
+	 * A client whose services all run in sandbox {@code name}, sharing this client's
+	 * session.
+	 */
 	public Tm1Client withSandbox(String name) {
 		return new Tm1Client(session.withSandbox(name));
 	}
@@ -71,7 +78,10 @@ public final class Tm1Client {
 		return "Tm1Client[" + session + "]";
 	}
 
-	/** Builds a {@link Tm1Client}: the same settings as {@link Tm1Session.Builder}, which it delegates to. */
+	/**
+	 * Builds a {@link Tm1Client}: the same settings as {@link Tm1Session.Builder}, which
+	 * it delegates to.
+	 */
 	public static final class Builder {
 
 		private final Tm1Session.Builder session = Tm1Session.builder();
@@ -137,5 +147,7 @@ public final class Tm1Client {
 		public Tm1Client build() {
 			return new Tm1Client(session.build());
 		}
+
 	}
+
 }

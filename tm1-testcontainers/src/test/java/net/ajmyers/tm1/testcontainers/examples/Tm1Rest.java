@@ -14,11 +14,12 @@ import java.util.regex.Pattern;
 import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
 
 /**
- * A minimal TM1 REST session for the examples, standing in for tm1-client until it exists.
- * In your own tests you'd build a {@code Tm1Client} from {@link Tm1ServerContainer#getRestUrl()}
- * and the container's login instead.
+ * A minimal TM1 REST session for the examples, standing in for tm1-client until it
+ * exists. In your own tests you'd build a {@code Tm1Client} from
+ * {@link Tm1ServerContainer#getRestUrl()} and the container's login instead.
  *
- * <p>It logs in once, reuses the session cookie, and closes the session when done, since TM1
+ * <p>
+ * It logs in once, reuses the session cookie, and closes the session when done, since TM1
  * opens a new session for every request that doesn't send one back.
  */
 final class Tm1Rest implements AutoCloseable {
@@ -26,26 +27,34 @@ final class Tm1Rest implements AutoCloseable {
 	private static final Pattern COUNT = Pattern.compile("^\\d+$");
 
 	private final HttpClient http = HttpClient.newHttpClient();
+
 	private final String baseUrl;
+
 	private final String authorization;
+
 	private String cookie;
 
 	Tm1Rest(Tm1ServerContainer tm1) {
 		this.baseUrl = tm1.getRestUrl();
-		this.authorization = "Basic "
-				+ Base64.getEncoder().encodeToString((tm1.getUsername() + ":" + tm1.getPassword()).getBytes(StandardCharsets.UTF_8));
+		this.authorization = "Basic " + Base64.getEncoder()
+			.encodeToString((tm1.getUsername() + ":" + tm1.getPassword()).getBytes(StandardCharsets.UTF_8));
 	}
 
-	/** GETs a path under the service root and returns the body. Fails on anything but 200. */
+	/**
+	 * GETs a path under the service root and returns the body. Fails on anything but 200.
+	 */
 	String get(String path) {
 		HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(baseUrl + path));
 		request.header(cookie == null ? "Authorization" : "Cookie", cookie == null ? authorization : cookie);
 		HttpResponse<String> response = send(request.build());
 		if (response.statusCode() != 200) {
-			throw new IllegalStateException("GET " + path + " returned " + response.statusCode() + ": " + response.body());
+			throw new IllegalStateException(
+					"GET " + path + " returned " + response.statusCode() + ": " + response.body());
 		}
 		if (cookie == null) {
-			cookie = response.headers().allValues("Set-Cookie").stream()
+			cookie = response.headers()
+				.allValues("Set-Cookie")
+				.stream()
 				.map(c -> c.split(";", 2)[0].strip())
 				.filter(c -> c.startsWith("TM1SessionId="))
 				.findFirst()
@@ -87,4 +96,5 @@ final class Tm1Rest implements AutoCloseable {
 			throw new IllegalStateException(e);
 		}
 	}
+
 }

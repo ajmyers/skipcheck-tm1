@@ -51,8 +51,11 @@ class Tm1ServerContainerTest {
 	}
 
 	private HttpResponse<String> get(Tm1ServerContainer tm1, String path) throws Exception {
-		String auth = Base64.getEncoder().encodeToString((tm1.getUsername() + ":" + tm1.getPassword()).getBytes(StandardCharsets.UTF_8));
-		return http.send(HttpRequest.newBuilder(URI.create(tm1.getRestUrl() + path)).header("Authorization", "Basic " + auth).build(),
-				HttpResponse.BodyHandlers.ofString());
+		String auth = Base64.getEncoder()
+			.encodeToString((tm1.getUsername() + ":" + tm1.getPassword()).getBytes(StandardCharsets.UTF_8));
+		return http.send(HttpRequest.newBuilder(URI.create(tm1.getRestUrl() + path))
+			.header("Authorization", "Basic " + auth)
+			.build(), HttpResponse.BodyHandlers.ofString());
 	}
+
 }

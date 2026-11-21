@@ -4,12 +4,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
  * A parsed CSDL document ({@code $metadata}): its schemas, and lookups across them.
  *
- * <p>Lookups take a qualified name using either the namespace or the alias, so
+ * <p>
+ * Lookups take a qualified name using either the namespace or the alias, so
  * {@code ibm.tm1.api.v1.Cube} and {@code tm1.Cube} find the same type.
  *
  * @param version the {@code edmx:Edmx} {@code Version}, e.g. {@code 4.0}
@@ -27,8 +29,8 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 
 	/**
 	 * Rewrites a qualified name to use its schema's namespace rather than its alias:
-	 * {@code tm1.Cube} becomes {@code ibm.tm1.api.v1.Cube}. Names in other namespaces, such as
-	 * {@code Edm.String}, are returned unchanged.
+	 * {@code tm1.Cube} becomes {@code ibm.tm1.api.v1.Cube}. Names in other namespaces,
+	 * such as {@code Edm.String}, are returned unchanged.
 	 */
 	public String qualify(String qualifiedName) {
 		Objects.requireNonNull(qualifiedName, "qualifiedName");
@@ -45,7 +47,10 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 		return qualifiedName;
 	}
 
-	/** The schema version from {@code Core.SchemaVersion}, e.g. {@code 11.8.35}, if declared. */
+	/**
+	 * The schema version from {@code Core.SchemaVersion}, e.g. {@code 11.8.35}, if
+	 * declared.
+	 */
 	public Optional<String> schemaVersion() {
 		return schemas.stream()
 			.flatMap(s -> CsdlAnnotation.find(s.annotations(), SCHEMA_VERSION_TERM).stream())
@@ -93,7 +98,10 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 		return result;
 	}
 
-	/** The operations bound to this type (not collections of it), e.g. every {@code tm1.Cube} action. */
+	/**
+	 * The operations bound to this type (not collections of it), e.g. every
+	 * {@code tm1.Cube} action.
+	 */
 	public List<CsdlOperation> boundTo(String qualifiedTypeName) {
 		String type = qualify(qualifiedTypeName);
 		return schemas.stream()
@@ -103,8 +111,8 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 	}
 
 	/**
-	 * A structured type followed by its base types, nearest first. Stops at a base type the
-	 * document doesn't define, and at a cycle (which valid CSDL never has).
+	 * A structured type followed by its base types, nearest first. Stops at a base type
+	 * the document doesn't define, and at a cycle (which valid CSDL never has).
 	 */
 	public List<CsdlStructuredType> typeHierarchy(String qualifiedName) {
 		List<CsdlStructuredType> chain = new ArrayList<>();
@@ -117,7 +125,10 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 		return chain;
 	}
 
-	/** The qualified name, by namespace, of a type defined in one of this document's schemas. */
+	/**
+	 * The qualified name, by namespace, of a type defined in one of this document's
+	 * schemas.
+	 */
 	public Optional<String> qualifiedName(CsdlStructuredType type) {
 		return schemas.stream()
 			.filter(s -> s.entityTypes().contains(type) || s.complexTypes().contains(type))
@@ -125,8 +136,8 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 			.findFirst();
 	}
 
-	private <T> Optional<T> find(String qualifiedName, java.util.function.Function<CsdlSchema, List<T>> members,
-			java.util.function.Function<T, String> nameOf) {
+	private <T> Optional<T> find(String qualifiedName, Function<CsdlSchema, List<T>> members,
+			Function<T, String> nameOf) {
 		String name = qualify(qualifiedName);
 		return schemas.stream()
 			.flatMap(s -> members.apply(s).stream().filter(t -> (s.namespace() + "." + nameOf.apply(t)).equals(name)))

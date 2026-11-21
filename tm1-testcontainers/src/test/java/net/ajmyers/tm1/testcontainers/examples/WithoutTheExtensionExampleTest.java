@@ -14,11 +14,12 @@ import net.ajmyers.tm1.testcontainers.Tm1Source;
 /**
  * <b>Without {@code @RequiresTm1}</b>: plain JUnit assumptions and try-with-resources.
  *
- * <p>Use this when you want full control of the container's lifetime, or when you're not using
- * JUnit Jupiter extensions (other test frameworks, or code outside tests, such as a local dev
- * tool). It's also the pattern for a test that <b>damages its server</b>, such as changing
- * server configuration or testing a shutdown: give it a fresh server of its own, thrown away
- * at the end, so it can't affect other tests.
+ * <p>
+ * Use this when you want full control of the container's lifetime, or when you're not
+ * using JUnit Jupiter extensions (other test frameworks, or code outside tests, such as a
+ * local dev tool). It's also the pattern for a test that <b>damages its server</b>, such
+ * as changing server configuration or testing a shutdown: give it a fresh server of its
+ * own, thrown away at the end, so it can't affect other tests.
  */
 class WithoutTheExtensionExampleTest {
 
@@ -33,6 +34,7 @@ class WithoutTheExtensionExampleTest {
 			try (var rest = new Tm1Rest(tm1)) {
 				assertThat(rest.get("Configuration/ProductVersion/$value")).isEqualTo(tm1.getTm1Version().toString());
 			}
-		}   // the container, and anything the test did to it, is removed here
+		} // the container, and anything the test did to it, is removed here
 	}
+
 }

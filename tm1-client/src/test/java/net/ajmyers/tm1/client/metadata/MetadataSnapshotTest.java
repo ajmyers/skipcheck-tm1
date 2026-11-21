@@ -4,13 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
+import net.ajmyers.tm1.client.odata.csdl.CsdlAnnotation;
 import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
 import net.ajmyers.tm1.client.odata.csdl.CsdlEntityContainer;
 import net.ajmyers.tm1.client.odata.csdl.CsdlOperation;
 import net.ajmyers.tm1.client.odata.csdl.CsdlRevision;
 import net.ajmyers.tm1.client.odata.csdl.CsdlSchema;
 
-/** Checks the committed snapshot parses into the API surface measured from the live server. */
+/**
+ * Checks the committed snapshot parses into the API surface measured from the live
+ * server.
+ */
 class MetadataSnapshotTest {
 
 	private final CsdlDocument doc = MetadataSnapshot.load();
@@ -23,7 +27,11 @@ class MetadataSnapshotTest {
 
 	@Test
 	void hasTheWholeApiSurface() {
-		CsdlSchema tm1 = doc.schemas().stream().filter(s -> "ibm.tm1.api.v1".equals(s.namespace())).findFirst().orElseThrow();
+		CsdlSchema tm1 = doc.schemas()
+			.stream()
+			.filter(s -> "ibm.tm1.api.v1".equals(s.namespace()))
+			.findFirst()
+			.orElseThrow();
 		assertThat(tm1.alias()).isEqualTo("tm1");
 		assertThat(tm1.entityTypes()).hasSize(67);
 		assertThat(tm1.complexTypes()).hasSize(62);
@@ -40,9 +48,16 @@ class MetadataSnapshotTest {
 
 	@Test
 	void keepsTheRevisionHistory() {
-		assertThat(CsdlRevision.addedIn(doc.boundTo("tm1.Cube").stream().filter(o -> o.name().equals("Reserve")).findFirst().orElseThrow()
+		assertThat(CsdlRevision.addedIn(doc.boundTo("tm1.Cube")
+			.stream()
+			.filter(o -> o.name().equals("Reserve"))
+			.findFirst()
+			.orElseThrow()
 			.annotations())).contains("11.8.34");
-		assertThat(CsdlRevision.deprecatedIn(doc.boundTo("tm1.Chore").stream().filter(o -> o.name().equals("Activate")).findFirst()
+		assertThat(CsdlRevision.deprecatedIn(doc.boundTo("tm1.Chore")
+			.stream()
+			.filter(o -> o.name().equals("Activate"))
+			.findFirst()
 			.orElseThrow()
 			.annotations())).contains("11.8.3");
 	}
@@ -50,16 +65,25 @@ class MetadataSnapshotTest {
 	@Test
 	void keepsTheDescriptions() {
 		// IBM's descriptions are kept: generated model docs (phase 1) come from them
-		var name = doc.entityType("tm1.Cube").orElseThrow().properties().stream().filter(p -> p.name().equals("Name")).findFirst().orElseThrow();
-		assertThat(net.ajmyers.tm1.client.odata.csdl.CsdlAnnotation.find(name.annotations(), "Core.Description")).isPresent();
+		var name = doc.entityType("tm1.Cube")
+			.orElseThrow()
+			.properties()
+			.stream()
+			.filter(p -> p.name().equals("Name"))
+			.findFirst()
+			.orElseThrow();
+		assertThat(CsdlAnnotation.find(name.annotations(), "Core.Description")).isPresent();
 	}
 
 	@Test
 	void signaturesCoverEveryKindOfElement() {
 		assertThat(Signatures.of(doc))
 			.contains("EntitySet Cubes: ibm.tm1.api.v1.Cube", "Singleton Server: ibm.tm1.api.v1.Server",
-					"Property ibm.tm1.api.v1.Cube/Name: Edm.String", "Navigation ibm.tm1.api.v1.Cube/Views: Collection(tm1.View)",
-					"EnumMember ibm.tm1.api.v1.ElementType/Numeric", "EntityType ibm.tm1.api.v1.MDXView : ibm.tm1.api.v1.View")
+					"Property ibm.tm1.api.v1.Cube/Name: Edm.String",
+					"Navigation ibm.tm1.api.v1.Cube/Views: Collection(tm1.View)",
+					"EnumMember ibm.tm1.api.v1.ElementType/Numeric",
+					"EntityType ibm.tm1.api.v1.MDXView : ibm.tm1.api.v1.View")
 			.anyMatch(s -> s.startsWith("Action ibm.tm1.api.v1.Reserve(Cube: ibm.tm1.api.v1.Cube"));
 	}
+
 }

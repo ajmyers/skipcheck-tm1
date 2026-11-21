@@ -5,9 +5,11 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.jspecify.annotations.Nullable;
+
 /**
- * A {@code $filter} expression, built from {@link ODataProperty} comparisons and the canonical
- * functions TM1 supports:
+ * A {@code $filter} expression, built from {@link ODataProperty} comparisons and the
+ * canonical functions TM1 supports:
  *
  * <pre>{@code
  * Filter.and(Filter.startsWith(Element.NAME, "Q"), Element.TYPE.eq(ODataLiterals.enumMember("ibm.tm1.api.v1.ElementType", "Numeric")))
@@ -16,13 +18,16 @@ import java.util.stream.Collectors;
  *     // Hierarchies/any(h:h/Name eq 'Region')
  * }</pre>
  *
- * <p>Every binary expression is parenthesized, so precedence never depends on how a filter was
- * composed. Values are written as OData literals ({@link ODataLiterals#of}); the whole
- * expression is percent-encoded once, when the query is rendered. {@link #raw} takes any
- * expression as is.
+ * <p>
+ * Every binary expression is parenthesized, so precedence never depends on how a filter
+ * was composed. Values are written as OData literals ({@link ODataLiterals#of}); the
+ * whole expression is percent-encoded once, when the query is rendered. {@link #raw}
+ * takes any expression as is.
  *
- * <p>Note that TM1 compares names in {@code $filter} case- and space-sensitively, while keyed
- * access ignores both. To find one object by name, use its key rather than a filter.
+ * <p>
+ * Note that TM1 compares names in {@code $filter} case- and space-sensitively, while
+ * keyed access ignores both. To find one object by name, use its key rather than a
+ * filter.
  */
 public final class Filter {
 
@@ -69,27 +74,34 @@ public final class Filter {
 	}
 
 	/**
-	 * {@code collection/any(v:condition)}: true if any member of a collection matches. The
-	 * lambda receives the range variable, from which to build paths ({@code v.nav("Name")}).
+	 * {@code collection/any(v:condition)}: true if any member of a collection matches.
+	 * The lambda receives the range variable, from which to build paths
+	 * ({@code v.nav("Name")}).
 	 */
 	public static Filter any(String collectionPath, String variable, Function<Variable, Filter> condition) {
 		return lambda("any", collectionPath, variable, condition);
 	}
 
-	/** {@code collection/all(v:condition)}: true if every member of a collection matches. */
+	/**
+	 * {@code collection/all(v:condition)}: true if every member of a collection matches.
+	 */
 	public static Filter all(String collectionPath, String variable, Function<Variable, Filter> condition) {
 		return lambda("all", collectionPath, variable, condition);
 	}
 
-	/** {@code property in (a,b,c)}. Not every TM1 version supports {@code in}; {@link #or} of {@code eq}s always works. */
+	/**
+	 * {@code property in (a,b,c)}. Not every TM1 version supports {@code in}; {@link #or}
+	 * of {@code eq}s always works.
+	 */
 	public static Filter in(ODataProperty property, Object... values) {
 		if (values.length == 0) {
 			throw new IllegalArgumentException("in() needs at least one value: an empty set matches nothing");
 		}
-		return new Filter("(" + property.path() + " in (" + Arrays.stream(values).map(ODataLiterals::of).collect(Collectors.joining(",")) + "))");
+		return new Filter("(" + property.path() + " in ("
+				+ Arrays.stream(values).map(ODataLiterals::of).collect(Collectors.joining(",")) + "))");
 	}
 
-	static Filter compare(ODataProperty property, String operator, Object value) {
+	static Filter compare(ODataProperty property, String operator, @Nullable Object value) {
 		return new Filter("(" + property.path() + " " + operator + " " + ODataLiterals.of(value) + ")");
 	}
 
@@ -127,6 +139,7 @@ public final class Filter {
 		public ODataProperty self() {
 			return ODataProperty.of(name);
 		}
+
 	}
 
 	private static Filter join(String operator, Filter... filters) {
@@ -136,17 +149,22 @@ public final class Filter {
 		if (filters.length == 1) {
 			return filters[0];
 		}
-		return new Filter("(" + Arrays.stream(filters).map(f -> f.expression).collect(Collectors.joining(" " + operator + " ")) + ")");
+		return new Filter(
+				"(" + Arrays.stream(filters).map(f -> f.expression).collect(Collectors.joining(" " + operator + " "))
+						+ ")");
 	}
 
 	private static Filter function(String name, ODataProperty property, String argument) {
 		return new Filter(name + "(" + property.path() + "," + ODataLiterals.string(argument) + ")");
 	}
 
-	private static Filter lambda(String kind, String collectionPath, String variable, Function<Variable, Filter> condition) {
+	private static Filter lambda(String kind, String collectionPath, String variable,
+			Function<Variable, Filter> condition) {
 		if (!variable.matches("[A-Za-z_][A-Za-z0-9_]*")) {
 			throw new IllegalArgumentException("Not a valid range variable: " + variable);
 		}
-		return new Filter(collectionPath + "/" + kind + "(" + variable + ":" + condition.apply(new Variable(variable)).expression + ")");
+		return new Filter(collectionPath + "/" + kind + "(" + variable + ":"
+				+ condition.apply(new Variable(variable)).expression + ")");
 	}
+
 }

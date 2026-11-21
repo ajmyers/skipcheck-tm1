@@ -131,7 +131,8 @@ class CsdlParserTest {
 		assertThat(folder.baseType()).isEqualTo("tm1.Entry");
 		assertThat(folder.key()).isEmpty();
 		assertThat(folder.navigationProperties().get(0).containsTarget()).isTrue();
-		assertThat(doc.typeHierarchy("tm1.Folder")).extracting(CsdlStructuredType::name).containsExactly("Folder", "Entry");
+		assertThat(doc.typeHierarchy("tm1.Folder")).extracting(CsdlStructuredType::name)
+			.containsExactly("Folder", "Entry");
 		assertThat(doc.entityType("tm1.Entry").orElseThrow().isAbstract()).isTrue();
 	}
 
@@ -139,7 +140,8 @@ class CsdlParserTest {
 	void readsEnumMembersInOrder() {
 		CsdlEnumType type = doc.enumType("tm1.ElementType").orElseThrow();
 		assertThat(type.underlyingType()).isEqualTo("Edm.Int32");
-		assertThat(type.members()).extracting(CsdlEnumType.Member::name).containsExactly("Numeric", "String", "Consolidated");
+		assertThat(type.members()).extracting(CsdlEnumType.Member::name)
+			.containsExactly("Numeric", "String", "Consolidated");
 		assertThat(type.members()).extracting(CsdlEnumType.Member::value).containsExactly(1L, 2L, 3L);
 	}
 
@@ -157,19 +159,23 @@ class CsdlParserTest {
 		assertThat(mdx.returnType()).isEqualTo(new CsdlTypeRef("tm1.Cellset", false));
 		assertThat(mdx.returnNullable()).isFalse();
 
-		assertThat(doc.boundTo("tm1.Cube")).extracting(CsdlOperation::name).containsExactly("Reserve", "DimensionsStorageOrder");
+		assertThat(doc.boundTo("tm1.Cube")).extracting(CsdlOperation::name)
+			.containsExactly("Reserve", "DimensionsStorageOrder");
 		assertThat(doc.operations("tm1.DimensionsStorageOrder").get(0).composable()).isTrue();
 	}
 
 	@Test
 	void readsTheContainer() {
 		CsdlEntityContainer api = doc.entityContainer().orElseThrow();
-		assertThat(api.entitySets()).extracting(CsdlEntityContainer.EntitySet::name).containsExactly("Cubes", "Dimensions");
+		assertThat(api.entitySets()).extracting(CsdlEntityContainer.EntitySet::name)
+			.containsExactly("Cubes", "Dimensions");
 		assertThat(api.entitySets().get(0).navigationBindings()).containsEntry("Dimensions", "Dimensions");
 		assertThat(api.singletons()).extracting(CsdlEntityContainer.Singleton::type).containsExactly("tm1.Cube");
-		assertThat(api.actionImports()).extracting(CsdlEntityContainer.ActionImport::action).containsExactly("tm1.ExecuteMDX");
+		assertThat(api.actionImports()).extracting(CsdlEntityContainer.ActionImport::action)
+			.containsExactly("tm1.ExecuteMDX");
 		assertThat(api.functionImports()).isEmpty();
-		assertThat(api.annotations()).singleElement().satisfies(a -> assertThat(a.value()).isEqualTo(new CsdlValue.Empty()));
+		assertThat(api.annotations()).singleElement()
+			.satisfies(a -> assertThat(a.value()).isEqualTo(new CsdlValue.Empty()));
 	}
 
 	@Test
@@ -186,7 +192,8 @@ class CsdlParserTest {
 		List<CsdlAnnotation> annotations = doc.entityType("tm1.Cube").orElseThrow().annotations();
 		assertThat(CsdlRevision.of(annotations)).containsExactly(
 				new CsdlRevision("11.0.0", CsdlRevision.Kind.ADDED, "Core.RevisionKind/Added", null),
-				new CsdlRevision("11.8.3", CsdlRevision.Kind.DEPRECATED, "Core.RevisionKind/Deprecated", "Use something else"),
+				new CsdlRevision("11.8.3", CsdlRevision.Kind.DEPRECATED, "Core.RevisionKind/Deprecated",
+						"Use something else"),
 				new CsdlRevision("12.0.0", CsdlRevision.Kind.UNKNOWN, "Core.RevisionKind/Retired", null));
 		assertThat(CsdlRevision.addedIn(annotations)).contains("11.0.0");
 		assertThat(CsdlRevision.deprecatedIn(annotations)).contains("11.8.3");
@@ -200,12 +207,15 @@ class CsdlParserTest {
 				<!DOCTYPE edmx:Edmx [<!ENTITY x SYSTEM "file:///etc/passwd">]>
 				<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">&x;</edmx:Edmx>
 				""";
-		assertThatThrownBy(() -> CsdlParser.parse(xxe)).isInstanceOf(CsdlParseException.class).hasMessageContaining("DOCTYPE");
+		assertThatThrownBy(() -> CsdlParser.parse(xxe)).isInstanceOf(CsdlParseException.class)
+			.hasMessageContaining("DOCTYPE");
 	}
 
 	@Test
 	void refusesDocumentsThatArentCsdl() {
-		assertThatThrownBy(() -> CsdlParser.parse("<html/>")).isInstanceOf(CsdlParseException.class).hasMessageContaining("not edmx:Edmx");
+		assertThatThrownBy(() -> CsdlParser.parse("<html/>")).isInstanceOf(CsdlParseException.class)
+			.hasMessageContaining("not edmx:Edmx");
 		assertThatThrownBy(() -> CsdlParser.parse("not xml")).isInstanceOf(CsdlParseException.class);
 	}
+
 }

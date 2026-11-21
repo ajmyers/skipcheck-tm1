@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -27,12 +28,9 @@ class Tm1SourceTest {
 	@Test
 	void triesSourcesInTheImagesOrder() throws IOException {
 		Path install = fakeInstall();
-		Map<String, String> all = Map.of(
-				Tm1Source.PRIVATE_IMAGE, "registry.example.com/private/tm1-server:2.1.19",
-				Tm1Source.HOME_DIR, install.toString(),
-				Tm1Source.INSTALL_VOLUME, "tm1_tm1-install",
-				Tm1Source.BUNDLE_DIR, temp.toString(),
-				Tm1Source.BUNDLE_URL, "https://example.com/b.tar.gz");
+		Map<String, String> all = Map.of(Tm1Source.PRIVATE_IMAGE, "registry.example.com/private/tm1-server:2.1.19",
+				Tm1Source.HOME_DIR, install.toString(), Tm1Source.INSTALL_VOLUME, "tm1_tm1-install",
+				Tm1Source.BUNDLE_DIR, temp.toString(), Tm1Source.BUNDLE_URL, "https://example.com/b.tar.gz");
 
 		assertThat(discover(all)).containsInstanceOf(Tm1Source.PrivateImage.class);
 		assertThat(discover(without(all, Tm1Source.PRIVATE_IMAGE))).contains(new Tm1Source.InstallDir(install));
@@ -40,7 +38,8 @@ class Tm1SourceTest {
 			.contains(new Tm1Source.InstallVolume("tm1_tm1-install"));
 		assertThat(discover(without(all, Tm1Source.PRIVATE_IMAGE, Tm1Source.HOME_DIR, Tm1Source.INSTALL_VOLUME)))
 			.contains(new Tm1Source.Bundle(temp, null));
-		assertThat(discover(Map.of(Tm1Source.BUNDLE_URL, "https://example.com/b.tar.gz", Tm1Source.BUNDLE_SHA256, "abc")))
+		assertThat(
+				discover(Map.of(Tm1Source.BUNDLE_URL, "https://example.com/b.tar.gz", Tm1Source.BUNDLE_SHA256, "abc")))
 			.contains(new Tm1Source.BundleUrl(URI.create("https://example.com/b.tar.gz"), "abc"));
 	}
 
@@ -48,7 +47,8 @@ class Tm1SourceTest {
 	void failsOnAWrongSettingRatherThanSkipping() {
 		assertThatIllegalArgumentException().isThrownBy(() -> discover(Map.of(Tm1Source.HOME_DIR, temp.toString())))
 			.withMessageContaining("no bin64/tm1s.exe");
-		assertThatIllegalArgumentException().isThrownBy(() -> discover(Map.of(Tm1Source.BUNDLE_DIR, temp.resolve("missing").toString())))
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> discover(Map.of(Tm1Source.BUNDLE_DIR, temp.resolve("missing").toString())))
 			.withMessageContaining("is not a folder");
 		assertThatIllegalArgumentException()
 			.isThrownBy(() -> discover(Map.of(Tm1Source.BUNDLE_DIR, temp.toString(), Tm1Source.BUNDLE, "nope.tar.gz")))
@@ -58,19 +58,23 @@ class Tm1SourceTest {
 	@Test
 	void namesABundleFileWithinItsFolder() throws IOException {
 		Files.createFile(temp.resolve("tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz"));
-		assertThat(discover(Map.of(Tm1Source.BUNDLE_DIR, temp.toString(), Tm1Source.BUNDLE, "tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz")))
+		assertThat(discover(Map.of(Tm1Source.BUNDLE_DIR, temp.toString(), Tm1Source.BUNDLE,
+				"tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz")))
 			.contains(new Tm1Source.Bundle(temp, "tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz"));
 	}
 
 	@Test
 	void neverDescribesAUrlsQueryString() {
-		Tm1Source url = new Tm1Source.BundleUrl(URI.create("https://bucket.s3.amazonaws.com/b.tar.gz?X-Amz-Signature=secret"), null);
-		assertThat(url.describe()).isEqualTo("bundle URL https://bucket.s3.amazonaws.com/b.tar.gz").doesNotContain("secret");
+		Tm1Source url = new Tm1Source.BundleUrl(
+				URI.create("https://bucket.s3.amazonaws.com/b.tar.gz?X-Amz-Signature=secret"), null);
+		assertThat(url.describe()).isEqualTo("bundle URL https://bucket.s3.amazonaws.com/b.tar.gz")
+			.doesNotContain("secret");
 	}
 
 	@Test
 	void neverDescribesCredentialsInAUrl() {
-		Tm1Source url = new Tm1Source.BundleUrl(URI.create("https://ci-user:s3cr3t@artifacts.example.com:8443/tm1/b.tar.gz"), null);
+		Tm1Source url = new Tm1Source.BundleUrl(
+				URI.create("https://ci-user:s3cr3t@artifacts.example.com:8443/tm1/b.tar.gz"), null);
 		assertThat(url.describe()).isEqualTo("bundle URL https://artifacts.example.com:8443/tm1/b.tar.gz")
 			.doesNotContain("ci-user")
 			.doesNotContain("s3cr3t");
@@ -94,10 +98,11 @@ class Tm1SourceTest {
 	}
 
 	private static Map<String, String> without(Map<String, String> settings, String... names) {
-		var copy = new java.util.HashMap<>(settings);
+		var copy = new HashMap<>(settings);
 		for (String name : names) {
 			copy.remove(name);
 		}
 		return copy;
 	}
+
 }

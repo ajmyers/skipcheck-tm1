@@ -2,11 +2,11 @@ package net.ajmyers.tm1.client.session;
 
 import java.net.URI;
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
@@ -34,12 +34,14 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The state every view of one {@link Tm1Session} shares: the HTTP client, the credentials, and
- * the TM1 session itself (its cookie, the login in progress, whether it's closed).
+ * The state every view of one {@link Tm1Session} shares: the HTTP client, the
+ * credentials, and the TM1 session itself (its cookie, the login in progress, whether
+ * it's closed).
  *
- * <p>State changes (starting a login, replacing a failed one, closing) happen under this object's
- * lock. They only swap references, never wait for I/O, so the lock is never held across a
- * request.
+ * <p>
+ * State changes (starting a login, replacing a failed one, closing) happen under this
+ * object's lock. They only swap references, never wait for I/O, so the lock is never held
+ * across a request.
  */
 @Slf4j
 final class Connection {
@@ -48,27 +50,41 @@ final class Connection {
 	static final String SESSION_CONTEXT = "TM1-SessionContext";
 
 	private static final String LOGIN_PATH = "ActiveSession?$select=ID";
+
 	private static final String CLOSE_PATH = "ActiveSession/tm1.Close";
+
 	private static final byte[] EMPTY_OBJECT = { '{', '}' };
 
 	private final WebClient web;
+
 	private final String root;
+
 	private final String authorization;
-	private final String sessionContext;
+
+	private final @Nullable String sessionContext;
+
 	private final Tm1Timeouts timeouts;
+
 	private final Tm1ErrorClassifier classifier;
+
 	private final ObjectMapper mapper;
+
 	private final ObservationRegistry observations;
 
-	/** The current login, or null if none has started (or the last one failed). Guarded by this. */
-	private Attempt attempt;
+	/**
+	 * The current login, or null if none has started (or the last one failed). Guarded by
+	 * this.
+	 */
+	private @Nullable Attempt attempt;
+
 	/** Set once by {@link #close()}. Guarded by this. */
 	private boolean closed;
-	/** What {@link #close()} returns, once called. Guarded by this. */
-	private Mono<Void> closing;
 
-	Connection(WebClient web, String root, String authorization, String sessionContext, Tm1Timeouts timeouts, Tm1ErrorClassifier classifier,
-			ObjectMapper mapper, ObservationRegistry observations) {
+	/** What {@link #close()} returns, once called. Guarded by this. */
+	private @Nullable Mono<Void> closing;
+
+	Connection(WebClient web, String root, String authorization, @Nullable String sessionContext, Tm1Timeouts timeouts,
+			Tm1ErrorClassifier classifier, ObjectMapper mapper, ObservationRegistry observations) {
 		this.web = Objects.requireNonNull(web, "web");
 		this.root = Objects.requireNonNull(root, "root");
 		this.authorization = Objects.requireNonNull(authorization, "authorization");
@@ -87,7 +103,10 @@ final class Connection {
 		return closed;
 	}
 
-	/** The logged-in session, logging in first if needed. Concurrent callers share one login. */
+	/**
+	 * The logged-in session, logging in first if needed. Concurrent callers share one
+	 * login.
+	 */
 	Mono<LoggedIn> session() {
 		return Mono.defer(() -> current().login);
 	}
@@ -99,20 +118,22 @@ final class Connection {
 	}
 
 	/**
-	 * Sends a collection request and streams its items, following {@code @odata.nextLink}.
+	 * Sends a collection request and streams its items, following
+	 * {@code @odata.nextLink}.
 	 *
-	 * <p>Each page is its own exchange, decoded as it arrives. The next page is only requested
-	 * once the previous response is complete and its connection back in the pool, so a
-	 * collection of many pages doesn't hold a connection for its whole length.
+	 * <p>
+	 * Each page is its own exchange, decoded as it arrives. The next page is only
+	 * requested once the previous response is complete and its connection back in the
+	 * pool, so a collection of many pages doesn't hold a connection for its whole length.
 	 */
 	<T> Flux<T> stream(Tm1Request<T> request) {
 		return page(request, uri(request.relativeUri()));
 	}
 
 	/**
-	 * Closes the TM1 session: waits for a login in progress, then sends {@code tm1.Close}. Does
-	 * nothing if no login ever started. Afterwards the connection refuses requests. Every call
-	 * returns the same result.
+	 * Closes the TM1 session: waits for a login in progress, then sends
+	 * {@code tm1.Close}. Does nothing if no login ever started. Afterwards the connection
+	 * refuses requests. Every call returns the same result.
 	 */
 	Mono<Void> close() {
 		return Mono.defer(() -> {
@@ -139,12 +160,12 @@ final class Connection {
 	}
 
 	/**
-	 * The login to replay on after {@code expired} saw a 401. The first request to report it
-	 * starts a new login; requests that report the same expired login later share that one.
-	 * TM1 opened a session along with the 401, so the new login logs that one in (by sending its
-	 * cookie) rather than opening another.
+	 * The login to replay on after {@code expired} saw a 401. The first request to report
+	 * it starts a new login; requests that report the same expired login later share that
+	 * one. TM1 opened a session along with the 401, so the new login logs that one in (by
+	 * sending its cookie) rather than opening another.
 	 */
-	private synchronized Attempt relogin(Attempt expired, String seedCookie) {
+	private synchronized Attempt relogin(Attempt expired, @Nullable String seedCookie) {
 		if (closed) {
 			throw new Tm1SessionClosedException(root);
 		}
@@ -166,19 +187,21 @@ final class Connection {
 		return Flux.defer(() -> {
 			String[] next = new String[1];
 			Flux<ODataCollectionDecoder.Event<T>> events = exchange(request, uri,
-					response -> ODataCollectionDecoder.decode(response.bodyToFlux(DataBuffer.class), mapper, request.type(), request.method().name(),
-							uri.toString()));
+					response -> ODataCollectionDecoder.decode(response.bodyToFlux(DataBuffer.class), mapper,
+							request.type(), request.method().name(), uri.toString()));
 			Flux<T> items = events.handle((event, sink) -> {
 				if (event instanceof ODataCollectionDecoder.Event.Item<T> item && item.value() != null) {
 					sink.next(item.value());
 				}
-				else if (event instanceof ODataCollectionDecoder.Event.Control<T> control && ODataJson.NEXT_LINK.equals(control.name())
-						&& control.value().isString()) {
+				else if (event instanceof ODataCollectionDecoder.Event.Control<T> control
+						&& ODataJson.NEXT_LINK.equals(control.name()) && control.value().isString()) {
 					next[0] = control.value().asString();
 				}
 			});
-			// Next links are opaque: resolved against the service root, never changed (OData Part 1 §11.2.6.7)
-			return items.concatWith(Flux.defer(() -> next[0] == null ? Flux.empty() : page(request, URI.create(root).resolve(next[0]))));
+			// Next links are opaque: resolved against the service root, never changed
+			// (OData Part 1 §11.2.6.7)
+			return items.concatWith(Flux
+				.defer(() -> next[0] == null ? Flux.empty() : page(request, URI.create(root).resolve(next[0]))));
 		});
 	}
 
@@ -186,38 +209,40 @@ final class Connection {
 	 * Sends {@code request} on the logged-in session, and hands a successful response to
 	 * {@code onSuccess}.
 	 *
-	 * <p>A 401 means the session expired or was killed. Then the session logs in again, once for
-	 * all the requests that saw it expire, and the request is replayed <b>once</b>, POSTs included:
-	 * TM1 refuses a request on a dead session before running it, so the replay can't run it twice
-	 * ({@code Tm1SessionBehaviorTest} pins this). A 401 on the replay is final, so a server that
-	 * keeps refusing can't cause a loop of logins.
+	 * <p>
+	 * A 401 means the session expired or was killed. Then the session logs in again, once
+	 * for all the requests that saw it expire, and the request is replayed <b>once</b>,
+	 * POSTs included: TM1 refuses a request on a dead session before running it, so the
+	 * replay can't run it twice ({@code Tm1SessionBehaviorTest} pins this). A 401 on the
+	 * replay is final, so a server that keeps refusing can't cause a loop of logins.
 	 */
 	private <T, R> Flux<R> exchange(Tm1Request<T> request, URI uri, Function<ClientResponse, Flux<R>> onSuccess) {
 		return Flux.defer(() -> {
 			Attempt used = current();
 			return used.login.flatMapMany(session -> send(request, uri, session, onSuccess))
-				.onErrorResume(Expired.class, expired -> relogin(used, expired.cookie).login.flatMapMany(session -> send(request, uri, session, onSuccess)));
+				.onErrorResume(Expired.class, expired -> relogin(used, expired.cookie).login
+					.flatMapMany(session -> send(request, uri, session, onSuccess)));
 		}).onErrorMap(Expired.class, expired -> unauthenticated(request, uri));
 	}
 
-	private <T, R> Flux<R> send(Tm1Request<T> request, URI uri, LoggedIn session, Function<ClientResponse, Flux<R>> onSuccess) {
+	private <T, R> Flux<R> send(Tm1Request<T> request, URI uri, LoggedIn session,
+			Function<ClientResponse, Flux<R>> onSuccess) {
 		String method = request.method().name();
 		return Flux.defer(() -> {
 			long start = System.nanoTime();
 			log.debug("Sending {} {}", method, uri);
-			WebClient.RequestBodySpec spec = web.method(request.method())
-				.uri(uri)
-				.headers(h -> {
-					odataHeaders(h, request.response() == Tm1Request.Response.TEXT);
-					request.headers().forEach(h::set);
-				})
+			WebClient.RequestBodySpec spec = web.method(request.method()).uri(uri).headers(h -> {
+				odataHeaders(h, request.response() == Tm1Request.Response.TEXT);
+				request.headers().forEach(h::set);
+			})
 				.cookie(COOKIE, session.cookie())
 				.httpRequest(r -> responseTimeout(r.getNativeRequest(), request.timeout().orElse(timeouts.request())));
 			WebClient.RequestHeadersSpec<?> ready = request.body() == null ? spec
 					: spec.contentType(MediaType.APPLICATION_JSON).bodyValue(json(request.body()));
 			return ready.<R>exchangeToFlux(response -> {
 				int status = response.statusCode().value();
-				log.debug("Received {} for {} {} after {} ms", status, method, uri, Duration.ofNanos(System.nanoTime() - start).toMillis());
+				log.debug("Received {} for {} {} after {} ms", status, method, uri,
+						Duration.ofNanos(System.nanoTime() - start).toMillis());
 				if (status == 401) {
 					return response.releaseBody().thenMany(Flux.<R>error(new Expired(cookie(response))));
 				}
@@ -226,31 +251,31 @@ final class Connection {
 				}
 				return onSuccess.apply(response);
 			});
-		}).onErrorMap(e -> !(e instanceof Expired), e -> Transport.map(e, method, uri.toString(), request.isIdempotent()));
+		})
+			.onErrorMap(e -> !(e instanceof Expired),
+					e -> Transport.map(e, method, uri.toString(), request.isIdempotent()));
 	}
 
 	private <T> Mono<T> read(Tm1Request<T> request, URI uri, ClientResponse response) {
-		switch (request.response()) {
-			case NONE:
-				return response.releaseBody().then(Mono.empty());
-			case TEXT:
-				return response.bodyToMono(String.class).map(request.type()::cast);
-			case SINGLE:
-				return DataBufferUtils.join(response.bodyToFlux(DataBuffer.class)).map(buffer -> {
-					try {
-						return mapper.readValue(buffer.asInputStream(), request.type());
-					}
-					catch (JacksonException e) {
-						throw new Tm1ProtocolException("TM1 sent a response that isn't valid JSON for " + request.type().getSimpleName(), null,
-								request.method().name(), uri.toString(), e);
-					}
-					finally {
-						DataBufferUtils.release(buffer);
-					}
-				});
-			default:
-				return Mono.error(new IllegalArgumentException(request.response() + " responses are streamed: use stream(), not execute()"));
-		}
+		return switch (request.response()) {
+			case NONE -> response.releaseBody().then(Mono.empty());
+			case TEXT -> response.bodyToMono(String.class).map(request.type()::cast);
+			case SINGLE -> DataBufferUtils.join(response.bodyToFlux(DataBuffer.class)).map(buffer -> {
+				try {
+					return mapper.readValue(buffer.asInputStream(), request.type());
+				}
+				catch (JacksonException e) {
+					throw new Tm1ProtocolException(
+							"TM1 sent a response that isn't valid JSON for " + request.type().getSimpleName(), null,
+							request.method().name(), uri.toString(), e);
+				}
+				finally {
+					DataBufferUtils.release(buffer);
+				}
+			});
+			default -> Mono.error(new IllegalArgumentException(
+					request.response() + " responses are streamed: use stream(), not execute()"));
+		};
 	}
 
 	/** The exception for an error response, from its OData error body if it has one. */
@@ -276,19 +301,16 @@ final class Connection {
 
 	// Login and close
 
-	private Mono<LoggedIn> login(String seedCookie, String reason) {
+	private Mono<LoggedIn> login(@Nullable String seedCookie, String reason) {
 		URI uri = uri(LOGIN_PATH);
 		Mono<LoggedIn> login = Mono.defer(() -> {
-			WebClient.RequestHeadersSpec<?> spec = web.get()
-				.uri(uri)
-				.headers(h -> {
-					odataHeaders(h, false);
-					h.set(HttpHeaders.AUTHORIZATION, authorization);
-					if (sessionContext != null) {
-						h.set(SESSION_CONTEXT, sessionContext);
-					}
-				})
-				.httpRequest(r -> responseTimeout(r.getNativeRequest(), timeouts.login()));
+			WebClient.RequestHeadersSpec<?> spec = web.get().uri(uri).headers(h -> {
+				odataHeaders(h, false);
+				h.set(HttpHeaders.AUTHORIZATION, authorization);
+				if (sessionContext != null) {
+					h.set(SESSION_CONTEXT, sessionContext);
+				}
+			}).httpRequest(r -> responseTimeout(r.getNativeRequest(), timeouts.login()));
 			if (seedCookie != null) {
 				// Log in the session TM1 opened for a 401, rather than opening another
 				spec = spec.cookie(COOKIE, seedCookie);
@@ -297,7 +319,8 @@ final class Connection {
 				int status = response.statusCode().value();
 				if (status == 401) {
 					return response.releaseBody()
-						.then(Mono.error(Tm1ApiException.of(401, Tm1ErrorKind.CREDENTIAL_REJECTED, null, "GET", uri.toString())));
+						.then(Mono.error(Tm1ApiException.of(401, Tm1ErrorKind.CREDENTIAL_REJECTED, null, "GET",
+								uri.toString())));
 				}
 				if (status >= 400) {
 					return error(response, "GET", uri);
@@ -312,19 +335,22 @@ final class Connection {
 			.doOnError(e -> log.debug("Login to TM1 at {} failed", root, e));
 	}
 
-	private LoggedIn loggedIn(String cookie, byte[] body, URI uri) {
+	private LoggedIn loggedIn(@Nullable String cookie, byte[] body, URI uri) {
 		if (cookie == null) {
-			throw new Tm1ProtocolException("TM1 accepted the login but set no " + COOKIE + " cookie", null, "GET", uri.toString(), null);
+			throw new Tm1ProtocolException("TM1 accepted the login but set no " + COOKIE + " cookie", null, "GET",
+					uri.toString(), null);
 		}
 		try {
 			JsonNode id = mapper.readTree(body).get("ID");
 			if (id == null || !id.canConvertToLong()) {
-				throw new Tm1ProtocolException("TM1 accepted the login but didn't return the session ID", null, "GET", uri.toString(), null);
+				throw new Tm1ProtocolException("TM1 accepted the login but didn't return the session ID", null, "GET",
+						uri.toString(), null);
 			}
 			return new LoggedIn(cookie, id.asLong());
 		}
 		catch (JacksonException e) {
-			throw new Tm1ProtocolException("TM1 accepted the login but its response isn't JSON", null, "GET", uri.toString(), e);
+			throw new Tm1ProtocolException("TM1 accepted the login but its response isn't JSON", null, "GET",
+					uri.toString(), e);
 		}
 	}
 
@@ -340,7 +366,8 @@ final class Connection {
 			.exchangeToMono(response -> {
 				int status = response.statusCode().value();
 				log.debug("Received {} for POST {}", status, uri);
-				// 401: the session was already gone (killed, or timed out), which is what close wants
+				// 401: the session was already gone (killed, or timed out), which is what
+				// close wants
 				if (status < 400 || status == 401) {
 					return response.releaseBody();
 				}
@@ -349,13 +376,15 @@ final class Connection {
 			.onErrorMap(e -> Transport.map(e, "POST", uri.toString(), true));
 		return observe("tm1.session.close", "tm1 close", "close", close)
 			.doOnSuccess(v -> log.info("Closed TM1 session {} at {}", session.sessionId(), root))
-			.doOnError(e -> log.warn("Couldn't close TM1 session {} at {}: {}", session.sessionId(), root, e.toString()));
+			.doOnError(
+					e -> log.warn("Couldn't close TM1 session {} at {}: {}", session.sessionId(), root, e.toString()));
 	}
 
 	// Helpers
 
 	private URI uri(String relative) {
-		// Already encoded by ODataPath and ODataQuery: never through a URI template, which would
+		// Already encoded by ODataPath and ODataQuery: never through a URI template,
+		// which would
 		// read the braces in TM1 control object names as variables (plan §16.2)
 		return URI.create(root + relative);
 	}
@@ -367,7 +396,8 @@ final class Connection {
 	}
 
 	private static void responseTimeout(Object nativeRequest, Duration timeout) {
-		// Only Reactor Netty supports an idle timeout per request; other connectors use their own settings
+		// Only Reactor Netty supports an idle timeout per request; other connectors use
+		// their own settings
 		if (nativeRequest instanceof HttpClientRequest netty) {
 			netty.responseTimeout(timeout);
 		}
@@ -384,19 +414,20 @@ final class Connection {
 			return mapper.writeValueAsBytes(body);
 		}
 		catch (JacksonException e) {
-			throw new IllegalArgumentException("The request body can't be written as JSON: " + body.getClass().getName(), e);
+			throw new IllegalArgumentException(
+					"The request body can't be written as JSON: " + body.getClass().getName(), e);
 		}
 	}
 
 	/**
-	 * The {@code TM1SessionId} a response sets, found by name among all its {@code Set-Cookie}
-	 * headers, or null. A cookie being expired ({@code Max-Age=0}, as {@code tm1.Close} sends)
-	 * doesn't count. Parsed from the headers rather than through the connector's cookie support,
-	 * so it works the same with any connector.
+	 * The {@code TM1SessionId} a response sets, found by name among all its
+	 * {@code Set-Cookie} headers, or null. A cookie being expired ({@code Max-Age=0}, as
+	 * {@code tm1.Close} sends) doesn't count. Parsed from the headers rather than through
+	 * the connector's cookie support, so it works the same with any connector.
 	 */
-	static String cookie(ClientResponse response) {
+	static @Nullable String cookie(ClientResponse response) {
 		for (String header : response.headers().header(HttpHeaders.SET_COOKIE)) {
-			String[] parts = header.split(";");
+			String[] parts = header.split(";", -1);
 			int eq = parts[0].indexOf('=');
 			if (eq < 0 || !parts[0].substring(0, eq).trim().equals(COOKIE)) {
 				continue;
@@ -427,34 +458,47 @@ final class Connection {
 		});
 	}
 
-	/** One login and what it led to: shared by every request until it fails or the session expires. */
+	/**
+	 * One login and what it led to: shared by every request until it fails or the session
+	 * expires.
+	 */
 	private final class Attempt {
 
 		final Mono<LoggedIn> login;
 
-		Attempt(String seedCookie, String reason) {
-			// cache(): concurrent requests share one login. A failed login is forgotten, so the next
+		Attempt(@Nullable String seedCookie, String reason) {
+			// cache(): concurrent requests share one login. A failed login is forgotten,
+			// so the next
 			// request tries again rather than getting the cached failure forever.
 			this.login = Mono.defer(() -> login(seedCookie, reason)).doOnError(e -> forget(this)).cache();
 		}
 
-		/** Waits for this login if it's in progress, then closes the session. A failed login leaves nothing to close. */
+		/**
+		 * Waits for this login if it's in progress, then closes the session. A failed
+		 * login leaves nothing to close.
+		 */
 		Mono<Void> close() {
 			return login.onErrorResume(e -> Mono.empty()).flatMap(Connection.this::sendClose);
 		}
+
 	}
 
-	/** A 401 on an established session: the session expired or was killed. Internal, never seen by callers. */
+	/**
+	 * A 401 on an established session: the session expired or was killed. Internal, never
+	 * seen by callers.
+	 */
 	static final class Expired extends RuntimeException {
 
 		private static final long serialVersionUID = 1L;
 
 		/** The cookie of the session TM1 opened along with the 401, or null. */
-		final transient String cookie;
+		final transient @Nullable String cookie;
 
-		Expired(String cookie) {
+		Expired(@Nullable String cookie) {
 			super("TM1 session expired", null, false, false);
 			this.cookie = cookie;
 		}
+
 	}
+
 }

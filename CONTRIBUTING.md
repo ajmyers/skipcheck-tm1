@@ -38,6 +38,24 @@ PRs are squash-merged, so the PR title and description become the commit on `mas
 
 ## Code style
 
+**Layout is Spring Java Format, and the build checks it.** `./gradlew build` fails on a
+file the formatter would change; `./gradlew format` fixes them all. The pre-commit hook formats
+what you stage, so you rarely need to (skip it once with `SKIP_FORMAT_HOOK=1`). The same check
+fails on unused imports, imports out of order (static, `java`/`javax`, `org`, then the rest) and
+fully qualified type names in code; `format` fixes all but the last. In a Javadoc code example,
+write `@` as `&#64;` inside `<pre class="code">`, as Spring does: the formatter takes an `@` at
+the start of a line for a block tag and breaks the comment, which the check also reports.
+
+**Error Prone and NullAway check every compile.** Their findings are errors. Library packages
+are `@NullMarked` (JSpecify): nothing is null unless declared `@Nullable`, and NullAway checks
+that at compile time, so a nullable field, parameter or return gets `@Nullable` where it's
+declared. Lombok copies it onto the accessors it generates. Tests aren't null-checked.
+
+**Architecture rules are tests.** `ArchitectureTest` in `tm1-client` checks the compiled library:
+it never blocks or calls a bare `subscribe()`, builds request URIs instead of using URI templates,
+logs only through SLF4J, and keeps the `odata` package free of TM1. Each rule's `because` says
+why. If one fails, fix the code; change a rule only with a reason in the commit.
+
 **Value types are records.** Immutable data (requests, results, model types) is a Java
 record. Records already remove the boilerplate of constructors, accessors, `equals`,
 `hashCode` and `toString`.

@@ -4,10 +4,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.jspecify.annotations.Nullable;
+
 /**
- * An action or a function. Actions may change data and are invoked with POST; functions don't,
- * and are invoked with GET. A bound operation's first parameter is its binding parameter: the
- * type it's invoked on, such as {@code tm1.Cube} for {@code Cubes('x')/tm1.Reserve}.
+ * An action or a function. Actions may change data and are invoked with POST; functions
+ * don't, and are invoked with GET. A bound operation's first parameter is its binding
+ * parameter: the type it's invoked on, such as {@code tm1.Cube} for
+ * {@code Cubes('x')/tm1.Reserve}.
  *
  * @param kind action or function
  * @param name the operation's name, unqualified
@@ -19,12 +22,15 @@ import java.util.Optional;
  * @param returnNullable whether the return value may be null
  * @param annotations its annotations
  */
-public record CsdlOperation(Kind kind, String name, boolean bound, boolean composable, String entitySetPath, List<CsdlParameter> parameters,
-		CsdlTypeRef returnType, boolean returnNullable, List<CsdlAnnotation> annotations) {
+public record CsdlOperation(Kind kind, String name, boolean bound, boolean composable, @Nullable String entitySetPath,
+		List<CsdlParameter> parameters, @Nullable CsdlTypeRef returnType, boolean returnNullable,
+		List<CsdlAnnotation> annotations) {
 
 	/** Action or function. */
 	public enum Kind {
+
 		ACTION, FUNCTION
+
 	}
 
 	public CsdlOperation {

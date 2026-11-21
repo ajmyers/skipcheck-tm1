@@ -26,8 +26,12 @@ import tools.jackson.databind.JsonNode;
 class Tm1SessionReloginTest {
 
 	private static final String CREATE_KEY = "POST Dimensions";
-	private static final Tm1Request<JsonNode> CREATE = Tm1Request.post(ODataPath.of("Dimensions"), Map.of("Name", "d"), JsonNode.class);
-	private static final Tm1Request<JsonNode> SERVER = Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), JsonNode.class);
+
+	private static final Tm1Request<JsonNode> CREATE = Tm1Request.post(ODataPath.of("Dimensions"), Map.of("Name", "d"),
+			JsonNode.class);
+
+	private static final Tm1Request<JsonNode> SERVER = Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(),
+			JsonNode.class);
 
 	private final FakeTm1 tm1 = new FakeTm1();
 
@@ -41,7 +45,8 @@ class Tm1SessionReloginTest {
 
 		List<ClientRequest> logins = tm1.requests(FakeTm1.LOGIN);
 		assertThat(logins).hasSize(2);
-		assertThat(FakeTm1.cookie(logins.get(1))).as("the re-login logs in the session TM1 opened for the 401").isEqualTo("fresh");
+		assertThat(FakeTm1.cookie(logins.get(1))).as("the re-login logs in the session TM1 opened for the 401")
+			.isEqualTo("fresh");
 		assertThat(FakeTm1.authorization(logins.get(1))).isNotNull();
 		List<ClientRequest> creates = tm1.requests(CREATE_KEY);
 		assertThat(creates).hasSize(2);
@@ -54,9 +59,12 @@ class Tm1SessionReloginTest {
 	@Test
 	void sharesOneReloginBetweenRequestsThatSawTheSameExpiry() {
 		Sinks.One<ClientResponse> relogin = Sinks.one();
-		tm1.onEach(FakeTm1.LOGIN, r -> Mono.just(FakeTm1.json(200, "{\"ID\":1}", "TM1SessionId=old; Path=/api/")), r -> relogin.asMono());
-		tm1.on("GET Server", r -> "old".equals(FakeTm1.cookie(r)) ? Mono.just(FakeTm1.status(401, "TM1SessionId=anon" + System.nanoTime()))
-				: Mono.just(FakeTm1.json(200, "{}")));
+		tm1.onEach(FakeTm1.LOGIN, r -> Mono.just(FakeTm1.json(200, "{\"ID\":1}", "TM1SessionId=old; Path=/api/")),
+				r -> relogin.asMono());
+		tm1.on("GET Server",
+				r -> "old".equals(FakeTm1.cookie(r))
+						? Mono.just(FakeTm1.status(401, "TM1SessionId=anon" + System.nanoTime()))
+						: Mono.just(FakeTm1.json(200, "{}")));
 		Tm1Session session = tm1.session();
 		session.connect().block();
 
@@ -132,4 +140,5 @@ class Tm1SessionReloginTest {
 			.hasNumberOfObservationsWithNameEqualTo("tm1.session.login", 2)
 			.hasAnObservationWithAKeyValue("tm1.reason", "relogin");
 	}
+
 }

@@ -6,8 +6,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 /**
- * The entity container: the service's top-level resources, addressed from the service root.
+ * The entity container: the service's top-level resources, addressed from the service
+ * root.
  *
  * @param name the container's name
  * @param entitySets its entity sets, such as {@code Cubes}
@@ -16,8 +19,8 @@ import java.util.Objects;
  * @param functionImports its function imports, such as {@code TailMessageLog}
  * @param annotations its annotations, including the service's {@code Capabilities}
  */
-public record CsdlEntityContainer(String name, List<EntitySet> entitySets, List<Singleton> singletons, List<ActionImport> actionImports,
-		List<FunctionImport> functionImports, List<CsdlAnnotation> annotations) {
+public record CsdlEntityContainer(String name, List<EntitySet> entitySets, List<Singleton> singletons,
+		List<ActionImport> actionImports, List<FunctionImport> functionImports, List<CsdlAnnotation> annotations) {
 
 	public CsdlEntityContainer {
 		Objects.requireNonNull(name, "name");
@@ -36,7 +39,8 @@ public record CsdlEntityContainer(String name, List<EntitySet> entitySets, List<
 	 * @param navigationBindings navigation property paths and the sets they lead to
 	 * @param annotations its annotations
 	 */
-	public record EntitySet(String name, String entityType, Map<String, String> navigationBindings, List<CsdlAnnotation> annotations) {
+	public record EntitySet(String name, String entityType, Map<String, String> navigationBindings,
+			List<CsdlAnnotation> annotations) {
 		public EntitySet {
 			Objects.requireNonNull(name, "name");
 			Objects.requireNonNull(entityType, "entityType");
@@ -53,7 +57,8 @@ public record CsdlEntityContainer(String name, List<EntitySet> entitySets, List<
 	 * @param navigationBindings navigation property paths and the sets they lead to
 	 * @param annotations its annotations
 	 */
-	public record Singleton(String name, String type, Map<String, String> navigationBindings, List<CsdlAnnotation> annotations) {
+	public record Singleton(String name, String type, Map<String, String> navigationBindings,
+			List<CsdlAnnotation> annotations) {
 		public Singleton {
 			Objects.requireNonNull(name, "name");
 			Objects.requireNonNull(type, "type");
@@ -70,7 +75,8 @@ public record CsdlEntityContainer(String name, List<EntitySet> entitySets, List<
 	 * @param entitySet the entity set its result belongs to, or {@code null}
 	 * @param annotations its annotations
 	 */
-	public record ActionImport(String name, String action, String entitySet, List<CsdlAnnotation> annotations) {
+	public record ActionImport(String name, String action, @Nullable String entitySet,
+			List<CsdlAnnotation> annotations) {
 		public ActionImport {
 			Objects.requireNonNull(name, "name");
 			Objects.requireNonNull(action, "action");
@@ -86,7 +92,8 @@ public record CsdlEntityContainer(String name, List<EntitySet> entitySets, List<
 	 * @param entitySet the entity set its result belongs to, or {@code null}
 	 * @param annotations its annotations
 	 */
-	public record FunctionImport(String name, String function, String entitySet, List<CsdlAnnotation> annotations) {
+	public record FunctionImport(String name, String function, @Nullable String entitySet,
+			List<CsdlAnnotation> annotations) {
 		public FunctionImport {
 			Objects.requireNonNull(name, "name");
 			Objects.requireNonNull(function, "function");

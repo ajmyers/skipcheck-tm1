@@ -3,25 +3,29 @@ package net.ajmyers.tm1.client.odata;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Percent-encoding for OData URLs, applied exactly once to each piece (OData Part 2 §2.1).
+ * Percent-encoding for OData URLs, applied exactly once to each piece (OData Part 2
+ * §2.1).
  *
- * <p>TM1 object names contain almost anything: {@code }Clients}, {@code Year 2026},
- * {@code O'Neil}, {@code a/b}, {@code 50%}, {@code {x}}, {@code &=+#}. Two rules, one per place
- * a value can go, keep them intact:
+ * <p>
+ * TM1 object names contain almost anything: {@code }Clients}, {@code Year 2026},
+ * {@code O'Neil}, {@code a/b}, {@code 50%}, {@code {x}}, {@code &=+#}. Two rules, one per
+ * place a value can go, keep them intact:
  *
  * <ul>
- *   <li>{@link #pathValue}: inside a path segment, such as a key literal. Only unreserved
- *       characters and {@code '} are left as is; {@code /} becomes {@code %2F}.
- *   <li>{@link #queryValue}: a query option's value. The OData punctuation used inside values
- *       ({@code $ ( ) , ; ' : @ / ! *}) is kept readable; {@code & = + #} and everything else
- *       is encoded, so a value can't split or end the query. A space is {@code %20}, never
- *       {@code +}.
+ * <li>{@link #pathValue}: inside a path segment, such as a key literal. Only unreserved
+ * characters and {@code '} are left as is; {@code /} becomes {@code %2F}.
+ * <li>{@link #queryValue}: a query option's value. The OData punctuation used inside
+ * values ({@code $ ( ) , ; ' : @ / ! *}) is kept readable; {@code & = + #} and everything
+ * else is encoded, so a value can't split or end the query. A space is {@code %20}, never
+ * {@code +}.
  * </ul>
  */
 public final class ODataEncoding {
 
 	private static final boolean[] PATH_SAFE = safe("'");
+
 	private static final boolean[] QUERY_SAFE = safe("$(),;':@/!*");
+
 	private static final char[] HEX = "0123456789ABCDEF".toCharArray();
 
 	private ODataEncoding() {
@@ -65,9 +69,11 @@ public final class ODataEncoding {
 		for (char c : "-._~".toCharArray()) {
 			safe[c] = true;
 		}
-		for (char c : extra.toCharArray()) {
+		for (int i = 0; i < extra.length(); i++) {
+			char c = extra.charAt(i);
 			safe[c] = true;
 		}
 		return safe;
 	}
+
 }

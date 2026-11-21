@@ -3,6 +3,8 @@ package net.ajmyers.tm1.client.odata.csdl;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A structural property of an entity or complex type.
  *
@@ -12,7 +14,8 @@ import java.util.Objects;
  * @param defaultValue its {@code DefaultValue}, or {@code null}
  * @param annotations its annotations, in document order
  */
-public record CsdlProperty(String name, CsdlTypeRef type, boolean nullable, String defaultValue, List<CsdlAnnotation> annotations) {
+public record CsdlProperty(String name, CsdlTypeRef type, boolean nullable, @Nullable String defaultValue,
+		List<CsdlAnnotation> annotations) {
 
 	public CsdlProperty {
 		Objects.requireNonNull(name, "name");

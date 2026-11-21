@@ -1,17 +1,22 @@
 package net.ajmyers.tm1.client.odata.csdl;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * The value of a CSDL annotation: a constant, a collection or a record. Expression kinds the
- * client doesn't interpret (paths, {@code If}, {@code Apply} and so on) are kept as
+ * The value of a CSDL annotation: a constant, a collection or a record. Expression kinds
+ * the client doesn't interpret (paths, {@code If}, {@code Apply} and so on) are kept as
  * {@link Other}, with their element name.
  */
 public sealed interface CsdlValue {
 
-	/** A {@code String}, {@code Bool}, {@code Int}, {@code Decimal}, {@code EnumMember} or other constant, as written. */
+	/**
+	 * A {@code String}, {@code Bool}, {@code Int}, {@code Decimal}, {@code EnumMember} or
+	 * other constant, as written.
+	 */
 	record Constant(String kind, String text) implements CsdlValue {
 	}
 
@@ -23,13 +28,20 @@ public sealed interface CsdlValue {
 	}
 
 	/** A {@code Record}: property values by name, in document order. */
+	// Named after the CSDL Record expression; inside CsdlValue it shadows
+	// java.lang.Record, which is fine
+	@SuppressWarnings("AvoidCommonTypeNames")
 	record Record(Map<String, CsdlValue> properties) implements CsdlValue {
 		public Record {
-			properties = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(properties));
+			properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
 		}
 	}
 
-	/** An annotation with no value, such as {@code <Annotation Term="Core.ConventionalIDs"/>}, which means true for a Boolean term. */
+	/**
+	 * An annotation with no value, such as
+	 * {@code <Annotation Term="Core.ConventionalIDs"/>}, which means true for a Boolean
+	 * term.
+	 */
 	record Empty() implements CsdlValue {
 	}
 
@@ -41,4 +53,5 @@ public sealed interface CsdlValue {
 	default Optional<String> asText() {
 		return this instanceof Constant constant ? Optional.of(constant.text()) : Optional.empty();
 	}
+
 }

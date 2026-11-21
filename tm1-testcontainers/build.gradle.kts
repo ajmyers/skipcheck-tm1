@@ -12,6 +12,8 @@ mavenPublishing {
 }
 
 dependencies {
+	// Nullness annotations in the API (@NullMarked packages, @Nullable), as Spring 7 uses
+	api(libs.jspecify)
 	// Tm1Version is part of this module's API (Tm1ServerContainer.withExpectedVersion)
 	api(project(":tm1-client"))
 	api(libs.testcontainers)

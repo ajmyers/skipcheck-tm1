@@ -20,10 +20,13 @@ class ODataPathTest {
 		assertThat(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements"))
 			.hasToString("Dimensions('Region')/Hierarchies('Region')/Elements");
 		assertThat(ODataPath.of("Cubes").key("Sales").action("tm1.Reserve")).hasToString("Cubes('Sales')/tm1.Reserve");
-		assertThat(ODataPath.of("Cubes").key("Sales").nav("Views").cast("tm1.NativeView")).hasToString("Cubes('Sales')/Views/tm1.NativeView");
-		assertThat(ODataPath.of("Configuration").nav("ProductVersion").value()).hasToString("Configuration/ProductVersion/$value");
+		assertThat(ODataPath.of("Cubes").key("Sales").nav("Views").cast("tm1.NativeView"))
+			.hasToString("Cubes('Sales')/Views/tm1.NativeView");
+		assertThat(ODataPath.of("Configuration").nav("ProductVersion").value())
+			.hasToString("Configuration/ProductVersion/$value");
 		assertThat(ODataPath.of("Dimensions").count()).hasToString("Dimensions/$count");
-		assertThat(ODataPath.of("Cubes").key("Sales").nav("Dimensions").ref()).hasToString("Cubes('Sales')/Dimensions/$ref");
+		assertThat(ODataPath.of("Cubes").key("Sales").nav("Dimensions").ref())
+			.hasToString("Cubes('Sales')/Dimensions/$ref");
 		assertThat(ODataPath.of("Threads").key(42)).hasToString("Threads(42)");
 	}
 
@@ -40,12 +43,15 @@ class ODataPathTest {
 		Map<String, Object> range = new LinkedHashMap<>();
 		range.put("Begin", 0);
 		range.put("End", 99);
-		assertThat(ODataPath.of("Cellsets").key("abc").function("tm1.GetPartition", range)).hasToString("Cellsets('abc')/tm1.GetPartition(Begin=0,End=99)");
-		assertThat(ODataPath.of("Hierarchies").function("tm1.Fn", Map.of("p", new ODataPath.Alias("@p")))).hasToString("Hierarchies/tm1.Fn(p=@p)");
+		assertThat(ODataPath.of("Cellsets").key("abc").function("tm1.GetPartition", range))
+			.hasToString("Cellsets('abc')/tm1.GetPartition(Begin=0,End=99)");
+		assertThat(ODataPath.of("Hierarchies").function("tm1.Fn", Map.of("p", new ODataPath.Alias("@p"))))
+			.hasToString("Hierarchies/tm1.Fn(p=@p)");
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = { "}Clients", "Year 2026", "O'Neil", "a/b", "50%", "{x}", "a&b=c+d#e", "Région", "日本", "😀", "''", "%2F", "?", "\\", "a\tb" })
+	@ValueSource(strings = { "}Clients", "Year 2026", "O'Neil", "a/b", "50%", "{x}", "a&b=c+d#e", "Région", "日本", "😀",
+			"''", "%2F", "?", "\\", "a\tb" })
 	void keepsAwkwardNamesIntact(String name) {
 		ODataPath path = ODataPath.of("Dimensions").key(name).nav("Hierarchies");
 		assertThat(keyOf(path)).isEqualTo(name);
@@ -72,7 +78,8 @@ class ODataPathTest {
 			}
 			ODataPath path = ODataPath.of("Cubes").key(name.toString()).nav("Views").key(name.toString());
 			assertThat(URI.create("http://tm1:8010/api/v1/" + path)).as(name.toString()).isNotNull();
-			assertThat(keyOf(ODataPath.of("Cubes").key(name.toString()))).as(name.toString()).isEqualTo(name.toString());
+			assertThat(keyOf(ODataPath.of("Cubes").key(name.toString()))).as(name.toString())
+				.isEqualTo(name.toString());
 		}
 	}
 
@@ -91,15 +98,20 @@ class ODataPathTest {
 
 	@Test
 	void isAValueType() {
-		assertThat(ODataPath.of("Cubes").key("a")).isEqualTo(ODataPath.of("Cubes").key("a")).hasSameHashCodeAs(ODataPath.of("Cubes").key("a"));
+		assertThat(ODataPath.of("Cubes").key("a")).isEqualTo(ODataPath.of("Cubes").key("a"))
+			.hasSameHashCodeAs(ODataPath.of("Cubes").key("a"));
 	}
 
-	/** Decodes a path once, as a server would, and reads back the first segment's key literal. */
+	/**
+	 * Decodes a path once, as a server would, and reads back the first segment's key
+	 * literal.
+	 */
 	private static String keyOf(ODataPath path) {
-		String decoded = URI.create("http://tm1:8010/api/v1/" + path.toString().split("/")[0]).getPath();
+		String decoded = URI.create("http://tm1:8010/api/v1/" + path.toString().split("/", -1)[0]).getPath();
 		String segment = decoded.substring(decoded.lastIndexOf("/api/v1/") + 8);
 		String literal = segment.substring(segment.indexOf('(') + 1, segment.lastIndexOf(')'));
 		assertThat(literal).startsWith("'").endsWith("'");
 		return literal.substring(1, literal.length() - 1).replace("''", "'");
 	}
+
 }

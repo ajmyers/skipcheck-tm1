@@ -9,9 +9,9 @@ import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
 import net.ajmyers.tm1.client.odata.csdl.CsdlParser;
 
 /**
- * The committed snapshot of TM1's {@code $metadata}: the response exactly as the server sent
- * it, IBM's descriptions included, so it can be compared with a live server byte for byte.
- * {@link MetadataSnapshotUpdateTest} writes it.
+ * The committed snapshot of TM1's {@code $metadata}: the response exactly as the server
+ * sent it, IBM's descriptions included, so it can be compared with a live server byte for
+ * byte. {@link MetadataSnapshotUpdateTest} writes it.
  */
 public final class MetadataSnapshot {
 
@@ -41,4 +41,5 @@ public final class MetadataSnapshot {
 			throw new UncheckedIOException(e);
 		}
 	}
+
 }

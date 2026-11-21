@@ -12,6 +12,8 @@ mavenPublishing {
 }
 
 dependencies {
+	// Nullness annotations in the API (@NullMarked packages, @Nullable), as Spring 7 uses
+	api(libs.jspecify)
 	// The API is reactive: WebClient, Reactor's Mono and Flux, and Spring's DataBuffer
 	api(libs.spring.webflux)
 	// The default HTTP connector (plan Q4): pool control and per-request response timeouts
@@ -32,5 +34,7 @@ dependencies {
 	testImplementation(libs.reactor.test)
 	testImplementation(libs.hamcrest)
 	testImplementation(libs.micrometer.observation.test)
+	// ArchitectureTest: rules over the compiled library code
+	testImplementation(libs.archunit)
 	testRuntimeOnly(libs.slf4j.simple)
 }
