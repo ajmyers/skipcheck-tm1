@@ -12,6 +12,7 @@ import org.springframework.http.HttpMethod;
 
 import net.ajmyers.tm1.client.odata.ODataPath;
 import net.ajmyers.tm1.client.odata.ODataQuery;
+import net.ajmyers.tm1.client.version.Tm1Capability;
 
 /**
  * One TM1 REST call, described but not sent: the method, path, query, headers and body,
@@ -63,8 +64,11 @@ public final class Tm1Request<T> {
 
 	private final @Nullable Duration timeout;
 
+	private final @Nullable Tm1Capability requires;
+
 	private Tm1Request(HttpMethod method, ODataPath path, ODataQuery query, Map<String, String> headers,
-			@Nullable Object body, Response response, Class<T> type, @Nullable Duration timeout) {
+			@Nullable Object body, Response response, Class<T> type, @Nullable Duration timeout,
+			@Nullable Tm1Capability requires) {
 		this.method = Objects.requireNonNull(method, "method");
 		this.path = Objects.requireNonNull(path, "path");
 		this.query = Objects.requireNonNull(query, "query");
@@ -73,6 +77,7 @@ public final class Tm1Request<T> {
 		this.response = Objects.requireNonNull(response, "response");
 		this.type = Objects.requireNonNull(type, "type");
 		this.timeout = timeout;
+		this.requires = requires;
 	}
 
 	/**
@@ -84,7 +89,7 @@ public final class Tm1Request<T> {
 	 * @return the request
 	 */
 	public static <T> Tm1Request<T> get(ODataPath path, ODataQuery query, Class<T> type) {
-		return new Tm1Request<>(HttpMethod.GET, path, query, Map.of(), null, Response.SINGLE, type, null);
+		return new Tm1Request<>(HttpMethod.GET, path, query, Map.of(), null, Response.SINGLE, type, null, null);
 	}
 
 	/**
@@ -96,7 +101,7 @@ public final class Tm1Request<T> {
 	 * @return the request
 	 */
 	public static <T> Tm1Request<T> list(ODataPath path, ODataQuery query, Class<T> itemType) {
-		return new Tm1Request<>(HttpMethod.GET, path, query, Map.of(), null, Response.COLLECTION, itemType, null);
+		return new Tm1Request<>(HttpMethod.GET, path, query, Map.of(), null, Response.COLLECTION, itemType, null, null);
 	}
 
 	/**
@@ -106,7 +111,7 @@ public final class Tm1Request<T> {
 	 */
 	public static Tm1Request<String> text(ODataPath path) {
 		return new Tm1Request<>(HttpMethod.GET, path, ODataQuery.none(), Map.of(), null, Response.TEXT, String.class,
-				null);
+				null, null);
 	}
 
 	/**
@@ -122,7 +127,7 @@ public final class Tm1Request<T> {
 	 */
 	public static <T> Tm1Request<T> post(ODataPath path, @Nullable Object body, Class<T> type) {
 		return new Tm1Request<>(HttpMethod.POST, path, ODataQuery.none(), Map.of(), body == null ? Map.of() : body,
-				responseFor(type), type, null);
+				responseFor(type), type, null, null);
 	}
 
 	/**
@@ -133,7 +138,7 @@ public final class Tm1Request<T> {
 	 */
 	public static Tm1Request<Void> patch(ODataPath path, Object body) {
 		return new Tm1Request<>(HttpMethod.PATCH, path, ODataQuery.none(), Map.of(),
-				Objects.requireNonNull(body, "body"), Response.NONE, Void.class, null);
+				Objects.requireNonNull(body, "body"), Response.NONE, Void.class, null, null);
 	}
 
 	/**
@@ -143,7 +148,7 @@ public final class Tm1Request<T> {
 	 */
 	public static Tm1Request<Void> delete(ODataPath path) {
 		return new Tm1Request<>(HttpMethod.DELETE, path, ODataQuery.none(), Map.of(), null, Response.NONE, Void.class,
-				null);
+				null, null);
 	}
 
 	/**
@@ -152,7 +157,7 @@ public final class Tm1Request<T> {
 	 * @return the copy
 	 */
 	public Tm1Request<T> withQuery(ODataQuery query) {
-		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout);
+		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout, requires);
 	}
 
 	/**
@@ -164,7 +169,7 @@ public final class Tm1Request<T> {
 	public Tm1Request<T> withHeader(String name, String value) {
 		Map<String, String> next = new LinkedHashMap<>(headers);
 		next.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(value, "value"));
-		return new Tm1Request<>(method, path, query, next, body, response, type, timeout);
+		return new Tm1Request<>(method, path, query, next, body, response, type, timeout, requires);
 	}
 
 	/**
@@ -179,7 +184,28 @@ public final class Tm1Request<T> {
 		if (timeout.isNegative() || timeout.isZero()) {
 			throw new IllegalArgumentException("timeout must be positive: " + timeout);
 		}
-		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout);
+		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout, requires);
+	}
+
+	/**
+	 * A copy that's only sent if the server defines {@code capability}: before sending,
+	 * the session checks the server's {@code $metadata} and otherwise fails with
+	 * {@link net.ajmyers.tm1.client.error.Tm1UnsupportedOperationException}, without
+	 * calling the server (plan §9). Service methods for newer endpoints declare it.
+	 * @param capability what the request needs the server to define
+	 * @return the copy
+	 */
+	public Tm1Request<T> requires(Tm1Capability capability) {
+		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout,
+				Objects.requireNonNull(capability, "capability"));
+	}
+
+	/**
+	 * What this request needs the server to define, if anything.
+	 * @return the capability, or empty
+	 */
+	public Optional<Tm1Capability> requirement() {
+		return Optional.ofNullable(requires);
 	}
 
 	/**
