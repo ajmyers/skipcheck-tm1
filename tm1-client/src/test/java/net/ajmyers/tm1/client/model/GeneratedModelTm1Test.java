@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +45,41 @@ class GeneratedModelTm1Test {
 			});
 		}
 		finally {
+			session.close().block(WAIT);
+		}
+	}
+
+	@Test
+	void createsAViewAsItsSubtypeAndReadsItBackThroughTheHierarchy(Tm1ServerContainer tm1) {
+		Tm1Session session = Tm1Session.builder()
+			.baseUrl(tm1.getRestUrl())
+			.basicAuth(tm1.getUsername(), tm1.getPassword())
+			.build();
+		String name = "tm1-client-" + UUID.randomUUID();
+		ODataPath views = ODataPath.of("Cubes").key("}ClientGroups").nav("Views");
+		try {
+			View created = session
+				.execute(Tm1Request.post(views,
+						new MDXView(null, name, null, null, null,
+								"SELECT {[}Groups].[}Groups].MEMBERS} ON 0 FROM [}ClientGroups]"),
+						View.class))
+				.block(WAIT);
+			assertThat(created).isInstanceOfSatisfying(MDXView.class, v -> assertThat(v.mdx()).contains("}Groups"));
+
+			List<View> all = session.stream(Tm1Request.list(views, ODataQuery.none(), View.class))
+				.collectList()
+				.block(WAIT);
+			assertThat(all).filteredOn(v -> name.equals(v.name())).singleElement().isInstanceOf(MDXView.class);
+
+			List<Member> members = session.stream(Tm1Request.list(
+					ODataPath.of("Dimensions").key("}Groups").nav("Hierarchies").key("}Groups").nav("Members"),
+					ODataQuery.none(), Member.class))
+				.collectList()
+				.block(WAIT);
+			assertThat(members).isNotEmpty().allSatisfy(m -> assertThat(m).isInstanceOf(Member.Plain.class));
+		}
+		finally {
+			session.execute(Tm1Request.delete(views.key(name))).onErrorComplete().block(WAIT);
 			session.close().block(WAIT);
 		}
 	}

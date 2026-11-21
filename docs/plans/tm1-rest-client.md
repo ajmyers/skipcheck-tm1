@@ -340,9 +340,12 @@ CSDL parser:
 **How it's built (phase 1).** `tm1-codegen`, an unpublished build tool, reads the snapshot with
 `tm1-csdl` and writes Java with JavaPoet. `tm1-client`'s `generateModel` task runs it into
 `build/generated`, which is compiled and published with the hand-written code but never
-committed. The first step (#63) generates enums (with an `UNKNOWN` fallback) and records for the
-99 types outside inheritance hierarchies; hierarchies (#64), field constants and patch builders
-(#65), and the operation catalog with revision annotations (#66) follow.
+committed. It generates enums (with an `UNKNOWN` fallback), a record per complex and entity type
+(null components not sent), and a sealed interface per inheritance hierarchy (#64): its subtypes'
+records are read by `@odata.type`, which Jackson writes when one is sent, and a nested `Plain`
+(concrete root, such as `Member`) or `Unknown` (abstract root, such as `View`) record takes a
+value no known subtype stands for. Field constants and patch builders (#65), and the operation
+catalog with revision annotations (#66), follow.
 
 **Services stay hand-written.** Their names, parameter order and grouping are API design that
 a generator would do badly. Generating them is still possible later.
