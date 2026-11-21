@@ -1,0 +1,3 @@
+# Endpoints deliberately not implemented, as: <endpoint> | <reason>
+# None yet: deprecated endpoints are still implemented, since servers still serve them.
+# See CoverageGateTest.
