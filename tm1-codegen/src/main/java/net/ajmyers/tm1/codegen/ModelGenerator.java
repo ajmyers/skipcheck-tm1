@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -23,6 +24,7 @@ import javax.lang.model.element.Modifier;
 import org.jspecify.annotations.Nullable;
 
 import com.palantir.javapoet.AnnotationSpec;
+import com.palantir.javapoet.ArrayTypeName;
 import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.FieldSpec;
 import com.palantir.javapoet.JavaFile;
@@ -31,6 +33,7 @@ import com.palantir.javapoet.ParameterSpec;
 import com.palantir.javapoet.ParameterizedTypeName;
 import com.palantir.javapoet.TypeName;
 import com.palantir.javapoet.TypeSpec;
+import com.palantir.javapoet.WildcardTypeName;
 import net.ajmyers.tm1.csdl.CsdlAnnotation;
 import net.ajmyers.tm1.csdl.CsdlDocument;
 import net.ajmyers.tm1.csdl.CsdlEntityType;
@@ -94,6 +97,8 @@ public final class ModelGenerator {
 
 	private static final ClassName ODATA_LITERALS = ClassName.get("net.ajmyers.tm1.client.odata", "ODataLiterals");
 
+	private static final ClassName ODATA_PATH = ClassName.get("net.ajmyers.tm1.client.odata", "ODataPath");
+
 	private static final ClassName JSON_NODE = ClassName.get("tools.jackson.databind", "JsonNode");
 
 	private static final Set<String> KEYWORDS = Set.of("abstract", "assert", "boolean", "break", "byte", "case",
@@ -148,6 +153,9 @@ public final class ModelGenerator {
 			List<CsdlStructuredType> subtypes = hierarchies.get(qualified(t));
 			files.add(file(subtypes != null ? hierarchy(t, subtypes) : record(t, roots.get(qualified(t)))));
 		});
+		metadata.structuredTypes()
+			.sorted(Comparator.comparing(CsdlStructuredType::name))
+			.forEach(t -> files.add(file(patch(t))));
 		return files;
 	}
 
@@ -440,6 +448,237 @@ public final class ModelGenerator {
 			.findFirst()
 			.map(s -> s.namespace() + "." + type.name())
 			.orElse(type.name());
+	}
+
+	/** A setter or bind method of a patch builder, for one property. */
+	private record PatchProperty(String method, TypeName type, String json, String doc, boolean navigation,
+			boolean collection) {
+	}
+
+	private List<PatchProperty> patchProperties(CsdlStructuredType type) {
+		Set<String> names = new HashSet<>(Set.of("build"));
+		List<PatchProperty> properties = new ArrayList<>();
+		for (CsdlProperty property : type.properties()) {
+			patchType(property.type()).ifPresent(t -> properties
+				.add(new PatchProperty(unique(componentName(property.name()), names), t, property.name(),
+						paramText(property.annotations(), property.name()), false, property.type().collection())));
+		}
+		for (CsdlNavigationProperty navigation : type.navigationProperties()) {
+			patchType(navigation.type()).ifPresent(t -> properties
+				.add(new PatchProperty(unique(componentName(navigation.name()), names), t, navigation.name(),
+						paramText(navigation.annotations(), navigation.name()), true, navigation.type().collection())));
+		}
+		return properties;
+	}
+
+	/**
+	 * What a patch takes for a property: patches for structured values, so nested ones
+	 * are partial too.
+	 */
+	private Optional<TypeName> patchType(CsdlTypeRef ref) {
+		String qualified = metadata.qualify(ref.name());
+		Optional<CsdlStructuredType> structured = ref.name().startsWith("Edm.") ? Optional.empty()
+				: metadata.structuredType(qualified);
+		if (structured.isEmpty()) {
+			return javaType(ref).map(t -> {
+				if (t.equals(JSON_NODE)) {
+					return ClassName.get(Object.class);
+				}
+				if (t instanceof ParameterizedTypeName list && list.typeArguments().get(0).equals(JSON_NODE)) {
+					return ParameterizedTypeName.get(ClassName.get(List.class), ClassName.get(Object.class));
+				}
+				return t;
+			});
+		}
+		ClassName patch = patchName(structured.get());
+		if (!ref.collection()) {
+			return Optional.of(patch);
+		}
+		TypeName element = hierarchies.containsKey(qualified) ? WildcardTypeName.subtypeOf(patch) : patch;
+		return Optional.of(ParameterizedTypeName.get(ClassName.get(List.class), element));
+	}
+
+	private static ClassName patchName(CsdlStructuredType type) {
+		return ClassName.get(PACKAGE, javaTypeName(type.name()) + "Patch");
+	}
+
+	/**
+	 * A type's patch (plan §8.3): only the properties set are written, explicit nulls
+	 * included, plus {@code @odata.bind} references, in the order they were set. A record
+	 * can't do that, since it can't tell "not set" from "set to null". A subtype's patch
+	 * extends its root's and writes {@code @odata.type} first.
+	 */
+	private TypeSpec patch(CsdlStructuredType type) {
+		ClassName name = patchName(type);
+		if (metadata.structuredTypes().anyMatch(t -> javaTypeName(t.name()).equals(name.simpleName()))) {
+			throw new IllegalArgumentException(name.simpleName() + " is a CSDL type, so its patch needs another name");
+		}
+		CsdlStructuredType root = roots.get(qualified(type));
+		boolean extensible = hierarchies.containsKey(qualified(type));
+		ClassName builder = name.nestedClass("Builder");
+		TypeName valuesType = ParameterizedTypeName.get(ClassName.get(Map.class), ClassName.get(String.class),
+				ClassName.get(Object.class).annotated(AnnotationSpec.builder(NULLABLE).build()));
+		String record = javaTypeName(type.name());
+
+		TypeSpec.Builder spec = TypeSpec.classBuilder(name)
+			.addModifiers(extensible ? new Modifier[] { Modifier.PUBLIC }
+					: new Modifier[] { Modifier.PUBLIC, Modifier.FINAL })
+			.addAnnotation(GENERATED)
+			.addJavadoc("$L", "A write of {@link " + record
+					+ "}: for a {@code PATCH}, only the properties set are sent, an explicit {@code null} included; for a {@code POST}, the new entity's properties, nested patches for deep inserts and {@code @odata.bind} references to existing entities.\n\n<p>\n"
+					+ (root != null ? "Extends {@link " + patchName(root).simpleName()
+							+ "} and sends {@code @odata.type} {@code " + typeId(type) + "}. " : "")
+					+ (extensible ? "Each subtype's patch extends this one. " : "")
+					+ "Generated from {@code $metadata}.\n");
+		if (root != null) {
+			spec.superclass(patchName(root));
+			spec.addMethod(MethodSpec.constructorBuilder()
+				.addParameter(valuesType, "values")
+				.addStatement("super(values)")
+				.build());
+		}
+		else {
+			spec.addField(FieldSpec.builder(valuesType, "values", Modifier.PRIVATE, Modifier.FINAL).build())
+				.addMethod(MethodSpec.constructorBuilder()
+					.addParameter(valuesType, "values")
+					.addStatement("this.values = $T.unmodifiableMap(new $T<>(values))", Collections.class,
+							LinkedHashMap.class)
+					.build())
+				.addMethod(MethodSpec.methodBuilder("json")
+					.addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+					.addAnnotation(JSON_VALUE)
+					.returns(valuesType)
+					.addJavadoc(
+							"The properties set, by their names in TM1's JSON, in the order they were set.\n@return the properties, unmodifiable\n")
+					.addStatement("return values")
+					.build())
+				.addMethod(MethodSpec.methodBuilder("equals")
+					.addAnnotation(Override.class)
+					.addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+					.addParameter(ClassName.get(Object.class).annotated(AnnotationSpec.builder(NULLABLE).build()),
+							"other")
+					.returns(boolean.class)
+					.addStatement(
+							"return other != null && other.getClass() == getClass() && values.equals((($T) other).values)",
+							name)
+					.build())
+				.addMethod(MethodSpec.methodBuilder("hashCode")
+					.addAnnotation(Override.class)
+					.addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+					.returns(int.class)
+					.addStatement("return values.hashCode()")
+					.build())
+				.addMethod(MethodSpec.methodBuilder("toString")
+					.addAnnotation(Override.class)
+					.addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+					.returns(String.class)
+					.addStatement("return getClass().getSimpleName() + values")
+					.build());
+		}
+		spec.addMethod(MethodSpec.methodBuilder("builder")
+			.addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+			.returns(builder)
+			.addJavadoc("A builder with nothing set" + (root != null ? " but {@code @odata.type}" : "")
+					+ ".\n@return a new builder\n")
+			.addStatement("return new $T()", builder)
+			.build());
+
+		TypeSpec.Builder b = TypeSpec.classBuilder(builder)
+			.addModifiers(extensible ? new Modifier[] { Modifier.PUBLIC, Modifier.STATIC }
+					: new Modifier[] { Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL })
+			.addJavadoc("Builds a {@link $T}; each setter replaces what an earlier call set.\n", name);
+		MethodSpec.Builder ctor = MethodSpec.constructorBuilder();
+		if (root != null) {
+			b.superclass(patchName(root).nestedClass("Builder"));
+			ctor.addStatement("this.values.put($S, $S)", "@odata.type", typeId(type));
+			for (PatchProperty inherited : patchProperties(root)) {
+				addPatchMethods(b, builder, inherited, true);
+			}
+		}
+		else {
+			b.addField(
+					FieldSpec
+						.builder(
+								ParameterizedTypeName.get(ClassName.get(Map.class), ClassName.get(String.class),
+										ClassName.get(Object.class)
+											.annotated(AnnotationSpec.builder(NULLABLE).build())),
+								"values", Modifier.FINAL)
+						.initializer("new $T<>()", LinkedHashMap.class)
+						.build());
+		}
+		b.addMethod(ctor.build());
+		for (PatchProperty own : patchProperties(type)) {
+			addPatchMethods(b, builder, own, false);
+		}
+		MethodSpec.Builder build = MethodSpec.methodBuilder("build")
+			.addModifiers(Modifier.PUBLIC)
+			.returns(name)
+			.addJavadoc("The patch, with what's been set so far.\n@return the patch\n")
+			.addStatement("return new $T(values)", name);
+		if (root != null) {
+			build.addAnnotation(Override.class);
+		}
+		b.addMethod(build.build());
+		spec.addType(b.build());
+		return spec.build();
+	}
+
+	private static void addPatchMethods(TypeSpec.Builder builder, ClassName builderName, PatchProperty property,
+			boolean inherited) {
+		TypeName nullable = property.type().annotated(AnnotationSpec.builder(NULLABLE).build());
+		MethodSpec.Builder set = MethodSpec.methodBuilder(property.method())
+			.addModifiers(Modifier.PUBLIC)
+			.addParameter(nullable, property.method())
+			.returns(builderName)
+			.addJavadoc(
+					"Sets {@code $L}: $L$L\n@param $L the value; {@code null} sends an explicit {@code null}\n@return this builder\n",
+					property.json(), property.doc(), property.navigation() ? " (nested, for a deep insert)" : "",
+					property.method());
+		if (inherited) {
+			set.addAnnotation(Override.class).addStatement("super.$L($L)", property.method(), property.method());
+		}
+		else if (property.collection()) {
+			set.addStatement("this.values.put($S, $L == null ? null : $T.copyOf($L))", property.json(),
+					property.method(), List.class, property.method());
+		}
+		else {
+			set.addStatement("this.values.put($S, $L)", property.json(), property.method());
+		}
+		builder.addMethod(set.addStatement("return this").build());
+		if (!property.navigation()) {
+			return;
+		}
+		String bind = "bind" + capitalize(property.method());
+		MethodSpec.Builder bindMethod = MethodSpec.methodBuilder(bind)
+			.addModifiers(Modifier.PUBLIC)
+			.returns(builderName);
+		if (property.collection()) {
+			bindMethod.addParameter(ArrayTypeName.of(ODATA_PATH), "targets")
+				.varargs()
+				.addJavadoc(
+						"Binds {@code $L} to existing entities ({@code $L@odata.bind}).\n@param targets the entities' paths, such as {@code Dimensions('Region')}\n@return this builder\n",
+						property.json(), property.json());
+			if (inherited) {
+				bindMethod.addAnnotation(Override.class).addStatement("super.$L(targets)", bind);
+			}
+			else {
+				bindMethod.addStatement("this.values.put($S, $T.stream(targets).map($T::toString).toList())",
+						property.json() + "@odata.bind", Arrays.class, ODATA_PATH);
+			}
+		}
+		else {
+			bindMethod.addParameter(ODATA_PATH, "target")
+				.addJavadoc(
+						"Binds {@code $L} to an existing entity ({@code $L@odata.bind}).\n@param target the entity's path\n@return this builder\n",
+						property.json(), property.json());
+			if (inherited) {
+				bindMethod.addAnnotation(Override.class).addStatement("super.$L(target)", bind);
+			}
+			else {
+				bindMethod.addStatement("this.values.put($S, target.toString())", property.json() + "@odata.bind");
+			}
+		}
+		builder.addMethod(bindMethod.addStatement("return this").build());
 	}
 
 	private String typeId(CsdlStructuredType type) {
