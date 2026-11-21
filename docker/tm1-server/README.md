@@ -49,7 +49,10 @@ Published to GitHub Container Registry by [`.github/workflows/docker.yml`](../.g
 Publishing is off until the repository variable `PUBLISH_DOCKER_TM1_SERVER` is set to
 `true`. Until then, the image is built and smoke-tested but not pushed.
 
-To build it yourself: `docker build -t tm1-server .` from this folder. The image is
+To build it yourself, run `docker build --platform linux/amd64 -t tm1-server .` from
+this folder. Always pass `--platform linux/amd64`: without it, Docker on Apple Silicon
+labels the image arm64 even though its contents are amd64, and compose or
+`docker run --platform linux/amd64` then can't find it. The image is
 `linux/amd64` only, because TM1 Server only runs on x86-64.
 
 ## Compose
