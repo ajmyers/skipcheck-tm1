@@ -5,10 +5,10 @@ plugins {
 	id("tm1.publishing")
 }
 
-// Build with the latest JDK, but emit bytecode for Spring Framework 7's baseline
-// so consumers on Java 17+ can use the library
+// Build with the latest JDK, but emit Java 21 bytecode (LTS, and what most TM1 shops run)
+// so consumers on Java 21+ can use the library
 tasks.withType<JavaCompile>().configureEach {
-	options.release = 17
+	options.release = 21
 }
 
 tasks.withType<Javadoc>().configureEach {

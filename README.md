@@ -9,7 +9,7 @@ Java libraries and tools for the **IBM Planning Analytics (TM1) REST API**.
 | [`tm1-bom`](tm1-bom) | Keeps the module versions aligned. |
 | [`tools/`](tools) | Applications built on the libraries (not published). |
 
-Requires Java 17+.
+Requires Java 21+.
 
 ## Building
 
@@ -19,7 +19,7 @@ Requires Java 17+.
 ./gradlew publishToMavenLocal            # try the libraries from another project
 ```
 
-Builds use JDK 27 via Gradle toolchains; published libraries target Java 17 bytecode.
+Builds use JDK 27 via Gradle toolchains; published libraries target Java 21 bytecode.
 
 ## Project layout
 
