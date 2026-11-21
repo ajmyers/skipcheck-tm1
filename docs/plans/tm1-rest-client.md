@@ -68,9 +68,18 @@ Full inventory in [Appendix A](#appendix-a-endpoint-inventory-tm1-11803500--sche
 | `$batch`, multipart | **400**: "use JSON" | OData 4.01 **JSON batch works**, even though the server says 4.0. `BatchSupport` says there are no cross-request references or `continue-on-error`. |
 | `$ref` on a navigation, `odata.metadata=full` | Work (`@odata.id`, `navigationLink`, `associationLink`) | Standard OData. |
 
-**Still to verify:** whether TM1 runs concurrent requests on one session in parallel or one at a
-time. This matters for how we share a session under load (§5). Also unchecked: whether
-`odata.metadata=none` is honored and whether TM1 sends `OData-EntityId` / `Location` on create.
+**Session behavior, probed in step 3 (#30)** and pinned by `Tm1SessionBehaviorTest`:
+
+| Behavior | Consequence |
+|---|---|
+| A cookie-only request on a killed session gets **401 and doesn't run** | The re-login replay is safe for POSTs (§5) |
+| **Every 401 opens a session** with no user, and so does an anonymous `GET Server` (allowed, 200) | Never send a request outside the session |
+| Sending the 401's cookie with credentials logs **that** session in | Re-login reuses it and leaves nothing behind |
+| A closed session is refused at once but stays listed in `Sessions` for 5–9 s | Leak checks wait for the count to settle |
+| Requests on one session run **in parallel** | One shared session doesn't serialize traffic |
+| `TM1-SessionContext` labels the whole session; the last request to send one wins | The label is a session setting, not a view (§5) |
+| A create returns 201 with `Location` and `ETag`; `return=minimal` gives 204 with `Location` and `OData-EntityId` | Creates can skip the body |
+| `odata.metadata=none` drops `@odata.etag` but keeps `@odata.context` | Use it only where ETags aren't needed |
 
 ---
 
@@ -179,15 +188,18 @@ by every service and every concurrent subscriber.
   authenticator, and the **TM1 session cookie**, plus the server's `Tm1Version` and
   `Tm1Capabilities` once connected.
 - **Lazy, single login.** `connect()` returns `Mono<Tm1Session>`. The first request triggers
-  login, and concurrent first requests share one login (a cached `Mono`). On a **401** with an
-  established session (an expired or killed session), it logs in again once and replays the
-  request once. Login failures are not replayed.
+  login (`GET ActiveSession?$select=ID`, which also gives the session ID; the deprecated
+  `Configuration` singleton is avoided), and concurrent first requests share one login (a cached
+  `Mono`). Only the login carries credentials. On a **401** with an established session (an
+  expired or killed session), it logs in again once, sending the cookie TM1 set with the 401 so
+  that session is the one logged in, and replays the request once. Login failures are not
+  replayed.
   - **This replay covers POSTs too, deliberately.** It's an exception to "never retry a
     non-idempotent request" (§16.2). A 401 means TM1 refused the request before running it,
     because the session wasn't valid, so replaying it after logging in again can't run it twice.
-    Step 3 (#30) verifies this against TM1 before relying on it: it kills the session, sends a
-    POST that creates an object, and checks the object exists exactly once. Every other failure
-    after a request was sent is never replayed for non-idempotent requests.
+    **Verified in step 3 (#30):** a cookie-only POST on a killed session doesn't run, and through
+    the client the replayed POST creates its object exactly once. Every other failure after a
+    request was sent is never replayed for non-idempotent requests.
 - **Explicit close.** `close()` returns `Mono<Void>` and calls `POST ActiveSession/tm1.Close`
   with a JSON body. Spring calls it on context shutdown. Without it, sessions pile up on the
   server until they time out (seen while probing).
@@ -195,20 +207,23 @@ by every service and every concurrent subscriber.
     first request would do nothing, and the login would finish afterwards and leave a session
     open. Only a session that never started a login is skipped.
   - After `close()`, the session refuses new requests rather than logging in again.
-- **Request context, derived not mutated.** `session.withSandbox("What-if")` and
-  `session.withContext("my-app")` return a **new view sharing the same connection and cookie**.
-  One adds TM1's `!sandbox=` query option, the other the `TM1-SessionContext` header, which
-  labels the session in `Threads`/`Sessions`. Services take whichever view they're given:
+- **Request context, derived not mutated.** `session.withSandbox("What-if")` returns a **new
+  view sharing the same connection and cookie** that adds TM1's `!sandbox=` query option to each
+  request. Services take whichever view they're given:
   `new CellsetService(session.withSandbox("x"))`. This avoids the classic shared-cursor bug,
   where one caller's sandbox leaks into another's request. Rejected alternative: carrying the
   sandbox in Reactor `Context`. It's implicit and easy to lose across operator boundaries.
+  - **The session label is not a view.** The `withContext` view first planned here was dropped
+    in step 3: TM1 keeps one `TM1-SessionContext` per session and the last request wins, so
+    views sharing a session would keep relabeling it. The label is a builder setting
+    (`sessionContext("my-app")`) sent at login; a different label needs another session.
 - **Per-user sessions.** A single session suits service accounts. Apps acting **on behalf of
   users** need one session per identity. The identity-keyed `Tm1SessionPool` (step 4, #31;
   §16.1) provides them, with bounded lifetimes and close-on-evict. It takes the place of the
   `Tm1SessionFactory` this plan first described.
-- **Raw escape hatch.** `session.odata()` exposes the low-level request API (path, query,
-  body) returning `JsonNode` or a chosen type. It's for anything not yet modeled, and for
-  endpoints that only exist on newer servers.
+- **Raw escape hatch.** `session.execute(Tm1Request)` and `session.stream(Tm1Request)` send
+  any request (path, query, body), returning `JsonNode` or a chosen type. They're for anything
+  not yet modeled, and for endpoints that only exist on newer servers.
 
 ---
 
@@ -635,7 +650,8 @@ of it is assumed for other versions.
 - **Login must be non-blocking.** Blocking logins on event loops, and identity held in
   thread-locals, caused deadlocks and wrong-user requests. Identity is an explicit value, never
   ambient state.
-- TM1 tolerates parallel requests on one session (confirmed in production use).
+- TM1 tolerates parallel requests on one session (confirmed in production use, and in step 3:
+  they run in parallel, not one at a time).
 
 ### 16.2 HTTP behavior (§7, §11)
 
