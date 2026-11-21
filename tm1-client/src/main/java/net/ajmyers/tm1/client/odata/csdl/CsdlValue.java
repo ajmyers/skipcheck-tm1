@@ -16,22 +16,35 @@ public sealed interface CsdlValue {
 	/**
 	 * A {@code String}, {@code Bool}, {@code Int}, {@code Decimal}, {@code EnumMember} or
 	 * other constant, as written.
+	 *
+	 * @param kind the constant's kind, e.g. {@code String} or {@code Bool}
+	 * @param text its value as written
 	 */
 	record Constant(String kind, String text) implements CsdlValue {
 	}
 
-	/** A {@code Collection} of values, in document order. */
+	/**
+	 * A {@code Collection} of values, in document order.
+	 *
+	 * @param items the values, in document order
+	 */
 	record Collection(List<CsdlValue> items) implements CsdlValue {
+		/** Copies the items. */
 		public Collection {
 			items = List.copyOf(items);
 		}
 	}
 
-	/** A {@code Record}: property values by name, in document order. */
+	/**
+	 * A {@code Record}: property values by name, in document order.
+	 *
+	 * @param properties the property values by name, in document order
+	 */
 	// Named after the CSDL Record expression; inside CsdlValue it shadows
 	// java.lang.Record, which is fine
 	@SuppressWarnings("AvoidCommonTypeNames")
 	record Record(Map<String, CsdlValue> properties) implements CsdlValue {
+		/** Copies the properties, keeping their order. */
 		public Record {
 			properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
 		}
@@ -45,11 +58,18 @@ public sealed interface CsdlValue {
 	record Empty() implements CsdlValue {
 	}
 
-	/** An expression the client doesn't interpret, kept by element name. */
+	/**
+	 * An expression the client doesn't interpret, kept by element name.
+	 *
+	 * @param kind the expression's element name, e.g. {@code If}
+	 */
 	record Other(String kind) implements CsdlValue {
 	}
 
-	/** This value's text if it's a constant. */
+	/**
+	 * This value's text if it's a constant.
+	 * @return the constant's text, or empty if this isn't a {@link Constant}
+	 */
 	default Optional<String> asText() {
 		return this instanceof Constant constant ? Optional.of(constant.text()) : Optional.empty();
 	}

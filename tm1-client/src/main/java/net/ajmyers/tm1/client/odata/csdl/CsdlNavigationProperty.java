@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 public record CsdlNavigationProperty(String name, CsdlTypeRef type, boolean nullable, @Nullable String partner,
 		boolean containsTarget, List<CsdlAnnotation> annotations) {
 
+	/** Validates and copies the components. */
 	public CsdlNavigationProperty {
 		Objects.requireNonNull(name, "name");
 		Objects.requireNonNull(type, "type");

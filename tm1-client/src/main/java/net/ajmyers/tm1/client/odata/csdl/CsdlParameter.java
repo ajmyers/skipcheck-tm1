@@ -13,6 +13,7 @@ import java.util.Objects;
  */
 public record CsdlParameter(String name, CsdlTypeRef type, boolean nullable, List<CsdlAnnotation> annotations) {
 
+	/** Validates and copies the components. */
 	public CsdlParameter {
 		Objects.requireNonNull(name, "name");
 		Objects.requireNonNull(type, "type");

@@ -13,11 +13,17 @@ public record CsdlTypeRef(String name, boolean collection) {
 
 	private static final String COLLECTION = "Collection(";
 
+	/** Validates the components. */
 	public CsdlTypeRef {
 		Objects.requireNonNull(name, "name");
 	}
 
-	/** Parses a {@code Type} attribute. */
+	/**
+	 * Parses a {@code Type} attribute.
+	 * @param text the attribute's value, e.g. {@code Collection(tm1.Element)};
+	 * surrounding whitespace is ignored
+	 * @return the type reference
+	 */
 	public static CsdlTypeRef parse(String text) {
 		Objects.requireNonNull(text, "text");
 		String t = text.strip();
@@ -27,7 +33,10 @@ public record CsdlTypeRef(String name, boolean collection) {
 		return new CsdlTypeRef(t, false);
 	}
 
-	/** True for the built-in {@code Edm.*} types. */
+	/**
+	 * True for the built-in {@code Edm.*} types.
+	 * @return true if the type's name starts with {@code Edm.}
+	 */
 	public boolean isPrimitive() {
 		return name.startsWith("Edm.");
 	}

@@ -24,6 +24,7 @@ public record CsdlEntityType(String name, @Nullable String baseType, boolean isA
 		List<CsdlNavigationProperty> navigationProperties,
 		List<CsdlAnnotation> annotations) implements CsdlStructuredType {
 
+	/** Validates and copies the components. */
 	public CsdlEntityType {
 		Objects.requireNonNull(name, "name");
 		key = List.copyOf(key);

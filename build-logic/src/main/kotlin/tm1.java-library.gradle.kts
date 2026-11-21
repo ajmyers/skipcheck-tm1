@@ -11,9 +11,19 @@ tasks.withType<JavaCompile>().configureEach {
 	options.release = 17
 }
 
+// The public API's Javadoc is part of the deliverable (plan §13 item 14): every public class,
+// method and record component must be documented, any doclint warning fails, and check runs it,
+// so ./gradlew build catches a gap rather than the release.
 tasks.withType<Javadoc>().configureEach {
 	(options as StandardJavadocDocletOptions).apply {
-		addStringOption("Xdoclint:all,-missing", "-quiet")
+		addStringOption("Xdoclint:all", "-quiet")
+		addBooleanOption("Werror", true)
+		// Report every gap, not just the first 100
+		addStringOption("Xmaxwarns", "10000")
 		links("https://docs.spring.io/spring-framework/docs/current/javadoc-api/")
 	}
+}
+
+tasks.named("check") {
+	dependsOn(tasks.named("javadoc"))
 }

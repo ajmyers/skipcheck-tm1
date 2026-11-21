@@ -46,6 +46,11 @@ fully qualified type names in code; `format` fixes all but the last. In a Javado
 write `@` as `&#64;` inside `<pre class="code">`, as Spring does: the formatter takes an `@` at
 the start of a line for a block tag and breaks the comment, which the check also reports.
 
+**Public API needs Javadoc.** In the published libraries, every public class, method, constructor
+and record component is documented, with `@param` and `@return`. `./gradlew build` runs Javadoc
+and fails on any gap. For a Lombok `@Getter`, put the `@return` line in the field's Javadoc;
+Lombok copies it onto the accessor.
+
 **Error Prone and NullAway check every compile.** Their findings are errors. Library packages
 are `@NullMarked` (JSpecify): nothing is null unless declared `@Nullable`, and NullAway checks
 that at compile time, so a nullable field, parameter or return gets `@Nullable` where it's

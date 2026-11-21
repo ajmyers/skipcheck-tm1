@@ -17,6 +17,7 @@ import org.jspecify.annotations.Nullable;
 public record CsdlProperty(String name, CsdlTypeRef type, boolean nullable, @Nullable String defaultValue,
 		List<CsdlAnnotation> annotations) {
 
+	/** Validates and copies the components. */
 	public CsdlProperty {
 		Objects.requireNonNull(name, "name");
 		Objects.requireNonNull(type, "type");

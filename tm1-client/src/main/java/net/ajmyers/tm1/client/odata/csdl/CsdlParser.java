@@ -44,13 +44,20 @@ public final class CsdlParser {
 	private CsdlParser() {
 	}
 
-	/** Parses a CSDL document from text. */
+	/**
+	 * Parses a CSDL document from text.
+	 * @param xml the document's XML
+	 * @return the parsed document
+	 * @throws CsdlParseException if it isn't well-formed XML, or not a CSDL document
+	 */
 	public static CsdlDocument parse(String xml) {
 		return parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
 	}
 
 	/**
 	 * Parses a CSDL document. The stream isn't closed.
+	 * @param xml the document's XML, read to the end
+	 * @return the parsed document
 	 * @throws CsdlParseException if it isn't well-formed XML, or not a CSDL document
 	 */
 	public static CsdlDocument parse(InputStream xml) {

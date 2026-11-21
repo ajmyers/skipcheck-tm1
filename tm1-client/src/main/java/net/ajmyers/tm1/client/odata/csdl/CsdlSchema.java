@@ -27,6 +27,7 @@ public record CsdlSchema(String namespace, @Nullable String alias, List<CsdlEnti
 		@Nullable CsdlEntityContainer entityContainer, List<CsdlAnnotation> annotations,
 		Map<String, List<CsdlAnnotation>> externalAnnotations) {
 
+	/** Validates and copies the components. */
 	public CsdlSchema {
 		Objects.requireNonNull(namespace, "namespace");
 		entityTypes = List.copyOf(entityTypes);

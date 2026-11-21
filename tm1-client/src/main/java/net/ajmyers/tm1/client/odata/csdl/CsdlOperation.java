@@ -29,10 +29,18 @@ public record CsdlOperation(Kind kind, String name, boolean bound, boolean compo
 	/** Action or function. */
 	public enum Kind {
 
-		ACTION, FUNCTION
+		/** An action: may change data, invoked with POST. */
+		ACTION,
+
+		/** A function: doesn't change data, invoked with GET. */
+		FUNCTION
 
 	}
 
+	/**
+	 * Validates and copies the components.
+	 * @throws IllegalArgumentException if it's bound but has no parameters
+	 */
 	public CsdlOperation {
 		Objects.requireNonNull(kind, "kind");
 		Objects.requireNonNull(name, "name");
@@ -43,12 +51,18 @@ public record CsdlOperation(Kind kind, String name, boolean bound, boolean compo
 		}
 	}
 
-	/** The binding parameter's type, for a bound operation. */
+	/**
+	 * The binding parameter's type, for a bound operation.
+	 * @return the first parameter's type, or empty if the operation is unbound
+	 */
 	public Optional<CsdlTypeRef> bindingType() {
 		return bound ? Optional.of(parameters.get(0).type()) : Optional.empty();
 	}
 
-	/** The parameters passed by the caller: all of them, minus the binding parameter. */
+	/**
+	 * The parameters passed by the caller: all of them, minus the binding parameter.
+	 * @return the caller's parameters, in document order
+	 */
 	public List<CsdlParameter> callerParameters() {
 		return bound ? parameters.subList(1, parameters.size()) : parameters;
 	}

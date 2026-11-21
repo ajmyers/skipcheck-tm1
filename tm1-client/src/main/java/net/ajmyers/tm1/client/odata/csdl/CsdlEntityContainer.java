@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 public record CsdlEntityContainer(String name, List<EntitySet> entitySets, List<Singleton> singletons,
 		List<ActionImport> actionImports, List<FunctionImport> functionImports, List<CsdlAnnotation> annotations) {
 
+	/** Validates and copies the components. */
 	public CsdlEntityContainer {
 		Objects.requireNonNull(name, "name");
 		entitySets = List.copyOf(entitySets);
@@ -41,6 +42,7 @@ public record CsdlEntityContainer(String name, List<EntitySet> entitySets, List<
 	 */
 	public record EntitySet(String name, String entityType, Map<String, String> navigationBindings,
 			List<CsdlAnnotation> annotations) {
+		/** Validates and copies the components. */
 		public EntitySet {
 			Objects.requireNonNull(name, "name");
 			Objects.requireNonNull(entityType, "entityType");
@@ -59,6 +61,7 @@ public record CsdlEntityContainer(String name, List<EntitySet> entitySets, List<
 	 */
 	public record Singleton(String name, String type, Map<String, String> navigationBindings,
 			List<CsdlAnnotation> annotations) {
+		/** Validates and copies the components. */
 		public Singleton {
 			Objects.requireNonNull(name, "name");
 			Objects.requireNonNull(type, "type");
@@ -77,6 +80,7 @@ public record CsdlEntityContainer(String name, List<EntitySet> entitySets, List<
 	 */
 	public record ActionImport(String name, String action, @Nullable String entitySet,
 			List<CsdlAnnotation> annotations) {
+		/** Validates and copies the components. */
 		public ActionImport {
 			Objects.requireNonNull(name, "name");
 			Objects.requireNonNull(action, "action");
@@ -94,6 +98,7 @@ public record CsdlEntityContainer(String name, List<EntitySet> entitySets, List<
 	 */
 	public record FunctionImport(String name, String function, @Nullable String entitySet,
 			List<CsdlAnnotation> annotations) {
+		/** Validates and copies the components. */
 		public FunctionImport {
 			Objects.requireNonNull(name, "name");
 			Objects.requireNonNull(function, "function");

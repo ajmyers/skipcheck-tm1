@@ -38,17 +38,31 @@ public final class ODataPath {
 	/**
 	 * A path starting at an entity set, singleton or operation import, e.g.
 	 * {@code Cubes}.
+	 * @param name the first segment's name, an OData identifier
+	 * @return a one-segment path
+	 * @throws IllegalArgumentException if {@code name} isn't an identifier
 	 */
 	public static ODataPath of(String name) {
 		return new ODataPath(List.of(identifier(name)));
 	}
 
-	/** Adds a single-part key with a string value: {@code ('Sales')}. */
+	/**
+	 * Adds a single-part key with a string value: {@code ('Sales')}.
+	 * @param value the key value, any text; quoted and percent-encoded
+	 * @return a new path with the key on its last segment
+	 * @throws IllegalStateException if the last segment already has a key or is a
+	 * {@code $} segment
+	 */
 	public ODataPath key(String value) {
 		return appendToLast("(" + encodedString(value) + ")");
 	}
 
-	/** Adds a single-part key with a non-string value, such as a number: {@code (42)}. */
+	/**
+	 * Adds a single-part key with a non-string value, such as a number: {@code (42)}.
+	 * @param value the key value, written as an OData literal ({@link ODataLiterals#of});
+	 * text is treated as by {@link #key(String)}
+	 * @return a new path with the key on its last segment
+	 */
 	public ODataPath key(Object value) {
 		if (value instanceof CharSequence text) {
 			return key(text.toString());
@@ -59,6 +73,9 @@ public final class ODataPath {
 	/**
 	 * Adds a compound key, in the order given:
 	 * {@code (ParentName='Total',ComponentName='Q1')}.
+	 * @param parts the key's property names (identifiers) and values, in order
+	 * @return a new path with the key on its last segment
+	 * @throws IllegalArgumentException if {@code parts} is empty
 	 */
 	public ODataPath key(Map<String, ?> parts) {
 		if (parts.isEmpty()) {
@@ -77,12 +94,20 @@ public final class ODataPath {
 		return appendToLast(key.append(')').toString());
 	}
 
-	/** Adds a navigation property or structural property segment, e.g. {@code Views}. */
+	/**
+	 * Adds a navigation property or structural property segment, e.g. {@code Views}.
+	 * @param property the property name, an OData identifier
+	 * @return a new path with the segment added
+	 */
 	public ODataPath nav(String property) {
 		return append(identifier(property));
 	}
 
-	/** Adds a type-cast segment, e.g. {@code tm1.NativeView}. */
+	/**
+	 * Adds a type-cast segment, e.g. {@code tm1.NativeView}.
+	 * @param qualifiedType the namespace-qualified type name
+	 * @return a new path with the segment added
+	 */
 	public ODataPath cast(String qualifiedType) {
 		return append(qualified(qualifiedType));
 	}
@@ -90,6 +115,8 @@ public final class ODataPath {
 	/**
 	 * Adds a bound action segment, e.g. {@code tm1.Reserve}. Actions are invoked with
 	 * POST.
+	 * @param qualifiedName the namespace-qualified action name
+	 * @return a new path with the segment added
 	 */
 	public ODataPath action(String qualifiedName) {
 		return append(qualified(qualifiedName));
@@ -99,6 +126,10 @@ public final class ODataPath {
 	 * Adds a bound function call with literal parameters, e.g.
 	 * {@code tm1.GetPartition(Begin=0,End=99)}. Use parameter aliases (in
 	 * {@link ODataQuery}) for complex or collection parameters.
+	 * @param qualifiedName the namespace-qualified function name
+	 * @param parameters the parameter names and values, in order; each value is written
+	 * as an OData literal, or as the alias's name if it's an {@link Alias}
+	 * @return a new path with the segment added
 	 */
 	public ODataPath function(String qualifiedName, Map<String, ?> parameters) {
 		StringBuilder call = new StringBuilder(qualified(qualifiedName)).append('(');
@@ -116,17 +147,26 @@ public final class ODataPath {
 		return append(call.append(')').toString());
 	}
 
-	/** Adds {@code $value}: a property's or media entity's raw value. */
+	/**
+	 * Adds {@code $value}: a property's or media entity's raw value.
+	 * @return a new path with the segment added
+	 */
 	public ODataPath value() {
 		return append("$value");
 	}
 
-	/** Adds {@code $count}: the number of items in a collection, as plain text. */
+	/**
+	 * Adds {@code $count}: the number of items in a collection, as plain text.
+	 * @return a new path with the segment added
+	 */
 	public ODataPath count() {
 		return append("$count");
 	}
 
-	/** Adds {@code $ref}: references to entities rather than the entities themselves. */
+	/**
+	 * Adds {@code $ref}: references to entities rather than the entities themselves.
+	 * @return a new path with the segment added
+	 */
 	public ODataPath ref() {
 		return append("$ref");
 	}
@@ -150,8 +190,11 @@ public final class ODataPath {
 	/**
 	 * A parameter alias used as a function parameter value: {@code tm1.Fn(p=@p)}, with
 	 * {@code @p} defined in the query ({@link ODataQuery#alias}).
+	 *
+	 * @param name the alias, {@code @} followed by an identifier, e.g. {@code @p}
 	 */
 	public record Alias(String name) {
+		/** Validates the name. */
 		public Alias {
 			if (name == null || !name.startsWith("@") || !IDENTIFIER.matcher(name.substring(1)).matches()) {
 				throw new IllegalArgumentException("A parameter alias is @ followed by an identifier: " + name);

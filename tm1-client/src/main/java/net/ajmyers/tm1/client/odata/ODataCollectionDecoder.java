@@ -48,15 +48,29 @@ public final class ODataCollectionDecoder {
 	private ODataCollectionDecoder() {
 	}
 
-	/** An item or a piece of control information from a collection response. */
+	/**
+	 * An item or a piece of control information from a collection response.
+	 *
+	 * @param <T> the type of the collection's items
+	 */
 	public sealed interface Event<T> {
 
-		/** One member of {@code value}. */
+		/**
+		 * One member of {@code value}.
+		 *
+		 * @param <T> the type of the collection's items
+		 * @param value the member, or {@code null} for a null member of a collection of
+		 * primitive values
+		 */
 		record Item<T>(T value) implements Event<T> {
 		}
 
 		/**
 		 * A top-level property other than {@code value}, such as {@code @odata.nextLink}.
+		 *
+		 * @param <T> the type of the collection's items
+		 * @param name the property's name, e.g. {@code @odata.nextLink}
+		 * @param value the property's value, as JSON
 		 */
 		record Control<T>(String name, JsonNode value) implements Event<T> {
 		}
@@ -70,6 +84,8 @@ public final class ODataCollectionDecoder {
 	 * @param itemType the type to read each item as
 	 * @param method the request's method, for error messages
 	 * @param url the request's URL, for error messages
+	 * @param <T> the type of the collection's items
+	 * @return the items and control information, in the order they appear in the body
 	 */
 	public static <T> Flux<Event<T>> decode(Flux<DataBuffer> body, ObjectMapper mapper, Class<T> itemType,
 			String method, String url) {
@@ -85,6 +101,13 @@ public final class ODataCollectionDecoder {
 	 * Just the items of one response body. Null members (possible in a collection of
 	 * primitive values) are skipped, since a Reactor stream can't carry nulls; use
 	 * {@link #decode} to see them.
+	 * @param body the response body; each buffer is released once read
+	 * @param mapper the mapper to read items with
+	 * @param itemType the type to read each item as
+	 * @param method the request's method, for error messages
+	 * @param url the request's URL, for error messages
+	 * @param <T> the type of the collection's items
+	 * @return the non-null items, in order
 	 */
 	public static <T> Flux<T> items(Flux<DataBuffer> body, ObjectMapper mapper, Class<T> itemType, String method,
 			String url) {
@@ -101,6 +124,15 @@ public final class ODataCollectionDecoder {
 	 * it had an {@code @odata.nextLink}, the page {@code fetch} returns for that link,
 	 * and so on. Next links are opaque: they're passed to {@code fetch} exactly as
 	 * received (OData Part 1 §11.2.6.7).
+	 * @param firstPage the first page's response body; each buffer is released once read
+	 * @param fetch fetches the page at a next link, returning its response body
+	 * @param mapper the mapper to read items with
+	 * @param itemType the type to read each item as
+	 * @param method the request's method, for error messages
+	 * @param url the first request's URL, for error messages; later pages use their next
+	 * link
+	 * @param <T> the type of the collection's items
+	 * @return the non-null items of every page, in order
 	 */
 	public static <T> Flux<T> follow(Flux<DataBuffer> firstPage, Function<String, Flux<DataBuffer>> fetch,
 			ObjectMapper mapper, Class<T> itemType, String method, String url) {

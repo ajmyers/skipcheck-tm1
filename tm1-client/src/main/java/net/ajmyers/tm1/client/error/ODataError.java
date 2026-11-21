@@ -25,6 +25,10 @@ import tools.jackson.databind.JsonNode;
 public record ODataError(String code, String message, @Nullable String target, List<ODataError> details,
 		@Nullable JsonNode innerError) {
 
+	/**
+	 * Replaces a {@code null} code or message with an empty string and copies the
+	 * details.
+	 */
 	public ODataError {
 		code = code == null ? "" : code;
 		message = message == null ? "" : message;
@@ -34,6 +38,9 @@ public record ODataError(String code, String message, @Nullable String target, L
 	/**
 	 * Reads an error from a response body, if it is one: either {@code {"error":{...}}}
 	 * or the inner object.
+	 * @param body a response body, or {@code null}
+	 * @return the error, or {@code null} if the body isn't an object with a {@code code}
+	 * or {@code message}
 	 */
 	public static @Nullable ODataError from(@Nullable JsonNode body) {
 		if (body == null || !body.isObject()) {

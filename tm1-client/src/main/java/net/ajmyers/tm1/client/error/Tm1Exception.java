@@ -21,14 +21,27 @@ public abstract sealed class Tm1Exception extends RuntimeException
 
 	private static final long serialVersionUID = 1L;
 
-	/** The request's HTTP method, or {@code null} if not known. */
+	/**
+	 * The request's HTTP method, or {@code null} if not known.
+	 * @return the HTTP method, or {@code null}
+	 */
 	@Getter
 	private final @Nullable String method;
 
-	/** The request's URL, never including credentials, or {@code null} if not known. */
+	/**
+	 * The request's URL, never including credentials, or {@code null} if not known.
+	 * @return the URL, or {@code null}
+	 */
 	@Getter
 	private final @Nullable String url;
 
+	/**
+	 * Creates an exception for a failed request.
+	 * @param message the detail message
+	 * @param method the request's HTTP method, or {@code null} if not known
+	 * @param url the request's URL, without credentials, or {@code null} if not known
+	 * @param cause the underlying failure, or {@code null}
+	 */
 	protected Tm1Exception(String message, @Nullable String method, @Nullable String url, @Nullable Throwable cause) {
 		super(message, cause);
 		this.method = method;
@@ -38,6 +51,7 @@ public abstract sealed class Tm1Exception extends RuntimeException
 	/**
 	 * Whether sending the same request again could succeed, such as after a timeout or a
 	 * 503.
+	 * @return {@code true} if a retry could succeed
 	 */
 	public abstract boolean isRetryable();
 
@@ -46,6 +60,7 @@ public abstract sealed class Tm1Exception extends RuntimeException
 	 * when TM1 certainly didn't act on it, such as a connection that was never made, or a
 	 * request it rejected. Check this before retrying anything that isn't idempotent,
 	 * like running a process.
+	 * @return {@code false} only if TM1 certainly didn't act on the request
 	 */
 	public abstract boolean mayHaveApplied();
 

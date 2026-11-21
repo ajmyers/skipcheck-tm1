@@ -20,6 +20,7 @@ public record CsdlComplexType(String name, @Nullable String baseType, boolean is
 		List<CsdlProperty> properties, List<CsdlNavigationProperty> navigationProperties,
 		List<CsdlAnnotation> annotations) implements CsdlStructuredType {
 
+	/** Validates and copies the components. */
 	public CsdlComplexType {
 		Objects.requireNonNull(name, "name");
 		properties = List.copyOf(properties);

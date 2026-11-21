@@ -17,18 +17,35 @@ public sealed class Tm1ApiException extends Tm1Exception
 
 	private static final long serialVersionUID = 1L;
 
-	/** The HTTP status. */
+	/**
+	 * The HTTP status.
+	 * @return the status code, such as {@code 404}
+	 */
 	@Getter
 	private final int status;
 
-	/** What the error means. */
+	/**
+	 * What the error means.
+	 * @return the kind, never {@code null}
+	 */
 	@Getter
 	private final Tm1ErrorKind kind;
 
-	/** The OData error body, or {@code null} if the response didn't have one. */
+	/**
+	 * The OData error body, or {@code null} if the response didn't have one.
+	 * @return the error, or {@code null}
+	 */
 	@Getter
 	private final transient @Nullable ODataError error;
 
+	/**
+	 * Creates an exception for an error response.
+	 * @param status the HTTP status
+	 * @param kind what the error means
+	 * @param error the parsed error body, or {@code null}
+	 * @param method the request's HTTP method
+	 * @param url the request's URL, without credentials
+	 */
 	protected Tm1ApiException(int status, Tm1ErrorKind kind, @Nullable ODataError error, String method, String url) {
 		super(message(status, error, method, url), method, url, null);
 		this.status = status;
@@ -38,8 +55,13 @@ public sealed class Tm1ApiException extends Tm1Exception
 
 	/**
 	 * The exception for an error response, classified with {@code classifier}.
+	 * @param status the HTTP status
 	 * @param error the parsed error body, or {@code null} if the body wasn't an OData
 	 * error
+	 * @param method the request's HTTP method
+	 * @param url the request's URL, without credentials
+	 * @param classifier works out the error's kind from the status and body
+	 * @return the subclass matching the kind and status
 	 */
 	public static Tm1ApiException of(int status, @Nullable ODataError error, String method, String url,
 			Tm1ErrorClassifier classifier) {
@@ -47,7 +69,16 @@ public sealed class Tm1ApiException extends Tm1Exception
 		return of(status, kind, error, method, url);
 	}
 
-	/** The exception for an error response whose kind is already known. */
+	/**
+	 * The exception for an error response whose kind is already known.
+	 * @param status the HTTP status
+	 * @param kind what the error means
+	 * @param error the parsed error body, or {@code null} if the body wasn't an OData
+	 * error
+	 * @param method the request's HTTP method
+	 * @param url the request's URL, without credentials
+	 * @return the subclass matching the kind first and the status second
+	 */
 	public static Tm1ApiException of(int status, Tm1ErrorKind kind, @Nullable ODataError error, String method,
 			String url) {
 		switch (kind) {

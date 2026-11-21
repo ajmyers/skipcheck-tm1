@@ -39,26 +39,38 @@ public sealed interface Tm1Source {
 	/** Settings read by {@link #discover()}, in the order they're tried. */
 	String PRIVATE_IMAGE = "TM1_PRIVATE_IMAGE";
 
+	/** An installed {@code tm1_64} folder, for {@link InstallDir}. */
 	String HOME_DIR = "TM1_HOME_DIR";
 
+	/** A Docker volume holding an install, for {@link InstallVolume}. */
 	String INSTALL_VOLUME = "TM1_INSTALL_VOLUME";
 
+	/** A folder holding IBM's bundle, for {@link Bundle}. */
 	String BUNDLE_DIR = "TM1_BUNDLE_DIR";
 
+	/** The bundle's file name within {@link #BUNDLE_DIR}; the newest one if unset. */
 	String BUNDLE = "TM1_BUNDLE";
 
+	/** A download link for IBM's bundle, for {@link BundleUrl}. */
 	String BUNDLE_URL = "TM1_BUNDLE_URL";
 
+	/** The SHA-256 to check the {@link #BUNDLE_URL} download against; optional. */
 	String BUNDLE_SHA256 = "TM1_BUNDLE_SHA256";
 
-	/** A short description for logs and messages. Never includes a URL's query string. */
+	/**
+	 * A short description for logs and messages. Never includes a URL's query string.
+	 * @return the description
+	 */
 	String describe();
 
 	/**
 	 * An image built on {@code tm1-server} with TM1 inside, from a <b>private</b>
 	 * registry. It contains IBM software, so it must never be pushed anywhere public.
+	 *
+	 * @param image the image's full name, including its registry and tag
 	 */
 	record PrivateImage(String image) implements Tm1Source {
+		/** Checks the image name isn't blank. */
 		public PrivateImage {
 			requireText(image, "image");
 		}
@@ -72,8 +84,11 @@ public sealed interface Tm1Source {
 	/**
 	 * An installed {@code tm1_64} folder, the one containing {@code bin64/tm1s.exe}.
 	 * Mounted read-only.
+	 *
+	 * @param dir the {@code tm1_64} folder; made absolute
 	 */
 	record InstallDir(Path dir) implements Tm1Source {
+		/** Makes the folder absolute and checks it holds {@code bin64/tm1s.exe}. */
 		public InstallDir {
 			Objects.requireNonNull(dir, "dir");
 			dir = dir.toAbsolutePath().normalize();
@@ -93,8 +108,11 @@ public sealed interface Tm1Source {
 	 * A named Docker volume holding a TM1 install, such as the one the {@code tm1-server}
 	 * compose setup creates ({@code tm1_tm1-install}). If the volume is empty, the
 	 * container fails to start, since there's nothing to install from.
+	 *
+	 * @param name the volume's name
 	 */
 	record InstallVolume(String name) implements Tm1Source {
+		/** Checks the volume name isn't blank. */
 		public InstallVolume {
 			requireText(name, "name");
 		}
@@ -115,6 +133,10 @@ public sealed interface Tm1Source {
 	 * newest one
 	 */
 	record Bundle(Path dir, @Nullable String file) implements Tm1Source {
+		/**
+		 * Makes the folder absolute, treats a blank file name as {@code null}, and checks
+		 * both exist.
+		 */
 		public Bundle {
 			Objects.requireNonNull(dir, "dir");
 			dir = dir.toAbsolutePath().normalize();
@@ -142,9 +164,11 @@ public sealed interface Tm1Source {
 	 * ({@code https://user:token@host/...}, common with artifact repositories), so
 	 * neither is ever logged.
 	 *
+	 * @param url the link to download the bundle from
 	 * @param sha256 the bundle's SHA-256, checked before installing; {@code null} to skip
 	 */
 	record BundleUrl(URI url, @Nullable String sha256) implements Tm1Source {
+		/** Checks the URL is set and treats a blank SHA-256 as {@code null}. */
 		public BundleUrl {
 			Objects.requireNonNull(url, "url");
 			if (sha256 != null && sha256.isBlank()) {
@@ -163,6 +187,8 @@ public sealed interface Tm1Source {
 	/**
 	 * Finds a source from system properties and environment variables. See the class
 	 * docs.
+	 * @return the source, or empty if none is configured
+	 * @throws IllegalArgumentException if a setting is present but invalid
 	 */
 	static Optional<Tm1Source> discover() {
 		return discover(name -> {
@@ -174,6 +200,8 @@ public sealed interface Tm1Source {
 	/**
 	 * Finds a source using {@code lookup} to read each setting. Blank values count as
 	 * unset.
+	 * @param lookup reads a setting by name, returning {@code null} if it's unset
+	 * @return the first source found, or empty if none is configured
 	 * @throws IllegalArgumentException if a setting is present but invalid, such as a
 	 * folder that doesn't exist. A wrong setting fails rather than silently skipping the
 	 * tests.

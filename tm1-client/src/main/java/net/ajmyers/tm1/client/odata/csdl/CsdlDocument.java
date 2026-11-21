@@ -22,6 +22,7 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 	/** The term holding the service's schema version. */
 	public static final String SCHEMA_VERSION_TERM = "Core.SchemaVersion";
 
+	/** Validates and copies the components. */
 	public CsdlDocument {
 		Objects.requireNonNull(version, "version");
 		schemas = List.copyOf(schemas);
@@ -31,6 +32,8 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 	 * Rewrites a qualified name to use its schema's namespace rather than its alias:
 	 * {@code tm1.Cube} becomes {@code ibm.tm1.api.v1.Cube}. Names in other namespaces,
 	 * such as {@code Edm.String}, are returned unchanged.
+	 * @param qualifiedName a name qualified by namespace or alias
+	 * @return the name qualified by namespace
 	 */
 	public String qualify(String qualifiedName) {
 		Objects.requireNonNull(qualifiedName, "qualifiedName");
@@ -50,6 +53,7 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 	/**
 	 * The schema version from {@code Core.SchemaVersion}, e.g. {@code 11.8.35}, if
 	 * declared.
+	 * @return the schema version, or empty if no schema declares one
 	 */
 	public Optional<String> schemaVersion() {
 		return schemas.stream()
@@ -58,33 +62,56 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 			.findFirst();
 	}
 
-	/** The document's entity container, if any. */
+	/**
+	 * The document's entity container, if any.
+	 * @return the first schema's entity container, or empty if none has one
+	 */
 	public Optional<CsdlEntityContainer> entityContainer() {
 		return schemas.stream().map(CsdlSchema::entityContainer).filter(Objects::nonNull).findFirst();
 	}
 
-	/** The entity type with this qualified name. */
+	/**
+	 * The entity type with this qualified name.
+	 * @param qualifiedName the type's name, qualified by namespace or alias
+	 * @return the entity type, or empty if the document doesn't define it
+	 */
 	public Optional<CsdlEntityType> entityType(String qualifiedName) {
 		return find(qualifiedName, CsdlSchema::entityTypes, CsdlEntityType::name);
 	}
 
-	/** The complex type with this qualified name. */
+	/**
+	 * The complex type with this qualified name.
+	 * @param qualifiedName the type's name, qualified by namespace or alias
+	 * @return the complex type, or empty if the document doesn't define it
+	 */
 	public Optional<CsdlComplexType> complexType(String qualifiedName) {
 		return find(qualifiedName, CsdlSchema::complexTypes, CsdlComplexType::name);
 	}
 
-	/** The entity or complex type with this qualified name. */
+	/**
+	 * The entity or complex type with this qualified name.
+	 * @param qualifiedName the type's name, qualified by namespace or alias
+	 * @return the type, or empty if the document doesn't define it
+	 */
 	public Optional<CsdlStructuredType> structuredType(String qualifiedName) {
 		Optional<CsdlStructuredType> entity = entityType(qualifiedName).map(CsdlStructuredType.class::cast);
 		return entity.isPresent() ? entity : complexType(qualifiedName).map(CsdlStructuredType.class::cast);
 	}
 
-	/** The enum type with this qualified name. */
+	/**
+	 * The enum type with this qualified name.
+	 * @param qualifiedName the type's name, qualified by namespace or alias
+	 * @return the enum type, or empty if the document doesn't define it
+	 */
 	public Optional<CsdlEnumType> enumType(String qualifiedName) {
 		return find(qualifiedName, CsdlSchema::enumTypes, CsdlEnumType::name);
 	}
 
-	/** Every overload of the action or function with this qualified name. */
+	/**
+	 * Every overload of the action or function with this qualified name.
+	 * @param qualifiedName the operation's name, qualified by namespace or alias
+	 * @return the overloads in document order, or an empty list if there are none
+	 */
 	public List<CsdlOperation> operations(String qualifiedName) {
 		String name = qualify(qualifiedName);
 		List<CsdlOperation> result = new ArrayList<>();
@@ -101,6 +128,8 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 	/**
 	 * The operations bound to this type (not collections of it), e.g. every
 	 * {@code tm1.Cube} action.
+	 * @param qualifiedTypeName the binding type's name, qualified by namespace or alias
+	 * @return the bound operations in document order, or an empty list if there are none
 	 */
 	public List<CsdlOperation> boundTo(String qualifiedTypeName) {
 		String type = qualify(qualifiedTypeName);
@@ -113,6 +142,9 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 	/**
 	 * A structured type followed by its base types, nearest first. Stops at a base type
 	 * the document doesn't define, and at a cycle (which valid CSDL never has).
+	 * @param qualifiedName the type's name, qualified by namespace or alias
+	 * @return the type and its base types, or an empty list if the document doesn't
+	 * define the type
 	 */
 	public List<CsdlStructuredType> typeHierarchy(String qualifiedName) {
 		List<CsdlStructuredType> chain = new ArrayList<>();
@@ -128,6 +160,8 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 	/**
 	 * The qualified name, by namespace, of a type defined in one of this document's
 	 * schemas.
+	 * @param type the type to name
+	 * @return its name qualified by namespace, or empty if it isn't in this document
 	 */
 	public Optional<String> qualifiedName(CsdlStructuredType type) {
 		return schemas.stream()
@@ -144,7 +178,10 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 			.findFirst();
 	}
 
-	/** Every structured type in the document. */
+	/**
+	 * Every structured type in the document.
+	 * @return the entity and complex types, schema by schema, entity types first
+	 */
 	public Stream<CsdlStructuredType> structuredTypes() {
 		return schemas.stream().flatMap(s -> Stream.concat(s.entityTypes().stream(), s.complexTypes().stream()));
 	}

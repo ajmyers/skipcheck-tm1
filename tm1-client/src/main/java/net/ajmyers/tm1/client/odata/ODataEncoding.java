@@ -31,12 +31,20 @@ public final class ODataEncoding {
 	private ODataEncoding() {
 	}
 
-	/** Encodes text for use inside a path segment, e.g. the inside of a key literal. */
+	/**
+	 * Encodes text for use inside a path segment, e.g. the inside of a key literal.
+	 * @param text the unencoded text
+	 * @return the percent-encoded text
+	 */
 	public static String pathValue(String text) {
 		return encode(text, PATH_SAFE);
 	}
 
-	/** Encodes text for use as (part of) a query option's value. */
+	/**
+	 * Encodes text for use as (part of) a query option's value.
+	 * @param text the unencoded text
+	 * @return the percent-encoded text
+	 */
 	public static String queryValue(String text) {
 		return encode(text, QUERY_SAFE);
 	}
