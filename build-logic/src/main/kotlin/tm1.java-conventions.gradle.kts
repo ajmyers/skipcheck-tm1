@@ -25,6 +25,30 @@ tasks.withType<JavaCompile>().configureEach {
 	options.compilerArgs.add("-Werror")
 }
 
+// Java layout: Spring Java Format (tabs, Spring's style). `./gradlew format` fixes it; checkFormat
+// is part of check, so unformatted code fails the build. -PformatFiles=a.java,b.java (paths from
+// the repository root) narrows format to those files; the pre-commit hook uses this.
+val javaSources = the<SourceSetContainer>().map { it.allJava }
+val formatOnly = providers.gradleProperty("formatFiles").orNull?.split(",")?.filter { it.isNotBlank() }?.map { rootDir.resolve(it) }
+val format by tasks.registering(FormatJava::class) {
+	group = "formatting"
+	description = "Formats Java sources with Spring Java Format."
+	if (formatOnly == null) {
+		source.from(javaSources)
+	}
+	else {
+		val dirs = javaSources.flatMap { it.srcDirs }
+		source.from(formatOnly.filter { f -> f.isFile && dirs.any { f.startsWith(it) } })
+	}
+}
+val checkFormat by tasks.registering(CheckJavaFormat::class) {
+	group = "verification"
+	description = "Fails if any Java source isn't formatted with Spring Java Format."
+	source.from(javaSources)
+	report = layout.buildDirectory.file("reports/check-format.txt")
+	mustRunAfter(format)
+}
+
 tasks.withType<Test>().configureEach {
 	useJUnitPlatform()
 
