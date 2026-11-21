@@ -145,6 +145,28 @@ class Tm1SessionTest {
 	}
 
 	@Test
+	void refusesToExecuteACollectionWithoutSendingIt() {
+		Tm1Request<JsonNode> list = Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), JsonNode.class);
+		StepVerifier.create(tm1.session().execute(list)).expectError(IllegalArgumentException.class).verify();
+		assertThat(tm1.requests()).isEmpty();
+	}
+
+	@Test
+	void reportsABodyThatIsntJsonAsTheCallersMistakeNotATransportFailure() {
+		Tm1Request<Void> bad = Tm1Request.post(ODataPath.of("Cubes"), new Unwritable("x"), Void.class);
+		StepVerifier.create(tm1.session().execute(bad))
+			.expectErrorSatisfies(e -> assertThat(e).isInstanceOf(IllegalArgumentException.class)
+				.isNotInstanceOf(Tm1TransportException.class))
+			.verify();
+	}
+
+	@Test
+	void passesOtherFailuresThroughUnwrapped() {
+		tm1.on("GET Server?$select=Name", r -> Mono.error(new IllegalStateException("a bug, not the network")));
+		StepVerifier.create(tm1.session().execute(SERVER)).expectError(IllegalStateException.class).verify();
+	}
+
+	@Test
 	void mapsConnectFailuresAndOtherTransportFailures() {
 		tm1.on("GET Server?$select=Name", r -> Mono.error(new WebClientRequestException(new ConnectException("refused"),
 				HttpMethod.GET, URI.create(FakeTm1.ROOT + "Server"), new HttpHeaders())));
@@ -250,6 +272,14 @@ class Tm1SessionTest {
 			.hasObservationWithNameEqualTo("tm1.session.close")
 			.that()
 			.hasBeenStopped();
+	}
+
+	/** A body Jackson can't write: reading its property fails. */
+	record Unwritable(String name) {
+		@Override
+		public String name() {
+			throw new UnsupportedOperationException("not readable");
+		}
 	}
 
 }
