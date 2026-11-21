@@ -363,7 +363,7 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		return libraryVersion.endsWith("-SNAPSHOT") ? "edge" : libraryVersion;
 	}
 
-	private static String libraryVersion() {
+	static String libraryVersion() {
 		try (InputStream in = Tm1ServerContainer.class.getResourceAsStream("tm1-testcontainers.properties")) {
 			Properties properties = new Properties();
 			properties.load(Objects.requireNonNull(in, "tm1-testcontainers.properties is missing from the jar"));
