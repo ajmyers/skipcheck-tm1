@@ -300,8 +300,8 @@ CSDL parser:
   `Element.TYPE`, and so on.
 - **A `Patch` builder per entity** (§8.3).
 - **Each type, property and operation carries its revision history** from `Core.Revisions`,
-  e.g. `@Since("11.8.34")` and `@Deprecated(since = "11.8.3")`, along with Javadoc (see Q2 on
-  IBM's description text).
+  e.g. `@Since("11.8.34")` and `@Deprecated(since = "11.8.3")`, and Javadoc from IBM's
+  `Core.Description` text (Q2).
 - **An operation catalog:** one descriptor per action and function, holding its name, binding,
   parameters and return type. Hand-written service methods refer to these descriptors, which
   feeds the coverage gate (§12.3).
@@ -549,7 +549,7 @@ These are concerns the requirements don't name, but that need deciding early:
 | # | Question | Recommendation |
 |---|---|---|
 | Q1 | Generate the model from CSDL, or write it by hand? | **Agreed 2026-11-21.** Generate records, enums, patch builders, field constants and the operation catalog. Write services by hand (§8.1). |
-| Q2 | Can we commit IBM's `$metadata` to the repo? Its `Core.Description` text is IBM-authored, and the project deliberately ships no IBM material. | **Agreed 2026-11-21.** Commit a **stripped snapshot**: structure, types and `Core.Revisions` kept, IBM description text removed. Generated Javadoc is our own. Worth a quick legal sanity check. |
+| Q2 | Can we commit IBM's `$metadata` to the repo? Its `Core.Description` text is IBM-authored. | **Decided 2026-11-21 (revised): commit it as served, IBM's text included.** First agreed as a stripped snapshot; the user then decided keeping IBM's text is fine. Keeping the exact response also makes the drift check a byte-for-byte comparison, and the descriptions can become generated Javadoc. |
 | Q3 | Flat services with parent-key parameters, or fluent navigation (`tm1.dimension("d").hierarchy("h").elements()`)? | **Decided 2026-11-21: both.** Flat 1:1 services are the core: injectable, and what the coverage gate checks. Fluent handles holding context and defaults come later as a thin layer over them (with the Q10 helpers). Each fluent call runs the flat call it stands for, so the flat layer is always the escape hatch. |
 | Q4 | Default HTTP connector: Reactor Netty, or the JDK `HttpClient` connector? | **Decided 2026-11-21: Reactor Netty is the default and a required dependency.** Any other `ClientHttpConnector` is accepted. Why Netty: pool control (separate named pools per workload, bounded waits for a connection, max idle and max life), which the connection-pinning and 100 s+ pause lessons in §16.2 depend on; per-request response timeouts; gzip; Spring Boot's own default and metrics. The JDK client lacks pool control, doesn't decompress gzip, and defaults to HTTP/2 (TM1 speaks 1.1). Session cookies are always managed by our session code, never a connector's cookie support. |
 | Q5 | Build per-user sessions (`Tm1SessionFactory`) in phase 0, or design only? | Design now, build when the first tool needs it. |
