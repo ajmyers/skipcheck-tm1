@@ -1,0 +1,25 @@
+# PRs are squash-merged: the PR title and description become the commit on master.
+# Check them against the same conventions as the commit-msg hook (.githooks/check_message.py).
+name: PR Conventions
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  conventions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check PR title and description
+        # Passed via env, never interpolated into the script, so PR text can't inject shell
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n\n%s\n' "$PR_TITLE" "$PR_BODY" > "$RUNNER_TEMP/pr-message"
+          python3 .githooks/check_message.py pr "$RUNNER_TEMP/pr-message"
