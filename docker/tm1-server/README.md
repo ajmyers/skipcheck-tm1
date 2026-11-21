@@ -8,6 +8,13 @@ built for local development and integration tests of TM1 client libraries.
 > licensed TM1 Server installation, and you are responsible for complying with
 > your IBM license terms.
 
+**New here? Follow [GETTING-STARTED.md](GETTING-STARTED.md)** for step-by-step
+instructions on Mac, Windows and Linux. This README is the reference.
+
+The shortest path: put your IBM bundle (`tm1server-*-linuxi38664h_bundle.tar.gz`)
+in [`bundles/`](bundles/README.md), run `docker compose up -d`, and TM1 is at
+http://localhost:8010 (user `admin`, no password).
+
 ## What you mount
 
 TM1 itself comes from one of [six sources](#getting-tm1-into-the-container); the
@@ -44,7 +51,7 @@ docker run -d --name tm1 -p 8010:8010 \
 
 ## Image
 
-Published to GitHub Container Registry by [`.github/workflows/docker.yml`](../.github/workflows/docker.yml):
+Published to GitHub Container Registry by [`.github/workflows/docker.yml`](../../.github/workflows/docker.yml):
 
 | Tag | Published when |
 |-----|----------------|
@@ -54,6 +61,10 @@ Published to GitHub Container Registry by [`.github/workflows/docker.yml`](../.g
 Publishing is off until the repository variable `PUBLISH_DOCKER_TM1_SERVER` is set to
 `true`. Until then, the image is built and smoke-tested but not pushed.
 
+To use your own build in place of the published image, build it (below) and use
+`tm1-server:local` wherever this README says `ghcr.io/ajmyers/tm1-server`. For
+compose, set `TM1_SERVER_IMAGE=tm1-server:local` in `.env`.
+
 To build it yourself, run `docker build --platform linux/amd64 -t tm1-server .` from
 this folder. Always pass `--platform linux/amd64`: without it, Docker on Apple Silicon
 labels the image arm64 even though its contents are amd64, and compose or
@@ -62,13 +73,15 @@ labels the image arm64 even though its contents are amd64, and compose or
 
 ## Compose
 
-`compose.yaml` builds the image from this folder by default. To use the published
-image, set `TM1_SERVER_IMAGE=ghcr.io/ajmyers/tm1-server:latest` in `.env` and run
-`docker compose pull`. Then `cp .env.example .env` and set `TM1_HOME_DIR`:
+`compose.yaml` runs a small TM1 environment: an Admin Server and a TM1 server with
+an empty database, plus IBM's SData sample if you ask for it. It works on its own:
+copy it into any folder. It uses the published image; to use your own build, set
+`TM1_SERVER_IMAGE=tm1-server:local` in `.env`.
 
 ```sh
 docker compose up -d                      # Admin Server + empty database "tm1" -> http://localhost:8010
 docker compose --profile samples up -d    # adds IBM's SData sample             -> http://localhost:8011
+docker compose ps                         # wait for (healthy)
 docker compose logs -f tm1                # server message log
 docker compose stop                       # clean shutdown (TM1 saves on SIGINT)
 ```
@@ -79,8 +92,24 @@ docker compose stop                       # clean shutdown (TM1 saves on SIGINT)
 | `tm1` | TM1 server, empty database | http://localhost:8010/api/v1/ | `admin`, blank password |
 | `tm1-sdata` | TM1 server, IBM's SData sample | http://localhost:8011/api/v1/ | `admin` / `apple` |
 
-Like a real deployment, one Admin Server serves every TM1 server: the servers
-register with `tm1-admin` through `TM1_ADMIN_HOST` (see [Roles](#roles)).
+**TM1 source.** With no settings, compose installs TM1 from the bundle in
+[`bundles/`](bundles/README.md) into the Docker volume `tm1-server_tm1-install` on
+first start. The three containers share it, and only the first one installs. Set
+these in a `.env` file to use another source (see [`.env.example`](.env.example)):
+
+| Setting | Source |
+|---------|--------|
+| `TM1_BUNDLE_DIR` (and optionally `TM1_BUNDLE`) | A bundle in another folder |
+| `TM1_BUNDLE_URL` (and optionally `TM1_BUNDLE_SHA256`) | A bundle downloaded from a URL |
+| `TM1_HOME_DIR` | An installed `tm1_64` folder |
+| `TM1_SERVER_IMAGE` | A private image with TM1 built in |
+
+To fill the volume from a pipe instead: `... | docker compose run --rm -T --no-deps tm1 install -`.
+
+**Your files.** Each server's config, database and logs are in
+`tm1-files/<server>/{config,data,logs}` (or set `TM1_FILES_DIR`), created on first
+start. Like a real deployment, one Admin Server serves every TM1 server: the
+servers register with `tm1-admin` through `TM1_ADMIN_HOST` (see [Roles](#roles)).
 
 The REST API is plain HTTP by default (`UseSSL=F`), so there are no certificates to
 deal with. To use SSL, set `TM1_USE_SSL=T` or `UseSSL=T` in your own `tm1s.cfg`. TM1
@@ -232,14 +261,21 @@ names (e.g. `http://tm1:8010`), so the addresses the Admin Server lists work
 from other containers on the network (TM1 Web, PAW), not from your machine.
 From your machine, use each server's published port.
 
-## Apple Silicon
+## Platforms
 
-TM1 is x86-64 only. Docker Desktop runs it under Rosetta, which is fast. The
-server is ready in a few seconds. You need to:
+TM1 Server is Linux x86-64 software, so the image is `linux/amd64` only. Setup for
+each platform is in [GETTING-STARTED.md](GETTING-STARTED.md#step-1-install-docker).
 
-1. Run `softwareupdate --install-rosetta --agree-to-license`.
-2. In Docker Desktop, enable **Settings → General → Use Rosetta for x86_64/amd64
-   emulation on Apple Silicon**.
+| Platform | How TM1 runs |
+|----------|--------------|
+| Linux, x86-64 | Natively |
+| Windows, Intel/AMD | Natively, in Docker Desktop's WSL2 Linux VM |
+| Mac, Apple Silicon | Rosetta emulation, which is fast (ready in a few seconds). Needs `softwareupdate --install-rosetta` and Docker Desktop's **Use Rosetta for x86_64/amd64 emulation** setting. |
+| Mac, Intel | Natively, in Docker Desktop's Linux VM |
+| Windows or Linux on ARM | QEMU emulation: works, but noticeably slower |
+
+Tested on Apple Silicon. The image's files keep LF line endings on Windows
+(`.gitattributes`), so it also builds there.
 
 ## Notes and limitations
 
