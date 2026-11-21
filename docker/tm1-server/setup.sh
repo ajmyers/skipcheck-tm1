@@ -20,6 +20,7 @@ set -eu
 DEFAULT_BASE_URL=https://raw.githubusercontent.com/ajmyers/tm1-pa-developer-tools/master/docker/tm1-server
 GUIDE=https://github.com/ajmyers/tm1-pa-developer-tools/blob/master/docker/tm1-server/GETTING-STARTED.md
 DEFAULT_IMAGE=ghcr.io/ajmyers/tm1-server:latest
+ISSUES=https://github.com/ajmyers/tm1-pa-developer-tools/issues
 
 # --- Options: flags override TM1_SETUP_* environment variables -----------------
 DIR=${TM1_SETUP_DIR:-}
@@ -77,19 +78,39 @@ EOF
 
 # --- Output ---------------------------------------------------------------------
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-  B=$(printf '\033[1m'); R=$(printf '\033[31m'); G=$(printf '\033[32m'); Y=$(printf '\033[33m'); N=$(printf '\033[0m')
+  B=$(printf '\033[1m'); R=$(printf '\033[31m'); G=$(printf '\033[32m'); Y=$(printf '\033[33m'); C=$(printf '\033[36m'); N=$(printf '\033[0m')
 else
-  B=; R=; G=; Y=; N=
+  B=; R=; G=; Y=; C=; N=
 fi
 step() { printf '\n%s==> %s%s\n' "$B" "$*" "$N"; }
 ok()   { printf '  %s✓%s %s\n' "$G" "$N" "$*"; }
 info() { printf '    %s\n' "$*"; }
 warn() { printf '  %s!%s %s\n' "$Y" "$N" "$*" >&2; }
+# Who made this. Same text as setup.ps1 and the image's startup log (docker/banner.txt).
+banner() {
+  printf '\n%s' "$C"
+  cat <<'EOF'
+  ------------------------------------------------------------------
+   tm1-server: a local IBM Planning Analytics (TM1) server in Docker
+   Free and open source, made by Andrew Myers
+
+     Website  https://ajmyers.net
+     GitHub   https://github.com/ajmyers
+     Issues   https://github.com/ajmyers/tm1-pa-developer-tools/issues
+
+   Useful? A star helps: https://github.com/ajmyers/tm1-pa-developer-tools
+   Need help with TM1, or a commercial license? https://ajmyers.net
+   Not affiliated with IBM. You need your own licensed copy of TM1.
+  ------------------------------------------------------------------
+EOF
+  printf '%s' "$N"
+}
 # die MESSAGE [HOW TO FIX, one line per argument]
 die() {
   printf '\n%sError:%s %s\n' "$R" "$N" "$1" >&2; shift
   for line in "$@"; do printf '  %s\n' "$line" >&2; done
   printf '\nHelp: %s\n' "$GUIDE" >&2
+  printf 'Still stuck? Open an issue: %s\n' "$ISSUES" >&2
   exit 1
 }
 
@@ -129,6 +150,8 @@ while [ $# -gt 0 ]; do
     -h|--help) usage; exit 0 ;;
   esac
 done
+
+banner
 
 case $TIMEOUT in ''|*[!0-9]*) die "--timeout must be a number of seconds, not '$TIMEOUT'." ;; esac
 case $SAMPLES in ''|0|1) ;; true|yes|y) SAMPLES=1 ;; false|no|n) SAMPLES=0 ;;

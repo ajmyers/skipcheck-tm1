@@ -15,7 +15,7 @@ run() { docker run --rm "$@"; }  # image is linux/amd64 (pinned in the Dockerfil
 
 # 1. Shell scripts pass shellcheck
 if command -v shellcheck >/dev/null; then
-  shellcheck -S warning "$here"/docker/*.sh "$here"/ci-smoke-test.sh && pass "shellcheck"
+  shellcheck -S warning "$here"/docker/*.sh "$here"/ci-smoke-test.sh "$here"/setup.sh && pass "shellcheck"
 else
   echo "skip - shellcheck not installed"
 fi
@@ -37,6 +37,8 @@ set -e
 [ "$rc" -eq 2 ] || fail "expected exit 2 without a TM1 install, got $rc: $out"
 grep -q "does not include IBM software" <<<"$out" || fail "missing help text: $out"
 pass "start without TM1 install fails with help text"
+grep -qF "$(sed -n 3p "$here/docker/banner.txt")" <<<"$out" || fail "startup log doesn't show docker/banner.txt: $out"
+pass "startup log shows the banner"
 
 # 5. Admin role without a TM1 install: same, naming the Admin Server binary
 set +e
@@ -63,5 +65,14 @@ set -e
 grep -q "download failed: http://127.0.0.1:9/tm1server-bundle.tar.gz" <<<"$out" || fail "missing download error: $out"
 ! grep -q "SECRET123" <<<"$out" || fail "bundle URL credentials were printed: $out"
 pass "unreachable bundle URL fails cleanly without printing credentials"
+
+# 8. The setup script shows the same banner as the image (it embeds a copy)
+while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  for script in setup.sh; do
+    grep -qF -- "$line" "$here/$script" || fail "$script's banner differs from docker/banner.txt, at: $line"
+  done
+done <"$here/docker/banner.txt"
+pass "setup.sh shows docker/banner.txt"
 
 echo "All smoke tests passed."

@@ -45,10 +45,13 @@
 #                       TM1_ADMIN_HOST is set)
 set -euo pipefail
 
+# Who made this image, at the top of every TM1 start (and install)
+banner() { cat /usr/local/lib/tm1-server/banner.txt 2>/dev/null || true; }
+
 case "${1:-start}" in
-  start|server) ROLE="server" ;;
-  admin) ROLE="admin" ;;
-  install) shift; exec /usr/local/bin/tm1-install "$@" ;;
+  start|server) ROLE="server"; banner ;;
+  admin) ROLE="admin"; banner ;;
+  install) shift; banner; exec /usr/local/bin/tm1-install "$@" ;;
   *) exec "$@" ;;
 esac
 
