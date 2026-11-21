@@ -237,6 +237,39 @@ public final class Tm1Session {
 		private Builder() {
 		}
 
+		/** A copy of these settings, for the pool to build one session per identity. */
+		Builder copy() {
+			Builder copy = new Builder();
+			copy.baseUrl = baseUrl;
+			copy.authenticator = authenticator;
+			copy.sessionContext = sessionContext;
+			copy.impersonate = impersonate;
+			copy.nanoTime = nanoTime;
+			copy.timeouts = timeouts;
+			copy.classifier = classifier;
+			copy.mapper = mapper;
+			copy.observations = observations;
+			copy.webClient = webClient == null ? null : webClient.clone();
+			copy.connector = connector;
+			return copy;
+		}
+
+		/** Logs in as the credentials' own user: no impersonation. */
+		Builder withoutImpersonation() {
+			this.impersonate = null;
+			return this;
+		}
+
+		/** The base URL, or a placeholder if it isn't set yet, for the pool's logs. */
+		String baseUrlOrUnset() {
+			return baseUrl == null ? "(no base URL)" : baseUrl;
+		}
+
+		/** The observation registry, which the pool reports to as well. */
+		ObservationRegistry observations() {
+			return observations;
+		}
+
 		/**
 		 * The service root, such as {@code http://localhost:8010/api/v1/}. A missing
 		 * trailing {@code /} is added.
@@ -305,7 +338,7 @@ public final class Tm1Session {
 		 * {@code TM1-Impersonate}. The credentials must be an administrator's or a data
 		 * administrator's, and nobody can impersonate an administrator. TM1 decides the
 		 * identity at login and keeps it for the session, so one session is one identity;
-		 * for many users, use one session per user.
+		 * for many users, use a {@link Tm1SessionPool}.
 		 *
 		 * <p>
 		 * A refused login fails with
