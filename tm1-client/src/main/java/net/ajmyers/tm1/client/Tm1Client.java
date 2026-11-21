@@ -10,6 +10,7 @@ import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
 import net.ajmyers.tm1.client.session.Tm1Session;
 import net.ajmyers.tm1.client.session.Tm1Timeouts;
+import net.ajmyers.tm1.client.version.Tm1Dialect;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
@@ -113,6 +114,26 @@ public final class Tm1Client {
 		 */
 		public Builder baseUrl(String baseUrl) {
 			session.baseUrl(baseUrl);
+			return this;
+		}
+
+		/**
+		 * See {@link Tm1Session.Builder#address}.
+		 * @param address the server's address, such as {@code http://tm1:8010}
+		 * @return this builder
+		 */
+		public Builder address(String address) {
+			session.address(address);
+			return this;
+		}
+
+		/**
+		 * See {@link Tm1Session.Builder#dialect}.
+		 * @param dialect the kind of deployment
+		 * @return this builder
+		 */
+		public Builder dialect(Tm1Dialect dialect) {
+			session.dialect(dialect);
 			return this;
 		}
 

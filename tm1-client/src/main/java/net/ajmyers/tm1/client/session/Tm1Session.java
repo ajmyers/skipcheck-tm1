@@ -16,6 +16,7 @@ import net.ajmyers.tm1.client.Tm1Request;
 import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
 import net.ajmyers.tm1.client.version.Tm1Capabilities;
+import net.ajmyers.tm1.client.version.Tm1Dialect;
 import net.ajmyers.tm1.client.version.Tm1Version;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -238,6 +239,8 @@ public final class Tm1Session {
 
 		private @Nullable String baseUrl;
 
+		private Tm1Dialect dialect = Tm1Dialect.V11;
+
 		private @Nullable Tm1Authenticator authenticator;
 
 		private @Nullable String sessionContext;
@@ -268,6 +271,7 @@ public final class Tm1Session {
 		Builder copy() {
 			Builder copy = new Builder();
 			copy.baseUrl = baseUrl;
+			copy.dialect = dialect;
 			copy.authenticator = authenticator;
 			copy.sessionContext = sessionContext;
 			copy.impersonate = impersonate;
@@ -296,6 +300,30 @@ public final class Tm1Session {
 		/** The observation registry, which the pool reports to as well. */
 		ObservationRegistry observations() {
 			return observations;
+		}
+
+		/**
+		 * The server's address, such as {@code http://tm1:8010}: its scheme, host and
+		 * HTTP port. The service root comes from the dialect, {@link Tm1Dialect#V11}
+		 * unless set, which adds {@code /api/v1/}. Use {@link #baseUrl} to give the
+		 * service root itself.
+		 * @param address the server's address
+		 * @return this builder
+		 * @throws IllegalArgumentException if the address doesn't fit the dialect
+		 */
+		public Builder address(String address) {
+			return baseUrl(dialect.serviceRoot(address));
+		}
+
+		/**
+		 * The kind of deployment, for {@link #address}. {@link Tm1Dialect#V11} unless
+		 * set.
+		 * @param dialect the dialect
+		 * @return this builder
+		 */
+		public Builder dialect(Tm1Dialect dialect) {
+			this.dialect = Objects.requireNonNull(dialect, "dialect");
+			return this;
 		}
 
 		/**
