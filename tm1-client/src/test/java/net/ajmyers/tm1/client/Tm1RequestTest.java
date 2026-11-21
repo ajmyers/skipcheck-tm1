@@ -1,7 +1,9 @@
 package net.ajmyers.tm1.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import java.time.Duration;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -46,5 +48,15 @@ class Tm1RequestTest {
 		assertThat(delete.headers()).isEmpty();
 		assertThat(guarded.headers()).containsEntry("If-Match", "W/\"1\"");
 		assertThat(guarded.relativeUri()).isEqualTo("Cubes('x')?!sandbox=s");
+	}
+
+	@Test
+	void carriesItsOwnTimeoutThroughCopies() {
+		Tm1Request<Void> run = Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.ExecuteWithReturn"), null, Void.class);
+		assertThat(run.timeout()).isEmpty();
+		Tm1Request<Void> slow = run.withTimeout(Duration.ofHours(2)).withHeader("Prefer", "respond-async");
+		assertThat(slow.timeout()).hasValue(Duration.ofHours(2));
+		assertThat(run.timeout()).isEmpty();
+		assertThatIllegalArgumentException().isThrownBy(() -> run.withTimeout(Duration.ZERO));
 	}
 }

@@ -1,9 +1,11 @@
 package net.ajmyers.tm1.client;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.springframework.http.HttpMethod;
 
@@ -48,9 +50,10 @@ public final class Tm1Request<T> {
 	private final Object body;
 	private final Response response;
 	private final Class<T> type;
+	private final Duration timeout;
 
 	private Tm1Request(HttpMethod method, ODataPath path, ODataQuery query, Map<String, String> headers, Object body, Response response,
-			Class<T> type) {
+			Class<T> type, Duration timeout) {
 		this.method = Objects.requireNonNull(method, "method");
 		this.path = Objects.requireNonNull(path, "path");
 		this.query = Objects.requireNonNull(query, "query");
@@ -58,21 +61,22 @@ public final class Tm1Request<T> {
 		this.body = body;
 		this.response = Objects.requireNonNull(response, "response");
 		this.type = Objects.requireNonNull(type, "type");
+		this.timeout = timeout;
 	}
 
 	/** {@code GET} of one entity or value. */
 	public static <T> Tm1Request<T> get(ODataPath path, ODataQuery query, Class<T> type) {
-		return new Tm1Request<>(HttpMethod.GET, path, query, Map.of(), null, Response.SINGLE, type);
+		return new Tm1Request<>(HttpMethod.GET, path, query, Map.of(), null, Response.SINGLE, type, null);
 	}
 
 	/** {@code GET} of a collection, read item by item as {@code itemType}. */
 	public static <T> Tm1Request<T> list(ODataPath path, ODataQuery query, Class<T> itemType) {
-		return new Tm1Request<>(HttpMethod.GET, path, query, Map.of(), null, Response.COLLECTION, itemType);
+		return new Tm1Request<>(HttpMethod.GET, path, query, Map.of(), null, Response.COLLECTION, itemType, null);
 	}
 
 	/** {@code GET} of plain text, such as {@code Configuration/ProductVersion/$value}. */
 	public static Tm1Request<String> text(ODataPath path) {
-		return new Tm1Request<>(HttpMethod.GET, path, ODataQuery.none(), Map.of(), null, Response.TEXT, String.class);
+		return new Tm1Request<>(HttpMethod.GET, path, ODataQuery.none(), Map.of(), null, Response.TEXT, String.class, null);
 	}
 
 	/**
@@ -81,29 +85,42 @@ public final class Tm1Request<T> {
 	 * content type. With {@code Void.class} the response is ignored.
 	 */
 	public static <T> Tm1Request<T> post(ODataPath path, Object body, Class<T> type) {
-		return new Tm1Request<>(HttpMethod.POST, path, ODataQuery.none(), Map.of(), body == null ? Map.of() : body, responseFor(type), type);
+		return new Tm1Request<>(HttpMethod.POST, path, ODataQuery.none(), Map.of(), body == null ? Map.of() : body, responseFor(type), type, null);
 	}
 
 	/** {@code PATCH}: change the properties in {@code body}, leaving the rest as they are. */
 	public static Tm1Request<Void> patch(ODataPath path, Object body) {
-		return new Tm1Request<>(HttpMethod.PATCH, path, ODataQuery.none(), Map.of(), Objects.requireNonNull(body, "body"), Response.NONE, Void.class);
+		return new Tm1Request<>(HttpMethod.PATCH, path, ODataQuery.none(), Map.of(), Objects.requireNonNull(body, "body"), Response.NONE, Void.class, null);
 	}
 
 	/** {@code DELETE}. */
 	public static Tm1Request<Void> delete(ODataPath path) {
-		return new Tm1Request<>(HttpMethod.DELETE, path, ODataQuery.none(), Map.of(), null, Response.NONE, Void.class);
+		return new Tm1Request<>(HttpMethod.DELETE, path, ODataQuery.none(), Map.of(), null, Response.NONE, Void.class, null);
 	}
 
 	/** A copy with these query options instead. */
 	public Tm1Request<T> withQuery(ODataQuery query) {
-		return new Tm1Request<>(method, path, query, headers, body, response, type);
+		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout);
 	}
 
 	/** A copy with a header added or replaced, such as {@code If-Match}. */
 	public Tm1Request<T> withHeader(String name, String value) {
 		Map<String, String> next = new LinkedHashMap<>(headers);
 		next.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(value, "value"));
-		return new Tm1Request<>(method, path, query, next, body, response, type);
+		return new Tm1Request<>(method, path, query, next, body, response, type, timeout);
+	}
+
+	/**
+	 * A copy that may go {@code timeout} without receiving any data before it fails, instead of
+	 * the session's request timeout. For calls TM1 only answers when the work is done, such as a
+	 * long process run.
+	 */
+	public Tm1Request<T> withTimeout(Duration timeout) {
+		Objects.requireNonNull(timeout, "timeout");
+		if (timeout.isNegative() || timeout.isZero()) {
+			throw new IllegalArgumentException("timeout must be positive: " + timeout);
+		}
+		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout);
 	}
 
 	/** A copy sent with {@code If-Match: etag}, failing with 412 if the entity has changed since. */
@@ -138,6 +155,11 @@ public final class Tm1Request<T> {
 
 	public Class<T> type() {
 		return type;
+	}
+
+	/** This request's own timeout, if it has one; otherwise the session's applies. */
+	public Optional<Duration> timeout() {
+		return Optional.ofNullable(timeout);
 	}
 
 	/**

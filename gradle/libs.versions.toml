@@ -13,6 +13,7 @@ freefair-lombok = "9.8.3"
 testcontainers = "2.0.5"
 # Keep reactor in step with what spring-webflux brings in
 reactor = "3.9.0"
+reactor-netty = "1.4.0"
 # Keep slf4j and micrometer in step with what spring-boot manages
 slf4j = "2.0.20"
 micrometer = "1.18.0"
@@ -20,6 +21,7 @@ micrometer = "1.18.0"
 [libraries]
 spring-web = { module = "org.springframework:spring-web", version.ref = "spring-framework" }
 spring-webflux = { module = "org.springframework:spring-webflux", version.ref = "spring-framework" }
+reactor-netty-http = { module = "io.projectreactor.netty:reactor-netty-http", version.ref = "reactor-netty" }
 reactor-test = { module = "io.projectreactor:reactor-test", version.ref = "reactor" }
 spring-test = { module = "org.springframework:spring-test", version.ref = "spring-framework" }
 jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson" }
