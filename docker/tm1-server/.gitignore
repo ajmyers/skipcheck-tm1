@@ -1,12 +1,12 @@
-# local database + log files
-data/
-logs/
-# your TM1 install, if you keep it inside this folder
-tm1_64/
-# machine-specific paths
-.env
-# never commit IBM software
+# Your TM1 server files (config, databases, logs)
+tm1-files/
+# Your IBM bundles: never commit IBM software
+bundles/*
+!bundles/README.md
 *.tar.gz
 *.zip
 *.bin
-config/
+# An installed TM1, if you keep it inside this folder
+tm1_64/
+# Machine-specific settings
+.env

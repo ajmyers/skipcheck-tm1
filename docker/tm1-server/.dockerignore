@@ -1,12 +1,10 @@
-# local database + log files
-data/
-logs/
-# your TM1 install, if you keep it inside this folder
+# Only the image's own files belong in the build context. Keep IBM software,
+# databases and local settings out (they'd be sent to Docker on every build).
+tm1-files/
+bundles/
 tm1_64/
-# machine-specific paths
+examples/
 .env
-# never commit IBM software
 *.tar.gz
 *.zip
 *.bin
-config/
