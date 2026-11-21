@@ -1,5 +1,7 @@
 package net.ajmyers.tm1.client.error;
 
+import lombok.Getter;
+
 /**
  * Something went wrong talking to TM1. The root of all the client's exceptions; unchecked.
  *
@@ -14,23 +16,18 @@ public abstract sealed class Tm1Exception extends RuntimeException permits Tm1Ap
 
 	private static final long serialVersionUID = 1L;
 
+	/** The request's HTTP method, or {@code null} if not known. */
+	@Getter
 	private final String method;
+
+	/** The request's URL, never including credentials, or {@code null} if not known. */
+	@Getter
 	private final String url;
 
 	protected Tm1Exception(String message, String method, String url, Throwable cause) {
 		super(message, cause);
 		this.method = method;
 		this.url = url;
-	}
-
-	/** The request's HTTP method, or {@code null} if not known. */
-	public String method() {
-		return method;
-	}
-
-	/** The request's URL, never including credentials, or {@code null} if not known. */
-	public String url() {
-		return url;
 	}
 
 	/** Whether sending the same request again could succeed, such as after a timeout or a 503. */

@@ -1,5 +1,7 @@
 package net.ajmyers.tm1.client.error;
 
+import lombok.Getter;
+
 /**
  * TM1's response couldn't be read: malformed or truncated JSON, an unexpected shape, or an
  * error reported in the middle of a response that started as a success. OData says a client
@@ -10,16 +12,13 @@ public final class Tm1ProtocolException extends Tm1Exception {
 
 	private static final long serialVersionUID = 1L;
 
+	/** The error TM1 reported in the response, if it reported one. */
+	@Getter
 	private final transient ODataError error;
 
 	public Tm1ProtocolException(String message, ODataError error, String method, String url, Throwable cause) {
 		super(message + describe(method, url), method, url, cause);
 		this.error = error;
-	}
-
-	/** The error TM1 reported in the response, if it reported one. */
-	public ODataError error() {
-		return error;
 	}
 
 	@Override

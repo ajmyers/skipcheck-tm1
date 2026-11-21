@@ -1,5 +1,7 @@
 package net.ajmyers.tm1.client.error;
 
+import lombok.Getter;
+
 /**
  * No complete response from TM1: the connection failed, was reset, or timed out.
  *
@@ -20,7 +22,10 @@ public final class Tm1TransportException extends Tm1Exception {
 		RESPONSE
 	}
 
+	/** How far the request got. */
+	@Getter
 	private final Phase phase;
+
 	private final boolean idempotent;
 
 	/**
@@ -32,11 +37,6 @@ public final class Tm1TransportException extends Tm1Exception {
 				+ (cause == null || cause.getMessage() == null ? "" : ": " + cause.getMessage()), method, url, cause);
 		this.phase = phase;
 		this.idempotent = idempotent;
-	}
-
-	/** How far the request got. */
-	public Phase phase() {
-		return phase;
 	}
 
 	/** Connect failures are always retryable; response failures only for idempotent requests. */
