@@ -1,0 +1,12 @@
+  ------------------------------------------------------------------
+   cognos-server: a local IBM Cognos Analytics server in Docker
+   Free and open source, made by Andrew Myers
+
+     Website  https://ajmyers.net
+     GitHub   https://github.com/ajmyers
+     Issues   https://github.com/ajmyers/tm1-pa-developer-tools/issues
+
+   Useful? A star helps: https://github.com/ajmyers/tm1-pa-developer-tools
+   Need help with TM1, or a commercial license? https://ajmyers.net
+   Not affiliated with IBM. You need your own licensed copy of Cognos.
+  ------------------------------------------------------------------

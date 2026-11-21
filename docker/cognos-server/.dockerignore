@@ -1,0 +1,8 @@
+# Only the image's own files belong in the build context. Keep IBM software and
+# local settings out (they'd be sent to Docker on every build).
+bundles/
+examples/
+.env
+*.zip
+*.tar.gz
+*.bin

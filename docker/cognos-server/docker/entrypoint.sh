@@ -1,0 +1,167 @@
+#!/bin/bash
+# cognos-server entrypoint. The container is a thin runtime shell around your own
+# IBM Cognos Analytics.
+#
+# Where Cognos comes from (first match wins):
+#   1. an install at /opt/ibm/cognos/analytics: a private image with Cognos built in,
+#      or a volume already holding an install made by `install`
+#   2. a repository zip, installed on first start: COGNOS_ZIP_URL (download),
+#      COGNOS_ZIP, or the newest casrv-*-linuxi38664h.zip mounted at /ibm. It's
+#      installed into /opt/ibm/cognos/analytics: mount a volume there to keep it.
+#   3. `install -` with a zip piped in on stdin (docker run -i)
+#
+# Cognos writes into its install while it runs (configuration, data, temp, logs
+# and Liberty's work area), so one install can't be shared read-only between
+# containers. Use a private image for parallel containers.
+#
+# Content store (PostgreSQL):
+#   COGNOS_CS_HOST unset  an embedded PostgreSQL in this container, its data in
+#                         /cognos/postgres (mount a volume there to keep it)
+#   COGNOS_CS_HOST set    an external PostgreSQL: COGNOS_CS_PORT, COGNOS_CS_NAME,
+#                         COGNOS_CS_SCHEMA, COGNOS_CS_USER, COGNOS_CS_PASSWORD
+#
+# Other environment:
+#   COGNOS_HOST           host name in the dispatcher URIs (default: the container's
+#                         hostname). Others on the Docker network reach Cognos by it.
+#   COGNOS_MAX_MEMORY     dispatcher JVM heap in MB (default 6144)
+#
+# Port 9300: the dispatcher, http://localhost:9300/bi/
+#
+# Commands:
+#   (none) | start   run Cognos
+#   install [SOURCE] install Cognos from a zip into /opt/ibm/cognos/analytics and
+#                    exit; SOURCE is a URL, a file, or - for stdin (see install --help)
+#   <anything else>  exec'd as-is (e.g. bash)
+set -euo pipefail
+
+banner() { cat /usr/local/lib/cognos-server/banner.txt 2>/dev/null || true; }
+
+case "${1:-start}" in
+  start) banner ;;
+  install) shift; banner; exec /usr/local/bin/cognos-install "$@" ;;
+  *) exec "$@" ;;
+esac
+
+COGNOS_HOME=${COGNOS_HOME:-/opt/ibm/cognos/analytics}
+STATE="$COGNOS_HOME/.cognos-server"
+
+log() { echo "[cognos-entrypoint] $*"; }
+die() { echo "[cognos-entrypoint] ERROR: $*" >&2; exit 2; }
+
+# ---- find or install Cognos -------------------------------------------------
+have_zip() {
+  [ -n "${COGNOS_ZIP_URL:-}" ] || [ -n "${COGNOS_ZIP:-}" ] && return 0
+  compgen -G "${COGNOS_ZIP_DIR:-/ibm}/casrv-*-linuxi38664h.zip" >/dev/null
+}
+if [ ! -x "$COGNOS_HOME/bin64/cogconfig.sh" ] && have_zip; then
+  if mountpoint -q "$COGNOS_HOME"; then
+    log "No Cognos install in the volume at $COGNOS_HOME - installing from the zip"
+  else
+    log "No Cognos install - installing from the zip into this container. It takes a"
+    log "few minutes and 10 GB, every time a new container starts: mount a volume at"
+    log "$COGNOS_HOME to keep the install, or build a private image (see the README)."
+  fi
+  /usr/local/bin/cognos-install --target "$COGNOS_HOME" || exit $?
+fi
+
+if [ ! -x "$COGNOS_HOME/bin64/cogconfig.sh" ]; then
+  cat >&2 <<MSG
+[cognos-entrypoint] ERROR: $COGNOS_HOME/bin64/cogconfig.sh not found.
+
+  cognos-server does not include IBM software. Give it your own licensed Cognos
+  Analytics (the casrv-<version>-linuxi38664h.zip repository) in one of these ways:
+
+    Mount the folder with the zip (installed on first start):
+      -v /path/to/ibm-downloads:/ibm:ro -v cognos:$COGNOS_HOME
+    Download the zip (e.g. a pre-signed S3 link; installed on first start):
+      -e COGNOS_ZIP_URL=https://... -v cognos:$COGNOS_HOME
+    Pipe the zip into a volume, then mount that volume:
+      cat casrv-*.zip | docker run -i --rm -v cognos:$COGNOS_HOME cognos-server install -
+    Build a private image with Cognos inside (see examples/private-image).
+
+  The volume at $COGNOS_HOME keeps the install (about 10 GB) between containers.
+MSG
+  exit 2
+fi
+[ -f "$STATE/cogstartup.xml" ] || die "$COGNOS_HOME wasn't installed by this image's install command (no $STATE/cogstartup.xml). Install it with: docker run ... cognos-server install"
+
+# ---- content store ------------------------------------------------------------
+EMBEDDED_PG=F
+if [ -z "${COGNOS_CS_HOST:-}" ]; then
+  EMBEDDED_PG=T
+  /usr/local/bin/cognos-postgres start
+  export COGNOS_CS_HOST=127.0.0.1 COGNOS_CS_PORT=5432
+else
+  port=${COGNOS_CS_PORT:-5432}
+  log "Using the PostgreSQL content store at $COGNOS_CS_HOST:$port (database ${COGNOS_CS_NAME:-cm})"
+  for i in $(seq 1 ${COGNOS_CS_WAIT:-60}); do
+    (exec 3<>"/dev/tcp/$COGNOS_CS_HOST/$port") 2>/dev/null && break
+    [ "$i" = "${COGNOS_CS_WAIT:-60}" ] && die "can't reach PostgreSQL at $COGNOS_CS_HOST:$port"
+    sleep 1
+  done
+fi
+
+stop_pg() { [ "$EMBEDDED_PG" = T ] && /usr/local/bin/cognos-postgres stop; true; }
+
+# ---- configuration --------------------------------------------------------------
+cd "$COGNOS_HOME"
+if [ -e configuration/cogstartup.lock ]; then
+  # Left behind when a container is killed while Cognos Configuration runs; with it
+  # there, cogconfig refuses to start ("locked by another instance").
+  log "Removing a stale configuration lock"
+  rm -f configuration/cogstartup.lock
+fi
+python3 /usr/local/lib/cognos-server/configure-cognos.py render "$STATE/cogstartup.xml" configuration/cogstartup.xml >/dev/null \
+  || { stop_pg; die "couldn't write configuration/cogstartup.xml"; }
+log "Configured: host ${COGNOS_HOST:-$(hostname)}, dispatcher heap ${COGNOS_MAX_MEMORY:-6144} MB"
+
+# ---- start ----------------------------------------------------------------------
+# Show the application server's errors (and its "ready" line) while it starts and runs.
+mkdir -p logs
+touch logs/p2pd_messages.log
+tail -n 0 -F logs/p2pd_messages.log 2>/dev/null | grep --line-buffered -E ' E |CWWKF0011I' &
+TAIL_PID=$!
+cleanup() { kill "$TAIL_PID" 2>/dev/null || true; }
+
+STARTING=
+abort_start() {
+  log "Stopping during startup"
+  [ -n "$STARTING" ] && kill "$STARTING" 2>/dev/null
+  ./bin64/cogconfig.sh -stop >/dev/null 2>&1 || true
+  stop_pg; cleanup; exit 0
+}
+trap abort_start INT TERM
+
+log "Starting Cognos (this takes a few minutes; healthy once http://localhost:9300/bi/ answers)"
+# cogconfig -s applies the configuration, starts the services and returns once
+# they're up. Run in the background, so a stop signal is handled straight away.
+./bin64/cogconfig.sh -s > logs/cognos-server-start.log 2>&1 &
+STARTING=$!
+rc=0; wait "$STARTING" || rc=$?
+STARTING=
+if [ "$rc" != 0 ]; then
+  log "Cognos Configuration failed (exit $rc):"
+  grep -E '^(ERROR|WARNING)' logs/cogconfig_response.csv >&2 || tail -20 logs/cogconfig.log >&2 || true
+  stop_pg; cleanup; exit 1
+fi
+PID=$(cat logs/wlp_cogbootstrap_service.pid 2>/dev/null || true)
+[ -n "$PID" ] && kill -0 "$PID" 2>/dev/null || { log "Cognos didn't start (no bootstrap service running)"; stop_pg; cleanup; exit 1; }
+log "Cognos running (bootstrap service PID $PID)"
+
+running() { kill -0 "$PID" 2>/dev/null; }
+shutdown() {
+  log "Stopping Cognos"
+  ./bin64/cogconfig.sh -stop >/dev/null 2>&1 || kill -TERM "$PID" 2>/dev/null || true
+  while running; do sleep 1; done
+  stop_pg; cleanup
+  log "Stopped."
+  exit 0
+}
+trap shutdown INT TERM
+
+# Sleep in the background + wait, so the trap fires immediately on a signal.
+while running; do sleep 2 & wait $! || true; done
+log "Cognos exited unexpectedly - last lines of cognosserver.log:"
+tail -30 logs/cognosserver.log || true
+stop_pg; cleanup
+exit 1

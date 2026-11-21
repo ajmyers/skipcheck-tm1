@@ -1,0 +1,8 @@
+# Your IBM downloads: never commit IBM software
+bundles/*
+!bundles/README.md
+*.zip
+*.tar.gz
+*.bin
+# Machine-specific settings
+.env
