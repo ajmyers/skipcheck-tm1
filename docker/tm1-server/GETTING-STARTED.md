@@ -4,12 +4,51 @@ This guide takes you from nothing to a running IBM Planning Analytics (TM1) serv
 on your own computer, on **Mac, Windows or Linux**. It takes about 15 minutes, most
 of it installing Docker.
 
+> **Prefer a page that shows only your steps?** The interactive setup guide at
+> <https://ajmyers.net/tm1/> asks the same questions and shows just the commands for your
+> answers, including the setup script one-liner with your choices filled in.
+
 You make three choices along the way. Pick the option that fits; you can change
 any of them later:
 
 - [**Step 2: Published image or the source code?**](#step-2-get-tm1-server) Most people use the published image.
 - [**Step 3: Where does TM1 come from?**](#step-3-where-does-tm1-come-from) An IBM download file, cloud storage, an existing install, or a ready-made image.
 - [**Step 4: Where should your files live?**](#step-4-where-should-your-files-live) A folder on your computer, an existing server's database, somewhere else, or nowhere (throwaway).
+
+## The fast way: the setup script
+
+Once Docker is installed ([Step 1](#step-1-install-docker)), one command does Steps 2
+to 5 for you. It asks the same questions as this guide, checks your computer as it
+goes (Docker, Rosetta on Apple Silicon, WSL 2 on Windows, free ports, the right
+bundle), starts TM1 and waits until it's ready:
+
+```sh
+# Mac / Linux (Terminal)
+curl -fsSL https://ajmyers.net/tm1/setup.sh | sh
+```
+```powershell
+# Windows (PowerShell)
+irm https://ajmyers.net/tm1/setup.ps1 | iex
+```
+
+To skip the questions, give the answers as options. For example, to use the bundle in
+your Downloads folder and also start the SData sample:
+
+```sh
+# Mac / Linux
+curl -fsSL https://ajmyers.net/tm1/setup.sh | sh -s -- --bundle ~/Downloads/tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz --samples
+```
+```powershell
+# Windows
+& ([scriptblock]::Create((irm https://ajmyers.net/tm1/setup.ps1))) -Bundle "$HOME\Downloads\tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz" -Samples
+```
+
+Add `--help` (`-Help` on Windows) to see every option, or let
+<https://ajmyers.net/tm1/> build the command for your choices. Without a terminal (in CI, or with
+`--yes`) it never asks: a missing answer is an error naming the option to add. Running
+it again is safe: it keeps your settings and the installed TM1, and says what it reused.
+
+The rest of this guide does the same steps by hand, and explains each one.
 
 > **Before you start:** this project contains **no IBM software**. You need your
 > own licensed copy of IBM Planning Analytics TM1 Server, and you're responsible

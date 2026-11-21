@@ -13,6 +13,11 @@
 
 FROM --platform=linux/amd64 ubuntu:24.04
 
+LABEL org.opencontainers.image.authors="Andrew Myers (https://ajmyers.net)" \
+      org.opencontainers.image.vendor="Andrew Myers" \
+      org.opencontainers.image.description="A local IBM Planning Analytics (TM1) Server runtime for development and tests. Contains no IBM software. Not affiliated with IBM." \
+      org.opencontainers.image.documentation="https://github.com/ajmyers/tm1-pa-developer-tools/blob/master/docker/tm1-server/GETTING-STARTED.md"
+
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       libcurl4t64 ca-certificates tini procps curl tzdata locales unzip python3 \
@@ -31,7 +36,7 @@ COPY docker/entrypoint.sh /usr/local/bin/tm1-entrypoint
 COPY docker/install-tm1.sh /usr/local/bin/tm1-install
 COPY docker/unpack-tm1.py /usr/local/lib/tm1-server/unpack-tm1.py
 COPY docker/healthcheck.sh /usr/local/bin/tm1-healthcheck
-COPY docker/tm1s-log.properties docker/tm1s.cfg.default /usr/local/lib/tm1-server/
+COPY docker/tm1s-log.properties docker/tm1s.cfg.default docker/banner.txt /usr/local/lib/tm1-server/
 RUN chmod 755 /usr/local/bin/tm1-*
 
 # Deliberately no VOLUME: a VOLUME instruction makes Docker create an anonymous
