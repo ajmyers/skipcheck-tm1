@@ -16,5 +16,14 @@ dependencies {
 	api(libs.spring.boot.starter)
 	annotationProcessor(libs.spring.boot.configuration.processor)
 
+	// Boot's connector builder, for SSL bundles and connect timeouts
+	implementation(libs.spring.boot.http.client)
+	// Pool metrics, when the application uses Micrometer
+	compileOnly(libs.micrometer.core)
+
 	testImplementation(libs.spring.boot.test)
+	testImplementation(libs.spring.boot.webclient)
+	testImplementation(libs.micrometer.core)
+	// ArchitectureTest: rules over the compiled starter
+	testImplementation(libs.archunit)
 }
