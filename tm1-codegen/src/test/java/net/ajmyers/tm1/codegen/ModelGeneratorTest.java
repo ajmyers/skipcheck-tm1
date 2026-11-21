@@ -93,8 +93,8 @@ class ModelGeneratorTest {
 			.contains("@JsonProperty(\"Kind\") @Nullable CubeKind kind")
 			.contains("@JsonProperty(\"Sizes\") @Nullable List<Double> sizes")
 			.contains("@JsonProperty(\"Box\") @Nullable Box box")
-			.as("a hierarchy type, until sealed hierarchies are generated")
-			.contains("@JsonProperty(\"Views\") @Nullable List<JsonNode> views")
+			.as("a hierarchy, by its interface")
+			.contains("@JsonProperty(\"Views\") @Nullable List<View> views")
 			.as("IBM's description, escaped for Javadoc")
 			.contains("@param name The cube's name &amp; key.")
 			.doesNotContain("Content");
@@ -105,8 +105,24 @@ class ModelGeneratorTest {
 	}
 
 	@Test
-	void leavesHierarchiesForLater() {
-		assertThat(sample().generate()).extracting(f -> f.typeSpec().name()).containsExactly("CubeKind", "Box", "Cube");
+	void generatesASealedInterfacePerHierarchyReadByOdataType() {
+		assertThat(sample().generate()).extracting(f -> f.typeSpec().name())
+			.containsExactly("CubeKind", "Box", "Cube", "NativeView", "View");
+		String view = source(sample(), "View");
+		assertThat(view).contains("public sealed interface View permits NativeView, View.Unknown")
+			.contains(
+					"@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = \"@odata.type\", defaultImpl = View.Unknown.class)")
+			.contains(
+					"@JsonSubTypes.Type(value = NativeView.class, name = \"#ibm.tm1.api.v1.NativeView\", names = \"#tm1.NativeView\")")
+			.contains("@Nullable String name();")
+			.as("an abstract root's fallback is never sent, so it writes no type")
+			.contains("@JsonTypeInfo(use = JsonTypeInfo.Id.NONE) record Unknown(");
+		assertThat(source(sample(), "NativeView")).contains("public record NativeView(")
+			.contains("implements View")
+			.as("asked for by name, it reads without @odata.type")
+			.contains("defaultImpl = NativeView.class")
+			.contains("@JsonTypeName(\"#ibm.tm1.api.v1.NativeView\")")
+			.contains("@JsonProperty(\"Name\") @Nullable String name");
 	}
 
 	@Test
@@ -121,7 +137,7 @@ class ModelGeneratorTest {
 		try (Stream<Path> walk = Files.walk(out)) {
 			sources = walk.filter(p -> p.toString().endsWith(".java")).toList();
 		}
-		assertThat(sources).as("31 enums, 99 records, package-info").hasSize(131);
+		assertThat(sources).as("31 enums, 122 records, 7 hierarchies, package-info").hasSize(161);
 
 		JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
 		DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
