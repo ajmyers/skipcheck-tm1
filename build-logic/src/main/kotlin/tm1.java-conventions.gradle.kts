@@ -75,6 +75,9 @@ tasks.withType<Test>().configureEach {
 	for (name in listOf(
 		"TM1_PRIVATE_IMAGE", "TM1_HOME_DIR", "TM1_INSTALL_VOLUME", "TM1_BUNDLE_DIR",
 		"TM1_BUNDLE", "TM1_BUNDLE_URL", "TM1_BUNDLE_SHA256", "TM1_SERVER_IMAGE",
+		// ...and TM1 Web, for tests that need it too
+		"TM1_WEB_PRIVATE_IMAGE", "TM1_WEB_HOME_DIR", "TM1_WEB_INSTALL_VOLUME", "TM1_WEB_BUNDLE_DIR",
+		"TM1_WEB_BUNDLE", "TM1_WEB_BUNDLE_URL", "TM1_WEB_BUNDLE_SHA256", "TM1_WEB_IMAGE",
 		// Opt-in switches for tests that write files (see tm1-client's metadata tests)
 		"TM1_UPDATE_METADATA_SNAPSHOT",
 	)) {
