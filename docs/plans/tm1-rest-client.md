@@ -45,7 +45,7 @@ Local `tm1-server` (`ghcr.io/ajmyers/tm1-server:edge`), **TM1 11.8.03500.6**, `$
 | Actions | 91 (30 unbound action imports, 61 bound) |
 | Functions | 14 (11 unbound function imports, 3 bound) |
 | Navigation properties | 90 |
-| Entity sets / singletons | 37 / 6 |
+| Entity sets / singletons | 27 / 6 |
 | `Core.Revisions` records | 281: 261 *Added* and 20 *Deprecated*, from 10.2.2.0 to 11.8.35 |
 
 Full inventory in [Appendix A](#appendix-a-endpoint-inventory-tm1-11803500--schema-11835).
@@ -340,12 +340,16 @@ Three mechanisms, from most to least preferred:
    version. `Tm1Capabilities` answers "does this server define action `tm1.Cube/Reserve`,
    property `Element.X`, or entity set `GitPlans`?" Before a request, a service method checks
    the capability of the operation it calls. If it's missing, the method fails fast with
-   `Tm1UnsupportedOperationException` ("`Cube.Reserve` needs a server that defines it; added in
-   11.8.34 per metadata; connected server is 11.8.03400"), without calling the server. This
-   needs no version tables, and works for any TM1 we've never seen.
+   `Tm1UnsupportedOperationException` ("`Cube.Reserve` isn't defined by this server: it was added
+   in schema 11.8.34, and the server at … reports schema 11.8.28"), without calling the server.
+   Both versions are schema versions: one from the `Core.Revisions` annotation, the other from
+   the server's own `Core.SchemaVersion`. So the message needs no mapping to server build
+   numbers. This needs no version tables, and works for any TM1 we've never seen.
 2. **A version range, when behavior changes but the metadata doesn't.** `Tm1Version` is shared
-   with `tm1-testcontainers` (#14). It's parsed from `Server.ProductVersion` (`11.8.03500.6`)
-   and mapped to the schema version (`11.8.35`) and the PA release (`2.1.x`). Code branches only
+   with `tm1-testcontainers` (#14). It's parsed from `Server.ProductVersion` (`11.8.03500.6`).
+   It deliberately isn't mapped to the schema version (`11.8.35`) or the PA release (`2.1.x`):
+   one data point suggests the schema version is the build number divided by 100, but we won't
+   rely on that until more versions confirm it. Code branches only
    where a known difference exists, e.g. `if (version.atLeast(V11_8_23)) … else …`. Per R3,
    **we add none of these up front**. We add them when a test on another version fails.
 3. **Dialects, for structural differences.** `Tm1Dialect` covers how to reach and authenticate
@@ -607,7 +611,7 @@ of it is assumed for other versions.
 ### 16.3 Cellsets and data (§7)
 
 - **Paging (§7)** uses inline `Cells($top=N)` on `ExecuteMDX`, then `tm1.GetPartition`. Pages
-  are whole rows (size ≥ column count), with bounded parallelism (about 3). Row and column come
+  are whole rows (a multiple of the column count), with bounded parallelism (about 3). Row and column come
   from `Ordinal / cols` and `Ordinal % cols`. TM1 refuses a partition that starts past the end,
   so offsets are clamped.
 - **Always delete cellsets.** They hold server memory for the life of the session.
