@@ -41,7 +41,12 @@ tasks.withType<JavaCompile>().configureEach {
 // Java layout: Spring Java Format (tabs, Spring's style). `./gradlew format` fixes it; checkFormat
 // is part of check, so unformatted code fails the build. -PformatFiles=a.java,b.java (paths from
 // the repository root) narrows format to those files; the pre-commit hook uses this.
-val javaSources = the<SourceSetContainer>().map { it.allJava }
+// Hand-written sources only: generated ones (under build/) are the generator's business
+val buildDirectory = layout.buildDirectory.get().asFile
+val javaSourceDirs = provider {
+	the<SourceSetContainer>().flatMap { it.allJava.srcDirs }.filter { !it.startsWith(buildDirectory) }
+}
+val javaSources = files(javaSourceDirs).asFileTree.matching { include("**/*.java") }
 val formatOnly = providers.gradleProperty("formatFiles").orNull?.split(",")?.filter { it.isNotBlank() }?.map { rootDir.resolve(it) }
 val format by tasks.registering(FormatJava::class) {
 	group = "formatting"
@@ -50,7 +55,7 @@ val format by tasks.registering(FormatJava::class) {
 		source.from(javaSources)
 	}
 	else {
-		val dirs = javaSources.flatMap { it.srcDirs }
+		val dirs = javaSourceDirs.get()
 		source.from(formatOnly.filter { f -> f.isFile && dirs.any { f.startsWith(it) } })
 	}
 }
