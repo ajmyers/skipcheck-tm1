@@ -48,17 +48,20 @@ image, set `TM1_SERVER_IMAGE=ghcr.io/ajmyers/tm1-server:latest` in `.env` and ru
 `docker compose pull`. Then `cp .env.example .env` and set `TM1_HOME_DIR`:
 
 ```sh
-docker compose up -d                      # empty database "tm1"   -> https://localhost:8010
-docker compose --profile samples up -d    # adds IBM's SData sample -> https://localhost:8011
+docker compose up -d                      # Admin Server + empty database "tm1" -> https://localhost:8010
+docker compose --profile samples up -d    # adds IBM's SData sample             -> https://localhost:8011
 docker compose logs -f tm1                # server message log
 docker compose stop                       # clean shutdown (TM1 saves on SIGINT)
 ```
 
-| Instance | REST API                       | Login                 |
-|----------|--------------------------------|-----------------------|
-| `tm1`    | https://localhost:8010/api/v1/ | `admin`, blank password |
-| `SData`  | https://localhost:8011/api/v1/ | `admin` / `apple`     |
-| Admin    | http://localhost:5895/api/v1/Servers, https://localhost:5898 | – |
+| Container | What | Address | Login |
+|-----------|------|---------|-------|
+| `tm1-admin` | Admin Server, shared by every TM1 server | http://localhost:5895/api/v1/Servers, https://localhost:5898 | – |
+| `tm1` | TM1 server, empty database | https://localhost:8010/api/v1/ | `admin`, blank password |
+| `tm1-sdata` | TM1 server, IBM's SData sample | https://localhost:8011/api/v1/ | `admin` / `apple` |
+
+Like a real deployment, one Admin Server serves every TM1 server: the servers
+register with `tm1-admin` through `TM1_ADMIN_HOST` (see [Roles](#roles)).
 
 The REST API uses IBM's built-in self-signed certificate, so either turn off
 certificate verification in your client or set `TM1_USE_SSL=F` to use plain http.
@@ -107,7 +110,7 @@ container only changes the settings it needs to run:
 | `DataBaseDirectory` | `/tm1/data` | Must point to the mounted database |
 | `LoggingDirectory` | `/tm1/logs` | Must point to the mounted logs folder |
 | `RunningInBackground` | `T` | The server can't wait for console input in a container |
-| `AdminHost` | `localhost` | Only when `TM1_ADMIN_SERVER=T` (the default) |
+| `AdminHost` | `TM1_ADMIN_HOST`, or `localhost` | The Admin Server to register with: a separate one, or the embedded one |
 
 Each change is logged with its old value, and the file is only rewritten when
 something actually changes. CRLF line endings are kept. If you mount the folder
@@ -124,14 +127,34 @@ Environment variables:
 | `TM1_USE_SSL` | `T` | `UseSSL` |
 | `TM1_CFG_<Param>` | | Any `tm1s.cfg` parameter, e.g. `TM1_CFG_MaximumCubeLoadThreads=4` |
 | `TM1_SEED` | `empty` | `empty`, `sdata` or `24retail`. Objects to copy into an **empty** `/tm1/data`, taken from the samples in your install. |
-| `TM1_ADMIN_SERVER` | `T` | Also run `tm1admsrv` in the container |
+| `TM1_ADMIN_HOST` | | Host of a separate Admin Server (e.g. a container running `admin`). Sets `AdminHost` and turns the embedded Admin Server off. |
+| `TM1_ADMIN_SERVER` | `T`, or `F` when `TM1_ADMIN_HOST` is set | Run an embedded Admin Server in this container |
 
 The defaults only apply when the container creates `tm1s.cfg`. For an existing
 file, these variables change it only if you set them. The compose file sets the
 server name and ports so they match its port mappings.
 
-Commands: `start` (default), `install` (see above), or anything else, which is
-run as-is (e.g. `docker run --rm -it ... tm1-server bash`).
+## Roles
+
+One image runs either piece of a TM1 deployment, chosen by the command:
+
+| Command | Runs | Healthy when |
+|---------|------|--------------|
+| `start` (default) | One TM1 server. Also an embedded Admin Server, unless `TM1_ADMIN_HOST` points at a separate one. | The TM1 REST API answers (200 or 401) |
+| `admin` | Only the Admin Server, on ports 5895/5898 (REST) and 5495/5498 (legacy clients) | `GET /api/v1/Servers` on 5895 returns 200 |
+| `install` | The one-off bundle unpacker ([above](#getting-a-tm1_64-directory)) | – |
+
+Anything else is run as-is (e.g. `docker run --rm -it ... tm1-server bash`).
+
+**One container, quick start:** `start` with nothing else runs a TM1 server and
+its own Admin Server together.
+
+**Several TM1 servers:** run one container with `admin`, and give each TM1
+server `TM1_ADMIN_HOST=<that container's name>`, all on the same Docker network.
+This is what `compose.yaml` does. TM1 servers register under their in-network
+names (e.g. `https://tm1:8010`), so the addresses the Admin Server lists work
+from other containers on the network (TM1 Web, PAW), not from your machine.
+From your machine, use each server's published port.
 
 ## Apple Silicon
 
@@ -146,7 +169,11 @@ server is ready in a few seconds. You need to:
 
 - Only TM1 Server and Admin Server are included. TM1 Web, PAW and Cognos (CAM)
   security are not. Security mode is 1 (native TM1 users).
-- `tm1s.exe` daemonizes itself, so the entrypoint tracks the daemon's PID. On
-  `docker stop`, it sends SIGINT, which makes TM1 save data and shut down cleanly.
+- `tm1s.exe` and `tm1admsrv.exe` both daemonize themselves, so the entrypoint
+  tracks the daemons' PIDs. On `docker stop`, it sends TM1 SIGINT, which makes it
+  save data and shut down cleanly.
+- With a separate Admin Server, start it first (compose does, via `depends_on`).
+  Whether TM1 servers re-register after the Admin Server restarts, or when it
+  starts after them, hasn't been tested yet.
 - The Admin Server writes `tm1admsrv.log` into `bin64/` of the install. If the
   install is mounted read-only, that log isn't written.

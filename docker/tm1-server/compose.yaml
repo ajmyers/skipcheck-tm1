@@ -6,9 +6,12 @@
 #   ./data/<name>   -> /tm1/data                database
 #   ./logs/<name>   -> /tm1/logs                logs
 #
+# One Admin Server (tm1-admin) serves every TM1 server, as in a real deployment;
+# the servers register with it through TM1_ADMIN_HOST.
+#
 #   cp .env.example .env        # set TM1_HOME_DIR
-#   docker compose up -d                       # empty db "tm1"  -> https://localhost:8010
-#   docker compose --profile samples up -d     # + IBM "SData"   -> https://localhost:8011
+#   docker compose up -d                       # Admin Server + empty db "tm1" -> https://localhost:8010
+#   docker compose --profile samples up -d     # + IBM "SData"                 -> https://localhost:8011
 
 x-tm1: &tm1
   image: ${TM1_SERVER_IMAGE:-tm1-server:local}
@@ -21,20 +24,34 @@ x-tm1: &tm1
 x-tm1-home: &tm1-home "${TM1_HOME_DIR:?Set TM1_HOME_DIR in .env to your TM1 install directory (the one containing bin64/)}:/opt/ibm/cognos/tm1_64"
 
 services:
+  tm1-admin:
+    <<: *tm1
+    command: ["admin"]
+    container_name: tm1-admin
+    hostname: tm1-admin
+    ports:
+      - "5895:5895"    # Admin Server REST (http):  /api/v1/Servers
+      - "5898:5898"    # Admin Server REST (https)
+      - "5495:5495"    # Admin Server, legacy clients
+      - "5498:5498"    # Admin Server, legacy clients (SSL)
+    volumes:
+      - *tm1-home
+      - ./logs/admin:/tm1/logs
+
   tm1:
     <<: *tm1
     container_name: tm1
     hostname: tm1
+    depends_on: [tm1-admin]
     environment:
       TM1_SERVER_NAME: tm1
       TM1_SEED: empty
       TM1_HTTP_PORT: "8010"
       TM1_USE_SSL: ${TM1_USE_SSL:-T}
+      TM1_ADMIN_HOST: tm1-admin
     ports:
       - "8010:8010"    # REST API
       - "12345:12345"  # legacy TM1 API (Architect/Perspectives)
-      - "5895:5895"    # Admin server REST (http)
-      - "5898:5898"    # Admin server REST (https)
     volumes:
       - *tm1-home
       - ./config/tm1:/tm1/config
@@ -46,13 +63,14 @@ services:
     profiles: ["samples"]
     container_name: tm1-sdata
     hostname: tm1-sdata
+    depends_on: [tm1-admin]
     environment:
       TM1_SERVER_NAME: SData
       TM1_SEED: sdata
       TM1_HTTP_PORT: "8011"
       TM1_PORT: "12346"
       TM1_USE_SSL: ${TM1_USE_SSL:-T}
-      TM1_ADMIN_SERVER: "F"
+      TM1_ADMIN_HOST: tm1-admin
     ports:
       - "8011:8011"
       - "12346:12346"

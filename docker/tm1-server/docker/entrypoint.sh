@@ -9,7 +9,10 @@
 # that runs (and the one TM1 itself updates, e.g. via the REST StaticConfiguration API).
 #
 # Commands:
-#   (none) | start   start the Admin Server (optional) and one TM1 server instance
+#   (none) | start   run one TM1 server (plus an embedded Admin Server unless
+#                    TM1_ADMIN_HOST points at a separate one)
+#   admin            run only the TM1 Admin Server, for TM1 servers in other
+#                    containers to register with (they set TM1_ADMIN_HOST)
 #   install          one-off helper: unpack an IBM bundle mounted at /ibm into
 #                    /opt/ibm/cognos/tm1_64 (see README) and exit
 #   <anything else>  exec'd as-is (e.g. bash)
@@ -22,11 +25,15 @@
 #   TM1_USE_SSL         UseSSL, T/F                            (default: T)
 #   TM1_CFG_<Param>     Any tm1s.cfg parameter, e.g. TM1_CFG_EnableTIDebugging=T
 #   TM1_SEED            empty | sdata | 24retail - objects to put in an EMPTY /tm1/data
-#   TM1_ADMIN_SERVER    T/F - run tm1admsrv in this container  (default: T)
+#   TM1_ADMIN_HOST      host of a separate Admin Server (e.g. a container running
+#                       `admin`); sets AdminHost and turns the embedded one off
+#   TM1_ADMIN_SERVER    T/F - run an embedded Admin Server  (default: T, or F when
+#                       TM1_ADMIN_HOST is set)
 set -euo pipefail
 
 case "${1:-start}" in
-  start) ;;
+  start|server) ROLE="server" ;;
+  admin) ROLE="admin" ;;
   install) shift; exec /usr/local/bin/tm1-install "$@" ;;
   *) exec "$@" ;;
 esac
@@ -42,9 +49,22 @@ DEFAULTS=/usr/local/lib/tm1-server
 log() { echo "[tm1-entrypoint] $*"; }
 die() { echo "[tm1-entrypoint] ERROR: $*" >&2; exit 2; }
 
-if [ ! -x "$BIN/tm1s.exe" ]; then
+# tm1s.exe and tm1admsrv.exe both daemonize: the launcher exits 0 and the real
+# process keeps running. Wait for the daemon and print its PID.
+daemon_pid() {  # daemon_pid <pgrep -f pattern>
+  local pid
+  for _ in $(seq 1 30); do
+    pid=$(pgrep -f "$1" | head -1 || true)
+    if [ -n "$pid" ]; then echo "$pid"; return 0; fi
+    sleep 1
+  done
+  return 1
+}
+
+EXE=tm1s.exe; [ "$ROLE" = admin ] && EXE=tm1admsrv.exe
+if [ ! -x "$BIN/$EXE" ]; then
   cat >&2 <<MSG
-[tm1-entrypoint] ERROR: $BIN/tm1s.exe not found.
+[tm1-entrypoint] ERROR: $BIN/$EXE not found.
 
   tm1-server does not include IBM software. Mount your own licensed TM1 Server
   install directory (the one containing bin64/) at $TM1_HOME, e.g.
@@ -58,6 +78,30 @@ if [ ! -x "$BIN/tm1s.exe" ]; then
 MSG
   exit 2
 fi
+echo "$ROLE" > /tmp/tm1-role   # read by the healthcheck
+
+# ---- admin role: only the Admin Server -------------------------------------
+if [ "$ROLE" = admin ]; then
+  mkdir -p "$LOGS"
+  cd "$BIN"   # config.tm1admsrv.json and ./ssl are resolved relative to bin64
+  log "Starting TM1 Admin Server (REST on 5895 http / 5898 https)"
+  ./tm1admsrv.exe
+  ADMIN_PID=$(daemon_pid '^\./tm1admsrv\.exe$') || { log "TM1 Admin Server did not start"; exit 1; }
+  log "TM1 Admin Server running as PID $ADMIN_PID"
+  stop_admin() {
+    log "Stopping TM1 Admin Server"
+    kill -TERM "$ADMIN_PID" 2>/dev/null || true
+    while kill -0 "$ADMIN_PID" 2>/dev/null; do sleep 1; done
+    log "Stopped."
+    exit 0
+  }
+  trap stop_admin INT TERM
+  # Sleep in the background + wait, so the trap fires immediately on a signal.
+  while kill -0 "$ADMIN_PID" 2>/dev/null; do sleep 2 & wait $! || true; done
+  log "TM1 Admin Server exited unexpectedly"
+  exit 1
+fi
+
 mkdir -p "$CONF" "$DATA" "$LOGS"
 
 # ---- seed objects into an empty database -----------------------------------
@@ -127,7 +171,13 @@ done < <(env)
 set_cfg DataBaseDirectory   "$DATA"  "container path"
 set_cfg LoggingDirectory    "$LOGS"  "container path"
 set_cfg RunningInBackground "T"      "required in a container"
-[ "${TM1_ADMIN_SERVER:-T}" = "T" ] && set_cfg AdminHost "localhost" "admin server runs in this container"
+# Admin Server: a separate one (TM1_ADMIN_HOST), or embedded in this container.
+EMBED_ADMIN=${TM1_ADMIN_SERVER:-$([ -n "${TM1_ADMIN_HOST:-}" ] && echo F || echo T)}
+if [ -n "${TM1_ADMIN_HOST:-}" ]; then
+  set_cfg AdminHost "$TM1_ADMIN_HOST" "TM1_ADMIN_HOST"
+elif [ "$EMBED_ADMIN" = "T" ]; then
+  set_cfg AdminHost "localhost" "admin server runs in this container"
+fi
 
 if [ ! -f "$CFG" ] || ! cmp -s "$WORK" "$CFG"; then
   if [ -f "$CFG" ] && [ ! -w "$CFG" ]; then
@@ -150,11 +200,11 @@ cd "$BIN"
 
 # ---- admin server -----------------------------------------------------------
 ADMIN_PID=
-if [ "${TM1_ADMIN_SERVER:-T}" = "T" ]; then
+if [ "$EMBED_ADMIN" = "T" ]; then
   log "Starting TM1 Admin Server"
   # Writes tm1admsrv.log into bin64/ when the install is writable (skipped if mounted :ro).
-  ./tm1admsrv.exe &
-  ADMIN_PID=$!
+  ./tm1admsrv.exe
+  ADMIN_PID=$(daemon_pid '^\./tm1admsrv\.exe$') || log "WARNING: embedded Admin Server did not start"
 fi
 
 # ---- tm1 server -------------------------------------------------------------
@@ -166,12 +216,7 @@ TAIL_PID=$!
 log "Starting TM1 Server '$SERVER_NAME' (REST on ${HTTP_PORT:-none}, SSL=${USE_SSL:-T})"
 # tm1s.exe daemonizes: the launcher exits 0 and the real server keeps running.
 ./tm1s.exe -w -z"$CONF"
-TM1_PID=
-for _ in $(seq 1 30); do
-  TM1_PID=$(pgrep -f "^\./tm1s\.exe -w -z$CONF\$" | head -1 || true)
-  [ -n "$TM1_PID" ] && break
-  sleep 1
-done
+TM1_PID=$(daemon_pid "^\./tm1s\.exe -w -z$CONF\$" || true)
 if [ -z "$TM1_PID" ]; then
   log "TM1 Server did not start - last lines of tm1server.log:"
   tail -50 "$LOGS/tm1server.log" || true

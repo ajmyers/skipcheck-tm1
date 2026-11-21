@@ -38,7 +38,15 @@ set -e
 grep -q "does not include IBM software" <<<"$out" || fail "missing help text: $out"
 pass "start without TM1 install fails with help text"
 
-# 5. install helper without a bundle: exits 2 with a clear error
+# 5. Admin role without a TM1 install: same, naming the Admin Server binary
+set +e
+out=$(run "$image" admin 2>&1); rc=$?
+set -e
+[ "$rc" -eq 2 ] || fail "expected exit 2 for admin without a TM1 install, got $rc: $out"
+grep -q "tm1admsrv.exe not found" <<<"$out" || fail "missing admin help text: $out"
+pass "admin without TM1 install fails with help text"
+
+# 6. install helper without a bundle: exits 2 with a clear error
 set +e
 out=$(run -v "$(mktemp -d):/ibm:ro" "$image" install 2>&1); rc=$?
 set -e
