@@ -21,7 +21,8 @@ import reactor.core.publisher.Mono;
  * {@code METHOD path?query} with canned responses, and records every request.
  *
  * <p>Unless told otherwise, a login ({@code GET ActiveSession?$select=ID}) succeeds with cookie
- * {@code c1} and session ID 1, the next with {@code c2} and 2, and so on, and {@code tm1.Close}
+ * {@code c1} and session ID 1, the next with {@code c2} and 2, and so on (a login that sends a
+ * cookie keeps it, as with TM1), and {@code tm1.Close}
  * answers 204.
  */
 final class FakeTm1 implements ExchangeFunction {
@@ -40,7 +41,9 @@ final class FakeTm1 implements ExchangeFunction {
 			synchronized (this) {
 				n = ++logins;
 			}
-			return Mono.just(json(200, "{\"ID\":" + n + "}", "TM1SessionId=c" + n + "; Path=/api/; HttpOnly"));
+			// Like TM1: a login that sends a cookie logs that session in, and sets no new cookie
+			return Mono.just(cookie(request) != null ? json(200, "{\"ID\":" + n + "}")
+					: json(200, "{\"ID\":" + n + "}", "TM1SessionId=c" + n + "; Path=/api/; HttpOnly"));
 		});
 		on(CLOSE, request -> Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT).build()));
 	}

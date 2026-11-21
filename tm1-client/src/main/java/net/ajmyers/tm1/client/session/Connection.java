@@ -138,6 +138,23 @@ final class Connection {
 		return attempt;
 	}
 
+	/**
+	 * The login to replay on after {@code expired} saw a 401. The first request to report it
+	 * starts a new login; requests that report the same expired login later share that one.
+	 * TM1 opened a session along with the 401, so the new login logs that one in (by sending its
+	 * cookie) rather than opening another.
+	 */
+	private synchronized Attempt relogin(Attempt expired, String seedCookie) {
+		if (closed) {
+			throw new Tm1SessionClosedException(root);
+		}
+		if (attempt == expired || attempt == null) {
+			log.info("TM1 session at {} expired or was closed on the server; logging in again", root);
+			attempt = new Attempt(seedCookie, "relogin");
+		}
+		return attempt;
+	}
+
 	/** Forgets a login that failed, so the next request tries again. */
 	private synchronized void forget(Attempt failed) {
 		if (attempt == failed) {
@@ -165,11 +182,21 @@ final class Connection {
 		});
 	}
 
-	/** Sends {@code request} on the logged-in session, and hands a successful response to {@code onSuccess}. */
+	/**
+	 * Sends {@code request} on the logged-in session, and hands a successful response to
+	 * {@code onSuccess}.
+	 *
+	 * <p>A 401 means the session expired or was killed. Then the session logs in again, once for
+	 * all the requests that saw it expire, and the request is replayed <b>once</b>, POSTs included:
+	 * TM1 refuses a request on a dead session before running it, so the replay can't run it twice
+	 * ({@code Tm1SessionBehaviorTest} pins this). A 401 on the replay is final, so a server that
+	 * keeps refusing can't cause a loop of logins.
+	 */
 	private <T, R> Flux<R> exchange(Tm1Request<T> request, URI uri, Function<ClientResponse, Flux<R>> onSuccess) {
 		return Flux.defer(() -> {
 			Attempt used = current();
-			return used.login.flatMapMany(session -> send(request, uri, session, onSuccess));
+			return used.login.flatMapMany(session -> send(request, uri, session, onSuccess))
+				.onErrorResume(Expired.class, expired -> relogin(used, expired.cookie).login.flatMapMany(session -> send(request, uri, session, onSuccess)));
 		}).onErrorMap(Expired.class, expired -> unauthenticated(request, uri));
 	}
 

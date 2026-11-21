@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,6 +76,33 @@ class Tm1SessionTm1Test {
 		int before = raw.sessionCount(admin);
 		Tm1Session session = session();
 		Mono.when(session.execute(SERVER).onErrorResume(e -> Mono.empty()), session.close()).block(WAIT);
+		assertThat(raw.awaitSessionCount(admin, before, WAIT)).isEqualTo(before);
+	}
+
+	/**
+	 * The replay the client relies on, end to end: the session is killed from another session,
+	 * then a POST through the client logs in again and creates the dimension exactly once, and
+	 * the session TM1 opened for the 401 is the one logged in, so nothing is left behind.
+	 */
+	@Test
+	void logsInAgainAfterItsSessionIsKilledAndRunsThePostOnce() {
+		int before = raw.sessionCount(admin);
+		Tm1Session session = session();
+		String name = "zz_session_" + UUID.randomUUID().toString().substring(0, 8);
+		try {
+			long first = session.sessionId().block(WAIT);
+			assertThat(raw.kill(admin, first)).isEqualTo(204);
+
+			Map<String, Object> dimension = Map.of("Name", name, "Hierarchies", List.of(Map.of("Name", name)));
+			session.execute(Tm1Request.post(ODataPath.of("Dimensions"), dimension, Void.class)).block(WAIT);
+
+			assertThat(raw.send(raw.request("GET", "Dimensions/$count?$filter=Name%20eq%20'" + name + "'").cookie(admin)).body()).isEqualTo("1");
+			assertThat(session.sessionId().block(WAIT)).isNotEqualTo(first);
+		}
+		finally {
+			raw.send(raw.request("DELETE", "Dimensions('" + name + "')").cookie(admin));
+			session.close().block(WAIT);
+		}
 		assertThat(raw.awaitSessionCount(admin, before, WAIT)).isEqualTo(before);
 	}
 
