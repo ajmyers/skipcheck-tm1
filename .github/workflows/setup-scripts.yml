@@ -10,7 +10,8 @@
 #            under pwsh, against the same cases
 #   windows: setup.ps1 under Windows PowerShell 5.1 and pwsh. GitHub's Windows
 #            runners run Docker in Windows-containers mode, so the script must stop
-#            at that check with its fix.
+#            at that check with its fix (or at "Docker isn't running", when the
+#            runner's Docker service hasn't started yet).
 name: Setup scripts
 
 on:
@@ -142,6 +143,10 @@ jobs:
           $rc = $LASTEXITCODE
           Write-Host $out
           if ($rc -ne 1) { throw "expected exit 1, got $rc" }
-          if (-not $out.Contains('Docker is running Windows containers')) { throw 'expected the Windows-containers check to stop it' }
+          # Either Docker check may stop it: GitHub's runners use Windows containers, and
+          # their Docker service sometimes hasn't started yet.
+          if (-not ($out.Contains('Docker is running Windows containers') -or $out.Contains("Docker isn't running"))) {
+            throw 'expected a Docker check (Windows containers, or not running) to stop it'
+          }
           if (-not $out.Contains('made by Andrew Myers')) { throw 'banner missing' }
           exit 0   # the step would otherwise end with the expected exit 1 left in $LASTEXITCODE
