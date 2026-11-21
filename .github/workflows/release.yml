@@ -1,4 +1,10 @@
-# Push a tag like v0.1.0 to build, sign, and release to Maven Central.
+# Release to Maven Central.
+#
+#   Real release: push a tag like v0.1.0. Publishes that version, permanently.
+#   Dry run:      run this workflow manually (Actions tab, or `gh workflow run release.yml`).
+#                 Uploads 0.0.0-dryrun.<run number> to the Central Portal for validation but
+#                 does NOT release it. Check it under Deployments, then Drop it.
+#
 # Repo secrets needed:
 #   MAVEN_CENTRAL_USERNAME / MAVEN_CENTRAL_PASSWORD  - Central Portal user token
 #   SIGNING_KEY / SIGNING_KEY_PASSWORD               - ASCII-armored GPG private key
@@ -7,6 +13,7 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -18,7 +25,20 @@ jobs:
           distribution: temurin
           java-version: '27'
       - uses: gradle/actions/setup-gradle@v5
-      - run: ./gradlew build publishAndReleaseToMavenCentral -Pversion=${GITHUB_REF_NAME#v} --no-configuration-cache
+
+      - name: Choose version and publish task
+        id: plan
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "task=publishAndReleaseToMavenCentral" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dryrun.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "task=publishToMavenCentral" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish ${{ steps.plan.outputs.version }}
+        run: ./gradlew build ${{ steps.plan.outputs.task }} -Pversion=${{ steps.plan.outputs.version }} --no-configuration-cache
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
