@@ -1,6 +1,7 @@
 package net.ajmyers.tm1.client.session;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
@@ -278,7 +279,10 @@ final class Connection {
 		};
 	}
 
-	/** The exception for an error response, from its OData error body if it has one. */
+	/**
+	 * The exception for an error response, from its OData error body, or its text if it's
+	 * a plain-text error, so the classifier's message rules apply to both.
+	 */
 	private Mono<Throwable> errorOf(ClientResponse response, String method, URI uri) {
 		int status = response.statusCode().value();
 		return response.bodyToMono(byte[].class).defaultIfEmpty(new byte[0]).map(body -> {
@@ -288,7 +292,10 @@ final class Connection {
 					error = ODataError.from(mapper.readTree(body));
 				}
 				catch (JacksonException e) {
-					// Not JSON: report the status alone
+					// Not JSON: TM1 sends some errors as plain text, read below
+				}
+				if (error == null) {
+					error = ODataError.fromText(new String(body, StandardCharsets.UTF_8));
 				}
 			}
 			return Tm1ApiException.of(status, error, method, uri.toString(), classifier);

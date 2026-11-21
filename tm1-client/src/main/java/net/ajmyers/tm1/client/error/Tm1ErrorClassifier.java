@@ -25,8 +25,13 @@ import org.jspecify.annotations.Nullable;
 public final class Tm1ErrorClassifier {
 
 	private static final Tm1ErrorClassifier DEFAULTS = new Tm1ErrorClassifier(List.of(
-			// Impersonation failures, recognized only by message (observed on 11.8)
+			// Impersonation failures, recognized only by message (observed on 11.8; TM1
+			// sends them
+			// as plain text). Impersonating an administrator, and impersonating without
+			// being a
+			// (data) administrator, are refused with different messages.
 			Rule.message("insufficient rights to impersonate", Tm1ErrorKind.IMPERSONATION_REFUSED),
+			Rule.message("administrator to be able to impersonate", Tm1ErrorKind.IMPERSONATION_REFUSED),
 			Rule.message("user specified in the impersonation request does not exist", Tm1ErrorKind.UNKNOWN_USER),
 			Rule.message("tm1userexception: cancel", Tm1ErrorKind.CANCELLED),
 			Rule.message("DataSpreadFailed", Tm1ErrorKind.DATA_SPREAD_FAILED),
