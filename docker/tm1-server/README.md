@@ -113,37 +113,46 @@ when you update settings through the REST API's `StaticConfiguration`.
 the environment variables below. You can then edit it, and your changes are kept.
 A default `tm1s-log.properties` is created the same way.
 
-**Your own `tm1s.cfg` (for example, copied from a server):** it's used as-is. The
-container only changes the settings it needs to run:
+**Your own `tm1s.cfg` (for example, copied from a server):** it's used as-is,
+except for three groups of settings:
 
-| Setting | Set to | Why |
-|---------|--------|-----|
-| `DataBaseDirectory` | `/tm1/data` | Must point to the mounted database |
-| `LoggingDirectory` | `/tm1/logs` | Must point to the mounted logs folder |
-| `RunningInBackground` | `T` | The server can't wait for console input in a container |
-| `AdminHost` | `TM1_ADMIN_HOST`, or `localhost` | The Admin Server to register with: a separate one, or the embedded one |
+| Group | Settings | What happens |
+|-------|----------|--------------|
+| **Enforced**: the container depends on them | `DataBaseDirectory` = `/tm1/data`, `LoggingDirectory` = `/tm1/logs`, `RunningInBackground` = `T`, `HTTPPortNumber` = `8010`, `PortNumber` = `12345`, `ClientMessagePortNumber` = `12346`, `AdminHost` = `TM1_ADMIN_HOST` or `localhost`; `IPAddress`/`IPAddressV4`/`IPAddressV6` are commented out | Always set. Each change is logged with its old value. |
+| **Warned**: likely to break in a container | `IntegratedSecurityMode` 4 or 5 (Cognos/CAM security, not provided), `ServerCAMURI`/`ClientCAMURI`, absolute `IndexStoreDirectory`/`ODBCLibraryPath`/`FileRetry.FileSpec` paths that don't exist in the container, `StartupChores` | Left as they are, with a warning at startup. |
+| **Passed through** | Everything else: `ServerName`, `UseSSL`, tuning, logging, ... | Unchanged. |
 
-Each change is logged with its old value, and the file is only rewritten when
-something actually changes. CRLF line endings are kept. If you mount the folder
-read-only (`:ro`), startup fails with a list of the required changes rather than
-modifying your file. Once your file has those values, a read-only mount works.
+The file is only rewritten when something actually changes, and CRLF line
+endings are kept.
 
-Environment variables:
+**Read-only config folder (`:ro`):** if the file needs changes (or the folder has
+no `tm1s-log.properties`), TM1 runs from a corrected copy instead, with a warning.
+Your files stay untouched; the catch is that settings changed through the REST
+API's `StaticConfiguration` aren't saved.
+
+### Ports
+
+Ports inside the container are always the same, whatever your `tm1s.cfg` said:
+**8010** (REST API), **12345** (TM1 API), **12346** (client messages), plus
+**5895/5898/5495/5498** for the Admin Server. Choose the outside port when you map
+them, e.g. `-p 9000:8010` serves the REST API on `localhost:9000`. Docker fixes
+port mappings when a container is created, before the config is read, so the
+inside ports can't follow the file. Testcontainers maps them to random free
+ports, so parallel test runs never collide.
+
+### Environment variables
 
 | Variable | Default | |
 |----------|---------|-|
 | `TM1_SERVER_NAME` | `tm1` | `ServerName` |
-| `TM1_HTTP_PORT` | `8010` | `HTTPPortNumber` (REST API) |
-| `TM1_PORT` | `12345` | `PortNumber` |
 | `TM1_USE_SSL` | `T` | `UseSSL` |
-| `TM1_CFG_<Param>` | | Any `tm1s.cfg` parameter, e.g. `TM1_CFG_MaximumCubeLoadThreads=4` |
+| `TM1_CFG_<Param>` | | Any `tm1s.cfg` parameter, e.g. `TM1_CFG_MaximumCubeLoadThreads=4` (enforced settings still win) |
 | `TM1_SEED` | `empty` | `empty`, `sdata` or `24retail`. Objects to copy into an **empty** `/tm1/data`, taken from the samples in your install. |
 | `TM1_ADMIN_HOST` | | Host of a separate Admin Server (e.g. a container running `admin`). Sets `AdminHost` and turns the embedded Admin Server off. |
 | `TM1_ADMIN_SERVER` | `T`, or `F` when `TM1_ADMIN_HOST` is set | Run an embedded Admin Server in this container |
 
-The defaults only apply when the container creates `tm1s.cfg`. For an existing
-file, these variables change it only if you set them. The compose file sets the
-server name and ports so they match its port mappings.
+`TM1_SERVER_NAME` and `TM1_USE_SSL` defaults only apply when the container creates
+`tm1s.cfg`. For an existing file, they change it only if you set them.
 
 ## Roles
 
@@ -151,7 +160,7 @@ One image runs either piece of a TM1 deployment, chosen by the command:
 
 | Command | Runs | Healthy when |
 |---------|------|--------------|
-| `start` (default) | One TM1 server. Also an embedded Admin Server, unless `TM1_ADMIN_HOST` points at a separate one. | The TM1 REST API answers (200 or 401) |
+| `start` (default) | One TM1 server. Also an embedded Admin Server, unless `TM1_ADMIN_HOST` points at a separate one. | `GET /api/v1/$metadata` on 8010 returns 200 (no login needed) |
 | `admin` | Only the Admin Server, on ports 5895/5898 (REST) and 5495/5498 (legacy clients) | `GET /api/v1/Servers` on 5895 returns 200 |
 | `install` | The one-off bundle unpacker ([above](#getting-a-tm1_64-directory)) | – |
 

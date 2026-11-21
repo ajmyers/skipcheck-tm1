@@ -8,7 +8,9 @@ ServerName=tm1
 DataBaseDirectory=/tm1/data
 LoggingDirectory=/tm1/logs
 AdminHost=localhost
+# Ports are fixed by the container (map them with -p <host>:8010 etc.)
 PortNumber=12345
+ClientMessagePortNumber=12346
 HTTPPortNumber=8010
 UseSSL=T
 IPVersion=ipv4

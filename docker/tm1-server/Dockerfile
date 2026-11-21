@@ -39,8 +39,10 @@ RUN chmod 755 /usr/local/bin/tm1-*
 # it, unmounted config/data/logs live in the container's own filesystem and go away
 # with the container: a disposable TM1, which is what tests want.
 RUN mkdir -p /tm1/config /tm1/data /tm1/logs
-# 12345 = TM1 server (legacy API), 8010 = TM1 REST API, 5895/5898 = Admin server REST http/https
-EXPOSE 12345 8010 5895 5898 5495 5498
+# Fixed container ports (map them to any host port with -p):
+#   8010 TM1 REST API, 12345 TM1 API, 12346 TM1 client messages,
+#   5895/5898 Admin Server REST (http/https), 5495/5498 Admin Server (legacy clients)
+EXPOSE 8010 12345 12346 5895 5898 5495 5498
 
 # TM1 performs a clean save-and-shutdown on SIGINT (that's what IBM's shutdown_tm1s.sh sends)
 STOPSIGNAL SIGINT

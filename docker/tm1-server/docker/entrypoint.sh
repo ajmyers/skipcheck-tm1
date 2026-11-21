@@ -7,6 +7,11 @@
 #
 # tm1s.exe is started with -z/tm1/config, so the tm1s.cfg in that folder is the one
 # that runs (and the one TM1 itself updates, e.g. via the REST StaticConfiguration API).
+# If /tm1/config is read-only and needs changes, TM1 runs from a corrected copy instead.
+#
+# Ports inside the container are fixed; map them to any host port with -p:
+#   8010 REST API (HTTPPortNumber), 12345 TM1 API (PortNumber),
+#   12346 client messages (ClientMessagePortNumber), 5895/5898/5495/5498 Admin Server
 #
 # Commands:
 #   (none) | start   run one TM1 server (plus an embedded Admin Server unless
@@ -20,8 +25,6 @@
 # Environment (all optional). The named TM1_* settings seed a newly created tm1s.cfg;
 # for an existing tm1s.cfg they are applied only if explicitly set.
 #   TM1_SERVER_NAME     ServerName                             (default: tm1)
-#   TM1_HTTP_PORT       HTTPPortNumber (REST API)              (default: 8010)
-#   TM1_PORT            PortNumber (legacy API)                (default: 12345)
 #   TM1_USE_SSL         UseSSL, T/F                            (default: T)
 #   TM1_CFG_<Param>     Any tm1s.cfg parameter, e.g. TM1_CFG_EnableTIDebugging=T
 #   TM1_SEED            empty | sdata | 24retail - objects to put in an EMPTY /tm1/data
@@ -120,6 +123,12 @@ if [ -z "$(ls -A "$DATA")" ]; then
 fi
 
 # ---- tm1s.cfg ---------------------------------------------------------------
+# Settings fall in three groups:
+#   enforced    - the container depends on them; always set (each change is logged)
+#   warned      - likely to break in a container; logged as warnings, left as they are
+#   passthrough - everything else, used as-is
+HTTP_PORT=8010; TM1_API_PORT=12345; CLIENT_MSG_PORT=12346
+
 WORK=$(mktemp)
 get_cfg() {  # get_cfg Key -> value of Key in $WORK (empty if absent)
   grep -iE "^[[:space:]]*$1[[:space:]]*=" "$WORK" | tail -1 | cut -d= -f2- | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true
@@ -136,6 +145,14 @@ set_cfg() {  # set_cfg Key Value [reason] - replace the existing line or append 
   fi
   log "  ${key}=${val}${cur:+  (was: $cur)}${why:+  [$why]}"
 }
+unset_cfg() {  # unset_cfg Key reason - comment out any active line for Key
+  local key=$1 why=$2 cur
+  cur=$(get_cfg "$key")
+  grep -qiE "^[[:space:]]*${key}[[:space:]]*=" "$WORK" || return 0
+  sed -i -E "s|^([[:space:]]*${key}[[:space:]]*=)|#\1|I" "$WORK"
+  log "  ${key} removed  (was: ${cur})  [$why]"
+}
+warn() { log "  WARNING: $*"; WARNINGS=$((WARNINGS + 1)); }
 
 if [ -f "$CFG" ]; then
   log "Using tm1s.cfg from $CONF"
@@ -159,18 +176,23 @@ apply_named() {  # apply_named Key EnvVar Default
   fi
 }
 apply_named ServerName     TM1_SERVER_NAME tm1
-apply_named HTTPPortNumber TM1_HTTP_PORT   8010
-apply_named PortNumber     TM1_PORT        12345
 apply_named UseSSL         TM1_USE_SSL     T
 # Generic passthrough: TM1_CFG_Foo=bar -> Foo=bar
 while IFS='=' read -r name value; do
   [[ $name == TM1_CFG_* ]] || continue
   set_cfg "${name#TM1_CFG_}" "$value" "$name"
 done < <(env)
-# Required for this container to work.
-set_cfg DataBaseDirectory   "$DATA"  "container path"
-set_cfg LoggingDirectory    "$LOGS"  "container path"
-set_cfg RunningInBackground "T"      "required in a container"
+
+# Enforced: paths, ports and process settings the container depends on.
+set_cfg DataBaseDirectory       "$DATA"            "container path"
+set_cfg LoggingDirectory        "$LOGS"            "container path"
+set_cfg RunningInBackground     "T"                "required in a container"
+set_cfg HTTPPortNumber          "$HTTP_PORT"       "fixed container port; map it with -p <host>:$HTTP_PORT"
+set_cfg PortNumber              "$TM1_API_PORT"    "fixed container port"
+set_cfg ClientMessagePortNumber "$CLIENT_MSG_PORT" "fixed container port"
+unset_cfg IPAddress   "would bind TM1 to an address that doesn't exist in the container"
+unset_cfg IPAddressV4 "would bind TM1 to an address that doesn't exist in the container"
+unset_cfg IPAddressV6 "would bind TM1 to an address that doesn't exist in the container"
 # Admin Server: a separate one (TM1_ADMIN_HOST), or embedded in this container.
 EMBED_ADMIN=${TM1_ADMIN_SERVER:-$([ -n "${TM1_ADMIN_HOST:-}" ] && echo F || echo T)}
 if [ -n "${TM1_ADMIN_HOST:-}" ]; then
@@ -179,22 +201,52 @@ elif [ "$EMBED_ADMIN" = "T" ]; then
   set_cfg AdminHost "localhost" "admin server runs in this container"
 fi
 
-if [ ! -f "$CFG" ] || ! cmp -s "$WORK" "$CFG"; then
-  if [ -f "$CFG" ] && [ ! -w "$CFG" ]; then
-    die "$CFG needs the changes listed above but is read-only. Apply them to your file or mount $CONF read-write."
-  fi
-  cat "$WORK" > "$CFG"   # write in place (keeps single-file bind mounts working)
-  log "Wrote $CFG"
-else
-  log "  (no changes - $CFG used as-is)"
-fi
-SERVER_NAME=$(get_cfg ServerName); HTTP_PORT=$(get_cfg HTTPPortNumber); USE_SSL=$(get_cfg UseSSL)
-rm -f "$WORK"
+# Warned: settings that probably won't work in a container. Left as they are.
+WARNINGS=0
+case "$(get_cfg IntegratedSecurityMode)" in
+  4|5) warn "IntegratedSecurityMode=$(get_cfg IntegratedSecurityMode) uses IBM Cognos (CAM) security, which this container doesn't provide. Logins will fail unless a CAM server is reachable. Use 1 for native TM1 users." ;;
+esac
+for key in ServerCAMURI ClientCAMURI; do
+  v=$(get_cfg "$key"); [ -n "$v" ] && warn "$key=$v must be reachable from inside the container."
+done
+for key in IndexStoreDirectory ODBCLibraryPath 'FileRetry\.FileSpec'; do
+  v=$(get_cfg "$key")
+  case "$v" in /*) [ -e "$v" ] || warn "${key//\\/}=$v doesn't exist in the container. Mount it, or point it under /tm1/data or /tm1/logs." ;; esac
+done
+v=$(get_cfg StartupChores); [ -n "$v" ] && warn "StartupChores=$v runs at startup; those chores must exist in the database."
 
-if [ ! -f "$CONF/tm1s-log.properties" ]; then
-  log "No tm1s-log.properties in $CONF - creating the default"
-  cp "$DEFAULTS/tm1s-log.properties" "$CONF/"
+# ---- write the config, or run from a corrected copy if it's read-only --------
+CFG_CHANGED=F; { [ ! -f "$CFG" ] || ! cmp -s "$WORK" "$CFG"; } && CFG_CHANGED=T
+LOG_MISSING=F; [ -f "$CONF/tm1s-log.properties" ] || LOG_MISSING=T
+CAN_WRITE=T
+if [ "$CFG_CHANGED" = T ]; then
+  if [ -f "$CFG" ]; then [ -w "$CFG" ] || CAN_WRITE=F; else [ -w "$CONF" ] || CAN_WRITE=F; fi
 fi
+[ "$LOG_MISSING" = T ] && { [ -w "$CONF" ] || CAN_WRITE=F; }
+
+RUN_CONF="$CONF"
+if [ "$CAN_WRITE" = T ]; then
+  if [ "$CFG_CHANGED" = T ]; then
+    cat "$WORK" > "$CFG"   # write in place (keeps single-file bind mounts working)
+    log "Wrote $CFG"
+  else
+    log "  (no changes - $CFG used as-is)"
+  fi
+  if [ "$LOG_MISSING" = T ]; then
+    log "No tm1s-log.properties in $CONF - creating the default"
+    cp "$DEFAULTS/tm1s-log.properties" "$CONF/"
+  fi
+else
+  RUN_CONF=/tmp/tm1-config
+  mkdir -p "$RUN_CONF"
+  cp "$WORK" "$RUN_CONF/tm1s.cfg"
+  if [ "$LOG_MISSING" = T ]; then cp "$DEFAULTS/tm1s-log.properties" "$RUN_CONF/"; else cp "$CONF/tm1s-log.properties" "$RUN_CONF/"; fi
+  warn "$CONF is read-only, so TM1 runs from a corrected copy in $RUN_CONF. Your files are unchanged; settings changed through the REST API (StaticConfiguration) won't be saved."
+fi
+echo "$RUN_CONF" > /tmp/tm1-config-dir   # read by the healthcheck
+SERVER_NAME=$(get_cfg ServerName); USE_SSL=$(get_cfg UseSSL)
+rm -f "$WORK"
+[ "$WARNINGS" -gt 0 ] && log "$WARNINGS warning(s) about tm1s.cfg; see above."
 
 cd "$BIN"
 
@@ -215,8 +267,8 @@ TAIL_PID=$!
 
 log "Starting TM1 Server '$SERVER_NAME' (REST on ${HTTP_PORT:-none}, SSL=${USE_SSL:-T})"
 # tm1s.exe daemonizes: the launcher exits 0 and the real server keeps running.
-./tm1s.exe -w -z"$CONF"
-TM1_PID=$(daemon_pid "^\./tm1s\.exe -w -z$CONF\$" || true)
+./tm1s.exe -w -z"$RUN_CONF"
+TM1_PID=$(daemon_pid "^\./tm1s\.exe -w -z$RUN_CONF\$" || true)
 if [ -z "$TM1_PID" ]; then
   log "TM1 Server did not start - last lines of tm1server.log:"
   tail -50 "$LOGS/tm1server.log" || true
