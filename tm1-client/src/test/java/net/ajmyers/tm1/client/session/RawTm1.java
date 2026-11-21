@@ -107,6 +107,29 @@ final class RawTm1 {
 		}
 	}
 
+	/**
+	 * Creates a TM1 user with no groups (so not an administrator), from {@code admin}'s
+	 * session.
+	 */
+	void createUser(String admin, String name, String password) {
+		HttpResponse<String> created = send(request("POST", "Users").cookie(admin)
+			.body("{\"Name\":\"" + name + "\",\"Password\":\"" + password + "\"}"));
+		if (created.statusCode() != 201) {
+			throw new IllegalStateException(
+					"Couldn't create user " + name + ": " + created.statusCode() + " " + created.body());
+		}
+	}
+
+	/** Deletes a TM1 user, if it exists. */
+	void deleteUser(String admin, String name) {
+		send(request("DELETE", "Users('" + name + "')").cookie(admin));
+	}
+
+	/** {@code Basic} credentials for a user. */
+	static String basic(String user, String password) {
+		return "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
+	}
+
 	/** How many sessions TM1 has open, seen from {@code admin}'s session. */
 	int sessionCount(String admin) {
 		return json(send(request("GET", "Sessions?$select=ID").cookie(admin))).get("value").size();
