@@ -52,10 +52,33 @@ accessors are fluent (`status()`, not `getStatus()`) to match records.
 | `@Getter` on fields | Accessors on classes that can't be records, such as exceptions and container subclasses. Put the Javadoc on the field; delombok copies it to the accessor. |
 | `@Builder` | Options and configuration with many optional settings, including on records |
 | `@With` | Copy-on-change of immutable values, including on records |
-| `@CommonsLog` | Logging through Spring's commons-logging bridge, with no extra dependency |
+| `@Slf4j` | Logging (see below) |
 
-Not used, and refused by `lombok.config`: `@Data`, `@Setter`, `@SneakyThrows`, `val` and
-`var`. Experimental features need a good reason.
+Not used, and refused by `lombok.config`: `@Data`, `@Setter`, `@SneakyThrows`, `val`, `var`
+and every logger annotation except `@Slf4j`. Experimental features need a good reason.
+
+**Logging goes through SLF4J,** with Lombok's `@Slf4j`. The libraries depend only on
+`slf4j-api`, and the application chooses the backend (Spring Boot's is Logback).
+
+- `debug` for each request and response, `info` for session lifecycle (login, re-login,
+  close), `warn` for something the caller should know about but that didn't fail, such as a
+  close that timed out. Failures reach the caller as errors, so don't also log them as `error`.
+- Use placeholders (`log.debug("{} {}", method, url)`), not string concatenation.
+- **Never log credentials:** no `Authorization` headers, cookies, CAM passports, passwords
+  or pre-signed URLs, at any level.
+
+**Metrics and traces go through Micrometer's Observation API,** which Spring Boot turns into
+metrics and traces. The client takes an `ObservationRegistry` (a no-op one by default).
+
+- Every HTTP request is already observed by WebClient (`http.client.requests`), so don't
+  wrap single requests again.
+- Add an observation for work above one request: logging in, closing a session, and later
+  session pool events and long-running operations. Name them under `tm1.`, e.g.
+  `tm1.session.login`.
+- Tags (low-cardinality key values) must come from a small, fixed set: an outcome, a reason,
+  a kind. Object names, URLs and user names go in high-cardinality values, or nowhere.
+- The same rule as logging: never put credentials in tags or events.
+- Test them with `TestObservationRegistry` from `micrometer-observation-test`.
 
 **Compiler warnings fail the build** (`-Werror`). Fix the code; suppress a warning only with a
 comment saying why, as `Tm1ServerContainer` does for `this-escape`.
