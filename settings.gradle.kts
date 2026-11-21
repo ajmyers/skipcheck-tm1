@@ -18,6 +18,10 @@ rootProject.name = "tm1-pa-developer-tools"
 
 // Published libraries (Maven Central)
 include("tm1-csdl")
+
+// Build tools (not published)
+include("tm1-codegen")
+
 include("tm1-client")
 include("tm1-spring-boot-starter")
 include("tm1-spring-boot-testcontainers")
