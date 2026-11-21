@@ -413,8 +413,7 @@ TI process failures are **not** exceptions: `ExecuteWithReturn` returns a
 - **Named multi-server support** (`tm1.servers.<name>.*`) comes later, with #16.
 
 **Dependency change:** `tm1-client` today declares `api(libs.spring.web)`, commented for
-`RestClient`. That becomes `api(spring-webflux)` plus Reactor. The HTTP connector is chosen in
-Q4.
+`RestClient`. That becomes `api(spring-webflux)`, Reactor and `reactor-netty-http` (Q4).
 
 ---
 
@@ -511,8 +510,8 @@ These are concerns the requirements don't name, but that need deciding early:
 |---|---|---|
 | Q1 | Generate the model from CSDL, or write it by hand? | **Agreed 2026-11-21.** Generate records, enums, patch builders, field constants and the operation catalog. Write services by hand (§8.1). |
 | Q2 | Can we commit IBM's `$metadata` to the repo? Its `Core.Description` text is IBM-authored, and the project deliberately ships no IBM material. | **Agreed 2026-11-21.** Commit a **stripped snapshot**: structure, types and `Core.Revisions` kept, IBM description text removed. Generated Javadoc is our own. Worth a quick legal sanity check. |
-| Q3 | Flat services with parent-key parameters, or fluent navigation (`tm1.dimension("d").hierarchy("h").elements()`)? | **Flat services** first (R4, small and injectable). Fluent navigation can be a thin layer on top later. |
-| Q4 | Default HTTP connector: Reactor Netty, or the JDK `HttpClient` connector? | **Neither forced.** Accept any `ClientHttpConnector`. Default to Reactor Netty when it's on the classpath (as Spring Boot does), and otherwise use the JDK connector, so standalone users can avoid Netty. |
+| Q3 | Flat services with parent-key parameters, or fluent navigation (`tm1.dimension("d").hierarchy("h").elements()`)? | **Decided 2026-11-21: both.** Flat 1:1 services are the core: injectable, and what the coverage gate checks. Fluent handles holding context and defaults come later as a thin layer over them (with the Q10 helpers). Each fluent call runs the flat call it stands for, so the flat layer is always the escape hatch. |
+| Q4 | Default HTTP connector: Reactor Netty, or the JDK `HttpClient` connector? | **Decided 2026-11-21: Reactor Netty is the default and a required dependency.** Any other `ClientHttpConnector` is accepted. Why Netty: pool control (separate named pools per workload, bounded waits for a connection, max idle and max life), which the connection-pinning and 100 s+ pause lessons in §16.2 depend on; per-request response timeouts; gzip; Spring Boot's own default and metrics. The JDK client lacks pool control, doesn't decompress gzip, and defaults to HTTP/2 (TM1 speaks 1.1). Session cookies are always managed by our session code, never a connector's cookie support. |
 | Q5 | Build per-user sessions (`Tm1SessionFactory`) in phase 0, or design only? | Design now, build when the first tool needs it. |
 | Q6 | Interim integration-test harness, or build #14 first? | **Decided 2026-11-21: Testcontainers works from the start.** #14 is part of phase 0, and there's no interim harness. |
 | Q7 | When does v12 / PA Cloud become in scope? | After the v11 surface is complete. Only `Tm1Dialect` and `Tm1Authenticator` are shaped for it now. |
