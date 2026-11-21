@@ -1,0 +1,45 @@
+# cognos-server: local IBM Cognos Analytics for development and tests.
+#
+# This file works on its own: download it into an empty folder and run it. It uses
+# the published image (ghcr.io/ajmyers/cognos-server). To use an image you built
+# from the repo, set COGNOS_SERVER_IMAGE=cognos-server:local in .env.
+#
+#   docker compose up -d        # Cognos with an embedded content store -> http://localhost:9300/bi/
+#   docker compose ps           # wait for (healthy): a few minutes
+#
+# Where Cognos comes from (set in .env; see .env.example):
+#   - nothing set: put your IBM repository zip (casrv-*-linuxi38664h.zip) in
+#     ./bundles. It's installed once, on first start, into the volume "cognos-install".
+#   - COGNOS_ZIP_URL: download the zip instead (e.g. a pre-signed S3 link)
+#   - COGNOS_SERVER_IMAGE: a private image with Cognos built in
+#
+# The content store is a PostgreSQL inside the container, kept in the volume
+# "cognos-content-store". Docker needs at least 12 GB of memory for Cognos.
+
+services:
+  cognos:
+    image: ${COGNOS_SERVER_IMAGE:-ghcr.io/ajmyers/cognos-server:latest}
+    platform: linux/amd64
+    container_name: cognos
+    hostname: cognos
+    stop_grace_period: 3m    # Cognos takes a minute or two to stop cleanly
+    restart: unless-stopped
+    environment:
+      COGNOS_ZIP_URL: ${COGNOS_ZIP_URL:-}
+      COGNOS_ZIP: ${COGNOS_ZIP:-}
+      COGNOS_ZIP_SHA256: ${COGNOS_ZIP_SHA256:-}
+      COGNOS_MAX_MEMORY: ${COGNOS_MAX_MEMORY:-6144}
+    ports:
+      - "9300:9300"    # Cognos: http://localhost:9300/bi/
+    volumes:
+      - cognos-install:/opt/ibm/cognos/analytics
+      - cognos-content-store:/cognos/postgres
+      - ${COGNOS_ZIP_DIR:-./bundles}:/ibm:ro
+
+volumes:
+  # The Cognos install, filled once from your zip. Cognos writes to it while it
+  # runs, so it belongs to this one container. To install another version:
+  # docker compose down, docker volume rm cognos-server_cognos-install, up -d.
+  cognos-install:
+  # The content store (Cognos's own database). Remove it to start from scratch.
+  cognos-content-store:
