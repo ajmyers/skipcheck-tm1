@@ -5,7 +5,8 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * A TM1 server version, as reported by {@code /api/v1/Configuration/ProductVersion}.
+ * A TM1 server version, as reported by {@code Server.ProductVersion} (read through
+ * {@code Tm1Session.version()}).
  *
  * <p>
  * TM1 reports versions as dot-separated numbers, such as {@code 11.8.03500.6}. Each part

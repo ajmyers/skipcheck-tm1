@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 
@@ -28,8 +30,17 @@ import net.ajmyers.tm1.client.error.Tm1ApiException;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
 import net.ajmyers.tm1.client.error.Tm1ErrorKind;
 import net.ajmyers.tm1.client.error.Tm1ProtocolException;
+import net.ajmyers.tm1.client.error.Tm1UnsupportedOperationException;
 import net.ajmyers.tm1.client.odata.ODataCollectionDecoder;
 import net.ajmyers.tm1.client.odata.ODataJson;
+import net.ajmyers.tm1.client.odata.ODataPath;
+import net.ajmyers.tm1.client.odata.ODataQuery;
+import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
+import net.ajmyers.tm1.client.odata.csdl.CsdlParseException;
+import net.ajmyers.tm1.client.odata.csdl.CsdlParser;
+import net.ajmyers.tm1.client.version.Tm1Capabilities;
+import net.ajmyers.tm1.client.version.Tm1Capability;
+import net.ajmyers.tm1.client.version.Tm1Version;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClientRequest;
@@ -56,6 +67,12 @@ final class Connection {
 	static final String IMPERSONATE = "TM1-Impersonate";
 
 	private static final long NOT_REFUSED = Long.MIN_VALUE;
+
+	private static final Tm1Request<JsonNode> VERSION = Tm1Request.get(ODataPath.of("Server"),
+			ODataQuery.none().select("ProductVersion"), JsonNode.class);
+
+	private static final Tm1Request<String> METADATA = Tm1Request.text(ODataPath.metadata())
+		.withHeader(HttpHeaders.ACCEPT, "application/xml");
 
 	private static final String LOGIN_PATH = "ActiveSession?$select=ID";
 
@@ -89,6 +106,15 @@ final class Connection {
 	 */
 	private @Nullable Attempt attempt;
 
+	/**
+	 * The version read for the current login, and which login it was. Guarded by this.
+	 */
+	private @Nullable Mono<Tm1Version> version;
+
+	private @Nullable Attempt versionFor;
+
+	private final CapabilitiesCache capabilitiesCache;
+
 	/** Set once by {@link #close()}. Guarded by this. */
 	private boolean closed;
 
@@ -97,13 +123,14 @@ final class Connection {
 
 	Connection(WebClient web, String root, Tm1Authenticator authenticator, @Nullable String sessionContext,
 			@Nullable String impersonate, Tm1Timeouts timeouts, Tm1ErrorClassifier classifier, ObjectMapper mapper,
-			ObservationRegistry observations, LongSupplier nanoTime) {
+			ObservationRegistry observations, LongSupplier nanoTime, CapabilitiesCache capabilitiesCache) {
 		this.web = Objects.requireNonNull(web, "web");
 		this.root = Objects.requireNonNull(root, "root");
 		this.authenticator = Objects.requireNonNull(authenticator, "authenticator");
 		this.sessionContext = sessionContext;
 		this.impersonate = impersonate;
 		this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
+		this.capabilitiesCache = Objects.requireNonNull(capabilitiesCache, "capabilitiesCache");
 		this.timeouts = Objects.requireNonNull(timeouts, "timeouts");
 		this.classifier = Objects.requireNonNull(classifier, "classifier");
 		this.mapper = Objects.requireNonNull(mapper, "mapper");
@@ -124,6 +151,76 @@ final class Connection {
 	 */
 	Mono<LoggedIn> session() {
 		return Mono.defer(() -> current().login);
+	}
+
+	/**
+	 * The server's product version, read from {@code Server} inside the session (an
+	 * anonymous read would open a session of its own). Read once per login: a server that
+	 * restarted, perhaps upgraded, makes the session log in again.
+	 */
+	Mono<Tm1Version> version() {
+		return Mono.defer(() -> {
+			synchronized (this) {
+				Attempt now = current();
+				if (version == null || versionFor != now) {
+					AtomicReference<Mono<Tm1Version>> self = new AtomicReference<>();
+					Mono<Tm1Version> read = execute(VERSION).map(server -> {
+						JsonNode text = server.get("ProductVersion");
+						if (text == null || !text.isString()) {
+							throw new Tm1ProtocolException("TM1 didn't report its ProductVersion", null, "GET",
+									uri(VERSION.relativeUri()).toString(), null);
+						}
+						return Tm1Version.parse(text.asString());
+					}).doOnError(e -> forgetVersion(self.get())).cache();
+					self.set(read);
+					version = read;
+					versionFor = now;
+				}
+				return version;
+			}
+		});
+	}
+
+	/**
+	 * What the server supports, from its {@code $metadata}, fetched once per server
+	 * version and shared with every session built from the same settings.
+	 */
+	Mono<Tm1Capabilities> capabilities() {
+		return version()
+			.flatMap(v -> capabilitiesCache.get(root, v, () -> metadata().map(doc -> Tm1Capabilities.of(doc, v))));
+	}
+
+	/**
+	 * Fails with {@link Tm1UnsupportedOperationException} if the server doesn't define
+	 * {@code capability}.
+	 */
+	Mono<Void> require(Tm1Capability capability) {
+		return capabilities().flatMap(c -> {
+			Optional<Tm1UnsupportedOperationException> missing = c.check(capability, root);
+			return missing.isPresent() ? Mono.<Void>error(missing.get()) : Mono.<Void>empty();
+		});
+	}
+
+	private Mono<CsdlDocument> metadata() {
+		URI uri = uri(METADATA.relativeUri());
+		return execute(METADATA).map(xml -> {
+			try {
+				return CsdlParser.parse(xml);
+			}
+			catch (CsdlParseException e) {
+				throw new Tm1ProtocolException("TM1 sent $metadata that isn't valid CSDL", null, "GET", uri.toString(),
+						e);
+			}
+		});
+	}
+
+	// Identity on purpose: forget the read only if it's the one that failed
+	@SuppressWarnings("ReferenceEquality")
+	private synchronized void forgetVersion(@Nullable Mono<Tm1Version> failed) {
+		if (version == failed) {
+			version = null;
+			versionFor = null;
+		}
 	}
 
 	/** Sends one request and reads a single response: an entity, text, or nothing. */
@@ -300,7 +397,17 @@ final class Connection {
 	private <T> Mono<T> read(Tm1Request<T> request, URI uri, ClientResponse response) {
 		return switch (request.response()) {
 			case NONE -> response.releaseBody().then(Mono.empty());
-			case TEXT -> response.bodyToMono(String.class).map(request.type()::cast);
+			// Joined like SINGLE rather than bodyToMono(String), whose codec refuses
+			// bodies over
+			// 256 KB: $metadata alone is about 1 MB
+			case TEXT -> DataBufferUtils.join(response.bodyToFlux(DataBuffer.class)).map(buffer -> {
+				try {
+					return request.type().cast(buffer.toString(StandardCharsets.UTF_8));
+				}
+				finally {
+					DataBufferUtils.release(buffer);
+				}
+			});
 			case SINGLE -> DataBufferUtils.join(response.bodyToFlux(DataBuffer.class)).map(buffer -> {
 				try {
 					return mapper.readValue(buffer.asInputStream(), request.type());
