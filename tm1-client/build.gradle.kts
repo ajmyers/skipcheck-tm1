@@ -40,3 +40,34 @@ dependencies {
 	testImplementation(libs.archunit)
 	testRuntimeOnly(libs.slf4j.simple)
 }
+
+// The $metadata snapshot (src/model/metadata) is the generator's input, and tests read it from
+// the classpath as /metadata/tm1-schema-<version>.xml
+sourceSets.test {
+	resources.srcDir("src/model")
+}
+
+// The model (net.ajmyers.tm1.client.model) is generated from the $metadata snapshot at build
+// time by tm1-codegen (plan §8.1), into build/generated: never committed, never edited. A TM1
+// upgrade shows up as a diff of the snapshot, not of the generated code.
+val codegen = configurations.create("codegen") {
+	isCanBeConsumed = false
+}
+dependencies {
+	codegen(project(":tm1-codegen"))
+}
+val modelSources = layout.buildDirectory.dir("generated/sources/tm1-model/java/main")
+val snapshot = layout.projectDirectory.file("src/model/metadata/tm1-schema-11.8.35.xml")
+val generateModel = tasks.register<JavaExec>("generateModel") {
+	group = "build"
+	description = "Generates the model from the \$metadata snapshot."
+	classpath = codegen
+	mainClass = "net.ajmyers.tm1.codegen.Tm1Codegen"
+	inputs.file(snapshot).withPathSensitivity(PathSensitivity.RELATIVE)
+	outputs.dir(modelSources)
+	outputs.cacheIf { true }
+	args(snapshot.asFile.path, modelSources.get().asFile.path)
+}
+sourceSets.main {
+	java.srcDir(generateModel)
+}

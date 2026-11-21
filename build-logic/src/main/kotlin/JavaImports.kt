@@ -102,7 +102,7 @@ object JavaImports {
 	 */
 	private fun brokenJavadoc(source: String): List<Problem> {
 		val problems = mutableListOf<Problem>()
-		for (comment in Regex("""/\*\*[\s\S]*?\*/""").findAll(source)) {
+		for (comment in Regex("""/\*\*[\s\S]*?\*/""").findAll(blankLiterals(source))) {
 			val start = lineOf(source, comment.range.first)
 			comment.value.lines().drop(1).forEachIndexed { index, line ->
 				if (!line.trimStart().startsWith("*")) {
@@ -130,6 +130,15 @@ object JavaImports {
 			val simple = import.groupValues[2].substringAfterLast('.')
 			simple != "*" && !Regex("""\b${Regex.escape(simple)}\b""").containsMatchIn(rest)
 		}
+	}
+
+	/** The source with string, text block and character literals blanked out, comments kept, lines where they were. */
+	private fun blankLiterals(source: String): String {
+		val keepLines = { m: MatchResult -> "\"" + "\n".repeat(m.value.count { it == '\n' }) + "\"" }
+		var text = Regex("\"\"\"[\\s\\S]*?\"\"\"").replace(source, keepLines)
+		text = Regex("""'(?:\\.|[^'\\\n])'""").replace(text, "' '")
+		text = Regex("\"(?:\\\\.|[^\"\\\\\\n])*\"").replace(text, "\"\"")
+		return text
 	}
 
 	/** The source with comments and literals blanked out, keeping every line where it was. */

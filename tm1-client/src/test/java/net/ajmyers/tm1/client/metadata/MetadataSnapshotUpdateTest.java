@@ -26,9 +26,9 @@ import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
  * }</pre>
  *
  * <p>
- * It writes {@code src/test/resources/metadata/tm1-schema-<version>.xml}. For a new
- * schema version, also update {@link MetadataSnapshot#VERSION}, then triage the new
- * endpoints the coverage gate reports.
+ * It writes {@code src/model/metadata/tm1-schema-<version>.xml}. For a new schema
+ * version, also update {@link MetadataSnapshot#VERSION}, then triage the new endpoints
+ * the coverage gate reports.
  */
 @RequiresTm1
 @EnabledIfEnvironmentVariable(named = "TM1_UPDATE_METADATA_SNAPSHOT", matches = "true")
@@ -43,7 +43,7 @@ class MetadataSnapshotUpdateTest {
 		String version = CsdlParser.parse(live).schemaVersion().orElseThrow();
 
 		// Tests run with the module folder as the working directory
-		Path file = Path.of("src/test/resources/metadata/tm1-schema-" + version + ".xml");
+		Path file = Path.of("src/model/metadata/tm1-schema-" + version + ".xml");
 		Files.createDirectories(file.getParent());
 		Files.writeString(file, live, StandardCharsets.UTF_8);
 		assertThat(file).exists();
