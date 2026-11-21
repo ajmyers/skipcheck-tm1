@@ -463,8 +463,19 @@ function Invoke-Setup {
 
   # --- 3. Check for conflicts before changing anything -----------------------------
   Step 'Checking ports and containers'
-  function Owner-Dir([string]$c) { return "$(Docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' $c)".Trim() }
-  function Same-Dir([string]$a) { return $a -and ((Expand-SetupPath $a) -eq $Dir) }
+  # The folder a compose container was started from ('' if none). The labels come back
+  # as JSON: Windows PowerShell 5.1 mangles double quotes in native arguments, so a
+  # template like {{index .Config.Labels "..."}} can't be passed to docker.
+  function Owner-Dir([string]$c) {
+    $json = (Docker inspect -f '{{json .Config.Labels}}' $c) -join ''
+    if ($LASTEXITCODE -ne 0 -or -not $json.StartsWith('{')) { return '' }
+    $p = (ConvertFrom-Json $json).PSObject.Properties['com.docker.compose.project.working_dir']
+    if ($p) { return [string]$p.Value } return ''
+  }
+  function Same-Dir([string]$a) {
+    if (-not $a) { return $false }
+    try { return (Expand-SetupPath $a) -eq $Dir } catch { return $false }
+  }
   foreach ($c in 'tm1-admin', 'tm1', 'tm1-sdata') {
     if (-not (DockerOk container inspect $c)) { continue }
     $from = Owner-Dir $c
