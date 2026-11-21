@@ -23,17 +23,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * lifecycle method to get the {@linkplain Tm1ServerContainer#shared() shared container},
  * started on first use:
  *
- * <pre>{@code
+ * <pre class="code">
  * &#64;RequiresTm1
  * class CubeServiceTest {
  *
-
-&#64;Test
+ *     &#64;Test
  *     void listsCubes(Tm1ServerContainer tm1) {
  *         var client = Tm1Client.builder().baseUrl(tm1.getRestUrl()) ...
  *     }
  * }
- * }</pre>
+ * </pre>
  *
  * <p>
  * Tests share one server, so each test should create its own uniquely named objects and

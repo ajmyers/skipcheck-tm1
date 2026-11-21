@@ -25,9 +25,10 @@ object JavaImports {
 	/** One problem, at a 1-based line. */
 	data class Problem(val line: Int, val message: String)
 
-	/** What's wrong with the imports of one file. */
+	/** What's wrong with the imports of one file, and any Javadoc line that lost its leading {@code *}. */
 	fun problems(source: String): List<Problem> {
 		val problems = mutableListOf<Problem>()
+		problems += brokenJavadoc(source)
 		for (unused in unusedImports(source)) {
 			problems += Problem(lineOf(source, unused.range.first), "unused import ${unused.groupValues[2]}")
 		}
@@ -92,6 +93,24 @@ object JavaImports {
 		val last = importLine.findAll(source).lastOrNull() ?: return null
 		val end = source.indexOf(';', last.range.first) + 1
 		return Regex("""[\s\S]*""").matchAt(source.substring(0, end), first.range.first)
+	}
+
+	/**
+	 * Lines inside a Javadoc comment that don't start with {@code *}. The formatter makes these
+	 * out of an {@code @} at the start of a line in a code example, which it takes for a block
+	 * tag: write {@code &#64;} in a {@code <pre class="code">} example instead.
+	 */
+	private fun brokenJavadoc(source: String): List<Problem> {
+		val problems = mutableListOf<Problem>()
+		for (comment in Regex("""/\*\*[\s\S]*?\*/""").findAll(source)) {
+			val start = lineOf(source, comment.range.first)
+			comment.value.lines().drop(1).forEachIndexed { index, line ->
+				if (!line.trimStart().startsWith("*")) {
+					problems += Problem(start + index + 1, "a Javadoc line without its leading *, broken by the formatter: write @ in code examples as &#64; in <pre class=\"code\">")
+				}
+			}
+		}
+		return problems
 	}
 
 	/** The source without its unused imports. */
