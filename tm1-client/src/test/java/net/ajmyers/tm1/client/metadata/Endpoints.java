@@ -1,6 +1,6 @@
 package net.ajmyers.tm1.client.metadata;
 
-import java.util.SortedSet;
+import java.util.NavigableSet;
 import java.util.TreeSet;
 
 import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
@@ -32,8 +32,8 @@ final class Endpoints {
 	private Endpoints() {
 	}
 
-	static SortedSet<String> of(CsdlDocument doc) {
-		SortedSet<String> out = new TreeSet<>();
+	static NavigableSet<String> of(CsdlDocument doc) {
+		NavigableSet<String> out = new TreeSet<>();
 		doc.entityContainer().ifPresent(c -> container(out, c));
 		for (CsdlSchema schema : doc.schemas()) {
 			for (CsdlOperation op : schema.operations()) {
@@ -49,14 +49,14 @@ final class Endpoints {
 		return out;
 	}
 
-	private static void container(SortedSet<String> out, CsdlEntityContainer c) {
+	private static void container(NavigableSet<String> out, CsdlEntityContainer c) {
 		c.entitySets().forEach(s -> out.add("EntitySet " + s.name()));
 		c.singletons().forEach(s -> out.add("Singleton " + s.name()));
 		c.actionImports().forEach(a -> out.add("ActionImport " + a.name()));
 		c.functionImports().forEach(f -> out.add("FunctionImport " + f.name()));
 	}
 
-	private static void navigation(SortedSet<String> out, CsdlStructuredType t) {
+	private static void navigation(NavigableSet<String> out, CsdlStructuredType t) {
 		t.navigationProperties().forEach(n -> out.add("Navigation " + t.name() + "/" + n.name()));
 	}
 

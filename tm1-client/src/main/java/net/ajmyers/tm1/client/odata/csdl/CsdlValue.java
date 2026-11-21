@@ -28,6 +28,9 @@ public sealed interface CsdlValue {
 	}
 
 	/** A {@code Record}: property values by name, in document order. */
+	// Named after the CSDL Record expression; inside CsdlValue it shadows
+	// java.lang.Record, which is fine
+	@SuppressWarnings("AvoidCommonTypeNames")
 	record Record(Map<String, CsdlValue> properties) implements CsdlValue {
 		public Record {
 			properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));

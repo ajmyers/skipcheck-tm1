@@ -43,7 +43,7 @@ public final class Tm1Version implements Comparable<Tm1Version> {
 			throw new IllegalArgumentException(
 					"Not a TM1 version: '" + text + "' (expected numbers separated by dots, like 11.8.03500.6)");
 		}
-		String[] split = trimmed.split("\\.");
+		String[] split = trimmed.split("\\.", -1);
 		int[] parts = new int[split.length];
 		for (int i = 0; i < split.length; i++) {
 			try {

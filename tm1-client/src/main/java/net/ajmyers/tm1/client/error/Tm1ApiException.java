@@ -48,25 +48,25 @@ public sealed class Tm1ApiException extends Tm1Exception
 	/** The exception for an error response whose kind is already known. */
 	public static Tm1ApiException of(int status, Tm1ErrorKind kind, ODataError error, String method, String url) {
 		switch (kind) {
-			case NOT_FOUND:
+			case NOT_FOUND -> {
 				return new Tm1NotFoundException(status, kind, error, method, url);
-			case ALREADY_EXISTS:
-			case LOCKED:
-			case IN_USE:
-			case CONFLICT:
+			}
+			case ALREADY_EXISTS, LOCKED, IN_USE, CONFLICT -> {
 				return new Tm1ConflictException(status, kind, error, method, url);
-			case PRECONDITION_FAILED:
+			}
+			case PRECONDITION_FAILED -> {
 				return new Tm1PreconditionFailedException(status, kind, error, method, url);
-			case UNAUTHENTICATED:
-			case CREDENTIAL_REJECTED:
+			}
+			case UNAUTHENTICATED, CREDENTIAL_REJECTED -> {
 				return new Tm1AuthenticationException(status, kind, error, method, url);
-			case FORBIDDEN:
-			case NO_READ_RIGHTS:
-			case IMPERSONATION_REFUSED:
+			}
+			case FORBIDDEN, NO_READ_RIGHTS, IMPERSONATION_REFUSED -> {
 				return new Tm1ForbiddenException(status, kind, error, method, url);
-			case NOT_IMPLEMENTED:
+			}
+			case NOT_IMPLEMENTED -> {
 				return new Tm1NotImplementedException(status, kind, error, method, url);
-			default:
+			}
+			default -> {
 				if (status >= 500) {
 					return new Tm1ServerException(status, kind, error, method, url);
 				}
@@ -74,6 +74,7 @@ public sealed class Tm1ApiException extends Tm1Exception
 					return new Tm1BadRequestException(status, kind, error, method, url);
 				}
 				return new Tm1ApiException(status, kind, error, method, url);
+			}
 		}
 	}
 

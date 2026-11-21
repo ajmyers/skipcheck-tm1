@@ -137,8 +137,6 @@ public final class ODataCollectionDecoder {
 
 		private final ByteArrayFeeder feeder;
 
-		private int depth;
-
 		private boolean started;
 
 		private boolean finished;
@@ -219,7 +217,6 @@ public final class ODataCollectionDecoder {
 							method, url, null);
 				}
 				started = true;
-				depth = 1;
 				return;
 			}
 			if (current != null) {
@@ -229,7 +226,6 @@ public final class ODataCollectionDecoder {
 			if (inValue) {
 				if (token == JsonToken.END_ARRAY) {
 					inValue = false;
-					depth--;
 					return;
 				}
 				begin(token, null);
@@ -240,7 +236,6 @@ public final class ODataCollectionDecoder {
 			}
 			// At the top level of the response object
 			if (token == JsonToken.END_OBJECT) {
-				depth--;
 				finished = true;
 				return;
 			}
@@ -250,7 +245,6 @@ public final class ODataCollectionDecoder {
 			}
 			if ("value".equals(field) && token == JsonToken.START_ARRAY) {
 				inValue = true;
-				depth++;
 				return;
 			}
 			begin(token, field);

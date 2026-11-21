@@ -85,30 +85,17 @@ public final class CsdlParser {
 		Map<String, List<CsdlAnnotation>> external = new LinkedHashMap<>();
 		for (Element child : elements(e)) {
 			switch (child.getLocalName()) {
-				case "EntityType":
-					entityTypes.add(entityType(child));
-					break;
-				case "ComplexType":
-					complexTypes.add(complexType(child));
-					break;
-				case "EnumType":
-					enumTypes.add(enumType(child));
-					break;
-				case "Action":
-					operations.add(operation(child, CsdlOperation.Kind.ACTION));
-					break;
-				case "Function":
-					operations.add(operation(child, CsdlOperation.Kind.FUNCTION));
-					break;
-				case "EntityContainer":
-					container = container(child);
-					break;
-				case "Annotations":
-					external.computeIfAbsent(required(child, "Target"), t -> new ArrayList<>())
-						.addAll(annotations(child));
-					break;
-				default:
+				case "EntityType" -> entityTypes.add(entityType(child));
+				case "ComplexType" -> complexTypes.add(complexType(child));
+				case "EnumType" -> enumTypes.add(enumType(child));
+				case "Action" -> operations.add(operation(child, CsdlOperation.Kind.ACTION));
+				case "Function" -> operations.add(operation(child, CsdlOperation.Kind.FUNCTION));
+				case "EntityContainer" -> container = container(child);
+				case "Annotations" -> external.computeIfAbsent(required(child, "Target"), t -> new ArrayList<>())
+					.addAll(annotations(child));
+				default -> {
 					// TypeDefinition, Term and anything newer: not used by the client
+				}
 			}
 		}
 		return new CsdlSchema(required(e, "Namespace"), attr(e, "Alias", null), entityTypes, complexTypes, enumTypes,
@@ -192,24 +179,17 @@ public final class CsdlParser {
 		List<CsdlEntityContainer.FunctionImport> functions = new ArrayList<>();
 		for (Element child : elements(e)) {
 			switch (child.getLocalName()) {
-				case "EntitySet":
-					sets.add(new CsdlEntityContainer.EntitySet(required(child, "Name"), required(child, "EntityType"),
-							bindings(child), annotations(child)));
-					break;
-				case "Singleton":
-					singletons.add(new CsdlEntityContainer.Singleton(required(child, "Name"), required(child, "Type"),
-							bindings(child), annotations(child)));
-					break;
-				case "ActionImport":
-					actions.add(new CsdlEntityContainer.ActionImport(required(child, "Name"), required(child, "Action"),
-							attr(child, "EntitySet", null), annotations(child)));
-					break;
-				case "FunctionImport":
-					functions.add(new CsdlEntityContainer.FunctionImport(required(child, "Name"),
-							required(child, "Function"), attr(child, "EntitySet", null), annotations(child)));
-					break;
-				default:
+				case "EntitySet" -> sets.add(new CsdlEntityContainer.EntitySet(required(child, "Name"),
+						required(child, "EntityType"), bindings(child), annotations(child)));
+				case "Singleton" -> singletons.add(new CsdlEntityContainer.Singleton(required(child, "Name"),
+						required(child, "Type"), bindings(child), annotations(child)));
+				case "ActionImport" -> actions.add(new CsdlEntityContainer.ActionImport(required(child, "Name"),
+						required(child, "Action"), attr(child, "EntitySet", null), annotations(child)));
+				case "FunctionImport" -> functions.add(new CsdlEntityContainer.FunctionImport(required(child, "Name"),
+						required(child, "Function"), attr(child, "EntitySet", null), annotations(child)));
+				default -> {
 					// Annotations are read below
+				}
 			}
 		}
 		return new CsdlEntityContainer(required(e, "Name"), sets, singletons, actions, functions, annotations(e));

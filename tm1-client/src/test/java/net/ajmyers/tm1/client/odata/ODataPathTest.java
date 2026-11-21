@@ -107,7 +107,7 @@ class ODataPathTest {
 	 * literal.
 	 */
 	private static String keyOf(ODataPath path) {
-		String decoded = URI.create("http://tm1:8010/api/v1/" + path.toString().split("/")[0]).getPath();
+		String decoded = URI.create("http://tm1:8010/api/v1/" + path.toString().split("/", -1)[0]).getPath();
 		String segment = decoded.substring(decoded.lastIndexOf("/api/v1/") + 8);
 		String literal = segment.substring(segment.indexOf('(') + 1, segment.lastIndexOf(')'));
 		assertThat(literal).startsWith("'").endsWith("'");

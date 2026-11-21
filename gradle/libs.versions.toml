@@ -12,6 +12,10 @@ lombok = "1.18.48"
 freefair-lombok = "9.8.3"
 spring-javaformat = "0.0.48"
 archunit = "1.5.1"
+errorprone = "2.53.0"
+errorprone-plugin = "5.2.0"
+nullaway = "0.14.4"
+jspecify = "1.0.1"
 testcontainers = "2.0.5"
 # Keep reactor in step with what spring-webflux brings in
 reactor = "3.9.0"
@@ -43,6 +47,9 @@ junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 hamcrest = { module = "org.hamcrest:hamcrest", version.ref = "hamcrest" }
+errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
+nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
+jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
 archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
 testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 
@@ -51,4 +58,5 @@ gradle-plugin-spring-boot = { module = "org.springframework.boot:spring-boot-gra
 gradle-plugin-spring-dependency-management = { module = "io.spring.gradle:dependency-management-plugin", version.ref = "spring-dependency-management" }
 gradle-plugin-maven-publish = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "maven-publish" }
 spring-javaformat-formatter = { module = "io.spring.javaformat:spring-javaformat-formatter-shaded", version.ref = "spring-javaformat" }
+gradle-plugin-errorprone = { module = "net.ltgt.gradle:gradle-errorprone-plugin", version.ref = "errorprone-plugin" }
 gradle-plugin-freefair-lombok = { module = "io.freefair.gradle:lombok-plugin", version.ref = "freefair-lombok" }

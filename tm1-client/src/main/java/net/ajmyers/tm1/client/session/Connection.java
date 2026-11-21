@@ -256,29 +256,25 @@ final class Connection {
 	}
 
 	private <T> Mono<T> read(Tm1Request<T> request, URI uri, ClientResponse response) {
-		switch (request.response()) {
-			case NONE:
-				return response.releaseBody().then(Mono.empty());
-			case TEXT:
-				return response.bodyToMono(String.class).map(request.type()::cast);
-			case SINGLE:
-				return DataBufferUtils.join(response.bodyToFlux(DataBuffer.class)).map(buffer -> {
-					try {
-						return mapper.readValue(buffer.asInputStream(), request.type());
-					}
-					catch (JacksonException e) {
-						throw new Tm1ProtocolException(
-								"TM1 sent a response that isn't valid JSON for " + request.type().getSimpleName(), null,
-								request.method().name(), uri.toString(), e);
-					}
-					finally {
-						DataBufferUtils.release(buffer);
-					}
-				});
-			default:
-				return Mono.error(new IllegalArgumentException(
-						request.response() + " responses are streamed: use stream(), not execute()"));
-		}
+		return switch (request.response()) {
+			case NONE -> response.releaseBody().then(Mono.empty());
+			case TEXT -> response.bodyToMono(String.class).map(request.type()::cast);
+			case SINGLE -> DataBufferUtils.join(response.bodyToFlux(DataBuffer.class)).map(buffer -> {
+				try {
+					return mapper.readValue(buffer.asInputStream(), request.type());
+				}
+				catch (JacksonException e) {
+					throw new Tm1ProtocolException(
+							"TM1 sent a response that isn't valid JSON for " + request.type().getSimpleName(), null,
+							request.method().name(), uri.toString(), e);
+				}
+				finally {
+					DataBufferUtils.release(buffer);
+				}
+			});
+			default -> Mono.error(new IllegalArgumentException(
+					request.response() + " responses are streamed: use stream(), not execute()"));
+		};
 	}
 
 	/** The exception for an error response, from its OData error body if it has one. */
@@ -430,7 +426,7 @@ final class Connection {
 	 */
 	static String cookie(ClientResponse response) {
 		for (String header : response.headers().header(HttpHeaders.SET_COOKIE)) {
-			String[] parts = header.split(";");
+			String[] parts = header.split(";", -1);
 			int eq = parts[0].indexOf('=');
 			if (eq < 0 || !parts[0].substring(0, eq).trim().equals(COOKIE)) {
 				continue;

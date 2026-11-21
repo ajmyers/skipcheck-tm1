@@ -11,8 +11,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.junit.jupiter.api.Test;
@@ -39,7 +39,7 @@ class CoverageGateTest {
 
 	private static final String PENDING = "/metadata/coverage-pending.txt";
 
-	private final SortedSet<String> endpoints = Endpoints.of(MetadataSnapshot.load());
+	private final NavigableSet<String> endpoints = Endpoints.of(MetadataSnapshot.load());
 
 	@Test
 	void everyEndpointIsAccountedFor() throws IOException {
@@ -47,7 +47,7 @@ class CoverageGateTest {
 		List<String> pending = lines(PENDING);
 		Set<String> implemented = implemented();
 
-		SortedSet<String> untriaged = new TreeSet<>(endpoints);
+		NavigableSet<String> untriaged = new TreeSet<>(endpoints);
 		untriaged.removeAll(implemented);
 		untriaged.removeAll(excluded.keySet());
 		pending.forEach(untriaged::remove);
@@ -56,18 +56,18 @@ class CoverageGateTest {
 					EXCLUDED)
 			.isEmpty();
 
-		SortedSet<String> unknown = new TreeSet<>(pending);
+		NavigableSet<String> unknown = new TreeSet<>(pending);
 		unknown.addAll(excluded.keySet());
 		unknown.removeAll(endpoints);
 		assertThat(unknown)
 			.as("entries in the coverage lists that $metadata doesn't define (typos, or removed endpoints)")
 			.isEmpty();
 
-		SortedSet<String> stillPending = new TreeSet<>(implemented);
+		NavigableSet<String> stillPending = new TreeSet<>(implemented);
 		stillPending.retainAll(pending);
 		assertThat(stillPending).as("implemented endpoints still listed in %s: take them off", PENDING).isEmpty();
 
-		SortedSet<String> both = new TreeSet<>(pending);
+		NavigableSet<String> both = new TreeSet<>(pending);
 		both.retainAll(excluded.keySet());
 		assertThat(both).as("endpoints listed as both pending and excluded").isEmpty();
 		assertThat(pending).as("duplicate lines in %s", PENDING).doesNotHaveDuplicates();
@@ -111,7 +111,7 @@ class CoverageGateTest {
 		try (InputStream in = CoverageGateTest.class.getResourceAsStream(resource)) {
 			assertThat(in).as(resource).isNotNull();
 			List<String> result = new ArrayList<>();
-			for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
+			for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n", -1)) {
 				String l = line.strip();
 				if (!l.isEmpty() && !l.startsWith("#")) {
 					result.add(l);

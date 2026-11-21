@@ -66,23 +66,15 @@ public final class Tm1ErrorClassifier {
 				return rule.kind();
 			}
 		}
-		switch (status) {
-			case 401:
-				return Tm1ErrorKind.UNAUTHENTICATED;
-			case 403:
-				return Tm1ErrorKind.FORBIDDEN;
-			case 404:
-				return Tm1ErrorKind.NOT_FOUND;
-			case 409:
-				return Tm1ErrorKind.CONFLICT;
-			case 412:
-			case 428:
-				return Tm1ErrorKind.PRECONDITION_FAILED;
-			case 501:
-				return Tm1ErrorKind.NOT_IMPLEMENTED;
-			default:
-				return Tm1ErrorKind.OTHER;
-		}
+		return switch (status) {
+			case 401 -> Tm1ErrorKind.UNAUTHENTICATED;
+			case 403 -> Tm1ErrorKind.FORBIDDEN;
+			case 404 -> Tm1ErrorKind.NOT_FOUND;
+			case 409 -> Tm1ErrorKind.CONFLICT;
+			case 412, 428 -> Tm1ErrorKind.PRECONDITION_FAILED;
+			case 501 -> Tm1ErrorKind.NOT_IMPLEMENTED;
+			default -> Tm1ErrorKind.OTHER;
+		};
 	}
 
 	/**

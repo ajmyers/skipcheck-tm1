@@ -69,7 +69,8 @@ public final class ODataEncoding {
 		for (char c : "-._~".toCharArray()) {
 			safe[c] = true;
 		}
-		for (char c : extra.toCharArray()) {
+		for (int i = 0; i < extra.length(); i++) {
+			char c = extra.charAt(i);
 			safe[c] = true;
 		}
 		return safe;

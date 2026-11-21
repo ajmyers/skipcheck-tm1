@@ -187,8 +187,10 @@ public final class Tm1Request<T> {
 	 * never retries a non-idempotent request by itself.
 	 */
 	public boolean isIdempotent() {
-		return method == HttpMethod.GET || method == HttpMethod.PUT || method == HttpMethod.DELETE
-				|| method == HttpMethod.HEAD;
+		// equals, not ==: HttpMethod is a class, and a method parsed from text needn't be
+		// the constant
+		return HttpMethod.GET.equals(method) || HttpMethod.PUT.equals(method) || HttpMethod.DELETE.equals(method)
+				|| HttpMethod.HEAD.equals(method);
 	}
 
 	/**

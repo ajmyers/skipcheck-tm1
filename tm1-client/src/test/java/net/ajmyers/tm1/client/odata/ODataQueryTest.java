@@ -139,7 +139,7 @@ class ODataQueryTest {
 	 */
 	private static Map<String, String> parse(String query) {
 		Map<String, String> out = new LinkedHashMap<>();
-		for (String part : query.split("&")) {
+		for (String part : query.split("&", -1)) {
 			int eq = part.indexOf('=');
 			out.put(URLDecoder.decode(part.substring(0, eq), StandardCharsets.UTF_8),
 					URLDecoder.decode(part.substring(eq + 1), StandardCharsets.UTF_8));

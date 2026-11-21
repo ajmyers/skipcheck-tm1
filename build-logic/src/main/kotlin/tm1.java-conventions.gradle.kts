@@ -1,7 +1,11 @@
 // Baseline for every Java subproject: toolchain, compiler flags, JUnit
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
 	java
 	id("io.freefair.lombok")
+	// Error Prone: compile-time bug patterns, as errors because of -Werror below
+	id("net.ltgt.errorprone")
 }
 
 val libs = the<VersionCatalogsExtension>().named("libs")
@@ -19,6 +23,10 @@ java {
 }
 
 tasks.withType<JavaCompile>().configureEach {
+	options.errorprone {
+		// Lombok's generated code is Lombok's business
+		disableWarningsInGeneratedCode = true
+	}
 	options.encoding = "UTF-8"
 	options.compilerArgs.addAll(listOf("-parameters", "-Xlint:all,-serial,-processing,-options"))
 	// Warnings fail the build: a "static method called on an instance" warning once hid a real bug
@@ -70,6 +78,7 @@ tasks.withType<Test>().configureEach {
 }
 
 dependencies {
+	"errorprone"(libs.findLibrary("errorprone-core").get())
 	"testImplementation"(platform(libs.findLibrary("junit-bom").get()))
 	"testImplementation"(libs.findLibrary("junit-jupiter").get())
 	"testImplementation"(libs.findLibrary("assertj-core").get())

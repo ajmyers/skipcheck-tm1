@@ -80,15 +80,11 @@ public record CsdlRevision(String version, Kind kind, String rawKind, String des
 			return Kind.UNKNOWN;
 		}
 		String member = raw.substring(raw.lastIndexOf('/') + 1);
-		switch (member) {
-			case "Added":
-				return Kind.ADDED;
-			case "Modified":
-				return Kind.MODIFIED;
-			case "Deprecated":
-				return Kind.DEPRECATED;
-			default:
-				return Kind.UNKNOWN;
-		}
+		return switch (member) {
+			case "Added" -> Kind.ADDED;
+			case "Modified" -> Kind.MODIFIED;
+			case "Deprecated" -> Kind.DEPRECATED;
+			default -> Kind.UNKNOWN;
+		};
 	}
 }

@@ -51,7 +51,9 @@ final class Transport {
 	}
 
 	private static boolean beforeSending(Throwable failure) {
-		for (Throwable t = failure; t != null; t = t.getCause() == t ? null : t.getCause()) {
+		// getCause() is null at the end of the chain; the bound guards against a cycle
+		Throwable t = failure;
+		for (int depth = 0; t != null && depth < 32; t = t.getCause(), depth++) {
 			if (t instanceof ConnectException || t instanceof UnknownHostException
 					|| t instanceof NoRouteToHostException || t instanceof SSLHandshakeException) {
 				return true;

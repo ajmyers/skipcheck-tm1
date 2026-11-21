@@ -9,7 +9,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.SortedSet;
+import java.util.NavigableSet;
 import java.util.TreeSet;
 
 import org.junit.jupiter.api.Test;
@@ -49,11 +49,11 @@ class MetadataDriftTest {
 			return;
 		}
 
-		SortedSet<String> snapshot = Signatures.of(MetadataSnapshot.load());
-		SortedSet<String> server = Signatures.of(liveDoc);
-		SortedSet<String> added = new TreeSet<>(server);
+		NavigableSet<String> snapshot = Signatures.of(MetadataSnapshot.load());
+		NavigableSet<String> server = Signatures.of(liveDoc);
+		NavigableSet<String> added = new TreeSet<>(server);
 		added.removeAll(snapshot);
-		SortedSet<String> removed = new TreeSet<>(snapshot);
+		NavigableSet<String> removed = new TreeSet<>(snapshot);
 		removed.removeAll(server);
 
 		StringBuilder report = new StringBuilder().append("TM1 ")

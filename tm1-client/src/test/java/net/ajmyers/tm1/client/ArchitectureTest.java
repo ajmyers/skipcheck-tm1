@@ -96,8 +96,8 @@ class ArchitectureTest {
 
 	private static boolean blocks(JavaMethodCall call) {
 		String name = call.getName();
-		return call.getTargetOwner().isAssignableTo(Mono.class) && MONO_BLOCKING.contains(name)
-				|| call.getTargetOwner().isAssignableTo(Flux.class) && FLUX_BLOCKING.contains(name);
+		return (call.getTargetOwner().isAssignableTo(Mono.class) && MONO_BLOCKING.contains(name))
+				|| (call.getTargetOwner().isAssignableTo(Flux.class) && FLUX_BLOCKING.contains(name));
 	}
 
 	private static boolean fireAndForget(JavaMethodCall call) {
