@@ -25,6 +25,9 @@ import tools.jackson.databind.JsonNode;
 public record ODataError(String code, String message, @Nullable String target, List<ODataError> details,
 		@Nullable JsonNode innerError) {
 
+	/** The longest plain-text message kept, so an HTML error page can't fill a log. */
+	private static final int MAX_TEXT = 1000;
+
 	/**
 	 * Replaces a {@code null} code or message with an empty string and copies the
 	 * details.
@@ -63,6 +66,30 @@ public record ODataError(String code, String message, @Nullable String target, L
 		return new ODataError(Objects.requireNonNullElse(text(error, "code"), ""),
 				Objects.requireNonNullElse(text(error, "message"), ""), text(error, "target"), details,
 				error.get("innererror"));
+	}
+
+	/**
+	 * Reads an error from a plain-text body, as TM1 sends for some failures
+	 * (impersonation, for one): a status line such as {@code Error: Bad Request}, then
+	 * the message. The status line is dropped, and the remaining lines become the
+	 * message, with no code.
+	 * @param body the response body as text
+	 * @return the error, or {@code null} if the body has no message
+	 */
+	public static @Nullable ODataError fromText(String body) {
+		StringBuilder message = new StringBuilder();
+		for (String line : body.split("\\R", -1)) {
+			String trimmed = line.strip();
+			if (trimmed.isEmpty() || trimmed.startsWith("Error:")) {
+				continue;
+			}
+			message.append(message.length() == 0 ? "" : " ").append(trimmed);
+		}
+		if (message.length() == 0) {
+			return null;
+		}
+		String text = message.length() > MAX_TEXT ? message.substring(0, MAX_TEXT) + "…" : message.toString();
+		return new ODataError("", text, null, List.of(), null);
 	}
 
 	private static @Nullable String text(JsonNode node, String field) {

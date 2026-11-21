@@ -1,10 +1,9 @@
 package net.ajmyers.tm1.client.session;
 
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.LongSupplier;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.client.reactive.ClientHttpConnector;
@@ -14,7 +13,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 import io.micrometer.observation.ObservationRegistry;
 import io.netty.channel.ChannelOption;
 import net.ajmyers.tm1.client.Tm1Request;
+import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
+import net.ajmyers.tm1.client.version.Tm1Capabilities;
+import net.ajmyers.tm1.client.version.Tm1Dialect;
+import net.ajmyers.tm1.client.version.Tm1Version;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
@@ -92,7 +95,8 @@ public final class Tm1Session {
 			return Mono
 				.error(new IllegalArgumentException("Collection requests are streamed: use stream() for " + request));
 		}
-		return connection.execute(inSandbox(request));
+		Mono<T> send = connection.execute(inSandbox(request));
+		return request.requirement().map(needed -> connection.require(needed).then(send)).orElse(send);
 	}
 
 	/**
@@ -110,7 +114,28 @@ public final class Tm1Session {
 			return Flux.error(new IllegalArgumentException(
 					"Only collection requests are streamed: use execute() for " + request));
 		}
-		return connection.stream(inSandbox(request));
+		Flux<T> send = connection.stream(inSandbox(request));
+		return request.requirement().map(needed -> connection.require(needed).thenMany(send)).orElse(send);
+	}
+
+	/**
+	 * The server's product version, such as {@code 11.8.03500.6}, read from
+	 * {@code Server.ProductVersion} once per login. Logs in first if needed.
+	 * @return the version
+	 */
+	public Mono<Tm1Version> version() {
+		return connection.version();
+	}
+
+	/**
+	 * What the server supports, from its own {@code $metadata} (plan §9). Fetched once
+	 * per server version and shared by every session built from the same settings, a
+	 * pool's included. A request that declares {@link Tm1Request#requires} is checked
+	 * against it before it's sent.
+	 * @return the capabilities
+	 */
+	public Mono<Tm1Capabilities> capabilities() {
+		return connection.capabilities();
 	}
 
 	/**
@@ -214,9 +239,18 @@ public final class Tm1Session {
 
 		private @Nullable String baseUrl;
 
-		private @Nullable String authorization;
+		private Tm1Dialect dialect = Tm1Dialect.V11;
+
+		private @Nullable Tm1Authenticator authenticator;
 
 		private @Nullable String sessionContext;
+
+		private @Nullable String impersonate;
+
+		private LongSupplier nanoTime = System::nanoTime;
+
+		/** Shared by copies, so a pool's sessions fetch $metadata once. */
+		private CapabilitiesCache capabilitiesCache = new CapabilitiesCache();
 
 		private Tm1Timeouts timeouts = Tm1Timeouts.DEFAULTS;
 
@@ -231,6 +265,65 @@ public final class Tm1Session {
 		private @Nullable ClientHttpConnector connector;
 
 		private Builder() {
+		}
+
+		/** A copy of these settings, for the pool to build one session per identity. */
+		Builder copy() {
+			Builder copy = new Builder();
+			copy.baseUrl = baseUrl;
+			copy.dialect = dialect;
+			copy.authenticator = authenticator;
+			copy.sessionContext = sessionContext;
+			copy.impersonate = impersonate;
+			copy.nanoTime = nanoTime;
+			copy.capabilitiesCache = capabilitiesCache;
+			copy.timeouts = timeouts;
+			copy.classifier = classifier;
+			copy.mapper = mapper;
+			copy.observations = observations;
+			copy.webClient = webClient == null ? null : webClient.clone();
+			copy.connector = connector;
+			return copy;
+		}
+
+		/** Logs in as the credentials' own user: no impersonation. */
+		Builder withoutImpersonation() {
+			this.impersonate = null;
+			return this;
+		}
+
+		/** The base URL, or a placeholder if it isn't set yet, for the pool's logs. */
+		String baseUrlOrUnset() {
+			return baseUrl == null ? "(no base URL)" : baseUrl;
+		}
+
+		/** The observation registry, which the pool reports to as well. */
+		ObservationRegistry observations() {
+			return observations;
+		}
+
+		/**
+		 * The server's address, such as {@code http://tm1:8010}: its scheme, host and
+		 * HTTP port. The service root comes from the dialect, {@link Tm1Dialect#V11}
+		 * unless set, which adds {@code /api/v1/}. Use {@link #baseUrl} to give the
+		 * service root itself.
+		 * @param address the server's address
+		 * @return this builder
+		 * @throws IllegalArgumentException if the address doesn't fit the dialect
+		 */
+		public Builder address(String address) {
+			return baseUrl(dialect.serviceRoot(address));
+		}
+
+		/**
+		 * The kind of deployment, for {@link #address}. {@link Tm1Dialect#V11} unless
+		 * set.
+		 * @param dialect the dialect
+		 * @return this builder
+		 */
+		public Builder dialect(Tm1Dialect dialect) {
+			this.dialect = Objects.requireNonNull(dialect, "dialect");
+			return this;
 		}
 
 		/**
@@ -252,16 +345,24 @@ public final class Tm1Session {
 		}
 
 		/**
-		 * Basic authentication, for TM1 security modes 1 and 2.
+		 * Basic authentication, for TM1 security modes 1 and 2: shorthand for
+		 * {@code authenticator(Tm1Authenticator.basic(user, password))}.
 		 * @param user the TM1 user name
 		 * @param password the password; {@code null} counts as empty
 		 * @return this builder
 		 */
-		public Builder basicAuth(String user, String password) {
-			Objects.requireNonNull(user, "user");
-			String credentials = user + ":" + (password == null ? "" : password);
-			this.authorization = "Basic "
-					+ Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+		public Builder basicAuth(String user, @Nullable String password) {
+			return authenticator(Tm1Authenticator.basic(user, password));
+		}
+
+		/**
+		 * How to log in: TM1's own security, CAM, or credentials of your own. Asked for
+		 * credentials on every login.
+		 * @param authenticator supplies the credentials
+		 * @return this builder
+		 */
+		public Builder authenticator(Tm1Authenticator authenticator) {
+			this.authenticator = Objects.requireNonNull(authenticator, "authenticator");
 			return this;
 		}
 
@@ -285,6 +386,33 @@ public final class Tm1Session {
 						"TM1 keeps at most 250 characters of session context, got " + sessionContext.length());
 			}
 			this.sessionContext = sessionContext;
+			return this;
+		}
+
+		/**
+		 * Logs in as {@code user} rather than as the credentials' own user, with TM1's
+		 * {@code TM1-Impersonate}. The credentials must be an administrator's or a data
+		 * administrator's, and nobody can impersonate an administrator. TM1 decides the
+		 * identity at login and keeps it for the session, so one session is one identity;
+		 * for many users, use a {@link Tm1SessionPool}.
+		 *
+		 * <p>
+		 * A refused login fails with
+		 * {@link net.ajmyers.tm1.client.error.Tm1ErrorKind#UNKNOWN_USER} (no such user),
+		 * {@link net.ajmyers.tm1.client.error.Tm1ErrorKind#IMPERSONATION_REFUSED} (not
+		 * allowed), or
+		 * {@link net.ajmyers.tm1.client.error.Tm1ErrorKind#CREDENTIAL_REJECTED} (wrong
+		 * credentials, or the user is disabled: TM1 answers both alike). The client never
+		 * falls back to another identity.
+		 * @param user the TM1 user to act as; matched ignoring case and spaces, as TM1
+		 * does
+		 * @return this builder
+		 * @throws IllegalArgumentException if {@code user} is blank, which TM1 would take
+		 * as no impersonation at all, or has characters other than printable ASCII, which
+		 * TM1 can't match through the header
+		 */
+		public Builder impersonate(String user) {
+			this.impersonate = UserNames.checkImpersonated(user);
 			return this;
 		}
 
@@ -356,6 +484,12 @@ public final class Tm1Session {
 			return this;
 		}
 
+		/** The clock for remembering refused logins; for tests and the pool. */
+		Builder nanoTime(LongSupplier nanoTime) {
+			this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
+			return this;
+		}
+
 		/**
 		 * The session. Nothing is sent to TM1 until the first request.
 		 * @return a new session
@@ -365,16 +499,16 @@ public final class Tm1Session {
 			if (baseUrl == null) {
 				throw new IllegalStateException("baseUrl is required");
 			}
-			if (authorization == null) {
-				throw new IllegalStateException("credentials are required: call basicAuth");
+			if (authenticator == null) {
+				throw new IllegalStateException("credentials are required: call basicAuth or authenticator");
 			}
 			ClientHttpConnector http = connector != null ? connector : nettyConnector(timeouts);
 			WebClient web = (webClient != null ? webClient : WebClient.builder()).clientConnector(http)
 				.observationRegistry(observations)
 				.build();
 			ObjectMapper json = mapper != null ? mapper : JsonMapper.builder().build();
-			return new Tm1Session(new Connection(web, baseUrl, authorization, sessionContext, timeouts, classifier,
-					json, observations));
+			return new Tm1Session(new Connection(web, baseUrl, authenticator, sessionContext, impersonate, timeouts,
+					classifier, json, observations, nanoTime, capabilitiesCache));
 		}
 
 		private static ClientHttpConnector nettyConnector(Tm1Timeouts timeouts) {

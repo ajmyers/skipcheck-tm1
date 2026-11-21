@@ -26,6 +26,29 @@ class Tm1ErrorsTest {
 		assertThat(ODataError.from(MAPPER.readTree("[]"))).isNull();
 	}
 
+	/**
+	 * TM1 11.8 sends impersonation errors as plain text: a status line, then the message.
+	 */
+	@Test
+	void readsAndClassifiesPlainTextErrors() {
+		ODataError unknown = ODataError
+			.fromText("Error: Bad Request\r\nThe user specified in the impersonation request does not exist.\r\n");
+		assertThat(unknown).isNotNull();
+		assertThat(unknown.message()).isEqualTo("The user specified in the impersonation request does not exist.");
+		assertThat(unknown.code()).isEmpty();
+		Tm1ErrorClassifier classifier = Tm1ErrorClassifier.defaults();
+		assertThat(classifier.classify(400, unknown)).isEqualTo(Tm1ErrorKind.UNKNOWN_USER);
+		assertThat(classifier.classify(403,
+				ODataError.fromText(
+						"Error: Forbidden\r\nYou have insufficient rights to impersonate the user specified!\r\n")))
+			.isEqualTo(Tm1ErrorKind.IMPERSONATION_REFUSED);
+		assertThat(classifier.classify(403, ODataError.fromText(
+				"Error: Forbidden\r\nYou need to be a (data-)administrator to be able to impersonate another user.\r\n")))
+			.isEqualTo(Tm1ErrorKind.IMPERSONATION_REFUSED);
+		assertThat(ODataError.fromText("Error: Unauthorized\r\n")).isNull();
+		assertThat(ODataError.fromText("x".repeat(5000)).message()).hasSize(1001);
+	}
+
 	@Test
 	void classifiesCapturedResponses() {
 		// GET Cubes('NoSuchCube')

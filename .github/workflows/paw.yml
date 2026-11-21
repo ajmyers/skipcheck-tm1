@@ -1,0 +1,49 @@
+# Checks docker/paw/paw-local.sh.
+#
+# CI has no IBM software, so PAW can't start here. These checks cover what runs
+# before Docker is needed: ShellCheck, the help text, and the errors for a
+# missing zip, a file that isn't a PAW zip, and a license that hasn't been accepted.
+name: paw
+
+on:
+  push:
+    paths: ['docker/paw/**', '.github/workflows/paw.yml']
+  pull_request:
+    paths: ['docker/paw/**', '.github/workflows/paw.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  paw-local:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docker/paw
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ShellCheck
+        run: shellcheck -x paw-local.sh
+
+      - name: Help
+        run: ./paw-local.sh help | grep -q PAW_ACCEPT_LICENSE
+
+      - name: Fails without a zip
+        run: |
+          out=$(./paw-local.sh up 2>&1) && exit 1
+          echo "$out" | grep -q 'no PAW Local zip'
+
+      - name: Fails on a file that isn't a PAW zip
+        run: |
+          echo nothing > notes.txt && zip -q not-paw.zip notes.txt
+          out=$(PAW_ZIP=not-paw.zip ./paw-local.sh up 2>&1) && exit 1
+          echo "$out" | grep -q 'not a PAW Local zip'
+
+      - name: Fails until the license is accepted
+        run: |
+          mkdir -p fake/config
+          printf 'export PAW_BUILD=1\nexport PAW_RELEASE=0.0.0\n' > fake/config/version.env
+          (cd fake && zip -qr ../ipa_workspace_local_0.0.0.1.zip config)
+          out=$(PAW_ZIP=ipa_workspace_local_0.0.0.1.zip ./paw-local.sh up 2>&1) && exit 1
+          echo "$out" | grep -q 'PAW_ACCEPT_LICENSE=true'

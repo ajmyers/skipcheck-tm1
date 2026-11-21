@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.ClientRequest;
@@ -12,6 +13,7 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import io.micrometer.observation.tck.TestObservationRegistry;
 import io.micrometer.observation.tck.TestObservationRegistryAssert;
 import net.ajmyers.tm1.client.Tm1Request;
+import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1AuthenticationException;
 import net.ajmyers.tm1.client.error.Tm1ErrorKind;
 import net.ajmyers.tm1.client.odata.ODataPath;
@@ -126,6 +128,30 @@ class Tm1SessionReloginTest {
 			.expectError(Tm1SessionClosedException.class)
 			.verify();
 		assertThat(tm1.requests(FakeTm1.LOGIN)).hasSize(1);
+	}
+
+	@Test
+	void asksTheAuthenticatorForFreshCredentialsOnEachLogin() {
+		AtomicInteger issued = new AtomicInteger();
+		tm1.onEach(CREATE_KEY, r -> Mono.just(FakeTm1.status(401, "TM1SessionId=fresh; Path=/api/")),
+				r -> Mono.just(FakeTm1.json(201, "{}")));
+		Tm1Session session = tm1.sessionWithOwnCredentials(Tm1Session.builder()
+			.authenticator(Tm1Authenticator
+				.camPassport(() -> Mono.fromSupplier(() -> "passport" + issued.incrementAndGet()))));
+		StepVerifier.create(session.connect().then(session.execute(CREATE))).expectNextCount(1).verifyComplete();
+
+		List<ClientRequest> logins = tm1.requests(FakeTm1.LOGIN);
+		assertThat(FakeTm1.authorization(logins.get(0))).isEqualTo("CAMPassport passport1");
+		assertThat(FakeTm1.authorization(logins.get(1))).isEqualTo("CAMPassport passport2");
+	}
+
+	@Test
+	void passesAnAuthenticatorFailureThroughWithoutSendingALogin() {
+		IllegalStateException noPassport = new IllegalStateException("Cognos is down");
+		Tm1Session session = tm1.sessionWithOwnCredentials(
+				Tm1Session.builder().authenticator(Tm1Authenticator.camPassport(() -> Mono.error(noPassport))));
+		StepVerifier.create(session.connect()).expectErrorSatisfies(e -> assertThat(e).isSameAs(noPassport)).verify();
+		assertThat(tm1.requests(FakeTm1.LOGIN)).isEmpty();
 	}
 
 	@Test

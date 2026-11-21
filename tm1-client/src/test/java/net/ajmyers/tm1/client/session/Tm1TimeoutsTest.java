@@ -12,7 +12,7 @@ class Tm1TimeoutsTest {
 	@Test
 	void fillsInDefaults() {
 		assertThat(Tm1Timeouts.DEFAULTS).isEqualTo(new Tm1Timeouts(Duration.ofSeconds(10), Duration.ofSeconds(30),
-				Duration.ofMinutes(10), Duration.ofSeconds(5)));
+				Duration.ofMinutes(10), Duration.ofSeconds(5), Duration.ofSeconds(30)));
 		Tm1Timeouts longRequests = Tm1Timeouts.builder().request(Duration.ofHours(1)).build();
 		assertThat(longRequests.request()).isEqualTo(Duration.ofHours(1));
 		assertThat(longRequests.login()).isEqualTo(Duration.ofSeconds(30));

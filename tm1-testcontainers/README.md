@@ -71,6 +71,7 @@ run on every build where TM1 is configured, so they always work as written.
 | Run two servers at once, e.g. to test a migration or comparison | [`TwoServersExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/TwoServersExampleTest.java) |
 | Choose where TM1 comes from in code: install folder, bundle, download link, Docker volume or private image | [`ExplicitSourceExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/ExplicitSourceExampleTest.java) |
 | Skip the extension: plain assumptions and a throwaway server, e.g. for a test that damages its server | [`WithoutTheExtensionExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/WithoutTheExtensionExampleTest.java) |
+| Run TM1 Web against a TM1 server of its own | [`Tm1WebExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/Tm1WebExampleTest.java) |
 
 Spring Boot tests will connect with `@ServiceConnection` once #15 lands.
 
@@ -105,6 +106,42 @@ build. By default the image's tag matches this library's version, and `edge` for
 x86_64/amd64 emulation* in Docker Desktop (see the [getting-started
 guide](../docker/tm1-server/GETTING-STARTED.md#step-1-install-docker)).
 
+## TM1 Web
+
+`Tm1WebContainer` runs TM1 Web (Planning Analytics Spreadsheet Services) on the
+[`tm1-web`](../docker/tm1-web) image, pointed at a `Tm1ServerContainer`'s Admin Server.
+`@RequiresTm1Web` works like `@RequiresTm1` (it includes it), skips tests unless a TM1 Web
+source is configured too, and injects one shared TM1 Web wired to the shared TM1 server:
+
+```java
+@RequiresTm1Web
+class WebsheetTest {
+
+    @Test
+    void opensAWebsheet(Tm1WebContainer web, Tm1ServerContainer tm1) {
+        String url = web.getUrl();             // http://localhost:54321/tm1web/
+        String adminHost = web.getAdminHost(); // the AdminHost to log on with
+        ...
+    }
+}
+```
+
+For TM1 Web against a server of its own, `new Tm1WebContainer(source).withTm1Server(tm1)`
+gives the two containers a shared Docker network, and starting TM1 Web starts the server
+first (see [`Tm1WebExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/Tm1WebExampleTest.java)).
+
+TM1 Web is found the same way as TM1, with `TM1_WEB_` settings: `TM1_WEB_PRIVATE_IMAGE`,
+`TM1_WEB_HOME_DIR` (an installed `tm1web` folder), `TM1_WEB_INSTALL_VOLUME`,
+`TM1_WEB_BUNDLE_DIR` (+ `TM1_WEB_BUNDLE`) or `TM1_WEB_BUNDLE_URL` (+ `TM1_WEB_BUNDLE_SHA256`).
+Simplest of all, keep IBM's `tm1web-*_bundle.tar.gz` next to the TM1 bundle: if
+`TM1_BUNDLE_DIR` holds one, it's used. `TM1_WEB_IMAGE` swaps the image, e.g.
+`tm1-web:local`. The first start installs TM1 Web into the shared cache volume (about 45 s
+on Apple Silicon), later starts take 15–20 s.
+
+TM1 Web's browser API is internal to IBM (DWR), so this module doesn't wrap it: drive TM1
+Web with a browser tool such as Playwright or Selenium, or its URL API. This module's own
+tests use a small DWR client to prove TM1 Web can list and log on to the server.
+
 ## Faster local runs
 
 The shared container is marked reusable. If you turn on Testcontainers reuse, it keeps
@@ -121,5 +158,5 @@ Objects tests leave behind then survive between runs too. Stop the container (`d
 ## Not yet
 
 - Running test classes once per TM1 version, and pinning tests to a version range.
-- Several TM1 servers with a shared Admin Server (`Tm1Stack`), TM1 Web and PAW (#16).
+- Several TM1 servers with a shared Admin Server (`Tm1Stack`), and PAW (#16).
 - Spring Boot `@ServiceConnection` (#15).

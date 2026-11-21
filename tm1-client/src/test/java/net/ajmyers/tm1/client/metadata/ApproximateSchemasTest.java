@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
-import net.ajmyers.tm1.client.odata.csdl.CsdlEntityContainer;
-import net.ajmyers.tm1.client.odata.csdl.CsdlOperation;
+import net.ajmyers.tm1.csdl.CsdlDocument;
+import net.ajmyers.tm1.csdl.CsdlEntityContainer;
+import net.ajmyers.tm1.csdl.CsdlOperation;
 
 class ApproximateSchemasTest {
 

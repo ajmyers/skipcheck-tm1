@@ -76,10 +76,12 @@ final class FakeTm1 implements ExchangeFunction {
 	}
 
 	Tm1Session session(Tm1Session.Builder builder) {
-		return builder.baseUrl(ROOT)
-			.basicAuth("admin", "apple")
-			.webClient(WebClient.builder().exchangeFunction(this))
-			.build();
+		return sessionWithOwnCredentials(builder.basicAuth("admin", "apple"));
+	}
+
+	/** A session from {@code builder}, which sets its own credentials. */
+	Tm1Session sessionWithOwnCredentials(Tm1Session.Builder builder) {
+		return builder.baseUrl(ROOT).webClient(WebClient.builder().exchangeFunction(this)).build();
 	}
 
 	@Override
