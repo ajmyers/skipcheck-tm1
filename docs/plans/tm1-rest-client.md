@@ -180,11 +180,21 @@ by every service and every concurrent subscriber.
   `Tm1Capabilities` once connected.
 - **Lazy, single login.** `connect()` returns `Mono<Tm1Session>`. The first request triggers
   login, and concurrent first requests share one login (a cached `Mono`). On a **401** with an
-  established session (an expired or killed session), it logs in again once and retries the
-  request once. Login failures are not retried.
+  established session (an expired or killed session), it logs in again once and replays the
+  request once. Login failures are not replayed.
+  - **This replay covers POSTs too, deliberately.** It's an exception to "never retry a
+    non-idempotent request" (§16.2). A 401 means TM1 refused the request before running it,
+    because the session wasn't valid, so replaying it after logging in again can't run it twice.
+    Step 3 (#30) verifies this against TM1 before relying on it: it kills the session, sends a
+    POST that creates an object, and checks the object exists exactly once. Every other failure
+    after a request was sent is never replayed for non-idempotent requests.
 - **Explicit close.** `close()` returns `Mono<Void>` and calls `POST ActiveSession/tm1.Close`
   with a JSON body. Spring calls it on context shutdown. Without it, sessions pile up on the
   server until they time out (seen while probing).
+  - **A login in progress is waited for, then closed.** Otherwise a `close()` that races a
+    first request would do nothing, and the login would finish afterwards and leave a session
+    open. Only a session that never started a login is skipped.
+  - After `close()`, the session refuses new requests rather than logging in again.
 - **Request context, derived not mutated.** `session.withSandbox("What-if")` and
   `session.withContext("my-app")` return a **new view sharing the same connection and cookie**.
   One adds TM1's `!sandbox=` query option, the other the `TM1-SessionContext` header, which
@@ -193,8 +203,9 @@ by every service and every concurrent subscriber.
   where one caller's sandbox leaks into another's request. Rejected alternative: carrying the
   sandbox in Reactor `Context`. It's implicit and easy to lose across operator boundaries.
 - **Per-user sessions.** A single session suits service accounts. Apps acting **on behalf of
-  users** need one session per user: `Tm1SessionFactory.open(credentials)` gives one, and the
-  caller owns its lifecycle. Designed now, built when needed.
+  users** need one session per identity. The identity-keyed `Tm1SessionPool` (step 4, #31;
+  §16.1) provides them, with bounded lifetimes and close-on-evict. It takes the place of the
+  `Tm1SessionFactory` this plan first described.
 - **Raw escape hatch.** `session.odata()` exposes the low-level request API (path, query,
   body) returning `JsonNode` or a chosen type. It's for anything not yet modeled, and for
   endpoints that only exist on newer servers.
@@ -230,8 +241,11 @@ by every service and every concurrent subscriber.
       .baseUrl("http://localhost:8010/api/v1/")
       .basicAuth("admin", "")
       .build();
-  tm1.cubes().list(Query.select(Cube.NAME)).map(Cube::name).subscribe(System.out::println);
-  tm1.close().block();
+  tm1.cubes().list(Query.select(Cube.NAME))
+      .map(Cube::name)
+      .doOnNext(System.out::println)
+      .then(tm1.close())       // close after the list completes, not alongside it
+      .block();                // standalone main() only; services never block
   ```
 
 ---
@@ -405,7 +419,7 @@ TI process failures are **not** exceptions: `ExecuteWithReturn` returns a
   - `Tm1Session`, with `destroyMethod` closing it;
   - **every service, individually**;
   - `Tm1Client`;
-  - `Tm1SessionFactory`.
+  - `Tm1SessionPool` (step 4), closed on shutdown.
 - **Builds on Boot's `WebClient.Builder`,** so the app's customizers, codecs and Micrometer
   observations apply.
 - **Works in servlet (MVC) apps too.** WebClient doesn't need a reactive web server, only
@@ -552,7 +566,7 @@ These are concerns the requirements don't name, but that need deciding early:
 | Q2 | Can we commit IBM's `$metadata` to the repo? Its `Core.Description` text is IBM-authored. | **Decided 2026-11-21 (revised): commit it as served, IBM's text included.** First agreed as a stripped snapshot; the user then decided keeping IBM's text is fine. Keeping the exact response also makes the drift check a byte-for-byte comparison, and the descriptions can become generated Javadoc. |
 | Q3 | Flat services with parent-key parameters, or fluent navigation (`tm1.dimension("d").hierarchy("h").elements()`)? | **Decided 2026-11-21: both.** Flat 1:1 services are the core: injectable, and what the coverage gate checks. Fluent handles holding context and defaults come later as a thin layer over them (with the Q10 helpers). Each fluent call runs the flat call it stands for, so the flat layer is always the escape hatch. |
 | Q4 | Default HTTP connector: Reactor Netty, or the JDK `HttpClient` connector? | **Decided 2026-11-21: Reactor Netty is the default and a required dependency.** Any other `ClientHttpConnector` is accepted. Why Netty: pool control (separate named pools per workload, bounded waits for a connection, max idle and max life), which the connection-pinning and 100 s+ pause lessons in §16.2 depend on; per-request response timeouts; gzip; Spring Boot's own default and metrics. The JDK client lacks pool control, doesn't decompress gzip, and defaults to HTTP/2 (TM1 speaks 1.1). Session cookies are always managed by our session code, never a connector's cookie support. |
-| Q5 | Build per-user sessions (`Tm1SessionFactory`) in phase 0, or design only? | Design now, build when the first tool needs it. |
+| Q5 | Build per-user sessions in phase 0, or design only? | **Superseded by Q11:** the identity-keyed `Tm1SessionPool` is built in phase 0 (step 4, #31), replacing the `Tm1SessionFactory` first described. |
 | Q6 | Interim integration-test harness, or build #14 first? | **Decided 2026-11-21: Testcontainers works from the start.** #14 is part of phase 0, and there's no interim harness. |
 | Q7 | When does v12 / PA Cloud become in scope? | **Decided 2026-11-21: later, not scheduled.** Only `Tm1Dialect` and `Tm1Authenticator` are shaped so it fits without a redesign. |
 | Q8 | Is JSON `$batch` public API? | **Decided 2026-11-21: public.** See §13 item 11 for the shape. Batched cellset deletes (§16.3) use the same API. |
@@ -566,7 +580,7 @@ These are concerns the requirements don't name, but that need deciding early:
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0. Foundation** | Module dependencies (WebFlux, Reactor, reactor-test). The `odata` layer: paths, literals, query and filter builder, codecs, streaming collection decoder, errors, CSDL parser. `Tm1Session` with Basic auth, cookie, re-login, close, request context. `Tm1Version`, `Tm1Capabilities`, the `V11` dialect. Raw `odata()` access. Metadata snapshot and coverage gate (failing, with everything listed as "pending"). Starter skeleton with `Tm1ConnectionDetails` (#15). | Connect, read `Server`, close, against the live server. Coverage report generated. |
+| **0. Foundation** (#27; steps #28–#32 and #15, as stacked PRs) | `tm1-testcontainers` (#14), before anything else. Metadata snapshot, CSDL parser and coverage gate. The `odata` layer: paths, literals, query and filter builder, streaming collection decoder, errors, `Tm1Request`. `Tm1Session`: Basic auth, cookie, single-flight re-login, close, request context, raw `odata()` access. The identity-keyed `Tm1SessionPool` and `Tm1Authenticator` SPI (Q11). `Tm1Capabilities`, `Tm1Version`, the `V11` dialect. Starter auto-configuration with `Tm1ConnectionDetails` and `@ServiceConnection` (#15). | On a Testcontainers TM1: connect, read `Server`, close, with no session left behind. Coverage report generated, all endpoints pending. |
 | **1. Codegen** | Generator: records, sealed hierarchies, enums, patch builders, field constants, `@Since`/`@Deprecated`, operation catalog. | Generated model compiles; round-trip tests on captured payloads. |
 | **2. Dimensions** | Dimensions, Hierarchies, Elements, Edges, Levels, Members, Subsets (public, private, session), element/hierarchy/subset attributes, locks and reservations | Integration tests green |
 | **3. Cubes and views** | Cubes, Native and MDX views (public, private), rules, CheckRules/CheckFeeders/Trace\*, Load/Unload, ReorderDimensions, locks and reservations, cube attributes | Integration tests green |
