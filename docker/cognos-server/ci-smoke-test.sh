@@ -17,7 +17,8 @@ run() { docker run --rm "$@"; }  # image is linux/amd64 (pinned in the Dockerfil
 
 # 1. Shell scripts pass shellcheck
 if command -v shellcheck >/dev/null; then
-  shellcheck -S warning "$here"/docker/*.sh "$here"/ci-smoke-test.sh && pass "shellcheck"
+  shellcheck -S warning "$here"/docker/*.sh "$here"/ci-smoke-test.sh || fail "shellcheck"
+  pass "shellcheck"
 else
   echo "skip - shellcheck not installed"
 fi
@@ -85,6 +86,24 @@ out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c 'python3 /usr/local/lib
 grep -q "Not in this manifest: Nope" <<<"$out" || fail "unknown installable error missing: $out"
 pass "unpacker follows the manifest (refs, tar.gz, zip with exec bit, jar; unwanted parts skipped)"
 
+# 4b. A part whose member names escape the install directory is refused
+python3 - "$fake/casrv-0.0.2-0-linuxi38664h.zip" <<'PY'
+import io, json, sys, zipfile
+buf = io.BytesIO()
+with zipfile.ZipFile(buf, "w") as zf:
+    zf.writestr("../escaped.txt", b"no")
+manifest = {"productName": "Evil", "productVersion": "0.0.2", "platform": "linuxi38664h",
+            "license": {"name": "l", "version": "1", "repositoryPath": "p/evil.zip", "installpath": "./"},
+            "installResource": {"name": "r", "version": "1", "repositoryPath": "p/evil.zip", "installpath": "./"},
+            "installables": []}
+with zipfile.ZipFile(sys.argv[1], "w") as repo:
+    repo.writestr("manifest/evil/0.0.2/evil.json", json.dumps(manifest))
+    repo.writestr("p/evil.zip", buf.getvalue())
+PY
+out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c 'python3 /usr/local/lib/cognos-server/unpack-cognos.py /ibm/casrv-0.0.2-0-linuxi38664h.zip /t/x; test ! -e /t/escaped.txt && echo contained' 2>&1) || true
+grep -q "unsafe path in a part: ../escaped.txt" <<<"$out" && grep -q contained <<<"$out" || fail "unpacker didn't refuse an escaping path: $out"
+pass "unpacker refuses paths that escape the install directory"
+
 # 5. The cogstartup.xml template and render steps
 out=$(run --entrypoint sh "$image" -c '
   cat > /tmp/in.xml <<XML
@@ -125,6 +144,11 @@ set -e
 grep -q "does not include IBM software" <<<"$out" || fail "missing help text: $out"
 grep -qF "$(sed -n 3p "$here/docker/banner.txt")" <<<"$out" || fail "startup log doesn't show docker/banner.txt: $out"
 pass "start without Cognos fails with help text and the banner"
+
+# 7b. Embedded PostgreSQL refuses names that aren't plain SQL identifiers
+out=$(run -e 'COGNOS_CS_USER=x"; DROP' --entrypoint cognos-postgres "$image" start 2>&1) && fail "odd role name accepted"
+grep -q "isn't a plain SQL name" <<<"$out" || fail "missing name error: $out"
+pass "embedded PostgreSQL refuses unsafe role names"
 
 # 8. install without a zip: exits 2 with a clear error
 set +e

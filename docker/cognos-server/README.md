@@ -31,7 +31,7 @@ Cognos uses about 8 GB once it's running.
 |----------------|------|-------|
 | `/ibm` | A folder holding your `casrv-<version>-linuxi38664h.zip` | Installed on first start. Can be read-only (`:ro`). |
 | `/opt/ibm/cognos/analytics` | The Cognos install (about 10 GB) | Mount a volume to keep it. Without one, every new container installs again. |
-| `/cognos/postgres` | The embedded content store | Mount a volume to keep it. Without one, the content store goes away with the container. |
+| `/cognos/postgres` | The embedded content store | Mount a volume to keep it. Without one, the content store goes away with the container. Never share it between containers. |
 
 **The install belongs to one container.** Cognos writes into its install while it
 runs: its configuration, data, temp files, logs, and about 2 GB of application
@@ -75,7 +75,9 @@ docker build --platform linux/amd64 \
 ```
 
 The `install` command installs from any source into `/opt/ibm/cognos/analytics`
-(or `--target DIR`) and exits: `install [URL | file | -]`. Run
+(or `--target DIR`) and exits: `install [URL | file | -]`. It installs only into an
+empty directory or volume. If an install is interrupted, the next start (or `install`)
+removes the unfinished one and starts over, as long as the zip is still available. Run
 `docker run --rm ghcr.io/ajmyers/cognos-server install --help` for details.
 Downloads are verified when `COGNOS_ZIP_SHA256` is set. Logs show URLs without
 their query string, since pre-signed links carry credentials there.
@@ -140,7 +142,7 @@ Anything else is run as-is (e.g. `docker run --rm -it ... cognos-server bash`).
 **Stopping.** `docker stop` asks Cognos to shut down and waits for it, which takes a
 minute or two. Docker's default is only 10 seconds before it kills the container,
 so give it longer: `docker stop --time 180`, `--stop-timeout 180` on `docker run`,
-or `stop_grace_period` in compose. A killed Cognos leaves a configuration lock
+or `stop_grace_period: 3m` in compose. A killed Cognos leaves a configuration lock
 behind; the next start removes it.
 
 ## Security

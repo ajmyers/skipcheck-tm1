@@ -21,8 +21,15 @@ ROLE=${COGNOS_CS_USER:-cognos}
 PASSWORD=${COGNOS_CS_PASSWORD:-cognos}
 
 log() { echo "[cognos-postgres] $*"; }
+die() { echo "[cognos-postgres] ERROR: $*" >&2; exit 2; }
+for name in "$DB" "$ROLE"; do
+  [[ $name =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || die "'$name' isn't a plain SQL name (COGNOS_CS_NAME / COGNOS_CS_USER: letters, digits, _)"
+done
 as_postgres() { runuser -u postgres -- "$@"; }
-sql() { as_postgres "$PGBIN/psql" -h /tmp -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -tAq "$@"; }
+# SQL goes in on stdin, with names and the password as psql variables: the password
+# is read from the environment (\getenv), so it never shows in ps.
+sql() { as_postgres env COGNOS_CS_PASSWORD="$PASSWORD" "$PGBIN/psql" -h /tmp -p 5432 -U postgres -d postgres \
+          -v ON_ERROR_STOP=1 -v role="$ROLE" -v db="$DB" -tAq; }
 
 case "${1:-}" in
   start)
@@ -35,20 +42,20 @@ case "${1:-}" in
       as_postgres "$PGBIN/initdb" -D "$PGDATA" -U postgres -E UTF8 --locale=C.UTF-8 \
         --auth-local=trust --auth-host=scram-sha-256 >/dev/null
     fi
-    rm -f "$PGDATA/postmaster.pid"   # left behind if the container was killed
+    # Left behind if the container was killed. (Never share this folder between
+    # containers: this would let a second PostgreSQL start on a live cluster.)
+    rm -f "$PGDATA/postmaster.pid"
     log "Starting PostgreSQL on 127.0.0.1:5432"
     as_postgres "$PGBIN/pg_ctl" -D "$PGDATA" -l "$PGDATA/postgres.log" -w -t 120 \
       -o "-c listen_addresses=127.0.0.1 -c port=5432 -c unix_socket_directories=/tmp" start >/dev/null
-    if [ -z "$(sql -c "SELECT 1 FROM pg_roles WHERE rolname = '$ROLE'")" ]; then
-      sql -c "CREATE ROLE \"$ROLE\" LOGIN"
-    fi
-    # Keep the password in step with COGNOS_CS_PASSWORD, even on an existing cluster.
-    q="'"
-    sql -c "ALTER ROLE \"$ROLE\" PASSWORD '${PASSWORD//$q/$q$q}'"
-    if [ -z "$(sql -c "SELECT 1 FROM pg_database WHERE datname = '$DB'")" ]; then
-      log "Creating database $DB owned by $ROLE"
-      sql -c "CREATE DATABASE \"$DB\" OWNER \"$ROLE\" ENCODING 'UTF8'"
-    fi
+    # Create the role and database if they're missing, and keep the password in step
+    # with COGNOS_CS_PASSWORD, even on an existing cluster.
+    sql <<'SQL'
+SELECT format('CREATE ROLE %I LOGIN', :'role') WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'role') \gexec
+\getenv pw COGNOS_CS_PASSWORD
+ALTER ROLE :"role" PASSWORD :'pw';
+SELECT format('CREATE DATABASE %I OWNER %I ENCODING %L', :'db', :'role', 'UTF8') WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'db') \gexec
+SQL
     log "PostgreSQL ready (database $DB, user $ROLE)"
     ;;
   stop)

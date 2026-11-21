@@ -52,8 +52,8 @@ RUN mkdir -p /opt/ibm/cognos/analytics /cognos/postgres
 # 9300: the Cognos dispatcher (http://localhost:9300/bi/)
 EXPOSE 9300
 
-# Cognos needs minutes to start, and up to a minute or two to stop: give
-# docker stop --time 120 (compose: stop_grace_period: 2m).
+# Cognos needs minutes to start, and a minute or two to stop: give it
+# docker stop --time 180 (docker run --stop-timeout 180; compose: stop_grace_period: 3m).
 STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=15s --timeout=10s --start-period=600s --retries=20 CMD ["/usr/local/bin/cognos-healthcheck"]
 

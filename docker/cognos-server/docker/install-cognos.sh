@@ -71,7 +71,7 @@ if [ "$KIND" = file ]; then [ -f "$SOURCE" ] || die "zip not found: $SOURCE"; fi
 # Install key: identifies a zip cheaply, without reading all 7 GB of it.
 #   file: name, size and modification time
 #   url:  COGNOS_ZIP_SHA256 if set, else the URL without its query string
-#   stdin: no key until it has been read (always installs)
+#   stdin: no key, so it's never recognized as already installed
 case "$KIND" in
   file) KEY=$(printf 'file:%s:%s' "$(basename "$SOURCE")" "$(stat -c '%s:%Y' "$SOURCE")" | sha256sum | cut -c1-16) ;;
   url)  KEY=$(printf 'url:%s' "${COGNOS_ZIP_SHA256:-$SHOWN}" | sha256sum | cut -c1-16) ;;
@@ -90,15 +90,21 @@ mkdir -p "$TARGET" 2>/dev/null || die "can't create $TARGET"
 exec 9>"$TARGET/.install.lock"
 flock 9
 
-if [ -n "$KEY" ] && [ -f "$STATE/install-key" ] && [ "$(cat "$STATE/install-key")" = "$KEY" ] && [ -x "$TARGET/bin64/cogconfig.sh" ]; then
-  log "Cognos already installed in $TARGET from this zip ($SHOWN)"
-  exit 0
+# An install is complete once install-key is written and the installing marker is
+# gone (the marker is removed last). A fresh install only starts in an empty
+# directory, so wiping an unfinished one can only remove what it unpacked.
+if [ -f "$STATE/install-key" ] && [ ! -f "$STATE/installing" ]; then
+  if [ -n "$KEY" ] && [ "$(cat "$STATE/install-key")" = "$KEY" ]; then
+    log "Cognos already installed in $TARGET from this zip ($SHOWN)"
+    exit 0
+  fi
+  die "$TARGET already has Cognos installed from another zip; refusing to overwrite it. Use an empty volume (or remove this one) to install another version."
 fi
 if [ -f "$STATE/installing" ]; then
   log "A previous install into $TARGET didn't finish; removing it and starting over"
   find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .install.lock -exec rm -rf {} +
-elif [ -e "$TARGET/bin64" ]; then
-  die "$TARGET already contains a Cognos install not created by cognos-install (or from another zip); refusing to overwrite it. Use an empty volume."
+elif [ -n "$(find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .install.lock ! -name lost+found -print -quit)" ]; then
+  die "$TARGET isn't empty; Cognos installs only into an empty directory or volume"
 fi
 mkdir -p "$STATE"
 : > "$STATE/installing"
@@ -117,6 +123,7 @@ case "$KIND" in
     log "Reading the zip from stdin"
     zip="$STATE/download.zip"
     cat > "$zip"
+    KEY=$(printf 'stdin:%s' "$(stat -c '%s' "$zip")" | sha256sum | cut -c1-16)
     ;;
 esac
 if [ -n "${COGNOS_ZIP_SHA256:-}" ]; then

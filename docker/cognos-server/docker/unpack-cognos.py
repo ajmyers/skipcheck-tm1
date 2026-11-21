@@ -34,20 +34,34 @@ installables = {i["name"]: i for i in manifest["installables"]}
 seen_parts = set()
 
 
+def inside(dest, path):
+    """True if path, with any symlinks in its directories resolved, is under dest."""
+    root = os.path.realpath(dest)
+    return os.path.commonpath([root, os.path.realpath(os.path.dirname(path))]) == root
+
+
 def extract_zip(zf, dest):
-    """zipfile.extractall drops Unix permissions and symlinks; restore both."""
+    """zipfile.extractall drops Unix permissions and symlinks; restore both.
+
+    Member names must be relative and stay inside dest, also through symlinks
+    unpacked earlier (the same rule as tarfile's "tar" filter)."""
     for info in zf.infolist():
+        name = info.filename
+        if os.path.isabs(name) or ".." in name.replace("\\", "/").split("/"):
+            raise SystemExit(f"unsafe path in a part: {name}")
         mode = info.external_attr >> 16
-        out = os.path.join(dest, info.filename)
+        out = os.path.join(dest, name)
+        if not inside(dest, out):
+            raise SystemExit(f"path escapes the install directory: {name}")
         if stat.S_ISLNK(mode):
             os.makedirs(os.path.dirname(out), exist_ok=True)
             if os.path.lexists(out):
                 os.remove(out)
             os.symlink(zf.read(info).decode(), out)
             continue
-        zf.extract(info, dest)
+        written = zf.extract(info, dest)
         if mode and not info.is_dir():
-            os.chmod(out, stat.S_IMODE(mode))
+            os.chmod(written, stat.S_IMODE(mode))
 
 
 def extract(part):

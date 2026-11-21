@@ -53,7 +53,15 @@ have_zip() {
   [ -n "${COGNOS_ZIP_URL:-}" ] || [ -n "${COGNOS_ZIP:-}" ] && return 0
   compgen -G "${COGNOS_ZIP_DIR:-/ibm}/casrv-*-linuxi38664h.zip" >/dev/null
 }
-if [ ! -x "$COGNOS_HOME/bin64/cogconfig.sh" ] && have_zip; then
+# Wait for an install another container may be running into a shared volume.
+if [ -f "$COGNOS_HOME/.install.lock" ] && [ -w "$COGNOS_HOME/.install.lock" ]; then
+  flock "$COGNOS_HOME/.install.lock" true
+fi
+installed() { [ -x "$COGNOS_HOME/bin64/cogconfig.sh" ] && [ -f "$STATE/install-key" ] && [ ! -f "$STATE/installing" ]; }
+if [ -f "$STATE/installing" ] && ! have_zip; then
+  die "the Cognos install in $COGNOS_HOME didn't finish. Provide the zip again (mount it at ${COGNOS_ZIP_DIR:-/ibm} or set COGNOS_ZIP_URL) to finish it, or use an empty volume."
+fi
+if ! installed && { [ -f "$STATE/installing" ] || [ ! -e "$COGNOS_HOME/bin64" ]; } && have_zip; then
   if mountpoint -q "$COGNOS_HOME"; then
     log "No Cognos install in the volume at $COGNOS_HOME - installing from the zip"
   else
@@ -83,7 +91,7 @@ if [ ! -x "$COGNOS_HOME/bin64/cogconfig.sh" ]; then
 MSG
   exit 2
 fi
-[ -f "$STATE/cogstartup.xml" ] || die "$COGNOS_HOME wasn't installed by this image's install command (no $STATE/cogstartup.xml). Install it with: docker run ... cognos-server install"
+installed || die "$COGNOS_HOME holds a Cognos install this image didn't make (no $STATE/install-key), e.g. one from IBM's installer. Install into an empty volume with this image's install command instead."
 
 # ---- content store ------------------------------------------------------------
 EMBEDDED_PG=F
@@ -126,7 +134,13 @@ cleanup() { kill "$TAIL_PID" 2>/dev/null || true; }
 STARTING=
 abort_start() {
   log "Stopping during startup"
-  [ -n "$STARTING" ] && kill "$STARTING" 2>/dev/null
+  if [ -n "$STARTING" ]; then
+    # cogconfig.sh is a wrapper: stop its Java too, which holds the configuration lock.
+    pkill -TERM -P "$STARTING" 2>/dev/null || true
+    kill -TERM "$STARTING" 2>/dev/null || true
+    wait "$STARTING" 2>/dev/null || true
+    rm -f configuration/cogstartup.lock
+  fi
   ./bin64/cogconfig.sh -stop >/dev/null 2>&1 || true
   stop_pg; cleanup; exit 0
 }
