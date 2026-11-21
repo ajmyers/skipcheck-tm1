@@ -40,3 +40,9 @@ dependencies {
 	testImplementation(libs.archunit)
 	testRuntimeOnly(libs.slf4j.simple)
 }
+
+// The $metadata snapshot (src/model/metadata) is the generator's input, and tests read it from
+// the classpath as /metadata/tm1-schema-<version>.xml
+sourceSets.test {
+	resources.srcDir("src/model")
+}

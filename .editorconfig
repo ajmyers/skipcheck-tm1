@@ -24,7 +24,7 @@ trim_trailing_whitespace = false
 end_of_line = crlf
 
 # TM1's $metadata is committed exactly as the server sends it (plan Q2): never reformat it
-[tm1-client/src/test/resources/metadata/**]
+[tm1-client/src/model/metadata/**]
 charset = unset
 end_of_line = unset
 insert_final_newline = unset
