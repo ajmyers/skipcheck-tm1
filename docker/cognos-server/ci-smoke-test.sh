@@ -92,6 +92,14 @@ import io, json, sys, zipfile
 buf = io.BytesIO()
 with zipfile.ZipFile(buf, "w") as zf:
     zf.writestr("../escaped.txt", b"no")
+# A symlink, then a file of the same name: writing the file must not follow the link.
+link_buf = io.BytesIO()
+with zipfile.ZipFile(link_buf, "w") as zf:
+    link = zipfile.ZipInfo("a"); link.external_attr = (0o120777) << 16
+    zf.writestr(link, "/tmp/outside-target")
+    with __import__("warnings").catch_warnings():
+        __import__("warnings").simplefilter("ignore")
+        zf.writestr("a", b"inside")
 manifest = {"productName": "Evil", "productVersion": "0.0.2", "platform": "linuxi38664h",
             "license": {"name": "l", "version": "1", "repositoryPath": "p/evil.zip", "installpath": "./"},
             "installResource": {"name": "r", "version": "1", "repositoryPath": "p/evil.zip", "installpath": "./"},
@@ -99,10 +107,16 @@ manifest = {"productName": "Evil", "productVersion": "0.0.2", "platform": "linux
 with zipfile.ZipFile(sys.argv[1], "w") as repo:
     repo.writestr("manifest/evil/0.0.2/evil.json", json.dumps(manifest))
     repo.writestr("p/evil.zip", buf.getvalue())
+manifest["license"]["repositoryPath"] = manifest["installResource"]["repositoryPath"] = "p/link.zip"
+with zipfile.ZipFile(sys.argv[1].replace("0.0.2", "0.0.3"), "w") as repo:
+    repo.writestr("manifest/evil/0.0.3/evil.json", json.dumps(manifest))
+    repo.writestr("p/link.zip", link_buf.getvalue())
 PY
 out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c 'python3 /usr/local/lib/cognos-server/unpack-cognos.py /ibm/casrv-0.0.2-0-linuxi38664h.zip /t/x; test ! -e /t/escaped.txt && echo contained' 2>&1) || true
 grep -q "unsafe path in a part: ../escaped.txt" <<<"$out" && grep -q contained <<<"$out" || fail "unpacker didn't refuse an escaping path: $out"
-pass "unpacker refuses paths that escape the install directory"
+out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c 'python3 /usr/local/lib/cognos-server/unpack-cognos.py /ibm/casrv-0.0.3-0-linuxi38664h.zip /t >/dev/null && test ! -e /tmp/outside-target && test ! -L /t/a && grep -qx inside /t/a && echo contained' 2>&1) || true
+grep -q contained <<<"$out" || fail "unpacker wrote through a symlink from an earlier member: $out"
+pass "unpacker refuses paths that escape the install directory (incl. through symlinks)"
 
 # 5. The cogstartup.xml template and render steps
 out=$(run --entrypoint sh "$image" -c '

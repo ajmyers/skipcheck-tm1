@@ -59,6 +59,8 @@ def extract_zip(zf, dest):
                 os.remove(out)
             os.symlink(zf.read(info).decode(), out)
             continue
+        if os.path.islink(out):
+            os.remove(out)  # writing would follow a link an earlier member made
         written = zf.extract(info, dest)
         if mode and not info.is_dir():
             os.chmod(written, stat.S_IMODE(mode))
