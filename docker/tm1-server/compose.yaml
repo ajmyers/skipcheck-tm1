@@ -1,0 +1,97 @@
+# tm1-server: local IBM Planning Analytics (TM1 Server) for development and tests.
+# New here? Start with GETTING-STARTED.md.
+#
+# This file works on its own: download it into an empty folder and run it. It uses
+# the published image (ghcr.io/ajmyers/tm1-server). To use an image you built from
+# the repo, set TM1_SERVER_IMAGE=tm1-server:local in .env.
+#
+#   docker compose up -d                       # Admin Server + empty database "tm1" -> http://localhost:8010
+#   docker compose --profile samples up -d     # + IBM's "SData" sample             -> http://localhost:8011
+#
+# Where TM1 comes from (set in .env; see .env.example):
+#   - nothing set: put your IBM bundle (tm1server-*_bundle.tar.gz) in ./bundles. It's
+#     installed once, on first start, into the Docker volume "tm1-install".
+#   - TM1_BUNDLE_URL: download the bundle instead (e.g. a pre-signed S3 link)
+#   - TM1_HOME_DIR:   use an installed tm1_64 folder on your computer
+#   - TM1_SERVER_IMAGE: a private image with TM1 built in (or your own build)
+#
+# Each server's files are in ./tm1-files/<server>/{config,data,logs} (or TM1_FILES_DIR).
+# One Admin Server (tm1-admin) serves every TM1 server, as in a real deployment.
+
+x-tm1: &tm1
+  image: ${TM1_SERVER_IMAGE:-ghcr.io/ajmyers/tm1-server:latest}
+  platform: linux/amd64
+  stop_signal: SIGINT
+  stop_grace_period: 2m
+  restart: unless-stopped
+  environment: &tm1-env
+    TM1_BUNDLE_URL: ${TM1_BUNDLE_URL:-}
+    TM1_BUNDLE: ${TM1_BUNDLE:-}
+    TM1_BUNDLE_SHA256: ${TM1_BUNDLE_SHA256:-}
+
+# The TM1 install: a folder on your computer (TM1_HOME_DIR), or else the
+# "tm1-install" volume, filled from a bundle on first start.
+x-tm1-home: &tm1-home "${TM1_HOME_DIR:-tm1-install}:/opt/ibm/cognos/tm1_64"
+x-bundles: &bundles "${TM1_BUNDLE_DIR:-./bundles}:/ibm:ro"
+
+services:
+  tm1-admin:
+    <<: *tm1
+    command: ["admin"]
+    container_name: tm1-admin
+    hostname: tm1-admin
+    ports:
+      - "5895:5895"    # Admin Server REST: /api/v1/Servers
+      - "5495:5495"    # Admin Server, legacy clients
+      # SSL ports, if you use UseSSL=T: "5898:5898" (REST over https), "5498:5498"
+    volumes:
+      - *tm1-home
+      - *bundles
+      - ${TM1_FILES_DIR:-./tm1-files}/admin/logs:/tm1/logs
+
+  tm1:
+    <<: *tm1
+    container_name: tm1
+    hostname: tm1
+    depends_on: [tm1-admin]
+    environment:
+      <<: *tm1-env
+      TM1_SERVER_NAME: tm1
+      TM1_SEED: empty
+      TM1_ADMIN_HOST: tm1-admin
+    ports:             # <host>:<container>; ports inside the container are always the same
+      - "8010:8010"    # REST API
+      - "12345:12345"  # TM1 API (Architect/Perspectives)
+      - "12346:12346"  # TM1 client messages
+    volumes:
+      - *tm1-home
+      - *bundles
+      - ${TM1_FILES_DIR:-./tm1-files}/tm1/config:/tm1/config
+      - ${TM1_FILES_DIR:-./tm1-files}/tm1/data:/tm1/data
+      - ${TM1_FILES_DIR:-./tm1-files}/tm1/logs:/tm1/logs
+
+  sdata:
+    <<: *tm1
+    profiles: ["samples"]
+    container_name: tm1-sdata
+    hostname: tm1-sdata
+    depends_on: [tm1-admin]
+    environment:
+      <<: *tm1-env
+      TM1_SERVER_NAME: SData
+      TM1_SEED: sdata
+      TM1_ADMIN_HOST: tm1-admin
+    ports:
+      - "8011:8010"    # REST API on host port 8011
+    volumes:
+      - *tm1-home
+      - *bundles
+      - ${TM1_FILES_DIR:-./tm1-files}/sdata/config:/tm1/config
+      - ${TM1_FILES_DIR:-./tm1-files}/sdata/data:/tm1/data
+      - ${TM1_FILES_DIR:-./tm1-files}/sdata/logs:/tm1/logs
+
+volumes:
+  # The TM1 install when TM1_HOME_DIR isn't set. Filled once from your bundle.
+  # To install a different TM1 version: docker compose down, then
+  # docker volume rm tm1-server_tm1-install, then docker compose up -d.
+  tm1-install:

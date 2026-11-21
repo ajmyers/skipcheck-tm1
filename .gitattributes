@@ -1,3 +1,7 @@
 /gradlew text eol=lf
 *.bat text eol=crlf
 *.jar binary
+# Everything that goes into a Linux image keeps LF line endings, even when checked
+# out on Windows (CRLF breaks shell scripts and config inside the container).
+/docker/** text eol=lf
+*.sh text eol=lf

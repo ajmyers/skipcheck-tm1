@@ -1,0 +1,12 @@
+# Your TM1 server files (config, databases, logs)
+tm1-files/
+# Your IBM bundles: never commit IBM software
+bundles/*
+!bundles/README.md
+*.tar.gz
+*.zip
+*.bin
+# An installed TM1, if you keep it inside this folder
+tm1_64/
+# Machine-specific settings
+.env

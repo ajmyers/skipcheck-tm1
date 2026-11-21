@@ -1,0 +1,52 @@
+# tm1s.cfg - created by tm1-server because none was found in /tm1/config.
+# Edit freely; it is used as-is on the next start. tm1-server only changes
+# DataBaseDirectory, LoggingDirectory, RunningInBackground and AdminHost (to match
+# the container), plus any TM1_* overrides you set explicitly.
+# Parameter reference: IBM Planning Analytics docs, "Parameters in the tm1s.cfg file".
+[TM1S]
+ServerName=tm1
+DataBaseDirectory=/tm1/data
+LoggingDirectory=/tm1/logs
+AdminHost=localhost
+# Ports are fixed by the container (map them with -p <host>:8010 etc.)
+PortNumber=12345
+ClientMessagePortNumber=12346
+HTTPPortNumber=8010
+# Plain HTTP by default (no IBM self-signed certificates). Set T to use SSL.
+UseSSL=F
+IPVersion=ipv4
+RunningInBackground=T
+
+# Security: 1 = native TM1 users (a new database has user "Admin" with a blank password)
+IntegratedSecurityMode=1
+
+# Modelling behaviour: match common production settings, so models behave in
+# tests the way they do in production.
+AllowSeparateNandCRules=T
+ForceReevaluationOfFeedersForFedCellsOnDataChange=T
+ParallelInteraction=T
+EnableNewHierarchyCreation=T
+
+# Development
+EnableTIDebugging=T
+# Sandboxes as a virtual "Sandboxes" dimension. TM1 adds it as the first dimension
+# of every cube, so MDX and views can address sandboxes directly.
+EnableSandboxDimension=T
+
+# Faster startup for larger test models: load cubes and compute feeders on several threads
+MTCubeLoad=T
+MTFeeders=T
+MTFeeders.AtStartup=T
+
+# Diagnostics: event log (tm1event.log) entries for threads running or waiting longer
+# than these thresholds, in seconds (3000 s = 50 minutes, 50 s)
+EventLogging=T
+EventThreshold.ThreadRunningTime=3000
+EventThreshold.ThreadWaitingTime=50
+
+# Off by default for a dev/test server; turn on to match production more closely.
+PersistentFeeders=F
+AuditLogOn=F
+ServerLogging=F
+#TopLogging=T                 # periodic thread snapshots to tm1top.log
+#HTTPSessionTimeoutMinutes=60 # REST session timeout (default 20)
