@@ -1,5 +1,7 @@
 package net.ajmyers.tm1.client.odata.csdl;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,7 +30,7 @@ public sealed interface CsdlValue {
 	/** A {@code Record}: property values by name, in document order. */
 	record Record(Map<String, CsdlValue> properties) implements CsdlValue {
 		public Record {
-			properties = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(properties));
+			properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
 		}
 	}
 

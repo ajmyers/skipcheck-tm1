@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import net.ajmyers.tm1.client.Tm1Request;
+import net.ajmyers.tm1.client.error.Tm1ApiException;
 import net.ajmyers.tm1.client.error.Tm1NotFoundException;
 import net.ajmyers.tm1.client.odata.ODataPath;
 import net.ajmyers.tm1.client.odata.ODataQuery;
@@ -152,7 +153,7 @@ class Tm1SessionTm1Test {
 				.map(n -> (Object) n)
 				.onErrorResume(e -> Mono.just(e))
 				.block(WAIT);
-			assertThat(missing).isInstanceOf(net.ajmyers.tm1.client.error.Tm1ApiException.class);
+			assertThat(missing).isInstanceOf(Tm1ApiException.class);
 		}
 		finally {
 			session.execute(Tm1Request.delete(ODataPath.of("Sandboxes").key(sandbox)))

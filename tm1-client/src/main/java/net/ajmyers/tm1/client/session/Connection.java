@@ -2,7 +2,6 @@ package net.ajmyers.tm1.client.session;
 
 import java.net.URI;
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;

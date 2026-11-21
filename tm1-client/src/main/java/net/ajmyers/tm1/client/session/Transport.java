@@ -3,7 +3,6 @@ package net.ajmyers.tm1.client.session;
 import java.net.ConnectException;
 import java.net.NoRouteToHostException;
 import java.net.UnknownHostException;
-
 import javax.net.ssl.SSLHandshakeException;
 
 import org.springframework.web.reactive.function.client.WebClientRequestException;

@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -97,7 +98,7 @@ class Tm1SourceTest {
 	}
 
 	private static Map<String, String> without(Map<String, String> settings, String... names) {
-		var copy = new java.util.HashMap<>(settings);
+		var copy = new HashMap<>(settings);
 		for (String name : names) {
 			copy.remove(name);
 		}

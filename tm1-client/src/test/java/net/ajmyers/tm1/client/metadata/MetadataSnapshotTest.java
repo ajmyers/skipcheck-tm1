@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
+import net.ajmyers.tm1.client.odata.csdl.CsdlAnnotation;
 import net.ajmyers.tm1.client.odata.csdl.CsdlDocument;
 import net.ajmyers.tm1.client.odata.csdl.CsdlEntityContainer;
 import net.ajmyers.tm1.client.odata.csdl.CsdlOperation;
@@ -71,8 +72,7 @@ class MetadataSnapshotTest {
 			.filter(p -> p.name().equals("Name"))
 			.findFirst()
 			.orElseThrow();
-		assertThat(net.ajmyers.tm1.client.odata.csdl.CsdlAnnotation.find(name.annotations(), "Core.Description"))
-			.isPresent();
+		assertThat(CsdlAnnotation.find(name.annotations(), "Core.Description")).isPresent();
 	}
 
 	@Test

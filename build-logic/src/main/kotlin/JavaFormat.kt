@@ -15,8 +15,10 @@ import org.gradle.work.DisableCachingByDefault
 import java.nio.charset.StandardCharsets
 
 /**
- * Fails when a Java file isn't laid out the way Spring Java Format lays it out. Cacheable, and only
- * reruns when a source file changes. Run `./gradlew format` to fix what it reports.
+ * Fails when a Java file isn't laid out the way Spring Java Format lays it out, or has an unused
+ * import, imports out of order, or a fully qualified type name in code (see JavaImports). Cacheable, and only reruns when
+ * a source file changes. `./gradlew format` fixes the layout and the imports, except fully
+ * qualified names.
  *
  * Our own task around Spring Java Format's formatter, rather than its Gradle plugin, because the
  * plugin's tasks don't support the configuration cache (0.0.48 calls Task.project while running).
@@ -38,17 +40,24 @@ abstract class CheckJavaFormat : DefaultTask() {
 	fun check() {
 		val files = source.files.sorted()
 		val unformatted = FileFormatter().formatFiles(files, StandardCharsets.UTF_8).filter { it.hasEdits() }.map { it.file }.toList()
+		val imports = files.flatMap { file -> JavaImports.problems(file.readText()).map { "  ${file.path}:${it.line}: ${it.message}" } }
 		val reportFile = report.get().asFile
 		reportFile.parentFile.mkdirs()
 		reportFile.writeText(files.joinToString("\n", postfix = "\n") { it.path })
+		val failures = mutableListOf<String>()
 		if (unformatted.isNotEmpty()) {
-			throw GradleException(
-				"These files aren't formatted (run ./gradlew format):\n" + unformatted.joinToString("\n") { "  " + it.path })
+			failures += "These files aren't formatted (run ./gradlew format):\n" + unformatted.joinToString("\n") { "  " + it.path }
+		}
+		if (imports.isNotEmpty()) {
+			failures += "Import problems (./gradlew format removes unused imports and orders the rest):\n" + imports.joinToString("\n")
+		}
+		if (failures.isNotEmpty()) {
+			throw GradleException(failures.joinToString("\n\n"))
 		}
 	}
 }
 
-/** Formats Java files in place with Spring Java Format. */
+/** Formats Java files in place with Spring Java Format, after removing unused imports and ordering the rest. */
 @DisableCachingByDefault(because = "Changes the source files in place")
 abstract class FormatJava : DefaultTask() {
 
@@ -60,6 +69,13 @@ abstract class FormatJava : DefaultTask() {
 
 	@TaskAction
 	fun format() {
+		for (file in source.files) {
+			val text = file.readText()
+			val cleaned = JavaImports.sortImports(JavaImports.removeUnusedImports(text))
+			if (cleaned != text) {
+				file.writeText(cleaned)
+			}
+		}
 		FileFormatter().formatFiles(source.files.sorted(), StandardCharsets.UTF_8).filter { it.hasEdits() }.forEach {
 			it.save()
 			logger.lifecycle("Formatted {}", it.file)

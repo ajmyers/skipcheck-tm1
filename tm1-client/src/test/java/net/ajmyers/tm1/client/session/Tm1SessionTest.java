@@ -10,6 +10,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 
@@ -185,7 +186,7 @@ class Tm1SessionTest {
 		StepVerifier.create(Mono.when(session.close(), session.close())).verifyComplete();
 		StepVerifier.create(session.close()).verifyComplete();
 
-		List<org.springframework.web.reactive.function.client.ClientRequest> closes = tm1.requests(FakeTm1.CLOSE);
+		List<ClientRequest> closes = tm1.requests(FakeTm1.CLOSE);
 		assertThat(closes).hasSize(1);
 		assertThat(FakeTm1.cookie(closes.get(0))).isEqualTo("c1");
 		assertThat(closes.get(0).headers().getContentType()).hasToString("application/json");

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -135,8 +136,8 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 			.findFirst();
 	}
 
-	private <T> Optional<T> find(String qualifiedName, java.util.function.Function<CsdlSchema, List<T>> members,
-			java.util.function.Function<T, String> nameOf) {
+	private <T> Optional<T> find(String qualifiedName, Function<CsdlSchema, List<T>> members,
+			Function<T, String> nameOf) {
 		String name = qualify(qualifiedName);
 		return schemas.stream()
 			.flatMap(s -> members.apply(s).stream().filter(t -> (s.namespace() + "." + nameOf.apply(t)).equals(name)))
