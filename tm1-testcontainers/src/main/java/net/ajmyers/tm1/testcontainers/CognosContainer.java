@@ -31,7 +31,7 @@ import com.github.dockerjava.api.model.Volume;
  * <p>
  * Give it test users, and the container builds an LDAP directory with them and a Cognos
  * namespace ({@value #NAMESPACE}) for it. Then run a {@link Tm1ServerContainer} against
- * it with {@code Tm1ServerContainer.withCamSecurity}:
+ * it with {@link Tm1ServerContainer#withCamSecurity}:
  *
  * <pre>{@code
  * try (var cognos = new CognosContainer(cognosSource)

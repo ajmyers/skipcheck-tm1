@@ -6,8 +6,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,9 +33,16 @@ final class Tm1Rest implements AutoCloseable {
 	private String cookie;
 
 	Tm1Rest(Tm1ServerContainer tm1) {
+		this(tm1, tm1.getAuthorization());
+	}
+
+	/**
+	 * A session with its own login, e.g. a Cognos user's
+	 * {@code CognosContainer.camAuthorization}.
+	 */
+	Tm1Rest(Tm1ServerContainer tm1, String authorization) {
 		this.baseUrl = tm1.getRestUrl();
-		this.authorization = "Basic " + Base64.getEncoder()
-			.encodeToString((tm1.getUsername() + ":" + tm1.getPassword()).getBytes(StandardCharsets.UTF_8));
+		this.authorization = authorization;
 	}
 
 	/**
@@ -61,6 +66,20 @@ final class Tm1Rest implements AutoCloseable {
 				.orElse(null);
 		}
 		return response.body();
+	}
+
+	/**
+	 * POSTs a JSON body to a path under the service root and returns the response,
+	 * whatever its status.
+	 */
+	HttpResponse<String> post(String path, String json) {
+		HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(baseUrl + path))
+			.header("Content-Type", "application/json")
+			.POST(HttpRequest.BodyPublishers.ofString(json));
+		if (cookie == null) {
+			get("ActiveUser?$select=Name"); // logs in and keeps the session cookie
+		}
+		return send(request.header("Cookie", cookie).build());
 	}
 
 	/** The number of cubes, excluding control cubes (whose names start with '}'). */
