@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiFunction;
 
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import net.ajmyers.tm1.client.Tm1Operation;
@@ -14,10 +15,12 @@ import net.ajmyers.tm1.client.model.Cellset;
 import net.ajmyers.tm1.client.model.CellsetAxis;
 import net.ajmyers.tm1.client.model.CellsetAxisTuple;
 import net.ajmyers.tm1.client.model.CellsetCell;
+import net.ajmyers.tm1.client.model.CellsetUpdatePatch;
 import net.ajmyers.tm1.client.model.Cube;
 import net.ajmyers.tm1.client.model.Hierarchy;
 import net.ajmyers.tm1.client.model.Member;
 import net.ajmyers.tm1.client.model.Tm1Operations;
+import net.ajmyers.tm1.client.model.View;
 import net.ajmyers.tm1.client.odata.ODataPath;
 import net.ajmyers.tm1.client.odata.ODataQuery;
 import net.ajmyers.tm1.client.service.Tm1Endpoint;
@@ -237,6 +240,78 @@ public final class CellsetService {
 		range.put("End", end);
 		return session.stream(Tm1Request.list(cellset(id).function(operation.name(), range), query, CellsetCell.class)
 			.requires(operation.capability()));
+	}
+
+	/**
+	 * {@code tm1.Update}: writes one value to a cell of the cellset, by ordinal. The
+	 * action takes a range ({@code BeginOrdinal}, {@code EndOrdinal}), but TM1 (11.8)
+	 * writes only the first cell of it, so this takes one ordinal; {@link #updateCells}
+	 * writes many.
+	 * @param id the cellset's ID
+	 * @param ordinal the cell's ordinal
+	 * @param value the value, or {@code null} to clear the cell
+	 * @return completes when it's written
+	 */
+	@Tm1Endpoint("Action Cellset/Update")
+	public Mono<Void> update(String id, long ordinal, @Nullable Object value) {
+		Map<String, @Nullable Object> body = new LinkedHashMap<>();
+		body.put("BeginOrdinal", ordinal);
+		body.put("EndOrdinal", ordinal);
+		body.put("Value", value);
+		return session.execute(cellsetAction(Tm1Operations.CELLSET_UPDATE, id, body, Void.class));
+	}
+
+	/**
+	 * {@code tm1.UpdateCells}: writes many of the cellset's cells, each its own value, by
+	 * ordinal. Needs schema 11.0.0.
+	 * @param id the cellset's ID
+	 * @param updates the writes:
+	 * {@code CellsetUpdatePatch.builder().ordinal(n).value(v)}, or with a reference cube
+	 * and cell to copy from
+	 * @return completes when they're written
+	 */
+	@Tm1Endpoint("Action Cellset/UpdateCells")
+	@Tm1Endpoint("Navigation CellsetUpdate/ReferenceCube")
+	@Tm1Endpoint("Navigation CellsetUpdate/ReferenceCell")
+	public Mono<Void> updateCells(String id, List<CellsetUpdatePatch> updates) {
+		return session.execute(cellsetAction(Tm1Operations.CELLSET_UPDATE_CELLS, id,
+				Map.of("Updates", List.copyOf(updates)), Void.class));
+	}
+
+	/**
+	 * {@code tm1.SaveViewAs}: saves the cellset's query as a public view of its cube,
+	 * failing if one has the name. Needs schema 11.0.0.
+	 * @param id the cellset's ID
+	 * @param name the view's name
+	 * @return the view
+	 */
+	@Tm1Endpoint("Action Cellset/SaveViewAs")
+	public Mono<View> saveViewAs(String id, String name) {
+		return session.execute(cellsetAction(Tm1Operations.CELLSET_SAVE_VIEW_AS, id,
+				Map.of("Name", Objects.requireNonNull(name, "name")), View.class));
+	}
+
+	/**
+	 * {@code tm1.SaveViewAs}: saves the cellset's query as a view of its cube. Needs
+	 * schema 11.0.0.
+	 * @param id the cellset's ID
+	 * @param name the view's name
+	 * @param overwrite whether to replace a view that has the name
+	 * @param makePrivate whether the view is private
+	 * @return the view
+	 */
+	@Tm1Endpoint("Action Cellset/SaveViewAs")
+	public Mono<View> saveViewAs(String id, String name, boolean overwrite, boolean makePrivate) {
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("Name", Objects.requireNonNull(name, "name"));
+		body.put("Overwrite", overwrite);
+		body.put("MakePrivate", makePrivate);
+		return session.execute(cellsetAction(Tm1Operations.CELLSET_SAVE_VIEW_AS, id, body, View.class));
+	}
+
+	private static <T> Tm1Request<T> cellsetAction(Tm1Operation operation, String id, Map<String, ?> body,
+			Class<T> type) {
+		return Tm1Request.post(cellset(id).action(operation.name()), body, type).requires(operation.capability());
 	}
 
 	/**
