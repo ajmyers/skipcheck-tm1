@@ -33,6 +33,18 @@ import reactor.core.publisher.Mono;
  * not text. Running a process returns when it ends, however long that takes: give the
  * request a timeout that fits, and know that cancelling the subscription doesn't stop the
  * process on the server.
+ *
+ * <p>
+ * Create a process, compiling it first, since TM1 saves code that doesn't compile:
+ * {@snippet class = examples.ProcessServiceExamples region = create}
+ *
+ * <p>
+ * Run it with parameters, and fail if it wrote an error log:
+ * {@snippet class = examples.ProcessServiceExamples region = run}
+ *
+ * <p>
+ * Run code without saving it as a process:
+ * {@snippet class = examples.ProcessServiceExamples region = run-unsaved}
  */
 public final class ProcessService {
 

@@ -42,6 +42,18 @@ import tools.jackson.databind.JsonNode;
  * properties and not open, so its columns would all be lost in a record: relational rows
  * come as {@code JsonNode}. A rowset's rows ({@code RowsetRow}) are open, and keep theirs
  * in {@code dynamicProperties}.
+ *
+ * <p>
+ * Drill from a cell of a query to the detail behind it:
+ * {@snippet class = examples.DrillthroughServiceExamples region = cell}
+ *
+ * <p>
+ * Run a drillthrough process directly, with its parameters:
+ * {@snippet class = examples.DrillthroughServiceExamples region = process}
+ *
+ * <p>
+ * Read the rows of a relational drillthrough as a rowset:
+ * {@snippet class = examples.DrillthroughServiceExamples region = rowset}
  */
 public final class DrillthroughService {
 

@@ -16,6 +16,14 @@ import reactor.core.publisher.Mono;
 /**
  * Levels: {@code /Dimensions('d')/Hierarchies('h')/Levels}, keyed by number, and their
  * members. Read only: TM1 derives levels from the hierarchy's structure.
+ *
+ * <p>
+ * List a hierarchy's levels, with how many members each has:
+ * {@snippet class = examples.LevelServiceExamples region = list}
+ *
+ * <p>
+ * Read a level's members. Levels are numbered from the top, so level 0 holds the roots:
+ * {@snippet class = examples.LevelServiceExamples region = members}
  */
 public final class LevelService {
 

@@ -19,6 +19,18 @@ import reactor.core.publisher.Mono;
 /**
  * Edges: {@code /Dimensions('d')/Hierarchies('h')/Edges}, the parent-child links of a
  * hierarchy, each keyed by its parent's and its component's names.
+ *
+ * <p>
+ * List a hierarchy's edges:
+ * {@snippet class = examples.EdgeServiceExamples region = list}
+ *
+ * <p>
+ * Change an edge's weight:
+ * {@snippet class = examples.EdgeServiceExamples region = reweight}
+ *
+ * <p>
+ * Move an element to another parent:
+ * {@snippet class = examples.EdgeServiceExamples region = move}
  */
 public final class EdgeService {
 

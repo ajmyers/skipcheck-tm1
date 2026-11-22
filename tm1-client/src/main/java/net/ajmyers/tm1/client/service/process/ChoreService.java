@@ -28,6 +28,18 @@ import reactor.core.publisher.Mono;
  * <p>
  * A task binds a process ({@code ChoreTaskPatch.Builder#bindProcess}) and gives each of
  * its parameters a value; its {@code Step}, its place in the chore, is TM1's to number.
+ *
+ * <p>
+ * Create a daily chore with one task:
+ * {@snippet class = examples.ChoreServiceExamples region = create}
+ *
+ * <p>
+ * Add a task at the end, and get the step TM1 gave it:
+ * {@snippet class = examples.ChoreServiceExamples region = add-task}
+ *
+ * <p>
+ * Schedule the chore, by patching {@code Active}:
+ * {@snippet class = examples.ChoreServiceExamples region = activate}
  */
 public final class ChoreService {
 

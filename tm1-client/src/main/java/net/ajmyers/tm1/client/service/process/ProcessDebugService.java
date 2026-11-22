@@ -42,6 +42,15 @@ import reactor.core.publisher.Mono;
  * which {@link #finish} does, and {@link #debugging} does when its work is done. A
  * finished context stays readable until the session ends. {@code ProcessDebugContexts}
  * lists none, though each reads by ID.
+ *
+ * <p>
+ * Stop at a breakpoint and see where the run is, with {@link #debugging} finishing the
+ * run afterwards:
+ * {@snippet class = examples.ProcessDebugServiceExamples region = breakpoint}
+ *
+ * <p>
+ * Step through a run started with {@link #debug}, and finish it:
+ * {@snippet class = examples.ProcessDebugServiceExamples region = step}
  */
 public final class ProcessDebugService {
 
@@ -91,8 +100,9 @@ public final class ProcessDebugService {
 	}
 
 	/**
-	 * Debugs a process for the length of {@code work}, then deletes the debug context:
-	 * when the work completes, fails or is cancelled.
+	 * Debugs a process for the length of {@code work}, then finishes the run: when the
+	 * work completes, fails or is cancelled. TM1 (11.8) refuses to delete a debug
+	 * context, so finishing it is how the run ends.
 	 * @param <R> what the work gives
 	 * @param process the process's name
 	 * @param parameters its parameters, by name, in order; may be empty

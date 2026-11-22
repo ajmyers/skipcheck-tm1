@@ -18,6 +18,9 @@ dependencies {
 	api(project(":tm1-testcontainers"))
 	api(libs.spring.boot.testcontainers)
 
+	// The examples show a @SpringBootTest and a @TestConfiguration
+	"examplesImplementation"(libs.spring.boot.test)
+
 	testImplementation(libs.spring.boot.test)
 	testImplementation(libs.spring.test)
 }

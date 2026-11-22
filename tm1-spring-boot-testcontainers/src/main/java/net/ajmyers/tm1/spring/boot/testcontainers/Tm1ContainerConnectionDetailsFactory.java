@@ -14,6 +14,11 @@ import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
  * {@code @ServiceConnection}: its REST URL and its login. Registered in
  * {@code META-INF/spring.factories}, so Spring Boot finds it; applications don't use it
  * directly.
+ *
+ * <p>
+ * A Spring Boot test with its TM1 from the shared container:
+ *
+ * {@snippet class = examples.ServiceConnectionExamples region = test}
  */
 public final class Tm1ContainerConnectionDetailsFactory
 		extends ContainerConnectionDetailsFactory<Tm1ServerContainer, Tm1ConnectionDetails> {

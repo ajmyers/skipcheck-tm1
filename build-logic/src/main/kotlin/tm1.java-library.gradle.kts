@@ -30,6 +30,44 @@ tasks.named("check") {
 	dependsOn(tasks.named("javadoc"))
 }
 
+// Usage examples for the Javadoc, in src/examples/java: real code, compiled against the library on
+// every build, so an API change that breaks an example fails the build rather than shipping it.
+// The Javadoc quotes marked regions of them with {@snippet class=... region=...}. Compiled, not
+// run: they need a TM1 server (CONTRIBUTING.md, "Usage examples").
+val main = sourceSets.named("main")
+val examples = sourceSets.create("examples") {
+	compileClasspath += main.get().output + main.get().compileClasspath
+}
+tasks.named("check") {
+	dependsOn(tasks.named(examples.compileJavaTaskName))
+}
+// A module's overview page (src/main/javadoc/overview.html) is the first page of its Javadoc:
+// where its Getting started goes. {{version}} in it becomes the version being built, so the
+// dependency it shows can be copied as is.
+val overviewSource = layout.projectDirectory.file("src/main/javadoc/overview.html")
+val overview = layout.buildDirectory.file("javadoc-overview/overview.html")
+val javadocOverview = tasks.register<Copy>("javadocOverview") {
+	val version = project.version.toString()
+	inputs.property("version", version)
+	from(overviewSource)
+	into(overview.map { it.asFile.parentFile })
+	filter { line: String -> line.replace("{{version}}", version) }
+}
+tasks.withType<Javadoc>().configureEach {
+	if (overviewSource.asFile.isFile) {
+		dependsOn(javadocOverview)
+		inputs.file(overview)
+		(options as StandardJavadocDocletOptions).overview = overview.get().asFile.path
+	}
+}
+val examplesDir = layout.projectDirectory.dir("src/examples/java")
+tasks.withType<Javadoc>().configureEach {
+	if (examplesDir.asFile.isDirectory) {
+		inputs.dir(examplesDir)
+		(options as StandardJavadocDocletOptions).addPathOption("-snippet-path").value = listOf(examplesDir.asFile)
+	}
+}
+
 // The same Javadoc, themed for ajmyers.net/projects/<module>/api/ (api-site/README.md). A separate
 // task, so the javadoc jar on Maven Central stays plain: the theme imports the site's styles from
 // the same origin, which only works there.

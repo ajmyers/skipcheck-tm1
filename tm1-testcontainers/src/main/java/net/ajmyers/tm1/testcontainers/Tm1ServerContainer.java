@@ -42,18 +42,32 @@ import net.ajmyers.tm1.client.version.Tm1Version;
  * source from the environment, starts one {@linkplain #shared() shared} container, and
  * skips the tests when there's no source or no Docker.
  *
- * <pre>{@code
- * try (var tm1 = new Tm1ServerContainer(new Tm1Source.InstallDir(Path.of("/opt/ibm/tm1_64")))) {
- *     tm1.start();
- *     String url = tm1.getRestUrl();   // http://localhost:54321/api/v1/
- * }
- * }</pre>
- *
  * <p>
  * By default the server starts with an empty database and the login {@code admin} with no
  * password. Once started, the container reads the server's version, available from
  * {@link #getTm1Version()}. If {@link #withExpectedVersion} was set and the version
  * differs, it fails to start, before any test runs against the wrong TM1.
+ *
+ * <p>
+ * A client for the server, from its URL and login:
+ *
+ * {@snippet class = examples.Tm1ServerContainerExamples region = client}
+ *
+ * <p>
+ * A container of a test's own, with IBM's SData sample on one TM1 version:
+ *
+ * {@snippet class = examples.Tm1ServerContainerExamples region = sample}
+ *
+ * <p>
+ * Your own database, from a folder in the project:
+ *
+ * {@snippet class = examples.Tm1ServerContainerExamples region = own-database}
+ *
+ * <p>
+ * In Cognos (CAM) security, with {@link #withCamSecurity}, each Cognos test user logs in
+ * as themselves:
+ *
+ * {@snippet class = examples.CognosContainerExamples region = cam-security}
  */
 public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 

@@ -47,17 +47,7 @@ import tools.jackson.databind.ObjectMapper;
  * (plan §6), such as {@link #dimensions()}. Services arrive with the endpoint phases;
  * {@link #session()} sends any request, for what has no service yet.
  *
- * <pre>{@code
- * Tm1Client tm1 = Tm1Client.builder()
- *     .baseUrl("http://localhost:8010/api/v1/")
- *     .basicAuth("admin", "")
- *     .build();
- * tm1.session().stream(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none().select("Name"), JsonNode.class))
- *     .map(cube -> cube.get("Name").asString())
- *     .doOnNext(System.out::println)
- *     .then(tm1.close())   // close after the list completes, not alongside it
- *     .block();            // in a standalone main() only
- * }</pre>
+ * {@snippet class = examples.ClientExamples region = connect}
  */
 public final class Tm1Client {
 

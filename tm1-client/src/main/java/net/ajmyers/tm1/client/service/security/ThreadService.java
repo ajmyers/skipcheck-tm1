@@ -19,6 +19,14 @@ import reactor.core.publisher.Mono;
  * Server threads: what the server is doing right now ({@code /Threads}), and cancelling
  * an operation, which is how to stop a running process: cancelling a client's request
  * doesn't.
+ *
+ * <p>
+ * See what the server is busy with:
+ * {@snippet class = examples.ThreadServiceExamples region = busy}
+ *
+ * <p>
+ * Stop a running process by cancelling its thread, found by its request:
+ * {@snippet class = examples.ThreadServiceExamples region = cancel-process}
  */
 public final class ThreadService {
 

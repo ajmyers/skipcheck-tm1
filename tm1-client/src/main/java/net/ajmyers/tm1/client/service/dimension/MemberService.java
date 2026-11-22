@@ -18,6 +18,18 @@ import reactor.core.publisher.Mono;
  * Members: {@code /Dimensions('d')/Hierarchies('h')/Members}, the MDX view of a
  * hierarchy's elements, and a member's parent, children, element, level and hierarchy.
  * Read only: members change through their elements.
+ *
+ * <p>
+ * Read a member's unique name, to use in MDX:
+ * {@snippet class = examples.MemberServiceExamples region = unique-name}
+ *
+ * <p>
+ * Read a member's children:
+ * {@snippet class = examples.MemberServiceExamples region = children}
+ *
+ * <p>
+ * Read a member's parent, which a root doesn't have:
+ * {@snippet class = examples.MemberServiceExamples region = parent}
  */
 public final class MemberService {
 

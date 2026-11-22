@@ -20,13 +20,20 @@ import reactor.core.publisher.Mono;
 /**
  * Dimensions: {@code /Dimensions} and the operations bound to a dimension.
  *
- * <pre class="code">
- * DimensionService dimensions = new DimensionService(session);
- * dimensions.list(ODataQuery.none().select(Dimension.NAME)).map(Dimension::name);
- * </pre>
- *
  * <p>
  * A dimension's hierarchies, elements and subsets have services of their own.
+ *
+ * <p>
+ * List dimensions with a query: here, the names of the model dimensions.
+ * {@snippet class = examples.DimensionServiceExamples region = list}
+ *
+ * <p>
+ * Create a dimension with its hierarchy, elements and edges in one request:
+ * {@snippet class = examples.DimensionServiceExamples region = create}
+ *
+ * <p>
+ * Read a dimension with its hierarchies expanded:
+ * {@snippet class = examples.DimensionServiceExamples region = hierarchies}
  */
 public final class DimensionService {
 

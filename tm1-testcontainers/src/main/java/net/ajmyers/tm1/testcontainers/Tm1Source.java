@@ -33,6 +33,23 @@ import org.jspecify.annotations.Nullable;
  * <li>{@code TM1_BUNDLE_URL}, optionally with {@code TM1_BUNDLE_SHA256}: a download link
  * for the bundle ({@link BundleUrl})
  * </ol>
+ *
+ * <p>
+ * Most tests let {@link #discover()} find the source, so each developer and CI system can
+ * supply TM1 their own way:
+ *
+ * {@snippet class = examples.Tm1SourceExamples region = discover}
+ *
+ * <p>
+ * A test that needs a particular TM1 chooses it in code:
+ *
+ * {@snippet class = examples.Tm1SourceExamples region = explicit}
+ *
+ * <p>
+ * A test setup with its own configuration reads the same settings from it with
+ * {@link #discover(Function)}:
+ *
+ * {@snippet class = examples.Tm1SourceExamples region = own-settings}
  */
 public sealed interface Tm1Source {
 

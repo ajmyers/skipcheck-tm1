@@ -23,6 +23,14 @@ import reactor.core.publisher.Mono;
  * Like a cellset, a member set stays until it's deleted or the session ends. TM1 (11.8)
  * lists none, though each reads by its ordinal: keep the ordinals {@link #execute}
  * returns, and delete what you're done with.
+ *
+ * <p>
+ * Evaluate a set expression and read its members' names, deleting the set after:
+ * {@snippet class = examples.MemberSetServiceExamples region = names}
+ *
+ * <p>
+ * Keep a set on the server to read later, by the ordinal TM1 gives it:
+ * {@snippet class = examples.MemberSetServiceExamples region = keep}
  */
 public final class MemberSetService {
 

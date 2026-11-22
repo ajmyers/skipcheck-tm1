@@ -26,6 +26,14 @@ import reactor.core.publisher.Mono;
  * {@code Tm1Session.withSandbox} or {@code Tm1Client.withSandbox}, which add TM1's
  * {@code !sandbox} option to every request. This service manages the sandboxes
  * themselves.
+ *
+ * <p>
+ * Create a sandbox, write to it, and publish the changes to base data:
+ * {@snippet class = examples.SandboxServiceExamples region = publish}
+ *
+ * <p>
+ * Read a cell in base data and in a sandbox:
+ * {@snippet class = examples.SandboxServiceExamples region = compare}
  */
 public final class SandboxService {
 

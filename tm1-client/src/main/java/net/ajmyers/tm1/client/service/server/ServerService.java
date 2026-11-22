@@ -23,6 +23,18 @@ import reactor.core.publisher.Mono;
  * <p>
  * The static configuration is {@code tm1s.cfg}'s, and the one to change; the active one
  * is what the server runs with now, read only.
+ *
+ * <p>
+ * Read the server's name and version:
+ * {@snippet class = examples.ServerServiceExamples region = version}
+ *
+ * <p>
+ * Read a setting the server runs with now:
+ * {@snippet class = examples.ServerServiceExamples region = data-directory}
+ *
+ * <p>
+ * Change a logger's level:
+ * {@snippet class = examples.ServerServiceExamples region = logger-level}
  */
 public final class ServerService {
 

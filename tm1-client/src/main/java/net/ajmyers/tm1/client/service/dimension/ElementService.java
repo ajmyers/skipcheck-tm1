@@ -29,6 +29,18 @@ import reactor.core.publisher.Mono;
  * rejects {@code Attributes}, whose values are cells of the
  * <code>&#125;ElementAttributes_&lt;dimension&gt;</code> cube. {@link #update} refuses
  * both, saying why.
+ *
+ * <p>
+ * List elements with a query: here, the consolidations.
+ * {@snippet class = examples.ElementServiceExamples region = filter}
+ *
+ * <p>
+ * Add an element under a consolidation. A new element is a root until it has a parent:
+ * {@snippet class = examples.ElementServiceExamples region = add-child}
+ *
+ * <p>
+ * Read a consolidation's children:
+ * {@snippet class = examples.ElementServiceExamples region = children}
  */
 public final class ElementService {
 

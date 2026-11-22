@@ -27,6 +27,18 @@ import reactor.core.publisher.Mono;
  * user PATCH replaces them. TM1 (11.8) has no safe way to leave one group: a
  * {@code DELETE Users('u')/Groups('g')/$ref}, which OData means as "remove the link",
  * <em>deletes the group</em>, for everyone. This service never sends it.
+ *
+ * <p>
+ * Create a user in some groups, binding them by path:
+ * {@snippet class = examples.UserServiceExamples region = create}
+ *
+ * <p>
+ * Take a user out of one group by setting the rest:
+ * {@snippet class = examples.UserServiceExamples region = leave-group}
+ *
+ * <p>
+ * Lock a user out: disable them, then close their sessions.
+ * {@snippet class = examples.UserServiceExamples region = lock-out}
  */
 public final class UserService {
 

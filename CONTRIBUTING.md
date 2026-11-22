@@ -53,6 +53,36 @@ and record component is documented, with `@param` and `@return`. `./gradlew buil
 and fails on any gap. For a Lombok `@Getter`, put the `@return` line in the field's Javadoc;
 Lombok copies it onto the accessor.
 
+**Show how to use the main types.** `Tm1Client`, `Tm1Session`, every service and the
+testcontainers and Spring Boot entry points have usage examples in their Javadoc. The examples are
+real code in the library's `src/examples/java`, in a package named just `examples` (which keeps
+the `{@snippet}` tags short enough for the formatter to leave on one line), one
+`<Type>Examples` class per documented type. The build compiles them against the library, so an
+API change that breaks one fails the build. The Javadoc quotes a marked region of one:
+
+```java
+// In src/examples/java/examples/CubeServiceExamples.java
+Flux<String> list(Tm1Client tm1) {
+	// @start region = list
+	return tm1.cubes().modelCubes(ODataQuery.none().select(Cube.NAME)).map(Cube::name);
+	// @end
+}
+
+// In CubeService's Javadoc
+ * {@snippet class = examples.CubeServiceExamples region = list}
+```
+
+- Show the common tasks of the type, a few per class, each introduced by a sentence. Not every
+  method needs one.
+- Write them as an application would: methods that take a `Tm1Client` and return the `Mono` or
+  `Flux`, without `block()`, except where a standalone `main` is the point.
+- Use what users can use: the public API only, so the examples sit in their own package.
+- Respect TM1's quirks: an example mustn't do what the Javadoc says TM1 refuses or ignores. The
+  integration tests (`*Tm1Test`) show what works.
+- The examples are compiled but not run, since they need a TM1 server.
+- Spring Java Format writes `region = list` with spaces, in the comment and the `{@snippet}`
+  tag. Javadoc accepts both forms.
+
 **Document TM1's surprises where they bite.** When TM1 behaves differently from its
 `$metadata`, or from what a reader would expect, say so in the Javadoc of the method or type it
 affects, as "TM1 (11.8) …". That covers a property a PATCH ignores, an append where a replace is

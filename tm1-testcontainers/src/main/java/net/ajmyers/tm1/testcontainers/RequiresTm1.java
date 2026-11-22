@@ -21,22 +21,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * <p>
  * Declare a {@link Tm1ServerContainer} parameter on a test method, constructor or
  * lifecycle method to get the {@linkplain Tm1ServerContainer#shared() shared container},
- * started on first use:
- *
- * <pre class="code">
- * &#64;RequiresTm1
- * class CubeServiceTest {
- *
- *     &#64;Test
- *     void listsCubes(Tm1ServerContainer tm1) {
- *         var client = Tm1Client.builder().baseUrl(tm1.getRestUrl()) ...
- *     }
- * }
- * </pre>
+ * started on first use.
  *
  * <p>
  * Tests share one server, so each test should create its own uniquely named objects and
- * delete them afterwards.
+ * delete them afterwards. A test class that sets up a client once and cleans up after
+ * each test:
+ *
+ * {@snippet class = examples.RequiresTm1Examples region = test-class}
+ *
+ * <p>
+ * A test that only applies to some TM1 versions checks the server's and skips:
+ *
+ * {@snippet class = examples.RequiresTm1Examples region = by-version}
  */
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)

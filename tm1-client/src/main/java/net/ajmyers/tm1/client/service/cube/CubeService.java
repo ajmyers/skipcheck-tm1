@@ -29,12 +29,17 @@ import tools.jackson.databind.JsonNode;
  * Cubes: {@code /Cubes}, a cube's dimensions, and the operations bound to a cube. Views
  * have a service of their own; cell data is read and written through cellsets.
  *
- * <pre class="code">
- * cubes.create(CubePatch.builder()
- *     .name("Sales")
- *     .bindDimensions(ODataPath.of("Dimensions").key("Region"), ODataPath.of("Dimensions").key("Month"))
- *     .build());
- * </pre>
+ * <p>
+ * List cubes with a query: here, the model cubes whose names start with "Sales".
+ * {@snippet class = examples.CubeServiceExamples region = list}
+ *
+ * <p>
+ * Create a cube over existing dimensions, bound in order:
+ * {@snippet class = examples.CubeServiceExamples region = create}
+ *
+ * <p>
+ * Change a cube's rules, checking them first:
+ * {@snippet class = examples.CubeServiceExamples region = update-rules}
  */
 public final class CubeService {
 

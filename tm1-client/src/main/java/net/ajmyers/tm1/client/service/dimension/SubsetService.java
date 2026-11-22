@@ -31,6 +31,22 @@ import reactor.core.publisher.Mono;
  * Binding {@code Elements} in a subset PATCH <em>appends</em> to them, so {@link #update}
  * refuses it: {@link #addElements} appends by name and {@link #clearElements} empties the
  * list.
+ *
+ * <p>
+ * Create a static subset, binding its elements:
+ * {@snippet class = examples.SubsetServiceExamples region = create-static}
+ *
+ * <p>
+ * Create a dynamic subset from an MDX expression:
+ * {@snippet class = examples.SubsetServiceExamples region = create-dynamic}
+ *
+ * <p>
+ * Replace a static subset's elements:
+ * {@snippet class = examples.SubsetServiceExamples region = replace}
+ *
+ * <p>
+ * Create a session subset and read its elements by the name TM1 gave it:
+ * {@snippet class = examples.SubsetServiceExamples region = session}
  */
 public final class SubsetService {
 

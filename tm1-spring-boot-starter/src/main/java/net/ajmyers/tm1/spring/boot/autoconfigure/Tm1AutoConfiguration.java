@@ -39,6 +39,16 @@ import net.ajmyers.tm1.client.session.Tm1Timeouts;
  * {@link ObservationRegistry}. The connector is Reactor Netty, built with Boot's
  * connector builder so {@code tm1.ssl.bundle} works like any other Boot client's SSL
  * bundle.
+ *
+ * <p>
+ * Set the {@link Tm1Properties tm1.* properties} and inject the client:
+ *
+ * {@snippet class = examples.Tm1AutoConfigurationExamples region = inject}
+ *
+ * <p>
+ * An application acting for many users gets each user's session from the pool:
+ *
+ * {@snippet class = examples.Tm1AutoConfigurationExamples region = pool}
  */
 @AutoConfiguration(after = Tm1ConnectionDetailsAutoConfiguration.class,
 		afterName = "org.springframework.boot.webclient.autoconfigure.WebClientAutoConfiguration")

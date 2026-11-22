@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><title>tm1-spring-boot-starter</title></head>
+<body>
+The <a href="https://ajmyers.net/projects/tm1-client/api/">TM1 client</a> as Spring Boot beans,
+configured from <code>tm1.*</code> properties.
+
+<h1>Getting started</h1>
+
+<ol>
+<li><p><b>Add the starter.</b> Gradle:</p>
+<pre><code class="language-kotlin">implementation("net.ajmyers.tm1:tm1-spring-boot-starter:{{version}}")</code></pre>
+<p>Maven:</p>
+<pre><code class="language-xml">&lt;dependency&gt;
+  &lt;groupId&gt;net.ajmyers.tm1&lt;/groupId&gt;
+  &lt;artifactId&gt;tm1-spring-boot-starter&lt;/artifactId&gt;
+  &lt;version&gt;{{version}}&lt;/version&gt;
+&lt;/dependency&gt;</code></pre></li>
+
+<li><p><b>Point it at TM1, and inject the client.</b></p>
+{@snippet class = examples.Tm1AutoConfigurationExamples region = inject}</li>
+</ol>
+
+<h1>Where next</h1>
+
+<ul>
+<li>{@link net.ajmyers.tm1.spring.boot.autoconfigure.Tm1AutoConfiguration}: the beans it creates,
+and a session per user from the pool.</li>
+<li>{@link net.ajmyers.tm1.spring.boot.autoconfigure.Tm1ConnectionDetails}: logging in your own
+way, such as with CAM.</li>
+<li><a href="https://ajmyers.net/projects/tm1-spring-boot-testcontainers/api/">tm1-spring-boot-testcontainers</a>:
+a real TM1 in your Spring Boot tests.</li>
+</ul>
+</body>
+</html>
