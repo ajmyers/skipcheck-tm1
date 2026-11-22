@@ -119,6 +119,11 @@ public final class ConformanceScenarios {
 			this.step = step;
 		}
 
+		/** The step running: {@code steps[i]} or {@code finally[i]}. */
+		String step() {
+			return step;
+		}
+
 		public List<ObjectNode> exchanges() {
 			return List.copyOf(exchanges);
 		}

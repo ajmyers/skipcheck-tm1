@@ -6,7 +6,6 @@ import {
   Element,
   ElementPatch,
   ElementType,
-  Hierarchy,
   HierarchyPatch,
   ODataPath,
   ODataQuery,
@@ -60,10 +59,7 @@ describe("ElementService on TM1" + liveReason, () => {
 
   const components = async (parent: string): Promise<string[]> => (await tm1.elements.components(d, d, parent).toArray()).map((e) => e.Name!);
 
-  // Edges through the session until EdgeService is ported
-  const edgePath = (parent: string, component: string): ODataPath =>
-    ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Edges").key(new Map([["ParentName", parent], ["ComponentName", component]]));
-  const edgeOf = (parent: string, component: string): Promise<Edge> => tm1.session.execute(Tm1Request.get(edgePath(parent, component), undefined, Edge));
+  const edgeOf = (parent: string, component: string): Promise<Edge> => tm1.edges.get(d, d, parent, component);
 
   tm1Test("creates, reads, updates and deletes an element", async () => {
     expect((await tm1.elements.create(d, d, element("West", ElementType.Numeric))).Name).toBe("West");
@@ -121,18 +117,17 @@ describe("ElementService on TM1" + liveReason, () => {
   });
 
   tm1Test("creates, reads, reweights and deletes edges", async () => {
-    const edges = ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Edges");
-    expect(await tm1.session.stream(Tm1Request.list(edges, undefined, Edge)).toArray()).toHaveLength(2);
+    expect(await tm1.edges.list(d, d).toArray()).toHaveLength(2);
     expect((await edgeOf("Total", "North")).Weight).toBe(1.0);
-    await tm1.session.execute(Tm1Request.patch(edgePath("Total", "North"), EdgePatch.builder().weight(3.0).build()));
+    await tm1.edges.update(d, d, "Total", "North", EdgePatch.builder().weight(3.0).build());
     expect((await edgeOf("Total", "North")).Weight).toBe(3.0);
 
-    expect((await tm1.session.execute(Tm1Request.get(edgePath("Total", "North").nav("Parent"), undefined, Element))).Name).toBe("Total");
-    expect((await tm1.session.execute(Tm1Request.get(edgePath("Total", "North").nav("Component"), undefined, Element))).Name).toBe("North");
-    expect((await tm1.session.execute(Tm1Request.get(edgePath("Total", "North").nav("Hierarchy"), undefined, Hierarchy))).Name).toBe(d);
+    expect((await tm1.edges.parent(d, d, "Total", "North")).Name).toBe("Total");
+    expect((await tm1.edges.component(d, d, "Total", "North")).Name).toBe("North");
+    expect((await tm1.edges.hierarchy(d, d, "Total", "North")).Name).toBe(d);
 
-    expect((await tm1.session.execute(Tm1Request.post(edges, edge("Total", "East"), Edge))).ComponentName).toBe("East");
-    await tm1.session.execute(Tm1Request.delete(edgePath("Total", "North")));
+    expect((await tm1.edges.create(d, d, edge("Total", "East"))).ComponentName).toBe("East");
+    await tm1.edges.delete(d, d, "Total", "North");
     expect(await components("Total")).toEqual(["South", "East"]);
     // Still an element, now a root
     expect(await tm1.elements.parents(d, d, "North").toArray()).toEqual([]);

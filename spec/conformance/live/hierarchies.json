@@ -1,0 +1,31 @@
+{
+	"specVersion" : 1,
+	"name" : "hierarchies",
+	"description" : "A fresh dimension (Total = North + South, and East): another hierarchy created, listed, read and deleted; navigation, the all, default and root members, placing a root, copying it, replacing its structure.",
+	"names" : ["dimension"],
+	"steps" : [
+		{"service": "dimensions", "method": "create", "params": ["dimension"], "args": [{"$patch": "DimensionPatch", "json": {"Name": "${dimension}", "Hierarchies": [{"Name": "${dimension}", "Elements": [{"Name": "Total", "Type": "Consolidated"}, {"Name": "North", "Type": "Numeric"}, {"Name": "South", "Type": "Numeric"}, {"Name": "East", "Type": "Numeric"}], "Edges": [{"ParentName": "Total", "ComponentName": "North", "Weight": 1.0}, {"ParentName": "Total", "ComponentName": "South", "Weight": 1.0}]}]}}], "expect": {"fields": {"Name": "${dimension}"}}},
+		{"service": "hierarchies", "method": "create", "params": ["dimension", "hierarchy"], "args": ["${dimension}", {"$patch": "HierarchyPatch", "json": {"Name": "Alt", "Elements": [{"Name": "Total", "Type": "Consolidated"}, {"Name": "North", "Type": "Numeric"}, {"Name": "South", "Type": "Numeric"}, {"Name": "East", "Type": "Numeric"}], "Edges": [{"ParentName": "Total", "ComponentName": "North", "Weight": 1.0}, {"ParentName": "Total", "ComponentName": "South", "Weight": 1.0}]}}], "expect": {"fields": {"Name": "Alt"}}},
+		{"service": "hierarchies", "method": "list", "params": ["dimension", "query"], "args": ["${dimension}", {"$query": {"select": ["Name"], "filter": "Name eq 'Alt'"}}], "expect": {"items": {"Name": ["Alt"]}}},
+		{"service": "hierarchies", "method": "get", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "Alt", {"$query": {"expand": {"Elements": {"select": ["Name"]}}}}], "expect": {"fields": {"Name": "Alt"}}},
+		{"service": "hierarchies", "method": "defaultHierarchy", "params": ["dimension", "query"], "args": ["${dimension}", {"$query": {"select": ["Name"]}}], "expect": {"fields": {"Name": "${dimension}"}}},
+		{"service": "hierarchies", "method": "dimension", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "Alt", {"$query": {}}], "expect": {"fields": {"Name": "${dimension}"}}},
+		{"service": "hierarchies", "method": "delete", "params": ["dimension", "hierarchy"], "args": ["${dimension}", "Alt"], "expect": {"none": true}},
+		{"service": "hierarchies", "method": "get", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "Alt", {"$query": {}}], "expect": {"error": {"category": "api", "kind": "NOT_FOUND", "status": 404}}},
+		{"service": "hierarchies", "method": "allMember", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "${dimension}", {"$query": {}}], "expect": {"none": true}},
+		{"service": "hierarchies", "method": "rootMembers", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "${dimension}", {"$query": {"select": ["Name"]}}], "expect": {"items": {"Name": ["Total", "East"]}}},
+		{"service": "hierarchies", "method": "setElement", "params": ["dimension", "hierarchy", "element", "before"], "args": ["${dimension}", "${dimension}", "East", "Total"], "expect": {"none": true}},
+		{"service": "hierarchies", "method": "rootMembers", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "${dimension}", {"$query": {"select": ["Name"]}}], "expect": {"items": {"Name": ["East", "Total"]}}},
+		{"service": "hierarchies", "method": "setElement", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "East"], "expect": {"none": true}},
+		{"service": "hierarchies", "method": "rootMembers", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "${dimension}", {"$query": {"select": ["Name"]}}], "expect": {"items": {"Name": ["Total", "East"]}}},
+		{"service": "hierarchies", "method": "update", "params": ["dimension", "hierarchy", "patch"], "args": ["${dimension}", "${dimension}", {"$patch": "HierarchyPatch", "json": {"Visible": false}}], "expect": {"none": true}},
+		{"service": "hierarchies", "method": "saveAs", "params": ["dimension", "hierarchy", "newName"], "args": ["${dimension}", "${dimension}", "Copy"], "expect": {"fields": {"Name": "Copy"}}},
+		{"service": "hierarchies", "method": "saveAs", "params": ["dimension", "hierarchy", "newName", "overwrite", "keepExistingAttributes"], "args": ["${dimension}", "${dimension}", "Copy", true, false], "expect": {"fields": {"Name": "Copy"}}},
+		{"service": "hierarchies", "method": "replaceStructure", "params": ["dimension", "hierarchy", "elements", "edges"], "args": ["${dimension}", "${dimension}", [{"$patch": "ElementPatch", "json": {"Name": "Total", "Type": "Consolidated"}}, {"$patch": "ElementPatch", "json": {"Name": "North", "Type": "Numeric"}}], [{"$patch": "EdgePatch", "json": {"ParentName": "Total", "ComponentName": "North", "Weight": 1.0}}]], "expect": {"none": true}},
+		{"service": "hierarchies", "method": "allMember", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "${dimension}", {"$query": {"select": ["Name"]}}], "expect": {"fields": {"Name": "Total"}}},
+		{"service": "elements", "method": "list", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "${dimension}", {"$query": {"select": ["Name"], "orderBy": ["Name"]}}], "expect": {"items": {"Name": ["North", "Total"]}}}
+	],
+	"finally" : [
+		{"service": "dimensions", "method": "delete", "params": ["name"], "args": ["${dimension}"]}
+	]
+}

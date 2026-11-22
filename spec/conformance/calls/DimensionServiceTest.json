@@ -1,0 +1,1675 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.dimension.DimensionServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "DimensionServiceTest#aDimensionWithoutANameIsABadRequest#1",
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [
+				"dimension"
+			],
+			"args" : [
+				{
+					"$patch" : "DimensionPatch",
+					"json" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Name is required."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#aMissingDimensionIsNotFound#1",
+			"service" : "dimensions",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Dimension'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#aMissingDimensionIsNotFound#2",
+			"service" : "dimensions",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Nope"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Dimension'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#aNameTm1RefusesIsAnInvalidUniqueName#1",
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [
+				"dimension"
+			],
+			"args" : [
+				{
+					"$patch" : "DimensionPatch",
+					"json" : {
+						"Name" : "a]b"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "a]b"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "248",
+								"message" : "Invalid name."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "INVALID_UNIQUE_NAME",
+				"status" : 400,
+				"code" : "248"
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#aServerErrorWithoutABodyIsTm1s#1",
+			"service" : "dimensions",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Region",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 500,
+						"headers" : { }
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ServerException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 500
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#aStaleEtagIsRefused#1",
+			"service" : "dimensions",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Region",
+				{
+					"$patch" : "DimensionPatch",
+					"json" : {
+						"Name" : "Region"
+					}
+				},
+				"W/\"0\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"0\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Region"
+						}
+					},
+					"response" : {
+						"status" : 412,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "stale"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1PreconditionFailedException",
+				"category" : "api",
+				"kind" : "PRECONDITION_FAILED",
+				"status" : 412,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#addsAnAllLeavesHierarchy#1",
+			"service" : "dimensions",
+			"method" : "addAllLeavesHierarchy",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Region"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/tm1.AddAllLeavesHierarchy",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Leaves",
+							"Visible" : false
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "Leaves",
+					"Visible" : false
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#addsAnAllLeavesHierarchy#2",
+			"service" : "dimensions",
+			"method" : "addAllLeavesHierarchy",
+			"params" : [
+				"name",
+				"hierarchyName",
+				"visible"
+			],
+			"args" : [
+				"Region",
+				"All Leaves",
+				true
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/tm1.AddAllLeavesHierarchy",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"AllLeavesHierarchyName" : "All Leaves",
+							"Visible" : true
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "All Leaves",
+							"Visible" : true
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "All Leaves",
+					"Visible" : true
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#anEmptyListIsEmpty#1",
+			"service" : "dimensions",
+			"method" : "modelDimensions",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ModelDimensions()",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "DimensionServiceTest#createsADimensionWithItsStructure#1",
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [
+				"dimension"
+			],
+			"args" : [
+				{
+					"$patch" : "DimensionPatch",
+					"json" : {
+						"Name" : "Region",
+						"Hierarchies" : [
+							{
+								"Name" : "Region",
+								"Elements" : [
+									{
+										"Name" : "Total",
+										"Type" : "Consolidated"
+									},
+									{
+										"Name" : "North",
+										"Type" : "Numeric"
+									}
+								],
+								"Edges" : [
+									{
+										"ParentName" : "Total",
+										"ComponentName" : "North",
+										"Weight" : 1.0
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Region",
+							"Hierarchies" : [
+								{
+									"Name" : "Region",
+									"Elements" : [
+										{
+											"Name" : "Total",
+											"Type" : "Consolidated"
+										},
+										{
+											"Name" : "North",
+											"Type" : "Numeric"
+										}
+									],
+									"Edges" : [
+										{
+											"ParentName" : "Total",
+											"ComponentName" : "North",
+											"Weight" : 1.0
+										}
+									]
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Region"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "Region"
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#creatingADimensionThatExistsConflicts#1",
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [
+				"dimension"
+			],
+			"args" : [
+				{
+					"$patch" : "DimensionPatch",
+					"json" : {
+						"Name" : "Region"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Region"
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Dimension 'Region' already exists."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#deletesADimension#1",
+			"service" : "dimensions",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Region"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "DimensionServiceTest#escapesSpecialCharactersInAName#1",
+			"service" : "dimensions",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"O'Brien",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('O''Brien')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#escapesSpecialCharactersInAName#2",
+			"service" : "dimensions",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Sales & Costs",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Sales%20%26%20Costs')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#escapesSpecialCharactersInAName#3",
+			"service" : "dimensions",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"a/b",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('a%2Fb')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#escapesSpecialCharactersInAName#4",
+			"service" : "dimensions",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"50% off?",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('50%25%20off%3F')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#escapesSpecialCharactersInAName#5",
+			"service" : "dimensions",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"#1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('%231')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#escapesSpecialCharactersInAName#6",
+			"service" : "dimensions",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Région",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('R%C3%A9gion')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#escapesSpecialCharactersInAName#7",
+			"service" : "dimensions",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"}Cubes",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('%7DCubes')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#followsNextLinksAcrossPages#1",
+			"service" : "dimensions",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "a"
+								}
+							],
+							"@odata.nextLink" : "Dimensions?$skiptoken=2"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions?$skiptoken=2",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "b"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Dimension",
+					"json" : {
+						"Name" : "a"
+					}
+				},
+				{
+					"$model" : "Dimension",
+					"json" : {
+						"Name" : "b"
+					}
+				}
+			]
+		},
+		{
+			"id" : "DimensionServiceTest#getsADimensionWithItsHierarchiesAndEtag#1",
+			"service" : "dimensions",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Region",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"expand" : {
+							"Hierarchies" : {
+								"select" : [
+									"Name"
+								],
+								"expand" : {
+									"Elements" : { }
+								}
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')?$select=Name&$expand=Hierarchies($select%3DName;$expand%3DElements)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.etag" : "W/\"1\"",
+							"Name" : "Region",
+							"Hierarchies" : [
+								{
+									"Name" : "Region",
+									"Elements" : [
+										{
+											"Name" : "North",
+											"Type" : "Numeric"
+										}
+									]
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"@odata.etag" : "W/\"1\"",
+					"Name" : "Region",
+					"Hierarchies" : [
+						{
+							"Name" : "Region",
+							"Elements" : [
+								{
+									"Name" : "North",
+									"Type" : "Numeric"
+								}
+							]
+						}
+					]
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#listsAllModelAndControlDimensions#1",
+			"service" : "dimensions",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"top" : 2
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions?$top=2",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Region"
+								},
+								{
+									"Name" : "}Clients"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Dimension",
+					"json" : {
+						"Name" : "Region"
+					}
+				},
+				{
+					"$model" : "Dimension",
+					"json" : {
+						"Name" : "}Clients"
+					}
+				}
+			]
+		},
+		{
+			"id" : "DimensionServiceTest#listsAllModelAndControlDimensions#2",
+			"service" : "dimensions",
+			"method" : "modelDimensions",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"filter" : "startswith(Name,'Reg')",
+						"orderBy" : [
+							"Name desc"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ModelDimensions()?$select=Name&$filter=startswith(Name,'Reg')&$orderby=Name%20desc",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Region"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Dimension",
+					"json" : {
+						"Name" : "Region"
+					}
+				}
+			]
+		},
+		{
+			"id" : "DimensionServiceTest#listsAllModelAndControlDimensions#3",
+			"service" : "dimensions",
+			"method" : "controlDimensions",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ControlDimensions()",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "}Clients"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Dimension",
+					"json" : {
+						"Name" : "}Clients"
+					}
+				}
+			]
+		},
+		{
+			"id" : "DimensionServiceTest#locksUnlocksReservesAndReleases#1",
+			"service" : "dimensions",
+			"method" : "lock",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Region"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/tm1.Lock",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "DimensionServiceTest#locksUnlocksReservesAndReleases#2",
+			"service" : "dimensions",
+			"method" : "unlock",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Region"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/tm1.Unlock",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "DimensionServiceTest#locksUnlocksReservesAndReleases#3",
+			"service" : "dimensions",
+			"method" : "reserve",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Region"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/tm1.Reserve",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "DimensionServiceTest#locksUnlocksReservesAndReleases#4",
+			"service" : "dimensions",
+			"method" : "release",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Region"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/tm1.Release",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "DimensionServiceTest#refusesAMissingName#1",
+			"service" : "dimensions",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#refusesAMissingName#2",
+			"service" : "dimensions",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#refusesAMissingName#3",
+			"service" : "dimensions",
+			"method" : "lock",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#savesACopy#1",
+			"service" : "dimensions",
+			"method" : "saveAs",
+			"params" : [
+				"name",
+				"newName"
+			],
+			"args" : [
+				"Region",
+				"Copy"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/tm1.SaveAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Copy"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Copy"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "Copy"
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#savesACopy#2",
+			"service" : "dimensions",
+			"method" : "saveAs",
+			"params" : [
+				"name",
+				"newName",
+				"overwrite",
+				"keepExistingAttributes"
+			],
+			"args" : [
+				"Region",
+				"Copy",
+				true,
+				false
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/tm1.SaveAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Copy",
+							"Overwrite" : true,
+							"KeepExistingAttributes" : false
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Copy"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "Copy"
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#savesACopy#3",
+			"service" : "dimensions",
+			"method" : "saveAs",
+			"params" : [
+				"name",
+				"newName",
+				"overwrite",
+				"keepExistingAttributes"
+			],
+			"args" : [
+				"Region",
+				"Copy",
+				false,
+				true
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/tm1.SaveAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Copy",
+							"Overwrite" : false,
+							"KeepExistingAttributes" : true
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Copy"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "Copy"
+				}
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#savingOverAnExistingDimensionConflicts#1",
+			"service" : "dimensions",
+			"method" : "saveAs",
+			"params" : [
+				"name",
+				"newName"
+			],
+			"args" : [
+				"Region",
+				"Copy"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/tm1.SaveAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Copy"
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Dimension 'Copy' already exists."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "DimensionServiceTest#updatesWithAndWithoutAnEtag#1",
+			"service" : "dimensions",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				{
+					"$patch" : "DimensionPatch",
+					"json" : {
+						"UniqueName" : "[Region]"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"UniqueName" : "[Region]"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "DimensionServiceTest#updatesWithAndWithoutAnEtag#2",
+			"service" : "dimensions",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"O'Brien",
+				{
+					"$patch" : "DimensionPatch",
+					"json" : {
+						"AllLeavesHierarchyName" : null
+					}
+				},
+				"W/\"1\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('O''Brien')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"1\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"AllLeavesHierarchyName" : null
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

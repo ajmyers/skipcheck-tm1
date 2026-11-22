@@ -60,7 +60,8 @@ public static class ConformanceLive
                 headers[h.Key.ToLowerInvariant()] = string.Join(", ", h.Value);
             }
             var response = await base.SendAsync(request, cancellationToken);
-            var url = request.RequestUri!.ToString();
+            // As sent: ToString() would unescape it
+            var url = request.RequestUri!.AbsoluteUri;
             var prefix = root.EndsWith('/') ? root : root + "/";
             var target = url.StartsWith(prefix, StringComparison.Ordinal) ? url[prefix.Length..] : url;
             if (!SessionRequests.Any(s => target.StartsWith(s, StringComparison.Ordinal)))

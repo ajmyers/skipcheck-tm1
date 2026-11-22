@@ -140,12 +140,22 @@ public final class ConformanceCodec {
 		}
 		if (type.getPackageName().equals(MODEL) && type.isRecord()) {
 			ObjectNode node = NODES.objectNode();
-			node.put("$model", type.getSimpleName());
+			node.put("$model", modelName(type));
 			node.set("json", JSON.valueToTree(value));
 			return node;
 		}
 		throw new IllegalArgumentException("Conformance can't encode a " + type.getName()
 				+ ": register an encoder with ConformanceCodec.register, or leave this call out of the fixtures");
+	}
+
+	/**
+	 * A model's name: a sealed model's plain variant, such as {@code Member.Plain}, is
+	 * named for the model ({@code Member}), as the other clients name it.
+	 */
+	private static String modelName(Class<?> type) {
+		Class<?> enclosing = type.getEnclosingClass();
+		return enclosing != null && enclosing.getPackageName().equals(MODEL) ? enclosing.getSimpleName()
+				: type.getSimpleName();
 	}
 
 	/**
@@ -166,8 +176,14 @@ public final class ConformanceCodec {
 		Class<?> type = value.getClass();
 		if (type.getPackageName().equals(MODEL) && !type.isEnum()) {
 			ObjectNode node = NODES.objectNode();
-			node.put("$model", type.getSimpleName());
-			node.set("json", JSON.valueToTree(value));
+			node.put("$model", modelName(type));
+			JsonNode json = JSON.valueToTree(value);
+			if (!modelName(type).equals(type.getSimpleName()) && json instanceof ObjectNode object) {
+				// The plain variant's type id is Jackson's, written on serializing: TM1's
+				// JSON has none
+				object.remove("@odata.type");
+			}
+			node.set("json", json);
 			return node;
 		}
 		return JSON.valueToTree(value);
