@@ -244,6 +244,17 @@ public final class Tm1Client {
 	}
 
 	/**
+	 * A client on a view of this client's session whose writes are recorded in change set
+	 * {@code id} ({@link Tm1Session#withChangeSet}); {@code ChangeSetService.within}
+	 * makes one for the length of some work.
+	 * @param id the change set's ID
+	 * @return the client
+	 */
+	public Tm1Client withChangeSet(String id) {
+		return new Tm1Client(session.withChangeSet(id));
+	}
+
+	/**
 	 * Logs in now rather than on the first request, and completes with this client.
 	 * @return a {@link Mono} emitting this client once logged in
 	 */

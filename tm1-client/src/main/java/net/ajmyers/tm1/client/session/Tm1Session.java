@@ -55,17 +55,23 @@ public final class Tm1Session {
 	/** TM1's custom query option that runs a request in a sandbox. */
 	static final String SANDBOX_OPTION = "!sandbox";
 
+	/** TM1's custom query option that records a request's writes in a change set. */
+	static final String CHANGE_SET_OPTION = "!ChangeSet";
+
 	private final Connection connection;
 
 	private final @Nullable String sandbox;
 
+	private final @Nullable String changeSet;
+
 	Tm1Session(Connection connection) {
-		this(connection, null);
+		this(connection, null, null);
 	}
 
-	private Tm1Session(Connection connection, @Nullable String sandbox) {
+	private Tm1Session(Connection connection, @Nullable String sandbox, @Nullable String changeSet) {
 		this.connection = Objects.requireNonNull(connection, "connection");
 		this.sandbox = sandbox;
+		this.changeSet = changeSet;
 	}
 
 	/**
@@ -158,7 +164,7 @@ public final class Tm1Session {
 		if (name.isBlank()) {
 			throw new IllegalArgumentException("sandbox name is blank");
 		}
-		return new Tm1Session(connection, name);
+		return new Tm1Session(connection, name, changeSet);
 	}
 
 	/**
@@ -166,7 +172,7 @@ public final class Tm1Session {
 	 * @return the view, or this session if it has no sandbox
 	 */
 	public Tm1Session withoutSandbox() {
-		return sandbox == null ? this : new Tm1Session(connection, null);
+		return sandbox == null ? this : new Tm1Session(connection, null, changeSet);
 	}
 
 	/**
@@ -175,6 +181,39 @@ public final class Tm1Session {
 	 */
 	public Optional<String> sandbox() {
 		return Optional.ofNullable(sandbox);
+	}
+
+	/**
+	 * A view of this session whose writes are recorded in change set {@code id}: each
+	 * request gets TM1's {@code !ChangeSet} query option, unless it sets its own, so
+	 * {@code UndoChangeSet} can revert them together. Like {@link #withSandbox}, the view
+	 * shares this session's login and connections; it keeps the sandbox, if any.
+	 * @param id the change set's ID, from {@code BeginChangeSet}; not blank
+	 * @return a view of this session recording into that change set
+	 * @throws IllegalArgumentException if {@code id} is blank
+	 */
+	public Tm1Session withChangeSet(String id) {
+		Objects.requireNonNull(id, "id");
+		if (id.isBlank()) {
+			throw new IllegalArgumentException("change set ID is blank");
+		}
+		return new Tm1Session(connection, sandbox, id);
+	}
+
+	/**
+	 * A view of this session whose writes go into no change set.
+	 * @return the view, or this session if it has no change set
+	 */
+	public Tm1Session withoutChangeSet() {
+		return changeSet == null ? this : new Tm1Session(connection, sandbox, null);
+	}
+
+	/**
+	 * The change set this view's writes are recorded in, if any.
+	 * @return the change set's ID, or empty
+	 */
+	public Optional<String> changeSet() {
+		return Optional.ofNullable(changeSet);
 	}
 
 	/**
@@ -222,14 +261,19 @@ public final class Tm1Session {
 
 	@Override
 	public String toString() {
-		return "Tm1Session[" + connection.root() + (sandbox == null ? "" : ", sandbox=" + sandbox) + "]";
+		return "Tm1Session[" + connection.root() + (sandbox == null ? "" : ", sandbox=" + sandbox)
+				+ (changeSet == null ? "" : ", changeSet=" + changeSet) + "]";
 	}
 
 	private <T> Tm1Request<T> inSandbox(Tm1Request<T> request) {
-		if (sandbox == null || request.query().option(SANDBOX_OPTION) != null) {
-			return request;
+		Tm1Request<T> result = request;
+		if (sandbox != null && result.query().option(SANDBOX_OPTION) == null) {
+			result = result.withQuery(result.query().option(SANDBOX_OPTION, sandbox));
 		}
-		return request.withQuery(request.query().option(SANDBOX_OPTION, sandbox));
+		if (changeSet != null && result.query().option(CHANGE_SET_OPTION) == null) {
+			result = result.withQuery(result.query().option(CHANGE_SET_OPTION, changeSet));
+		}
+		return result;
 	}
 
 	/**
