@@ -12,7 +12,14 @@
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node"],
+    // The workspace's packages from their sources (test/live uses the testcontainers package,
+    // which uses this one), so typecheck and tests need no build first
+    "paths": {
+      "@ajmyers/tm1-client": ["./src/index.ts"],
+      "@ajmyers/tm1-testcontainers": ["./testcontainers/src/index.ts"],
+      "@ajmyers/tm1-testcontainers/vitest": ["./testcontainers/src/vitest.ts"]
+    }
   },
   "include": ["src", "test", "codegen"]
 }

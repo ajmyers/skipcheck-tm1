@@ -23,13 +23,16 @@
   "files": [
     "dist"
   ],
+  "workspaces": [
+    "testcontainers"
+  ],
   "scripts": {
     "generate": "tsx codegen/main.ts ../spec/tm1-api.json src/generated",
     "prebuild": "npm run generate",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && npm run build --workspace testcontainers",
     "pretest": "npm run generate",
-    "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run && npm test --workspace testcontainers",
+    "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck --workspace testcontainers",
     "test:live": "vitest run test/live"
   },
   "devDependencies": {

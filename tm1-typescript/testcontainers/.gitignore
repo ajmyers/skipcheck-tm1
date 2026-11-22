@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# Copied from docker/paw by npm run embed (prebuild)
+paw-local.sh

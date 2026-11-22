@@ -1,0 +1,48 @@
+{
+  "name": "@ajmyers/tm1-testcontainers",
+  "version": "0.1.0-dev",
+  "description": "Testcontainers for IBM Planning Analytics: TM1, its Admin Server, TM1 Web, Planning Analytics Workspace, Cognos and Keycloak in Docker for Node tests, as the Java tm1-testcontainers",
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "type": "module",
+  "engines": {
+    "node": ">=20.18.1"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./vitest": {
+      "types": "./dist/vitest.d.ts",
+      "default": "./dist/vitest.js"
+    }
+  },
+  "files": [
+    "dist",
+    "paw-local.sh"
+  ],
+  "scripts": {
+    "embed": "node scripts/embed-paw-script.mjs",
+    "prebuild": "npm run embed",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "testcontainers": "11.14.0"
+  },
+  "peerDependencies": {
+    "@ajmyers/tm1-client": "*",
+    "vitest": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@ajmyers/tm1-client": "file:.."
+  }
+}
