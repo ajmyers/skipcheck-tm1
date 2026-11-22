@@ -804,6 +804,7 @@ and document the replace-vs-append semantics.
 | Behavior (11.8) | Handling |
 |---|---|
 | Element PATCH silently ignores `Name` (no rename). Hierarchy PATCH ignores `Visible`. | Patch builders omit them. Javadoc. |
+| A dimension PATCH returns success but ignores `Hierarchies` and `AllLeavesHierarchyName`. A stale `If-Match` gets 412 (code 278). (Seen in phase 2.) | `DimensionService.update` says so; hierarchies change through `HierarchyService`. Pinned by a test |
 | The `Server` singleton has no `@odata.etag`. A cube's `Dimensions` lists the virtual `Sandboxes` dimension first. (Seen in phase 1.) | Don't rely on either; tests pin both |
 | TM1 writes durations its own way (`P1DT00H00M00S`, `P0DT00H00M00S`) but accepts standard ISO 8601 (`PT24H`). (Seen in phase 1.) | `java.time.Duration` reads and writes them as is |
 | Element and Process PATCH **reject** `Attributes` | Element attributes are written as cells of `}ElementAttributes_<dim>` |
