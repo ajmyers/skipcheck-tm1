@@ -39,6 +39,18 @@ import reactor.core.publisher.Mono;
  * elements, comma-separated). They're in {@code dynamicProperties}.</li>
  * <li>IDs look like <code>C&#125;ClientGroups~B.B~7uA_4TxLwG</code>.</li>
  * </ul>
+ *
+ * <p>
+ * Comment on a cell:
+ * {@snippet class = examples.AnnotationServiceExamples region = annotate}
+ *
+ * <p>
+ * Read a cube's comments:
+ * {@snippet class = examples.AnnotationServiceExamples region = read}
+ *
+ * <p>
+ * Change what a comment says:
+ * {@snippet class = examples.AnnotationServiceExamples region = edit}
  */
 public final class AnnotationService {
 

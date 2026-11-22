@@ -37,6 +37,22 @@ import tools.jackson.databind.JsonNode;
  * <li>The transaction and audit logs only fill when they're switched on (a cube's
  * logging, and {@code AuditLog} in the configuration).</li>
  * </ul>
+ *
+ * <p>
+ * Read the newest message log entries:
+ * {@snippet class = examples.LogServiceExamples region = newest}
+ *
+ * <p>
+ * Follow the message log for errors:
+ * {@snippet class = examples.LogServiceExamples region = follow}
+ *
+ * <p>
+ * Read a process's error logs:
+ * {@snippet class = examples.LogServiceExamples region = process-errors}
+ *
+ * <p>
+ * Count the cell changes in the transaction log:
+ * {@snippet class = examples.LogServiceExamples region = changes}
  */
 public final class LogService {
 

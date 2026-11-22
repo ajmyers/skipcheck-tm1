@@ -18,6 +18,10 @@ import reactor.core.publisher.Mono;
  * The OpenID Connect signing keys TM1 has cached, for servers that check OIDC tokens
  * themselves. Removing a key makes TM1 fetch it from the provider again, as after the
  * provider rotates its keys. On a server that checks no tokens, the cache is empty.
+ *
+ * <p>
+ * Refresh the cache after the provider rotates its keys:
+ * {@snippet class = examples.OidcKeyServiceExamples region = refresh}
  */
 public final class OidcKeyService {
 

@@ -15,6 +15,10 @@ import reactor.core.publisher.Mono;
  * The ODBC data sources on TM1's host, which processes can read from
  * ({@code DataSource.Type} {@code ODBC}). They're the host's ODBC configuration, not
  * TM1's: read only here.
+ *
+ * <p>
+ * List the data sources:
+ * {@snippet class = examples.SqlDataSourceServiceExamples region = names}
  */
 public final class SqlDataSourceService {
 
