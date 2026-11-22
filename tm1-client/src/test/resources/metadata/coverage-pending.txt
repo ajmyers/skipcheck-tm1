@@ -22,12 +22,6 @@ Action Cube/Unlock
 Action Cube/Update
 Action Cube/UpdateCells
 Action CubeDrillthrough/Execute
-Action Dimension/AddAllLeavesHierarchy
-Action Dimension/Lock
-Action Dimension/Release
-Action Dimension/Reserve
-Action Dimension/SaveAs
-Action Dimension/Unlock
 Action Element/Lock
 Action Element/Release
 Action Element/Reserve
@@ -102,7 +96,6 @@ EntitySet Contents
 EntitySet CubeAttributes
 EntitySet Cubes
 EntitySet DimensionAttributes
-EntitySet Dimensions
 EntitySet ErrorLogFiles
 EntitySet GitPlans
 EntitySet Groups

@@ -8,6 +8,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import io.micrometer.observation.ObservationRegistry;
 import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
+import net.ajmyers.tm1.client.service.dimension.DimensionService;
 import net.ajmyers.tm1.client.session.Tm1Session;
 import net.ajmyers.tm1.client.session.Tm1Timeouts;
 import net.ajmyers.tm1.client.version.Tm1Dialect;
@@ -16,8 +17,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * The client for one TM1 server: one {@link Tm1Session}, and every service built on it
- * (plan §6). Services arrive with the endpoint phases; until then, {@link #session()}
- * sends any request.
+ * (plan §6), such as {@link #dimensions()}. Services arrive with the endpoint phases;
+ * {@link #session()} sends any request, for what has no service yet.
  *
  * <pre>{@code
  * Tm1Client tm1 = Tm1Client.builder()
@@ -35,8 +36,11 @@ public final class Tm1Client {
 
 	private final Tm1Session session;
 
+	private final DimensionService dimensions;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
+		this.dimensions = new DimensionService(session);
 	}
 
 	/**
@@ -63,6 +67,14 @@ public final class Tm1Client {
 	 */
 	public Tm1Session session() {
 		return session;
+	}
+
+	/**
+	 * Dimensions.
+	 * @return the dimension service, on this client's session
+	 */
+	public DimensionService dimensions() {
+		return dimensions;
 	}
 
 	/**
