@@ -207,6 +207,8 @@ public class ConformanceLiveRunnerTests
     [InlineData("sessions")]
     [InlineData("attributes")]
     [InlineData("annotations")]
+    [InlineData("processes")]
+    [InlineData("chores")]
     public async Task RunsAScenarioSendingOneRequestPerStep(string name)
     {
         var scenario = ConformanceLive.Load(name);

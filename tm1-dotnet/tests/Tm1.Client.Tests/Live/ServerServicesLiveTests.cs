@@ -80,7 +80,7 @@ public class ServerServicesLiveTests
             {
                 await Task.Delay(1500);
                 await using var other = Live.Client();
-                await other.Session.StreamAsync(Tm1Request.List<Cube>(ODataPath.Of("Cubes"), ODataQuery.None().Select("Name"))).ToListAsync();
+                await other.Cubes.ListAsync(ODataQuery.None().Select("Name")).ToListAsync();
             }
         });
         var seen = new List<MessageLogEntry>();
@@ -118,13 +118,10 @@ public class ServerServicesLiveTests
     {
         await using var tm1 = Live.Client();
         var process = Live.Name();
-        var processes = ODataPath.Of("Processes");
-        await tm1.Session.ExecuteAsync(Tm1Request.Post(processes, ProcessPatch.Builder().Name(process).PrologProcedure("ProcessError;\n").Build()));
+        await tm1.Processes.CreateAsync(ProcessPatch.Builder().Name(process).PrologProcedure("ProcessError;\n").Build());
         try
         {
-            var execute = Tm1Request.Post<ProcessExecuteResult>(processes.Key(process).Action("tm1.ExecuteWithReturn"), new Dictionary<string, object?> { ["Parameters"] = Array.Empty<object>() })
-                .WithQuery(ODataQuery.None().Expand("ErrorLogFile"));
-            var filename = (await tm1.Session.ExecuteAsync(execute)).ErrorLogFile!.Filename!;
+            var filename = (await tm1.Processes.ExecuteWithReturnAsync(process, null, ODataQuery.None().Expand("ErrorLogFile"))).ErrorLogFile!.Filename!;
             Assert.Contains(await tm1.Logs.ErrorLogFilesAsync().ToListAsync(), f => f.Filename == filename);
             Assert.Equal(filename, (await tm1.Logs.ErrorLogFileAsync(filename)).Filename);
             var content = await tm1.Logs.ErrorLogContentAsync(filename);
@@ -133,7 +130,7 @@ public class ServerServicesLiveTests
         }
         finally
         {
-            await tm1.Session.ExecuteAsync(Tm1Request.Delete(processes.Key(process)));
+            await tm1.Processes.DeleteAsync(process);
         }
     }
 

@@ -1,0 +1,86 @@
+{
+	"specVersion" : 1,
+	"name" : "server",
+	"description" : "The server, its configurations and loggers, its logs and ODBC data sources, read only: what each gives, and missing ones.",
+	"names" : [ "missing" ],
+	"steps" : [
+		{
+			"service" : "server",
+			"method" : "server",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { "select" : [ "Name", "ProductVersion" ] } } ],
+			"expect" : { "fields" : { } }
+		},
+		{
+			"service" : "server",
+			"method" : "staticConfiguration",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { "select" : [ "ServerName" ] } } ],
+			"expect" : { "fields" : { } }
+		},
+		{
+			"service" : "server",
+			"method" : "activeConfiguration",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { "select" : [ "ServerName" ] } } ],
+			"expect" : { "fields" : { } }
+		},
+		{
+			"service" : "server",
+			"method" : "configuration",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { "select" : [ "ServerName" ] } } ],
+			"expect" : { "fields" : { } }
+		},
+		{
+			"service" : "server",
+			"method" : "loggers",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { "select" : [ "Name", "Level" ], "top" : 1 } } ],
+			"expect" : { "count" : 1 }
+		},
+		{
+			"service" : "server",
+			"method" : "logger",
+			"params" : [ "name", "query" ],
+			"args" : [ "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "logs",
+			"method" : "messageLogEntries",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { "top" : 2 } } ],
+			"expect" : { "count" : 2 }
+		},
+		{
+			"service" : "logs",
+			"method" : "messageLog",
+			"params" : [ "reverse", "query" ],
+			"args" : [ true, { "$query" : { "top" : 3 } } ],
+			"expect" : { "count" : 3 }
+		},
+		{
+			"service" : "logs",
+			"method" : "errorLogFile",
+			"params" : [ "filename", "query" ],
+			"args" : [ "${missing}.log", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "sqlDataSources",
+			"method" : "list",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { } } ],
+			"expect" : { "count" : 0 }
+		},
+		{
+			"service" : "sqlDataSources",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		}
+	],
+	"finally" : [ ]
+}

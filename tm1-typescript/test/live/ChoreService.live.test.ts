@@ -12,12 +12,9 @@ import {
   Tm1Duration,
   Tm1Exception,
   Tm1PreconditionFailedException,
-  Tm1Request,
   type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
-
-const DIMENSIONS = ODataPath.of("Dimensions");
 
 /** ChoreService against a real TM1, with a process that creates the dimension its pName parameter
  * names: the Java client's `ChoreServiceTm1Test`. */
@@ -66,8 +63,7 @@ describe("ChoreService on TM1" + liveReason, () => {
     if (!tm1) return;
     await tm1.chores.delete(chore).catch(() => undefined);
     await tm1.processes.delete(process);
-    // Dimensions through the session until DimensionService is ported
-    for (const d of ["marker-" + id, "second-" + id]) await tm1.session.execute(Tm1Request.delete(DIMENSIONS.key(d))).catch(() => undefined);
+    for (const d of ["marker-" + id, "second-" + id]) await tm1.dimensions.delete(d).catch(() => undefined);
     await tm1.close();
   });
 
@@ -119,7 +115,7 @@ describe("ChoreService on TM1" + liveReason, () => {
 
   tm1Test("runs the chore now", async () => {
     await tm1.chores.execute(chore);
-    const dimension = (await tm1.session.execute(Tm1Request.get(DIMENSIONS.key("marker-" + id)))) as { Name?: string };
+    const dimension = await tm1.dimensions.get("marker-" + id);
     expect(dimension.Name).toBe("marker-" + id);
   });
 });

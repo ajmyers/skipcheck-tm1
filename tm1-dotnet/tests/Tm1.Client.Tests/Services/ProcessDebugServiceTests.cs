@@ -170,6 +170,31 @@ public class ProcessDebugServiceTests
         Assert.Equal("POST ProcessDebugContexts('d1')/tm1.Continue", $"{_tm1.Last.Method} {_tm1.Last.Target}");
     }
 
+    [Fact]
+    public async Task DebuggingFinishesTheRunWhenItsLeftEarlyAsACancelledFlux()
+    {
+        // As the Java client's ProcessDebugServiceTest.debuggingFinishesTheRunWhenItsCancelled
+        _tm1.Respond = r => r.Target.EndsWith("/Breakpoints", StringComparison.Ordinal) ? FakeTm1.Collection() : Context(r.Target.EndsWith("tm1.Debug", StringComparison.Ordinal) ? "Paused" : "Complete");
+        var tm1 = _tm1.Client();
+        var taken = new List<int>();
+        await foreach (var i in tm1.ProcessDebugging.DebuggingAsync("Load", null, _ => Forever()))
+        {
+            taken.Add(i);
+            break;
+        }
+        Assert.Equal([0], taken);
+        Assert.Equal("POST ProcessDebugContexts('d1')/tm1.Continue", $"{_tm1.Last.Method} {_tm1.Last.Target}");
+    }
+
+    private static async IAsyncEnumerable<int> Forever([EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        for (var i = 0; ; i++)
+        {
+            await Task.Yield();
+            yield return i;
+        }
+    }
+
     private static async IAsyncEnumerable<string> Yield(string value, int count, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         for (var i = 0; i < count; i++)

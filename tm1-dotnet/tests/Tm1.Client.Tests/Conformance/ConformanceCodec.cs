@@ -76,7 +76,7 @@ public static class ConformanceCodec
         {
             JsonValueKind.String when target == typeof(string) || target == typeof(object) => element.GetString(),
             JsonValueKind.True or JsonValueKind.False => element.GetBoolean(),
-            JsonValueKind.Number when target == typeof(object) => element.TryGetInt64(out var l) ? l : element.GetDouble(),
+            JsonValueKind.Number when target == typeof(object) => element.TryGetInt64(out var l) ? (object)l : element.GetDouble(),
             JsonValueKind.Number => Convert.ChangeType(element.GetDouble(), target, CultureInfo.InvariantCulture),
             _ => throw new UnknownConformanceValueException($"{element} for a {target}"),
         };
@@ -121,7 +121,8 @@ public static class ConformanceCodec
                 {
                     var type = Client.GetType("AjMyers.Tm1.Client.Model." + body!.GetValue<string>())
                         ?? throw new UnknownConformanceValueException("no model " + body);
-                    return Tm1Json.Read(JsonSerializer.SerializeToElement(node["json"]), type);
+                    // An argument Java built: its date-times as given, as a caller's are
+                    return JsonSerializer.Deserialize(JsonSerializer.SerializeToElement(node["json"]), type, AsGiven.Value);
                 }
             case "$enum":
                 {
@@ -218,7 +219,7 @@ public static class ConformanceCodec
             { ValueKind: JsonValueKind.String } e => e.GetString(),
             { ValueKind: JsonValueKind.True } => true,
             { ValueKind: JsonValueKind.False } => false,
-            { ValueKind: JsonValueKind.Number } e => e.TryGetInt64(out var l) ? l : e.GetDouble(),
+            { ValueKind: JsonValueKind.Number } e => e.TryGetInt64(out var l) ? (object)l : e.GetDouble(),
             var e => throw new UnknownConformanceValueException(e.ToString()),
         },
         _ => throw new UnknownConformanceValueException(node.ToJsonString()),
@@ -270,7 +271,7 @@ public static class ConformanceCodec
     }
 
     /// <summary>Calls the method and encodes what it gave; its exceptions propagate unwrapped.</summary>
-    public static async Task<JsonNode?> Call(object service, MethodInfo method, object?[] values)
+    public static async Task<JsonNode?> Call(object service, MethodInfo method, object?[] values, int? take = null)
     {
         object? returned;
         try
@@ -282,7 +283,7 @@ public static class ConformanceCodec
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(e.InnerException!).Throw();
             throw;
         }
-        return Result(await Await(returned, method.ReturnType));
+        return Result(await Await(returned, method.ReturnType, take));
     }
 
     /// <summary>A query rebuilt from its parts, with this client's own query builder.</summary>
@@ -341,8 +342,9 @@ public static class ConformanceCodec
         return q;
     }
 
-    /// <summary>What a call gave: a <c>Task</c>'s value, or an <c>IAsyncEnumerable</c>'s items.</summary>
-    public static async Task<object?> Await(object? returned, Type declared)
+    /// <summary>What a call gave: a <c>Task</c>'s value, or an <c>IAsyncEnumerable</c>'s items (with
+    /// <paramref name="take"/>, the first so many, for a stream that doesn't end by itself).</summary>
+    public static async Task<object?> Await(object? returned, Type declared, int? take = null)
     {
         switch (returned)
         {
@@ -361,15 +363,23 @@ public static class ConformanceCodec
         }
         var collect = typeof(ConformanceCodec).GetMethod(nameof(Collect), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(enumerable.GetGenericArguments()[0]);
-        return await (Task<List<object?>>)collect.Invoke(null, [returned])!;
+        return await (Task<List<object?>>)collect.Invoke(null, [returned, take])!;
     }
 
-    private static async Task<List<object?>> Collect<T>(IAsyncEnumerable<T> items)
+    private static async Task<List<object?>> Collect<T>(IAsyncEnumerable<T> items, int? take)
     {
         var list = new List<object?>();
+        if (take <= 0)
+        {
+            return list;
+        }
         await foreach (var item in items)
         {
             list.Add(item);
+            if (list.Count >= take)
+            {
+                break;
+            }
         }
         return list;
     }
@@ -384,9 +394,79 @@ public static class ConformanceCodec
         double or float or decimal => JsonValue.Create(Convert.ToDouble(value, CultureInfo.InvariantCulture)),
         IList list => new JsonArray(list.Cast<object?>().Select(Result).ToArray()),
         _ when value.GetType().Namespace == "AjMyers.Tm1.Client.Model" && !value.GetType().IsEnum =>
-            new JsonObject { ["$model"] = value.GetType().Name, ["json"] = WithoutTypes(JsonNode.Parse(Tm1Json.Write(value).GetRawText())) },
-        _ => JsonNode.Parse(Tm1Json.Write(value).GetRawText()),
+            new JsonObject { ["$model"] = value.GetType().Name, ["json"] = WithoutTypes(JsonSerializer.SerializeToNode(value, value.GetType(), ResultOptions)) },
+        _ => JsonSerializer.SerializeToNode(value, value.GetType(), ResultOptions),
     };
+
+    /// <summary>The client's JSON options, but reading date-times as given (the client reads TM1's
+    /// in UTC, as Java's Jackson does), for arguments Java built.</summary>
+    private static readonly Lazy<JsonSerializerOptions> AsGiven = new(() =>
+    {
+        var options = new JsonSerializerOptions(Tm1Json.Options);
+        options.Converters.Insert(0, new AsGivenDateTime());
+        options.Converters.Insert(0, new AsGivenLenientDateTime());
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    });
+
+    private sealed class AsGivenDateTime : System.Text.Json.Serialization.JsonConverter<DateTimeOffset>
+    {
+        public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            reader.GetDateTimeOffset();
+
+        public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) =>
+            throw new NotSupportedException("Arguments are read, not written");
+    }
+
+    private sealed class AsGivenLenientDateTime : System.Text.Json.Serialization.JsonConverter<DateTimeOffset?>
+    {
+        public override DateTimeOffset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            reader.TokenType == JsonTokenType.String && DateTimeOffset.TryParse(reader.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d) ? d : null;
+
+        public override void Write(Utf8JsonWriter writer, DateTimeOffset? value, JsonSerializerOptions options) =>
+            throw new NotSupportedException("Arguments are read, not written");
+    }
+
+    /// <summary>The client's JSON options, but writing an enum's fallback (a value this client
+    /// doesn't know, which it never sends) as null, as Java writes its fallback constant.</summary>
+    private static readonly JsonSerializerOptions ResultOptions = CreateResultOptions();
+
+    private static JsonSerializerOptions CreateResultOptions()
+    {
+        var options = new JsonSerializerOptions(Tm1Json.Options);
+        options.Converters.Insert(0, new FallbackAsNullFactory());
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    }
+
+    private sealed class FallbackAsNullFactory : System.Text.Json.Serialization.JsonConverterFactory
+    {
+        public override bool CanConvert(Type typeToConvert) => Tm1EnumConverter.Describe(typeToConvert) is not null;
+
+        public override System.Text.Json.Serialization.JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options) =>
+            (System.Text.Json.Serialization.JsonConverter)Activator.CreateInstance(typeof(FallbackAsNull<>).MakeGenericType(typeToConvert))!;
+    }
+
+    private sealed class FallbackAsNull<T> : System.Text.Json.Serialization.JsonConverter<T>
+        where T : struct, Enum
+    {
+        private readonly Tm1EnumConverter.Description _d = Tm1EnumConverter.Describe(typeof(T))!;
+
+        public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            throw new NotSupportedException("Results are written, not read");
+
+        public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
+        {
+            if (_d.ByValue.TryGetValue(value, out var name))
+            {
+                writer.WriteStringValue(name);
+            }
+            else
+            {
+                writer.WriteNullValue();
+            }
+        }
+    }
 
     /// <summary>A model's JSON without <c>@odata.type</c>, throughout: the type is <c>$model</c>'s, as
     /// the Java recorder writes it.</summary>
@@ -468,9 +548,52 @@ public static class ConformanceCodec
         JsonObject o when dropNulls && o.ContainsKey("$model") => Normal(o["json"], dropNulls),
         JsonObject o => Members(o, dropNulls),
         JsonValue v when Element(v).ValueKind == JsonValueKind.Number => JsonValue.Create(Element(v).GetDouble()),
+        JsonValue v when dropNulls && Element(v).ValueKind == JsonValueKind.String => JsonValue.Create(AsJavaText(Element(v).GetString()!)),
         JsonValue v => JsonNode.Parse(v.ToJsonString()),
         _ => throw new InvalidOperationException(),
     };
+
+    private static readonly System.Text.RegularExpressions.Regex DateTimeText = new(
+        @"^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}(?::?\d{2})?)$",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private static readonly System.Text.RegularExpressions.Regex DurationText = new(
+        @"^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)(?:\.(\d+))?S)?)?$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>A date-time or a duration in a result as Java writes it (<c>2026-01-01T02:00:00Z</c>,
+    /// <c>PT24H</c>), however this client or TM1 wrote it (<c>2026-01-01T02:00+00:00</c>,
+    /// <c>P1D</c>); any other text as it is. For comparing results, not requests.</summary>
+    public static string AsJavaText(string text)
+    {
+        var d = DateTimeText.Match(text);
+        if (d.Success)
+        {
+            var fraction = d.Groups[4].Value.TrimEnd('0');
+            var zone = d.Groups[5].Value.ToUpperInvariant();
+            if (zone != "Z")
+            {
+                var digits = zone[1..].Replace(":", "", StringComparison.Ordinal).PadRight(4, '0');
+                zone = int.Parse(digits, CultureInfo.InvariantCulture) == 0 ? "Z" : $"{zone[0]}{digits[..2]}:{digits[2..]}";
+            }
+            var seconds = d.Groups[3].Success ? d.Groups[3].Value : "00";
+            return $"{d.Groups[1].Value}T{d.Groups[2].Value}:{seconds}{(fraction.Length > 0 ? "." + fraction : "")}{zone}";
+        }
+        var p = DurationText.Match(text);
+        if (p.Success && text != "P" && text != "PT" && !text.EndsWith('T'))
+        {
+            long N(int i) => p.Groups[i].Success ? long.Parse(p.Groups[i].Value, CultureInfo.InvariantCulture) : 0;
+            var total = ((N(1) * 24 + N(2)) * 60 + N(3)) * 60 + N(4);
+            var (h, m, s) = (total / 3600, total % 3600 / 60, total % 60);
+            var nanos = p.Groups[5].Value.TrimEnd('0');
+            var out_ = "PT" + (h != 0 ? h + "H" : "") + (m != 0 ? m + "M" : "");
+            if (s != 0 || nanos.Length > 0)
+            {
+                out_ += s.ToString(CultureInfo.InvariantCulture) + (nanos.Length > 0 ? "." + nanos : "") + "S";
+            }
+            return out_ == "PT" ? "PT0S" : out_;
+        }
+        return text;
+    }
 
     private static JsonObject Members(JsonObject o, bool dropNulls)
     {

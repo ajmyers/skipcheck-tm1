@@ -1,0 +1,1217 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.process.ChoreServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "ChoreServiceTest#aMissingChoreIsNotFound#1",
+			"service" : "chores",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Chores('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Chore'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#aMissingTaskIsNotFound#1",
+			"service" : "chores",
+			"method" : "taskProcess",
+			"params" : [
+				"name",
+				"step",
+				"query"
+			],
+			"args" : [
+				"Nightly",
+				9,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Chores('Nightly')/Tasks(9)/Process",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Task 9 can not be found"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#aStaleEtagIsRefused#1",
+			"service" : "chores",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Nightly",
+				{
+					"$patch" : "ChorePatch",
+					"json" : {
+						"Active" : true
+					}
+				},
+				"W/\"0\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Chores('Nightly')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"0\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Active" : true
+						}
+					},
+					"response" : {
+						"status" : 412,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "stale"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1PreconditionFailedException",
+				"category" : "api",
+				"kind" : "PRECONDITION_FAILED",
+				"status" : 412,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#anActiveChoresStartIsRefused#1",
+			"service" : "chores",
+			"method" : "setServerLocalStartTime",
+			"params" : [
+				"name",
+				"date",
+				"time"
+			],
+			"args" : [
+				"Nightly",
+				{
+					"$date" : "2026-01-02"
+				},
+				{
+					"$time" : "03:04"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Chores('Nightly')/tm1.SetServerLocalStartTime",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"StartDate" : "2026-01-02",
+							"StartTime" : "03:04"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "7",
+								"message" : "Can't duplicate active chore"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "7"
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#anExistingChoreConflicts#1",
+			"service" : "chores",
+			"method" : "create",
+			"params" : [
+				"chore"
+			],
+			"args" : [
+				{
+					"$patch" : "ChorePatch",
+					"json" : {
+						"Name" : "Nightly"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Chores",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Nightly"
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Chore 'Nightly' already exists"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#createsAChoreWithAnOffsetStart#1",
+			"service" : "chores",
+			"method" : "create",
+			"params" : [
+				"chore"
+			],
+			"args" : [
+				{
+					"$patch" : "ChorePatch",
+					"json" : {
+						"Name" : "Hourly",
+						"StartTime" : "2026-03-04T05:06:07.5+02:00",
+						"Frequency" : "PT1H30M",
+						"ExecutionMode" : "MultipleCommit"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Chores",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Hourly",
+							"StartTime" : "2026-03-04T05:06:07.5+02:00",
+							"Frequency" : "PT1H30M",
+							"ExecutionMode" : "MultipleCommit"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Hourly"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Chore",
+				"json" : {
+					"Name" : "Hourly"
+				}
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#createsAChoreWithItsTasks#1",
+			"service" : "chores",
+			"method" : "create",
+			"params" : [
+				"chore"
+			],
+			"args" : [
+				{
+					"$patch" : "ChorePatch",
+					"json" : {
+						"Name" : "Nightly",
+						"StartTime" : "2026-01-01T02:00:00Z",
+						"DSTSensitive" : false,
+						"Frequency" : "PT24H",
+						"ExecutionMode" : "SingleCommit",
+						"Active" : false,
+						"Tasks" : [
+							{
+								"Process@odata.bind" : "Processes('Load')",
+								"Parameters" : [
+									{
+										"Name" : "pVersion",
+										"Value" : "Actual"
+									},
+									{
+										"Name" : "pYear",
+										"Value" : 2026
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Chores",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Nightly",
+							"StartTime" : "2026-01-01T02:00:00Z",
+							"DSTSensitive" : false,
+							"Frequency" : "PT24H",
+							"ExecutionMode" : "SingleCommit",
+							"Active" : false,
+							"Tasks" : [
+								{
+									"Process@odata.bind" : "Processes('Load')",
+									"Parameters" : [
+										{
+											"Name" : "pVersion",
+											"Value" : "Actual"
+										},
+										{
+											"Name" : "pYear",
+											"Value" : 2026
+										}
+									]
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Nightly"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Chore",
+				"json" : {
+					"Name" : "Nightly"
+				}
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#deletesAChore#1",
+			"service" : "chores",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Nightly"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Chores('Nightly')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ChoreServiceTest#getsAChoreWithItsTasksAndProcesses#1",
+			"service" : "chores",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Nightly",
+				{
+					"$query" : {
+						"expand" : {
+							"Tasks" : {
+								"expand" : {
+									"Process" : { }
+								}
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Chores('Nightly')?$expand=Tasks($expand%3DProcess)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.etag" : "W/\"3\"",
+							"Name" : "Nightly",
+							"StartTime" : "2026-01-01T02:00Z",
+							"Frequency" : "P1DT00H00M00S",
+							"DSTSensitive" : false,
+							"ExecutionMode" : "MultipleCommit",
+							"Tasks" : [
+								{
+									"Step" : 0,
+									"Process" : {
+										"Name" : "Load"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Chore",
+				"json" : {
+					"@odata.etag" : "W/\"3\"",
+					"Name" : "Nightly",
+					"StartTime" : "2026-01-01T02:00:00Z",
+					"DSTSensitive" : false,
+					"ExecutionMode" : "MultipleCommit",
+					"Frequency" : "PT24H",
+					"Tasks" : [
+						{
+							"Step" : 0,
+							"Process" : {
+								"Name" : "Load"
+							}
+						}
+					]
+				}
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#listsChores#1",
+			"service" : "chores",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"Active"
+						],
+						"expand" : {
+							"Tasks" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Chores?$select=Name,Active&$expand=Tasks",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Nightly",
+									"Active" : true,
+									"ExecutionMode" : "SingleCommit"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Chore",
+					"json" : {
+						"Name" : "Nightly",
+						"Active" : true,
+						"ExecutionMode" : "SingleCommit"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ChoreServiceTest#quotesAName#1",
+			"service" : "chores",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Joe's nightly #2",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Chores('Joe''s%20nightly%20%232')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Joe's nightly #2"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Chore",
+				"json" : {
+					"Name" : "Joe's nightly #2"
+				}
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#refusesAMissingName#1",
+			"service" : "chores",
+			"method" : "execute",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#runsTheChoresActions#1",
+			"service" : "chores",
+			"method" : "execute",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Nightly"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Chores('Nightly')/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ChoreServiceTest#runsTheChoresActions#2",
+			"service" : "chores",
+			"method" : "activate",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Nightly"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Chores('Nightly')/tm1.Activate",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ChoreServiceTest#runsTheChoresActions#3",
+			"service" : "chores",
+			"method" : "deactivate",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Nightly"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Chores('Nightly')/tm1.Deactivate",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ChoreServiceTest#setsTheServerLocalStartTime#1",
+			"service" : "chores",
+			"method" : "setServerLocalStartTime",
+			"params" : [
+				"name",
+				"date",
+				"time"
+			],
+			"args" : [
+				"Nightly",
+				{
+					"$date" : "2026-01-02"
+				},
+				{
+					"$time" : "03:04"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Chores('Nightly')/tm1.SetServerLocalStartTime",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"StartDate" : "2026-01-02",
+							"StartTime" : "03:04"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ChoreServiceTest#setsTheServerLocalStartTime#2",
+			"service" : "chores",
+			"method" : "setServerLocalStartTime",
+			"params" : [
+				"name",
+				"date",
+				"time"
+			],
+			"args" : [
+				"Nightly",
+				{
+					"$date" : "2026-12-31"
+				},
+				{
+					"$time" : "23:59:30.500"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Chores('Nightly')/tm1.SetServerLocalStartTime",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"StartDate" : "2026-12-31",
+							"StartTime" : "23:59:30.500"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ChoreServiceTest#updatesWithAndWithoutAnEtag#1",
+			"service" : "chores",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch"
+			],
+			"args" : [
+				"Nightly",
+				{
+					"$patch" : "ChorePatch",
+					"json" : {
+						"Active" : true
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Chores('Nightly')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Active" : true
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ChoreServiceTest#updatesWithAndWithoutAnEtag#2",
+			"service" : "chores",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Nightly",
+				{
+					"$patch" : "ChorePatch",
+					"json" : {
+						"Frequency" : "PT6H"
+					}
+				},
+				"W/\"3\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Chores('Nightly')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"3\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Frequency" : "PT6H"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ChoreServiceTest#worksWithTasksByStep#1",
+			"service" : "chores",
+			"method" : "tasks",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Nightly",
+				{
+					"$query" : {
+						"expand" : {
+							"Process" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Chores('Nightly')/Tasks?$expand=Process",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Step" : 0,
+									"Parameters" : [
+										{
+											"Name" : "pVersion",
+											"Value" : "Actual"
+										}
+									]
+								},
+								{
+									"Step" : 1
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "ChoreTask",
+					"json" : {
+						"Step" : 0,
+						"Parameters" : [
+							{
+								"Name" : "pVersion",
+								"Value" : "Actual"
+							}
+						]
+					}
+				},
+				{
+					"$model" : "ChoreTask",
+					"json" : {
+						"Step" : 1
+					}
+				}
+			]
+		},
+		{
+			"id" : "ChoreServiceTest#worksWithTasksByStep#2",
+			"service" : "chores",
+			"method" : "addTask",
+			"params" : [
+				"name",
+				"task"
+			],
+			"args" : [
+				"Nightly",
+				{
+					"$patch" : "ChoreTaskPatch",
+					"json" : {
+						"Process@odata.bind" : "Processes('Load')",
+						"Parameters" : [
+							{
+								"Name" : "pVersion",
+								"Value" : "Forecast"
+							},
+							{
+								"Name" : "pYear",
+								"Value" : 2026
+							}
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Chores('Nightly')/Tasks",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Process@odata.bind" : "Processes('Load')",
+							"Parameters" : [
+								{
+									"Name" : "pVersion",
+									"Value" : "Forecast"
+								},
+								{
+									"Name" : "pYear",
+									"Value" : 2026
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Step" : 2
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ChoreTask",
+				"json" : {
+					"Step" : 2
+				}
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#worksWithTasksByStep#3",
+			"service" : "chores",
+			"method" : "updateTask",
+			"params" : [
+				"name",
+				"step",
+				"patch"
+			],
+			"args" : [
+				"Nightly",
+				2,
+				{
+					"$patch" : "ChoreTaskPatch",
+					"json" : {
+						"Parameters" : [
+							{
+								"Name" : "pVersion",
+								"Value" : "Budget"
+							}
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Chores('Nightly')/Tasks(2)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Parameters" : [
+								{
+									"Name" : "pVersion",
+									"Value" : "Budget"
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ChoreServiceTest#worksWithTasksByStep#4",
+			"service" : "chores",
+			"method" : "deleteTask",
+			"params" : [
+				"name",
+				"step"
+			],
+			"args" : [
+				"Nightly",
+				0
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Chores('Nightly')/Tasks(0)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ChoreServiceTest#worksWithTasksByStep#5",
+			"service" : "chores",
+			"method" : "taskProcess",
+			"params" : [
+				"name",
+				"step",
+				"query"
+			],
+			"args" : [
+				"Nightly",
+				1,
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Chores('Nightly')/Tasks(1)/Process?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Load"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Process",
+				"json" : {
+					"Name" : "Load"
+				}
+			}
+		},
+		{
+			"id" : "ChoreServiceTest#worksWithTasksByStep#6",
+			"service" : "chores",
+			"method" : "taskChore",
+			"params" : [
+				"name",
+				"step",
+				"query"
+			],
+			"args" : [
+				"Nightly",
+				1,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Chores('Nightly')/Tasks(1)/Chore",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Nightly"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Chore",
+				"json" : {
+					"Name" : "Nightly"
+				}
+			}
+		}
+	]
+}

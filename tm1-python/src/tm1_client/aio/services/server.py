@@ -101,7 +101,10 @@ class ServerService(Service):
     @endpoint("EntitySet Loggers")
     async def set_logger_level(self, name: str, level: LogLevel) -> None:
         """``PATCH Loggers('name')``: changes a logger's level, at once."""
-        body = {"Level": _require(level, "level").value}
+        if not _require(level, "level").known:
+            # As the Java client's: a level this client doesn't know isn't sent
+            raise ValueError(f"LogLevel.{level.name} stands for a level this client doesn't know, and isn't sent")
+        body = {"Level": level.value}
         await self._session.execute(Tm1Request.patch(_LOGGERS.key(_require(name, "name")), body))
 
 
@@ -234,7 +237,8 @@ class LogService(Service):
         return text[1:] if text.startswith(_BYTE_ORDER_MARK) else text
 
     async def _tail(self, operation: Tm1Operation, type: Any, every: float | timedelta) -> AsyncIterator[Any]:
-        seconds = poll_interval(_require(every, "every"))
+        # As the Java client's: no wait between polls is allowed (a poll waits for its answer anyway)
+        seconds = 0.0 if _is_zero(_require(every, "every")) else poll_interval(every)
         request = Tm1Request.get(ODataPath.function_import(_import_name(operation), {}), ODataQuery.none(), dict)
         doc = await self._session.execute(request.requires(operation.capability()))
         link = ODataPath.link(str((doc or {}).get("value", "")))
@@ -247,6 +251,10 @@ class LogService(Service):
                     seen = index
                     yield entry
             await runtime.sleep(seconds)
+
+
+def _is_zero(every: float | timedelta) -> bool:
+    return (every.total_seconds() if isinstance(every, timedelta) else float(every)) == 0
 
 
 def _import_name(operation: Tm1Operation) -> str:

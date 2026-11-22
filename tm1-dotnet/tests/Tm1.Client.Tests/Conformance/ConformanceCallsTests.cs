@@ -105,7 +105,7 @@ public class ConformanceCallsTests
         JsonObject outcome;
         try
         {
-            outcome = new JsonObject { ["result"] = await ConformanceCodec.Call(service, method, values) };
+            outcome = new JsonObject { ["result"] = await ConformanceCodec.Call(service, method, values, c["take"]?.GetValue<int>()) };
         }
         catch (UnknownConformanceValueException)
         {
@@ -122,7 +122,7 @@ public class ConformanceCallsTests
         {
             Assert.Equal(ConformanceCodec.Comparable(expected), ConformanceCodec.Comparable(sent));
         }
-        Assert.Equal(recorded, fake.Requests.Count);
+        Assert.True(recorded == fake.Requests.Count, $"sent {fake.Requests.Count} requests, Java sent {recorded}; .NET gave {outcome.ToJsonString()}");
 
         if (c["error"] is JsonObject error)
         {

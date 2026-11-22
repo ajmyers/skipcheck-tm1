@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import itertools
 import json
 from pathlib import Path
 from typing import Any
@@ -124,17 +125,35 @@ def _call(service: Any, case: dict[str, Any]) -> Any:
     return method(**kwargs)
 
 
-async def _drain(value: Any) -> Any:
+async def _drain(value: Any, take: int | None = None) -> Any:
     if inspect.isawaitable(value):
         value = await value
     if hasattr(value, "__aiter__"):
-        value = [v async for v in value]
+        if take is None:
+            value = [v async for v in value]
+        else:
+            # A stream that doesn't end by itself: its first items, then left
+            items = []
+            if take > 0:
+                async for v in value:
+                    items.append(v)
+                    if len(items) >= take:
+                        break
+            if hasattr(value, "aclose"):
+                await value.aclose()
+            value = items
     return value
 
 
-def _sync_drain(value: Any) -> Any:
+def _sync_drain(value: Any, take: int | None = None) -> Any:
     if inspect.isgenerator(value) or (hasattr(value, "__iter__") and hasattr(value, "__next__")):
-        value = list(value)
+        if take is None:
+            value = list(value)
+        else:
+            items = list(itertools.islice(value, take))
+            if hasattr(value, "close"):
+                value.close()
+            value = items
     return value
 
 
@@ -149,7 +168,7 @@ def test_replays_the_java_call(session: dict[str, Any], case: dict[str, Any], fl
         client = Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=httpx.Client(transport=httpx.MockTransport(replay.fake.handler))))
         service = getattr(client, snake(case["service"]))
         try:
-            outcome = {"result": codec.result(_sync_drain(_call(service, case)))}
+            outcome = {"result": codec.result(_sync_drain(_call(service, case), case.get("take")))}
         except Unknown:
             raise
         except Exception as exc:  # noqa: BLE001 - compared below
@@ -160,7 +179,7 @@ def test_replays_the_java_call(session: dict[str, Any], case: dict[str, Any], fl
         client = AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http))
         service = getattr(client, snake(case["service"]))
         try:
-            outcome = {"result": codec.result(loop.run_until_complete(_drain(_call(service, case))))}
+            outcome = {"result": codec.result(loop.run_until_complete(_drain(_call(service, case), case.get("take"))))}
         except Unknown:
             raise
         except Exception as exc:  # noqa: BLE001 - compared below

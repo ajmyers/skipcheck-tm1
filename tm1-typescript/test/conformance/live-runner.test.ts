@@ -127,7 +127,7 @@ describe("the live conformance runner", () => {
     return tm1;
   }
 
-  it.each(["subsets", "members", "edges", "member-sets", "content", "encryption", "git", "users", "sessions", "attributes", "annotations"])("runs the %s scenario, one request per step", async (name) => {
+  it.each(["subsets", "members", "edges", "member-sets", "content", "encryption", "git", "users", "sessions", "attributes", "annotations", "processes", "chores"])("runs the %s scenario, one request per step", async (name) => {
     const s = live.scenarios().find((x) => x.name === name)!;
     const names = live.namesFor(s);
     const tm1 = answeringAsExpected(s, names);

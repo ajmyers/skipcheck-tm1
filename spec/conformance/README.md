@@ -39,6 +39,7 @@ The Java client is the definition of how a call behaves. Its unit tests record e
 - A body is `json`, `text` or `bytes` (base64), by its content type, or absent.
 - The session's own requests (login, `Server?$select=ProductVersion`, `$metadata`, close) aren't in the fixture. Every runner's fake answers them the same way: the same product version and the same `$metadata` snapshot.
 - `result` is what the call returned: `null` for nothing (`Mono<Void>`, an empty `Mono`), a list for a `Flux`, a model as `{"$model": <type>, "json": <TM1's JSON>}`, or a plain value. A polymorphic model is named by its own type (`Member` for `Member.Plain`, `TupleMember`), and its JSON leaves out the `@odata.type` Jackson writes for one. A stream of bytes (`Flux<DataBuffer>`, such as a document's content) is `{"$bytes": …}`, however it was split; a `Publisher<DataBuffer>` argument is recorded the same way. Durations and date-times are as Java writes what it read: `PT26H3.5S`, and the instant in UTC (`2026-01-01T21:34:00.12Z`).
+- `take`, when there, is how many items of a `Flux` that doesn't end by itself (a log tail) the call took before it was cancelled: runners stop iterating after as many, and `result` lists them.
 - `error` is how it failed: `category` (`api`, `protocol`, `transport`, `unsupported`, `argument` or `state`), and for TM1's own errors (`api`) its `kind` (Java's `Tm1ErrorKind` constant), `status` and `code`. `exception` is Java's class name, for reading; each language has its own, and it isn't compared.
 
 ### Arguments
@@ -69,7 +70,7 @@ For every case, in each client (`tm1-python/tests/test_conformance_calls.py` in 
 2. It answers each request with the recorded answers, in order; within an `unordered` group, with the answer of the group's equal request not yet answered.
 3. Each request must equal the recorded one it was answered for: method, target, the headers above, and the body. JSON bodies are compared with their members in order.
 4. It must send exactly as many requests (a group's count as its members).
-5. The result must equal the recorded one (models by their JSON, with null members left out, as clients differ on writing them), or the error must match its category, kind, status and code.
+5. The result must equal the recorded one (models by their JSON, with null members left out, as clients differ on writing them), or the error must match its category, kind, status and code. A model's JSON leaves out `@odata.type` (its `$model` is its type), and an enum's fallback (a value the client doesn't know) is `null`, as Java writes its fallback constant. Everything else, durations and date-times included, must be exactly as Java wrote it.
 
 A case a language can't express goes in that client's `conformance/unsupported.txt`, with the reason. The runner fails if the list names a case no fixture has.
 
@@ -90,7 +91,7 @@ A case a language can't express goes in that client's `conformance/unsupported.t
    }
    ```
 
-   `conformance.call` calls the method by name, so what's recorded is what ran; `conformance.fail` does the same for a call that must fail, and returns the error. Script one answer per request (`json`, `text`, `bytes`, `status`, `error`): a call that leaves answers unused fails. Requests that may come in any order are scripted as a group, each answer for its `METHOD target`, and recorded in the order scripted:
+   `conformance.call` calls the method by name, so what's recorded is what ran; `conformance.fail` does the same for a call that must fail, and returns the error; `conformance.take(n, …)` takes the first `n` items of a `Flux` that doesn't end by itself, then cancels it. Script one answer per request (`json`, `text`, `bytes`, `status`, `error`): a call that leaves answers unused fails. Requests that may come in any order are scripted as a group, each answer for its `METHOD target`, and recorded in the order scripted:
 
    ```java
    conformance.tm1().unordered(pages -> pages

@@ -125,13 +125,17 @@ class Tm1Model(BaseModel):
                     return sub.model_validate(data)
         return handler(data)
 
-    @field_validator("*", mode="after")
+    @field_validator("*", mode="wrap")
     @classmethod
-    def _in_utc(cls, value: Any) -> Any:
-        # The Java client reads every date-time as its instant in UTC
-        if isinstance(value, datetime) and value.tzinfo is not None:
-            return value.astimezone(timezone.utc)
-        return value
+    def _in_utc(cls, value: Any, handler: Any, info: ValidationInfo) -> Any:
+        # The Java client reads every date-time in TM1's JSON as its instant in UTC (Jackson's
+        # ADJUST_DATES_TO_CONTEXT_TIME_ZONE), but keeps one it's given as it was given: so does
+        # this one. A ``{"as_given": True}`` context reads text as given too.
+        read = handler(value)
+        given = not isinstance(value, str) or bool(info.context and info.context.get("as_given"))
+        if isinstance(read, datetime) and read.tzinfo is not None and not given:
+            return read.astimezone(timezone.utc)
+        return read
 
     @field_serializer("*", mode="wrap", when_used="json")
     def _as_java(self, value: Any, handler: Any) -> Any:

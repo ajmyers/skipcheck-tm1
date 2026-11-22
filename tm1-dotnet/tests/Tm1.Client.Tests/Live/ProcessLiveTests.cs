@@ -228,8 +228,6 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
 /// parameter names: Java's <c>ChoreServiceTm1Test</c>.</summary>
 public sealed class ChoreLiveTests : IAsyncLifetime
 {
-    private static readonly ODataPath Dimensions = ODataPath.Of("Dimensions");
-
     private Tm1Client _tm1 = null!;
     private readonly string _id = Guid.NewGuid().ToString("N")[..8];
 
@@ -275,7 +273,7 @@ public sealed class ChoreLiveTests : IAsyncLifetime
         await _tm1.Processes.DeleteAsync(Process);
         foreach (var d in new[] { "marker_" + _id, "second_" + _id })
         {
-            await Quietly(() => _tm1.Session.ExecuteAsync(Tm1Request.Delete(Dimensions.Key(d))));
+            await Quietly(() => _tm1.Dimensions.DeleteAsync(d));
         }
         await _tm1.DisposeAsync();
     }
@@ -334,7 +332,7 @@ public sealed class ChoreLiveTests : IAsyncLifetime
     public async Task RunsTheChoreNow()
     {
         await Chores.ExecuteAsync(Chore);
-        var dimension = await _tm1.Session.ExecuteAsync(Tm1Request.Get<Dimension>(Dimensions.Key("marker_" + _id), null));
+        var dimension = await _tm1.Dimensions.GetAsync("marker_" + _id);
         Assert.Equal("marker_" + _id, dimension.Name);
     }
 

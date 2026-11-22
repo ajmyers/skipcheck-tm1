@@ -84,6 +84,9 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 
 	private @Nullable Class<?> testClass;
 
+	/** How many items {@link #take} takes of the call's {@code Flux}; null for all. */
+	private @Nullable Integer taking;
+
 	@Override
 	public void beforeEach(ExtensionContext context) {
 		testClass = context.getRequiredTestClass();
@@ -122,6 +125,21 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 		}
 		record(service, method, args, outcome, null);
 		return (T) outcome.value();
+	}
+
+	/**
+	 * Calls as {@link #call} a method whose {@code Flux} doesn't end by itself, such as a
+	 * log tail: takes its first {@code n} items, then cancels it. Records
+	 * {@code "take": n}, which every runner replays by stopping after as many items.
+	 */
+	public <T> List<T> take(int n, String service, String method, @Nullable Object... args) {
+		taking = n;
+		try {
+			return call(service, method, args);
+		}
+		finally {
+			taking = null;
+		}
 	}
 
 	/** Calls as {@link #call}, which must fail; records how, and returns the error. */
@@ -169,7 +187,7 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 				value = ConformanceCodec.bytes(flux);
 			}
 			else if (returned instanceof Flux<?> flux) {
-				value = flux.collectList().block();
+				value = (taking == null ? flux : flux.take(taking)).collectList().block();
 			}
 			else {
 				value = returned;
@@ -241,6 +259,9 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 		ArrayNode a = c.putArray("args");
 		for (Object arg : args) {
 			a.add(ConformanceCodec.arg(arg));
+		}
+		if (taking != null) {
+			c.put("take", taking);
 		}
 		ArrayNode exchanges = c.putArray("exchanges");
 		tm1().takeExchanges().forEach(exchanges::add);

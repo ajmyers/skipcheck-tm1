@@ -76,7 +76,9 @@ public sealed class ServerService : Tm1Service
     [Tm1Endpoint("EntitySet Loggers")]
     public Task SetLoggerLevelAsync(string name, LogLevel level, CancellationToken cancellationToken = default)
     {
-        var json = Tm1EnumConverter.Describe(typeof(LogLevel))!.Name(level);
+        // As the Java client's: a level this client doesn't know is a bad argument, and isn't sent
+        var json = Tm1EnumConverter.Describe(typeof(LogLevel))!.ByValue.TryGetValue(level, out var known) ? known
+            : throw new System.ArgumentException($"LogLevel.{level} stands for a level this client doesn't know, and isn't sent", nameof(level));
         var body = new Dictionary<string, object?> { ["Level"] = json };
         return Session.ExecuteAsync(Tm1Request.Patch(Loggers.Key(Require(name, nameof(name))), body), cancellationToken);
     }

@@ -16,6 +16,7 @@ import pydantic
 import tm1_client
 from tm1_client import Filter, ODataPath, ODataQuery
 from tm1_client import errors as e
+from tm1_client.base import Tm1Enum
 from tm1_client._generated import model as m
 from tm1_client._generated import patches as p
 
@@ -67,7 +68,8 @@ def decode(value: Any) -> Any:
         cls = getattr(m, value["$model"], None)
         if cls is None:
             raise Unknown(f"no model {value['$model']}")
-        return cls.model_validate(value["json"])
+        # An argument Java built: its date-times as given, as a caller's are
+        return cls.model_validate(value["json"], context={"as_given": True})
     if tag == "$enum":
         return _enum(value)
     if tag == "$duration":
@@ -167,8 +169,11 @@ def result(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [result(v) for v in value]
     if isinstance(value, pydantic.BaseModel):
-        # Without @odata.type, at any depth, as the Java recorder writes a model: its $model is its type
-        return {"$model": type(value).__name__, "json": _without_types(value.model_dump(by_alias=True, mode="json", exclude_none=True))}
+        # Without @odata.type, at any depth, as the Java recorder writes a model: its $model is its type;
+        # a fallback enum member (a value this client doesn't know) as null, as Java writes its own
+        return {"$model": type(value).__name__, "json": _fallbacks_as_null(_without_types(value.model_dump(by_alias=True, mode="json", exclude_none=True)))}
+    if isinstance(value, Tm1Enum) and not value.known:
+        return None  # Java's fallback constant, whose JSON is null
     if isinstance(value, enum.Enum):
         return value.value
     if isinstance(value, dict):
@@ -183,6 +188,20 @@ def _without_types(value: Any) -> Any:
         return {k: _without_types(v) for k, v in value.items() if k != "@odata.type"}
     if isinstance(value, list):
         return [_without_types(v) for v in value]
+    return value
+
+
+_FALLBACK = "\x00unknown"  # a fallback enum member's value: a value this client doesn't know
+
+
+def _fallbacks_as_null(value: Any) -> Any:
+    """A model's JSON with its fallback enum members as null, as Java writes its own."""
+    if value == _FALLBACK:
+        return None
+    if isinstance(value, list):
+        return [_fallbacks_as_null(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _fallbacks_as_null(v) for k, v in value.items()}
     return value
 
 
@@ -214,12 +233,51 @@ def same_error(expected: dict[str, Any], got: dict[str, Any]) -> bool:
     return {k: v for k, v in expected.items() if k in keys} == {k: v for k, v in got.items() if k in keys}
 
 
+_DATE_TIME = re.compile(r"^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}(?::?\d{2})?)$", re.IGNORECASE)
+_DURATION = re.compile(r"^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$")
+
+
+def as_java_text(text: str) -> str:
+    """A date-time or a duration in a result as Java writes it (``2026-01-01T02:00:00Z``,
+    ``PT24H``), however this client or TM1 wrote it (``2026-01-01T02:00+00:00``,
+    ``P1DT00H00M00S``); any other text as it is. For comparing results, not requests."""
+    m = _DATE_TIME.match(text)
+    if m:
+        date, minutes, seconds, fraction, zone = m.groups()
+        fraction = (fraction or "").rstrip("0")
+        zone = zone.upper()
+        if zone != "Z":
+            digits = zone[1:].replace(":", "").ljust(4, "0")
+            zone = "Z" if int(digits) == 0 else f"{zone[0]}{digits[:2]}:{digits[2:]}"
+        return f"{date}T{minutes}:{seconds or '00'}{'.' + fraction if fraction else ''}{zone}"
+    m = _DURATION.match(text)
+    if m and text not in ("P", "PT") and not text.endswith("T"):
+        days, hours, minutes, seconds = m.groups()
+        whole, _, nanos = (seconds or "0").partition(".")
+        total = ((int(days or 0) * 24 + int(hours or 0)) * 60 + int(minutes or 0)) * 60 + int(whole)
+        h, rest = divmod(total, 3600)
+        mins, secs = divmod(rest, 60)
+        nanos = nanos.rstrip("0")
+        out = "PT" + (f"{h}H" if h else "") + (f"{mins}M" if mins else "")
+        if secs or nanos:
+            out += f"{secs}{'.' + nanos if nanos else ''}S"
+        return out if out != "PT" else "PT0S"
+    return text
+
+
 def normal(value: Any, drop_nulls: bool = False) -> Any:
-    """For comparing: integral floats as ints; with ``drop_nulls``, null members left out."""
+    """For comparing: integral floats as ints; with ``drop_nulls`` (results), null members left
+    out, and date-times and durations as Java writes them."""
     if isinstance(value, float) and value.is_integer():
         return int(value)
+    if drop_nulls and isinstance(value, str):
+        return as_java_text(value)
     if isinstance(value, list):
         return [normal(v, drop_nulls) for v in value]
+    if drop_nulls and isinstance(value, dict) and "$model" in value:
+        # A model by its JSON, as the README says (a derived type's by its @odata.type in it):
+        # its class is each language's own, such as Java's Unknown for a root read without one
+        return normal(value.get("json"), drop_nulls)
     if isinstance(value, dict):
         return {k: normal(v, drop_nulls) for k, v in value.items() if not (drop_nulls and v is None)}
     return value

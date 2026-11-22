@@ -25,6 +25,7 @@ interface Case {
   method: string;
   params: string[];
   args: any[];
+  take?: number;
   exchanges: Entry[];
   result?: any;
   error?: codec.EncodedError;
@@ -93,7 +94,17 @@ describe("conformance with the Java client's recorded calls", () => {
         let outcome: { result: unknown } | { error: codec.EncodedError };
         try {
           let value: any = method.apply(service, args);
-          if (value && typeof value.toArray === "function") value = await value.toArray();
+          if (value && c.take !== undefined && typeof value[Symbol.asyncIterator] === "function") {
+            // A stream that doesn't end by itself: its first items, then left
+            const items: unknown[] = [];
+            if (c.take > 0) {
+              for await (const item of value as AsyncIterable<unknown>) {
+                items.push(item);
+                if (items.length >= c.take) break;
+              }
+            }
+            value = items;
+          } else if (value && typeof value.toArray === "function") value = await value.toArray();
           else value = await value;
           // A stream of bytes, recorded as its bytes however they're split
           if (c.result && typeof c.result === "object" && "$bytes" in c.result && Array.isArray(value)) value = Buffer.concat(value);
@@ -114,7 +125,7 @@ describe("conformance with the Java client's recorded calls", () => {
           );
         } else {
           expect("result" in outcome, "a result, not " + JSON.stringify(outcome)).toBe(true);
-          expect(codec.normal(codec.javaResult((outcome as { result: any }).result, c.result), true)).toEqual(codec.normal(codec.expectedResult(c.result), true));
+          expect(codec.normal(codec.javaResult(codec.fallbacksAsNull((outcome as { result: any }).result, c.result), c.result), true)).toEqual(codec.normal(codec.expectedResult(c.result), true));
         }
       });
     }

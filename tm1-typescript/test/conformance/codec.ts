@@ -7,6 +7,7 @@ import { javaForm } from "../../src/json.js";
 import * as Model from "../../src/generated/model.js";
 import * as Patches from "../../src/generated/patches.js";
 import * as Services from "../../src/services/index.js";
+import { schema } from "../../src/generated/schema.js";
 
 export const SPEC_VERSION = 1;
 
@@ -129,6 +130,37 @@ export function result(value: unknown): Json {
   throw new Unknown("can't encode a result of type " + typeof value);
 }
 
+/** A result with each enum property that holds its fallback (a value this client doesn't know)
+ * as null, as Java writes its fallback constant: by the model types the recorded result names. */
+export function fallbacksAsNull(value: Json, recorded: Json): Json {
+  if (Array.isArray(value) && Array.isArray(recorded)) return value.map((v, i) => fallbacksAsNull(v, recorded[i] ?? null));
+  if (recorded !== null && typeof recorded === "object" && !Array.isArray(recorded) && typeof recorded.$model === "string") {
+    return ofType(recorded.$model, value);
+  }
+  return value;
+}
+
+function ofType(type: string, value: Json): Json {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+  const out: Record<string, Json> = { ...value };
+  let root = type;
+  while (schema.types[root]?.base) root = schema.types[root]!.base!;
+  const odataType = typeof value["@odata.type"] === "string" ? value["@odata.type"].replace(/^#/, "") : "";
+  for (let t: string | undefined = schema.types[root]?.derived?.[odataType] ?? type; t; t = schema.types[t]?.base) {
+    for (const [property, kind] of Object.entries(schema.types[t]?.properties ?? {})) {
+      if (property in out) out[property] = ofKind(kind, out[property]!);
+    }
+  }
+  return out;
+}
+
+function ofKind(kind: string, value: Json): Json {
+  if (Array.isArray(value)) return value.map((v) => ofKind(kind, v));
+  if (kind.startsWith("e:")) return value === schema.enums[kind.slice(2)]?.fallback ? null : value;
+  if (kind.startsWith("t:")) return ofType(kind.slice(2), value);
+  return value;
+}
+
 /** This client's result, where Java's is a model, as Java writes the model: durations and date-times
  * as Java writes the values it read (reading here keeps TM1's text), and no `@odata.type`, which the
  * recorded `$model` stands for. */
@@ -189,8 +221,43 @@ export function sameError(expected: EncodedError, got: EncodedError): boolean {
   return pick(expected) === pick(got);
 }
 
-/** For comparing: with dropNulls, null members left out. (JSON numbers have one type here.) */
+const DATE_TIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}(?::?\d{2})?)$/i;
+const DURATION = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)(?:\.(\d+))?S)?)?$/;
+
+/** A date-time or a duration in a result as Java writes it (`2026-01-01T02:00:00Z`, `PT24H`),
+ * however TM1 wrote it (`2026-01-01T02:00Z`, `P1DT00H00M00S`); any other text as it is. For
+ * comparing results, not requests. */
+export function asJavaText(text: string): string {
+  const d = DATE_TIME.exec(text);
+  if (d) {
+    const [, date, minutes, seconds, fraction, zone] = d;
+    const trimmed = (fraction ?? "").replace(/0+$/, "");
+    let offset = zone!.toUpperCase();
+    if (offset !== "Z") {
+      const digits = offset.slice(1).replace(":", "").padEnd(4, "0");
+      offset = Number(digits) === 0 ? "Z" : `${offset[0]}${digits.slice(0, 2)}:${digits.slice(2)}`;
+    }
+    return `${date}T${minutes}:${seconds ?? "00"}${trimmed ? "." + trimmed : ""}${offset}`;
+  }
+  const p = DURATION.exec(text);
+  if (p && text !== "P" && text !== "PT" && !text.endsWith("T")) {
+    const [, days, hours, minutes, seconds, fraction] = p;
+    const total = ((Number(days ?? 0) * 24 + Number(hours ?? 0)) * 60 + Number(minutes ?? 0)) * 60 + Number(seconds ?? 0);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const nanos = (fraction ?? "").replace(/0+$/, "");
+    let out = "PT" + (h ? `${h}H` : "") + (m ? `${m}M` : "");
+    if (s || nanos) out += `${s}${nanos ? "." + nanos : ""}S`;
+    return out === "PT" ? "PT0S" : out;
+  }
+  return text;
+}
+
+/** For comparing: with dropNulls (results), null members left out, and date-times and durations
+ * as Java writes them. (JSON numbers have one type here.) */
 export function normal(value: Json, dropNulls = false): Json {
+  if (dropNulls && typeof value === "string") return asJavaText(value);
   if (Array.isArray(value)) return value.map((v) => normal(v, dropNulls));
   if (value !== null && typeof value === "object") {
     const out: Record<string, Json> = {};

@@ -1,0 +1,3851 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.process.ProcessDebugServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "ProcessDebugServiceTest#aMissingProcessIsNotFound#1",
+			"service" : "processDebugging",
+			"method" : "debug",
+			"params" : [
+				"process",
+				"parameters",
+				"query"
+			],
+			"args" : [
+				"Nope",
+				{
+					"$map" : { }
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Nope')/tm1.Debug",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Process'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#aSecondBreakpointWithTheSameIdConflicts#1",
+			"service" : "processDebugging",
+			"method" : "addBreakpoint",
+			"params" : [
+				"id",
+				"breakpoint"
+			],
+			"args" : [
+				"d1",
+				{
+					"$patch" : "ProcessDebugContextBreakpointPatch",
+					"json" : {
+						"ID" : 1
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/Breakpoints",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"ID" : 1
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "A breakpoint with ID 1 already exists"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#addsUpdatesAndRemovesBreakpoints#1",
+			"service" : "processDebugging",
+			"method" : "addBreakpoint",
+			"params" : [
+				"id",
+				"breakpoint"
+			],
+			"args" : [
+				"d1",
+				{
+					"$patch" : "ProcessDebugContextLineBreakpointPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint",
+						"ID" : 1,
+						"Enabled" : true,
+						"ProcessName" : "Load",
+						"Procedure" : "Prolog",
+						"LineNumber" : 3
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/Breakpoints",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint",
+							"ID" : 1,
+							"Enabled" : true,
+							"ProcessName" : "Load",
+							"Procedure" : "Prolog",
+							"LineNumber" : 3
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint",
+							"ID" : 1,
+							"Enabled" : true,
+							"LineNumber" : 3
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContextLineBreakpoint",
+				"json" : {
+					"ID" : 1,
+					"Enabled" : true,
+					"LineNumber" : 3
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#addsUpdatesAndRemovesBreakpoints#2",
+			"service" : "processDebugging",
+			"method" : "addBreakpoint",
+			"params" : [
+				"id",
+				"breakpoint"
+			],
+			"args" : [
+				"d1",
+				{
+					"$patch" : "ProcessDebugContextBreakpointPatch",
+					"json" : {
+						"ID" : 0
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/Breakpoints",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"ID" : 0
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : 0
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContextBreakpoint",
+				"json" : {
+					"ID" : 0
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#addsUpdatesAndRemovesBreakpoints#3",
+			"service" : "processDebugging",
+			"method" : "updateBreakpoint",
+			"params" : [
+				"id",
+				"breakpoint",
+				"patch"
+			],
+			"args" : [
+				"d1",
+				1,
+				{
+					"$patch" : "ProcessDebugContextBreakpointPatch",
+					"json" : {
+						"Enabled" : false
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "ProcessDebugContexts('d1')/Breakpoints(1)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Enabled" : false
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ProcessDebugServiceTest#addsUpdatesAndRemovesBreakpoints#4",
+			"service" : "processDebugging",
+			"method" : "removeBreakpoint",
+			"params" : [
+				"id",
+				"breakpoint"
+			],
+			"args" : [
+				"d1",
+				1
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "ProcessDebugContexts('d1')/Breakpoints(1)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ProcessDebugServiceTest#debugsWithParametersInOrder#1",
+			"service" : "processDebugging",
+			"method" : "debug",
+			"params" : [
+				"process",
+				"parameters",
+				"query"
+			],
+			"args" : [
+				"Load",
+				{
+					"$map" : {
+						"pYear" : 2026,
+						"pVersion" : "Actual"
+					}
+				},
+				{
+					"$query" : {
+						"expand" : {
+							"Breakpoints" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Load')/tm1.Debug?$expand=Breakpoints",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Parameters" : [
+								{
+									"Name" : "pYear",
+									"Value" : 2026
+								},
+								{
+									"Name" : "pVersion",
+									"Value" : "Actual"
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContext",
+				"json" : {
+					"ID" : "d1",
+					"Status" : "Paused"
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#debugsWithParametersInOrder#2",
+			"service" : "processDebugging",
+			"method" : "debug",
+			"params" : [
+				"process",
+				"parameters",
+				"query"
+			],
+			"args" : [
+				"Joe's load",
+				{
+					"$map" : { }
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Joe''s%20load')/tm1.Debug",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContext",
+				"json" : {
+					"ID" : "d1",
+					"Status" : "Paused"
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#finishesARunThatIsAlreadyComplete#1",
+			"service" : "processDebugging",
+			"method" : "finish",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"d1"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')/Breakpoints",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Complete",
+							"Result" : {
+								"ProcessExecuteStatusCode" : "CompletedSuccessfully"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContext",
+				"json" : {
+					"ID" : "d1",
+					"Status" : "Complete",
+					"Result" : {
+						"ProcessExecuteStatusCode" : "CompletedSuccessfully"
+					}
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#finishesByRemovingTheBreakpointsItCanAndResumingToTheEnd#1",
+			"service" : "processDebugging",
+			"method" : "finish",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"d1"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')/Breakpoints",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 1
+								},
+								{
+									"ID" : -1
+								},
+								{ },
+								{
+									"ID" : 4
+								}
+							]
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "ProcessDebugContexts('d1')/Breakpoints(1)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				},
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "ProcessDebugContexts('d1')/Breakpoints(4)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Complete",
+							"Result" : {
+								"ProcessExecuteStatusCode" : "CompletedSuccessfully"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContext",
+				"json" : {
+					"ID" : "d1",
+					"Status" : "Complete",
+					"Result" : {
+						"ProcessExecuteStatusCode" : "CompletedSuccessfully"
+					}
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#givesUpFinishingAfterAHundredResumes#1",
+			"service" : "processDebugging",
+			"method" : "finish",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"d1"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')/Breakpoints",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContext",
+				"json" : {
+					"ID" : "d1",
+					"Status" : "Paused"
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#listsAndGetsContexts#1",
+			"service" : "processDebugging",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "ProcessDebugServiceTest#listsAndGetsContexts#2",
+			"service" : "processDebugging",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : {
+						"select" : [
+							"Status"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')?$select=Status",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContext",
+				"json" : {
+					"ID" : "d1",
+					"Status" : "Paused"
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#listsAndGetsContexts#3",
+			"service" : "processDebugging",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"x",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('x')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'x' can not be found"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#readsBreakpointsAsTheirKinds#1",
+			"service" : "processDebugging",
+			"method" : "breakpoints",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')/Breakpoints",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint",
+									"ID" : 1,
+									"Enabled" : true,
+									"ProcessName" : "Load",
+									"Procedure" : "Prolog",
+									"LineNumber" : 3
+								},
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextDataBreakpoint",
+									"ID" : 2,
+									"Enabled" : false
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "ProcessDebugContextLineBreakpoint",
+					"json" : {
+						"ID" : 1,
+						"Enabled" : true,
+						"ProcessName" : "Load",
+						"Procedure" : "Prolog",
+						"LineNumber" : 3
+					}
+				},
+				{
+					"$model" : "ProcessDebugContextDataBreakpoint",
+					"json" : {
+						"ID" : 2,
+						"Enabled" : false
+					}
+				}
+			]
+		},
+		{
+			"id" : "ProcessDebugServiceTest#refusesABreakpointWithoutAnIdOfZeroOrMore#1",
+			"service" : "processDebugging",
+			"method" : "addBreakpoint",
+			"params" : [
+				"id",
+				"breakpoint"
+			],
+			"args" : [
+				"d1",
+				{
+					"$patch" : "ProcessDebugContextLineBreakpointPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint",
+						"LineNumber" : 3
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#refusesABreakpointWithoutAnIdOfZeroOrMore#2",
+			"service" : "processDebugging",
+			"method" : "addBreakpoint",
+			"params" : [
+				"id",
+				"breakpoint"
+			],
+			"args" : [
+				"d1",
+				{
+					"$patch" : "ProcessDebugContextBreakpointPatch",
+					"json" : {
+						"ID" : -1
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#refusesABreakpointWithoutAnIdOfZeroOrMore#3",
+			"service" : "processDebugging",
+			"method" : "addBreakpoint",
+			"params" : [
+				"id",
+				"breakpoint"
+			],
+			"args" : [
+				"d1",
+				{
+					"$patch" : "ProcessDebugContextBreakpointPatch",
+					"json" : {
+						"ID" : null
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#refusesAMissingId#1",
+			"service" : "processDebugging",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#saysWhereTheRunIs#1",
+			"service" : "processDebugging",
+			"method" : "currentBreakpoint",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')/CurrentBreakpoint",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : 2,
+							"Enabled" : true
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContextBreakpoint",
+				"json" : {
+					"ID" : 2,
+					"Enabled" : true
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#saysWhereTheRunIs#2",
+			"service" : "processDebugging",
+			"method" : "currentBreakpoint",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : {
+						"select" : [
+							"ID"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')/CurrentBreakpoint?$select=ID",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ProcessDebugServiceTest#saysWhereTheRunIs#3",
+			"service" : "processDebugging",
+			"method" : "callStack",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : {
+						"expand" : {
+							"Variables" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')/CallStack?$expand=Variables",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : "f0",
+									"Procedure" : "Prolog",
+									"LineNumber" : 3
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "ProcessDebugContextStackFrame",
+					"json" : {
+						"ID" : "f0",
+						"Procedure" : "Prolog",
+						"LineNumber" : 3
+					}
+				}
+			]
+		},
+		{
+			"id" : "ProcessDebugServiceTest#saysWhereTheRunIs#4",
+			"service" : "processDebugging",
+			"method" : "variables",
+			"params" : [
+				"id",
+				"frame",
+				"query"
+			],
+			"args" : [
+				"d1",
+				"f0",
+				{
+					"$query" : {
+						"top" : 1
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')/CallStack('f0')/Variables?$top=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "NVALUE",
+									"Value" : "1"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "ProcessDebugContextVariable",
+					"json" : {
+						"Name" : "NVALUE",
+						"Value" : "1"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ProcessDebugServiceTest#saysWhereTheRunIs#5",
+			"service" : "processDebugging",
+			"method" : "frameProcess",
+			"params" : [
+				"id",
+				"frame",
+				"query"
+			],
+			"args" : [
+				"d1",
+				"f0",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')/CallStack('f0')/Process",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Load"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Process",
+				"json" : {
+					"Name" : "Load"
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#saysWhereTheRunIs#6",
+			"service" : "processDebugging",
+			"method" : "process",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')/Process?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Load"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Process",
+				"json" : {
+					"Name" : "Load"
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#saysWhereTheRunIs#7",
+			"service" : "processDebugging",
+			"method" : "thread",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessDebugContexts('d1')/Thread",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : 42,
+							"ObjectName" : "Load"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Thread",
+				"json" : {
+					"ID" : 42,
+					"ObjectName" : "Load"
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#steps#1",
+			"service" : "processDebugging",
+			"method" : "resume",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.Continue",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContext",
+				"json" : {
+					"ID" : "d1",
+					"Status" : "Paused"
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#steps#2",
+			"service" : "processDebugging",
+			"method" : "stepIn",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.StepIn",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContext",
+				"json" : {
+					"ID" : "d1",
+					"Status" : "Paused"
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#steps#3",
+			"service" : "processDebugging",
+			"method" : "stepOut",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.StepOut",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContext",
+				"json" : {
+					"ID" : "d1",
+					"Status" : "Paused"
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#steps#4",
+			"service" : "processDebugging",
+			"method" : "stepOver",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.StepOver",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContext",
+				"json" : {
+					"ID" : "d1",
+					"Status" : "Paused"
+				}
+			}
+		},
+		{
+			"id" : "ProcessDebugServiceTest#steps#5",
+			"service" : "processDebugging",
+			"method" : "stepOver",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"d1",
+				{
+					"$query" : {
+						"expand" : {
+							"CurrentBreakpoint" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessDebugContexts('d1')/tm1.StepOver?$expand=CurrentBreakpoint",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Status" : "Paused"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessDebugContext",
+				"json" : {
+					"ID" : "d1",
+					"Status" : "Paused"
+				}
+			}
+		}
+	]
+}

@@ -269,6 +269,11 @@ def test_debugging_finishes_however_the_work_ends(api: Api, fake: FakeTm1) -> No
             return "done " + context.id
 
     assert api.run(api.client.process_debugging.debugging("Load", {"p": 1}, ok)) == "done c1"
+    # As the Java client's ProcessDebugServiceTest.debuggingFinishesTheRunAfterTheWork: debugged
+    # with the parameters, then finished
+    debug = next(r for r in reversed(fake.requests) if r.url.path.endswith("tm1.Debug"))
+    assert json.loads(debug.content) == {"Parameters": [{"Name": "p", "Value": 1}]}
+    assert target(fake.last) == "POST ProcessDebugContexts('c1')/tm1.Continue"
 
 
 # ChoreService
