@@ -274,7 +274,12 @@ public final class HierarchyService {
 	}
 
 	private static HierarchyPatch withoutStructure(HierarchyPatch patch) {
-		if (patch.json().containsKey("Elements") || patch.json().containsKey("Edges")) {
+		// Bindings to the collections (Elements@odata.bind) are structure changes too
+		if (patch.json()
+			.keySet()
+			.stream()
+			.anyMatch(key -> key.equals("Elements") || key.equals("Edges") || key.startsWith("Elements@")
+					|| key.startsWith("Edges@"))) {
 			throw new IllegalArgumentException(
 					"A hierarchy PATCH with Elements or Edges replaces them, deleting what it doesn't list: use replaceStructure");
 		}

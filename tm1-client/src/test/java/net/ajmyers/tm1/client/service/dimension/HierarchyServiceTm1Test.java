@@ -24,6 +24,7 @@ import net.ajmyers.tm1.client.model.ElementType;
 import net.ajmyers.tm1.client.model.Hierarchy;
 import net.ajmyers.tm1.client.model.HierarchyPatch;
 import net.ajmyers.tm1.client.model.Member;
+import net.ajmyers.tm1.client.odata.ODataPath;
 import net.ajmyers.tm1.client.odata.ODataQuery;
 import net.ajmyers.tm1.testcontainers.RequiresTm1;
 import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
@@ -89,6 +90,18 @@ class HierarchyServiceTm1Test {
 		assertThatIllegalArgumentException().isThrownBy(
 				() -> hierarchies.update(dimension, dimension, HierarchyPatch.builder().elements(List.of()).build()))
 			.withMessageContaining("replaceStructure");
+		assertThatIllegalArgumentException().as("binding the collection changes the structure too")
+			.isThrownBy(() -> hierarchies.update(dimension, dimension,
+					HierarchyPatch.builder()
+						.bindElements(ODataPath.of("Dimensions")
+							.key(dimension)
+							.nav("Hierarchies")
+							.key(dimension)
+							.nav("Elements")
+							.key("North"))
+						.build()));
+		assertThatIllegalArgumentException().isThrownBy(() -> hierarchies.update(dimension, dimension,
+				HierarchyPatch.builder().edges(List.of(edge("Total", "East"))).build(), "W/\"x\""));
 	}
 
 	@Test
