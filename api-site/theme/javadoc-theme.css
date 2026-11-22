@@ -1,0 +1,200 @@
+/* ajmyers.net theme for Javadoc, added with --add-stylesheet by the apiSiteJavadoc task.
+ *
+ * It restyles the standard doclet's output (JDK 27) to match ajmyers.net. Colours, fonts and
+ * sizes come from the site's own tokens, imported below at view time from the same origin, so a
+ * change to the site's palette, fonts or dark mode reaches the docs without a rebuild. The site's
+ * masthead and footer are inserted by the docs Worker (api-site/src/worker.js) and styled by the
+ * site's chrome.css.
+ *
+ * Opened straight from build/docs/api-site, the pages can't reach /tokens.css and fall back to
+ * Javadoc's own look; preview through the Worker instead (api-site/README.md).
+ *
+ * Javadoc's colours are CSS variables, so most of this file maps them onto the site's tokens.
+ * The rest adjusts Javadoc's markup, and may need revisiting after a JDK upgrade.
+ */
+
+@import url("/tokens.css");
+@import url("/chrome.css");
+
+/* One palette that follows the OS setting, like the site. The doclet's own theme switch sets
+   data-theme on <html>; matching it here too keeps a stored choice from overriding the site's. */
+:root, :root[data-theme] {
+    --body-font-family: var(--sans);
+    --block-font-family: var(--sans);
+    --code-font-family: var(--mono);
+    --body-font-size: 14.5px;
+    --block-font-size: 15px;
+    --code-font-size: 13.5px;
+    --nav-font-size: 13px;
+    --block-line-height: 1.6;
+
+    --body-text-color: var(--ink);
+    --block-text-color: var(--ink-soft);
+    --body-background-color: var(--paper);
+    --section-background-color: var(--paper);
+    --detail-background-color: var(--paper);
+    --code-background-color: var(--chip);
+    --mark-background-color: var(--chip);
+    --detail-block-color: var(--surface);
+
+    --navbar-background-color: var(--surface);
+    --navbar-text-color: var(--ink-soft);
+    --subnav-background-color: var(--paper);
+    --subnav-link-color: var(--accent);
+    --member-heading-background-color: var(--chip);
+
+    --selected-background-color: var(--accent);
+    --selected-text-color: var(--accent-ink);
+    --selected-link-color: var(--accent-ink);
+
+    --table-header-color: var(--chip);
+    --even-row-color: var(--surface);
+    --odd-row-color: color-mix(in srgb, var(--chip) 55%, var(--surface));
+
+    --title-color: var(--ink);
+    --link-color: var(--accent);
+    --link-color-active: var(--accent-2);
+
+    --toc-background-color: var(--paper);
+    --toc-highlight-color: var(--chip);
+    --toc-hover-color: var(--chip);
+
+    --snippet-background-color: var(--surface);
+    --snippet-text-color: var(--ink);
+    --snippet-highlight-color: color-mix(in srgb, var(--accent) 25%, transparent);
+    --pre-background-color: var(--surface);
+    --pre-text-color: var(--ink);
+
+    --border-color: var(--rule);
+    --table-border-color: var(--rule);
+    --tab-border-radius: 8px 8px 0 0;
+
+    --search-input-background-color: var(--surface);
+    --search-input-text-color: var(--ink);
+    --search-input-placeholder-color: var(--muted);
+    --overlay-background: rgba(5, 7, 13, 0.45);
+    --search-tag-background-color: color-mix(in srgb, var(--accent) 25%, transparent);
+    --search-tag-text-color: var(--ink);
+    --search-hover-background: var(--chip);
+    --button-border-color: var(--rule);
+    --caption-link-color: var(--accent);
+}
+
+/* Javadoc's icons are dark line drawings; light them up on the dark palette */
+@media (prefers-color-scheme: dark) {
+    :root, :root[data-theme] {
+        --icon-filter: invert(100%) brightness(160%);
+    }
+}
+
+/* The palette follows the OS, so the theme switch would do nothing */
+#theme-button, #theme-panel { display: none !important; }
+
+body {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* The site masthead scrolls away; Javadoc's own navigation bar stays pinned below it */
+.masthead { position: relative; }
+/* Javadoc's link colours (a:link) outrank chrome.css's .monogram; keep the site's */
+.masthead a.monogram { color: #eef4ff; }
+
+/* Wide code scrolls inside its block rather than widening the page, which stock Javadoc does on
+   phones: the content column is a flex item, which otherwise grows to fit its widest line */
+.main-grid main { min-width: 0; }
+pre { overflow-x: auto; }
+
+/* One column for the masthead, Javadoc's bars and content, and the footer: the site's gutters,
+   but wider than the site's reading width, since API pages carry a sidebar and wide tables */
+:root, :root[data-theme] { --max-content-width: 90rem; }
+.masthead .wrap, body > .footer.wrap, .nav-content, div.main-grid {
+    width: min(100% - 2 * var(--gutter), var(--max-content-width));
+    margin-inline: auto;
+}
+
+.top-nav {
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    letter-spacing: 0.04em;
+}
+.top-nav a:hover, .sub-nav a:hover { color: var(--accent); }
+.sub-nav { border-bottom: 1px solid var(--rule); }
+
+/* Page titles in the site's heading style */
+.title, .header h1 {
+    font-family: var(--sans);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+}
+.sub-title {
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+h2, h3, h4 { font-family: var(--sans); font-style: normal; letter-spacing: -0.01em; }
+
+/* Signatures and code in the site's monospace */
+code, pre, .member-signature, .type-signature { font-family: var(--mono); }
+pre, .snippet {
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+}
+
+/* Syntax highlighting (--syntax-highlight), in a palette built around the site's blue. Javadoc's
+   highlight.css loads after this file and picks its dark colours from data-theme, which no longer
+   follows the OS here, so these rules are more specific to win either way. */
+:root, :root[data-theme] {
+    --code-keyword: #1d4ed8;
+    --code-function: #0e7490;
+    --code-string: #047857;
+    --code-number: #b45309;
+    --code-annotation: #7c3aed;
+    --code-variable: #9d174d;
+}
+@media (prefers-color-scheme: dark) {
+    :root, :root[data-theme] {
+        --code-keyword: #93c5fd;
+        --code-function: #67e8f9;
+        --code-string: #86efac;
+        --code-number: #fcd34d;
+        --code-annotation: #c4b5fd;
+        --code-variable: #f9a8d4;
+    }
+}
+html:root[data-theme] :is(.hljs-keyword, .hljs-literal, .hljs-built_in, .hljs-symbol, .hljs-name,
+        .hljs-template-tag, .hljs-char.escape_) { color: var(--code-keyword); }
+html:root[data-theme] :is(.hljs-title.function_, .hljs-template-variable) { color: var(--code-function); }
+html:root[data-theme] :is(.hljs-string, .hljs-link) { color: var(--code-string); }
+html:root[data-theme] :is(.hljs-number, .hljs-regexp) { color: var(--code-number); }
+html:root[data-theme] .hljs-meta { color: var(--code-annotation); }
+html:root[data-theme] :is(.hljs-variable, .hljs-property, .hljs-attr, .hljs-attribute, .hljs-section) {
+    color: var(--code-variable);
+}
+html:root[data-theme] :is(.hljs-comment, .hljs-quote, .hljs-code) { color: var(--muted); font-style: italic; }
+
+/* Summary tables and member details as the site's cards */
+.summary-table, .details-table {
+    border: 1px solid var(--rule);
+    border-radius: 0 var(--radius) var(--radius) var(--radius);
+    overflow: hidden;
+}
+.caption, .table-tabs button {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+}
+body.class-declaration-page .details h3 {
+    border-radius: 10px;
+    font-family: var(--mono);
+    font-weight: 600;
+}
+section.detail, .block-list > li {
+    border-radius: var(--radius);
+}
+
+/* The site's footer follows Javadoc's own; keep a little space between them */
+body > .footer { margin-top: 2rem; }
