@@ -10,6 +10,7 @@ import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
 import net.ajmyers.tm1.client.service.attribute.AttributeService;
 import net.ajmyers.tm1.client.service.attribute.LocalizedAttributeService;
+import net.ajmyers.tm1.client.service.content.ContentService;
 import net.ajmyers.tm1.client.service.cube.CubeService;
 import net.ajmyers.tm1.client.service.cube.ViewService;
 import net.ajmyers.tm1.client.service.data.CellService;
@@ -113,6 +114,8 @@ public final class Tm1Client {
 
 	private final LogService logs;
 
+	private final ContentService contents;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -141,6 +144,7 @@ public final class Tm1Client {
 		this.threads = new ThreadService(session);
 		this.server = new ServerService(session);
 		this.logs = new LogService(session);
+		this.contents = new ContentService(session);
 	}
 
 	/**
@@ -375,6 +379,14 @@ public final class Tm1Client {
 	 */
 	public LogService logs() {
 		return logs;
+	}
+
+	/**
+	 * The contents tree.
+	 * @return the the contents tree service, on this client's session
+	 */
+	public ContentService contents() {
+		return contents;
 	}
 
 	/**

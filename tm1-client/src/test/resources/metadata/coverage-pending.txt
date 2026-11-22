@@ -1,8 +1,6 @@
 # Endpoints not implemented yet. This list only shrinks: implementing an endpoint means
 # taking it off. A new $metadata snapshot's new endpoints go here or in coverage-excluded.txt.
 # See CoverageGateTest.
-Action Entry/Copy
-Action Entry/Move
 Action GitPullPlan/Execute
 Action GitPushPlan/Execute
 ActionImport ConfigureEncryptionAtRest
@@ -23,7 +21,6 @@ ActionImport RotateDataEncryptionKey
 ActionImport RotateDataModelKey
 EntitySet Annotations
 EntitySet ApplicationContextFacets
-EntitySet Contents
 EntitySet GitPlans
 EntitySet SQLDataSources
 FunctionImport GetOIDCKeys
@@ -34,15 +31,4 @@ Navigation Annotation/DimensionalContext
 Navigation ApplicationContextFacet/Values
 Navigation ApplicationContextFacetValue/Facet
 Navigation CellsetCell/Annotations
-Navigation ChoreReference/Chore
 Navigation Cube/Annotations
-Navigation CubeReference/Cube
-Navigation DimensionReference/Dimension
-Navigation DocumentReference/Document
-Navigation Entry/ContainedBy
-Navigation Entry/LocalizedAttributes
-Navigation Folder/Contents
-Navigation Folder/PrivateContents
-Navigation ProcessReference/Process
-Navigation SubsetReference/Subset
-Navigation ViewReference/View
