@@ -64,4 +64,13 @@ class Tm1RequestTest {
 		assertThatIllegalArgumentException().isThrownBy(() -> run.withTimeout(Duration.ZERO));
 	}
 
+	@Test
+	void postsAndStreamsACollection() {
+		Tm1Request<String> request = Tm1Request.postList(ODataPath.of("Cubes").key("c").action("tm1.CheckRules"),
+				Map.of(), String.class);
+		assertThat(request.method()).isEqualTo(HttpMethod.POST);
+		assertThat(request.response()).isEqualTo(Tm1Request.Response.COLLECTION);
+		assertThat(request.isIdempotent()).isFalse();
+	}
+
 }
