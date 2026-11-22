@@ -1,0 +1,36 @@
+// Cloudflare Worker for the Java API docs, served at ajmyers.net/projects/<module>/api/.
+// The site itself (ajmyers/ajmyers.net) is a separate Worker on the ajmyers.net custom domain;
+// a route takes precedence over a custom domain on the same hostname, so these paths come here.
+// Deployed by .github/workflows/api-docs.yml; see README.md.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ajmyers-net-api-docs",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    // Assembled from each library's build/docs/api-site by scripts/assemble.mjs
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // Every request goes through the Worker, which adds the site's masthead, footer and headers
+    "run_worker_first": true,
+    "not_found_handling": "none",
+    // Serve files at their own paths: Javadoc links to .html, and the default would redirect each
+    // of those to an extensionless URL. The Worker maps a trailing slash to index.html itself.
+    "html_handling": "none"
+  },
+  "vars": {
+    // Where the masthead, footer, styles and 404 page come from
+    "SITE_ORIGIN": "https://ajmyers.net"
+  },
+  // One route per published library: route patterns allow a wildcard only at the end of the path.
+  // scripts/assemble.mjs reads the module names from here, so this is the one list to update.
+  "routes": [
+    { "pattern": "ajmyers.net/projects/tm1-client/api*", "zone_name": "ajmyers.net" },
+    { "pattern": "ajmyers.net/projects/tm1-csdl/api*", "zone_name": "ajmyers.net" },
+    { "pattern": "ajmyers.net/projects/tm1-testcontainers/api*", "zone_name": "ajmyers.net" },
+    { "pattern": "ajmyers.net/projects/tm1-spring-boot-starter/api*", "zone_name": "ajmyers.net" },
+    { "pattern": "ajmyers.net/projects/tm1-spring-boot-testcontainers/api*", "zone_name": "ajmyers.net" }
+  ],
+  "workers_dev": false,
+  "preview_urls": false
+}
