@@ -61,7 +61,8 @@ describe("ProcessDebugService on TM1" + liveReason, () => {
     expect((await debug.thread(id, ODataQuery.none())).ObjectName).toBe(process);
     expect(await debug.list(ODataQuery.none()).toArray(), "lists none").toEqual([]);
 
-    expect((await debug.stepOver(id, ODataQuery.none())).Status).toBe("Running");
+    // TM1 answers before or after the step lands, whichever comes first
+    expect(["Running", "Paused"]).toContain((await debug.stepOver(id, ODataQuery.none())).Status);
     const done = await debug.finish(id);
     expect(done.Status).toBe("Complete");
     expect(done.Result?.ProcessExecuteStatusCode).toBe("CompletedSuccessfully");

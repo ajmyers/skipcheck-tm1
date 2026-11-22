@@ -182,7 +182,8 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
         Assert.Equal(_process, (await Debug.ThreadAsync(id)).ObjectName);
         Assert.Empty(await Debug.ListAsync().ToListAsync()); // lists none
 
-        Assert.Equal(ProcessDebugContextStatus.Running, (await Debug.StepOverAsync(id)).Status);
+        // TM1 answers before or after the step lands, whichever comes first
+        Assert.Contains((await Debug.StepOverAsync(id)).Status, new ProcessDebugContextStatus?[] { ProcessDebugContextStatus.Running, ProcessDebugContextStatus.Paused });
         var done = await Debug.FinishAsync(id);
         Assert.Equal(ProcessDebugContextStatus.Complete, done.Status);
         Assert.Equal(ProcessExecuteStatusCode.CompletedSuccessfully, done.Result!.ProcessExecuteStatusCode);

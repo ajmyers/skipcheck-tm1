@@ -184,7 +184,8 @@ def test_stops_at_a_breakpoint_reads_the_state_and_runs_to_the_end(tm1: Tm1Clien
     assert debug.thread(id).object_name == three_lines
     assert debug.list() == [], "lists none"
 
-    assert debug.step_over(id).status is ProcessDebugContextStatus.RUNNING
+    # TM1 answers before or after the step lands, whichever comes first
+    assert debug.step_over(id).status in (ProcessDebugContextStatus.RUNNING, ProcessDebugContextStatus.PAUSED)
     done = debug.finish(id)
     assert done.status is ProcessDebugContextStatus.COMPLETE
     assert done.result.process_execute_status_code is ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY
