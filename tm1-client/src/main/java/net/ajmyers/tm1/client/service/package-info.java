@@ -15,6 +15,10 @@
  * ({@code If-Match});</li>
  * <li>operations come from the generated {@code Tm1Operations}, so a server that lacks
  * one fails before anything is sent.</li>
+ * <li>where TM1 behaves differently from {@code $metadata}, or from what a reader would
+ * expect (a property a PATCH ignores, an append where a replace is natural, an operation
+ * it refuses), the method's Javadoc says so, as "TM1 (11.8) …", and a test pins it. The
+ * plan's §16.5 keeps the list.</li>
  * </ul>
  */
 @NullMarked

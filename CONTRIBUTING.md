@@ -53,6 +53,13 @@ and record component is documented, with `@param` and `@return`. `./gradlew buil
 and fails on any gap. For a Lombok `@Getter`, put the `@return` line in the field's Javadoc;
 Lombok copies it onto the accessor.
 
+**Document TM1's surprises where they bite.** When TM1 behaves differently from its
+`$metadata`, or from what a reader would expect, say so in the Javadoc of the method or type it
+affects, as "TM1 (11.8) …". That covers a property a PATCH ignores, an append where a replace is
+natural, a 204 instead of an entity, or an operation it refuses. Pin it with a test against TM1,
+and add it to the plan's §16.5 table. Agents and people reading the API learn it there, at the
+call they're about to make.
+
 **Error Prone and NullAway check every compile.** Their findings are errors. Library packages
 are `@NullMarked` (JSpecify): nothing is null unless declared `@Nullable`, and NullAway checks
 that at compile time, so a nullable field, parameter or return gets `@Nullable` where it's
