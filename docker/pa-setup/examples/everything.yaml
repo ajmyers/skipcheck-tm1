@@ -1,0 +1,19 @@
+# Everything at once: two TM1 servers on a shared Admin Server, TM1 Web, and Cognos
+# security with three test users through LDAP and OIDC (Keycloak). Needs about 14 GB
+# of memory for Docker; add PAW (another ~15 GB) with the paw section.
+version: 1
+ibm: ~/Downloads/ibm
+tm1:
+  servers:
+    planning: { port: 8010, seed: sdata }
+    reporting: { port: 8011 }
+tm1Web: { port: 9510 }
+cognos:
+  port: 9300
+  users:
+    - admin:adminpw:Admins
+    - analyst:analystpw:Analysts,Readers
+    - viewer:viewerpw:Readers
+  oidc: { keycloakPort: 8180 }
+  cam: { namespace: ldap, admins: [admin] }
+# paw: { port: 8800, acceptLicense: true }

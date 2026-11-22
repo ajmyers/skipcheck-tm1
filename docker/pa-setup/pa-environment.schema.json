@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ajmyers/tm1-pa-developer-tools/master/docker/pa-setup/pa-environment.schema.json",
+  "title": "pa-environment.yaml",
+  "description": "What pa-setup runs: a local IBM Planning Analytics environment in Docker. Every component is optional. Secrets (download links) go in .env, not here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version"
+  ],
+  "$defs": {
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "user": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+:[^:\\s]+(:[A-Za-z0-9._,-]*)?$",
+          "description": "user:password[:group,group]"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "password"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]+$"
+            },
+            "password": {
+              "type": "string",
+              "pattern": "^[^:\\s]+$"
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]+$"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "description": "The compose project name; default: the folder name"
+    },
+    "ibm": {
+      "type": "string",
+      "description": "The folder holding your IBM downloads: tm1server and tm1web bundles, the Cognos casrv zip, the PAW Local zip. A host path; relative to this file, or starting with ~"
+    },
+    "files": {
+      "type": "string",
+      "description": "Where TM1 servers keep config, data and logs; default ./pa-files"
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Other images, e.g. local builds or private images with IBM software built in",
+      "properties": {
+        "tm1Server": {
+          "type": "string"
+        },
+        "tm1Web": {
+          "type": "string"
+        },
+        "cognosServer": {
+          "type": "string"
+        },
+        "keycloak": {
+          "type": "string"
+        }
+      }
+    },
+    "tm1": {
+      "type": [
+        "object",
+        "boolean"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "servers": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "$ref": "#/$defs/name"
+          },
+          "additionalProperties": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "$ref": "#/$defs/port",
+                "description": "REST API port on the host; default 8010, 8011, ..."
+              },
+              "seed": {
+                "enum": [
+                  "empty",
+                  "sdata",
+                  "24retail"
+                ],
+                "description": "Objects for a new database"
+              },
+              "cfg": {
+                "type": "object",
+                "description": "Any tm1s.cfg parameter",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "adminServer": {
+          "type": "boolean",
+          "description": "A shared Admin Server; automatic with more than one server"
+        },
+        "adminPort": {
+          "$ref": "#/$defs/port"
+        }
+      }
+    },
+    "tm1Web": {
+      "type": [
+        "object",
+        "boolean"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "$ref": "#/$defs/port"
+        },
+        "heap": {
+          "type": "string"
+        }
+      }
+    },
+    "paw": {
+      "type": [
+        "object",
+        "boolean"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "$ref": "#/$defs/port"
+        },
+        "acceptLicense": {
+          "const": true,
+          "description": "IBM's PAW license, required"
+        },
+        "zip": {
+          "type": "string"
+        }
+      }
+    },
+    "cognos": {
+      "type": [
+        "object",
+        "boolean"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "$ref": "#/$defs/port"
+        },
+        "users": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/user"
+          },
+          "description": "Test users: an LDAP namespace, and OIDC with oidc"
+        },
+        "oidc": {
+          "type": [
+            "object",
+            "boolean"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keycloakPort": {
+              "$ref": "#/$defs/port"
+            }
+          }
+        },
+        "cam": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "namespace": {
+              "enum": [
+                "ldap",
+                "oidc"
+              ]
+            },
+            "admins": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "memory": {
+          "type": "integer",
+          "minimum": 2048,
+          "description": "Dispatcher heap, MB"
+        }
+      }
+    }
+  }
+}
