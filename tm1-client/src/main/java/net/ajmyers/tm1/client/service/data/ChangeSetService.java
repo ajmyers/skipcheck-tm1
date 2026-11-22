@@ -25,6 +25,14 @@ import tools.jackson.databind.JsonNode;
  * ({@code $metadata} doesn't say how; TM1 11.8 does it this way). {@link #within} does it
  * all: begins a change set, gives the work a session that records into it, and ends it
  * however the work finishes.
+ *
+ * <p>
+ * Make some writes in a change set, keeping its ID:
+ * {@snippet class = examples.ChangeSetServiceExamples region = within}
+ *
+ * <p>
+ * Undo them later:
+ * {@snippet class = examples.ChangeSetServiceExamples region = undo}
  */
 public final class ChangeSetService {
 
@@ -82,9 +90,7 @@ public final class ChangeSetService {
 	 * session that records into it ({@code session.changeSet()} has the ID, for a later
 	 * {@link #undo}), and ends it when the work completes, fails or is cancelled.
 	 *
-	 * <pre class="code">
-	 * changeSets.within(session -&gt; Tm1Client.of(session).cells().update(cube, cell, 42));
-	 * </pre>
+	 * {@snippet class = examples.ChangeSetServiceExamples region = within}
 	 * @param <R> what the work gives
 	 * @param work the writes to record, given the session to make them through
 	 * @return what the work gives, with the change set ended at the end

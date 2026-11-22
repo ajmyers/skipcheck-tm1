@@ -31,6 +31,14 @@ import reactor.core.publisher.Mono;
  * <p>
  * {@code tm1.Update} takes several cells, but TM1 (11.8) writes only the first, so
  * {@link #update} takes one; {@link #updateCells} writes many in one request.
+ *
+ * <p>
+ * Write one cell, given an element for every dimension of the cube, in order:
+ * {@snippet class = examples.CellServiceExamples region = update}
+ *
+ * <p>
+ * Write many cells in one request:
+ * {@snippet class = examples.CellServiceExamples region = update-cells}
  */
 public final class CellService {
 

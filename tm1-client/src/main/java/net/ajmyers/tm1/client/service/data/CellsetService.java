@@ -38,6 +38,18 @@ import reactor.core.publisher.Mono;
  * {@link #partition}, {@link #delete}) leave that to the caller. {@link #stream} does it
  * all: runs the query, pages the cells in order, and deletes the cellset when the result
  * completes, fails or is cancelled.
+ *
+ * <p>
+ * Read the cells of an MDX query, placing each by its ordinal on the axes:
+ * {@snippet class = examples.CellsetServiceExamples region = stream}
+ *
+ * <p>
+ * Write into the cells of a query by ordinal, deleting its cellset after:
+ * {@snippet class = examples.CellsetServiceExamples region = write}
+ *
+ * <p>
+ * Read the values of a saved view:
+ * {@snippet class = examples.CellsetServiceExamples region = view}
  */
 public final class CellsetService {
 
@@ -341,10 +353,7 @@ public final class CellsetService {
 	 * pages of {@code GetPartition}, a few at a time and in ordinal order, so memory
 	 * stays bounded on both sides however large the cellset.
 	 *
-	 * <pre class="code">
-	 * cellsets.stream(mdx, ODataQuery.none().select("Ordinal", "Value"), 10_000,
-	 *     (cellset, cells) -> cells.map(cell -> toRow(cellset.axes(), cell)));
-	 * </pre>
+	 * {@snippet class = examples.CellsetServiceExamples region = stream}
 	 * @param <R> what the handler gives
 	 * @param mdx the query
 	 * @param cellQuery what to select of each cell; include {@code Ordinal} to place them
