@@ -1,0 +1,239 @@
+package net.ajmyers.tm1.client.service.cube;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+import net.ajmyers.tm1.client.Tm1Operation;
+import net.ajmyers.tm1.client.Tm1Request;
+import net.ajmyers.tm1.client.model.Cube;
+import net.ajmyers.tm1.client.model.CubePatch;
+import net.ajmyers.tm1.client.model.Dimension;
+import net.ajmyers.tm1.client.model.Tm1Operations;
+import net.ajmyers.tm1.client.odata.ODataPath;
+import net.ajmyers.tm1.client.odata.ODataQuery;
+import net.ajmyers.tm1.client.service.Tm1Endpoint;
+import net.ajmyers.tm1.client.session.Tm1Session;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import tools.jackson.databind.JsonNode;
+
+/**
+ * Cubes: {@code /Cubes}, a cube's dimensions, and the operations bound to a cube. Views
+ * have a service of their own; cell data is read and written through cellsets.
+ *
+ * <pre class="code">
+ * cubes.create(CubePatch.builder()
+ *     .name("Sales")
+ *     .bindDimensions(ODataPath.of("Dimensions").key("Region"), ODataPath.of("Dimensions").key("Month"))
+ *     .build());
+ * </pre>
+ */
+public final class CubeService {
+
+	private static final ODataPath CUBES = ODataPath.of("Cubes");
+
+	private final Tm1Session session;
+
+	/**
+	 * A service sending its requests through {@code session}.
+	 * @param session the session
+	 */
+	public CubeService(Tm1Session session) {
+		this.session = Objects.requireNonNull(session, "session");
+	}
+
+	/**
+	 * {@code GET Cubes}: every cube, control cubes included, streamed.
+	 * @param query what to select, expand, filter and order
+	 * @return the cubes
+	 */
+	@Tm1Endpoint("EntitySet Cubes")
+	public Flux<Cube> list(ODataQuery query) {
+		return session.stream(Tm1Request.list(CUBES, query, Cube.class));
+	}
+
+	/**
+	 * {@code GET Cubes('name')}.
+	 * @param name the cube's name
+	 * @param query what to select and expand
+	 * @return the cube, or a {@code Tm1NotFoundException} if there's none
+	 */
+	@Tm1Endpoint("EntitySet Cubes")
+	public Mono<Cube> get(String name, ODataQuery query) {
+		return session.execute(Tm1Request.get(cube(name), query, Cube.class));
+	}
+
+	/**
+	 * {@code POST Cubes}: creates a cube over existing dimensions, bound in order with
+	 * {@code CubePatch.Builder#bindDimensions}, and optionally its rules.
+	 * @param cube the new cube; it needs a name and at least two dimensions
+	 * @return the cube as created
+	 */
+	@Tm1Endpoint("EntitySet Cubes")
+	public Mono<Cube> create(CubePatch cube) {
+		return session.execute(Tm1Request.post(CUBES, cube, Cube.class));
+	}
+
+	/**
+	 * {@code PATCH Cubes('name')}: changes the properties the patch sets, typically
+	 * {@code Rules} or {@code DrillthroughRules}; {@code null} clears them.
+	 *
+	 * <p>
+	 * TM1 (11.8) saves rules even when they don't compile: check them first with
+	 * {@code checkRules}.
+	 * @param name the cube's name
+	 * @param patch the changes
+	 * @return completes when the cube is changed
+	 */
+	@Tm1Endpoint("EntitySet Cubes")
+	public Mono<Void> update(String name, CubePatch patch) {
+		return session.execute(Tm1Request.patch(cube(name), patch));
+	}
+
+	/**
+	 * {@code PATCH Cubes('name')} with {@code If-Match}: changes the properties the patch
+	 * sets, unless the cube changed since it was read. TM1 (11.8) saves rules even when
+	 * they don't compile.
+	 * @param name the cube's name
+	 * @param patch the changes
+	 * @param etag the ETag the cube was read with ({@link Cube#etag()})
+	 * @return completes when the cube is changed, or a
+	 * {@code Tm1PreconditionFailedException} if it had changed
+	 */
+	@Tm1Endpoint("EntitySet Cubes")
+	public Mono<Void> update(String name, CubePatch patch, String etag) {
+		return session.execute(Tm1Request.patch(cube(name), patch).ifMatch(etag));
+	}
+
+	/**
+	 * {@code DELETE Cubes('name')}, with its data and views; its dimensions stay.
+	 * @param name the cube's name
+	 * @return completes when the cube is deleted
+	 */
+	@Tm1Endpoint("EntitySet Cubes")
+	public Mono<Void> delete(String name) {
+		return session.execute(Tm1Request.delete(cube(name)));
+	}
+
+	/**
+	 * {@code GET Cubes('name')/Dimensions}, streamed, in the cube's order.
+	 *
+	 * <p>
+	 * TM1 (11.8) lists its virtual {@code Sandboxes} dimension first, before the
+	 * dimensions the cube was made of; skip it to get those.
+	 * @param name the cube's name
+	 * @param query what to select, expand, filter and order
+	 * @return the cube's dimensions, {@code Sandboxes} first
+	 */
+	@Tm1Endpoint("Navigation Cube/Dimensions")
+	public Flux<Dimension> dimensions(String name, ODataQuery query) {
+		return session.stream(Tm1Request.list(cube(name).nav("Dimensions"), query, Dimension.class));
+	}
+
+	/**
+	 * {@code tm1.DimensionsStorageOrder()}: the cube's dimensions in the order TM1 stores
+	 * them, which can differ from the order they're presented in. Needs schema 11.4.0.
+	 * @param name the cube's name
+	 * @param query what to select of each dimension
+	 * @return the dimensions in storage order
+	 */
+	@Tm1Endpoint("Function Cube/DimensionsStorageOrder")
+	public Flux<Dimension> dimensionsStorageOrder(String name, ODataQuery query) {
+		Tm1Operation operation = Tm1Operations.CUBE_DIMENSIONS_STORAGE_ORDER;
+		return session.stream(Tm1Request.list(cube(name).function(operation.name(), Map.of()), query, Dimension.class)
+			.requires(operation.capability()));
+	}
+
+	/**
+	 * {@code tm1.ReorderDimensions}: changes the order TM1 stores the cube's dimensions
+	 * in, which changes its memory use but not how it's presented. Needs schema 11.4.0.
+	 * @param name the cube's name
+	 * @param dimensions the cube's dimensions, in the new storage order
+	 * @return the change in the cube's memory use, as TM1 reports it (a percentage)
+	 */
+	@Tm1Endpoint("Action Cube/ReorderDimensions")
+	public Mono<Double> reorderDimensions(String name, List<String> dimensions) {
+		List<String> bindings = new ArrayList<>();
+		for (String dimension : dimensions) {
+			bindings.add(ODataPath.of("Dimensions").key(dimension).toString());
+		}
+		return session
+			.execute(action(Tm1Operations.CUBE_REORDER_DIMENSIONS, name, Map.of("Dimensions@odata.bind", bindings),
+					JsonNode.class))
+			// A primitive result comes wrapped, as {"@odata.context": ..., "value": 12.5}
+			.map(result -> result.path("value").asDouble());
+	}
+
+	/**
+	 * {@code tm1.Load}: loads the cube into memory, if it isn't. Needs schema 11.6.0.
+	 * @param name the cube's name
+	 * @return completes when the cube is loaded
+	 */
+	@Tm1Endpoint("Action Cube/Load")
+	public Mono<Void> load(String name) {
+		return session.execute(action(Tm1Operations.CUBE_LOAD, name, Map.of(), Void.class));
+	}
+
+	/**
+	 * {@code tm1.Unload}: frees the cube's memory; TM1 loads it again when it's next
+	 * used. Needs schema 11.6.0.
+	 * @param name the cube's name
+	 * @return completes when the cube is unloaded
+	 */
+	@Tm1Endpoint("Action Cube/Unload")
+	public Mono<Void> unload(String name) {
+		return session.execute(action(Tm1Operations.CUBE_UNLOAD, name, Map.of(), Void.class));
+	}
+
+	/**
+	 * {@code tm1.Lock}: stops everyone else changing the cube until it's unlocked.
+	 * @param name the cube's name
+	 * @return completes when the cube is locked
+	 */
+	@Tm1Endpoint("Action Cube/Lock")
+	public Mono<Void> lock(String name) {
+		return session.execute(action(Tm1Operations.CUBE_LOCK, name, Map.of(), Void.class));
+	}
+
+	/**
+	 * {@code tm1.Unlock}.
+	 * @param name the cube's name
+	 * @return completes when the cube is unlocked
+	 */
+	@Tm1Endpoint("Action Cube/Unlock")
+	public Mono<Void> unlock(String name) {
+		return session.execute(action(Tm1Operations.CUBE_UNLOCK, name, Map.of(), Void.class));
+	}
+
+	/**
+	 * {@code tm1.Reserve}: stops everyone else changing the cube until it's released.
+	 * Needs schema 11.8.34.
+	 * @param name the cube's name
+	 * @return completes when the cube is reserved
+	 */
+	@Tm1Endpoint("Action Cube/Reserve")
+	public Mono<Void> reserve(String name) {
+		return session.execute(action(Tm1Operations.CUBE_RESERVE, name, Map.of(), Void.class));
+	}
+
+	/**
+	 * {@code tm1.Release}. Needs schema 11.8.34.
+	 * @param name the cube's name
+	 * @return completes when the cube is released
+	 */
+	@Tm1Endpoint("Action Cube/Release")
+	public Mono<Void> release(String name) {
+		return session.execute(action(Tm1Operations.CUBE_RELEASE, name, Map.of(), Void.class));
+	}
+
+	private static ODataPath cube(String name) {
+		return CUBES.key(Objects.requireNonNull(name, "name"));
+	}
+
+	private static <T> Tm1Request<T> action(Tm1Operation operation, String name, Map<String, ?> body, Class<T> type) {
+		return Tm1Request.post(cube(name).action(operation.name()), body, type).requires(operation.capability());
+	}
+
+}
