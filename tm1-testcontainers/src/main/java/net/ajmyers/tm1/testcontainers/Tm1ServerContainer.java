@@ -20,6 +20,7 @@ import java.util.Properties;
 
 import org.jspecify.annotations.Nullable;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
@@ -95,6 +96,10 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	private @Nullable Tm1Version expectedVersion;
 
 	private @Nullable Tm1Version version;
+
+	private @Nullable CognosContainer cognos;
+
+	private List<String> camAdmins = List.of();
 
 	/**
 	 * A container on the default {@code tm1-server} image (or {@code TM1_SERVER_IMAGE}),
@@ -199,6 +204,63 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	}
 
 	/**
+	 * Runs TM1 in Cognos (CAM) security against {@code cognos}: TM1 takes its users from
+	 * Cognos's test users, who log on with {@link CognosContainer#camAuthorization}.
+	 *
+	 * <ul>
+	 * <li>{@code admins} become TM1 administrators, and {@link #getUsername()} is the
+	 * first of them, so the container's own checks log on as that user;
+	 * <li>every group of the test users is added to TM1 (named by its CAMID, e.g.
+	 * {@code CAMID("LDAP:g:cn=analysts,ou=groups")}), so users get their groups at logon.
+	 * Give those groups the security each test needs.
+	 * </ul>
+	 *
+	 * <p>
+	 * The two containers share a Docker network: {@code cognos}'s, or a new one if it has
+	 * none. Starting TM1 starts Cognos first. Call this before either is started.
+	 * @param cognos the Cognos to take users from
+	 * @param admins names of {@code cognos}'s test users to make TM1 administrators; at
+	 * least one
+	 * @return this container
+	 * @throws IllegalArgumentException if no admin is given
+	 */
+	public Tm1ServerContainer withCamSecurity(CognosContainer cognos, String... admins) {
+		this.cognos = Objects.requireNonNull(cognos, "cognos");
+		if (admins.length == 0) {
+			throw new IllegalArgumentException("Name at least one of the Cognos test users as a TM1 administrator");
+		}
+		this.camAdmins = List.of(admins);
+		if (cognos.getNetwork() == null) {
+			cognos.withNetwork(Network.newNetwork());
+		}
+		withNetwork(cognos.getNetwork());
+		dependsOn(cognos);
+		return self();
+	}
+
+	/**
+	 * The Cognos set with {@link #withCamSecurity}.
+	 * @return the Cognos, or {@code null} if TM1 uses its own (native) security
+	 */
+	public @Nullable CognosContainer getCognos() {
+		return cognos;
+	}
+
+	/**
+	 * The {@code Authorization} header for the container's login: {@code Basic} with
+	 * {@link #getUsername()} and {@link #getPassword()}, or, in CAM security,
+	 * {@code CAMNamespace} for that Cognos user.
+	 * @return the header value
+	 */
+	public String getAuthorization() {
+		if (cognos != null) {
+			return CognosContainer.camAuthorization(username, password, CognosContainer.NAMESPACE);
+		}
+		return "Basic "
+				+ Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
+	}
+
+	/**
 	 * Fails startup unless the server reports exactly this version.
 	 * @param version the version the server must report
 	 * @return this container
@@ -254,6 +316,25 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	}
 
 	@Override
+	protected void configure() {
+		if (cognos == null) {
+			return;
+		}
+		// Here rather than in withCamSecurity, so users added to Cognos later still count
+		CognosContainer.User admin = cognos.getUser(camAdmins.get(0));
+		for (String name : camAdmins) {
+			cognos.getUser(name);
+		}
+		withCredentials(admin.name(), admin.password());
+		withEnv("TM1_CAM_URI", cognos.getNetworkUrl());
+		withEnv("TM1_CAM_NAMESPACE", CognosContainer.NAMESPACE);
+		withEnv("TM1_CAM_ADMINS", String.join(" ", camAdmins));
+		if (!cognos.getGroups().isEmpty()) {
+			withEnv("TM1_CAM_GROUPS", String.join(" ", cognos.getGroups()));
+		}
+	}
+
+	@Override
 	protected void containerIsStarted(InspectContainerResponse info) {
 		version = readVersion();
 		if (expectedVersion != null && !expectedVersion.equals(version)) {
@@ -295,8 +376,7 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	 */
 	private Tm1Version readVersion() {
 		HttpClient http = HttpClient.newBuilder().connectTimeout(REQUEST_TIMEOUT).build();
-		String auth = "Basic "
-				+ Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
+		String auth = getAuthorization();
 		try {
 			HttpResponse<String> response = http
 				.send(HttpRequest.newBuilder(URI.create(getRestUrl() + "Configuration/ProductVersion/$value"))

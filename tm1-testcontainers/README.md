@@ -72,6 +72,7 @@ run on every build where TM1 is configured, so they always work as written.
 | Choose where TM1 comes from in code: install folder, bundle, download link, Docker volume or private image | [`ExplicitSourceExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/ExplicitSourceExampleTest.java) |
 | Skip the extension: plain assumptions and a throwaway server, e.g. for a test that damages its server | [`WithoutTheExtensionExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/WithoutTheExtensionExampleTest.java) |
 | Run TM1 Web against a TM1 server of its own | [`Tm1WebExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/Tm1WebExampleTest.java) |
+| Test Cognos (CAM) security: three users, three TM1 security profiles | [`CamSecurityExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/CamSecurityExampleTest.java) |
 
 Spring Boot tests will connect with `@ServiceConnection` once #15 lands.
 
@@ -105,6 +106,62 @@ build. By default the image's tag matches this library's version, and `edge` for
 **Apple Silicon:** TM1 runs under Rosetta, as with compose. Turn on *Use Rosetta for
 x86_64/amd64 emulation* in Docker Desktop (see the [getting-started
 guide](../docker/tm1-server/GETTING-STARTED.md#step-1-install-docker)).
+
+## Cognos (CAM) security
+
+`CognosContainer` runs IBM Cognos Analytics on the [`cognos-server`](../docker/cognos-server)
+image, with test users you list. `Tm1ServerContainer.withCamSecurity` runs TM1 in CAM
+security against it, so each test user logs on to TM1 with their own identity and groups:
+
+```java
+@RequiresCognos
+class SecurityTest {
+
+    @Test
+    void viewersCanOnlyRead(CognosSource cognosSource) {
+        try (var cognos = new CognosContainer(cognosSource)
+                 .withUser("admin", "adminpw", "Admins")
+                 .withUser("analyst", "analystpw", "Analysts", "Readers")
+                 .withUser("viewer", "viewerpw", "Readers");
+             var tm1 = new Tm1ServerContainer(Tm1Source.discover().orElseThrow())
+                 .withCamSecurity(cognos, "admin")) {
+            tm1.start();   // starts Cognos first
+            String auth = cognos.camAuthorization("viewer");   // the Authorization header
+            ...
+        }
+    }
+}
+```
+
+- **Users and groups:** `withUser(name, password, groups...)`. Cognos gets an LDAP namespace
+  (`LDAP`) with them, and anonymous access is off.
+- **`withCamSecurity(cognos, admins...)`** gives the two containers a shared network and
+  starts Cognos first. It makes the named users TM1 administrators, and the container's own
+  login (`getUsername()`, `getAuthorization()`) is the first of them.
+- **Groups:** every group of the test users is added to TM1, named by its CAMID, e.g.
+  `CAMID("LDAP:g:cn=analysts,ou=groups")`. TM1 puts users into their groups at logon, so give
+  each group the rights the test needs.
+- **Logging on:** `cognos.camAuthorization(user)` is the `Authorization: CAMNamespace …`
+  header for that user. Native logons are refused.
+
+`@RequiresCognos` includes `@RequiresTm1` and also skips without a Cognos source. It injects
+the `CognosSource` found. There's no shared Cognos: it takes about two minutes to start, and
+each test wants its own users. Cognos needs about 8 GB of memory, so give Docker at least 12 GB.
+
+Cognos is found from these settings, first match wins:
+
+| Setting | Cognos comes from | Start time |
+|---|---|---|
+| `COGNOS_PRIVATE_IMAGE` | An image with Cognos built in, kept **private** or local ([how to build one](../docker/cognos-server/examples/private-image/Dockerfile)). Recommended. | ~2 min |
+| `COGNOS_INSTALL_VOLUME` | A Docker volume holding an install. Cognos writes into it, so one container at a time. | ~2 min |
+| `COGNOS_ZIP_DIR` (+ `COGNOS_ZIP`) | A folder holding IBM's `casrv-*-linuxi38664h.zip` | ~3 min, installing every time |
+| `COGNOS_ZIP_URL` (+ `COGNOS_ZIP_SHA256`) | A download link for the zip | download + ~3 min |
+| `TM1_BUNDLE_DIR` | The TM1 downloads folder, if it also holds the Cognos zip | as `COGNOS_ZIP_DIR` |
+
+Cognos writes into its install while it runs, so unlike TM1 the zip sources install into
+every new container (about a minute and 10 GB). A private image avoids that: Docker gives
+each container its own copy-on-write copy. `COGNOS_SERVER_IMAGE` swaps the
+`cognos-server` image itself, e.g. `cognos-server:local`. Start times are from Apple Silicon.
 
 ## TM1 Web
 
