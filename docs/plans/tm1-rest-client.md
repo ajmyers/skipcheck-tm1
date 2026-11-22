@@ -647,7 +647,7 @@ These are concerns the requirements don't name, but that need deciding early:
 | **2. Dimensions** (#79; steps #80–#85, done) | Dimensions, Hierarchies, Elements, Edges, Levels, Members, Subsets (public, private, session), element/hierarchy/subset attributes, locks and reservations | Integration tests green |
 | **3. Cubes and views** (#98; steps #99–#102, done) | Cubes, Native and MDX views (public, private), rules, CheckRules/CheckFeeders/Trace\*, Load/Unload, ReorderDimensions, locks and reservations, cube attributes | Integration tests green |
 | **4. Data** (#116; steps #117–#121, done) | ExecuteMDX\*, Cellsets (streamed, auto-deleted), Update/UpdateCells, Sandboxes, change sets, drillthrough, ModelCubes/ControlCubes | Integration tests green |
-| **5. Processes and chores** | Processes (CRUD, Compile, ExecuteWithReturn with async, deprecated Execute), error logs, debugging (contexts, breakpoints, stepping), Chores and tasks | Integration tests green |
+| **5. Processes and chores** (#129; steps #130–#133, done) | Processes (CRUD, Compile, ExecuteWithReturn with async, deprecated Execute), error logs, debugging (contexts, breakpoints, stepping), Chores and tasks | Integration tests green |
 | **6. Security and runtime** | Users, Groups, ActiveUser, Sessions, ActiveSession, Threads (CancelOperation), Disconnect | Integration tests green |
 | **7. Server, configuration and logs** | Server, Static/ActiveConfiguration, deprecated Configuration, Loggers, Message/Transaction/Audit logs with delta `tail` Flux, ErrorLogFiles | Integration tests green |
 | **8. Contents and annotations** | Contents/Folders/Documents/Links/References (Copy/Move), Annotations, ApplicationContextFacets, DeleteAnnotationArtifacts | Integration tests green |

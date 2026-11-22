@@ -27,14 +27,12 @@ ActionImport RotateDataModelKey
 EntitySet Annotations
 EntitySet ApplicationContextFacets
 EntitySet AuditLogEntries
-EntitySet ChoreAttributes
 EntitySet Contents
 EntitySet ErrorLogFiles
 EntitySet GitPlans
 EntitySet Groups
 EntitySet Loggers
 EntitySet MessageLogEntries
-EntitySet ProcessAttributes
 EntitySet SQLDataSources
 EntitySet Sessions
 EntitySet Threads
@@ -54,7 +52,6 @@ Navigation ApplicationContextFacet/Values
 Navigation ApplicationContextFacetValue/Facet
 Navigation AuditLogEntry/AuditDetails
 Navigation CellsetCell/Annotations
-Navigation Chore/LocalizedAttributes
 Navigation ChoreReference/Chore
 Navigation Cube/Annotations
 Navigation CubeReference/Cube
@@ -65,7 +62,6 @@ Navigation Entry/LocalizedAttributes
 Navigation Folder/Contents
 Navigation Folder/PrivateContents
 Navigation Group/Users
-Navigation Process/LocalizedAttributes
 Navigation ProcessReference/Process
 Navigation Session/Threads
 Navigation Session/User
