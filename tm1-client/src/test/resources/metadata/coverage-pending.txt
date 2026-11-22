@@ -1,15 +1,10 @@
 # Endpoints not implemented yet. This list only shrinks: implementing an endpoint means
 # taking it off. A new $metadata snapshot's new endpoints go here or in coverage-excluded.txt.
 # See CoverageGateTest.
-Action Cellset/SaveViewAs
-Action Cellset/Update
-Action Cellset/UpdateCells
 Action Chore/Activate
 Action Chore/Deactivate
 Action Chore/Execute
 Action Chore/SetServerLocalStartTime
-Action Cube/Update
-Action Cube/UpdateCells
 Action CubeDrillthrough/Execute
 Action Entry/Copy
 Action Entry/Move
@@ -61,7 +56,6 @@ ActionImport RemoveOIDCKeyFromCache
 ActionImport RotateDataEncryptionKey
 ActionImport RotateDataModelKey
 ActionImport UndoChangeSet
-ActionImport Update
 EntitySet Annotations
 EntitySet ApplicationContextFacets
 EntitySet AuditLogEntries
@@ -102,11 +96,8 @@ Navigation ApplicationContextFacet/Values
 Navigation ApplicationContextFacetValue/Facet
 Navigation AuditLogEntry/AuditDetails
 Navigation CalculationComponent/Tuple
-Navigation CellDescriptor/Tuple
 Navigation CellsetCell/Annotations
 Navigation CellsetCell/DrillthroughScripts
-Navigation CellsetUpdate/ReferenceCell
-Navigation CellsetUpdate/ReferenceCube
 Navigation Chore/LocalizedAttributes
 Navigation Chore/Tasks
 Navigation ChoreReference/Chore
@@ -114,9 +105,6 @@ Navigation ChoreTask/Chore
 Navigation ChoreTask/Process
 Navigation Cube/Annotations
 Navigation CubeReference/Cube
-Navigation CubeUpdate/ReferenceCell
-Navigation CubeUpdate/ReferenceCube
-Navigation CubeUpdate/Tuple
 Navigation DimensionReference/Dimension
 Navigation DocumentReference/Document
 Navigation Entry/ContainedBy

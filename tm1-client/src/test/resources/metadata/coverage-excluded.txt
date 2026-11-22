@@ -1,3 +1,4 @@
 # Endpoints deliberately not implemented, as: <endpoint> | <reason>
-# None yet: deprecated endpoints are still implemented, since servers still serve them.
+# Deprecated endpoints are still implemented, since servers still serve them.
 # See CoverageGateTest.
+ActionImport Update | The same tm1.Update as Action Cube/Update, with the cube as a parameter; CellService.update calls the bound one

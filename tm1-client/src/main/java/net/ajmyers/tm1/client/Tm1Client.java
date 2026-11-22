@@ -12,6 +12,7 @@ import net.ajmyers.tm1.client.service.attribute.AttributeService;
 import net.ajmyers.tm1.client.service.attribute.LocalizedAttributeService;
 import net.ajmyers.tm1.client.service.cube.CubeService;
 import net.ajmyers.tm1.client.service.cube.ViewService;
+import net.ajmyers.tm1.client.service.data.CellService;
 import net.ajmyers.tm1.client.service.data.CellsetService;
 import net.ajmyers.tm1.client.service.dimension.DimensionService;
 import net.ajmyers.tm1.client.service.dimension.EdgeService;
@@ -71,6 +72,8 @@ public final class Tm1Client {
 
 	private final CellsetService cellsets;
 
+	private final CellService cells;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -85,6 +88,7 @@ public final class Tm1Client {
 		this.cubes = new CubeService(session);
 		this.views = new ViewService(session);
 		this.cellsets = new CellsetService(session);
+		this.cells = new CellService(session);
 	}
 
 	/**
@@ -207,6 +211,14 @@ public final class Tm1Client {
 	 */
 	public CellsetService cellsets() {
 		return cellsets;
+	}
+
+	/**
+	 * Cell writes.
+	 * @return the cell service, on this client's session
+	 */
+	public CellService cells() {
+		return cells;
 	}
 
 	/**
