@@ -26,7 +26,6 @@ Action Entry/Copy
 Action Entry/Move
 Action GitPullPlan/Execute
 Action GitPushPlan/Execute
-Action Hierarchy/CreateSessionSubset
 Action MDXView/Execute
 Action NativeView/Execute
 Action Process/Compile
@@ -45,8 +44,6 @@ Action Sandbox/Merge
 Action Sandbox/Publish
 Action Sandbox/Unload
 Action Session/Close
-Action Subset/SaveAs
-Action Subset/SetElement
 Action Thread/CancelOperation
 Action User/Disconnect
 ActionImport BeginChangeSet
@@ -167,10 +164,7 @@ Navigation Folder/PrivateContents
 Navigation Group/Users
 Navigation Hierarchy/ElementAttributes
 Navigation Hierarchy/LocalizedAttributes
-Navigation Hierarchy/PrivateSubsets
-Navigation Hierarchy/SessionSubsets
 Navigation Hierarchy/SubsetAttributes
-Navigation Hierarchy/Subsets
 Navigation Member/LocalizedAttributes
 Navigation Process/ErrorLogs
 Navigation Process/LocalizedAttributes
@@ -186,8 +180,6 @@ Navigation ProcessReference/Process
 Navigation Rowset/Rows
 Navigation Session/Threads
 Navigation Session/User
-Navigation Subset/Elements
-Navigation Subset/Hierarchy
 Navigation Subset/LocalizedAttributes
 Navigation SubsetReference/Subset
 Navigation Thread/Session

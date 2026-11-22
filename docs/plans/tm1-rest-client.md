@@ -811,7 +811,8 @@ and document the replace-vs-append semantics.
 | Element and Process PATCH **reject** `Attributes` | Element attributes are written as cells of `}ElementAttributes_<dim>` |
 | Hierarchy PATCH with `Elements`/`Edges` **replaces** the collection (deletes elements not listed). Subset and Chore PATCH **append**. | Separate, explicitly named methods: `replace…` and `add…` |
 | `SetElement`/`SetComponent` with null `Before` put the element **last**; `$metadata` says first | Documented, and pinned by a test |
-| `CreateSessionSubset` ignores the given name | Return the server's name |
+| `CreateSessionSubset` ignores the given name and names the subset like an ID (`yExesF4AAIABAAAQ`). `SessionSubsets` lists none of them, though each reads by that name. (Listing seen in phase 2.) | Return the server's name; `SubsetService.list` says so |
+| A subset PATCH binding `Elements` appends; `SetElement` with no position appends, and moves an element already there. (Seen in phase 2.) | `addElements` and `clearElements` (`Elements/$ref`); `update` refuses `Elements` |
 | A Process GET with `$select=*` omits most `DataSource/*` properties, `UIData` and `VariablesUIData` | The default process projection lists them explicitly |
 | Chore task `Step` is server-assigned. `Active` changes only through `Activate`/`Deactivate`. A chore task must list every process parameter. | Builders enforce this |
 | Cube `Rules` and process code are saved even when they don't compile | `CheckRules` / `Compile` helpers, and an optional check before save |
