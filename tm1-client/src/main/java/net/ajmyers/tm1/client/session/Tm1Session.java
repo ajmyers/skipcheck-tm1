@@ -29,16 +29,6 @@ import tools.jackson.databind.json.JsonMapper;
  * between any number of concurrent subscribers: TM1 runs requests on one session in
  * parallel.
  *
- * <pre>{@code
- * Tm1Session session = Tm1Session.builder()
- *     .baseUrl("http://localhost:8010/api/v1/")
- *     .basicAuth("admin", "")
- *     .build();
- * session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none().select("Name"), JsonNode.class))
- *     .then(session.close())
- *     .block();   // in a standalone main() only
- * }</pre>
- *
  * <ul>
  * <li><b>Login is lazy and happens once.</b> The first request logs in, and concurrent
  * first requests share that login. Only the login carries the credentials; every other
@@ -49,6 +39,22 @@ import tools.jackson.databind.json.JsonMapper;
  * <li><b>Any request.</b> {@link #execute} and {@link #stream} send any
  * {@link Tm1Request}, so anything the services don't cover yet is still reachable.
  * </ul>
+ *
+ * <p>
+ * Build a session with CAM security and a label:
+ * {@snippet class = examples.SessionExamples region = build}
+ *
+ * <p>
+ * Or log in with a CAM passport, such as one from exchanging an OIDC token with Cognos:
+ * {@snippet class = examples.SessionExamples region = passport}
+ *
+ * <p>
+ * Send a request no service covers yet, here streaming a collection:
+ * {@snippet class = examples.SessionExamples region = request}
+ *
+ * <p>
+ * Run a service's requests in a sandbox by giving it a sandbox view of the session:
+ * {@snippet class = examples.SessionExamples region = sandbox}
  */
 public final class Tm1Session {
 

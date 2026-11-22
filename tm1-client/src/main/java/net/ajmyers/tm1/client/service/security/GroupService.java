@@ -16,6 +16,14 @@ import reactor.core.publisher.Mono;
 /**
  * Security groups: {@code /Groups} and their users. A user's membership is set from the
  * user's side, with {@link UserService#setGroups}.
+ *
+ * <p>
+ * List a group's members:
+ * {@snippet class = examples.GroupServiceExamples region = members}
+ *
+ * <p>
+ * Create a group and add a user to it, from the user's side:
+ * {@snippet class = examples.GroupServiceExamples region = create}
  */
 public final class GroupService {
 

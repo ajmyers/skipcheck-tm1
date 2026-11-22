@@ -24,6 +24,14 @@ import reactor.core.publisher.Mono;
  * To close this client's own session, close the {@code Tm1Session} or {@code Tm1Client}:
  * it sends {@code ActiveSession/tm1.Close}, and knows not to log in again. A closed
  * session stays listed in {@code Sessions} for a few seconds (5 to 9 in TM1 11.8).
+ *
+ * <p>
+ * List who's logged in, expanding each session's user:
+ * {@snippet class = examples.SessionServiceExamples region = list}
+ *
+ * <p>
+ * Close other clients' sessions by their label, sparing this one:
+ * {@snippet class = examples.SessionServiceExamples region = close}
  */
 public final class SessionService {
 
