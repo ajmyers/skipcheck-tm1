@@ -15,8 +15,6 @@ Action Entry/Copy
 Action Entry/Move
 Action GitPullPlan/Execute
 Action GitPushPlan/Execute
-Action MDXView/Execute
-Action NativeView/Execute
 Action Process/Compile
 Action Process/Debug
 Action Process/Execute
@@ -47,7 +45,6 @@ ActionImport EncryptDataModel
 ActionImport EndChangeSet
 ActionImport ExecuteChore
 ActionImport ExecuteCubeDrillthrough
-ActionImport ExecuteMDX
 ActionImport ExecuteMDXSetExpression
 ActionImport ExecuteMDXStatement
 ActionImport ExecuteProcess
@@ -68,7 +65,6 @@ ActionImport Update
 EntitySet Annotations
 EntitySet ApplicationContextFacets
 EntitySet AuditLogEntries
-EntitySet Cellsets
 EntitySet ChoreAttributes
 EntitySet Chores
 EntitySet Contents
@@ -88,7 +84,6 @@ EntitySet Sessions
 EntitySet Threads
 EntitySet TransactionLogEntries
 EntitySet Users
-Function Cellset/GetPartition
 FunctionImport ControlCubes
 FunctionImport ControlDimensions
 FunctionImport GetOIDCKeys
@@ -108,15 +103,8 @@ Navigation ApplicationContextFacetValue/Facet
 Navigation AuditLogEntry/AuditDetails
 Navigation CalculationComponent/Tuple
 Navigation CellDescriptor/Tuple
-Navigation Cellset/Axes
-Navigation Cellset/Cells
-Navigation Cellset/Cube
-Navigation CellsetAxis/Hierarchies
-Navigation CellsetAxis/Tuples
-Navigation CellsetAxisTuple/Members
 Navigation CellsetCell/Annotations
 Navigation CellsetCell/DrillthroughScripts
-Navigation CellsetCell/Members
 Navigation CellsetUpdate/ReferenceCell
 Navigation CellsetUpdate/ReferenceCube
 Navigation Chore/LocalizedAttributes
