@@ -22,6 +22,7 @@ from ...odata import ODataPath, ODataQuery
 from ...operation import Tm1Operation
 from ...request import Tm1Request
 from ._base import Service, _require
+from ...values import ViewScope
 
 __all__ = ["CubeService", "ViewScope", "ViewService"]
 
@@ -219,19 +220,6 @@ def _cube(name: str) -> ODataPath:
 
 def _action(operation: Tm1Operation, name: str, body: Mapping[str, Any], type: Any) -> Tm1Request[Any]:
     return Tm1Request.post(_cube(name).action(operation.name), dict(body), type).requires(operation.capability())
-
-
-class ViewScope(enum.Enum):
-    """Who sees a view, and so which of a cube's collections holds it."""
-
-    PUBLIC = "Views"
-    """Everyone: ``Cubes('c')/Views``."""
-    PRIVATE = "PrivateViews"
-    """Only the user who made it: ``Cubes('c')/PrivateViews``."""
-
-    def navigation(self) -> str:
-        """The cube's navigation property holding views of this scope, such as ``PrivateViews``."""
-        return self.value
 
 
 class ViewService(Service):

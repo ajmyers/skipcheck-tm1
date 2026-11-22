@@ -14,6 +14,7 @@ from ...odata import ODataPath, ODataQuery
 from ...operation import Tm1Operation
 from ...request import Tm1Request, body_of
 from ._base import Service, _require
+from ...values import SubsetScope
 
 __all__ = [
     "DimensionService",
@@ -753,21 +754,6 @@ class MemberService(Service):
         """``GET …/Members('m')/Hierarchy``."""
         path = _member(dimension, hierarchy, member).nav("Hierarchy")
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Hierarchy))
-
-
-class SubsetScope(enum.Enum):
-    """Who sees a subset, and so which of a hierarchy's collections holds it."""
-
-    PUBLIC = "Subsets"
-    """Everyone: ``Hierarchies('h')/Subsets``."""
-    PRIVATE = "PrivateSubsets"
-    """Only the user who made it: ``Hierarchies('h')/PrivateSubsets``."""
-    SESSION = "SessionSubsets"
-    """Only this session, gone when it ends: ``Hierarchies('h')/SessionSubsets``."""
-
-    def navigation(self) -> str:
-        """The hierarchy's navigation property holding subsets of this scope."""
-        return self.value
 
 
 _SUBSET_SETS = ("Navigation Hierarchy/Subsets", "Navigation Hierarchy/PrivateSubsets", "Navigation Hierarchy/SessionSubsets")

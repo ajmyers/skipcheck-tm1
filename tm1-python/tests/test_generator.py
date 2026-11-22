@@ -87,3 +87,12 @@ def test_unasync_makes_the_sync_flavor() -> None:
         "        self.http.close()\n"
         '        s = "t.go() in a string reads right too"\n'
     )
+
+
+def test_value_types_are_shared_by_both_flavors() -> None:
+    """Value types live once (tm1_client.values), so a sync ContentScope is an asyncio one too."""
+    from tm1_client import services
+    from tm1_client.aio import services as aio_services
+
+    for name in ("ContentPath", "ContentScope", "ViewScope", "SubsetScope", "Tuples", "AttributeOwner", "AttributeSet", "GitCredentials", "GitCommitDetails"):
+        assert getattr(services, name) is getattr(aio_services, name), name

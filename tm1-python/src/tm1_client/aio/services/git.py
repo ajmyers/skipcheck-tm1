@@ -13,98 +13,11 @@ from ...odata import ODataPath, ODataQuery
 from ...operation import Tm1Operation
 from ...request import Tm1Request
 from ._base import Service, _require
+from ...values import GitCommitDetails, _Password, GitCredentials
 
 __all__ = ["GitCommitDetails", "GitCredentials", "GitService"]
 
 _PLANS = ODataPath.of("GitPlans")
-
-
-@dataclass(frozen=True)
-class GitCommitDetails:
-    """What a push's commit says, and who it's by."""
-
-    message: str
-    author: str
-    email: str
-
-    def __post_init__(self) -> None:
-        for name in ("message", "author", "email"):
-            _require(getattr(self, name), name)
-
-
-class _Password:
-    """``GitCredentials.password``: on the class, Java's factory ``password(username, password)``;
-    on credentials, their password."""
-
-    def __get__(self, obj: Any, cls: Any) -> Any:
-        if obj is None:
-
-            def password(username: str, password: str) -> GitCredentials:
-                """A user name and password, or access token, for an HTTPS remote."""
-                return GitCredentials(_require(username, "username"), _require(password, "password"))
-
-            return password
-        return obj._password
-
-
-class GitCredentials:
-    """How TM1 signs in to the Git remote: nothing (a public or ``git://`` remote), a user name
-    and password or token (HTTPS), or an SSH key pair. TM1 doesn't keep them, so every call
-    that reaches the remote takes them again. ``repr`` leaves the secrets out."""
-
-    __slots__ = ("username", "_password", "public_key", "private_key", "passphrase")
-
-    password = _Password()
-
-    def __init__(
-        self,
-        username: str | None = None,
-        password: str | None = None,
-        public_key: str | None = None,
-        private_key: str | None = None,
-        passphrase: str | None = None,
-    ):
-        self.username = username
-        self._password = password
-        self.public_key = public_key
-        self.private_key = private_key
-        self.passphrase = passphrase
-
-    @staticmethod
-    def none() -> GitCredentials:
-        """No credentials."""
-        return GitCredentials()
-
-    @staticmethod
-    def ssh_key(public_key: str, private_key: str, passphrase: str | None = None) -> GitCredentials:
-        """An SSH key pair, for an SSH remote, with its passphrase if any."""
-        return GitCredentials(
-            None, None, _require(public_key, "public_key"), _require(private_key, "private_key"), passphrase
-        )
-
-    def _add_to(self, parameters: dict[str, Any]) -> None:
-        _put(parameters, "Username", self.username)
-        _put(parameters, "Password", self._password)
-        _put(parameters, "PublicKey", self.public_key)
-        _put(parameters, "PrivateKey", self.private_key)
-        _put(parameters, "Passphrase", self.passphrase)
-
-    def __eq__(self, other: object) -> bool:
-        return isinstance(other, GitCredentials) and all(
-            getattr(self, s) == getattr(other, s) for s in GitCredentials.__slots__
-        )
-
-    def __hash__(self) -> int:
-        return hash(tuple(getattr(self, s) for s in GitCredentials.__slots__))
-
-    def __repr__(self) -> str:
-        """Which credentials these are, without the secrets."""
-        return (
-            f"GitCredentials[username={self.username}, password={'none' if self._password is None else '***'}, "
-            f"sshKey={'none' if self.private_key is None else '***'}]"
-        )
-
-    __str__ = __repr__
 
 
 def _put(parameters: dict[str, Any], name: str, value: Any) -> None:

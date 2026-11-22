@@ -30,6 +30,7 @@ from ...operation import Tm1Operation
 from ...request import Tm1Request
 from ..session import AsyncTm1Session
 from ._base import Service, _require
+from ...values import Tuples
 from .cube import ViewScope
 
 __all__ = [
@@ -51,34 +52,6 @@ _ROWSETS = ODataPath.of("Rowsets")
 def _import(operation: Tm1Operation) -> ODataPath:
     assert operation.import_name is not None
     return ODataPath.of(operation.import_name)
-
-
-class Tuples:
-    """Cell coordinates, as TM1 binds them: one element path per dimension of the cube, in the
-    cube's order::
-
-        cell = {"Region": "North", "Measure": "Amount"}
-        CubeUpdatePatch.builder().bind_tuple(*Tuples.of(cell)).value(42).build()
-    """
-
-    @staticmethod
-    def of(tuple: Mapping[str, str]) -> list[ODataPath]:
-        """The element paths for a cell: ``tuple`` maps dimension to element, for every dimension
-        of the cube in its order; each element is in its dimension's same-named hierarchy. One
-        path per element, such as ``Dimensions('Region')/Hierarchies('Region')/Elements('North')``."""
-        return [Tuples.element(d, d, e) for d, e in _require(tuple, "tuple").items()]
-
-    @staticmethod
-    def element(dimension: str, hierarchy: str, element: str) -> ODataPath:
-        """One element's path: ``Dimensions('d')/Hierarchies('h')/Elements('e')``."""
-        return (
-            ODataPath.of("Dimensions")
-            .key(_require(dimension, "dimension"))
-            .nav("Hierarchies")
-            .key(_require(hierarchy, "hierarchy"))
-            .nav("Elements")
-            .key(_require(element, "element"))
-        )
 
 
 def _bindings(tuple: Mapping[str, str]) -> list[str]:
