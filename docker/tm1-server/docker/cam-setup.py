@@ -10,11 +10,13 @@ there. Environment:
   TM1_CAM_ADMINS     Cognos users to make TM1 administrators (ADMIN group)
   TM1_CAM_GROUPS     Cognos groups to add to TM1, so their members get them at logon
   TM1_CAM_NAMESPACE  the Cognos namespace ID (default LDAP)
+  TM1_CAM_NAMESPACE_TYPE  ldap (default) or oidc: how short names become CAMIDs
   TM1_NATIVE_ADMIN_PASSWORD   password of TM1's native Admin (default: none)
 
 Entries are separated by spaces or commas. A short name assumes cognos-server's
-LDAP layout (users uid=<name>,ou=people; groups cn=<name>,ou=groups); anything
-else, give the full CAMID("...") as Cognos shows it.
+namespaces: LDAP (users uid=<name>,ou=people; groups cn=<name>,ou=groups) or OIDC
+(users and groups by name); anything else, give the full CAMID("...") as Cognos
+shows it.
 """
 import base64
 import http.cookiejar
@@ -29,6 +31,9 @@ import urllib.parse
 import urllib.request
 
 NS = os.environ.get("TM1_CAM_NAMESPACE") or "LDAP"
+TYPE = (os.environ.get("TM1_CAM_NAMESPACE_TYPE") or "ldap").lower()
+if TYPE not in ("ldap", "oidc"):
+    sys.exit(f"TM1_CAM_NAMESPACE_TYPE must be ldap or oidc, not '{TYPE}'")
 
 
 def entries(var):
@@ -41,9 +46,11 @@ def camid(kind, name):
         return name
     if not re.fullmatch(r"[A-Za-z0-9._-]+", name):
         sys.exit(f"'{name}' isn't a plain name; give the full CAMID(\"...\") instead")
+    # Cognos writes group names in lower case (cn=analysts for group Analysts).
+    if TYPE == "oidc":
+        return f'CAMID("{NS}:u:{name}")' if kind == "user" else f'CAMID("{NS}:g:{name.lower()}")'
     if kind == "user":
         return f'CAMID("{NS}:u:uid={name},ou=people")'
-    # Cognos writes group DNs in lower case (cn=analysts for group Analysts).
     return f'CAMID("{NS}:g:cn={name.lower()},ou=groups")'
 
 

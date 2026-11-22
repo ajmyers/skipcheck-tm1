@@ -152,6 +152,21 @@ for want in 'name="allowAnon"><crn:value xsi:type="xsd:boolean">false<' '<crn:in
   grep -qF -- "$want" <<<"$out" || fail "rendered cogstartup.xml with users lacks $want: $out"
 done
 grep -qF 'name="allowAnon"><crn:value xsi:type="xsd:boolean">true<' <<<"$out" || fail "anonymous access should stay on without users: $out"
+out=$(run --entrypoint sh -e COGNOS_CS_HOST=db -e COGNOS_OIDC_DISCOVERY_URL=http://kc:8080/realms/r/.well-known/openid-configuration \
+  -e COGNOS_OIDC_CLIENT_ID=cognos -e COGNOS_OIDC_CLIENT_SECRET=s3cret -e COGNOS_PUBLIC_URL=http://localhost:9301 "$image" -c '
+  cat > /tmp/t.xml <<XML
+<crn:parameters xmlns:crn="c" xmlns:xsi="x"><crn:parameter name="hostName"><crn:value xsi:type="xsd:string">cognos-install-host</crn:value></crn:parameter>
+<crn:instances name="database"><crn:instance class="DB2" name="Content Store"></crn:instance></crn:instances>
+<crn:parameter name="serverCommonName"><crn:value xsi:type="xsd:string">localhost</crn:value></crn:parameter>
+<crn:parameter name="sanDNSName"><crn:value xsi:type="xsd:string">localhost</crn:value></crn:parameter>
+<crn:parameter name="dispatcherMaxMemory"><crn:value xsi:type="xsd:unsignedInt">8192</crn:value></crn:parameter>
+<crn:instances name="authProvider"><crn:instance class="Cognos" name="Cognos"><crn:parameter name="allowAnon"><crn:value xsi:type="xsd:boolean">true</crn:value></crn:parameter></crn:instance></crn:instances></crn:parameters>
+XML
+  python3 /usr/local/lib/cognos-server/configure-cognos.py render /tmp/t.xml /tmp/o.xml && cat /tmp/o.xml' 2>&1) || fail "OIDC render failed: $out"
+for want in '<crn:instance class="OIDC_Generic" name="OIDC">' '>http://kc:8080/realms/r/.well-known/openid-configuration<' '>http://localhost:9301/bi/completeAuth.jsp<' \
+  'name="accountCamidProperty">' '>username<' 'name="acMemberOf">' '>groups<' 'name="allowAnon"><crn:value xsi:type="xsd:boolean">false<'; do
+  grep -qF -- "$want" <<<"$out" || fail "rendered cogstartup.xml with OIDC lacks $want: $out"
+done
 pass "cogstartup.xml template and render (with and without an LDAP namespace)"
 
 # 5b. Test users become an LDAP directory: each logs on with its own password,
@@ -177,6 +192,31 @@ grep -qx "cn: G1 cn: G2 " <<<"$out" || fail "unexpected groups from users with #
 out=$(run -e COGNOS_USERS="bad user:pw" --entrypoint cognos-ldap "$image" start 2>&1) && fail "bad user entry accepted"
 grep -q "bad user entry\|bad user name" <<<"$out" || fail "missing user entry error: $out"
 pass "test users become an LDAP directory (logons, wrong password refused, groups, hashes hidden)"
+
+# 5c. The test users become a Keycloak realm (against a real Keycloak): each user gets
+#     ID tokens with their groups, from Cognos's client and from tm1-app, whose tokens
+#     carry Cognos's client in their audience; a wrong password is refused
+net=cognos-smoke-$$
+docker network create "$net" >/dev/null
+kc=$(docker run -d --rm --network "$net" --network-alias keycloak -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
+  -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin -e KC_HTTP_ENABLED=true quay.io/keycloak/keycloak:26.4 start-dev)
+cleanup_kc() { docker rm -f "$kc" >/dev/null 2>&1; docker network rm "$net" >/dev/null 2>&1; true; }
+trap cleanup_kc EXIT
+out=$(run --network "$net" -e COGNOS_KEYCLOAK_URL=http://keycloak:8080 \
+  -e COGNOS_USERS="admin:adminpw:Admins analyst:analystpw:Analysts,Readers" --entrypoint bash "$image" -c '
+  settings=$(python3 /usr/local/lib/cognos-server/keycloak-setup.py 2>/dev/null) || exit 1
+  secret=$(sed -n "s/^COGNOS_OIDC_CLIENT_SECRET=//p" <<<"$settings")
+  claims() { python3 -c "import json,sys,base64; t=json.load(sys.stdin)[\"id_token\"].split(\".\")[1]; c=json.loads(base64.urlsafe_b64decode(t+\"==\")); print(c[\"preferred_username\"], sorted(c[\"groups\"]), sorted(c[\"aud\"] if isinstance(c[\"aud\"], list) else [c[\"aud\"]]))"; }
+  t=http://keycloak:8080/realms/cognos/protocol/openid-connect/token
+  curl -sf -d grant_type=password -d client_id=cognos -d "client_secret=$secret" -d username=analyst -d password=analystpw -d scope=openid $t | claims
+  curl -sf -d grant_type=password -d client_id=tm1-app -d username=admin -d password=adminpw -d scope=openid $t | claims
+  curl -s -o /dev/null -w "%{http_code}\n" -d grant_type=password -d client_id=tm1-app -d username=admin -d password=nope -d scope=openid $t
+  grep -c "^COGNOS_OIDC_DISCOVERY_URL=http://keycloak:8080/realms/cognos/" <<<"$settings"' 2>&1) || fail "Keycloak realm setup failed: $out"
+for want in "analyst ['Analysts', 'Readers'] ['cognos']" "admin ['Admins'] ['cognos', 'tm1-app']" "401"; do
+  grep -qxF -- "$want" <<<"$out" || fail "Keycloak realm lacks: $want; got: $out"
+done
+cleanup_kc; trap - EXIT
+pass "test users become a Keycloak realm (tokens with groups, audiences for Cognos and tm1-app)"
 
 # 6. The embedded PostgreSQL starts, and the content store role can log in over TCP
 out=$(run --entrypoint sh "$image" -c '

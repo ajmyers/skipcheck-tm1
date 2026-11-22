@@ -2,6 +2,9 @@
 
 Usage: users.py <base DN>    (writes LDIF to stdout, a summary to stderr)
 
+Also imported by keycloak-setup.py, which builds a Keycloak realm from the same
+list (parse()).
+
 Users come from COGNOS_USERS and/or the file named by COGNOS_USERS_FILE, one
 user per entry:
 
@@ -41,9 +44,17 @@ def ssha(password):
     return "{SSHA}" + base64.b64encode(hashlib.sha1(password.encode() + salt).digest() + salt).decode()
 
 
-base = sys.argv[1]
-users, groups = {}, {}
-for entry in entries():
+def parse():
+    """The users (name -> password) and groups (name -> member names), in list order."""
+    users, groups = {}, {}
+    for entry in entries():
+        add(entry, users, groups)
+    if not users:
+        sys.exit("no users given (COGNOS_USERS or COGNOS_USERS_FILE)")
+    return users, groups
+
+
+def add(entry, users, groups):
     parts = entry.split(":")
     if len(parts) not in (2, 3) or not parts[0] or not parts[1]:
         sys.exit(f"bad user entry '{parts[0]}:...': expected user:password[:group,group]")
@@ -59,21 +70,26 @@ for entry in entries():
         groups.setdefault(g, []).append(user)
     users[user] = password
 
-if not users:
-    sys.exit("no users given (COGNOS_USERS or COGNOS_USERS_FILE)")
 
-dc = base.split(",")[0].split("=", 1)[1]
-out = [f"dn: {base}", "objectClass: top", "objectClass: dcObject", "objectClass: organization",
-       f"dc: {dc}", f"o: {dc}", "",
-       f"dn: ou=people,{base}", "objectClass: organizationalUnit", "ou: people", "",
-       f"dn: ou=groups,{base}", "objectClass: organizationalUnit", "ou: groups", ""]
-for user, password in users.items():
-    out += [f"dn: uid={user},ou=people,{base}", "objectClass: inetOrgPerson", f"uid: {user}",
-            f"cn: {user}", f"sn: {user}", f"mail: {user}@example.com", f"userPassword: {ssha(password)}", ""]
-for group, members in groups.items():
-    out += [f"dn: cn={group},ou=groups,{base}", "objectClass: groupOfUniqueNames", f"cn: {group}"]
-    out += [f"uniqueMember: uid={m},ou=people,{base}" for m in members] + [""]
-print("\n".join(out))
-summary = ", ".join(f"{u}{' (' + ', '.join(g for g, ms in groups.items() if u in ms) + ')' if any(u in ms for ms in groups.values()) else ''}"
-                    for u in users)
-print(f"{len(users)} user(s): {summary}", file=sys.stderr)
+def main():
+    base = sys.argv[1]
+    users, groups = parse()
+    dc = base.split(",")[0].split("=", 1)[1]
+    out = [f"dn: {base}", "objectClass: top", "objectClass: dcObject", "objectClass: organization",
+           f"dc: {dc}", f"o: {dc}", "",
+           f"dn: ou=people,{base}", "objectClass: organizationalUnit", "ou: people", "",
+           f"dn: ou=groups,{base}", "objectClass: organizationalUnit", "ou: groups", ""]
+    for user, password in users.items():
+        out += [f"dn: uid={user},ou=people,{base}", "objectClass: inetOrgPerson", f"uid: {user}",
+                f"cn: {user}", f"sn: {user}", f"mail: {user}@example.com", f"userPassword: {ssha(password)}", ""]
+    for group, members in groups.items():
+        out += [f"dn: cn={group},ou=groups,{base}", "objectClass: groupOfUniqueNames", f"cn: {group}"]
+        out += [f"uniqueMember: uid={m},ou=people,{base}" for m in members] + [""]
+    print("\n".join(out))
+    summary = ", ".join(f"{u}{' (' + ', '.join(g for g, ms in groups.items() if u in ms) + ')' if any(u in ms for ms in groups.values()) else ''}"
+                        for u in users)
+    print(f"{len(users)} user(s): {summary}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

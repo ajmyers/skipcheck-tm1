@@ -243,6 +243,7 @@ ports, so parallel test runs never collide.
 | `TM1_CAM_ADMINS` | | Cognos users to make TM1 administrators, e.g. `admin` |
 | `TM1_CAM_GROUPS` | | Cognos groups to add to TM1, e.g. `Analysts Readers` |
 | `TM1_CAM_NAMESPACE` | `LDAP` | The Cognos namespace ID, for building CAMIDs from short names |
+| `TM1_CAM_NAMESPACE_TYPE` | `ldap` | `ldap` or `oidc`: how short names become CAMIDs (`oidc`: `CAMID("OIDC:u:admin")`, `CAMID("OIDC:g:analysts")`) |
 | `TM1_NATIVE_ADMIN_PASSWORD` | | Password of TM1's native `Admin`, if your database has one (used to set up CAM admins) |
 | `TM1_SEED` | `empty` | `empty`, `sdata` or `24retail`. Objects to copy into an **empty** `/tm1/data`, taken from the samples in your install. |
 | `TM1_ADMIN_HOST` | | Host of a separate Admin Server (e.g. a container running `admin`). Sets `AdminHost` and turns the embedded Admin Server off. |
@@ -287,8 +288,14 @@ Or run both with [`examples/cam-security/compose.yaml`](examples/cam-security/co
   into the groups Cognos says they belong to, so give each group the security it
   needs (cube, dimension, element, ...) to test different profiles. An
   administrator can add more groups the same way later.
-- Short names assume `cognos-server`'s directory layout. For any other Cognos
-  namespace, give full `CAMID("...")` values.
+- Short names assume `cognos-server`'s LDAP layout. For its OIDC namespace, set
+  `TM1_CAM_NAMESPACE=OIDC` and `TM1_CAM_NAMESPACE_TYPE=oidc`
+  ([`examples/cam-security-oidc`](examples/cam-security-oidc/compose.yaml)). For any
+  other Cognos namespace, give full `CAMID("...")` values.
+- **OIDC logons:** with an OIDC namespace, users log on with `CAMNamespace` (TM1 passes
+  the password to Cognos, which checks it with the provider). An app holding a user's ID
+  token logs on to Cognos with it and sends TM1 `Authorization: CAMPassport <passport>`.
+  See [OIDC](../cognos-server/README.md#oidc) in `cognos-server`.
 
 ## Roles
 

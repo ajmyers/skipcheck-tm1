@@ -17,6 +17,11 @@ render: writes the cogstartup.xml Cognos runs from, using environment variables:
   COGNOS_LDAP_HOST, COGNOS_LDAP_PORT (389), COGNOS_LDAP_BASE,
   COGNOS_LDAP_BIND_DN, COGNOS_LDAP_BIND_PASSWORD, COGNOS_NAMESPACE (LDAP)
                                             an LDAP namespace (when COGNOS_LDAP_HOST is set)
+  COGNOS_OIDC_DISCOVERY_URL, COGNOS_OIDC_CLIENT_ID, COGNOS_OIDC_CLIENT_SECRET,
+  COGNOS_OIDC_NAMESPACE (OIDC), COGNOS_OIDC_SCOPE (openid profile email),
+  COGNOS_OIDC_CAMID_CLAIM (preferred_username), COGNOS_OIDC_GROUPS_CLAIM (groups),
+  COGNOS_PUBLIC_URL (http://localhost:9300)
+                                            an OIDC namespace (when COGNOS_OIDC_DISCOVERY_URL is set)
   COGNOS_ANONYMOUS (T, or F with a namespace)   allow anonymous access
 
 Edits are textual, so IBM's comments and layout survive. cogconfig encrypts the
@@ -124,6 +129,49 @@ def ldap_namespace():
                 </crn:instance>"""
 
 
+def oidc_namespace():
+    ns = env("COGNOS_OIDC_NAMESPACE") or "OIDC"
+    if not re.fullmatch(r"[A-Za-z0-9_]+", ns):
+        raise SystemExit(f"COGNOS_OIDC_NAMESPACE must be letters, digits and _, not '{ns}'")
+    for name in ("COGNOS_OIDC_CLIENT_ID", "COGNOS_OIDC_CLIENT_SECRET"):
+        if not env(name):
+            raise SystemExit(f"{name} is required with COGNOS_OIDC_DISCOVERY_URL")
+    public = (env("COGNOS_PUBLIC_URL") or "http://localhost:9300").rstrip("/")
+    # The claim users are known by (their CAMID). accountCamidProperty names a Cognos
+    # account property, not a claim: "username", which acUsername maps to the claim.
+    camid = env("COGNOS_OIDC_CAMID_CLAIM") or "preferred_username"
+    params = [
+        ("id", "xsd:string", ns),
+        ("identityProviderType", "xsd:string", "Generic"),
+        ("useDiscoveryEndpoint", "xsd:boolean", "true"),
+        ("oidcDiscEndpoint", "cfg:anyPathURI", env("COGNOS_OIDC_DISCOVERY_URL")),
+        ("clientId", "xsd:string", env("COGNOS_OIDC_CLIENT_ID")),
+        ("clientSecret", "xsd:string", env("COGNOS_OIDC_CLIENT_SECRET")),
+        ("tokenEndpointAuth", "xsd:string", "client_secret_post"),
+        ("returnUrl", "cfg:anyPathURI", public + "/bi/completeAuth.jsp"),
+        ("authScope", "xsd:string", env("COGNOS_OIDC_SCOPE") or "openid profile email"),
+        ("accountClaims", "xsd:string", "token"),
+        ("keyLocation", "xsd:string", "jwks_uri"),
+        # CAMUsername/CAMPassword logons: a password grant at the provider
+        ("pgStrategy", "xsd:string", "idToken"),
+        ("tcStrategy", "xsd:string", "refreshToken"),
+        ("accountCamidProperty", "xsd:string", "username"),
+        ("acUsername", "xsd:string", camid),
+        ("acEmail", "xsd:string", "email"),
+        ("acName", "xsd:string", "name"),
+        ("acGivenName", "xsd:string", "given_name"),
+        ("acSurname", "xsd:string", "family_name"),
+        ("acMemberOf", "xsd:string", env("COGNOS_OIDC_GROUPS_CLAIM") or "groups"),
+    ]
+    body = "".join(f"""
+                    <crn:parameter name="{n}">
+                        <crn:value xsi:type="{t}">{escape(v)}</crn:value>
+                    </crn:parameter>""" for n, t, v in params)
+    return f"""
+                <crn:instance class="OIDC_Generic" name="{ns}">{body}
+                </crn:instance>"""
+
+
 def flag(name, default):
     value = (env(name) or default).upper()
     if value not in ("T", "F", "TRUE", "FALSE"):
@@ -146,13 +194,15 @@ def render(xml):
     memory = env("COGNOS_MAX_MEMORY") or "6144"
     if not memory.isdigit():
         raise SystemExit(f"COGNOS_MAX_MEMORY must be a number of MB, not '{memory}'")
-    namespace = bool(env("COGNOS_LDAP_HOST"))
+    namespace = bool(env("COGNOS_LDAP_HOST") or env("COGNOS_OIDC_DISCOVERY_URL"))
     xml = sub_once(
         r'(<crn:instance class="Cognos" name="Cognos">(?:\s|<!--.*?-->)*<crn:parameter name="allowAnon">\s*<crn:value [^>]*>)\w+(</crn:value>)',
         lambda m: m.group(1) + flag("COGNOS_ANONYMOUS", "F" if namespace else "T") + m.group(2), xml, "allowAnon")
-    if namespace:
+    providers = (ldap_namespace() if env("COGNOS_LDAP_HOST") else "") + \
+        (oidc_namespace() if env("COGNOS_OIDC_DISCOVERY_URL") else "")
+    if providers:
         xml = sub_once(r'(<crn:instances name="authProvider">.*?</crn:instance>)',
-                       lambda m: m.group(1) + ldap_namespace(), xml, "the authentication providers")
+                       lambda m: m.group(1) + providers, xml, "the authentication providers")
     xml = sub_once(
         r'(<crn:parameter name="dispatcherMaxMemory">\s*<crn:value [^>]*>)\d+(</crn:value>)',
         lambda m: m.group(1) + memory + m.group(2), xml, "dispatcherMaxMemory")

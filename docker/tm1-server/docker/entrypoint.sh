@@ -44,6 +44,8 @@
 #   TM1_CAM_ADMINS      Cognos users to make TM1 administrators, e.g. "admin"
 #   TM1_CAM_GROUPS      Cognos groups to add to TM1, e.g. "Analysts Readers"
 #   TM1_CAM_NAMESPACE   the Cognos namespace ID (default LDAP)
+#   TM1_CAM_NAMESPACE_TYPE  ldap (default) or oidc: how short names in the lists
+#                       become CAMIDs
 #   TM1_SEED            empty | sdata | 24retail - objects to put in an EMPTY /tm1/data
 #   TM1_ADMIN_HOST      host of a separate Admin Server (e.g. a container running
 #                       `admin`); sets AdminHost and turns the embedded one off
@@ -324,7 +326,7 @@ fi
 # lists, TM1 starts briefly in native security on a private port, cam-setup.py
 # adds the users and groups, and TM1 saves and stops before the real start.
 if [ -n "${TM1_CAM_ADMINS:-}${TM1_CAM_GROUPS:-}" ]; then
-  want="admins=${TM1_CAM_ADMINS:-};groups=${TM1_CAM_GROUPS:-};namespace=${TM1_CAM_NAMESPACE:-LDAP}"
+  want="admins=${TM1_CAM_ADMINS:-};groups=${TM1_CAM_GROUPS:-};namespace=${TM1_CAM_NAMESPACE:-LDAP};type=${TM1_CAM_NAMESPACE_TYPE:-ldap}"
   if [ "$(cat "$DATA/.tm1-server-cam" 2>/dev/null)" = "$want" ]; then
     log "CAM administrators and groups already set up"
   else
