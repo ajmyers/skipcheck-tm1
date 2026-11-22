@@ -85,7 +85,6 @@ EntitySet Chores
 EntitySet Contents
 EntitySet CubeAttributes
 EntitySet Cubes
-EntitySet DimensionAttributes
 EntitySet ErrorLogFiles
 EntitySet GitPlans
 EntitySet Groups
@@ -150,11 +149,8 @@ Navigation CubeReference/Cube
 Navigation CubeUpdate/ReferenceCell
 Navigation CubeUpdate/ReferenceCube
 Navigation CubeUpdate/Tuple
-Navigation Dimension/HierarchyAttributes
-Navigation Dimension/LocalizedAttributes
 Navigation DimensionReference/Dimension
 Navigation DocumentReference/Document
-Navigation Element/LocalizedAttributes
 Navigation Entry/ContainedBy
 Navigation Entry/LocalizedAttributes
 Navigation FedCellDescriptor/Cube
@@ -162,10 +158,6 @@ Navigation FedCellDescriptor/Tuple
 Navigation Folder/Contents
 Navigation Folder/PrivateContents
 Navigation Group/Users
-Navigation Hierarchy/ElementAttributes
-Navigation Hierarchy/LocalizedAttributes
-Navigation Hierarchy/SubsetAttributes
-Navigation Member/LocalizedAttributes
 Navigation Process/ErrorLogs
 Navigation Process/LocalizedAttributes
 Navigation ProcessDebugContext/Breakpoints
@@ -180,7 +172,6 @@ Navigation ProcessReference/Process
 Navigation Rowset/Rows
 Navigation Session/Threads
 Navigation Session/User
-Navigation Subset/LocalizedAttributes
 Navigation SubsetReference/Subset
 Navigation Thread/Session
 Navigation User/Groups

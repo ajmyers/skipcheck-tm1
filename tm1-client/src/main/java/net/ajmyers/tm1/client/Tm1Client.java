@@ -8,6 +8,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import io.micrometer.observation.ObservationRegistry;
 import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
+import net.ajmyers.tm1.client.service.attribute.AttributeService;
+import net.ajmyers.tm1.client.service.attribute.LocalizedAttributeService;
 import net.ajmyers.tm1.client.service.dimension.DimensionService;
 import net.ajmyers.tm1.client.service.dimension.EdgeService;
 import net.ajmyers.tm1.client.service.dimension.ElementService;
@@ -56,6 +58,10 @@ public final class Tm1Client {
 
 	private final SubsetService subsets;
 
+	private final AttributeService attributes;
+
+	private final LocalizedAttributeService localizedAttributes;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -65,6 +71,8 @@ public final class Tm1Client {
 		this.levels = new LevelService(session);
 		this.members = new MemberService(session);
 		this.subsets = new SubsetService(session);
+		this.attributes = new AttributeService(session);
+		this.localizedAttributes = new LocalizedAttributeService(session);
 	}
 
 	/**
@@ -147,6 +155,22 @@ public final class Tm1Client {
 	 */
 	public SubsetService subsets() {
 		return subsets;
+	}
+
+	/**
+	 * Attribute definitions.
+	 * @return the attribute service, on this client's session
+	 */
+	public AttributeService attributes() {
+		return attributes;
+	}
+
+	/**
+	 * Translated attribute values.
+	 * @return the localized attribute service, on this client's session
+	 */
+	public LocalizedAttributeService localizedAttributes() {
+		return localizedAttributes;
 	}
 
 	/**
