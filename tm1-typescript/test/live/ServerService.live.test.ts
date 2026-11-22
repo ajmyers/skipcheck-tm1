@@ -38,7 +38,9 @@ describe("ServerService on TM1" + liveReason, () => {
   tm1Test("reads and sets logger levels", async () => {
     const loggers = await tm1.server.loggers(ODataQuery.none()).toArray();
     expect(loggers.length).toBeGreaterThan(0);
-    const first = loggers[0]!;
+    // Not the first, TM1's root logger: at DEBUG it floods the message log of the server every
+    // test shares, with lines alike to the millisecond
+    const first = loggers.find((l) => l.Name === "TM1.Blob")!;
     expect((await tm1.server.logger(first.Name!, ODataQuery.none())).Level).toBe(first.Level);
     const other = first.Level === LogLevel.Debug ? LogLevel.Info : LogLevel.Debug;
     await tm1.server.setLoggerLevel(first.Name!, other);

@@ -39,7 +39,9 @@ public class ServerServicesLiveTests
         await using var tm1 = Live.Client();
         var loggers = await tm1.Server.LoggersAsync().ToListAsync();
         Assert.NotEmpty(loggers);
-        var first = loggers[0];
+        // Not the first, TM1's root logger: at DEBUG it floods the message log of the server every
+        // test shares, with lines alike to the millisecond
+        var first = loggers.First(l => l.Name == "TM1.Blob");
         Assert.Equal(first.Level, (await tm1.Server.LoggerAsync(first.Name!)).Level);
         var other = first.Level == LogLevel.Debug ? LogLevel.Info : LogLevel.Debug;
         await tm1.Server.SetLoggerLevelAsync(first.Name!, other);
@@ -97,7 +99,7 @@ public class ServerServicesLiveTests
         }
         await logins;
         Assert.True(seen.Count(e => e.Message?.Contains("Login Success", StringComparison.Ordinal) == true) >= 2);
-        var distinct = seen.Select(e => $"{e.TimeStamp} {e.ThreadID} {e.SessionID} {e.Message}").ToHashSet();
+        var distinct = seen.Select(e => $"{e.TimeStamp:O} {e.ThreadID} {e.SessionID} {e.Message}").ToHashSet();
         Assert.Equal(seen.Count, distinct.Count); // no entry twice, though each poll returns them all again
     }
 

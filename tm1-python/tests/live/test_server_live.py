@@ -40,7 +40,9 @@ def test_reads_the_server_and_its_configurations(tm1: Tm1Client) -> None:
 def test_reads_and_sets_logger_levels(tm1: Tm1Client) -> None:
     loggers = tm1.server.loggers()
     assert loggers
-    first = loggers[0]
+    # Not the first, TM1's root logger: at DEBUG it floods the message log of the server every
+    # test shares, with lines alike to the millisecond
+    first = next(logger for logger in loggers if logger.name == "TM1.Blob")
     assert tm1.server.logger(first.name).level == first.level
     other = LogLevel.INFO if first.level == LogLevel.DEBUG else LogLevel.DEBUG
     tm1.server.set_logger_level(first.name, other)

@@ -79,7 +79,9 @@ class ServerServiceTm1Test {
 	void readsAndSetsLoggerLevels() {
 		List<Logger> loggers = tm1.server().loggers(ODataQuery.none()).collectList().block(WAIT);
 		assertThat(loggers).isNotEmpty();
-		Logger first = loggers.get(0);
+		// Not the first, TM1's root logger: at DEBUG it floods the message log of the
+		// server every test shares, with lines alike to the millisecond
+		Logger first = loggers.stream().filter(l -> "TM1.Blob".equals(l.name())).findFirst().orElseThrow();
 		assertThat(tm1.server().logger(first.name(), ODataQuery.none()).block(WAIT).level()).isEqualTo(first.level());
 		LogLevel other = first.level() == LogLevel.DEBUG ? LogLevel.INFO : LogLevel.DEBUG;
 		tm1.server().setLoggerLevel(first.name(), other).block(WAIT);
