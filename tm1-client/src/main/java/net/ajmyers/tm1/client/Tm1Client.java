@@ -14,7 +14,9 @@ import net.ajmyers.tm1.client.service.cube.CubeService;
 import net.ajmyers.tm1.client.service.cube.ViewService;
 import net.ajmyers.tm1.client.service.data.CellService;
 import net.ajmyers.tm1.client.service.data.CellsetService;
+import net.ajmyers.tm1.client.service.data.ChangeSetService;
 import net.ajmyers.tm1.client.service.data.MemberSetService;
+import net.ajmyers.tm1.client.service.data.SandboxService;
 import net.ajmyers.tm1.client.service.dimension.DimensionService;
 import net.ajmyers.tm1.client.service.dimension.EdgeService;
 import net.ajmyers.tm1.client.service.dimension.ElementService;
@@ -77,6 +79,10 @@ public final class Tm1Client {
 
 	private final MemberSetService memberSets;
 
+	private final SandboxService sandboxes;
+
+	private final ChangeSetService changeSets;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -93,6 +99,8 @@ public final class Tm1Client {
 		this.cellsets = new CellsetService(session);
 		this.cells = new CellService(session);
 		this.memberSets = new MemberSetService(session);
+		this.sandboxes = new SandboxService(session);
+		this.changeSets = new ChangeSetService(session);
 	}
 
 	/**
@@ -231,6 +239,22 @@ public final class Tm1Client {
 	 */
 	public MemberSetService memberSets() {
 		return memberSets;
+	}
+
+	/**
+	 * Sandboxes.
+	 * @return the sandboxe service, on this client's session
+	 */
+	public SandboxService sandboxes() {
+		return sandboxes;
+	}
+
+	/**
+	 * Change sets.
+	 * @return the change set service, on this client's session
+	 */
+	public ChangeSetService changeSets() {
+		return changeSets;
 	}
 
 	/**
