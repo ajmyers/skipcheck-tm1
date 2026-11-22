@@ -28,6 +28,8 @@ import net.ajmyers.tm1.client.service.dimension.SubsetService;
 import net.ajmyers.tm1.client.service.process.ChoreService;
 import net.ajmyers.tm1.client.service.process.ProcessDebugService;
 import net.ajmyers.tm1.client.service.process.ProcessService;
+import net.ajmyers.tm1.client.service.security.GroupService;
+import net.ajmyers.tm1.client.service.security.UserService;
 import net.ajmyers.tm1.client.session.Tm1Session;
 import net.ajmyers.tm1.client.session.Tm1Timeouts;
 import net.ajmyers.tm1.client.version.Tm1Dialect;
@@ -95,6 +97,10 @@ public final class Tm1Client {
 
 	private final ChoreService chores;
 
+	private final UserService users;
+
+	private final GroupService groups;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -117,6 +123,8 @@ public final class Tm1Client {
 		this.processes = new ProcessService(session);
 		this.processDebugging = new ProcessDebugService(session);
 		this.chores = new ChoreService(session);
+		this.users = new UserService(session);
+		this.groups = new GroupService(session);
 	}
 
 	/**
@@ -303,6 +311,22 @@ public final class Tm1Client {
 	 */
 	public ChoreService chores() {
 		return chores;
+	}
+
+	/**
+	 * Users.
+	 * @return the user service, on this client's session
+	 */
+	public UserService users() {
+		return users;
+	}
+
+	/**
+	 * Groups.
+	 * @return the group service, on this client's session
+	 */
+	public GroupService groups() {
+		return groups;
 	}
 
 	/**
