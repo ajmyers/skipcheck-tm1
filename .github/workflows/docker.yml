@@ -22,6 +22,8 @@
 # Adding an image: add an entry to the matrix below.
 #   image:       name under ghcr.io/<owner>/
 #   context:     directory with the Dockerfile (the Docker build context)
+#   file:        optional: the Dockerfile, when it isn't <context>/Dockerfile
+#   smoke-test:  optional: the smoke test, when it isn't <context>/ci-smoke-test.sh
 #   platforms:   target platforms, e.g. linux/amd64,linux/arm64
 #   gradle-task: optional Gradle task to run first, e.g. ":tools:foo:bootJar" for a
 #                Spring Boot tool whose Dockerfile copies build/libs/*.jar
@@ -68,6 +70,13 @@ jobs:
             platforms: linux/amd64   # Cognos Analytics for Linux is x86-64 only
             gradle-task: ''
             publish-var: PUBLISH_DOCKER_COGNOS_SERVER
+          - image: pa-setup
+            context: docker                       # it ships docker/paw/paw-local.sh
+            file: docker/pa-setup/Dockerfile
+            smoke-test: docker/pa-setup/ci-smoke-test.sh
+            platforms: linux/amd64,linux/arm64    # no IBM software: runs natively everywhere
+            gradle-task: ''
+            publish-var: PUBLISH_DOCKER_PA_SETUP
           # Example for a Spring Boot tool (Dockerfile in tools/foo copies build/libs/*.jar):
           # - image: tm1-foo
           #   context: tools/foo
@@ -126,6 +135,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.file || format('{0}/Dockerfile', matrix.context) }}
           platforms: linux/amd64
           load: true
           tags: ${{ matrix.image }}:ci
@@ -135,7 +145,7 @@ jobs:
 
       - name: Smoke test
         run: |
-          script="${{ matrix.context }}/ci-smoke-test.sh"
+          script="${{ matrix.smoke-test || format('{0}/ci-smoke-test.sh', matrix.context) }}"
           if [ -f "$script" ]; then bash "$script" "${{ matrix.image }}:ci"; else echo "No $script, skipping"; fi
 
       - name: Log in to ghcr.io
@@ -151,6 +161,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.file || format('{0}/Dockerfile', matrix.context) }}
           platforms: ${{ matrix.platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}

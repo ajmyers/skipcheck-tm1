@@ -1,0 +1,80 @@
+#!/bin/bash
+# CI smoke test for the pa-setup image (run by .github/workflows/docker.yml). It needs
+# no IBM software and starts nothing: it generates compose projects from example
+# files, checks them with docker compose config, checks the wiring, and checks that
+# bad files fail with a clear message.
+#
+# Usage: ci-smoke-test.sh <image>
+set -euo pipefail
+image=${1:?usage: ci-smoke-test.sh <image>}
+here=$(cd "$(dirname "$0")" && pwd)
+fail() { echo "FAIL: $*" >&2; exit 1; }
+pass() { echo "ok - $*"; }
+
+# 1. Shell scripts pass shellcheck
+if command -v shellcheck >/dev/null; then
+  shellcheck -S warning "$here"/setup.sh "$here"/ci-smoke-test.sh || fail "shellcheck"
+  pass "shellcheck"
+fi
+
+# Runs the tool on a file, in a fresh folder; prints its output (and compose.yaml)
+tool() {  # tool <yaml> <command...>
+  local dir; dir=$(mktemp -d)
+  printf '%s\n' "$1" > "$dir/pa-environment.yaml"; shift
+  docker run --rm -v "$dir:/work" -e PA_HOST_DIR=/host/project -e PA_HOST_HOME=/home/me "$image" "$@" 2>&1 \
+    && { [ ! -f "$dir/compose.yaml" ] || { echo "---"; cat "$dir/compose.yaml"; \
+         docker run --rm -v "$dir:/work" --entrypoint docker "$image" compose -f /work/compose.yaml config -q \
+           || echo "COMPOSE INVALID"; }; }
+}
+
+# 2. The example with everything generates a valid compose project with the wiring
+out=$(tool "$(cat "$here/examples/everything.yaml")" generate) || fail "everything.yaml: $out"
+! grep -q "COMPOSE INVALID" <<<"$out" || fail "everything.yaml: docker compose config refused it: $out"
+for want in "  keycloak:" "  cognos:" "  tm1-admin:" "  planning:" "  reporting:" "  tm1-web:" \
+  "TM1_ADMIN_HOST: tm1-admin" "TM1_CAM_URI: http://cognos:9300" "TM1_CAM_ADMINS: admin" \
+  "TM1_CAM_GROUPS: Admins Analysts Readers" "TM1_SEED: sdata" "COGNOS_KEYCLOAK_URL: http://keycloak:8080" \
+  "KC_HOSTNAME: http://localhost:8180" "/home/me/Downloads/ibm:/ibm:ro" "/host/project/pa-files/planning/data:/tm1/data" \
+  "8011:8010" "condition: service_healthy"; do
+  grep -qF -- "$want" <<<"$out" || fail "everything.yaml: compose.yaml lacks '$want': $out"
+done
+pass "examples/everything.yaml generates a valid, fully wired compose project"
+
+# 3. One server: its own Admin Server, no CAM
+out=$(tool $'version: 1\nibm: ./ibm\ntm1: {servers: {tm1: {}}}' generate) || fail "one server: $out"
+! grep -q "COMPOSE INVALID" <<<"$out" || fail "one server: invalid compose: $out"
+grep -qF "/host/project/ibm:/ibm:ro" <<<"$out" || fail "one server: ibm not resolved against the folder: $out"
+! grep -q "tm1-admin\|TM1_CAM" <<<"$out" || fail "one server: unexpected Admin Server or CAM: $out"
+pass "one server uses its own Admin Server"
+
+# 4. urls lists every service with its login
+out=$(tool "$(cat "$here/examples/everything.yaml")" urls) || fail "urls: $out"
+for want in "http://localhost:8010/api/v1/" "http://localhost:9510/tm1web/" "http://localhost:9300/bi/" \
+  "http://localhost:8180/" "namespace LDAP: admin, analyst, viewer"; do
+  grep -qF -- "$want" <<<"$out" || fail "urls lacks '$want': $out"
+done
+pass "urls lists every service"
+
+# 5. Bad files fail with exit 2 and say what's wrong
+check_error() {  # check_error <yaml> <expected message>
+  local rc=0 out
+  out=$(tool "$1" generate) || rc=$?
+  [ "$rc" -eq 2 ] && grep -qF -- "$2" <<<"$out" || fail "expected exit 2 and '$2', got $rc: $out"
+}
+check_error $'version: 2' "version: must be 1"
+check_error $'version: 1\ntm1: {servers: {tm1: {prot: 1}}}' "unknown setting(s) prot"
+check_error $'version: 1\ntm1: {servers: {a: {port: 8010}, b: {port: 8010}}}' "port 8010 is used twice"
+check_error $'version: 1\ntm1: {servers: {tm1: {}}}\ncognos: {users: [bad user:pw]}' "user name"
+check_error $'version: 1\ntm1: {servers: {tm1: {}}}\ncognos: {users: ["a:p"], cam: {namespace: oidc}}' "oidc needs cognos.oidc"
+check_error $'version: 1\ntm1: {servers: {tm1: {}}}\ncognos: {users: ["a:p"], cam: {admins: [b]}}' "b isn't one of cognos.users"
+check_error $'version: 1\nibm: ./ibm\ntm1: {servers: {tm1: {}}}\npaw: {}' "paw.acceptLicense"
+check_error $'version: 1\ntm1Web: true' "tm1Web: needs a TM1 server"
+check_error $'version: 1' "nothing to run"
+pass "bad files fail with a clear message"
+
+# 6. init writes a starting file that generates
+dir=$(mktemp -d)
+docker run --rm -v "$dir:/work" "$image" init >/dev/null || fail "init failed"
+docker run --rm -v "$dir:/work" -e PA_HOST_DIR=/host/p "$image" generate >/dev/null || fail "init's file doesn't generate"
+pass "init writes a file that generates"
+
+echo "All smoke tests passed."

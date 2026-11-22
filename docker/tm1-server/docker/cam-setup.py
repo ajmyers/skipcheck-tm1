@@ -11,7 +11,8 @@ there. Environment:
   TM1_CAM_GROUPS     Cognos groups to add to TM1, so their members get them at logon
   TM1_CAM_NAMESPACE  the Cognos namespace ID (default LDAP)
   TM1_CAM_NAMESPACE_TYPE  ldap (default) or oidc: how short names become CAMIDs
-  TM1_NATIVE_ADMIN_PASSWORD   password of TM1's native Admin (default: none)
+  TM1_NATIVE_ADMIN_PASSWORD   password of TM1's native Admin (default: tries none,
+                     then "apple", the password of the image's seeds such as SData)
 
 Entries are separated by spaces or commas. A short name assumes cognos-server's
 namespaces: LDAP (users uid=<name>,ou=people; groups cn=<name>,ou=groups) or OIDC
@@ -64,7 +65,15 @@ if sys.argv[1:] == ["--print"]:
     sys.exit(0)
 
 base = sys.argv[1].rstrip("/") + "/api/v1/"
-auth = "Basic " + base64.b64encode(f"Admin:{os.environ.get('TM1_NATIVE_ADMIN_PASSWORD', '')}".encode()).decode()
+given = os.environ.get("TM1_NATIVE_ADMIN_PASSWORD")
+passwords = [given] if given is not None else ["", "apple"]
+
+
+def basic(password):
+    return "Basic " + base64.b64encode(f"Admin:{password}".encode()).decode()
+
+
+auth = basic(passwords[0])
 opener = urllib.request.build_opener(
     urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
     urllib.request.HTTPSHandler(context=ssl._create_unverified_context()))
@@ -85,6 +94,8 @@ def call(method, path, body=None):
             return 404
         if e.code == 503:
             raise NotReady() from e
+        if e.code == 401:
+            raise Refused() from e
         raise SystemExit(f"{method} {path} failed: HTTP {e.code} {e.read()[:300].decode(errors='replace')}")
 
 
@@ -92,14 +103,31 @@ def key(collection, name):
     return f"{collection}('{urllib.parse.quote(name.replace(chr(39), chr(39) * 2), safe='')}')"
 
 
-for _ in range(120):
-    try:
-        call("GET", "Configuration/ProductVersion")
-        break
-    except (NotReady, urllib.error.URLError, ConnectionError, OSError):
+class Refused(Exception):
+    pass
+
+
+def ready():
+    """Waits for TM1, logging on as the native Admin with the first password that works."""
+    global auth
+    for _ in range(120):
+        for password in passwords:
+            auth = basic(password)
+            try:
+                call("GET", "Configuration/ProductVersion")
+                return
+            except Refused:
+                continue
+            except (NotReady, urllib.error.URLError, ConnectionError, OSError):
+                break
+        else:
+            sys.exit("TM1's native Admin refused the CAM setup's logon. If the database's Admin has a "
+                     "password, set TM1_NATIVE_ADMIN_PASSWORD.")
         time.sleep(1)
-else:
     sys.exit("TM1 didn't come up for the CAM setup")
+
+
+ready()
 
 for g in groups:
     if call("GET", key("Groups", g)) == 404:
