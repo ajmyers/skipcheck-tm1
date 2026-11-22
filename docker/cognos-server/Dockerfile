@@ -48,7 +48,7 @@ COPY docker/install-cognos.sh /usr/local/bin/cognos-install
 COPY docker/embedded-postgres.sh /usr/local/bin/cognos-postgres
 COPY docker/embedded-ldap.sh /usr/local/bin/cognos-ldap
 COPY docker/healthcheck.sh /usr/local/bin/cognos-healthcheck
-COPY docker/unpack-cognos.py docker/configure-cognos.py docker/users.py docker/banner.txt /usr/local/lib/cognos-server/
+COPY docker/unpack-cognos.py docker/configure-cognos.py docker/users.py docker/keycloak-setup.py docker/banner.txt /usr/local/lib/cognos-server/
 RUN chmod 755 /usr/local/bin/cognos-*
 
 # Deliberately no VOLUME: unmounted paths stay in the container and go away with it.

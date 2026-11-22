@@ -27,6 +27,14 @@
 #   With users, an LDAP directory runs in the container, Cognos gets a namespace
 #   (COGNOS_NAMESPACE, default LDAP) and anonymous access is off (COGNOS_ANONYMOUS).
 #
+# OIDC (a second namespace, for interactive and token logons):
+#   COGNOS_KEYCLOAK_URL   a Keycloak, as this container reaches it (e.g. http://keycloak:8080):
+#                         a realm is built there from the users, and an OIDC namespace
+#                         (COGNOS_OIDC_NAMESPACE, default OIDC) points at it
+#   COGNOS_OIDC_DISCOVERY_URL, COGNOS_OIDC_CLIENT_ID, COGNOS_OIDC_CLIENT_SECRET
+#                         or any OIDC provider, configured by hand
+#   COGNOS_PUBLIC_URL     Cognos as browsers reach it (default http://localhost:9300)
+#
 # Other environment:
 #   COGNOS_HOST           host name in the dispatcher URIs (default: the container's
 #                         hostname). Others on the Docker network reach Cognos by it.
@@ -125,6 +133,13 @@ if [ -n "${COGNOS_USERS:-}" ] || [ -n "${COGNOS_USERS_FILE:-}" ]; then
   EMBEDDED_LDAP=T
   while IFS='=' read -r key value; do export "$key=$value"; done <<<"$ldap_env"
   log "Users log on through namespace ${COGNOS_NAMESPACE:-LDAP}; anonymous access $([ "${COGNOS_ANONYMOUS:-F}" = T ] && echo on || echo off)"
+fi
+if [ -n "${COGNOS_KEYCLOAK_URL:-}" ]; then
+  oidc_env=$(python3 /usr/local/lib/cognos-server/keycloak-setup.py) || { stop_pg; die "couldn't set up the Keycloak realm"; }
+  while IFS='=' read -r key value; do export "$key=$value"; done <<<"$oidc_env"
+fi
+if [ -n "${COGNOS_OIDC_DISCOVERY_URL:-}" ]; then
+  log "OIDC namespace ${COGNOS_OIDC_NAMESPACE:-OIDC} against ${COGNOS_OIDC_DISCOVERY_URL%%/.well-known*}; browsers return to ${COGNOS_PUBLIC_URL:-http://localhost:9300}"
 fi
 
 # ---- configuration --------------------------------------------------------------
