@@ -32,8 +32,6 @@ Action Entry/Move
 Action GitPullPlan/Execute
 Action GitPushPlan/Execute
 Action Hierarchy/CreateSessionSubset
-Action Hierarchy/SaveAs
-Action Hierarchy/SetElement
 Action MDXView/Execute
 Action NativeView/Execute
 Action Process/Compile
@@ -114,7 +112,6 @@ EntitySet TransactionLogEntries
 EntitySet Users
 Function Cellset/GetPartition
 Function Cube/DimensionsStorageOrder
-Function Hierarchy/RootMembers
 FunctionImport ControlCubes
 FunctionImport ControlDimensions
 FunctionImport GetOIDCKeys
@@ -161,8 +158,6 @@ Navigation CubeReference/Cube
 Navigation CubeUpdate/ReferenceCell
 Navigation CubeUpdate/ReferenceCube
 Navigation CubeUpdate/Tuple
-Navigation Dimension/DefaultHierarchy
-Navigation Dimension/Hierarchies
 Navigation Dimension/HierarchyAttributes
 Navigation Dimension/LocalizedAttributes
 Navigation DimensionReference/Dimension
@@ -182,9 +177,6 @@ Navigation FedCellDescriptor/Tuple
 Navigation Folder/Contents
 Navigation Folder/PrivateContents
 Navigation Group/Users
-Navigation Hierarchy/AllMember
-Navigation Hierarchy/DefaultMember
-Navigation Hierarchy/Dimension
 Navigation Hierarchy/Edges
 Navigation Hierarchy/ElementAttributes
 Navigation Hierarchy/Elements

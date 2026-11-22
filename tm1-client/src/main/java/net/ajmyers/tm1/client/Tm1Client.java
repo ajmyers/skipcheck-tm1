@@ -9,6 +9,7 @@ import io.micrometer.observation.ObservationRegistry;
 import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
 import net.ajmyers.tm1.client.service.dimension.DimensionService;
+import net.ajmyers.tm1.client.service.dimension.HierarchyService;
 import net.ajmyers.tm1.client.session.Tm1Session;
 import net.ajmyers.tm1.client.session.Tm1Timeouts;
 import net.ajmyers.tm1.client.version.Tm1Dialect;
@@ -38,9 +39,12 @@ public final class Tm1Client {
 
 	private final DimensionService dimensions;
 
+	private final HierarchyService hierarchies;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
+		this.hierarchies = new HierarchyService(session);
 	}
 
 	/**
@@ -75,6 +79,14 @@ public final class Tm1Client {
 	 */
 	public DimensionService dimensions() {
 		return dimensions;
+	}
+
+	/**
+	 * Hierarchies.
+	 * @return the hierarchie service, on this client's session
+	 */
+	public HierarchyService hierarchies() {
+		return hierarchies;
 	}
 
 	/**
