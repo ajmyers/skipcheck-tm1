@@ -1,15 +1,6 @@
 # Endpoints not implemented yet. This list only shrinks: implementing an endpoint means
 # taking it off. A new $metadata snapshot's new endpoints go here or in coverage-excluded.txt.
 # See CoverageGateTest.
-ActionImport ConfigureEncryptionAtRest
-ActionImport DecryptDataFile
-ActionImport DecryptDataModel
-ActionImport DisableEncryptionAtRest
-ActionImport EncryptDataFile
-ActionImport EncryptDataModel
 ActionImport RemoveOIDCKeyFromCache
-ActionImport RotateDataEncryptionKey
-ActionImport RotateDataModelKey
 EntitySet SQLDataSources
 FunctionImport GetOIDCKeys
-FunctionImport ValidateEncryptionAtRestSettings
