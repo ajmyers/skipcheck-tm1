@@ -18,6 +18,7 @@ from typing import Any, Iterable, Mapping, Sequence
 __all__ = [
     "Alias",
     "Bind",
+    "element",
     "ODataPath",
     "ODataQuery",
     "Raw",
@@ -264,6 +265,14 @@ class Bind:
 
     def __hash__(self) -> int:
         return hash(str(self))
+
+
+def element(dimension: str, element: str, hierarchy: str | None = None) -> Bind:
+    """A reference to an element, for a cell's ``Tuple`` or an operation's element parameter:
+    ``Dimensions('d')/Hierarchies('h')/Elements('e')``, the hierarchy defaulting to the
+    dimension's own."""
+    path = ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(hierarchy or dimension)
+    return Bind(path.nav("Elements").key(element))
 
 
 def _names(items: str | Iterable[str] | None) -> list[str]:

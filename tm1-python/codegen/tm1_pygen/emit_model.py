@@ -125,7 +125,7 @@ def emit(spec: Spec) -> str:
         if e["kind"] == "Navigation" and e["ownerKind"] == "complex":
             owner = spec.type_by_name[e["owner"]]
             fname = field_names(spec, owner)[("n", e["name"])]
-            out.append(f'register_endpoint("{e["id"]}", "{owner["name"]}.{fname} ($expand)")')
+            out.append(f'register_endpoint("{e["id"]}", "tm1_client._generated.model.{owner["name"]}.{fname} ($expand)")')
     out.append("")
     return "\n".join(out)
 

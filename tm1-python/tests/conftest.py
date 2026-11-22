@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -10,11 +13,13 @@ import httpx
 import pytest
 
 from tm1_client import Tm1Client, Tm1Session, auth
+from tm1_client.aio import AsyncTm1Client, AsyncTm1Session
 
 REPO = Path(__file__).resolve().parents[2]
 SPEC = REPO / "spec" / "tm1-api.json"
 CONFORMANCE = REPO / "spec" / "conformance"
 PAYLOADS = REPO / "tm1-client" / "src" / "test" / "resources" / "payloads"
+SNAPSHOT = REPO / "tm1-client" / "src" / "model" / "metadata" / "tm1-schema-11.8.35.xml"
 BASE = "http://tm1:8010/api/v1/"
 
 
@@ -24,12 +29,15 @@ def spec() -> dict[str, Any]:
 
 
 class FakeTm1:
-    """Answers logins with a session cookie, records every other request, and answers it with
-    ``respond(request)`` (a JSON body, or an httpx.Response)."""
+    """Answers logins with a session cookie and ``$metadata`` with the snapshot (or what it's
+    given), records every other request, and answers it with ``respond(request)`` (a JSON
+    body, text, ``None`` for 204, or an httpx.Response)."""
 
-    def __init__(self) -> None:
+    def __init__(self, metadata: bytes | None = None) -> None:
         self.requests: list[httpx.Request] = []
         self.logins = 0
+        self.metadata_reads = 0
+        self.metadata = SNAPSHOT.read_bytes() if metadata is None else metadata
         self.respond: Callable[[httpx.Request], Any] = lambda request: {}
 
     def handler(self, request: httpx.Request) -> httpx.Response:
@@ -39,6 +47,9 @@ class FakeTm1:
             return httpx.Response(
                 200, json={"ID": self.logins}, headers={"Set-Cookie": f"TM1SessionId=s{self.logins}; Path=/api/; HttpOnly"}
             )
+        if path == "/api/v1/$metadata":
+            self.metadata_reads += 1
+            return httpx.Response(200, content=self.metadata, headers={"Content-Type": "application/xml"})
         self.requests.append(request)
         answer = self.respond(request)
         if isinstance(answer, httpx.Response):
@@ -74,3 +85,33 @@ def session(fake: FakeTm1) -> Tm1Session:
 @pytest.fixture
 def client(session: Tm1Session) -> Tm1Client:
     return Tm1Client(session)
+
+
+@dataclass
+class Api:
+    """A client of either flavor, and ``run``, which gives what a call returns: at once for the
+    sync client, by running the coroutine for the asyncio one."""
+
+    flavor: str
+    client: Any
+    loop: asyncio.AbstractEventLoop | None
+
+    def run(self, value: Any) -> Any:
+        if inspect.isawaitable(value):
+            assert self.loop is not None, "a sync client returned an awaitable"
+            return self.loop.run_until_complete(value)
+        assert self.loop is None, "an asyncio client returned a plain value"
+        return value
+
+
+@pytest.fixture(params=["sync", "async"])
+def api(request: pytest.FixtureRequest, fake: FakeTm1) -> Any:
+    """The generated API in each flavor, over the same fake TM1."""
+    if request.param == "sync":
+        yield Api("sync", Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=httpx.Client(transport=httpx.MockTransport(fake.handler)))), None)
+        return
+    loop = asyncio.new_event_loop()
+    http = httpx.AsyncClient(transport=httpx.MockTransport(fake.handler))
+    yield Api("async", AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http)), loop)
+    loop.run_until_complete(http.aclose())
+    loop.close()

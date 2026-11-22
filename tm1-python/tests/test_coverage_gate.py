@@ -3,13 +3,16 @@ endpoint of the spec (spec/tm1-api.json) is implemented, excluded with a reason,
 
 Every client in the repository runs this gate against the same inventory, so "full coverage"
 means the same thing in each. Implemented is what ``@endpoint`` (and the generated API,
-which uses it) registers. A summary goes to build/tm1-coverage.txt.
+which uses it) registers, counted for the sync and the asyncio flavor separately. Summaries
+go to build/tm1-coverage-<flavor>.txt.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from tm1_client.resources import implemented_endpoints
 
@@ -37,9 +40,11 @@ def excluded() -> dict[str, str]:
     return out
 
 
-def test_every_endpoint_is_accounted_for(spec: dict[str, Any]) -> None:
+@pytest.mark.parametrize("flavor", ["sync", "async"])
+def test_every_endpoint_is_accounted_for(spec: dict[str, Any], flavor: str) -> None:
+    """Each flavor separately: the asyncio API is held to the same inventory as the sync one."""
     endpoints = {e["id"] for e in spec["endpoints"]}
-    implemented = set(implemented_endpoints())
+    implemented = set(implemented_endpoints(flavor))
     skip = excluded()
     pending = lines(PENDING)
 
@@ -55,10 +60,10 @@ def test_every_endpoint_is_accounted_for(spec: dict[str, Any]) -> None:
     assert not (set(pending) & set(skip)), "endpoints both pending and excluded"
     assert len(pending) == len(set(pending)), f"duplicate lines in {PENDING.name}"
 
-    report = ROOT / "build" / "tm1-coverage.txt"
+    report = ROOT / "build" / f"tm1-coverage-{flavor}.txt"
     report.parent.mkdir(exist_ok=True)
     report.write_text(
-        f"TM1 REST API coverage (Python), schema {spec['source']['schemaVersion']}\n\n"
+        f"TM1 REST API coverage (Python, {flavor}), schema {spec['source']['schemaVersion']}\n\n"
         f"Endpoints:   {len(endpoints)}\nImplemented: {len(implemented & endpoints)}\n"
         f"Excluded:    {len(skip)}\nPending:     {len(pending)}\n",
         encoding="utf-8",

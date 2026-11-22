@@ -32,9 +32,9 @@ Every client has a coverage gate over this list. An endpoint is implemented, exc
 | Client | Gate | Lists | Implemented |
 |---|---|---|---|
 | Java | `tm1-client` `CoverageGateTest` | `tm1-client/src/test/resources/metadata/coverage-*.txt` | 240 (2 excluded as duplicates) |
-| Python | `tm1-python/tests/test_coverage_gate.py` | `tm1-python/coverage/*.txt` | 242 |
+| Python (sync and asyncio, counted separately) | `tm1-python/tests/test_coverage_gate.py` | `tm1-python/coverage/*.txt` | 242 each |
 
-Python also runs `test_contract.py`, which works out a route from the root to every endpoint from the spec alone, calls it through the generated API against a fake server, and checks the request it sends.
+Python also runs `test_contract.py`, which works out a route from the root to every endpoint from the spec alone, calls it through both generated APIs against a fake server, and checks the request each sends. And it reads the `$metadata` snapshot itself, as a server's capabilities, into exactly the spec's 242 IDs.
 
 ## Adding a language
 

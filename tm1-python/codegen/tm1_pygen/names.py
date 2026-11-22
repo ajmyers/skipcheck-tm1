@@ -54,7 +54,9 @@ def snake(name: str) -> str:
     s = re.sub(r"[^A-Za-z0-9_]", "_", s).lower()
     if s[0].isdigit():
         s = "_" + s
-    if keyword.iskeyword(s) or keyword.issoftkeyword(s):
+    # Soft keywords (match, case, type) are identifiers; only hard ones are renamed, so the
+    # output is the same on every Python version
+    if keyword.iskeyword(s):
         s += "_"
     return s
 

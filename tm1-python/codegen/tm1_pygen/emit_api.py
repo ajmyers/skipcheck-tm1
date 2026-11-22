@@ -11,6 +11,19 @@ from .docs import docstring, md, revisions
 from .emit_model import python_type
 from .spec import Spec
 
+# The flavor being emitted: "sync" (api.py) or "async" (aio_api.py). The two differ only in
+# how operations and media methods are declared and called; navigation stays a property.
+_FLAVOR = "sync"
+
+
+def _def() -> str:
+    return "async def" if _FLAVOR == "async" else "def"
+
+
+def _await() -> str:
+    return "await " if _FLAVOR == "async" else ""
+
+
 class _Index:
     """What the generated members are called, for index.py."""
 
@@ -102,7 +115,7 @@ def _operation(spec: Spec, op: dict[str, Any], endpoint_id: str, method: str, in
             signature.append("*")
         signature.append("query: ODataQuery | None = None")
         signature.append("**options: Any")
-    out = ["", f"    @endpoint({endpoint_id!r})", f"    def {method}({', '.join(signature)}) -> {annotation}:"]
+    out = ["", f"    @endpoint({endpoint_id!r})", f"    {_def()} {method}({', '.join(signature)}) -> {annotation}:"]
     kind = "action" if op["kind"] == "action" else "function"
     verb = "POST" if kind == "action" else "GET"
     head = f"``{verb} …/{call_name}``" if op["bound"] else f"``{verb} {call_name}``"
@@ -117,9 +130,15 @@ def _operation(spec: Spec, op: dict[str, Any], endpoint_id: str, method: str, in
     out.extend(docstring(doc, "        "))
     args = "{" + ", ".join(f"{p['name']!r}: {pname}" for pname, p in params) + "}"
     method_name = "_action" if kind == "action" else "_function"
-    query = ", _r.query_of(query, options)" if takes_query else ""
-    out.append(f"        return self.{method_name}({call_name!r}, {args}, {returns}{query})")
+    query = ", _r.query_of(query, options)" if takes_query else ", None"
+    out.append(f"        return {_await()}self.{method_name}({call_name!r}, {args}, {returns}{query}, {endpoint_id!r})")
     return out
+
+
+def _free(name: str, suffix: str, taken: set[str]) -> str:
+    """``name``, or with ``suffix`` when a base class has it: the bound action ``Update`` is
+    ``update_action``, as ``update`` is the generic PATCH; a navigation ``Session``, ``session_``."""
+    return name + suffix if name in taken else name
 
 
 def _member_names(spec: Spec, t: dict[str, Any]) -> dict[str, str]:
@@ -129,9 +148,9 @@ def _member_names(spec: Spec, t: dict[str, Any]) -> dict[str, str]:
     out: dict[str, str] = {}
     for level in spec.chain(t):
         for n in level["navigationProperties"]:
-            out[f"nav:{n['name']}"] = names.unique(names.snake(n["name"]), taken)
+            out[f"nav:{n['name']}"] = names.unique(_free(names.snake(n["name"]), "_", taken), taken)
         for op in spec.bound_to(level["qualifiedName"]):
-            out[f"op:{op['endpoint']}"] = names.unique(names.snake(op["name"]), taken)
+            out[f"op:{op['endpoint']}"] = names.unique(_free(names.snake(op["name"]), "_" + op["kind"], taken), taken)
         for d in spec.derived(level):
             out[f"cast:{d['qualifiedName']}"] = names.unique("as_" + names.snake(d["name"]), taken)
         if level.get("hasStream"):
@@ -193,23 +212,23 @@ def _entity_class(spec: Spec, t: dict[str, Any], index: _Index) -> list[str]:
         out.append(f"        return {names.entity_class(d['name'])}(self._session, self._path.cast({alias!r}), self._forbidden)")
     if t.get("hasStream"):
         out.append("")
-        out.append(f"    def {members['media:read']}(self) -> bytes:")
+        out.append(f"    {_def()} {members['media:read']}(self) -> bytes:")
         out.extend(docstring("``GET …/$value``: the entity's media content.", "        "))
-        out.append("        return self._read_stream(None)")
+        out.append(f"        return {_await()}self._read_stream(None)")
         out.append("")
-        out.append(f"    def {members['media:write']}(self, data: bytes, content_type: str = \"application/octet-stream\") -> None:")
+        out.append(f"    {_def()} {members['media:write']}(self, data: bytes, content_type: str = \"application/octet-stream\") -> None:")
         out.extend(docstring("``PUT …/$value``: replaces the entity's media content.", "        "))
-        out.append("        self._write_stream(None, data, content_type)")
+        out.append(f"        {_await()}self._write_stream(None, data, content_type)")
     for p in t["properties"]:
         if p["type"] == "Edm.Stream":
             out.append("")
-            out.append(f"    def {members['stream-read:' + p['name']]}(self) -> bytes:")
+            out.append(f"    {_def()} {members['stream-read:' + p['name']]}(self) -> bytes:")
             out.extend(docstring(f"``GET …/{p['name']}/$value``" + (": " + p["description"] if p.get("description") else "."), "        "))
-            out.append(f"        return self._read_stream({p['name']!r})")
+            out.append(f"        return {_await()}self._read_stream({p['name']!r})")
             out.append("")
-            out.append(f"    def {members['stream-write:' + p['name']]}(self, data: bytes, content_type: str = \"application/octet-stream\") -> None:")
+            out.append(f"    {_def()} {members['stream-write:' + p['name']]}(self, data: bytes, content_type: str = \"application/octet-stream\") -> None:")
             out.extend(docstring(f"``PUT …/{p['name']}/$value``: replaces it.", "        "))
-            out.append(f"        self._write_stream({p['name']!r}, data, content_type)")
+            out.append(f"        {_await()}self._write_stream({p['name']!r}, data, content_type)")
     return out
 
 
@@ -273,17 +292,30 @@ def _root(spec: Spec, index: _Index) -> list[str]:
     for kind, i in sorted(imports, key=lambda k: k[1]["name"]):
         endpoint_id = f"{kind} {i['name']}"
         op = spec.unbound_operation[i["operation"]]
-        name = names.unique(names.snake(i["name"]), taken)
+        name = names.unique(_free(names.snake(i["name"]), "_" + op["kind"], taken), taken)
         index.operations[endpoint_id] = ("Tm1Api", name)
         out.extend(_operation(spec, op, endpoint_id, name, index, i["name"]))
     return out
 
 
-def emit(spec: Spec) -> tuple[str, str]:
+def emit(spec: Spec, flavor: str = "sync") -> tuple[str, str]:
+    """The API module of a flavor, ``sync`` or ``async``, and the index (the same for both)."""
+    global _FLAVOR
+    if flavor not in ("sync", "async"):
+        raise ValueError(flavor)
+    _FLAVOR = flavor
+    try:
+        return _emit(spec)
+    finally:
+        _FLAVOR = "sync"
+
+
+def _emit(spec: Spec) -> tuple[str, str]:
     index = _Index()
+    asyncio = _FLAVOR == "async"
     out = [
-        f'"""The TM1 REST API (schema {spec.schema_version}) as resources, generated from spec/tm1-api.json by',
-        "tm1_pygen: don't edit.",
+        f'"""The TM1 REST API (schema {spec.schema_version}) as {"asyncio " if asyncio else ""}resources, generated from',
+        "spec/tm1-api.json by tm1_pygen: don't edit.",
         '"""',
         "",
         "from __future__ import annotations",
@@ -293,10 +325,10 @@ def emit(spec: Spec) -> tuple[str, str]:
         "from typing import Any",
         "from uuid import UUID",
         "",
-        "from .. import resources as _r",
+        "from ..aio import resources as _r" if asyncio else "from .. import resources as _r",
         "from ..odata import Bind, ODataPath, ODataQuery",
         "from ..resources import endpoint",
-        "from ..session import Tm1Session",
+        "from ..aio.session import AsyncTm1Session as Tm1Session" if asyncio else "from ..session import Tm1Session",
         "from . import model as m",
         "",
         '__all__ = ["Tm1Api"]',
@@ -337,6 +369,13 @@ def _index(spec: Spec, index: _Index) -> str:
     out += block("CASTS", index.casts, "The cast method, by (type, derived type).")
     out += block("OPERATIONS", index.operations, "The (class, method) for each operation, by endpoint ID.")
     out += block("PARAMETERS", index.parameters, "Each operation's parameters' Python names, by TM1's, by endpoint ID.")
+    since = {o["endpoint"]: o["since"] for o in spec.operations if o["bound"] and o.get("since")}
+    for kind, key in (("ActionImport", "actionImports"), ("FunctionImport", "functionImports")):
+        for i in spec.container[key]:
+            op = spec.unbound_operation[i["operation"]]
+            if op.get("since"):
+                since[f"{kind} {i['name']}"] = op["since"]
+    out += block("SINCE", since, "The schema version each operation was added in, by endpoint ID.")
     out += block("ENTITY_CLASSES", index.entity_classes, "The resource class for each entity type.")
     out += block("COLLECTION_CLASSES", index.collection_classes, "The collection class for each entity type.")
     return "\n".join(out)

@@ -20,10 +20,10 @@ from typing import Any
 import httpx
 import pytest
 
-from tm1_client import Bind, Tm1Client
+from tm1_client import Bind
 from tm1_client._generated import index, model
 
-from .conftest import SPEC, FakeTm1, target
+from .conftest import SPEC, Api, FakeTm1, target
 
 DOC = json.loads(SPEC.read_text(encoding="utf-8"))
 TYPES = {t["qualifiedName"]: t for t in DOC["types"]}
@@ -198,7 +198,7 @@ def endpoint_ids(kind: str) -> list[str]:
     return [e["id"] for e in DOC["endpoints"] if e["kind"] == kind]
 
 
-def call(client: Tm1Client, owner: Any, method: str, op: dict[str, Any], endpoint_id: str) -> dict[str, Any]:
+def call(api: Api, owner: Any, method: str, op: dict[str, Any], endpoint_id: str) -> dict[str, Any]:
     names = index.PARAMETERS[endpoint_id]
     kwargs, expected = {}, {}
     for p in op["parameters"]:
@@ -207,36 +207,36 @@ def call(client: Tm1Client, owner: Any, method: str, op: dict[str, Any], endpoin
         value, json_value = sample(p)
         kwargs[names[p["name"]]] = value
         expected[p["name"]] = json_value
-    getattr(owner, method)(**kwargs)
+    api.run(getattr(owner, method)(**kwargs))
     return expected
 
 
 @pytest.mark.parametrize("endpoint_id", endpoint_ids("EntitySet"))
-def test_entity_set(endpoint_id: str, client: Tm1Client, fake: FakeTm1) -> None:
+def test_entity_set(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
     name = endpoint_id.split(" ", 1)[1]
-    collection = getattr(client, index.ENTITY_SETS[name])
+    collection = getattr(api.client, index.ENTITY_SETS[name])
     fake.respond = lambda r: {"value": []}
-    assert collection.list() == []
+    assert api.run(collection.list()) == []
     assert target(fake.last) == f"GET {name}"
     fake.respond = lambda r: {}
     entity_set = next(s for s in DOC["container"]["entitySets"] if s["name"] == name)
     key, text = key_of(TYPES[entity_set["entityType"]])
-    collection[key].get()
+    api.run(collection[key].get())
     assert target(fake.last) == f"GET {name}{text}"
     fake.respond = lambda r: "7"
-    assert collection.count() == 7
+    assert api.run(collection.count()) == 7
     assert target(fake.last) == f"GET {name}/$count"
 
 
 @pytest.mark.parametrize("endpoint_id", endpoint_ids("Singleton"))
-def test_singleton(endpoint_id: str, client: Tm1Client, fake: FakeTm1) -> None:
+def test_singleton(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
     name = endpoint_id.split(" ", 1)[1]
-    getattr(client, index.SINGLETONS[name]).get(select="ID")
+    api.run(getattr(api.client, index.SINGLETONS[name]).get(select="ID"))
     assert target(fake.last) == f"GET {name}?$select=ID"
 
 
 @pytest.mark.parametrize("endpoint_id", endpoint_ids("Navigation"))
-def test_navigation(endpoint_id: str, client: Tm1Client, fake: FakeTm1) -> None:
+def test_navigation(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
     e = next(x for x in DOC["endpoints"] if x["id"] == endpoint_id)
     owner = TYPES[e["owner"]]
     nav = next(n for n in owner["navigationProperties"] if n["name"] == e["name"])
@@ -248,38 +248,38 @@ def test_navigation(endpoint_id: str, client: Tm1Client, fake: FakeTm1) -> None:
         assert getattr(value, field) is not None
         return
     route = ROUTES[e["owner"]]
-    resource = getattr(route.walk(client), index.NAVIGATION[(e["owner"], e["name"])])
+    resource = getattr(route.walk(api.client), index.NAVIGATION[(e["owner"], e["name"])])
     if nav["collection"]:
         fake.respond = lambda r: {"value": []}
-        resource.list()
+        api.run(resource.list())
     else:
         fake.respond = lambda r: {}
-        resource.get()
+        api.run(resource.get())
     assert target(fake.last) == f"GET {route.path}/{e['name']}"
 
 
 @pytest.mark.parametrize("endpoint_id", endpoint_ids("Action") + endpoint_ids("Function"))
-def test_bound_operation(endpoint_id: str, client: Tm1Client, fake: FakeTm1) -> None:
+def test_bound_operation(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
     op = OPERATIONS[endpoint_id]
     binding = op["binding"]
     assert not binding["collection"], "no TM1 operation is bound to a collection yet: route one here"
     route = ROUTES[binding["type"]]
     cls_name, method = index.OPERATIONS[endpoint_id]
-    owner = route.walk(client)
+    owner = route.walk(api.client)
     assert type(owner).__name__ == cls_name or cls_name in [c.__name__ for c in type(owner).__mro__]
     fake.respond = lambda r: respond_for(op["returns"])
-    expected = call(client, owner, method, op, endpoint_id)
+    expected = call(api, owner, method, op, endpoint_id)
     check_operation(fake.last, op, route.path + "/" + op["pathName"], expected)
 
 
 @pytest.mark.parametrize("endpoint_id", endpoint_ids("ActionImport") + endpoint_ids("FunctionImport"))
-def test_unbound_operation(endpoint_id: str, client: Tm1Client, fake: FakeTm1) -> None:
+def test_unbound_operation(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
     e = next(x for x in DOC["endpoints"] if x["id"] == endpoint_id)
     op = UNBOUND[e["operation"]]
     cls_name, method = index.OPERATIONS[endpoint_id]
     assert cls_name == "Tm1Api"
     fake.respond = lambda r: respond_for(op["returns"])
-    expected = call(client, client, method, op, endpoint_id)
+    expected = call(api, api.client, method, op, endpoint_id)
     check_operation(fake.last, op, e["name"], expected)
 
 

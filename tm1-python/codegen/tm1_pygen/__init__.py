@@ -14,11 +14,10 @@ from .spec import Spec
 
 __all__ = ["generate"]
 
-_INIT = '''"""Generated from spec/tm1-api.json by tm1_pygen: don't edit, don't commit."""
+_INIT = '''"""Generated from spec/tm1-api.json by tm1_pygen: don't edit, don't commit.
 
-from . import api, index, model
-
-__all__ = ["api", "index", "model"]
+``model``, ``api`` (sync), ``aio_api`` (asyncio) and ``index``; import the one you need.
+"""
 '''
 
 
@@ -29,11 +28,13 @@ def generate(spec_path: str | Path, package_dir: str | Path) -> list[Path]:
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob("*.py"):
         old.unlink()
-    api, index = emit_api.emit(spec)
+    api, index = emit_api.emit(spec, "sync")
+    aio_api, _ = emit_api.emit(spec, "async")
     files = {
         "__init__.py": _INIT,
         "model.py": emit_model.emit(spec),
         "api.py": api,
+        "aio_api.py": aio_api,
         "index.py": index,
     }
     written = []
