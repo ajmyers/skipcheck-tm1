@@ -1,15 +1,21 @@
 package net.ajmyers.tm1.client.service.cube;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import net.ajmyers.tm1.client.Tm1Operation;
 import net.ajmyers.tm1.client.Tm1Request;
+import net.ajmyers.tm1.client.model.CalculationComponent;
+import net.ajmyers.tm1.client.model.CheckFeedersSelection;
 import net.ajmyers.tm1.client.model.Cube;
 import net.ajmyers.tm1.client.model.CubePatch;
 import net.ajmyers.tm1.client.model.Dimension;
+import net.ajmyers.tm1.client.model.FedCellDescriptor;
+import net.ajmyers.tm1.client.model.FeederTrace;
+import net.ajmyers.tm1.client.model.RuleSyntaxError;
 import net.ajmyers.tm1.client.model.Tm1Operations;
 import net.ajmyers.tm1.client.odata.ODataPath;
 import net.ajmyers.tm1.client.odata.ODataQuery;
@@ -82,7 +88,7 @@ public final class CubeService {
 	 *
 	 * <p>
 	 * TM1 (11.8) saves rules even when they don't compile: check them first with
-	 * {@code checkRules}.
+	 * {@link #checkRules(String, String)}.
 	 * @param name the cube's name
 	 * @param patch the changes
 	 * @return completes when the cube is changed
@@ -226,6 +232,109 @@ public final class CubeService {
 	@Tm1Endpoint("Action Cube/Release")
 	public Mono<Void> release(String name) {
 		return session.execute(action(Tm1Operations.CUBE_RELEASE, name, Map.of(), Void.class));
+	}
+
+	/**
+	 * {@code tm1.CheckRules}: compiles the cube's saved rules and lists their errors.
+	 * Needs schema 11.1.0.
+	 * @param name the cube's name
+	 * @return the syntax errors, with line numbers; none if the rules compile
+	 */
+	@Tm1Endpoint("Action Cube/CheckRules")
+	public Flux<RuleSyntaxError> checkRules(String name) {
+		Tm1Operation operation = Tm1Operations.CUBE_CHECK_RULES;
+		return session.stream(Tm1Request.postList(cube(name).action(operation.name()), Map.of(), RuleSyntaxError.class)
+			.requires(operation.capability()));
+	}
+
+	/**
+	 * {@code tm1.CheckRules} with {@code Rules}: compiles rules for the cube without
+	 * saving them, so they can be checked before {@link #update} saves them (which TM1
+	 * does even when they don't compile). Needs schema 11.1.0.
+	 * @param name the cube's name
+	 * @param rules the rules to check
+	 * @return the syntax errors, with line numbers; none if the rules compile
+	 */
+	@Tm1Endpoint("Action Cube/CheckRules")
+	public Flux<RuleSyntaxError> checkRules(String name, String rules) {
+		Tm1Operation operation = Tm1Operations.CUBE_CHECK_RULES;
+		return session.stream(
+				Tm1Request
+					.postList(cube(name).action(operation.name()),
+							Map.of("Rules", Objects.requireNonNull(rules, "rules")), RuleSyntaxError.class)
+					.requires(operation.capability()));
+	}
+
+	/**
+	 * {@code tm1.TraceCellCalculation}: how a cell's value is calculated, as a tree of
+	 * rule and consolidation components. Needs schema 11.1.0.
+	 * @param name the cube's name
+	 * @param tuple the cell: dimension name to element name, for every dimension of the
+	 * cube in its order (a {@code LinkedHashMap}); each element is in its dimension's
+	 * same-named hierarchy
+	 * @param query what to expand of the result, such as {@code Components},
+	 * {@code Tuple} or {@code Cube}
+	 * @return the calculation's root component
+	 */
+	@Tm1Endpoint("Action Cube/TraceCellCalculation")
+	@Tm1Endpoint("Navigation CalculationComponent/Cube")
+	public Mono<CalculationComponent> traceCellCalculation(String name, Map<String, String> tuple, ODataQuery query) {
+		return session.execute(action(Tm1Operations.CUBE_TRACE_CELL_CALCULATION, name,
+				Map.of("Tuple@odata.bind", bindings(tuple)), CalculationComponent.class)
+			.withQuery(query));
+	}
+
+	/**
+	 * {@code tm1.TraceFeeders}: which cells a cell feeds, and the feeder statements that
+	 * do it. Needs schema 11.1.0.
+	 * @param name the cube's name
+	 * @param tuple the cell, as for {@link #traceCellCalculation}
+	 * @param query what to expand of the result, such as {@code FedCells/Tuple}:
+	 * {@code FedCells} is a complex property, so TM1 wants a path, not nested options
+	 * ({@code FedCells($expand=Tuple)} gets 400)
+	 * @return the trace
+	 */
+	@Tm1Endpoint("Action Cube/TraceFeeders")
+	@Tm1Endpoint("Navigation FedCellDescriptor/Cube")
+	public Mono<FeederTrace> traceFeeders(String name, Map<String, String> tuple, ODataQuery query) {
+		return session.execute(action(Tm1Operations.CUBE_TRACE_FEEDERS, name,
+				Map.of("Tuple@odata.bind", bindings(tuple)), FeederTrace.class)
+			.withQuery(query));
+	}
+
+	/**
+	 * {@code tm1.CheckFeeders}: the cells under a consolidated cell that are fed, not
+	 * fed, or both, to find missing feeders. Needs schema 11.1.0.
+	 * @param name the cube's name
+	 * @param tuple the cell, as for {@link #traceCellCalculation}
+	 * @param selection which cells to list
+	 * @param query what to expand of each cell, such as {@code Tuple} or {@code Cube}
+	 * @return the cells, streamed
+	 */
+	@Tm1Endpoint("Action Cube/CheckFeeders")
+	@Tm1Endpoint("Navigation FedCellDescriptor/Cube")
+	public Flux<FedCellDescriptor> checkFeeders(String name, Map<String, String> tuple, CheckFeedersSelection selection,
+			ODataQuery query) {
+		Tm1Operation operation = Tm1Operations.CUBE_CHECK_FEEDERS;
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("Tuple@odata.bind", bindings(tuple));
+		body.put("Selection", Objects.requireNonNull(selection.json(), "selection"));
+		return session.stream(Tm1Request.postList(cube(name).action(operation.name()), body, FedCellDescriptor.class)
+			.withQuery(query)
+			.requires(operation.capability()));
+	}
+
+	private static List<String> bindings(Map<String, String> tuple) {
+		List<String> bindings = new ArrayList<>();
+		tuple.forEach((dimension,
+				element) -> bindings.add(ODataPath.of("Dimensions")
+					.key(dimension)
+					.nav("Hierarchies")
+					.key(dimension)
+					.nav("Elements")
+					.key(element)
+					.toString()));
+		return bindings;
 	}
 
 	private static ODataPath cube(String name) {

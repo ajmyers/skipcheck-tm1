@@ -8,10 +8,6 @@ Action Chore/Activate
 Action Chore/Deactivate
 Action Chore/Execute
 Action Chore/SetServerLocalStartTime
-Action Cube/CheckFeeders
-Action Cube/CheckRules
-Action Cube/TraceCellCalculation
-Action Cube/TraceFeeders
 Action Cube/Update
 Action Cube/UpdateCells
 Action CubeDrillthrough/Execute
@@ -111,7 +107,6 @@ Navigation Annotation/DimensionalContext
 Navigation ApplicationContextFacet/Values
 Navigation ApplicationContextFacetValue/Facet
 Navigation AuditLogEntry/AuditDetails
-Navigation CalculationComponent/Cube
 Navigation CalculationComponent/Tuple
 Navigation CellDescriptor/Tuple
 Navigation Cellset/Axes
@@ -143,7 +138,6 @@ Navigation DimensionReference/Dimension
 Navigation DocumentReference/Document
 Navigation Entry/ContainedBy
 Navigation Entry/LocalizedAttributes
-Navigation FedCellDescriptor/Cube
 Navigation FedCellDescriptor/Tuple
 Navigation Folder/Contents
 Navigation Folder/PrivateContents
