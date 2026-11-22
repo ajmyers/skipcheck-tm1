@@ -32,7 +32,9 @@ import net.ajmyers.tm1.client.service.git.GitService;
 import net.ajmyers.tm1.client.service.process.ChoreService;
 import net.ajmyers.tm1.client.service.process.ProcessDebugService;
 import net.ajmyers.tm1.client.service.process.ProcessService;
+import net.ajmyers.tm1.client.service.process.SqlDataSourceService;
 import net.ajmyers.tm1.client.service.security.GroupService;
+import net.ajmyers.tm1.client.service.security.OidcKeyService;
 import net.ajmyers.tm1.client.service.security.SessionService;
 import net.ajmyers.tm1.client.service.security.ThreadService;
 import net.ajmyers.tm1.client.service.security.UserService;
@@ -115,6 +117,10 @@ public final class Tm1Client {
 
 	private final EncryptionService encryption;
 
+	private final OidcKeyService oidcKeys;
+
+	private final SqlDataSourceService sqlDataSources;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -147,6 +153,8 @@ public final class Tm1Client {
 		this.annotations = new AnnotationService(session);
 		this.git = new GitService(session);
 		this.encryption = new EncryptionService(session);
+		this.oidcKeys = new OidcKeyService(session);
+		this.sqlDataSources = new SqlDataSourceService(session);
 	}
 
 	/**
@@ -413,6 +421,22 @@ public final class Tm1Client {
 	 */
 	public EncryptionService encryption() {
 		return encryption;
+	}
+
+	/**
+	 * The cached OpenID Connect keys.
+	 * @return the the cached openid connect key service, on this client's session
+	 */
+	public OidcKeyService oidcKeys() {
+		return oidcKeys;
+	}
+
+	/**
+	 * The ODBC data sources on TM1's host.
+	 * @return the the odbc data sources on tm1's host service, on this client's session
+	 */
+	public SqlDataSourceService sqlDataSources() {
+		return sqlDataSources;
 	}
 
 	/**
