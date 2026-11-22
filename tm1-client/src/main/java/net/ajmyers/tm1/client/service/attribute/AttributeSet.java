@@ -66,6 +66,25 @@ public final class AttributeSet {
 			.nav("SubsetAttributes"));
 	}
 
+	/**
+	 * Cubes' attributes: {@code /CubeAttributes}.
+	 * @return the set
+	 */
+	public static AttributeSet cubes() {
+		return new AttributeSet(ODataPath.of("CubeAttributes"));
+	}
+
+	/**
+	 * The attributes of a cube's views: {@code Cubes('c')/ViewAttributes}. TM1 (11.8)
+	 * refuses to create one (400, "no public views") until the cube has a public
+	 * <em>native</em> view; an MDX view doesn't count.
+	 * @param cube the cube's name
+	 * @return the set
+	 */
+	public static AttributeSet views(String cube) {
+		return new AttributeSet(ODataPath.of("Cubes").key(Objects.requireNonNull(cube, "cube")).nav("ViewAttributes"));
+	}
+
 	ODataPath path() {
 		return path;
 	}

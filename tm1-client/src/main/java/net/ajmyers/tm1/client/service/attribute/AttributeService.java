@@ -38,6 +38,8 @@ public final class AttributeService {
 	@Tm1Endpoint("Navigation Dimension/HierarchyAttributes")
 	@Tm1Endpoint("Navigation Hierarchy/ElementAttributes")
 	@Tm1Endpoint("Navigation Hierarchy/SubsetAttributes")
+	@Tm1Endpoint("EntitySet CubeAttributes")
+	@Tm1Endpoint("Navigation Cube/ViewAttributes")
 	public Flux<AttributeDefinition> list(AttributeSet set, ODataQuery query) {
 		return session.stream(Tm1Request.list(set.path(), query, AttributeDefinition.class));
 	}
@@ -53,6 +55,8 @@ public final class AttributeService {
 	@Tm1Endpoint("Navigation Dimension/HierarchyAttributes")
 	@Tm1Endpoint("Navigation Hierarchy/ElementAttributes")
 	@Tm1Endpoint("Navigation Hierarchy/SubsetAttributes")
+	@Tm1Endpoint("EntitySet CubeAttributes")
+	@Tm1Endpoint("Navigation Cube/ViewAttributes")
 	public Mono<AttributeDefinition> get(AttributeSet set, String name, ODataQuery query) {
 		return session.execute(
 				Tm1Request.get(set.path().key(Objects.requireNonNull(name, "name")), query, AttributeDefinition.class));
@@ -68,6 +72,8 @@ public final class AttributeService {
 	@Tm1Endpoint("Navigation Dimension/HierarchyAttributes")
 	@Tm1Endpoint("Navigation Hierarchy/ElementAttributes")
 	@Tm1Endpoint("Navigation Hierarchy/SubsetAttributes")
+	@Tm1Endpoint("EntitySet CubeAttributes")
+	@Tm1Endpoint("Navigation Cube/ViewAttributes")
 	public Mono<AttributeDefinition> create(AttributeSet set, AttributeDefinitionPatch attribute) {
 		return session.execute(Tm1Request.post(set.path(), attribute, AttributeDefinition.class));
 	}
@@ -83,6 +89,8 @@ public final class AttributeService {
 	@Tm1Endpoint("Navigation Dimension/HierarchyAttributes")
 	@Tm1Endpoint("Navigation Hierarchy/ElementAttributes")
 	@Tm1Endpoint("Navigation Hierarchy/SubsetAttributes")
+	@Tm1Endpoint("EntitySet CubeAttributes")
+	@Tm1Endpoint("Navigation Cube/ViewAttributes")
 	public Mono<Void> delete(AttributeSet set, String name) {
 		return session.execute(Tm1Request.delete(set.path().key(Objects.requireNonNull(name, "name"))));
 	}
