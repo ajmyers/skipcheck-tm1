@@ -136,48 +136,7 @@ public sealed class EncryptionService : Tm1Service
     }
 
     private static Dictionary<string, object?> Shutdown(TimeSpan? timeUntilShutdown) =>
-        timeUntilShutdown is { } t ? new() { ["TimeUntilShutdown"] = JavaDuration(t) } : new();
-
-    /// <summary>As Java's <c>Duration.toString</c> writes it, which the Java client sends: hours, never
-    /// days (<c>PT36H1.5S</c>).</summary>
-    internal static string JavaDuration(TimeSpan value)
-    {
-        if (value == TimeSpan.Zero)
-        {
-            return "PT0S";
-        }
-        var seconds = Math.DivRem(value.Ticks, TimeSpan.TicksPerSecond, out var rest);
-        if (rest < 0)
-        {
-            seconds--;
-            rest += TimeSpan.TicksPerSecond;
-        }
-        var nanos = rest * 100;
-        var total = seconds < 0 && nanos > 0 ? seconds + 1 : seconds;
-        var hours = total / 3600;
-        var minutes = total % 3600 / 60;
-        var secs = total % 60;
-        var text = new System.Text.StringBuilder("PT");
-        if (hours != 0)
-        {
-            text.Append(hours.ToString(CultureInfo.InvariantCulture)).Append('H');
-        }
-        if (minutes != 0)
-        {
-            text.Append(minutes.ToString(CultureInfo.InvariantCulture)).Append('M');
-        }
-        if (secs == 0 && nanos == 0 && text.Length > 2)
-        {
-            return text.ToString();
-        }
-        text.Append(seconds < 0 && nanos > 0 && secs == 0 ? "-0" : secs.ToString(CultureInfo.InvariantCulture));
-        if (nanos > 0)
-        {
-            var fraction = (seconds < 0 ? (2 * 1_000_000_000L) - nanos : nanos + 1_000_000_000L).ToString(CultureInfo.InvariantCulture).TrimEnd('0');
-            text.Append('.').Append(fraction, 1, fraction.Length - 1);
-        }
-        return text.Append('S').ToString();
-    }
+        timeUntilShutdown is { } t ? new() { ["TimeUntilShutdown"] = Iso8601TimeSpanConverter.Format(t) } : new();
 
     private Task Call(Tm1Operation operation, Dictionary<string, object?> parameters, CancellationToken cancellationToken) =>
         Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of(ImportName(operation)), parameters).Requires(operation.Capability()), cancellationToken);

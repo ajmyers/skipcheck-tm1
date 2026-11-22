@@ -233,45 +233,11 @@ def same_error(expected: dict[str, Any], got: dict[str, Any]) -> bool:
     return {k: v for k, v in expected.items() if k in keys} == {k: v for k, v in got.items() if k in keys}
 
 
-_DATE_TIME = re.compile(r"^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}(?::?\d{2})?)$", re.IGNORECASE)
-_DURATION = re.compile(r"^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$")
-
-
-def as_java_text(text: str) -> str:
-    """A date-time or a duration in a result as Java writes it (``2026-01-01T02:00:00Z``,
-    ``PT24H``), however this client or TM1 wrote it (``2026-01-01T02:00+00:00``,
-    ``P1DT00H00M00S``); any other text as it is. For comparing results, not requests."""
-    m = _DATE_TIME.match(text)
-    if m:
-        date, minutes, seconds, fraction, zone = m.groups()
-        fraction = (fraction or "").rstrip("0")
-        zone = zone.upper()
-        if zone != "Z":
-            digits = zone[1:].replace(":", "").ljust(4, "0")
-            zone = "Z" if int(digits) == 0 else f"{zone[0]}{digits[:2]}:{digits[2:]}"
-        return f"{date}T{minutes}:{seconds or '00'}{'.' + fraction if fraction else ''}{zone}"
-    m = _DURATION.match(text)
-    if m and text not in ("P", "PT") and not text.endswith("T"):
-        days, hours, minutes, seconds = m.groups()
-        whole, _, nanos = (seconds or "0").partition(".")
-        total = ((int(days or 0) * 24 + int(hours or 0)) * 60 + int(minutes or 0)) * 60 + int(whole)
-        h, rest = divmod(total, 3600)
-        mins, secs = divmod(rest, 60)
-        nanos = nanos.rstrip("0")
-        out = "PT" + (f"{h}H" if h else "") + (f"{mins}M" if mins else "")
-        if secs or nanos:
-            out += f"{secs}{'.' + nanos if nanos else ''}S"
-        return out if out != "PT" else "PT0S"
-    return text
-
-
 def normal(value: Any, drop_nulls: bool = False) -> Any:
     """For comparing: integral floats as ints; with ``drop_nulls`` (results), null members left
-    out, and date-times and durations as Java writes them."""
+    out. Everything else, date-times and durations included, must be exactly as Java wrote it."""
     if isinstance(value, float) and value.is_integer():
         return int(value)
-    if drop_nulls and isinstance(value, str):
-        return as_java_text(value)
     if isinstance(value, list):
         return [normal(v, drop_nulls) for v in value]
     if drop_nulls and isinstance(value, dict) and "$model" in value:

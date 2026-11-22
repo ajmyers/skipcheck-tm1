@@ -548,52 +548,9 @@ public static class ConformanceCodec
         JsonObject o when dropNulls && o.ContainsKey("$model") => Normal(o["json"], dropNulls),
         JsonObject o => Members(o, dropNulls),
         JsonValue v when Element(v).ValueKind == JsonValueKind.Number => JsonValue.Create(Element(v).GetDouble()),
-        JsonValue v when dropNulls && Element(v).ValueKind == JsonValueKind.String => JsonValue.Create(AsJavaText(Element(v).GetString()!)),
         JsonValue v => JsonNode.Parse(v.ToJsonString()),
         _ => throw new InvalidOperationException(),
     };
-
-    private static readonly System.Text.RegularExpressions.Regex DateTimeText = new(
-        @"^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}(?::?\d{2})?)$",
-        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-
-    private static readonly System.Text.RegularExpressions.Regex DurationText = new(
-        @"^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)(?:\.(\d+))?S)?)?$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-
-    /// <summary>A date-time or a duration in a result as Java writes it (<c>2026-01-01T02:00:00Z</c>,
-    /// <c>PT24H</c>), however this client or TM1 wrote it (<c>2026-01-01T02:00+00:00</c>,
-    /// <c>P1D</c>); any other text as it is. For comparing results, not requests.</summary>
-    public static string AsJavaText(string text)
-    {
-        var d = DateTimeText.Match(text);
-        if (d.Success)
-        {
-            var fraction = d.Groups[4].Value.TrimEnd('0');
-            var zone = d.Groups[5].Value.ToUpperInvariant();
-            if (zone != "Z")
-            {
-                var digits = zone[1..].Replace(":", "", StringComparison.Ordinal).PadRight(4, '0');
-                zone = int.Parse(digits, CultureInfo.InvariantCulture) == 0 ? "Z" : $"{zone[0]}{digits[..2]}:{digits[2..]}";
-            }
-            var seconds = d.Groups[3].Success ? d.Groups[3].Value : "00";
-            return $"{d.Groups[1].Value}T{d.Groups[2].Value}:{seconds}{(fraction.Length > 0 ? "." + fraction : "")}{zone}";
-        }
-        var p = DurationText.Match(text);
-        if (p.Success && text != "P" && text != "PT" && !text.EndsWith('T'))
-        {
-            long N(int i) => p.Groups[i].Success ? long.Parse(p.Groups[i].Value, CultureInfo.InvariantCulture) : 0;
-            var total = ((N(1) * 24 + N(2)) * 60 + N(3)) * 60 + N(4);
-            var (h, m, s) = (total / 3600, total % 3600 / 60, total % 60);
-            var nanos = p.Groups[5].Value.TrimEnd('0');
-            var out_ = "PT" + (h != 0 ? h + "H" : "") + (m != 0 ? m + "M" : "");
-            if (s != 0 || nanos.Length > 0)
-            {
-                out_ += s.ToString(CultureInfo.InvariantCulture) + (nanos.Length > 0 ? "." + nanos : "") + "S";
-            }
-            return out_ == "PT" ? "PT0S" : out_;
-        }
-        return text;
-    }
 
     private static JsonObject Members(JsonObject o, bool dropNulls)
     {

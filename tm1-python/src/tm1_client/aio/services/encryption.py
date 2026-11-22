@@ -9,7 +9,7 @@ from typing import Any
 from ..._calls import endpoint
 from ..._generated.model import EncryptionAtRestValidationReport, EncryptionFileType
 from ..._generated.operations import Tm1Operations
-from ...odata import Alias, ODataPath, ODataQuery
+from ...odata import Alias, ODataPath, ODataQuery, duration
 from ...operation import Tm1Operation
 from ...request import Tm1Request, body_of
 from ._base import Service, _require
@@ -139,33 +139,7 @@ def _shutdown(time_until_shutdown: float | timedelta | None) -> dict[str, Any]:
     value = (
         time_until_shutdown if isinstance(time_until_shutdown, timedelta) else timedelta(seconds=time_until_shutdown)
     )
-    return {"TimeUntilShutdown": _java_duration(value)}
-
-
-def _java_duration(value: timedelta) -> str:
-    """As Java's ``Duration.toString`` writes it, which the Java client sends: hours, never
-    days (``PT36H1.5S``)."""
-    micros = value // timedelta(microseconds=1)
-    if micros == 0:
-        return "PT0S"
-    seconds, nanos = divmod(micros, 1_000_000)
-    nanos *= 1000
-    total = seconds + 1 if seconds < 0 and nanos > 0 else seconds
-    hours = int(total / 3600)
-    minutes = int((total - hours * 3600) / 60)
-    secs = total - hours * 3600 - minutes * 60
-    out = "PT"
-    if hours:
-        out += f"{hours}H"
-    if minutes:
-        out += f"{minutes}M"
-    if secs == 0 and nanos == 0 and len(out) > 2:
-        return out
-    out += ("-0" if secs == 0 else str(secs)) if seconds < 0 and nanos > 0 else str(secs)
-    if nanos > 0:
-        fraction = str(2 * 1_000_000_000 - nanos if seconds < 0 else nanos + 1_000_000_000).rstrip("0")
-        out += "." + fraction[1:]
-    return out + "S"
+    return {"TimeUntilShutdown": duration(value)}
 
 
 def _import_name(operation: Tm1Operation) -> str:

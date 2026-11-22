@@ -214,43 +214,9 @@ export function sameError(expected: EncodedError, got: EncodedError): boolean {
   return pick(expected) === pick(got);
 }
 
-const DATE_TIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}(?::?\d{2})?)$/i;
-const DURATION = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)(?:\.(\d+))?S)?)?$/;
-
-/** A date-time or a duration in a result as Java writes it (`2026-01-01T02:00:00Z`, `PT24H`),
- * however TM1 wrote it (`2026-01-01T02:00Z`, `P1DT00H00M00S`); any other text as it is. For
- * comparing results, not requests. */
-export function asJavaText(text: string): string {
-  const d = DATE_TIME.exec(text);
-  if (d) {
-    const [, date, minutes, seconds, fraction, zone] = d;
-    const trimmed = (fraction ?? "").replace(/0+$/, "");
-    let offset = zone!.toUpperCase();
-    if (offset !== "Z") {
-      const digits = offset.slice(1).replace(":", "").padEnd(4, "0");
-      offset = Number(digits) === 0 ? "Z" : `${offset[0]}${digits.slice(0, 2)}:${digits.slice(2)}`;
-    }
-    return `${date}T${minutes}:${seconds ?? "00"}${trimmed ? "." + trimmed : ""}${offset}`;
-  }
-  const p = DURATION.exec(text);
-  if (p && text !== "P" && text !== "PT" && !text.endsWith("T")) {
-    const [, days, hours, minutes, seconds, fraction] = p;
-    const total = ((Number(days ?? 0) * 24 + Number(hours ?? 0)) * 60 + Number(minutes ?? 0)) * 60 + Number(seconds ?? 0);
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
-    const nanos = (fraction ?? "").replace(/0+$/, "");
-    let out = "PT" + (h ? `${h}H` : "") + (m ? `${m}M` : "");
-    if (s || nanos) out += `${s}${nanos ? "." + nanos : ""}S`;
-    return out === "PT" ? "PT0S" : out;
-  }
-  return text;
-}
-
-/** For comparing: with dropNulls (results), null members left out, and date-times and durations
- * as Java writes them. (JSON numbers have one type here.) */
+/** For comparing: with dropNulls (results), null members left out. Everything else, date-times
+ * and durations included, must be exactly as Java wrote it. (JSON numbers have one type here.) */
 export function normal(value: Json, dropNulls = false): Json {
-  if (dropNulls && typeof value === "string") return asJavaText(value);
   if (Array.isArray(value)) return value.map((v) => normal(v, dropNulls));
   if (value !== null && typeof value === "object") {
     const out: Record<string, Json> = {};
