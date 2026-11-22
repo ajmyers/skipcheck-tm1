@@ -124,6 +124,8 @@ public class PawContainer implements Startable {
 
 	private @Nullable Tm1ServerContainer tm1;
 
+	private @Nullable Tm1AdminServerContainer adminServer;
+
 	private boolean licenseAccepted = licenseAcceptedBySetting();
 
 	private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
@@ -179,6 +181,19 @@ public class PawContainer implements Startable {
 	 */
 	public PawContainer withTm1Server(Tm1ServerContainer tm1) {
 		this.tm1 = Objects.requireNonNull(tm1, "tm1");
+		return this;
+	}
+
+	/**
+	 * Lists servers from a separate Admin Server
+	 * ({@link Tm1ServerContainer#withAdminServer}) instead of the
+	 * {@linkplain #withTm1Server TM1 server}'s own. Users still log on through that TM1
+	 * server, which must be registered with this Admin Server and on its network.
+	 * @param admin the Admin Server PAW lists servers from
+	 * @return this container
+	 */
+	public PawContainer withAdminServer(Tm1AdminServerContainer admin) {
+		this.adminServer = Objects.requireNonNull(admin, "admin");
 		return this;
 	}
 
@@ -279,9 +294,21 @@ public class PawContainer implements Startable {
 		DockerClient docker = DockerClientFactory.instance().client();
 		ContainerNetwork tm1Network = networkOf(server);
 		String tm1Address = Objects.requireNonNull(tm1Network.getIpAddress(), "TM1's address");
+		String adminAddress = tm1Address;
+		Tm1AdminServerContainer admin = this.adminServer;
+		if (admin != null) {
+			if (!admin.isRunning()) {
+				admin.start();
+			}
+			ContainerNetwork adminNetwork = networkOf(admin);
+			if (!Objects.equals(adminNetwork.getNetworkID(), tm1Network.getNetworkID())) {
+				throw new IllegalStateException("PAW needs the Admin Server and the TM1 server on one network");
+			}
+			adminAddress = Objects.requireNonNull(adminNetwork.getIpAddress(), "the Admin Server's address");
+		}
 		httpPort = freePort();
 		Map<String, String> env = new LinkedHashMap<>(settings);
-		env.put("PAW_TM1_ADMIN_URL", "http://" + tm1Address + ":" + ADMIN_PORT);
+		env.put("PAW_TM1_ADMIN_URL", "http://" + adminAddress + ":" + ADMIN_PORT);
 		env.put("PAW_TM1_LOGIN_URL", "http://" + tm1Address + ":" + Tm1ServerContainer.REST_PORT);
 		env.put("PAW_AUTH_MODE", "tm1");
 		env.put("PAW_HTTP_PORT", Integer.toString(httpPort));
@@ -423,7 +450,7 @@ public class PawContainer implements Startable {
 	/**
 	 * The TM1 server's network: its {@link Network}, or Docker's default bridge network.
 	 */
-	private static ContainerNetwork networkOf(Tm1ServerContainer server) {
+	private static ContainerNetwork networkOf(GenericContainer<?> server) {
 		Map<String, ContainerNetwork> networks = server.getContainerInfo().getNetworkSettings().getNetworks();
 		Network network = server.getNetwork();
 		ContainerNetwork found = network == null ? networks.get("bridge")

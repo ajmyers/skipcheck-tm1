@@ -71,6 +71,8 @@ public class Tm1WebContainer extends GenericContainer<Tm1WebContainer> {
 
 	private @Nullable Tm1ServerContainer tm1;
 
+	private @Nullable Tm1AdminServerContainer adminServer;
+
 	/**
 	 * A container on the default {@code tm1-web} image (or {@code TM1_WEB_IMAGE}),
 	 * getting TM1 Web from {@code source}.
@@ -147,6 +149,30 @@ public class Tm1WebContainer extends GenericContainer<Tm1WebContainer> {
 	}
 
 	/**
+	 * Lists and logs on to the TM1 servers registered with a separate Admin Server
+	 * ({@link Tm1ServerContainer#withAdminServer}), instead of one server's own. Takes
+	 * precedence over the Admin Server of a {@linkplain #withTm1Server TM1 server}. The
+	 * two containers share a Docker network, and starting TM1 Web starts the Admin Server
+	 * first; start the TM1 servers before TM1 Web too, so they're listed.
+	 * @param admin the Admin Server to list servers from
+	 * @return this container
+	 */
+	public Tm1WebContainer withAdminServer(Tm1AdminServerContainer admin) {
+		this.adminServer = Objects.requireNonNull(admin, "admin");
+		Tm1ServerContainer.shareNetwork(this, admin);
+		dependsOn(admin);
+		return self();
+	}
+
+	/**
+	 * The Admin Server set with {@link #withAdminServer}.
+	 * @return the Admin Server, or {@code null} if none was set
+	 */
+	public @Nullable Tm1AdminServerContainer getAdminServer() {
+		return adminServer;
+	}
+
+	/**
 	 * Where TM1 Web comes from.
 	 * @return the source
 	 */
@@ -189,6 +215,10 @@ public class Tm1WebContainer extends GenericContainer<Tm1WebContainer> {
 
 	@Override
 	protected void configure() {
+		if (adminServer != null) {
+			withEnv("TM1_ADMIN_HOST", Tm1AdminServerContainer.NETWORK_ALIAS);
+			return;
+		}
 		if (tm1 == null) {
 			return;
 		}
