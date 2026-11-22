@@ -30,6 +30,18 @@ import reactor.core.publisher.Mono;
  * A hierarchy PATCH that sets {@code Elements} or {@code Edges} <em>replaces</em> them:
  * TM1 deletes the elements it doesn't list. So {@link #update} refuses such a patch, and
  * {@link #replaceStructure} does it by name.
+ *
+ * <p>
+ * Add a hierarchy to a dimension, with its elements and edges:
+ * {@snippet class = examples.HierarchyServiceExamples region = create}
+ *
+ * <p>
+ * Replace a hierarchy's structure, knowing that TM1 deletes what isn't listed:
+ * {@snippet class = examples.HierarchyServiceExamples region = replace}
+ *
+ * <p>
+ * Read the roots of a hierarchy:
+ * {@snippet class = examples.HierarchyServiceExamples region = roots}
  */
 public final class HierarchyService {
 
