@@ -69,6 +69,7 @@ run on every build where TM1 is configured, so they always work as written.
 | Run your own database (a fixture model in `src/test/resources`) | [`OwnDatabaseExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/OwnDatabaseExampleTest.java) |
 | Require one TM1 version, or skip tests on versions without a feature | [`PinnedVersionExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/PinnedVersionExampleTest.java) |
 | Run two servers at once, e.g. to test a migration or comparison | [`TwoServersExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/TwoServersExampleTest.java) |
+| Register several servers with one Admin Server, and list them all in TM1 Web | [`SharedAdminServerExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/SharedAdminServerExampleTest.java) |
 | Choose where TM1 comes from in code: install folder, bundle, download link, Docker volume or private image | [`ExplicitSourceExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/ExplicitSourceExampleTest.java) |
 | Skip the extension: plain assumptions and a throwaway server, e.g. for a test that damages its server | [`WithoutTheExtensionExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/WithoutTheExtensionExampleTest.java) |
 | Run TM1 Web against a TM1 server of its own | [`Tm1WebExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/Tm1WebExampleTest.java) |
@@ -106,6 +107,28 @@ build. By default the image's tag matches this library's version, and `edge` for
 **Apple Silicon:** TM1 runs under Rosetta, as with compose. Turn on *Use Rosetta for
 x86_64/amd64 emulation* in Docker Desktop (see the [getting-started
 guide](../docker/tm1-server/GETTING-STARTED.md#step-1-install-docker)).
+
+## Several servers, one Admin Server
+
+By default each `Tm1ServerContainer` runs its own Admin Server. For a deployment-like
+setup, `Tm1AdminServerContainer` runs one on its own (the `tm1-server` image in `admin`
+mode, from the same `Tm1Source`), and servers register with it:
+
+```java
+try (var admin = new Tm1AdminServerContainer(source);
+     var planning = new Tm1ServerContainer(source).withEnv("TM1_SERVER_NAME", "planning").withAdminServer(admin);
+     var reporting = new Tm1ServerContainer(source).withEnv("TM1_SERVER_NAME", "reporting").withAdminServer(admin);
+     var web = new Tm1WebContainer(webSource).withAdminServer(admin)) {
+    planning.start();
+    reporting.start();
+    web.start();   // lists planning and reporting
+}
+```
+
+`withAdminServer` puts the containers on the Admin Server's Docker network (or on the one
+they already share) and starts it first. `Tm1WebContainer` and `PawContainer` take
+`withAdminServer` too, and list every registered server from it. PAW still logs users on
+through its `withTm1Server`.
 
 ## Cognos (CAM) security
 
