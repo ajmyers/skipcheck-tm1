@@ -582,7 +582,8 @@ These are concerns the requirements don't name, but that need deciding early:
    timeouts, OData async, and real cancellation (§7).
 7. **Authentication modes:** Basic (security modes 1 and 2) first. The `Tm1Authenticator` SPI
    must also fit CAM (`Authorization: CAMNamespace <base64 user:pass:ns>`), CAM passports and
-   SSO, and v12/Cloud bearer or API keys.
+   SSO, and v12/Cloud bearer or API keys. Getting a passport from Cognos, and the CAM flows
+   end to end, are phase 11 (#158).
 8. **TLS:** TM1 ships with self-signed certificates. Offer explicit trust-store configuration
    and an opt-in "trust all" for dev only, never a default.
 9. **Observability:**
@@ -653,6 +654,7 @@ These are concerns the requirements don't name, but that need deciding early:
 | **8. Contents and annotations** | Contents/Folders/Documents/Links/References (Copy/Move), Annotations, ApplicationContextFacets, DeleteAnnotationArtifacts | Integration tests green |
 | **9. Infrastructure endpoints** | Git (Init/Status/Pull/Push/Deploy/Plans), encryption at rest, OIDC keys, SQLDataSources | Implemented, with tagged and skipped tests where the container can't host them |
 | **10. Protocol extras** | Public async API. JSON `$batch` (public, Q8), whose `Tm1Request` / `request()` shape is set in phase 0. | Coverage gate shows zero pending endpoints |
+| **11. Authentication flows** (#158) | Every TM1-side flow, tested against CAM test containers: Basic, `CAMNamespace` (LDAP, and OIDC by password), and CAM passports the client obtains from Cognos (by logon, or by exchanging an OIDC ID token), refreshed when they expire. Starter properties for each. | Integration tests green against `@RequiresCognos` containers (LDAP and OIDC namespaces) |
 
 Phases 2 to 9 can proceed in parallel once phases 0 and 1 land.
 
