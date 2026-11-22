@@ -27,3 +27,12 @@ dependencies {
 	// ArchitectureTest: rules over the compiled starter
 	testImplementation(libs.archunit)
 }
+
+// GettingStartedPropertiesTest reads the Getting started's application.properties from the examples
+// (not the test classpath), so declare it: an edit to that file alone must rerun the test rather than
+// come back UP-TO-DATE or from the build cache
+tasks.named<Test>("test") {
+	inputs.file("src/examples/java/examples/application.properties")
+		.withPathSensitivity(PathSensitivity.RELATIVE)
+		.withPropertyName("gettingStartedProperties")
+}
