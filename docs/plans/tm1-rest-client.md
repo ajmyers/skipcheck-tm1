@@ -344,8 +344,9 @@ committed. It generates enums (with an `UNKNOWN` fallback), a record per complex
 (null components not sent), and a sealed interface per inheritance hierarchy (#64): its subtypes'
 records are read by `@odata.type`, which Jackson writes when one is sent, and a nested `Plain`
 (concrete root, such as `Member`) or `Unknown` (abstract root, such as `View`) record takes a
-value no known subtype stands for. Field constants and patch builders (#65), and the operation
-catalog with revision annotations (#66), follow.
+value no known subtype stands for. Every type also has field constants for queries (`Cube.NAME`),
+its enums write their own literals for filters, and a patch builder (§8.3) does writes (#65). The
+operation catalog with revision annotations (#66) follows.
 
 **Services stay hand-written.** Their names, parameter order and grouping are API design that
 a generator would do badly. Generating them is still possible later.
@@ -369,6 +370,14 @@ So writes use generated builders backed by an ordered map: `DimensionPatch.build
 They serialize only the properties that were set, explicit nulls included, plus `@odata.bind`
 references (`Dimensions@odata.bind: ["Dimensions('A')", …]` when creating a cube). Create
 payloads use the same builders, with required properties checked.
+
+**Built in phase 1 (#65).** Every complex and entity type has a generated `XPatch`, over an
+ordered map written as is (`@JsonValue`). Structured properties take nested patches, so a deep
+insert (a dimension with its hierarchies and elements) is one value. Each navigation property
+also gets `bindX(ODataPath…)`. A subtype's patch extends its root's (`MDXViewPatch extends
+ViewPatch`) and sends `@odata.type` first. Not yet: checking required properties on create, and
+the per-endpoint quirks of §16 (properties TM1 ignores or rejects in a PATCH). Both need knowledge
+the snapshot doesn't hold, so they belong to the services.
 
 ---
 

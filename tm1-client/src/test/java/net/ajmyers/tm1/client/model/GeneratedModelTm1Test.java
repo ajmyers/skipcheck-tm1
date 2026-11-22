@@ -1,11 +1,13 @@
 package net.ajmyers.tm1.client.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import net.ajmyers.tm1.client.Tm1Request;
@@ -82,6 +84,101 @@ class GeneratedModelTm1Test {
 			session.execute(Tm1Request.delete(views.key(name))).onErrorComplete().block(WAIT);
 			session.close().block(WAIT);
 		}
+	}
+
+	@Test
+	void queriesWithFieldConstantsAndEnumLiterals(Tm1ServerContainer tm1) {
+		Tm1Session session = Tm1Session.builder()
+			.baseUrl(tm1.getRestUrl())
+			.basicAuth(tm1.getUsername(), tm1.getPassword())
+			.build();
+		ODataPath elements = ODataPath.of("Dimensions")
+			.key("}Groups")
+			.nav("Hierarchies")
+			.key("}Groups")
+			.nav("Elements");
+		try {
+			List<Element> all = session
+				.stream(Tm1Request.list(elements,
+						ODataQuery.none().select(Element.NAME, Element.TYPE).orderBy(Element.NAME), Element.class))
+				.collectList()
+				.block(WAIT);
+			assertThat(all).isNotEmpty().extracting(Element::name).isSorted();
+			ElementType type = all.get(0).type();
+			assertThat(type).isNotNull().isNotEqualTo(ElementType.UNKNOWN);
+
+			List<Element> filtered = session
+				.stream(Tm1Request.list(elements, ODataQuery.none().filter(Element.TYPE.eq(type)), Element.class))
+				.collectList()
+				.block(WAIT);
+			assertThat(filtered).hasSize((int) all.stream().filter(e -> e.type() == type).count())
+				.allSatisfy(e -> assertThat(e.type()).isEqualTo(type));
+		}
+		finally {
+			session.close().block(WAIT);
+		}
+	}
+
+	@Test
+	void createsADimensionAndACubeFromPatchesThenPatchesAndClearsItsRules(Tm1ServerContainer tm1) {
+		Tm1Session session = Tm1Session.builder()
+			.baseUrl(tm1.getRestUrl())
+			.basicAuth(tm1.getUsername(), tm1.getPassword())
+			.build();
+		String name = "tm1-client-" + UUID.randomUUID();
+		ODataPath dimension = ODataPath.of("Dimensions").key(name);
+		ODataPath cube = ODataPath.of("Cubes").key(name);
+		try {
+			session.execute(Tm1Request.post(ODataPath.of("Dimensions"),
+					DimensionPatch.builder()
+						.name(name)
+						.hierarchies(List.of(HierarchyPatch.builder()
+							.name(name)
+							.elements(List.of(ElementPatch.builder().name("North").type(ElementType.NUMERIC).build(),
+									ElementPatch.builder().name("South").type(ElementType.NUMERIC).build()))
+							.build()))
+						.build(),
+					Dimension.class))
+				.block(WAIT);
+			session.execute(Tm1Request.post(ODataPath.of("Cubes"),
+					CubePatch.builder()
+						.name(name)
+						.bindDimensions(dimension, ODataPath.of("Dimensions").key("}Groups"))
+						.build(),
+					Cube.class))
+				.block(WAIT);
+
+			Cube created = session
+				.execute(Tm1Request.get(cube, ODataQuery.none().expand(Cube.DIMENSIONS, d -> d.select(Dimension.NAME)),
+						Cube.class))
+				.block(WAIT);
+			assertThat(created.dimensions()).extracting(Dimension::name)
+				.as("TM1 lists its virtual Sandboxes dimension first")
+				.containsExactly("Sandboxes", name, "}Groups");
+			List<Element> elements = session
+				.stream(Tm1Request.list(dimension.nav("Hierarchies").key(name).nav("Elements"), ODataQuery.none(),
+						Element.class))
+				.collectList()
+				.block(WAIT);
+			assertThat(elements).extracting(Element::name, Element::type)
+				.containsExactlyInAnyOrder(tuple("North", ElementType.NUMERIC), tuple("South", ElementType.NUMERIC));
+
+			session.execute(Tm1Request.patch(cube, CubePatch.builder().rules("SKIPCHECK;").build())).block(WAIT);
+			assertThat(rules(session, cube)).contains("SKIPCHECK");
+			session.execute(Tm1Request.patch(cube, CubePatch.builder().rules(null).build())).block(WAIT);
+			assertThat(rules(session, cube)).as("an explicit null clears them").isNullOrEmpty();
+		}
+		finally {
+			session.execute(Tm1Request.delete(cube)).onErrorComplete().block(WAIT);
+			session.execute(Tm1Request.delete(dimension)).onErrorComplete().block(WAIT);
+			session.close().block(WAIT);
+		}
+	}
+
+	private static @Nullable String rules(Tm1Session session, ODataPath cube) {
+		return session.execute(Tm1Request.get(cube, ODataQuery.none().select(Cube.RULES), Cube.class))
+			.block(WAIT)
+			.rules();
 	}
 
 }

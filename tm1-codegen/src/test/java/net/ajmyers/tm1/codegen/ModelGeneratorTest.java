@@ -80,13 +80,17 @@ class ModelGeneratorTest {
 			.as("TM1 already has Unknown, so the fallback is UNRECOGNIZED")
 			.contains("UNRECOGNIZED((String) null)")
 			.contains("@JsonCreator(mode = JsonCreator.Mode.DELEGATING)")
-			.contains("@JsonValue");
+			.contains("@JsonValue")
+			.contains("enum CubeKind implements ODataLiteral")
+			.contains("return ODataLiterals.enumMember(\"ibm.tm1.api.v1.CubeKind\", json);");
 	}
 
 	@Test
 	void generatesRecordsWithNullableComponentsNamedAfterTm1Properties() {
 		String cube = source(sample(), "Cube");
 		assertThat(cube).contains("@JsonIgnoreProperties(ignoreUnknown = true)")
+			.contains("public static final ODataProperty NAME = ODataProperty.of(\"Name\");")
+			.contains("public static final ODataProperty VIEWS = ODataProperty.of(\"Views\");")
 			.contains("public record Cube(")
 			.contains("@JsonProperty(\"@odata.etag\") @Nullable String etag")
 			.contains("@JsonProperty(\"Name\") @Nullable String name")
@@ -107,7 +111,8 @@ class ModelGeneratorTest {
 	@Test
 	void generatesASealedInterfacePerHierarchyReadByOdataType() {
 		assertThat(sample().generate()).extracting(f -> f.typeSpec().name())
-			.containsExactly("CubeKind", "Box", "Cube", "NativeView", "View");
+			.containsExactly("CubeKind", "Box", "Cube", "NativeView", "View", "BoxPatch", "CubePatch",
+					"NativeViewPatch", "ViewPatch");
 		String view = source(sample(), "View");
 		assertThat(view).contains("public sealed interface View permits NativeView, View.Unknown")
 			.contains(
@@ -137,7 +142,7 @@ class ModelGeneratorTest {
 		try (Stream<Path> walk = Files.walk(out)) {
 			sources = walk.filter(p -> p.toString().endsWith(".java")).toList();
 		}
-		assertThat(sources).as("31 enums, 122 records, 7 hierarchies, package-info").hasSize(161);
+		assertThat(sources).as("31 enums, 122 records, 7 hierarchies, 129 patches, package-info").hasSize(290);
 
 		JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
 		DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
@@ -151,6 +156,31 @@ class ModelGeneratorTest {
 			assertThat(diagnostics.getDiagnostics()).extracting(Diagnostic::toString).isEmpty();
 			assertThat(compiled).isTrue();
 		}
+	}
+
+	@Test
+	void generatesPatchesThatSendOnlyWhatsSetAndExtendTheirRoots() {
+		String cube = source(sample(), "CubePatch");
+		assertThat(cube).contains("public final class CubePatch")
+			.contains("@JsonValue public final Map<String, @Nullable Object> json()")
+			.contains("public Builder name(@Nullable String name) { this.values.put(\"Name\", name); return this; }")
+			.as("nested values are patches too")
+			.contains("public Builder box(@Nullable BoxPatch box)")
+			.contains("public Builder kind(@Nullable CubeKind kind)")
+			.as("a hierarchy's subtypes' patches are welcome in a collection")
+			.contains("public Builder views(@Nullable List<? extends ViewPatch> views)")
+			.contains(
+					"public Builder bindViews(ODataPath... targets) { this.values.put(\"Views@odata.bind\", Arrays.stream(targets).map(ODataPath::toString).toList()); return this; }")
+			.doesNotContain("etag")
+			.doesNotContain("Content");
+		assertThat(source(sample(), "ViewPatch")).contains("public class ViewPatch")
+			.contains("public static class Builder");
+		assertThat(source(sample(), "NativeViewPatch")).contains("public final class NativeViewPatch extends ViewPatch")
+			.contains("public static final class Builder extends ViewPatch.Builder")
+			.contains("this.values.put(\"@odata.type\", \"#ibm.tm1.api.v1.NativeView\");")
+			.as("inherited setters keep the subtype's builder")
+			.contains("@Override public Builder name(@Nullable String name) { super.name(name); return this; }")
+			.contains("@Override public NativeViewPatch build()");
 	}
 
 	private static ModelGenerator sample() {

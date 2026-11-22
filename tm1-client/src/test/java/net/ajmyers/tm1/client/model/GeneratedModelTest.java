@@ -1,12 +1,17 @@
 package net.ajmyers.tm1.client.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import net.ajmyers.tm1.client.odata.Filter;
+import net.ajmyers.tm1.client.odata.ODataPath;
+import net.ajmyers.tm1.client.odata.ODataQuery;
 import tools.jackson.databind.json.JsonMapper;
 
 /** The generated model reads TM1's JSON (plan §8.1); full round trips come with #67. */
@@ -68,6 +73,65 @@ class GeneratedModelTest {
 		assertThat(JSON.readValue("{\"@odata.type\":\"#ibm.tm1.api.v1.MDXView\",\"Name\":\"e\"}", MDXView.class).name())
 			.isEqualTo("e");
 		assertThat(JSON.readValue("{\"Name\":\"f\"}", MDXView.class).name()).as("without @odata.type").isEqualTo("f");
+	}
+
+	@Test
+	void writesQueriesWithFieldConstantsAndEnumLiterals() {
+		ODataQuery query = ODataQuery.none()
+			.select(Element.NAME, Element.TYPE)
+			.filter(Element.TYPE.eq(ElementType.CONSOLIDATED))
+			.expand(Element.PARENTS, p -> p.select(Element.NAME))
+			.orderBy(Element.NAME);
+		assertThat(query).isEqualTo(ODataQuery.none()
+			.select("Name", "Type")
+			.filter(Filter.raw("(Type eq ibm.tm1.api.v1.ElementType'Consolidated')"))
+			.expand("Parents", p -> p.select("Name"))
+			.orderBy("Name"));
+		assertThat(MDXView.MDX.path()).isEqualTo("MDX");
+		assertThat(MDXView.NAME).as("inherited from View").isSameAs(View.NAME);
+		assertThatIllegalStateException().isThrownBy(ElementType.UNKNOWN::odataLiteral);
+	}
+
+	@Test
+	void sendsOnlyWhatAPatchSetsInOrderWithExplicitNullsAndBindings() {
+		CubePatch patch = CubePatch.builder()
+			.name("Sales")
+			.rules(null)
+			.bindDimensions(ODataPath.of("Dimensions").key("Region"), ODataPath.of("Dimensions").key("Month"))
+			.build();
+		assertThat(JSON.writeValueAsString(patch)).isEqualTo(
+				"{\"Name\":\"Sales\",\"Rules\":null,\"Dimensions@odata.bind\":[\"Dimensions('Region')\",\"Dimensions('Month')\"]}");
+		assertThat(patch)
+			.isEqualTo(CubePatch.builder()
+				.name("Sales")
+				.rules(null)
+				.bindDimensions(ODataPath.of("Dimensions").key("Region"), ODataPath.of("Dimensions").key("Month"))
+				.build())
+			.isNotEqualTo(CubePatch.builder().name("Sales").build());
+	}
+
+	@Test
+	void nestsPatchesForDeepInsertsAndWritesEnumsAsTm1Does() {
+		DimensionPatch dimension = DimensionPatch.builder()
+			.name("Region")
+			.hierarchies(List.of(HierarchyPatch.builder()
+				.name("Region")
+				.elements(List.of(ElementPatch.builder().name("North").type(ElementType.NUMERIC).build()))
+				.build()))
+			.build();
+		assertThat(JSON.writeValueAsString(dimension)).isEqualTo(
+				"{\"Name\":\"Region\",\"Hierarchies\":[{\"Name\":\"Region\",\"Elements\":[{\"Name\":\"North\",\"Type\":\"Numeric\"}]}]}");
+	}
+
+	@Test
+	void sendsASubtypesPatchWithItsOdataTypeAndKeepsItsBuilderWhenChaining() {
+		MDXViewPatch view = MDXViewPatch.builder().name("v").mdx("SELECT").build();
+		assertThat(JSON.writeValueAsString(view))
+			.isEqualTo("{\"@odata.type\":\"#ibm.tm1.api.v1.MDXView\",\"Name\":\"v\",\"MDX\":\"SELECT\"}");
+		ViewPatch asRoot = view;
+		assertThat(asRoot.json()).containsKey("@odata.type");
+		assertThat(JSON.writeValueAsString(CubePatch.builder().views(List.of(view)).build()))
+			.contains("#ibm.tm1.api.v1.MDXView");
 	}
 
 }

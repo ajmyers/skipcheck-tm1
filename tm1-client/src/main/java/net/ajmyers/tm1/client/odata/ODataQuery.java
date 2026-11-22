@@ -130,6 +130,28 @@ public final class ODataQuery {
 	}
 
 	/**
+	 * Expands a navigation property with no nested options:
+	 * {@code expand(Cube.DIMENSIONS)}.
+	 * @param navigation the navigation property
+	 * @return a new query
+	 */
+	public ODataQuery expand(ODataProperty navigation) {
+		return expand(navigation.path());
+	}
+
+	/**
+	 * Expands a navigation property, with nested options:
+	 * {@code expand(Dimension.HIERARCHIES, h -> h.select(Hierarchy.NAME))}.
+	 * @param navigation the navigation property
+	 * @param options adds the nested options to the query it's given, as for
+	 * {@link #expand(String, UnaryOperator)}
+	 * @return a new query
+	 */
+	public ODataQuery expand(ODataProperty navigation, UnaryOperator<ODataQuery> options) {
+		return expand(navigation.path(), options);
+	}
+
+	/**
 	 * Sets {@code $filter}.
 	 * @param filter the filter, replacing any set before
 	 * @return a new query
@@ -155,6 +177,24 @@ public final class ODataQuery {
 	 */
 	public ODataQuery orderByDescending(String property) {
 		return order(property, " desc");
+	}
+
+	/**
+	 * Adds an ascending {@code $orderby} key: {@code orderBy(Element.NAME)}.
+	 * @param property the property, after any keys already added
+	 * @return a new query
+	 */
+	public ODataQuery orderBy(ODataProperty property) {
+		return orderBy(property.path());
+	}
+
+	/**
+	 * Adds a descending {@code $orderby} key.
+	 * @param property the property, after any keys already added
+	 * @return a new query
+	 */
+	public ODataQuery orderByDescending(ODataProperty property) {
+		return orderByDescending(property.path());
 	}
 
 	/**
