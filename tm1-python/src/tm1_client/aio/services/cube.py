@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import enum
 from typing import Any, Mapping, Sequence
 
 from ..._calls import endpoint
@@ -12,7 +13,9 @@ from ..._generated.model import (
     Dimension,
     FedCellDescriptor,
     FeederTrace,
+    NativeView,
     RuleSyntaxError,
+    View,
 )
 from ..._generated.operations import Tm1Operations
 from ...odata import ODataPath, ODataQuery
@@ -20,7 +23,7 @@ from ...operation import Tm1Operation
 from ...request import Tm1Request
 from ._base import Service, _require
 
-__all__ = ["CubeService", "ViewService"]
+__all__ = ["CubeService", "ViewScope", "ViewService"]
 
 _CUBES = ODataPath.of("Cubes")
 
@@ -218,8 +221,135 @@ def _action(operation: Tm1Operation, name: str, body: Mapping[str, Any], type: A
     return Tm1Request.post(_cube(name).action(operation.name), dict(body), type).requires(operation.capability())
 
 
-class ViewService(Service):
-    """Views: a cube's public and private views, native (subsets on columns, rows and titles)
-    or MDX."""
+class ViewScope(enum.Enum):
+    """Who sees a view, and so which of a cube's collections holds it."""
 
-    # Not ported yet: see tests/test_java_parity.py
+    PUBLIC = "Views"
+    """Everyone: ``Cubes('c')/Views``."""
+    PRIVATE = "PrivateViews"
+    """Only the user who made it: ``Cubes('c')/PrivateViews``."""
+
+    def navigation(self) -> str:
+        """The cube's navigation property holding views of this scope, such as ``PrivateViews``."""
+        return self.value
+
+
+class ViewService(Service):
+    """Views: a cube's public and private views (:class:`ViewScope`), native (``NativeView``:
+    subsets on columns, rows and titles) or MDX (``MDXView``). They're read as ``View``, so
+    each comes back as its own type.
+
+    A native view's subsets are in complex properties, reached by expanding through the
+    ``tm1.NativeView`` type: :meth:`list` with ``tm1.NativeView/Columns/Subset``, or
+    :meth:`get_native`, which reads one view through the type. On TM1 11.8.35 the type-cast
+    expand works on a list holding MDX views too; an older server was reported to fail it,
+    and ``get_native`` doesn't depend on it.
+
+    Create a native view: each axis binds a subset, and every dimension of the cube has to be
+    on one::
+
+        dimensions = ODataPath.of("Dimensions")
+        months = dimensions.key("Month").nav("Hierarchies").key("Month").nav("Subsets").key("Quarters")
+        regions = dimensions.key("Region").nav("Hierarchies").key("Region").nav("Subsets").key("Leaves")
+        versions = dimensions.key("Version").nav("Hierarchies").key("Version")
+        measures = dimensions.key("Measure").nav("Hierarchies").key("Measure")
+        await tm1.views.create("Sales", ViewScope.PUBLIC, NativeViewPatch.builder()
+            .name("Revenue by Region")
+            .columns([ViewAxisSelectionPatch.builder().bind_subset(months).build()])
+            .rows([ViewAxisSelectionPatch.builder().bind_subset(regions).build()])
+            .titles([
+                ViewTitlePatch.builder().bind_subset(versions.nav("Subsets").key("All"))
+                    .bind_selected(versions.nav("Elements").key("Actual")).build(),
+                ViewTitlePatch.builder().bind_subset(measures.nav("Subsets").key("All"))
+                    .bind_selected(measures.nav("Elements").key("Revenue")).build(),
+            ])
+            .suppress_empty_rows(True)
+            .build())
+
+    Create an MDX view from its query::
+
+        mdx = ("SELECT {[Month].[Month].[Jan], [Month].[Month].[Feb]} ON 0,"
+               " {TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)} ON 1 FROM [Sales]"
+               " WHERE ([Version].[Version].[Actual], [Measure].[Measure].[Revenue])")
+        await tm1.views.create("Sales", ViewScope.PRIVATE, MDXViewPatch.builder().name("My Revenue").mdx(mdx).build())
+
+    List a cube's views, telling the kinds apart by type::
+
+        for view in await tm1.views.list("Sales", ViewScope.PUBLIC):
+            if isinstance(view, MDXView):
+                print(view.name, view.mdx)
+            elif isinstance(view, NativeView):
+                print(view.name, "native")
+
+    Read the subsets on a native view's axes::
+
+        view = await tm1.views.get_native("Sales", ViewScope.PUBLIC, "Revenue by Region",
+                                          ODataQuery.none().expand("Columns/Subset").expand("Rows/Subset"))
+        names = [axis.subset.unique_name for axis in [*view.columns, *view.rows]]
+    """
+
+    @endpoint("Navigation Cube/Views", "Navigation Cube/PrivateViews")
+    async def list(self, cube: str, scope: ViewScope, query: ODataQuery | None = None, **options: Any) -> list[View]:
+        """``GET Cubes('c')/Views`` (or the private ones): the views, each as its own type. A
+        native view's axes expand through its type, as ``tm1.NativeView/Columns/Subset``."""
+        return await self._session.collect(Tm1Request.list(_views(cube, scope), ODataQuery.of(query, **options), View))
+
+    @endpoint("Navigation Cube/Views", "Navigation Cube/PrivateViews")
+    async def get(
+        self, cube: str, scope: ViewScope, view: str, query: ODataQuery | None = None, **options: Any
+    ) -> View:
+        """``GET Cubes('c')/Views('v')``: the view as its own type, or a ``Tm1NotFoundError``."""
+        return await self._session.execute(Tm1Request.get(_view(cube, scope, view), ODataQuery.of(query, **options), View))
+
+    @endpoint(
+        "Navigation Cube/Views",
+        "Navigation Cube/PrivateViews",
+        "Navigation ViewAxisSelection/Subset",
+        "Navigation ViewTitle/Subset",
+        "Navigation ViewTitle/Selected",
+    )
+    async def get_native(
+        self, cube: str, scope: ViewScope, view: str, query: ODataQuery | None = None, **options: Any
+    ) -> NativeView:
+        """``GET Cubes('c')/Views('v')/tm1.NativeView``: reads a native view through its type,
+        so its axes can be expanded: ``Columns/Subset``, ``Rows/Subset``, ``Titles/Subset``,
+        ``Titles/Selected``. They're complex properties, so TM1 wants paths, not nested
+        options. An MDX view is an error."""
+        path = _view(cube, scope, view).cast("ibm.tm1.api.v1.NativeView")
+        return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), NativeView))
+
+    @endpoint("Navigation Cube/Views", "Navigation Cube/PrivateViews")
+    async def create(self, cube: str, scope: ViewScope, view: Any) -> View:
+        """``POST Cubes('c')/Views``: creates a view; the patch's type says which kind
+        (``MDXViewPatch``, ``NativeViewPatch``), and a native view's axes bind subsets. It
+        needs a name. TM1 (11.8) refuses a native view that leaves any of the cube's
+        dimensions off its columns, rows and titles (400, "All cube dimensions must be placed
+        on an axis")."""
+        return await self._session.execute(Tm1Request.post(_views(cube, scope), _require(view, "view"), View))
+
+    @endpoint("Navigation Cube/Views", "Navigation Cube/PrivateViews")
+    async def update(self, cube: str, scope: ViewScope, view: str, patch: Any, etag: str | None = None) -> None:
+        """``PATCH Cubes('c')/Views('v')``: changes the properties the patch (of the view's
+        kind) sets, such as an MDX view's ``MDX``. With ``etag``, sent as ``If-Match``: a
+        ``Tm1PreconditionFailedError`` if the view changed since it was read."""
+        request = Tm1Request.patch(_view(cube, scope, view), _require(patch, "patch"))
+        await self._session.execute(request if etag is None else request.if_match(etag))
+
+    @endpoint("Navigation Cube/Views", "Navigation Cube/PrivateViews")
+    async def delete(self, cube: str, scope: ViewScope, view: str) -> None:
+        """``DELETE Cubes('c')/Views('v')``; its subsets stay."""
+        await self._session.execute(Tm1Request.delete(_view(cube, scope, view)))
+
+    @endpoint("Navigation View/Cube")
+    async def cube(self, cube: str, scope: ViewScope, view: str, query: ODataQuery | None = None, **options: Any) -> Cube:
+        """``GET Cubes('c')/Views('v')/Cube``: the view's cube."""
+        path = _view(cube, scope, view).nav("Cube")
+        return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Cube))
+
+
+def _views(cube: str, scope: ViewScope) -> ODataPath:
+    return _CUBES.key(_require(cube, "cube")).nav(_require(scope, "scope").navigation())
+
+
+def _view(cube: str, scope: ViewScope, view: str) -> ODataPath:
+    return _views(cube, scope).key(_require(view, "view"))
