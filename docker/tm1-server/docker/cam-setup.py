@@ -32,7 +32,8 @@ NS = os.environ.get("TM1_CAM_NAMESPACE") or "LDAP"
 
 
 def entries(var):
-    return [e for e in re.split(r"[\s,]+", os.environ.get(var, "")) if e]
+    # A full CAMID("...") stays whole: DN-style ones contain commas and spaces.
+    return re.findall(r'CAMID\("[^"]*"\)|[^\s,]+', os.environ.get(var, ""))
 
 
 def camid(kind, name):

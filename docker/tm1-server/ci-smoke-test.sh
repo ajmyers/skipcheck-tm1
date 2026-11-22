@@ -67,13 +67,14 @@ grep -q "download failed: http://127.0.0.1:9/tm1server-bundle.tar.gz" <<<"$out" 
 pass "unreachable bundle URL fails cleanly without printing credentials"
 
 # 7b. CAM setup builds CAMIDs from short names and keeps full CAMIDs as given
-out=$(run -e 'TM1_CAM_ADMINS=admin CAMID("AD:u:abc")' -e 'TM1_CAM_GROUPS=Analysts,Readers' --entrypoint python3 "$image" /usr/local/lib/tm1-server/cam-setup.py --print 2>&1) \
+out=$(run -e 'TM1_CAM_ADMINS=admin,CAMID("AD:u:uid=x, ou=people,dc=a")' -e 'TM1_CAM_GROUPS=Analysts,Readers' --entrypoint python3 "$image" /usr/local/lib/tm1-server/cam-setup.py --print 2>&1) \
   || fail "cam-setup.py --print failed: $out"
-for want in 'admin CAMID("LDAP:u:uid=admin,ou=people")' 'admin CAMID("AD:u:abc")' \
+for want in 'admin CAMID("LDAP:u:uid=admin,ou=people")' 'admin CAMID("AD:u:uid=x, ou=people,dc=a")' \
   'group CAMID("LDAP:g:cn=analysts,ou=groups")' 'group CAMID("LDAP:g:cn=readers,ou=groups")'; do
   grep -qxF -- "$want" <<<"$out" || fail "cam-setup.py --print lacks $want: $out"
 done
-pass "CAM setup builds CAMIDs"
+[ "$(grep -c -E '^(admin|group) ' <<<"$out")" -eq 4 ] || fail "cam-setup.py --print split a CAMID: $out"
+pass "CAM setup builds CAMIDs (and keeps full CAMIDs whole)"
 
 # 8. The setup scripts show the same banner as the image (each embeds a copy)
 while IFS= read -r line; do
