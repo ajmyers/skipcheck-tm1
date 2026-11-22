@@ -3,6 +3,7 @@ package net.ajmyers.tm1.client.service.attribute;
 import java.util.Objects;
 
 import net.ajmyers.tm1.client.odata.ODataPath;
+import net.ajmyers.tm1.client.service.cube.ViewScope;
 import net.ajmyers.tm1.client.service.dimension.SubsetScope;
 
 /**
@@ -85,6 +86,29 @@ public final class AttributeOwner {
 			.key(Objects.requireNonNull(hierarchy, "hierarchy"))
 			.nav(scope.navigation())
 			.key(Objects.requireNonNull(subset, "subset")));
+	}
+
+	/**
+	 * A cube.
+	 * @param cube the cube's name
+	 * @return the owner
+	 */
+	public static AttributeOwner cube(String cube) {
+		return new AttributeOwner(ODataPath.of("Cubes").key(Objects.requireNonNull(cube, "cube")));
+	}
+
+	/**
+	 * A view.
+	 * @param cube the cube's name
+	 * @param scope where the view is
+	 * @param view the view's name
+	 * @return the owner
+	 */
+	public static AttributeOwner view(String cube, ViewScope scope, String view) {
+		return new AttributeOwner(ODataPath.of("Cubes")
+			.key(Objects.requireNonNull(cube, "cube"))
+			.nav(scope.navigation())
+			.key(Objects.requireNonNull(view, "view")));
 	}
 
 	ODataPath path() {

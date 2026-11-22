@@ -90,7 +90,9 @@ public final class ViewService {
 	/**
 	 * {@code POST Cubes('c')/Views}: creates a view; the patch's type says which kind
 	 * ({@code MDXViewPatch}, {@code NativeViewPatch}), and a native view's axes bind
-	 * subsets.
+	 * subsets. TM1 (11.8) refuses a native view that leaves any of the cube's dimensions
+	 * off its columns, rows and titles (400, "All cube dimensions must be placed on an
+	 * axis").
 	 * @param cube the cube's name
 	 * @param scope where to create it
 	 * @param view the new view; it needs a name

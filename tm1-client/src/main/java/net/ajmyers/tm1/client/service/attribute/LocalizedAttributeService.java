@@ -52,6 +52,8 @@ public final class LocalizedAttributeService {
 	@Tm1Endpoint("Navigation Element/LocalizedAttributes")
 	@Tm1Endpoint("Navigation Member/LocalizedAttributes")
 	@Tm1Endpoint("Navigation Subset/LocalizedAttributes")
+	@Tm1Endpoint("Navigation Cube/LocalizedAttributes")
+	@Tm1Endpoint("Navigation View/LocalizedAttributes")
 	public Flux<LocalizedAttributes> list(AttributeOwner owner, ODataQuery query) {
 		return session.stream(Tm1Request.list(localized(owner), query, LocalizedAttributes.class));
 	}
@@ -69,6 +71,8 @@ public final class LocalizedAttributeService {
 	@Tm1Endpoint("Navigation Element/LocalizedAttributes")
 	@Tm1Endpoint("Navigation Member/LocalizedAttributes")
 	@Tm1Endpoint("Navigation Subset/LocalizedAttributes")
+	@Tm1Endpoint("Navigation Cube/LocalizedAttributes")
+	@Tm1Endpoint("Navigation View/LocalizedAttributes")
 	public Mono<LocalizedAttributes> get(AttributeOwner owner, String locale, ODataQuery query) {
 		return session.execute(Tm1Request.get(localized(owner, locale), query, LocalizedAttributes.class));
 	}
@@ -84,6 +88,8 @@ public final class LocalizedAttributeService {
 	@Tm1Endpoint("Navigation Element/LocalizedAttributes")
 	@Tm1Endpoint("Navigation Member/LocalizedAttributes")
 	@Tm1Endpoint("Navigation Subset/LocalizedAttributes")
+	@Tm1Endpoint("Navigation Cube/LocalizedAttributes")
+	@Tm1Endpoint("Navigation View/LocalizedAttributes")
 	public Mono<LocalizedAttributes> create(AttributeOwner owner, LocalizedAttributesPatch translations) {
 		return session.execute(Tm1Request.post(localized(owner), translations, LocalizedAttributes.class));
 	}

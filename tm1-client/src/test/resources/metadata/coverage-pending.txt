@@ -72,7 +72,6 @@ EntitySet Cellsets
 EntitySet ChoreAttributes
 EntitySet Chores
 EntitySet Contents
-EntitySet CubeAttributes
 EntitySet ErrorLogFiles
 EntitySet GitPlans
 EntitySet Groups
@@ -126,8 +125,6 @@ Navigation ChoreReference/Chore
 Navigation ChoreTask/Chore
 Navigation ChoreTask/Process
 Navigation Cube/Annotations
-Navigation Cube/LocalizedAttributes
-Navigation Cube/ViewAttributes
 Navigation CubeReference/Cube
 Navigation CubeUpdate/ReferenceCell
 Navigation CubeUpdate/ReferenceCube
@@ -158,7 +155,6 @@ Navigation SubsetReference/Subset
 Navigation Thread/Session
 Navigation User/Groups
 Navigation User/Sessions
-Navigation View/LocalizedAttributes
 Navigation ViewReference/View
 Singleton ActiveConfiguration
 Singleton ActiveSession
