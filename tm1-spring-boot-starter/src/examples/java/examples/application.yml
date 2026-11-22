@@ -1,0 +1,9 @@
+# src/main/resources/application.yml
+tm1:
+  # Where TM1 is: the server's address, as for tm1-server on this computer
+  address: http://localhost:8010
+  # Who to log in as: tm1-server's default admin, with no password
+  user: admin
+  password: ""
+  # With Cognos (CAM) security, also name the CAM namespace:
+  # namespace: LDAP
