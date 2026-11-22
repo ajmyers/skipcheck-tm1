@@ -131,6 +131,20 @@ public final class ModelGenerator {
 	static final Map<String, String> DEPARTURES = Map.of("CAMSettings/ClientPingCAMPassport",
 			"TM1 (11.8) sends it as a number in {@code StaticConfiguration} and as an ISO 8601 duration in {@code ActiveConfiguration}, though {@code $metadata} declares {@code Edm.Int32}, so it's JSON");
 
+	/**
+	 * Date-time properties TM1 sometimes sends something else in, by
+	 * {@code Type/Property}, with what: they're read leniently, as {@code null} when the
+	 * text isn't a date-time.
+	 */
+	static final Map<String, String> LENIENT_DATES = Map.of("MessageLogEntry/TimeStamp",
+			"TM1 (11.8) sends {@code 0000-00-00T00:00Z} for an entry without a time, such as the first; it's read as {@code null}");
+
+	private static final ClassName JSON_DESERIALIZE = ClassName.get("tools.jackson.databind.annotation",
+			"JsonDeserialize");
+
+	private static final ClassName LENIENT_DATE_TIME = ClassName.get("net.ajmyers.tm1.client.odata",
+			"LenientOffsetDateTimeDeserializer");
+
 	private static final ClassName JSON_NODE = ClassName.get("tools.jackson.databind", "JsonNode");
 
 	private static final Set<String> KEYWORDS = Set.of("abstract", "assert", "boolean", "break", "byte", "case",
@@ -287,7 +301,13 @@ public final class ModelGenerator {
 	}
 
 	/** A record component, or a hierarchy interface's accessor. */
-	private record Component(String name, TypeName type, String json, String doc, Revisions revisions) {
+	private record Component(String name, TypeName type, String json, String doc, Revisions revisions,
+			boolean lenient) {
+
+		Component(String name, TypeName type, String json, String doc, Revisions revisions) {
+			this(name, type, json, doc, revisions, false);
+		}
+
 	}
 
 	/**
@@ -307,13 +327,16 @@ public final class ModelGenerator {
 		}
 		for (CsdlStructuredType level : rootFirst) {
 			for (CsdlProperty property : level.properties()) {
-				String departure = DEPARTURES.get(level.name() + "/" + property.name());
+				String key = level.name() + "/" + property.name();
+				String departure = DEPARTURES.get(key);
+				String lenient = LENIENT_DATES.get(key);
 				javaType(property.type()).map(t -> departure == null ? t : (TypeName) JSON_NODE)
 					.ifPresent(t -> components
 						.add(new Component(unique(componentName(property.name()), names), t, property.name(),
 								paramText(property.annotations(), property.name())
-										+ (departure == null ? "" : ". " + departure),
-								revisions(property.annotations()))));
+										+ (departure == null ? "" : ". " + departure)
+										+ (lenient == null ? "" : ". " + lenient),
+								revisions(property.annotations()), lenient != null)));
 			}
 			for (CsdlNavigationProperty navigation : level.navigationProperties()) {
 				javaType(navigation.type()).ifPresent(t -> components
@@ -374,9 +397,15 @@ public final class ModelGenerator {
 			.append(" Null components aren't sent.\n\n");
 		MethodSpec.Builder constructor = MethodSpec.constructorBuilder();
 		for (Component component : components) {
-			constructor.addParameter(component(component.type(), component.name(), component.json()).toBuilder()
-				.addAnnotations(component.revisions().annotations())
-				.build());
+			ParameterSpec.Builder parameter = component(component.type(), component.name(), component.json())
+				.toBuilder()
+				.addAnnotations(component.revisions().annotations());
+			if (component.lenient()) {
+				parameter.addAnnotation(AnnotationSpec.builder(JSON_DESERIALIZE)
+					.addMember("using", "$T.class", LENIENT_DATE_TIME)
+					.build());
+			}
+			constructor.addParameter(parameter.build());
 			doc.append("@param ")
 				.append(component.name())
 				.append(' ')

@@ -35,6 +35,11 @@
 #                         or any OIDC provider, configured by hand
 #   COGNOS_PUBLIC_URL     Cognos as browsers reach it (default http://localhost:9300)
 #
+# PAW and TM1 Web through Cognos:
+#   COGNOS_PMHUB_URLS     their addresses in browsers, e.g. "http://localhost:8800": installs
+#                         IBM's interoperability files (bi_interop.zip, from the TM1 bundle in
+#                         /ibm) so logons through Cognos go back to them
+#
 # Other environment:
 #   COGNOS_HOST           host name in the dispatcher URIs (default: the container's
 #                         hostname). Others on the Docker network reach Cognos by it.
@@ -140,6 +145,13 @@ if [ -n "${COGNOS_KEYCLOAK_URL:-}" ]; then
 fi
 if [ -n "${COGNOS_OIDC_DISCOVERY_URL:-}" ]; then
   log "OIDC namespace ${COGNOS_OIDC_NAMESPACE:-OIDC} against ${COGNOS_OIDC_DISCOVERY_URL%%/.well-known*}; browsers return to ${COGNOS_PUBLIC_URL:-http://localhost:9300}"
+fi
+
+# ---- PAW and TM1 Web logons through Cognos -----------------------------------------
+if [ -n "${COGNOS_PMHUB_URLS:-}" ]; then
+  # shellcheck disable=SC2086  # a list of URLs
+  python3 /usr/local/lib/cognos-server/bi-interop.py "${COGNOS_ZIP_DIR:-/ibm}" "$COGNOS_HOME" $COGNOS_PMHUB_URLS \
+    || { stop_pg; die "couldn't install the interoperability files"; }
 fi
 
 # ---- configuration --------------------------------------------------------------

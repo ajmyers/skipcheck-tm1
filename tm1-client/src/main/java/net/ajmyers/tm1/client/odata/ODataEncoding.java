@@ -24,6 +24,8 @@ public final class ODataEncoding {
 
 	private static final boolean[] PATH_SAFE = safe("'");
 
+	private static final boolean[] LINK_SAFE = safe("'!()");
+
 	private static final boolean[] QUERY_SAFE = safe("$(),;':@/!*");
 
 	private static final char[] HEX = "0123456789ABCDEF".toCharArray();
@@ -47,6 +49,16 @@ public final class ODataEncoding {
 	 */
 	public static String queryValue(String text) {
 		return encode(text, QUERY_SAFE);
+	}
+
+	/**
+	 * Encodes one segment of a link a server returned, keeping {@code !}, {@code (},
+	 * {@code )} and {@code '}, as TM1 writes {@code !delta('…')}.
+	 * @param segment the unencoded segment
+	 * @return the percent-encoded segment
+	 */
+	static String linkSegment(String segment) {
+		return encode(segment, LINK_SAFE);
 	}
 
 	private static String encode(String text, boolean[] safe) {

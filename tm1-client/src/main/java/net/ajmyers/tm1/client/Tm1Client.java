@@ -8,8 +8,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 import io.micrometer.observation.ObservationRegistry;
 import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
+import net.ajmyers.tm1.client.service.annotation.AnnotationService;
 import net.ajmyers.tm1.client.service.attribute.AttributeService;
 import net.ajmyers.tm1.client.service.attribute.LocalizedAttributeService;
+import net.ajmyers.tm1.client.service.content.ContentService;
 import net.ajmyers.tm1.client.service.cube.CubeService;
 import net.ajmyers.tm1.client.service.cube.ViewService;
 import net.ajmyers.tm1.client.service.data.CellService;
@@ -32,6 +34,7 @@ import net.ajmyers.tm1.client.service.security.GroupService;
 import net.ajmyers.tm1.client.service.security.SessionService;
 import net.ajmyers.tm1.client.service.security.ThreadService;
 import net.ajmyers.tm1.client.service.security.UserService;
+import net.ajmyers.tm1.client.service.server.LogService;
 import net.ajmyers.tm1.client.service.server.ServerService;
 import net.ajmyers.tm1.client.session.Tm1Session;
 import net.ajmyers.tm1.client.session.Tm1Timeouts;
@@ -100,6 +103,12 @@ public final class Tm1Client {
 
 	private final ServerService server;
 
+	private final LogService logs;
+
+	private final ContentService contents;
+
+	private final AnnotationService annotations;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -127,6 +136,9 @@ public final class Tm1Client {
 		this.sessions = new SessionService(session);
 		this.threads = new ThreadService(session);
 		this.server = new ServerService(session);
+		this.logs = new LogService(session);
+		this.contents = new ContentService(session);
+		this.annotations = new AnnotationService(session);
 	}
 
 	/**
@@ -353,6 +365,30 @@ public final class Tm1Client {
 	 */
 	public ServerService server() {
 		return server;
+	}
+
+	/**
+	 * The server's logs.
+	 * @return the the server's log service, on this client's session
+	 */
+	public LogService logs() {
+		return logs;
+	}
+
+	/**
+	 * The contents tree.
+	 * @return the the contents tree service, on this client's session
+	 */
+	public ContentService contents() {
+		return contents;
+	}
+
+	/**
+	 * Annotations on cube cells.
+	 * @return the annotations on cube cell service, on this client's session
+	 */
+	public AnnotationService annotations() {
+		return annotations;
 	}
 
 	/**

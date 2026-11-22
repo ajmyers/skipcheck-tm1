@@ -1,14 +1,11 @@
 # Endpoints not implemented yet. This list only shrinks: implementing an endpoint means
 # taking it off. A new $metadata snapshot's new endpoints go here or in coverage-excluded.txt.
 # See CoverageGateTest.
-Action Entry/Copy
-Action Entry/Move
 Action GitPullPlan/Execute
 Action GitPushPlan/Execute
 ActionImport ConfigureEncryptionAtRest
 ActionImport DecryptDataFile
 ActionImport DecryptDataModel
-ActionImport DeleteAnnotationArtifacts
 ActionImport DisableEncryptionAtRest
 ActionImport EncryptDataFile
 ActionImport EncryptDataModel
@@ -21,38 +18,7 @@ ActionImport GitUninit
 ActionImport RemoveOIDCKeyFromCache
 ActionImport RotateDataEncryptionKey
 ActionImport RotateDataModelKey
-EntitySet Annotations
-EntitySet ApplicationContextFacets
-EntitySet AuditLogEntries
-EntitySet Contents
-EntitySet ErrorLogFiles
 EntitySet GitPlans
-EntitySet MessageLogEntries
 EntitySet SQLDataSources
-EntitySet TransactionLogEntries
 FunctionImport GetOIDCKeys
-FunctionImport MessageLog
-FunctionImport TailAuditLog
-FunctionImport TailMessageLog
-FunctionImport TailTransactionLog
-FunctionImport TransactionLog
 FunctionImport ValidateEncryptionAtRestSettings
-Navigation Annotation/ApplicationContext
-Navigation Annotation/Attachments
-Navigation Annotation/DimensionalContext
-Navigation ApplicationContextFacet/Values
-Navigation ApplicationContextFacetValue/Facet
-Navigation AuditLogEntry/AuditDetails
-Navigation CellsetCell/Annotations
-Navigation ChoreReference/Chore
-Navigation Cube/Annotations
-Navigation CubeReference/Cube
-Navigation DimensionReference/Dimension
-Navigation DocumentReference/Document
-Navigation Entry/ContainedBy
-Navigation Entry/LocalizedAttributes
-Navigation Folder/Contents
-Navigation Folder/PrivateContents
-Navigation ProcessReference/Process
-Navigation SubsetReference/Subset
-Navigation ViewReference/View

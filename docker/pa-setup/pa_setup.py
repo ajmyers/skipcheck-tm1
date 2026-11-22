@@ -281,6 +281,11 @@ def generate(m):
         env = {"COGNOS_MAX_MEMORY": str(cognos["memory"]),
                "COGNOS_PUBLIC_URL": f"http://localhost:{cognos['port']}",
                "COGNOS_ZIP_URL": "${COGNOS_ZIP_URL:-}", "COGNOS_ZIP_SHA256": "${COGNOS_ZIP_SHA256:-}"}
+        # Browsers come back from Cognos's logon to PAW and TM1 Web (IBM's pmhub.html)
+        back = ([f"http://localhost:{m['paw']['port']}"] if m["paw"] else []) + \
+            ([f"http://localhost:{m['tm1Web']['port']}"] if m["tm1Web"] else [])
+        if back:
+            env["COGNOS_PMHUB_URLS"] = " ".join(back)
         if cognos["users"]:
             env["COGNOS_USERS"] = " ".join(
                 u["name"] + ":" + u["password"] + (":" + ",".join(u["groups"]) if u["groups"] else "")
@@ -372,14 +377,19 @@ def compose(m, *args, check=True):
 
 def paw_env(m):
     first = service_name(next(iter(m["tm1"])))
-    env = {"PAW_ACCEPT_LICENSE": "true", "PAW_HTTP_PORT": str(m["paw"]["port"]),
+    # PAW_WAIT=0: paw-local.sh would wait on localhost, which inside the runner container
+    # is the runner; wait_for_paw() checks from the project network instead.
+    env = {"PAW_ACCEPT_LICENSE": "true", "PAW_WAIT": "0", "PAW_HTTP_PORT": str(m["paw"]["port"]),
            "PAW_HTTPS_PORT": str(m["paw"]["port"] + 43), "PAW_NETWORK": f"{m['name']}_default",
            "PAW_TM1_ADMIN_URL": f"http://{'tm1-admin' if m['admin'] else first}:5895",
            "PAW_TM1_LOGIN_URL": f"http://{first}:8010", "PAW_ZIP": "/ibm/" + (m["paw"]["zip"] or "")}
     if m["tm1Web"]:
         env["PAW_TM1WEB_URL"] = "http://tm1-web:9510"
     if m["cognos"]:
+        # The gateway is where PAW sends browsers to log on, so it's Cognos's address on the
+        # host: Cognos's own logon page, and through the OIDC namespace, the provider's.
         env.update({"PAW_AUTH_MODE": "cam", "PAW_CAM_SERVLET": "http://cognos:9300/p2pd/servlet/dispatch",
+                    "PAW_CAM_GATEWAY": f"http://localhost:{m['cognos']['port']}/bi/v1/disp",
                     "PAW_CAM_NAMESPACE": m["cognos"]["namespace"].upper()})
     return env
 
@@ -426,6 +436,16 @@ def check_memory(m):
     if total < need + 2:
         log(f"WARNING: Docker has {total:.0f} GB of memory; this environment needs about {need:.0f} GB plus room "
             "for anything else running. Raise it in Docker Desktop (Settings > Resources), or things will stall.")
+
+
+def wait_for_paw(m, seconds=600):
+    """Polls PAW's gateway on the project network until its logon page answers."""
+    script = ("for i in $(seq 1 %d); do curl -fs -o /dev/null -m 5 http://pa-gateway:8000/login && exit 0; "
+              "sleep 5; done; exit 1") % (seconds // 5)
+    result = subprocess.run(["docker", "run", "--rm", "--network", f"{m['name']}_default", "--entrypoint", "sh",
+                             SELF_IMAGE, "-c", script])
+    if result.returncode != 0:
+        raise ConfigError(f"PAW didn't answer within {seconds}s; see: docker logs pa-gateway")
 
 
 def urls(m):
@@ -500,8 +520,9 @@ def main():
             log(f"Starting {', '.join(generate(m)['services'])}" + (" (Cognos takes a few minutes)" if m["cognos"] else "") + "...")
             compose(m, "up", "-d", "--wait", "--wait-timeout", "1800")
             if m["paw"]:
-                log("Starting PAW...")
+                log("Starting PAW (the first start loads IBM's images, a few minutes)...")
                 run_paw(m, "up")
+                wait_for_paw(m)
             log("\nReady:")
             urls(m)
         elif a.command == "urls":
