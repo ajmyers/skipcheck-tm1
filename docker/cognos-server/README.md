@@ -202,6 +202,15 @@ are also checked against the provider's signing keys (JWKS) and issuer.
 Users are `CAMID("OIDC:u:<username>")` and groups `CAMID("OIDC:g:<group, lower case>")`.
 Cognos only knows a user's groups from their token, so it can't list or search groups.
 
+**PAW and TM1 Web through Cognos.** With Cognos (CAM) security, PAW and TM1 Web send
+browsers to Cognos to log on, and Cognos sends them back through IBM's `pmhub.html`, which
+only returns to addresses on its list. Set `COGNOS_PMHUB_URLS` to their addresses in the
+browser (e.g. `http://localhost:8800 http://localhost:9510`; `pa-setup` does this), and the
+container installs IBM's interoperability files from `bi_interop.zip`. It finds that zip in
+`/ibm`, on its own or inside the TM1 Server bundle (the `biinterop` part of `PAA_Agent`),
+since it's IBM software the image can't carry. Through the OIDC namespace, a PAW logon then
+goes PAW, Cognos (pick OIDC), Keycloak, Cognos, PAW.
+
 **Another OIDC provider:** set `COGNOS_OIDC_DISCOVERY_URL`, `COGNOS_OIDC_CLIENT_ID` and
 `COGNOS_OIDC_CLIENT_SECRET` instead of `COGNOS_KEYCLOAK_URL`. Register
 `<COGNOS_PUBLIC_URL>/bi/completeAuth.jsp` as a redirect URI, allow the password grant if
@@ -231,6 +240,7 @@ default `groups`). Users are named by `COGNOS_OIDC_CAMID_CLAIM` (default
 | `COGNOS_OIDC_SCOPE` | `openid profile email` | Scopes Cognos asks for |
 | `COGNOS_OIDC_CAMID_CLAIM` / `COGNOS_OIDC_GROUPS_CLAIM` | `preferred_username` / `groups` | The claims users are named by, and their groups come from |
 | `COGNOS_PUBLIC_URL` | `http://localhost:9300` | Cognos as browsers reach it: OIDC providers send them back to `/bi/completeAuth.jsp` there |
+| `COGNOS_PMHUB_URLS` | | PAW and TM1 Web, as browsers reach them, e.g. `http://localhost:8800`: installs IBM's `bi_interop.zip` files so logons through Cognos go back to them |
 | `COGNOS_HOST` | the container's hostname | Host name in Cognos's dispatcher URIs. Other containers on the network reach Cognos by it, so keep it a name they can resolve. |
 | `COGNOS_MAX_MEMORY` | `6144` | Dispatcher JVM heap, in MB. 2048 is too small: Cognos's apps fail to start. |
 | `COGNOS_CS_HOST` | | External PostgreSQL host. Unset: the embedded one. |

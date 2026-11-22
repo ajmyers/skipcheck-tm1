@@ -218,6 +218,38 @@ done
 cleanup_kc; trap - EXIT
 pass "test users become a Keycloak realm (tokens with groups, audiences for Cognos and tm1-app)"
 
+# 5d. IBM's interoperability files are found inside a TM1 bundle (fake, built here) and
+#     installed, with pmhub.html's allow-list set
+python3 - "$fake/tm1server-9.9.9-1-linuxi38664h_bundle.tar.gz" <<'PY'
+import io, json, sys, tarfile, zipfile
+def tar_with(name, data):
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as t:
+        info = tarfile.TarInfo(name); info.size = len(data); t.addfile(info, io.BytesIO(data))
+    return buf.getvalue()
+interop = io.BytesIO()
+with zipfile.ZipFile(interop, "w") as z:
+    z.writestr("webcontent/pmhub.html", 'var pmhubURLs = ["http://mypmhubserver1:9510"];\n')
+    z.writestr("templates/ps/portal/variables_plan.xml", "<CRNenv/>")
+repo = io.BytesIO()
+with zipfile.ZipFile(repo, "w") as z:
+    z.writestr("manifest/tm1server-manifest/9.9.9/m.json", json.dumps({"installables": [
+        {"name": "PAA_Agent", "parts": [{"name": "biinterop", "repositoryPath": "p/biinterop.tar.gz"}]}]}))
+    z.writestr("p/biinterop.tar.gz", tar_with("bi_interop/bi_interop.zip", interop.getvalue()))
+data = repo.getvalue()
+with tarfile.open(sys.argv[1], "w:gz") as bundle:
+    info = tarfile.TarInfo("tm1server-9.9.9-1-linuxi38664h.zip"); info.size = len(data)
+    bundle.addfile(info, io.BytesIO(data))
+PY
+out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c '
+  python3 /usr/local/lib/cognos-server/bi-interop.py /ibm /c http://localhost:8800 http://localhost:9510 &&
+  cat /c/webcontent/pmhub.html && test -f /c/templates/ps/portal/variables_plan.xml && echo installed' 2>&1) || true
+grep -qF 'var pmhubURLs = ["http://localhost:8800", "http://localhost:9510"];' <<<"$out" && grep -q installed <<<"$out" \
+  || fail "interoperability files not installed from the TM1 bundle: $out"
+out=$(run --entrypoint python3 "$image" /usr/local/lib/cognos-server/bi-interop.py /ibm /c "http://x/path" 2>&1) && fail "a URL with a path was accepted"
+grep -q "isn't a URL" <<<"$out" || fail "missing URL error: $out"
+pass "IBM's interoperability files are installed from the TM1 bundle, with pmhub.html's allow-list"
+
 # 6. The embedded PostgreSQL starts, and the content store role can log in over TCP
 out=$(run --entrypoint sh "$image" -c '
   cognos-postgres start >/dev/null &&
