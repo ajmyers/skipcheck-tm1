@@ -7,10 +7,12 @@ import java.time.Duration;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpMethod;
 
 import net.ajmyers.tm1.client.odata.ODataPath;
 import net.ajmyers.tm1.client.odata.ODataQuery;
+import reactor.core.publisher.Flux;
 import tools.jackson.databind.JsonNode;
 
 class Tm1RequestTest {
@@ -71,6 +73,20 @@ class Tm1RequestTest {
 		assertThat(request.method()).isEqualTo(HttpMethod.POST);
 		assertThat(request.response()).isEqualTo(Tm1Request.Response.COLLECTION);
 		assertThat(request.isIdempotent()).isFalse();
+	}
+
+	@Test
+	void describesRawBytesBothWays() {
+		Tm1Request<DataBuffer> download = Tm1Request
+			.bytes(ODataPath.of("Contents").key("Blobs").nav("Contents").key("a.txt"));
+		assertThat(download.response()).isEqualTo(Tm1Request.Response.BYTES);
+		assertThat(download.method()).isEqualTo(HttpMethod.GET);
+		Flux<DataBuffer> content = Flux.empty();
+		Tm1Request<Void> upload = Tm1Request.put(ODataPath.of("Contents").key("Blobs"), content);
+		assertThat(upload.method()).isEqualTo(HttpMethod.PUT);
+		assertThat(upload.isIdempotent()).isTrue();
+		assertThat(upload.body()).isEqualTo(new Tm1Request.Bytes(content));
+		assertThat(upload.response()).isEqualTo(Tm1Request.Response.NONE);
 	}
 
 }
