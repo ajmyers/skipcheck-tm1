@@ -1,0 +1,13 @@
+{
+  "name": "ajmyers-net-api-docs",
+  "private": true,
+  "description": "Serves the Java API docs at ajmyers.net/projects/<module>/api/",
+  "scripts": {
+    "assemble": "node scripts/assemble.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.166.0"
+  }
+}
