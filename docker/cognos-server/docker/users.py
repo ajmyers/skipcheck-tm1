@@ -7,7 +7,8 @@ user per entry:
 
     user:password[:group,group,...]
 
-Entries are separated by whitespace or newlines; in a file, # starts a comment.
+Entries are separated by whitespace or newlines. In a file, # at the start of a
+line or after whitespace starts a comment (so passwords may contain #).
 User and group names are letters, digits, '.', '_' and '-'. A password can't
 contain ':' or whitespace.
 
@@ -24,15 +25,15 @@ NAME = re.compile(r"[A-Za-z0-9._-]+")
 
 
 def entries():
-    text = os.environ.get("COGNOS_USERS", "")
+    yield from os.environ.get("COGNOS_USERS", "").split()
     path = os.environ.get("COGNOS_USERS_FILE")
     if path:
         try:
-            text += "\n" + open(path, encoding="utf-8").read()
+            text = open(path, encoding="utf-8").read()
         except OSError as e:
             sys.exit(f"can't read COGNOS_USERS_FILE {path}: {e.strerror}")
-    for line in text.splitlines():
-        yield from line.split("#", 1)[0].split()
+        for line in text.splitlines():
+            yield from re.sub(r"(^|\s)#.*", "", line).split()
 
 
 def ssha(password):

@@ -119,7 +119,8 @@ docker run -d --name cognos -p 9300:9300 --stop-timeout 180 \
 
 Each entry is `user:password[:group,group,...]`, separated by spaces or newlines.
 Groups are created from the entries that name them. For a longer list, mount a
-file and set `COGNOS_USERS_FILE` (same format, one per line, `#` comments).
+file and set `COGNOS_USERS_FILE` (same format, one per line; `#` at the start of a
+line or after a space starts a comment).
 Names are letters, digits, `.`, `_` and `-`. A password can't contain `:` or
 spaces.
 

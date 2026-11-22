@@ -166,6 +166,14 @@ out=$(run -e COGNOS_USERS="admin:adminpw:Admins analyst:analystpw:Analysts,Reade
   ldapsearch -x -LLL -H ldap://127.0.0.1 -b "ou=groups,$b" "(uniqueMember=uid=analyst,ou=people,$b)" cn | grep "^cn:" | sort | tr "\n" " "
   ldapsearch -x -LLL -H ldap://127.0.0.1 -b "ou=people,$b" userPassword | grep -c "^userPassword" || true' 2>&1) || fail "embedded LDAP directory doesn't work: $out"
 grep -qx "cn: Analysts cn: Readers 0" <<<"$out" || fail "unexpected LDAP groups or readable passwords: $out"
+# '#' is part of a password inline, and in a file only starts a comment after whitespace
+out=$(run -e COGNOS_USERS="hash:pa#ss:G1" --entrypoint bash "$image" -c '
+  printf "# team\nfile:f#pw:G2   # trailing comment\n" > /tmp/users.txt
+  COGNOS_USERS_FILE=/tmp/users.txt cognos-ldap start >/dev/null 2>&1 || exit 1
+  ldapwhoami -x -H ldap://127.0.0.1 -D uid=hash,ou=people,dc=cognos,dc=local -w "pa#ss" >/dev/null &&
+  ldapwhoami -x -H ldap://127.0.0.1 -D uid=file,ou=people,dc=cognos,dc=local -w "f#pw" >/dev/null &&
+  ldapsearch -x -LLL -H ldap://127.0.0.1 -b ou=groups,dc=cognos,dc=local cn | grep "^cn:" | sort | tr "\n" " "' 2>&1) || fail "passwords with # or file comments mishandled: $out"
+grep -qx "cn: G1 cn: G2 " <<<"$out" || fail "unexpected groups from users with # / file comments: $out"
 out=$(run -e COGNOS_USERS="bad user:pw" --entrypoint cognos-ldap "$image" start 2>&1) && fail "bad user entry accepted"
 grep -q "bad user entry\|bad user name" <<<"$out" || fail "missing user entry error: $out"
 pass "test users become an LDAP directory (logons, wrong password refused, groups, hashes hidden)"
