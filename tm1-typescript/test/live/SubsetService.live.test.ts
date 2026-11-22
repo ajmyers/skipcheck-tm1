@@ -10,7 +10,6 @@ import {
   SubsetPatch,
   SubsetScope,
   Tm1PreconditionFailedException,
-  Tm1Request,
   type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
@@ -34,21 +33,17 @@ describe("SubsetService on TM1" + liveReason, () => {
     if (!Live.configured) return;
     d = Live.name();
     const numeric = (name: string): ElementPatch => ElementPatch.builder().name(name).type(ElementType.Numeric).build();
-    // Dimensions through the session until DimensionService is ported
-    await tm1.session.execute(
-      Tm1Request.post(
-        ODataPath.of("Dimensions"),
-        DimensionPatch.builder()
-          .name(d)
-          .hierarchies([HierarchyPatch.builder().name(d).elements([numeric("A"), numeric("B"), numeric("C"), numeric("D")]).build()])
-          .build(),
-      ),
+    await tm1.dimensions.create(
+      DimensionPatch.builder()
+        .name(d)
+        .hierarchies([HierarchyPatch.builder().name(d).elements([numeric("A"), numeric("B"), numeric("C"), numeric("D")]).build()])
+        .build(),
     );
   });
 
   afterEach(async () => {
     if (!tm1 || !d) return;
-    await tm1.session.execute(Tm1Request.delete(ODataPath.of("Dimensions").key(d))).catch(() => undefined);
+    await tm1.dimensions.delete(d).catch(() => undefined);
   });
 
   const el = (name: string): ODataPath => ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Elements").key(name);

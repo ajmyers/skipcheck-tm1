@@ -11,7 +11,7 @@ namespace AjMyers.Tm1.Client.Tests.Live;
 
 /// <summary>The dimension services against a real TM1: ports of the Java client's
 /// DimensionServiceTm1Test, HierarchyServiceTm1Test, ElementServiceTm1Test,
-/// LevelAndMemberServiceTm1Test and SubsetServiceTm1Test.</summary>
+/// EdgeServiceTm1Test, LevelAndMemberServiceTm1Test, MemberServiceTm1Test and SubsetServiceTm1Test.</summary>
 public class DimensionLiveTests
 {
     internal static ElementPatch Numeric(string name) => ElementPatch.Builder().Name(name).Type(ElementType.Numeric).Build();
@@ -319,6 +319,8 @@ public class DimensionLiveTests
         await tm1.Elements.ReleaseAsync(d, d, "North");
     }
 
+    // EdgeServiceTm1Test, on ElementServiceTm1Test's dimension
+
     [Tm1Fact]
     public async Task CreatesReadsReweightsAndDeletesEdges()
     {
@@ -356,6 +358,8 @@ public class DimensionLiveTests
         Assert.Equal(["France", "Japan", "Spain"], Names(await tm1.Levels.MembersAsync(d, d, 2, ODataQuery.None().Select(Member.Fields.Name)).ToListAsync()).Order());
         Assert.Equal(d, (await tm1.Levels.HierarchyAsync(d, d, 0)).Name);
     }
+
+    // MemberServiceTm1Test, on the same dimension
 
     [Tm1Fact]
     public async Task NavigatesMembers()

@@ -149,16 +149,6 @@ public final class ConformanceCodec {
 	}
 
 	/**
-	 * A model's name: a sealed model's plain variant, such as {@code Member.Plain}, is
-	 * named for the model ({@code Member}), as the other clients name it.
-	 */
-	private static String modelName(Class<?> type) {
-		Class<?> enclosing = type.getEnclosingClass();
-		return enclosing != null && enclosing.getPackageName().equals(MODEL) ? enclosing.getSimpleName()
-				: type.getSimpleName();
-	}
-
-	/**
 	 * A call's result: a model as its JSON, a list for a {@code Flux}, null for nothing.
 	 */
 	public static JsonNode result(@Nullable Object value) {
@@ -177,16 +167,38 @@ public final class ConformanceCodec {
 		if (type.getPackageName().equals(MODEL) && !type.isEnum()) {
 			ObjectNode node = NODES.objectNode();
 			node.put("$model", modelName(type));
-			JsonNode json = JSON.valueToTree(value);
-			if (!modelName(type).equals(type.getSimpleName()) && json instanceof ObjectNode object) {
-				// The plain variant's type id is Jackson's, written on serializing: TM1's
-				// JSON has none
-				object.remove("@odata.type");
-			}
-			node.set("json", json);
+			node.set("json", withoutTypes(JSON.valueToTree(value)));
 			return node;
 		}
 		return JSON.valueToTree(value);
+	}
+
+	/**
+	 * A model's name: a polymorphic type's own variant ({@code Member.Plain}) by its
+	 * type's name ({@code Member}).
+	 */
+	private static String modelName(Class<?> type) {
+		Class<?> enclosing = type.getEnclosingClass();
+		if (type.getSimpleName().equals("Plain") && enclosing != null && enclosing.isInterface()) {
+			return enclosing.getSimpleName();
+		}
+		return type.getSimpleName();
+	}
+
+	/**
+	 * A result's JSON without the {@code @odata.type} members Jackson writes for every
+	 * polymorphic model, whether TM1 sent one or not: the result's type is its
+	 * {@code $model}.
+	 */
+	private static JsonNode withoutTypes(JsonNode json) {
+		if (json instanceof ObjectNode object) {
+			object.remove("@odata.type");
+			object.forEach(ConformanceCodec::withoutTypes);
+		}
+		else if (json instanceof ArrayNode array) {
+			array.forEach(ConformanceCodec::withoutTypes);
+		}
+		return json;
 	}
 
 	/**

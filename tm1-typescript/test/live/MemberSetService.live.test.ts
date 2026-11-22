@@ -2,8 +2,8 @@ import { afterAll, beforeAll, describe, expect } from "vitest";
 import { ODataQuery, Tm1NotFoundException, type Tm1Client } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
-/** MemberSetService against a real TM1: the member sets test of the Java client's
- * `MdxAndModelTm1Test` (the rest is CellsetService's and CubeService's). */
+/** MemberSetService against a real TM1: the Java client's
+ * `MemberSetServiceTm1Test`. */
 describe("MemberSetService on TM1" + liveReason, () => {
   let tm1: Tm1Client;
 

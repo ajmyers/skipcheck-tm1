@@ -22,7 +22,10 @@ import net.ajmyers.tm1.client.odata.ODataQuery;
 import net.ajmyers.tm1.testcontainers.RequiresTm1;
 import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
 
-/** LevelService and MemberService, on World = Europe (France, Spain) + Asia (Japan). */
+/**
+ * LevelService, on World = Europe (France, Spain) + Asia (Japan). MemberServiceTm1Test
+ * has the members' own tests.
+ */
 @RequiresTm1
 class LevelAndMemberServiceTm1Test {
 
@@ -69,23 +72,6 @@ class LevelAndMemberServiceTm1Test {
 				names(tm1.levels().members(d, d, 2, ODataQuery.none().select(Member.NAME)).collectList().block(WAIT)))
 			.containsExactlyInAnyOrder("France", "Spain", "Japan");
 		assertThat(tm1.levels().hierarchy(d, d, 0, ODataQuery.none()).block(WAIT).name()).isEqualTo(d);
-	}
-
-	@Test
-	void navigatesMembers() {
-		assertThat(tm1.members().list(d, d, ODataQuery.none()).collectList().block(WAIT)).hasSize(6)
-			.allSatisfy(m -> assertThat(m).isInstanceOf(Member.Plain.class));
-		assertThat(tm1.members().get(d, d, "Europe", ODataQuery.none()).block(WAIT).uniqueName())
-			.isEqualTo("[" + d + "].[" + d + "].[Europe]");
-		assertThat(tm1.members().parent(d, d, "France", ODataQuery.none()).block(WAIT).name()).isEqualTo("Europe");
-		assertThat(tm1.members().parent(d, d, "World", ODataQuery.none()).blockOptional(WAIT)).as("a root has none")
-			.isEmpty();
-		assertThat(names(tm1.members().children(d, d, "Europe", ODataQuery.none()).collectList().block(WAIT)))
-			.containsExactly("France", "Spain");
-		assertThat(tm1.members().element(d, d, "Japan", ODataQuery.none()).block(WAIT).type())
-			.isEqualTo(ElementType.NUMERIC);
-		assertThat(tm1.members().level(d, d, "Japan", ODataQuery.none()).block(WAIT).number()).isEqualTo(2);
-		assertThat(tm1.members().hierarchy(d, d, "Japan", ODataQuery.none()).block(WAIT).name()).isEqualTo(d);
 	}
 
 	private static List<String> names(List<Member> members) {

@@ -1,0 +1,619 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.data.MemberSetServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "MemberSetServiceTest#aBadExpressionIsRefused#1",
+			"service" : "memberSets",
+			"method" : "execute",
+			"params" : [
+				"mdx",
+				"query"
+			],
+			"args" : [
+				"{",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDXSetExpression",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "{"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Syntax error at or near: '}', character position 1"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "MemberSetServiceTest#aDeletedMemberSetIsNotFound#1",
+			"service" : "memberSets",
+			"method" : "get",
+			"params" : [
+				"ordinal",
+				"query"
+			],
+			"args" : [
+				3,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MemberSets(3)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'3' can not be found in collection of type 'CellsetAxis'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "MemberSetServiceTest#aDeletedMemberSetIsNotFound#2",
+			"service" : "memberSets",
+			"method" : "delete",
+			"params" : [
+				"ordinal"
+			],
+			"args" : [
+				3
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "MemberSets(3)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'3' can not be found in collection of type 'CellsetAxis'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "MemberSetServiceTest#deletesAMemberSet#1",
+			"service" : "memberSets",
+			"method" : "delete",
+			"params" : [
+				"ordinal"
+			],
+			"args" : [
+				3
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "MemberSets(3)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "MemberSetServiceTest#deletesAMemberSet#2",
+			"service" : "memberSets",
+			"method" : "delete",
+			"params" : [
+				"ordinal"
+			],
+			"args" : [
+				2147483647
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "MemberSets(2147483647)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "MemberSetServiceTest#executesASetExpression#1",
+			"service" : "memberSets",
+			"method" : "execute",
+			"params" : [
+				"mdx",
+				"query"
+			],
+			"args" : [
+				"{TM1SUBSETALL([Region].[Region])}",
+				{
+					"$query" : {
+						"expand" : {
+							"Tuples" : {
+								"expand" : {
+									"Members" : {
+										"select" : [
+											"Name"
+										]
+									}
+								}
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDXSetExpression?$expand=Tuples($expand%3DMembers($select%3DName))",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "{TM1SUBSETALL([Region].[Region])}"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Ordinal" : 3,
+							"Cardinality" : 2,
+							"Tuples" : [
+								{
+									"Ordinal" : 0,
+									"Members" : [
+										{
+											"Name" : "North"
+										}
+									]
+								},
+								{
+									"Ordinal" : 1,
+									"Members" : [
+										{
+											"Name" : "South"
+										}
+									]
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "CellsetAxis",
+				"json" : {
+					"Ordinal" : 3,
+					"Cardinality" : 2,
+					"Tuples" : [
+						{
+							"Ordinal" : 0,
+							"Members" : [
+								{
+									"Name" : "North"
+								}
+							]
+						},
+						{
+							"Ordinal" : 1,
+							"Members" : [
+								{
+									"Name" : "South"
+								}
+							]
+						}
+					]
+				}
+			}
+		},
+		{
+			"id" : "MemberSetServiceTest#executesASetExpression#2",
+			"service" : "memberSets",
+			"method" : "execute",
+			"params" : [
+				"mdx",
+				"query"
+			],
+			"args" : [
+				"{}",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDXSetExpression",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "{}"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Ordinal" : 4,
+							"Cardinality" : 0
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "CellsetAxis",
+				"json" : {
+					"Ordinal" : 4,
+					"Cardinality" : 0
+				}
+			}
+		},
+		{
+			"id" : "MemberSetServiceTest#getsAMemberSetByItsOrdinal#1",
+			"service" : "memberSets",
+			"method" : "get",
+			"params" : [
+				"ordinal",
+				"query"
+			],
+			"args" : [
+				3,
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Cardinality"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MemberSets(3)?$select=Ordinal,Cardinality",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Ordinal" : 3,
+							"Cardinality" : 2
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "CellsetAxis",
+				"json" : {
+					"Ordinal" : 3,
+					"Cardinality" : 2
+				}
+			}
+		},
+		{
+			"id" : "MemberSetServiceTest#getsAMemberSetByItsOrdinal#2",
+			"service" : "memberSets",
+			"method" : "get",
+			"params" : [
+				"ordinal",
+				"query"
+			],
+			"args" : [
+				0,
+				{
+					"$query" : {
+						"expand" : {
+							"Tuples" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MemberSets(0)?$expand=Tuples",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Ordinal" : 0,
+							"Cardinality" : 0
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "CellsetAxis",
+				"json" : {
+					"Ordinal" : 0,
+					"Cardinality" : 0
+				}
+			}
+		},
+		{
+			"id" : "MemberSetServiceTest#listsMemberSets#1",
+			"service" : "memberSets",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal"
+						],
+						"top" : 2
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MemberSets?$select=Ordinal&$top=2",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Ordinal" : 3
+								},
+								{
+									"Ordinal" : 4
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "CellsetAxis",
+					"json" : {
+						"Ordinal" : 3
+					}
+				},
+				{
+					"$model" : "CellsetAxis",
+					"json" : {
+						"Ordinal" : 4
+					}
+				}
+			]
+		},
+		{
+			"id" : "MemberSetServiceTest#listsMemberSets#2",
+			"service" : "memberSets",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MemberSets",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "MemberSetServiceTest#refusesAMissingExpressionSendingNothing#1",
+			"service" : "memberSets",
+			"method" : "execute",
+			"params" : [
+				"mdx",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "MemberSetServiceTest#sendsQuotesAndBackslashesInTheExpressionAsTheyAre#1",
+			"service" : "memberSets",
+			"method" : "execute",
+			"params" : [
+				"mdx",
+				"query"
+			],
+			"args" : [
+				"{[Region].[Region].[O'Neil \"\\\\ West]}",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDXSetExpression",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "{[Region].[Region].[O'Neil \"\\\\ West]}"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Ordinal" : 5,
+							"Cardinality" : 1
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "CellsetAxis",
+				"json" : {
+					"Ordinal" : 5,
+					"Cardinality" : 1
+				}
+			}
+		}
+	]
+}

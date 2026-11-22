@@ -1,0 +1,46 @@
+{
+	"specVersion" : 1,
+	"name" : "member-sets",
+	"description" : "Set expressions over a fresh dimension of A, B and C: evaluate all of it and one member, TM1 listing no member sets, a missing ordinal.",
+	"names" : [ "dim" ],
+	"steps" : [
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${dim}", "Hierarchies" : [ { "Name" : "${dim}", "Elements" : [ { "Name" : "A", "Type" : "Numeric" }, { "Name" : "B", "Type" : "Numeric" }, { "Name" : "C", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${dim}" } }
+		},
+		{
+			"service" : "memberSets",
+			"method" : "execute",
+			"params" : [ "mdx", "query" ],
+			"args" : [ "{TM1SUBSETALL([${dim}].[${dim}])}", { "$query" : { } } ],
+			"expect" : { "fields" : { "Cardinality" : 3 } }
+		},
+		{
+			"service" : "memberSets",
+			"method" : "execute",
+			"params" : [ "mdx", "query" ],
+			"args" : [ "{[${dim}].[${dim}].[B]}", { "$query" : { "expand" : { "Tuples" : { "expand" : { "Members" : { "select" : [ "Name" ] } } } } } } ],
+			"expect" : { "fields" : { "Cardinality" : 1 } }
+		},
+		{
+			"service" : "memberSets",
+			"method" : "list",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { } } ],
+			"expect" : { "count" : 0 }
+		},
+		{
+			"service" : "memberSets",
+			"method" : "get",
+			"params" : [ "ordinal", "query" ],
+			"args" : [ 2147483647, { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND" } }
+		}
+	],
+	"finally" : [
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${dim}" ] }
+	]
+}

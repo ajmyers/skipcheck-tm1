@@ -48,4 +48,40 @@ describe("the live conformance runner", () => {
     expect(failures[0]).toMatch(/^step 0 dimensions.create/);
     expect(traffic.exchanges.slice(-3).map((e) => e["step"])).toEqual(["finally[0]", "finally[1]", "finally[2]"]);
   });
+
+  /** What a step expects, as TM1's answer to its one request. */
+  function expected(expect: Record<string, any>): unknown {
+    const json = { "content-type": "application/json" };
+    if (expect.error) {
+      const statuses: Record<string, number> = { NOT_FOUND: 404, CONFLICT: 409, PRECONDITION_FAILED: 412 };
+      const status = expect.error.status ?? statuses[expect.error.kind] ?? 400;
+      return FakeTm1.reply(status, { error: { code: "278", message: expect.error.kind === "NOT_FOUND" ? "can not be found" : "refused" } }, json);
+    }
+    if (expect.fields) return FakeTm1.reply(200, expect.fields, json);
+    if (expect.count !== undefined || expect.items) {
+      const value: Record<string, unknown>[] = Array.from({ length: expect.count ?? 0 }, () => ({}));
+      for (const [field, values] of Object.entries((expect.items ?? {}) as Record<string, unknown[]>)) {
+        values.forEach((v, i) => ((value[i] ??= {})[field] = v));
+      }
+      return FakeTm1.reply(200, { value }, json);
+    }
+    return null;
+  }
+
+  /** Answers each step's one request with what the step expects, and a finally step's with 204. */
+  function answeringAsExpected(s: live.Scenario, names: Record<string, string>): FakeTm1 {
+    const answers = [...s.steps.map((step) => expected(live.substitute(step.expect, names))), ...(s.finally ?? []).map(() => null)];
+    const tm1 = new FakeTm1();
+    tm1.respond = () => (answers.length ? answers.shift() : FakeTm1.reply(599, "unscripted"));
+    return tm1;
+  }
+
+  it.each(["subsets", "members", "edges", "member-sets"])("runs the %s scenario, one request per step", async (name) => {
+    const s = live.scenarios().find((x) => x.name === name)!;
+    const names = live.namesFor(s);
+    const tm1 = answeringAsExpected(s, names);
+    const traffic = new live.Traffic(tm1, FakeTm1.BASE);
+    expect(await live.run(tm1.client((b) => b.transport(traffic)), traffic, s, names)).toEqual([]);
+    expect(traffic.exchanges).toHaveLength(s.steps.length + (s.finally?.length ?? 0));
+  });
 });

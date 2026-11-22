@@ -12,8 +12,6 @@ import org.junit.jupiter.api.Test;
 
 import net.ajmyers.tm1.client.Tm1Client;
 import net.ajmyers.tm1.client.error.Tm1BadRequestException;
-import net.ajmyers.tm1.client.error.Tm1NotFoundException;
-import net.ajmyers.tm1.client.model.CellsetAxis;
 import net.ajmyers.tm1.client.model.Cube;
 import net.ajmyers.tm1.client.model.Dimension;
 import net.ajmyers.tm1.client.odata.ODataQuery;
@@ -21,7 +19,8 @@ import net.ajmyers.tm1.testcontainers.RequiresTm1;
 import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
 
 /**
- * Member sets, MDX statements, and the model and control cube and dimension functions.
+ * MDX statements, and the model and control cube and dimension functions
+ * (MemberSetServiceTm1Test has the member sets).
  */
 @RequiresTm1
 class MdxAndModelTm1Test {
@@ -41,24 +40,6 @@ class MdxAndModelTm1Test {
 	@AfterAll
 	static void close() {
 		tm1.close().block(WAIT);
-	}
-
-	@Test
-	void keepsASetExpressionsResultByOrdinalButListsNone() {
-		CellsetAxis set = tm1.memberSets()
-			.execute("{TM1SUBSETALL([}Clients].[}Clients])}",
-					ODataQuery.none().expand("Tuples", t -> t.expand("Members", m -> m.select("Name"))))
-			.block(WAIT);
-		assertThat(set.tuples())
-			.anySatisfy(t -> assertThat(t.members()).extracting(m -> m.name()).containsExactly("Admin"));
-		int ordinal = set.ordinal();
-		assertThat(tm1.memberSets().get(ordinal, ODataQuery.none()).block(WAIT).cardinality())
-			.isEqualTo(set.cardinality());
-		assertThat(tm1.memberSets().list(ODataQuery.none()).collectList().block(WAIT)).as("TM1 lists none").isEmpty();
-
-		tm1.memberSets().delete(ordinal).block(WAIT);
-		assertThatThrownBy(() -> tm1.memberSets().get(ordinal, ODataQuery.none()).block(WAIT))
-			.isInstanceOf(Tm1NotFoundException.class);
 	}
 
 	@Test

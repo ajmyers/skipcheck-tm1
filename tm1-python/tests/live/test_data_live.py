@@ -1,5 +1,5 @@
 """The data services against a real TM1: ports of the Java client's CellServiceTm1Test,
-CellsetServiceTm1Test, MdxAndModelTm1Test, SandboxAndChangeSetTm1Test and DrillthroughTm1Test
+CellsetServiceTm1Test, MemberSetServiceTm1Test, MdxAndModelTm1Test, SandboxAndChangeSetTm1Test and DrillthroughTm1Test
 (see conftest.py for how to point them at a server)."""
 
 from __future__ import annotations
@@ -264,7 +264,7 @@ def test_executes_mdx_and_native_views(tm1: Tm1Client, cellset_cube: Any) -> Non
             tm1.cellsets.delete(cellset.id)
 
 
-# MdxAndModelTm1Test
+# MemberSetServiceTm1Test
 
 
 def test_keeps_a_set_expressions_result_by_ordinal_but_lists_none(tm1: Tm1Client) -> None:
@@ -278,6 +278,9 @@ def test_keeps_a_set_expressions_result_by_ordinal_but_lists_none(tm1: Tm1Client
     tm1.member_sets.delete(ordinal)
     with pytest.raises(Tm1NotFoundError):
         tm1.member_sets.get(ordinal)
+
+
+# MdxAndModelTm1Test
 
 
 def test_runs_an_mdx_statement_but_not_create_set(tm1: Tm1Client) -> None:

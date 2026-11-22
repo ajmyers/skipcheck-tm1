@@ -1,0 +1,138 @@
+{
+	"specVersion" : 1,
+	"name" : "subsets",
+	"description" : "A static, a dynamic and a private subset of a fresh dimension: create, list, read, add, place, update, copy, clear, a missing subset, delete.",
+	"names" : [ "dim", "static", "dynamic", "copy", "missing" ],
+	"steps" : [
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${dim}", "Hierarchies" : [ { "Name" : "${dim}", "Elements" : [ { "Name" : "A", "Type" : "Numeric" }, { "Name" : "B", "Type" : "Numeric" }, { "Name" : "C", "Type" : "Numeric" }, { "Name" : "D", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${dim}" } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "SubsetPatch", "json" : { "Name" : "${static}", "Elements@odata.bind" : [ "Dimensions('${dim}')/Hierarchies('${dim}')/Elements('A')", "Dimensions('${dim}')/Hierarchies('${dim}')/Elements('B')" ] } } ],
+			"expect" : { "fields" : { "Name" : "${static}" } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "SubsetPatch", "json" : { "Name" : "${dynamic}", "Expression" : "{TM1SUBSETALL([${dim}].[${dim}])}" } } ],
+			"expect" : { "fields" : { "Name" : "${dynamic}" } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "list",
+			"params" : [ "dimension", "hierarchy", "scope", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "count" : 2 }
+		},
+		{
+			"service" : "subsets",
+			"method" : "elements",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${static}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "A", "B" ] } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "addElements",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "elements" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${static}", [ "C" ] ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "subsets",
+			"method" : "setElementBefore",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "element", "before" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${static}", "D", "B" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "subsets",
+			"method" : "elements",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${static}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "A", "D", "B", "C" ] } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "update",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "patch" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${dynamic}", { "$patch" : "SubsetPatch", "json" : { "Expression" : "{[${dim}].[${dim}].[C]}" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "subsets",
+			"method" : "elements",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${dynamic}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "C" ] } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "hierarchy",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${static}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "${dim}" } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "saveAs",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "newName", "makePrivate", "makeStatic" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${dynamic}", "${copy}", true, true ],
+			"expect" : { "fields" : { "Name" : "${copy}" } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "elements",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PRIVATE", "json" : "PRIVATE" }, "${copy}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "C" ] } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "clearElements",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${static}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "subsets",
+			"method" : "elements",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${static}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "count" : 0 }
+		},
+		{
+			"service" : "subsets",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${static}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "subsets",
+			"method" : "list",
+			"params" : [ "dimension", "hierarchy", "scope", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "${dynamic}" ] } }
+		}
+	],
+	"finally" : [
+		{ "service" : "subsets", "method" : "delete", "params" : [ "dimension", "hierarchy", "scope", "subset" ], "args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PRIVATE", "json" : "PRIVATE" }, "${copy}" ] },
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${dim}" ] }
+	]
+}

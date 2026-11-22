@@ -79,7 +79,8 @@ public final class EdgeService {
 	 */
 	@Tm1Endpoint("Navigation Hierarchy/Edges")
 	public Mono<Edge> create(String dimension, String hierarchy, EdgePatch edge) {
-		return session.execute(Tm1Request.post(edges(dimension, hierarchy), edge, Edge.class));
+		return session
+			.execute(Tm1Request.post(edges(dimension, hierarchy), Objects.requireNonNull(edge, "edge"), Edge.class));
 	}
 
 	/**

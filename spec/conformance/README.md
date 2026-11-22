@@ -37,7 +37,7 @@ The Java client is the definition of how a call behaves. Its unit tests record e
 - Its `headers` are the ones that are the call's, not the session's: `accept`, `content-type`, `if-match`, `if-none-match`, `odata-version`, `odata-maxversion`, `prefer`, and any `tm1-*` except `tm1-sessioncontext`. Cookies, credentials and the user agent aren't compared.
 - A body is `json`, `text` or `bytes` (base64), by its content type, or absent.
 - The session's own requests (login, `Server?$select=ProductVersion`, `$metadata`, close) aren't in the fixture. Every runner's fake answers them the same way: the same product version and the same `$metadata` snapshot.
-- `result` is what the call returned: `null` for nothing (`Mono<Void>`, an empty `Mono`), a list for a `Flux`, a model as `{"$model": <type>, "json": <TM1's JSON>}`, or a plain value.
+- `result` is what the call returned: `null` for nothing (`Mono<Void>`, an empty `Mono`), a list for a `Flux`, a model as `{"$model": <type>, "json": <TM1's JSON>}`, or a plain value. A polymorphic model is named by its own type (`Member` for `Member.Plain`, `TupleMember`), and its JSON leaves out the `@odata.type` Jackson writes for one.
 - `error` is how it failed: `category` (`api`, `protocol`, `transport`, `unsupported`, `argument` or `state`), and for TM1's own errors (`api`) its `kind` (Java's `Tm1ErrorKind` constant), `status` and `code`. `exception` is Java's class name, for reading; each language has its own, and it isn't compared.
 
 ### Arguments
@@ -124,7 +124,7 @@ A scenario is steps every client runs against a real TM1, with names made fresh 
 
 The runners are Java's `ConformanceScenarioTm1Test`, Python's `tests/live/test_conformance_scenarios.py` (sync and async), .NET's `Live/ConformanceScenarioLiveTests.cs` and TypeScript's `test/live/conformance-scenarios.live.test.ts`. Each runs with its client's live harness (testcontainers, or `TM1_URL`) and records what it sends to `build/conformance-live/<language>/<scenario>.jsonl`. The session's own requests are left out of the record.
 
-[`scripts/compare-live-traffic.py`](../../scripts/compare-live-traffic.py) normalizes the logs: names go back to placeholders and entity tags are dropped. It then requires every language to have sent the same requests, with the same statuses, in the same order. [`scripts/live-tests.sh`](../../scripts/live-tests.sh) runs it after the suites. Each runner also has an offline test that runs the cubes scenario against a fake TM1.
+[`scripts/compare-live-traffic.py`](../../scripts/compare-live-traffic.py) normalizes the logs: names go back to placeholders and entity tags are dropped. It then requires every language to have sent the same requests, with the same statuses, in the same order. [`scripts/live-tests.sh`](../../scripts/live-tests.sh) runs it after the suites. Each runner also has an offline test that runs the cubes scenario against a fake TM1, and one that runs other scenarios (subsets, members, edges, member-sets) against a fake answering each step's one request with what the step expects.
 
 ### Adding a scenario
 

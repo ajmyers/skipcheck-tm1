@@ -2,3 +2,4 @@
 #   <case id>  <why>
 # The replay runner skips them, and fails if a listed id isn't in any fixture. Keep it empty
 # unless the language truly can't make the call (and say why).
+SubsetServiceTest#refusesAMissingScopeSendingNothing#1  SubsetScope is a non-nullable enum in .NET: a null scope can't be passed (default(SubsetScope) is Public)

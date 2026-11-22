@@ -1,0 +1,81 @@
+{
+	"specVersion" : 1,
+	"name" : "members",
+	"description" : "A fresh dimension World = Europe (France, Spain) + Asia (Japan): its members, a member's parent (and a root's none), children, element, level and hierarchy, a missing member.",
+	"names" : [ "world", "missing" ],
+	"steps" : [
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${world}", "Hierarchies" : [ { "Name" : "${world}", "Elements" : [ { "Name" : "World", "Type" : "Consolidated" }, { "Name" : "Europe", "Type" : "Consolidated" }, { "Name" : "Asia", "Type" : "Consolidated" }, { "Name" : "France", "Type" : "Numeric" }, { "Name" : "Spain", "Type" : "Numeric" }, { "Name" : "Japan", "Type" : "Numeric" } ], "Edges" : [ { "ParentName" : "World", "ComponentName" : "Europe", "Weight" : 1.0 }, { "ParentName" : "World", "ComponentName" : "Asia", "Weight" : 1.0 }, { "ParentName" : "Europe", "ComponentName" : "France", "Weight" : 1.0 }, { "ParentName" : "Europe", "ComponentName" : "Spain", "Weight" : 1.0 }, { "ParentName" : "Asia", "ComponentName" : "Japan", "Weight" : 1.0 } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${world}" } }
+		},
+		{
+			"service" : "members",
+			"method" : "list",
+			"params" : [ "dimension", "hierarchy", "query" ],
+			"args" : [ "${world}", "${world}", { "$query" : { } } ],
+			"expect" : { "count" : 6 }
+		},
+		{
+			"service" : "members",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "member", "query" ],
+			"args" : [ "${world}", "${world}", "Europe", { "$query" : { "select" : [ "Name", "UniqueName" ] } } ],
+			"expect" : { "fields" : { "Name" : "Europe", "UniqueName" : "[${world}].[${world}].[Europe]" } }
+		},
+		{
+			"service" : "members",
+			"method" : "parent",
+			"params" : [ "dimension", "hierarchy", "member", "query" ],
+			"args" : [ "${world}", "${world}", "France", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "Europe" } }
+		},
+		{
+			"service" : "members",
+			"method" : "parent",
+			"params" : [ "dimension", "hierarchy", "member", "query" ],
+			"args" : [ "${world}", "${world}", "World", { "$query" : { } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "members",
+			"method" : "children",
+			"params" : [ "dimension", "hierarchy", "member", "query" ],
+			"args" : [ "${world}", "${world}", "Europe", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "France", "Spain" ] } }
+		},
+		{
+			"service" : "members",
+			"method" : "element",
+			"params" : [ "dimension", "hierarchy", "member", "query" ],
+			"args" : [ "${world}", "${world}", "Japan", { "$query" : { "select" : [ "Name", "Type" ] } } ],
+			"expect" : { "fields" : { "Name" : "Japan", "Type" : "Numeric" } }
+		},
+		{
+			"service" : "members",
+			"method" : "level",
+			"params" : [ "dimension", "hierarchy", "member", "query" ],
+			"args" : [ "${world}", "${world}", "Japan", { "$query" : { } } ],
+			"expect" : { "fields" : { "Number" : 2 } }
+		},
+		{
+			"service" : "members",
+			"method" : "hierarchy",
+			"params" : [ "dimension", "hierarchy", "member", "query" ],
+			"args" : [ "${world}", "${world}", "Japan", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "${world}" } }
+		},
+		{
+			"service" : "members",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "member", "query" ],
+			"args" : [ "${world}", "${world}", "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		}
+	],
+	"finally" : [
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${world}" ] }
+	]
+}

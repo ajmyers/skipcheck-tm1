@@ -1,6 +1,7 @@
 """The dimension services against a real TM1: ports of the Java client's
 DimensionServiceTm1Test, HierarchyServiceTm1Test, ElementServiceTm1Test,
-LevelAndMemberServiceTm1Test and SubsetServiceTm1Test. Skipped unless TM1_URL is set."""
+EdgeServiceTm1Test, LevelAndMemberServiceTm1Test, MemberServiceTm1Test and
+SubsetServiceTm1Test. Skipped unless TM1_URL is set."""
 
 from __future__ import annotations
 
@@ -298,6 +299,9 @@ def test_locks_and_reserves_an_element(tm1: Tm1Client, elements_dim: str) -> Non
     tm1.elements.release(d, d, "North")
 
 
+# EdgeServiceTm1Test, on ElementServiceTm1Test's dimension
+
+
 def test_creates_reads_reweights_and_deletes_edges(tm1: Tm1Client, elements_dim: str) -> None:
     d, edges = elements_dim, tm1.edges
     assert len(edges.list(d, d)) == 2
@@ -334,6 +338,9 @@ def test_lists_levels_and_their_members(tm1: Tm1Client, world: str) -> None:
     assert tm1.levels.get(d, d, 2).cardinality == 3
     assert sorted(names(tm1.levels.members(d, d, 2, ODataQuery.none().select(Member.NAME)))) == ["France", "Japan", "Spain"]
     assert tm1.levels.hierarchy(d, d, 0).name == d
+
+
+# MemberServiceTm1Test, on the same dimension
 
 
 def test_navigates_members(tm1: Tm1Client, world: str) -> None:

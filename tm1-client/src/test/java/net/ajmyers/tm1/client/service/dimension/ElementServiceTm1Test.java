@@ -34,8 +34,8 @@ import net.ajmyers.tm1.testcontainers.RequiresTm1;
 import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
 
 /**
- * ElementService and EdgeService, on a dimension with Total = North + South, and East and
- * Label alone.
+ * ElementService, on a dimension with Total = North + South, and East and Label alone
+ * (EdgeServiceTm1Test has the edges' own tests).
  */
 @RequiresTm1
 class ElementServiceTm1Test {
@@ -153,25 +153,6 @@ class ElementServiceTm1Test {
 	void locksAndReservesAnElement() {
 		elements.lock(d, d, "North").then(elements.unlock(d, d, "North")).block(WAIT);
 		elements.reserve(d, d, "North").then(elements.release(d, d, "North")).block(WAIT);
-	}
-
-	@Test
-	void createsReadsReweightsAndDeletesEdges() {
-		assertThat(edges.list(d, d, ODataQuery.none()).collectList().block(WAIT)).hasSize(2);
-		assertThat(edges.get(d, d, "Total", "North", ODataQuery.none()).block(WAIT).weight()).isEqualTo(1.0);
-		edges.update(d, d, "Total", "North", EdgePatch.builder().weight(3.0).build()).block(WAIT);
-		assertThat(edges.get(d, d, "Total", "North", ODataQuery.none()).block(WAIT).weight()).isEqualTo(3.0);
-
-		assertThat(edges.parent(d, d, "Total", "North", ODataQuery.none()).block(WAIT).name()).isEqualTo("Total");
-		assertThat(edges.component(d, d, "Total", "North", ODataQuery.none()).block(WAIT).name()).isEqualTo("North");
-		assertThat(edges.hierarchy(d, d, "Total", "North", ODataQuery.none()).block(WAIT).name()).isEqualTo(d);
-
-		assertThat(edges.create(d, d, edge("Total", "East")).block(WAIT).componentName()).isEqualTo("East");
-		edges.delete(d, d, "Total", "North").block(WAIT);
-		assertThat(components("Total")).containsExactly("South", "East");
-		assertThat(elements.parents(d, d, "North", ODataQuery.none()).collectList().block(WAIT))
-			.as("still an element, now a root")
-			.isEmpty();
 	}
 
 	private List<String> components(String parent) {

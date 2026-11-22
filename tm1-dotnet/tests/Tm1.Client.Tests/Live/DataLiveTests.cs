@@ -365,7 +365,7 @@ public sealed class DrillthroughLiveTests : IAsyncLifetime
 }
 
 /// <summary>Member sets, MDX statements, and model against control objects, on the server's own control
-/// objects: Java's MdxAndModelTm1Test.</summary>
+/// objects: Java's MemberSetServiceTm1Test and MdxAndModelTm1Test.</summary>
 public sealed class MdxAndModelLiveTests : IAsyncLifetime
 {
     private readonly Tm1Client _tm1 = Live.Client();

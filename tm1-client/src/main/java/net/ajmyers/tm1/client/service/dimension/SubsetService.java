@@ -106,7 +106,8 @@ public final class SubsetService {
 	@Tm1Endpoint("Navigation Hierarchy/PrivateSubsets")
 	@Tm1Endpoint("Navigation Hierarchy/SessionSubsets")
 	public Mono<Subset> create(String dimension, String hierarchy, SubsetScope scope, SubsetPatch subset) {
-		return session.execute(Tm1Request.post(subsets(dimension, hierarchy, scope), subset, Subset.class));
+		return session.execute(Tm1Request.post(subsets(dimension, hierarchy, scope),
+				Objects.requireNonNull(subset, "subset"), Subset.class));
 	}
 
 	/**

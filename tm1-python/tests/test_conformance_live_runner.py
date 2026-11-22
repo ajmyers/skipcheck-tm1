@@ -90,3 +90,64 @@ def test_a_step_that_misses_its_expectation_fails_and_still_cleans_up(traffic_di
     failures = live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names)
     assert len(failures) == 1 and failures[0].startswith("step 0 dimensions.create")
     assert [e["step"] for e in traffic.exchanges][-3:] == ["finally[0]", "finally[1]", "finally[2]"]
+
+
+def _expected(expect: dict[str, Any]) -> httpx.Response:
+    """What a step expects, as TM1's answer to its one request."""
+    if "error" in expect:
+        error = expect["error"]
+        status = error.get("status") or {"NOT_FOUND": 404, "CONFLICT": 409, "PRECONDITION_FAILED": 412}.get(error.get("kind"), 400)
+        message = "can not be found" if error.get("kind") == "NOT_FOUND" else "refused"
+        return httpx.Response(status, json={"error": {"code": "278", "message": message}})
+    if "fields" in expect:
+        return httpx.Response(200, json=expect["fields"])
+    if "count" in expect or "items" in expect:
+        value: list[dict[str, Any]] = [{} for _ in range(expect.get("count", 0))]
+        for field, values in expect.get("items", {}).items():
+            for i, v in enumerate(values):
+                if i == len(value):
+                    value.append({})
+                value[i][field] = v
+        return httpx.Response(200, json={"value": value})
+    return httpx.Response(204)
+
+
+def _answering_as_expected(scenario: dict[str, Any], names: dict[str, str]) -> FakeTm1:
+    """Answers each step's one request with what the step expects, and a finally step's with 204."""
+    answers = [_expected(live.substitute(step["expect"], names)) for step in scenario["steps"]]
+    answers += [httpx.Response(204) for _ in scenario.get("finally", [])]
+    fake = FakeTm1()
+    fake.respond = lambda request: answers.pop(0) if answers else httpx.Response(599, text="unscripted")
+    return fake
+
+
+@pytest.mark.parametrize("name", ["subsets", "members", "edges", "member-sets"])
+def test_runs_a_scenario_in_both_flavors_sending_one_request_per_step(traffic_dir: Path, name: str) -> None:
+    scenario = json.loads((live.SCENARIOS / f"{name}.json").read_text(encoding="utf-8"))
+    expected = len(scenario["steps"]) + len(scenario.get("finally", []))
+
+    names = live.names_for(scenario)
+    traffic = live.Traffic(BASE)
+    fake = _answering_as_expected(scenario, names)
+    http = httpx.Client(transport=httpx.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
+    assert live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names) == []
+    assert len(traffic.exchanges) == expected
+    traffic.write(name, "python-sync", names)
+
+    names2 = live.names_for(scenario)
+    traffic2 = live.Traffic(BASE)
+    fake2 = _answering_as_expected(scenario, names2)
+
+    async def go() -> list[str]:
+        http = httpx.AsyncClient(transport=httpx.MockTransport(fake2.handler), event_hooks={"response": [traffic2.arecord]})
+        return await live.arun(AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic2, scenario, names2)
+
+    assert asyncio.run(go()) == []
+    assert len(traffic2.exchanges) == expected
+    traffic2.write(name, "python-async", names2)
+
+    spec = importlib.util.spec_from_file_location("compare", live.REPO / "scripts" / "compare-live-traffic.py")
+    assert spec and spec.loader
+    compare = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(compare)
+    assert compare.main(["x", str(traffic_dir)]) == 0
