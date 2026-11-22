@@ -14,6 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 
 import net.ajmyers.tm1.client.error.Tm1ApiException;
 import net.ajmyers.tm1.client.error.Tm1ProtocolException;
@@ -22,6 +25,7 @@ import net.ajmyers.tm1.client.error.Tm1UnsupportedOperationException;
 import net.ajmyers.tm1.client.odata.Filter;
 import net.ajmyers.tm1.client.odata.ODataPath;
 import net.ajmyers.tm1.client.odata.ODataQuery;
+import reactor.core.publisher.Flux;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -134,6 +138,12 @@ public final class ConformanceCodec {
 			list.forEach(v -> array.add(arg(v)));
 			return array;
 		}
+		if (value instanceof Publisher<?> content) {
+			// Bytes to send, such as a document's content: subscribed again to read them,
+			// so
+			// it has to be a publisher that can be
+			return tagged("$bytes", NODES.stringNode(Base64.getEncoder().encodeToString(bytes(content))));
+		}
 		Class<?> type = value.getClass();
 		if (type.getPackageName().equals(MODEL) && type.getSimpleName().endsWith("Patch")) {
 			ObjectNode node = NODES.objectNode();
@@ -165,6 +175,9 @@ public final class ConformanceCodec {
 		}
 		if (value instanceof Double || value instanceof Float) {
 			return NODES.numberNode(((Number) value).doubleValue());
+		}
+		if (value instanceof byte[] bytes) {
+			return tagged("$bytes", NODES.stringNode(Base64.getEncoder().encodeToString(bytes)));
 		}
 		Class<?> type = value.getClass();
 		if (type.getPackageName().equals(MODEL) && !type.isEnum()) {
@@ -237,6 +250,21 @@ public final class ConformanceCodec {
 			throw new IllegalArgumentException("Conformance has no category for " + error, error);
 		}
 		return node;
+	}
+
+	/** A publisher's {@code DataBuffer}s, joined. */
+	public static byte[] bytes(Publisher<?> content) {
+		byte[] joined = DataBufferUtils.join(Flux.from(content).cast(DataBuffer.class)).map(buffer -> {
+			try {
+				byte[] bytes = new byte[buffer.readableByteCount()];
+				buffer.read(bytes);
+				return bytes;
+			}
+			finally {
+				DataBufferUtils.release(buffer);
+			}
+		}).block();
+		return joined == null ? new byte[0] : joined;
 	}
 
 	private static ObjectNode tagged(String tag, JsonNode value) {

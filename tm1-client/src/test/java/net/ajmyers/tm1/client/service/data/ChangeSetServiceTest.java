@@ -131,8 +131,7 @@ class ChangeSetServiceTest {
 	void doesNoWorkIfTheChangeSetCantBegin() {
 		tm1().error(500, "1", "down");
 		Flux<String> work = conformance.client().changeSets().within(session -> Mono.just("never"));
-		assertThatThrownBy(() -> work.blockLast(WAIT))
-			.isInstanceOf(Tm1ServerException.class);
+		assertThatThrownBy(() -> work.blockLast(WAIT)).isInstanceOf(Tm1ServerException.class);
 		assertThat(tm1().requests()).extracting(ConformanceTm1.Recorded::key).containsExactly("POST BeginChangeSet");
 	}
 

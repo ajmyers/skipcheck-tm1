@@ -88,7 +88,11 @@ def decode(value: Any) -> Any:
         cls = getattr(_services(), value["$type"], None) or getattr(tm1_client, value["$type"], None)
         if cls is None:
             raise Unknown(f"no type {value['$type']}")
-        return getattr(cls, snake(value["factory"]))(*[decode(a) for a in value["args"]])
+        args = [decode(a) for a in value["args"]]
+        if value["factory"] == "new":
+            return cls(*args)
+        # A static factory, or an instance method (``ContentPath.child``) on the first argument
+        return getattr(cls, snake(value["factory"]))(*args)
     raise Unknown(f"unknown tag {tag}")
 
 
@@ -144,16 +148,27 @@ def query(parts: dict[str, Any]) -> ODataQuery:
     return q
 
 
+def _without_types(json_: Any) -> Any:
+    if isinstance(json_, dict):
+        return {k: _without_types(v) for k, v in json_.items() if k != "@odata.type"}
+    if isinstance(json_, list):
+        return [_without_types(v) for v in json_]
+    return json_
+
+
 def result(value: Any) -> Any:
     """A result, encoded as the Java recorder encodes its own."""
     if value is None or isinstance(value, (str, bool, int)):
         return value
     if isinstance(value, float):
         return value
+    if isinstance(value, (bytes, bytearray)):
+        return {"$bytes": base64.b64encode(bytes(value)).decode("ascii")}
     if isinstance(value, (list, tuple)):
         return [result(v) for v in value]
     if isinstance(value, pydantic.BaseModel):
-        return {"$model": type(value).__name__, "json": value.model_dump(by_alias=True, mode="json", exclude_none=True)}
+        # Without @odata.type, at any depth, as the Java recorder writes a model: its $model is its type
+        return {"$model": type(value).__name__, "json": _without_types(value.model_dump(by_alias=True, mode="json", exclude_none=True))}
     if isinstance(value, enum.Enum):
         return value.value
     if isinstance(value, dict):

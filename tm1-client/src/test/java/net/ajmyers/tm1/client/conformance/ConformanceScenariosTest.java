@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.Base64;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientRequest;
@@ -25,6 +27,7 @@ import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import net.ajmyers.tm1.client.Tm1Client;
+import reactor.core.publisher.Flux;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -116,7 +119,7 @@ class ConformanceScenariosTest {
 		for (JsonNode step : scenario.get("steps")) {
 			answers.add(answer(ConformanceScenarios.substitute(step.get("expect"), names)));
 		}
-		scenario.get("finally").forEach(step -> answers.add(ClientResponse.create(HttpStatus.NO_CONTENT).build()));
+		scenario.path("finally").forEach(step -> answers.add(ClientResponse.create(HttpStatus.NO_CONTENT).build()));
 		return request -> {
 			String key = request.method().name() + " " + ConformanceTm1.target(request.url());
 			if (key.startsWith("GET ActiveSession") || key.equals("GET $metadata") || key.startsWith("GET Server?")
@@ -140,6 +143,13 @@ class ConformanceScenariosTest {
 			};
 			String message = error.path("kind").asString().equals("NOT_FOUND") ? "can not be found" : "refused";
 			return json(status, "{\"error\":{\"code\":\"278\",\"message\":\"" + message + "\"}}");
+		}
+		if (expect.has("fields") && expect.get("fields").has("$bytes")) {
+			return ClientResponse.create(HttpStatus.OK)
+				.header(HttpHeaders.CONTENT_TYPE, "application/octet-stream")
+				.body(Flux.just(DefaultDataBufferFactory.sharedInstance
+					.wrap(Base64.getDecoder().decode(expect.get("fields").get("$bytes").asString()))))
+				.build();
 		}
 		if (expect.has("fields")) {
 			return json(200, expect.get("fields").toString());
@@ -165,7 +175,7 @@ class ConformanceScenariosTest {
 	}
 
 	@ParameterizedTest(name = "{0}")
-	@ValueSource(strings = { "subsets", "members", "edges", "member-sets" })
+	@ValueSource(strings = { "subsets", "members", "edges", "member-sets", "content", "encryption", "git" })
 	void runsAScenarioSendingOneRequestPerStep(String name) {
 		JsonNode scenario = ConformanceScenarios.load(ConformanceScenarios.directory().resolve(name + ".json"));
 		Map<String, String> names = ConformanceScenarios.names(scenario);
@@ -173,7 +183,7 @@ class ConformanceScenariosTest {
 		List<String> failures = ConformanceScenarios.run(client(traffic, expected(scenario, names)), traffic, scenario,
 				names);
 		assertThat(failures).isEmpty();
-		assertThat(traffic.exchanges()).hasSize(scenario.get("steps").size() + scenario.get("finally").size());
+		assertThat(traffic.exchanges()).hasSize(scenario.get("steps").size() + scenario.path("finally").size());
 	}
 
 	/**

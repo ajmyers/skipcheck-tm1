@@ -225,7 +225,9 @@ public final class ConformanceScenarios {
 		try {
 			Object returned = method.invoke(service, args);
 			Object value = returned instanceof Mono<?> mono ? mono.block()
-					: returned instanceof Flux<?> flux ? flux.collectList().block() : returned;
+					// A stream of bytes, such as a document's content, as its bytes
+					: returned instanceof Flux<?> flux && Conformance.bytes(method) ? ConformanceCodec.bytes(flux)
+							: returned instanceof Flux<?> flux ? flux.collectList().block() : returned;
 			out.set("result", ConformanceCodec.result(value));
 		}
 		catch (InvocationTargetException e) {
@@ -240,12 +242,32 @@ public final class ConformanceScenarios {
 		return out;
 	}
 
-	/** Equal, numbers by their value: an expected {@code 0} is a {@code long} 0. */
-	private static boolean same(JsonNode expected, @Nullable JsonNode got) {
-		return got != null && expected.equals(
+	/**
+	 * Equal JSON, numbers by their value ({@code 11} as an int or a long), at any depth.
+	 */
+	static boolean same(@Nullable JsonNode expected, @Nullable JsonNode got) {
+		if (expected == null || got == null) {
+			JsonNode given = expected != null ? expected : got;
+			return given == null || given.isNull();
+		}
+		return expected.equals(
 				(a, b) -> a.equals(b)
 						|| (a.isNumber() && b.isNumber() && a.decimalValue().compareTo(b.decimalValue()) == 0) ? 0 : 1,
 				got);
+	}
+
+	/**
+	 * A model result's JSON with its type as {@code @odata.type}, for an expectation that
+	 * names it: a result's JSON leaves out the type, which its {@code $model} gives.
+	 */
+	private static JsonNode typed(JsonNode result) {
+		JsonNode json = result.get("json");
+		if (json instanceof ObjectNode object && !object.has("@odata.type")) {
+			ObjectNode typed = object.deepCopy();
+			typed.put("@odata.type", "#ibm.tm1.api.v1." + result.get("$model").asString());
+			return typed;
+		}
+		return json;
 	}
 
 	/** Why the outcome doesn't meet the expectation, or null if it does. */
@@ -253,7 +275,7 @@ public final class ConformanceScenarios {
 		if (expect.has("error")) {
 			JsonNode got = outcome.get("error");
 			for (var e : expect.get("error").properties()) {
-				if (got == null || !e.getValue().equals(got.get(e.getKey()))) {
+				if (got == null || !same(e.getValue(), got.get(e.getKey()))) {
 					return "expected the error " + expect.get("error") + ", got " + outcome;
 				}
 			}
@@ -263,7 +285,7 @@ public final class ConformanceScenarios {
 			return "failed with " + outcome.get("error");
 		}
 		JsonNode result = outcome.get("result");
-		JsonNode json = result.has("$model") ? result.get("json") : result;
+		JsonNode json = result.has("$model") ? typed(result) : result;
 		if (expect.has("none") && !result.isNull()) {
 			return "expected nothing, got " + result;
 		}

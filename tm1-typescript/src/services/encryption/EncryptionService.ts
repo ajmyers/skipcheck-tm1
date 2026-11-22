@@ -110,7 +110,11 @@ export class EncryptionService extends Tm1Service {
 }
 
 function file(source: string, destination: string, type: EncryptionFileType): Record<string, unknown> {
-  return { SourcePath: required(source, "source"), DestinationPath: required(destination, "destination"), FileType: required(type, "type") };
+  const sourcePath = required(source, "source");
+  const destinationPath = required(destination, "destination");
+  // "Unknown" stands for a value this client doesn't know, and isn't sent
+  if (required(type, "type") === "Unknown") throw new TypeError("type is required: Unknown isn't sent");
+  return { SourcePath: sourcePath, DestinationPath: destinationPath, FileType: type };
 }
 
 function shutdown(timeUntilShutdown: number | null | undefined): Record<string, unknown> {

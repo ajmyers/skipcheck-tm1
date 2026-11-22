@@ -1,0 +1,46 @@
+{
+	"specVersion": 1,
+	"name": "git",
+	"description": "Git on a server not tied to a repository: its status and plans are refused. (Pushing and pulling need a remote, which the Git live tests start.)",
+	"names": [],
+	"steps": [
+		{
+			"service": "git",
+			"method": "status",
+			"params": [
+				"credentials"
+			],
+			"args": [
+				{
+					"$type": "GitCredentials",
+					"factory": "none",
+					"args": []
+				}
+			],
+			"expect": {
+				"error": {
+					"category": "api",
+					"status": 400
+				}
+			}
+		},
+		{
+			"service": "git",
+			"method": "plans",
+			"params": [
+				"query"
+			],
+			"args": [
+				{
+					"$query": {}
+				}
+			],
+			"expect": {
+				"error": {
+					"category": "api",
+					"status": 400
+				}
+			}
+		}
+	]
+}

@@ -556,7 +556,6 @@
 			"result" : {
 				"$model" : "NativeView",
 				"json" : {
-					"@odata.type" : "#ibm.tm1.api.v1.NativeView",
 					"Name" : "Native",
 					"Columns" : [
 						{
@@ -617,7 +616,6 @@
 			"result" : {
 				"$model" : "NativeView",
 				"json" : {
-					"@odata.type" : "#ibm.tm1.api.v1.NativeView",
 					"Name" : "Mine"
 				}
 			}
@@ -678,7 +676,6 @@
 				{
 					"$model" : "MDXView",
 					"json" : {
-						"@odata.type" : "#ibm.tm1.api.v1.MDXView",
 						"Name" : "Mdx",
 						"MDX" : "SELECT"
 					}
@@ -686,7 +683,6 @@
 				{
 					"$model" : "NativeView",
 					"json" : {
-						"@odata.type" : "#ibm.tm1.api.v1.NativeView",
 						"Name" : "Native"
 					}
 				}

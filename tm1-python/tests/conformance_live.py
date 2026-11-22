@@ -91,6 +91,9 @@ def check(expect: dict[str, Any], outcome: dict[str, Any]) -> str | None:
         return f"expected {expect['count']} items, got {result!r}"
     if "fields" in expect:
         json_ = result.get("json") if isinstance(result, dict) and "$model" in result else result
+        if isinstance(json_, dict) and "$model" in result:
+            # A model's JSON leaves out its type, which its $model gives
+            json_ = {"@odata.type": f"#ibm.tm1.api.v1.{result['$model']}", **json_}
         if not isinstance(json_, dict) or any(json_.get(k) != v for k, v in expect["fields"].items()):
             return f"expected the fields {expect['fields']}, got {result!r}"
     if "items" in expect:

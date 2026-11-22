@@ -87,6 +87,19 @@ public static class ConformanceLive
         }
     }
 
+    /// <summary>A model result's JSON with its type as <c>@odata.type</c>, for an expectation that names it:
+    /// a result's JSON leaves out the type, which its <c>$model</c> gives.</summary>
+    private static JsonNode? Typed(JsonObject result)
+    {
+        if (result["json"] is JsonObject o && !o.ContainsKey("@odata.type"))
+        {
+            var typed = (JsonObject)o.DeepClone();
+            typed["@odata.type"] = "#ibm.tm1.api.v1." + result["$model"]!.GetValue<string>();
+            return typed;
+        }
+        return result["json"];
+    }
+
     /// <summary>Why the outcome doesn't meet the expectation, or null if it does.</summary>
     public static string? Check(JsonObject expect, JsonObject outcome)
     {
@@ -100,7 +113,7 @@ public static class ConformanceLive
             return "failed with " + failed.ToJsonString();
         }
         var result = outcome["result"];
-        var json = result is JsonObject m && m.ContainsKey("$model") ? m["json"] : result;
+        var json = result is JsonObject m && m.ContainsKey("$model") ? Typed(m) : result;
         if (expect["none"] is not null && result is not null)
         {
             return "expected nothing, got " + result.ToJsonString();

@@ -5,6 +5,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.ParameterizedType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.TestWatcher;
 import org.junit.platform.commons.annotation.Testable;
 import org.opentest4j.AssertionFailedError;
+import org.springframework.core.io.buffer.DataBuffer;
 
 import net.ajmyers.tm1.client.Tm1Client;
 import reactor.core.Exceptions;
@@ -161,6 +163,11 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 			if (returned instanceof Mono<?> mono) {
 				value = mono.block();
 			}
+			else if (returned instanceof Flux<?> flux && bytes(m)) {
+				// A stream of bytes, such as a document's content: recorded as its bytes,
+				// however they're split
+				value = ConformanceCodec.bytes(flux);
+			}
 			else if (returned instanceof Flux<?> flux) {
 				value = flux.collectList().block();
 			}
@@ -176,6 +183,12 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 		catch (RuntimeException e) {
 			return new Outcome(m, null, Exceptions.unwrap(e));
 		}
+	}
+
+	/** Whether the method gives a {@code Flux<DataBuffer>}. */
+	static boolean bytes(Method m) {
+		return m.getGenericReturnType() instanceof ParameterizedType p
+				&& p.getActualTypeArguments()[0] == DataBuffer.class;
 	}
 
 	/**

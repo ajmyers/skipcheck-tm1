@@ -1,0 +1,135 @@
+{
+	"specVersion": 1,
+	"name": "encryption",
+	"description": "Encryption at rest on a server that isn't encrypted, with a local key file the server can't make: settings checked, every change refused.",
+	"names": [],
+	"steps": [
+		{
+			"service": "encryption",
+			"method": "validate",
+			"params": [
+				"settings"
+			],
+			"args": [
+				{
+					"$patch": "LocalKeyFileProviderSettingsPatch",
+					"json": {
+						"@odata.type": "#ibm.tm1.api.v1.LocalKeyFileProviderSettings",
+						"KeyRef": "/tmp/tm1-client.key"
+					}
+				}
+			],
+			"expect": {
+				"fields": {
+					"IsValid": false
+				}
+			}
+		},
+		{
+			"service": "encryption",
+			"method": "configure",
+			"params": [
+				"settings"
+			],
+			"args": [
+				{
+					"$patch": "LocalKeyFileProviderSettingsPatch",
+					"json": {
+						"@odata.type": "#ibm.tm1.api.v1.LocalKeyFileProviderSettings",
+						"KeyRef": "/tmp/tm1-client.key"
+					}
+				}
+			],
+			"expect": {
+				"error": {
+					"category": "api",
+					"status": 400
+				}
+			}
+		},
+		{
+			"service": "encryption",
+			"method": "disable",
+			"params": [],
+			"args": [],
+			"expect": {
+				"error": {
+					"category": "api",
+					"status": 400
+				}
+			}
+		},
+		{
+			"service": "encryption",
+			"method": "rotateDataEncryptionKey",
+			"params": [],
+			"args": [],
+			"expect": {
+				"error": {
+					"category": "api",
+					"status": 400
+				}
+			}
+		},
+		{
+			"service": "encryption",
+			"method": "rotateDataModelKey",
+			"params": [],
+			"args": [],
+			"expect": {
+				"error": {
+					"category": "api",
+					"status": 400
+				}
+			}
+		},
+		{
+			"service": "encryption",
+			"method": "encryptFile",
+			"params": [
+				"source",
+				"destination",
+				"type"
+			],
+			"args": [
+				"tm1s.cfg",
+				"/tmp/tm1s.cfg.enc",
+				{
+					"$enum": "EncryptionFileType",
+					"name": "OBJECT",
+					"json": "Object"
+				}
+			],
+			"expect": {
+				"error": {
+					"category": "api",
+					"status": 400
+				}
+			}
+		},
+		{
+			"service": "encryption",
+			"method": "decryptFile",
+			"params": [
+				"source",
+				"destination",
+				"type"
+			],
+			"args": [
+				"}clientgroups.cub",
+				"/tmp/clientgroups.cub",
+				{
+					"$enum": "EncryptionFileType",
+					"name": "OBJECT",
+					"json": "Object"
+				}
+			],
+			"expect": {
+				"error": {
+					"category": "api",
+					"status": 400
+				}
+			}
+		}
+	]
+}

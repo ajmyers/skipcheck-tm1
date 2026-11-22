@@ -1,6 +1,7 @@
 package net.ajmyers.tm1.client.conformance;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
@@ -19,10 +20,13 @@ import java.util.Map;
 import java.util.function.UnaryOperator;
 
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 
 import net.ajmyers.tm1.client.odata.Filter;
 import net.ajmyers.tm1.client.odata.ODataPath;
 import net.ajmyers.tm1.client.odata.ODataQuery;
+import reactor.core.publisher.Flux;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -106,7 +110,7 @@ public final class ConformanceDecoder {
 			case "$dateTime" -> OffsetDateTime.parse(body.asString());
 			case "$date" -> LocalDate.parse(body.asString());
 			case "$time" -> LocalTime.parse(body.asString());
-			case "$bytes" -> Base64.getDecoder().decode(body.asString());
+			case "$bytes" -> bytes(raw, Base64.getDecoder().decode(body.asString()));
 			case "$handler" -> ConformanceHandler.named(body.asString());
 			case "$type" -> factory(raw, node.get("factory").asString(), node.get("args"));
 			default -> throw new IllegalArgumentException("Unknown tag " + tag);
@@ -132,18 +136,63 @@ public final class ConformanceDecoder {
 		return Enum.valueOf((Class) raw, constant);
 	}
 
+	/**
+	 * Bytes, or for a {@code Publisher<DataBuffer>} a publisher of them that can be
+	 * subscribed again.
+	 */
+	private static Object bytes(Class<?> raw, byte[] bytes) {
+		if (Publisher.class.isAssignableFrom(raw)) {
+			return Flux.defer(() -> Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(bytes.clone())));
+		}
+		return bytes;
+	}
+
+	/**
+	 * A helper type by its static factory; {@code new} for its constructor; or an
+	 * instance method, such as {@code ContentPath.child}, called on the first argument.
+	 */
 	private static @Nullable Object factory(Class<?> raw, String factory, JsonNode args) {
-		Method m = Arrays.stream(raw.getMethods())
-			.filter(x -> Modifier.isStatic(x.getModifiers()) && x.getName().equals(factory)
-					&& x.getParameterCount() == args.size())
-			.findFirst()
-			.orElseThrow(() -> new IllegalArgumentException("No factory " + raw.getSimpleName() + "." + factory));
-		try {
-			return m.invoke(null, args(m, args));
+		List<Executable> candidates = new ArrayList<>();
+		if (factory.equals("new")) {
+			Arrays.stream(raw.getConstructors())
+				.filter(c -> c.getParameterCount() == args.size())
+				.forEach(candidates::add);
 		}
-		catch (ReflectiveOperationException e) {
-			throw new IllegalStateException(e);
+		else {
+			Arrays.stream(raw.getMethods())
+				.filter(x -> Modifier.isStatic(x.getModifiers()) && x.getName().equals(factory)
+						&& x.getParameterCount() == args.size())
+				.forEach(candidates::add);
+			if (candidates.isEmpty() && !args.isEmpty()) {
+				Arrays.stream(raw.getMethods())
+					.filter(x -> !Modifier.isStatic(x.getModifiers()) && x.getName().equals(factory)
+							&& x.getParameterCount() == args.size() - 1)
+					.forEach(candidates::add);
+			}
 		}
+		for (Executable candidate : candidates) {
+			boolean instance = candidate instanceof Method m && !Modifier.isStatic(m.getModifiers());
+			Object receiver = instance ? decode(args.get(0), raw) : null;
+			Type[] types = candidate.getGenericParameterTypes();
+			Object[] values = new Object[types.length];
+			boolean fits = true;
+			for (int i = 0; i < types.length && fits; i++) {
+				values[i] = decode(args.get(instance ? i + 1 : i), types[i]);
+				Class<?> type = raw(types[i]);
+				fits = values[i] == null ? !type.isPrimitive() : type.isPrimitive() || type.isInstance(values[i]);
+			}
+			if (!fits) {
+				continue;
+			}
+			try {
+				return candidate instanceof Constructor<?> c ? c.newInstance(values)
+						: ((Method) candidate).invoke(receiver, values);
+			}
+			catch (ReflectiveOperationException e) {
+				throw new IllegalStateException(e);
+			}
+		}
+		throw new IllegalArgumentException("No factory " + raw.getSimpleName() + "." + factory + " takes " + args);
 	}
 
 	/** A query rebuilt from its parts, as every runner rebuilds it. */

@@ -38,7 +38,7 @@ The Java client is the definition of how a call behaves. Its unit tests record e
 - Its `headers` are the ones that are the call's, not the session's: `accept`, `content-type`, `if-match`, `if-none-match`, `odata-version`, `odata-maxversion`, `prefer`, and any `tm1-*` except `tm1-sessioncontext`. Cookies, credentials and the user agent aren't compared.
 - A body is `json`, `text` or `bytes` (base64), by its content type, or absent.
 - The session's own requests (login, `Server?$select=ProductVersion`, `$metadata`, close) aren't in the fixture. Every runner's fake answers them the same way: the same product version and the same `$metadata` snapshot.
-- `result` is what the call returned: `null` for nothing (`Mono<Void>`, an empty `Mono`), a list for a `Flux`, a model as `{"$model": <type>, "json": <TM1's JSON>}`, or a plain value. A polymorphic model is named by its own type (`Member` for `Member.Plain`, `TupleMember`), and its JSON leaves out the `@odata.type` Jackson writes for one.
+- `result` is what the call returned: `null` for nothing (`Mono<Void>`, an empty `Mono`), a list for a `Flux`, a model as `{"$model": <type>, "json": <TM1's JSON>}`, or a plain value. A polymorphic model is named by its own type (`Member` for `Member.Plain`, `TupleMember`), and its JSON leaves out the `@odata.type` Jackson writes for one. A stream of bytes (`Flux<DataBuffer>`, such as a document's content) is `{"$bytes": …}`, however it was split; a `Publisher<DataBuffer>` argument is recorded the same way.
 - `error` is how it failed: `category` (`api`, `protocol`, `transport`, `unsupported`, `argument` or `state`), and for TM1's own errors (`api`) its `kind` (Java's `Tm1ErrorKind` constant), `status` and `code`. `exception` is Java's class name, for reading; each language has its own, and it isn't compared.
 
 ### Arguments
@@ -56,7 +56,7 @@ A JSON value stands for itself. Anything else is an object with one `$` tag:
 | `$double` | a `double` (to tell it from an `int`) | `{"$double": 12.5}` |
 | `$duration`, `$dateTime`, `$date`, `$time` | `java.time` values | `{"$duration": "PT1H"}` |
 | `$bytes` | `byte[]` | `{"$bytes": "AAEC"}` |
-| `$type` | a service package's helper type, by its static factory | `{"$type": "AttributeOwner", "factory": "view", "args": ["Sales", {"$enum": "ViewScope", ...}, "v"]}` |
+| `$type` | a service package's helper type, by its static factory; `new` for its constructor; or an instance method called on the first argument | `{"$type": "AttributeOwner", "factory": "view", "args": ["Sales", {"$enum": "ViewScope", ...}, "v"]}`, `{"$type": "GitCommitDetails", "factory": "new", "args": ["m", "a", "a@example.com"]}`, `{"$type": "ContentPath", "factory": "child", "args": [{"$type": "ContentPath", "factory": "applications", "args": []}, "Planning", {"$enum": "ContentScope", ...}]}` |
 | `$handler` | a handler every runner knows by name (`ConformanceHandler`) | `{"$handler": "cells"}`: a cellset stream's handler that gives back its cells, `(cellset, cells) -> cells` |
 
 Each runner rebuilds a query with its own query builder (`select`, `expand`, `Filter.raw`, `orderBy` or `orderByDescending`, and so on), and a patch from its JSON. A value the recorder can't encode, or a tag a runner doesn't know, is an error, never a skip. A helper type needs an encoder registered with `ConformanceCodec.register(type, value -> ConformanceCodec.factory("AttributeOwner", "view", ...))`. A call whose argument is a function (a change set's work, a cellset handler other than the named ones) can't be recorded: test it with plain Java unit tests, and port those by hand.
@@ -128,14 +128,14 @@ A scenario is steps every client runs against a real TM1, with names made fresh 
 - Each step has one expectation:
   - `{"none": true}`: the call returns nothing.
   - `{"count": n}`: a list of `n` items.
-  - `{"fields": {...}}`: these fields of the result.
+  - `{"fields": {...}}`: these fields of the result. An `@odata.type` field is the result's type (its `$model`, as `#ibm.tm1.api.v1.<model>`), since a result's JSON leaves the type out.
   - `{"items": {"Name": [...]}}`: a field of each item, in order.
   - `{"error": {"category": "api", "kind": "NOT_FOUND"}}`: the call fails this way.
 - The run stops at the first step that misses its expectation. The `finally` steps always run, ignoring failures.
 
 The runners are Java's `ConformanceScenarioTm1Test`, Python's `tests/live/test_conformance_scenarios.py` (sync and async), .NET's `Live/ConformanceScenarioLiveTests.cs` and TypeScript's `test/live/conformance-scenarios.live.test.ts`. Each runs with its client's live harness (testcontainers, or `TM1_URL`) and records what it sends to `build/conformance-live/<language>/<scenario>.jsonl`. The session's own requests are left out of the record.
 
-[`scripts/compare-live-traffic.py`](../../scripts/compare-live-traffic.py) normalizes the logs: names go back to placeholders and entity tags are dropped. It then requires every language to have sent the same requests, with the same statuses, in the same order, but for a step's `unordered` runs. [`scripts/live-tests.sh`](../../scripts/live-tests.sh) runs it after the suites. Each runner also has offline tests: the cubes scenario against a fake TM1; the data scenarios (cellsets, views, sandboxes) against a fake that answers as TM1 would; and other scenarios (subsets, members, edges, member-sets and more) against a fake answering each step's one request with what the step expects.
+[`scripts/compare-live-traffic.py`](../../scripts/compare-live-traffic.py) normalizes the logs: names go back to placeholders and entity tags are dropped. It then requires every language to have sent the same requests, with the same statuses, in the same order, but for a step's `unordered` runs. [`scripts/live-tests.sh`](../../scripts/live-tests.sh) runs it after the suites. Each runner also has offline tests: the cubes scenario against a fake TM1; the data scenarios (cellsets, views, sandboxes) against a fake that answers as TM1 would; and other scenarios (subsets, members, edges, member-sets, content, encryption, git and more) against a fake answering each step's one request with what the step expects. A byte stream's result is checked as `{"fields": {"$bytes": …}}`.
 
 ### Adding a scenario
 

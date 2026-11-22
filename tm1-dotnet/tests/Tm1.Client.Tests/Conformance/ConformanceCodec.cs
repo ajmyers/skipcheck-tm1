@@ -153,9 +153,44 @@ public static class ConformanceCodec
                     var type = Client.GetTypes().SingleOrDefault(t => t.IsPublic && t.Name == name && t.Namespace == "AjMyers.Tm1.Client.Services")
                         ?? throw new UnknownConformanceValueException("no type " + name);
                     var args = node["args"]!.AsArray();
+                    var factoryName = node["factory"]!.GetValue<string>();
+                    if (factoryName == "new")
+                    {
+                        var ctor = type.GetConstructors().SingleOrDefault(c => c.GetParameters().Length == args.Count)
+                            ?? throw new UnknownConformanceValueException($"no constructor {name}({args.Count})");
+                        var ps = ctor.GetParameters();
+                        return ctor.Invoke(args.Select((a, i) => Decode(a, ps[i].ParameterType)).ToArray());
+                    }
                     var factory = type.GetMethods(BindingFlags.Public | BindingFlags.Static)
-                        .SingleOrDefault(m => m.Name == Pascal(node["factory"]!.GetValue<string>()) && m.GetParameters().Length == args.Count)
-                        ?? throw new UnknownConformanceValueException($"no factory {name}.{node["factory"]}");
+                        .SingleOrDefault(m => m.Name == Pascal(factoryName) && m.GetParameters().Length == args.Count);
+                    if (factory is null && args.Count > 0)
+                    {
+                        // An instance method, such as ContentPath.Child, on the first argument: the
+                        // overload the rest of the arguments decode for
+                        var receiver = Decode(args[0], type);
+                        foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                            .Where(m => m.Name == Pascal(factoryName) && m.GetParameters().Length == args.Count - 1))
+                        {
+                            var ps = method.GetParameters();
+                            object?[] values;
+                            try
+                            {
+                                values = ps.Select((p, i) => Decode(args[i + 1], p.ParameterType)).ToArray();
+                            }
+                            catch (UnknownConformanceValueException)
+                            {
+                                continue;
+                            }
+                            if (values.Select((v, i) => v is null || ps[i].ParameterType.IsInstanceOfType(v)).All(fits => fits))
+                            {
+                                return method.Invoke(receiver, values);
+                            }
+                        }
+                    }
+                    if (factory is null)
+                    {
+                        throw new UnknownConformanceValueException($"no factory {name}.{factoryName}");
+                    }
                     var parameters = factory.GetParameters();
                     return factory.Invoke(null, args.Select((a, i) => Decode(a, parameters[i].ParameterType)).ToArray());
                 }
@@ -349,9 +384,57 @@ public static class ConformanceCodec
         double or float or decimal => JsonValue.Create(Convert.ToDouble(value, CultureInfo.InvariantCulture)),
         IList list => new JsonArray(list.Cast<object?>().Select(Result).ToArray()),
         _ when value.GetType().Namespace == "AjMyers.Tm1.Client.Model" && !value.GetType().IsEnum =>
-            new JsonObject { ["$model"] = value.GetType().Name, ["json"] = JsonNode.Parse(Tm1Json.Write(value).GetRawText()) },
+            new JsonObject { ["$model"] = value.GetType().Name, ["json"] = ModelJson(value) },
         _ => JsonNode.Parse(Tm1Json.Write(value).GetRawText()),
     };
+
+    /// <summary>The client's JSON options, with dates and times written as Java's Jackson writes an
+    /// <c>OffsetDateTime</c> (<c>2026-11-22T12:59:39Z</c>), for comparing models by their JSON.</summary>
+    private static readonly Lazy<JsonSerializerOptions> JavaDates = new(() =>
+    {
+        var options = new JsonSerializerOptions(Tm1Json.Options);
+        options.Converters.Insert(0, new JavaDateTimeConverter());
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    });
+
+    private sealed class JavaDateTimeConverter : System.Text.Json.Serialization.JsonConverter<DateTimeOffset>
+    {
+        public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            DateTimeOffset.Parse(reader.GetString()!, CultureInfo.InvariantCulture);
+
+        public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)
+        {
+            var fraction = value.ToString("fffffff", CultureInfo.InvariantCulture).TrimEnd('0');
+            var offset = value.Offset == TimeSpan.Zero ? "Z" : value.ToString("zzz", CultureInfo.InvariantCulture);
+            writer.WriteStringValue(value.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture) + (fraction.Length > 0 ? "." + fraction : "") + offset);
+        }
+    }
+
+    /// <summary>A model's JSON without <c>@odata.type</c>, at any depth, as the Java recorder writes it
+    /// (its <c>$model</c> is its type), with dates as Java's Jackson writes them.</summary>
+    private static JsonNode? ModelJson(object value) =>
+        WithoutTypes(JsonNode.Parse(JsonSerializer.SerializeToElement(value, value.GetType(), JavaDates.Value).GetRawText()));
+
+    private static JsonNode? WithoutTypes(JsonNode? json)
+    {
+        if (json is JsonObject o)
+        {
+            o.Remove("@odata.type");
+            foreach (var (_, member) in o.ToList())
+            {
+                WithoutTypes(member);
+            }
+        }
+        else if (json is JsonArray a)
+        {
+            foreach (var item in a)
+            {
+                WithoutTypes(item);
+            }
+        }
+        return json;
+    }
 
     /// <summary>How a call failed, as the Java recorder writes it (kinds in Java's constant case).</summary>
     public static JsonObject Error(Exception e)

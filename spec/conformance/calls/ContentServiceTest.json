@@ -1,0 +1,2652 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.content.ContentServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "ContentServiceTest#aMissingEntryIsNotFound#1",
+			"service" : "contents",
+			"method" : "get",
+			"params" : [
+				"entry",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"notes.txt",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('notes.txt')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'notes.txt' can not be found in collection of type 'Entry'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ContentServiceTest#aMoveIntoAMissingFolderIsNotFound#1",
+			"service" : "contents",
+			"method" : "move",
+			"params" : [
+				"entry",
+				"target",
+				"scope",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"notes.txt.blob",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Nowhere",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				null
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')/tm1.Move",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Target@odata.bind" : "Contents('Applications')/Contents('Nowhere')",
+							"Private" : false
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nowhere' can not be found in collection of type 'Entry'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ContentServiceTest#aNameTakenIsAConflict#1",
+			"service" : "contents",
+			"method" : "create",
+			"params" : [
+				"folder",
+				"scope",
+				"entry"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "applications",
+					"args" : [ ]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$patch" : "FolderPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.Folder",
+						"Name" : "Planning"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Contents('Applications')/Contents",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Folder",
+							"Name" : "Planning"
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "An entry named 'Planning' already exists."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "ContentServiceTest#aPathIsRequired#1",
+			"service" : "contents",
+			"method" : "contents",
+			"params" : [
+				"folder",
+				"scope",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$enum" : "ContentScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ContentServiceTest#aPathIsRequired#2",
+			"service" : "contents",
+			"method" : "get",
+			"params" : [
+				"entry",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ContentServiceTest#aPathIsRequired#3",
+			"service" : "contents",
+			"method" : "copy",
+			"params" : [
+				"entry",
+				"target",
+				"scope",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"notes.txt.blob",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				null,
+				{
+					"$enum" : "ContentScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ContentServiceTest#anEmptyDocumentHasNoContent#1",
+			"service" : "contents",
+			"method" : "content",
+			"params" : [
+				"document"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"notes.txt.blob",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')/tm1.DocumentReference/Document/Content",
+						"headers" : {
+							"accept" : "*/*",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : {
+				"$bytes" : ""
+			}
+		},
+		{
+			"id" : "ContentServiceTest#copiesAnEntryNamedOrAsItIs#1",
+			"service" : "contents",
+			"method" : "copy",
+			"params" : [
+				"entry",
+				"target",
+				"scope",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"notes.txt.blob",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Planning",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"copy.txt"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')/tm1.Copy",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Target@odata.bind" : "Contents('Applications')/Contents('Planning')",
+							"Private" : false,
+							"Name" : "copy.txt"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.DocumentReference",
+							"ID" : "copy.txt.blob",
+							"Name" : "copy.txt"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "DocumentReference",
+				"json" : {
+					"ID" : "copy.txt.blob",
+					"Name" : "copy.txt"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#copiesAnEntryNamedOrAsItIs#2",
+			"service" : "contents",
+			"method" : "copy",
+			"params" : [
+				"entry",
+				"target",
+				"scope",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"notes.txt.blob",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Other",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"mine",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PRIVATE",
+							"json" : "PRIVATE"
+						}
+					]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				null
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')/tm1.Copy",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Target@odata.bind" : "Contents('Applications')/Contents('Other')/PrivateContents('mine')",
+							"Private" : true
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.DocumentReference",
+							"ID" : "notes.txt.blob"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "DocumentReference",
+				"json" : {
+					"ID" : "notes.txt.blob"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#createsFoldersDocumentsLinksAndReferences#1",
+			"service" : "contents",
+			"method" : "create",
+			"params" : [
+				"folder",
+				"scope",
+				"entry"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "applications",
+					"args" : [ ]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$patch" : "FolderPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.Folder",
+						"Name" : "Planning"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Contents('Applications')/Contents",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Folder",
+							"Name" : "Planning"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Folder",
+							"ID" : "Planning",
+							"Name" : "Planning"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Folder",
+				"json" : {
+					"ID" : "Planning",
+					"Name" : "Planning"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#createsFoldersDocumentsLinksAndReferences#2",
+			"service" : "contents",
+			"method" : "create",
+			"params" : [
+				"folder",
+				"scope",
+				"entry"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Planning",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$patch" : "DocumentPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.Document",
+						"Name" : "notes.txt"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Document",
+							"Name" : "notes.txt"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.DocumentReference",
+							"ID" : "notes.txt.blob",
+							"Name" : "notes.txt"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "DocumentReference",
+				"json" : {
+					"ID" : "notes.txt.blob",
+					"Name" : "notes.txt"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#createsFoldersDocumentsLinksAndReferences#3",
+			"service" : "contents",
+			"method" : "create",
+			"params" : [
+				"folder",
+				"scope",
+				"entry"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Planning",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$patch" : "LinkPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.Link",
+						"Name" : "ibm",
+						"URL" : "https://www.ibm.com"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Link",
+							"Name" : "ibm",
+							"URL" : "https://www.ibm.com"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Link",
+							"ID" : "ibm.extr",
+							"Name" : "ibm",
+							"URL" : "https://www.ibm.com"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Link",
+				"json" : {
+					"ID" : "ibm.extr",
+					"Name" : "ibm",
+					"URL" : "https://www.ibm.com"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#createsFoldersDocumentsLinksAndReferences#4",
+			"service" : "contents",
+			"method" : "create",
+			"params" : [
+				"folder",
+				"scope",
+				"entry"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Planning",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$patch" : "CubeReferencePatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.CubeReference",
+						"Name" : "}ClientGroups",
+						"Cube@odata.bind" : "Cubes('%7DClientGroups')"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.CubeReference",
+							"Name" : "}ClientGroups",
+							"Cube@odata.bind" : "Cubes('%7DClientGroups')"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.CubeReference",
+							"ID" : "}ClientGroups.cube",
+							"Name" : "}ClientGroups"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "CubeReference",
+				"json" : {
+					"ID" : "}ClientGroups.cube",
+					"Name" : "}ClientGroups"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#createsFoldersDocumentsLinksAndReferences#5",
+			"service" : "contents",
+			"method" : "create",
+			"params" : [
+				"folder",
+				"scope",
+				"entry"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Planning",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				{
+					"$patch" : "FolderPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.Folder",
+						"Name" : "mine"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Contents('Applications')/Contents('Planning')/PrivateContents",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Folder",
+							"Name" : "mine"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Folder",
+							"ID" : "mine",
+							"Name" : "mine"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Folder",
+				"json" : {
+					"ID" : "mine",
+					"Name" : "mine"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#deletesAnEntry#1",
+			"service" : "contents",
+			"method" : "delete",
+			"params" : [
+				"entry"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Planning",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Contents('Applications')/Contents('Planning')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ContentServiceTest#deletesAnEntry#2",
+			"service" : "contents",
+			"method" : "delete",
+			"params" : [
+				"entry"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"gone",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PRIVATE",
+							"json" : "PRIVATE"
+						}
+					]
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Contents('Applications')/Contents('Planning')/PrivateContents('gone')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'gone' can not be found in collection of type 'Entry'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ContentServiceTest#findsTheDocumentBehindAReferenceOrInBlobs#1",
+			"service" : "contents",
+			"method" : "document",
+			"params" : [
+				"reference",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"notes.txt.blob",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')/tm1.DocumentReference/Document",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "notes_20261122125939.txt",
+							"Name" : "notes_20261122125939.txt",
+							"Size" : 11,
+							"LastUpdated" : "2026-11-22T12:59:39Z"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Document",
+				"json" : {
+					"ID" : "notes_20261122125939.txt",
+					"Name" : "notes_20261122125939.txt",
+					"Size" : 11,
+					"LastUpdated" : "2026-11-22T12:59:39Z"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#findsTheDocumentBehindAReferenceOrInBlobs#2",
+			"service" : "contents",
+			"method" : "document",
+			"params" : [
+				"reference",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "blobs",
+							"args" : [ ]
+						},
+						"notes_20261122125939.txt",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : {
+						"select" : [
+							"Size"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Blobs')/Contents('notes_20261122125939.txt')/tm1.Document?$select=Size",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Size" : 11
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Document",
+				"json" : {
+					"Size" : 11
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#findsTheFolderAnEntryIsIn#1",
+			"service" : "contents",
+			"method" : "containedBy",
+			"params" : [
+				"entry",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"ibm.extr",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : {
+						"select" : [
+							"ID"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('ibm.extr')/ContainedBy?$select=ID",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "Planning",
+							"Name" : "Planning"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Folder",
+				"json" : {
+					"ID" : "Planning",
+					"Name" : "Planning"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#getsAPrivateEntry#1",
+			"service" : "contents",
+			"method" : "get",
+			"params" : [
+				"entry",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"mine",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PRIVATE",
+							"json" : "PRIVATE"
+						}
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/PrivateContents('mine')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Folder",
+							"ID" : "mine",
+							"Name" : "mine"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Folder",
+				"json" : {
+					"ID" : "mine",
+					"Name" : "mine"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#getsAnEntryOfItsOwnKind#1",
+			"service" : "contents",
+			"method" : "get",
+			"params" : [
+				"entry",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"ibm.extr",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('ibm.extr')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Link",
+							"ID" : "ibm.extr",
+							"Name" : "ibm",
+							"URL" : "https://www.ibm.com"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Link",
+				"json" : {
+					"ID" : "ibm.extr",
+					"Name" : "ibm",
+					"URL" : "https://www.ibm.com"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#getsAnEntryOfItsOwnKind#2",
+			"service" : "contents",
+			"method" : "get",
+			"params" : [
+				"entry",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"}ClientGroups.cube",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : {
+						"select" : [
+							"ID",
+							"Name"
+						],
+						"expand" : {
+							"tm1.CubeReference/Cube" : {
+								"select" : [
+									"Name"
+								]
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('%7DClientGroups.cube')?$select=ID,Name&$expand=tm1.CubeReference/Cube($select%3DName)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.CubeReference",
+							"ID" : "}ClientGroups.cube",
+							"Name" : "}ClientGroups",
+							"Cube" : {
+								"Name" : "}ClientGroups"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "CubeReference",
+				"json" : {
+					"ID" : "}ClientGroups.cube",
+					"Name" : "}ClientGroups",
+					"Cube" : {
+						"Name" : "}ClientGroups"
+					}
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#getsAnEntryOfItsOwnKind#3",
+			"service" : "contents",
+			"method" : "get",
+			"params" : [
+				"entry",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "applications",
+					"args" : [ ]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Folder",
+							"ID" : "Applications",
+							"Name" : "Applications"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Folder",
+				"json" : {
+					"ID" : "Applications",
+					"Name" : "Applications"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#listsAFoldersPublicAndPrivateEntries#1",
+			"service" : "contents",
+			"method" : "contents",
+			"params" : [
+				"folder",
+				"scope",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Planning",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$query" : {
+						"expand" : {
+							"tm1.CubeReference/Cube" : {
+								"select" : [
+									"Name"
+								]
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents?$expand=tm1.CubeReference/Cube($select%3DName)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.Link",
+									"ID" : "ibm.extr",
+									"Name" : "ibm"
+								},
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.CubeReference",
+									"ID" : "}ClientGroups.cube",
+									"Name" : "}ClientGroups",
+									"Cube" : {
+										"Name" : "}ClientGroups"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Link",
+					"json" : {
+						"ID" : "ibm.extr",
+						"Name" : "ibm"
+					}
+				},
+				{
+					"$model" : "CubeReference",
+					"json" : {
+						"ID" : "}ClientGroups.cube",
+						"Name" : "}ClientGroups",
+						"Cube" : {
+							"Name" : "}ClientGroups"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "ContentServiceTest#listsAFoldersPublicAndPrivateEntries#2",
+			"service" : "contents",
+			"method" : "contents",
+			"params" : [
+				"folder",
+				"scope",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Planning",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				{
+					"$query" : {
+						"top" : 1
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/PrivateContents?$top=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.Folder",
+									"ID" : "mine",
+									"Name" : "mine"
+								}
+							],
+							"@odata.nextLink" : "Contents('Applications')/Contents('Planning')/PrivateContents?$skiptoken=1"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/PrivateContents?$skiptoken=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.Folder",
+									"ID" : "also",
+									"Name" : "also"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Folder",
+					"json" : {
+						"ID" : "mine",
+						"Name" : "mine"
+					}
+				},
+				{
+					"$model" : "Folder",
+					"json" : {
+						"ID" : "also",
+						"Name" : "also"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ContentServiceTest#listsAnEntrysLocalizedAttributes#1",
+			"service" : "contents",
+			"method" : "localizedAttributes",
+			"params" : [
+				"entry",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Planning",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : {
+						"filter" : "LocaleID eq 'fr'"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/LocalizedAttributes?$filter=LocaleID%20eq%20'fr'",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Planification"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Planification"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "ContentServiceTest#listsAnEntrysLocalizedAttributes#2",
+			"service" : "contents",
+			"method" : "localizedAttributes",
+			"params" : [
+				"entry",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"notes.txt.blob",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "ContentServiceTest#listsTheRoots#1",
+			"service" : "contents",
+			"method" : "roots",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.Folder",
+									"ID" : "Applications",
+									"Name" : "Applications"
+								},
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.Folder",
+									"ID" : "Blobs",
+									"Name" : "Blobs"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Folder",
+					"json" : {
+						"ID" : "Applications",
+						"Name" : "Applications"
+					}
+				},
+				{
+					"$model" : "Folder",
+					"json" : {
+						"ID" : "Blobs",
+						"Name" : "Blobs"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ContentServiceTest#listsTheRoots#2",
+			"service" : "contents",
+			"method" : "roots",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"filter" : "Name eq 'Blobs'",
+						"orderBy" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents?$select=Name&$filter=Name%20eq%20'Blobs'&$orderby=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.Folder",
+									"Name" : "Blobs"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Folder",
+					"json" : {
+						"Name" : "Blobs"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ContentServiceTest#movesAnEntry#1",
+			"service" : "contents",
+			"method" : "move",
+			"params" : [
+				"entry",
+				"target",
+				"scope",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"ibm.extr",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Other",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				null
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('ibm.extr')/tm1.Move",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Target@odata.bind" : "Contents('Applications')/Contents('Other')",
+							"Private" : false
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Link",
+							"ID" : "ibm.extr"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Link",
+				"json" : {
+					"ID" : "ibm.extr"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#movesAnEntry#2",
+			"service" : "contents",
+			"method" : "move",
+			"params" : [
+				"entry",
+				"target",
+				"scope",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"ibm.extr",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"Other",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum" : "ContentScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"renamed"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('ibm.extr')/tm1.Move",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Target@odata.bind" : "Contents('Applications')/Contents('Other')",
+							"Private" : true,
+							"Name" : "renamed"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Link",
+							"ID" : "renamed.extr"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Link",
+				"json" : {
+					"ID" : "renamed.extr"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#quotesAndEncodesIds#1",
+			"service" : "contents",
+			"method" : "get",
+			"params" : [
+				"entry",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"Joe's plan #1 (50%).txt.blob",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('Joe''s%20plan%20%231%20%2850%25%29.txt.blob')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.DocumentReference",
+							"ID" : "Joe's plan #1 (50%).txt.blob"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "DocumentReference",
+				"json" : {
+					"ID" : "Joe's plan #1 (50%).txt.blob"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#quotesAndEncodesIds#2",
+			"service" : "contents",
+			"method" : "get",
+			"params" : [
+				"entry",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "applications",
+							"args" : [ ]
+						},
+						"a/b?c&d",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('a%2Fb%3Fc%26d')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.Folder",
+							"ID" : "a/b?c&d"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Folder",
+				"json" : {
+					"ID" : "a/b?c&d"
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#readsADocumentsContent#1",
+			"service" : "contents",
+			"method" : "content",
+			"params" : [
+				"document"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"notes.txt.blob",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')/tm1.DocumentReference/Document/Content",
+						"headers" : {
+							"accept" : "*/*",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/octet-stream"
+						},
+						"bytes" : "aGVsbG8gdGhlcmU="
+					}
+				}
+			],
+			"result" : {
+				"$bytes" : "aGVsbG8gdGhlcmU="
+			}
+		},
+		{
+			"id" : "ContentServiceTest#readsADocumentsContent#2",
+			"service" : "contents",
+			"method" : "content",
+			"params" : [
+				"document"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "blobs",
+							"args" : [ ]
+						},
+						"notes_1.bin",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Blobs')/Contents('notes_1.bin')/tm1.Document/Content",
+						"headers" : {
+							"accept" : "*/*",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/octet-stream"
+						},
+						"bytes" : "AAEC/w=="
+					}
+				}
+			],
+			"result" : {
+				"$bytes" : "AAEC/w=="
+			}
+		},
+		{
+			"id" : "ContentServiceTest#uploadsADocumentsContent#1",
+			"service" : "contents",
+			"method" : "upload",
+			"params" : [
+				"document",
+				"content"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "applications",
+									"args" : [ ]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"notes.txt.blob",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$bytes" : "aGVsbG8gdGhlcmU="
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PUT",
+						"target" : "Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')/tm1.DocumentReference/Document/Content",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/octet-stream",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"bytes" : "aGVsbG8gdGhlcmU="
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ContentServiceTest#uploadsADocumentsContent#2",
+			"service" : "contents",
+			"method" : "upload",
+			"params" : [
+				"document",
+				"content"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "blobs",
+							"args" : [ ]
+						},
+						"notes_1.txt",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$bytes" : "eA=="
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PUT",
+						"target" : "Contents('Blobs')/Contents('notes_1.txt')/tm1.Document/Content",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/octet-stream",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"bytes" : "eA=="
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

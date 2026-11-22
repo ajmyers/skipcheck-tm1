@@ -67,8 +67,13 @@ export function decode(value: Json): unknown {
     }
     case "$type": {
       const type = (Services as Record<string, any>)[v.$type];
-      if (type === undefined || typeof type[v.factory] !== "function") throw new Unknown(`no factory ${v.$type}.${v.factory}`);
-      return type[v.factory](...(v.args as Json[]).map(decode));
+      const args = (v.args as Json[]).map(decode);
+      if (type !== undefined && v.factory === "new") return new type(...args);
+      if (type !== undefined && typeof type[v.factory] === "function") return type[v.factory](...args);
+      // An instance method, such as ContentPath.child, on the first argument
+      const [receiver, ...rest] = args as any[];
+      if (type !== undefined && receiver instanceof type && typeof receiver[v.factory] === "function") return receiver[v.factory](...rest);
+      throw new Unknown(`no factory ${v.$type}.${v.factory}`);
     }
     default:
       throw new Unknown("unknown tag " + tag);
@@ -123,11 +128,21 @@ export function result(value: unknown): Json {
   throw new Unknown("can't encode a result of type " + typeof value);
 }
 
-/** Recorded results without what only Java knows: a model's type name. */
-export function expectedResult(value: Json): Json {
-  if (Array.isArray(value)) return value.map(expectedResult);
+/** Recorded results without what only Java knows, a model's type name (`$model`): a model here is
+ * the JSON TM1 sent. `got` is unused, kept for the callers' signature. */
+export function expectedResult(value: Json, _got?: unknown): Json {
+  if (Array.isArray(value)) return value.map((v) => expectedResult(v));
   if (value !== null && typeof value === "object" && "$model" in value) return (value as Record<string, Json>).json ?? null;
   return value;
+}
+
+/** JSON without `@odata.type`, at any depth: a recorded result leaves it out, its `$model` being its type. */
+export function withoutTypes(value: unknown): Json {
+  if (Array.isArray(value)) return value.map(withoutTypes);
+  if (value !== null && typeof value === "object" && !(value instanceof Uint8Array)) {
+    return Object.fromEntries(Object.entries(value).filter(([k]) => k !== "@odata.type").map(([k, v]) => [k, withoutTypes(v)]));
+  }
+  return value as Json;
 }
 
 export interface EncodedError {

@@ -4,6 +4,7 @@ would, in both flavors, writing traffic that scripts/compare-live-traffic.py fin
 from __future__ import annotations
 
 import asyncio
+import base64
 import importlib.util
 import json
 import re
@@ -99,6 +100,9 @@ def _expected(expect: dict[str, Any]) -> httpx.Response:
         status = error.get("status") or {"NOT_FOUND": 404, "CONFLICT": 409, "PRECONDITION_FAILED": 412}.get(error.get("kind"), 400)
         message = "can not be found" if error.get("kind") == "NOT_FOUND" else "refused"
         return httpx.Response(status, json={"error": {"code": "278", "message": message}})
+    if "$bytes" in expect.get("fields", {}):
+        content = base64.b64decode(expect["fields"]["$bytes"])
+        return httpx.Response(200, content=content, headers={"Content-Type": "application/octet-stream"})
     if "fields" in expect:
         return httpx.Response(200, json=expect["fields"])
     if "count" in expect or "items" in expect:
@@ -121,7 +125,7 @@ def _answering_as_expected(scenario: dict[str, Any], names: dict[str, str]) -> F
     return fake
 
 
-@pytest.mark.parametrize("name", ["subsets", "members", "edges", "member-sets"])
+@pytest.mark.parametrize("name", ["subsets", "members", "edges", "member-sets", "content", "encryption", "git"])
 def test_runs_a_scenario_in_both_flavors_sending_one_request_per_step(traffic_dir: Path, name: str) -> None:
     scenario = json.loads((live.SCENARIOS / f"{name}.json").read_text(encoding="utf-8"))
     expected = len(scenario["steps"]) + len(scenario.get("finally", []))

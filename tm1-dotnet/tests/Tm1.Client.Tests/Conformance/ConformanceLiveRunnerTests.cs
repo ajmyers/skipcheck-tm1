@@ -148,6 +148,12 @@ public class ConformanceLiveRunnerTests
             var message = kind == "NOT_FOUND" ? "can not be found" : "refused";
             return Reply((HttpStatusCode)status, new JsonObject { ["error"] = new JsonObject { ["code"] = "278", ["message"] = message } });
         }
+        if (expect["fields"] is JsonObject { } bytes && bytes["$bytes"] is JsonValue content)
+        {
+            var answer = new System.Net.Http.HttpResponseMessage(HttpStatusCode.OK) { Content = new System.Net.Http.ByteArrayContent(System.Convert.FromBase64String(content.GetValue<string>())) };
+            answer.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            return answer;
+        }
         if (expect["fields"] is JsonObject fields)
         {
             return Reply(HttpStatusCode.OK, fields.DeepClone());
@@ -190,6 +196,9 @@ public class ConformanceLiveRunnerTests
     [InlineData("members")]
     [InlineData("edges")]
     [InlineData("member-sets")]
+    [InlineData("content")]
+    [InlineData("encryption")]
+    [InlineData("git")]
     public async Task RunsAScenarioSendingOneRequestPerStep(string name)
     {
         var scenario = ConformanceLive.Load(name);

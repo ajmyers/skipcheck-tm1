@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using AjMyers.Tm1.Client.Errors;
 using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
 using AjMyers.Tm1.Client.Services;
 
 namespace AjMyers.Tm1.Client.Tests.Live;
@@ -50,11 +49,10 @@ public class GitLiveTests
             Assert.Contains("main", tied.Remote!.Branches!);
             await Fails(() => tm1.Git.PushAsync("main", null, Commit, none, true), "Cannot create bare commit"); // nothing has changed
 
-            // Through the session, so this doesn't depend on DimensionService
-            await tm1.Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Dimensions"), DimensionPatch.Builder()
+            await tm1.Dimensions.CreateAsync(DimensionPatch.Builder()
                 .Name(dimension)
                 .Hierarchies([HierarchyPatch.Builder().Name(dimension).Elements([ElementPatch.Builder().Name("North").Build()]).Build()])
-                .Build()));
+                .Build());
             var push = await tm1.Git.PushAsync("main", null, Commit, none, true);
             Assert.Contains($"/dimensions/{dimension}.json", push.SourceFiles!);
             Assert.IsType<GitPushPlan>(await tm1.Git.PlanAsync(push.Id!));
@@ -82,7 +80,7 @@ public class GitLiveTests
                 Assert.Equal("Copy " + dimension, pull.Commit!.Summary);
                 Assert.Contains($"Create Dimensions('{copy}')", pull.Operations!);
                 await tm1.Git.ExecuteAsync(pull);
-                Assert.Equal(copy, (await tm1.Session.ExecuteAsync(Tm1Request.Get<Dimension>(ODataPath.Of("Dimensions").Key(copy)))).Name);
+                Assert.Equal(copy, (await tm1.Dimensions.GetAsync(copy)).Name);
             }
 
             // Refused while initialized
@@ -104,7 +102,7 @@ public class GitLiveTests
         {
             Assert.Equal("Copy " + dimension, (await tm1.Git.StatusAsync(none)).DeployedCommit!.Summary);
             // A deploy brings back the whole branch, the deleted dimension too
-            Assert.Equal(dimension, (await tm1.Session.ExecuteAsync(Tm1Request.Get<Dimension>(ODataPath.Of("Dimensions").Key(dimension)))).Name);
+            Assert.Equal(dimension, (await tm1.Dimensions.GetAsync(dimension)).Name);
         }
         finally
         {
@@ -128,7 +126,7 @@ public class GitLiveTests
     {
         try
         {
-            await tm1.Session.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Dimensions").Key(name)));
+            await tm1.Dimensions.DeleteAsync(name);
         }
         catch (Tm1NotFoundException)
         {

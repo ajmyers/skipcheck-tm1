@@ -101,6 +101,7 @@ describe("the live conformance runner", () => {
       const status = expect.error.status ?? statuses[expect.error.kind] ?? 400;
       return FakeTm1.reply(status, { error: { code: "278", message: expect.error.kind === "NOT_FOUND" ? "can not be found" : "refused" } }, json);
     }
+    if (expect.fields?.$bytes !== undefined) return FakeTm1.reply(200, Uint8Array.from(Buffer.from(expect.fields.$bytes, "base64")), { "content-type": "application/octet-stream" });
     if (expect.fields) return FakeTm1.reply(200, expect.fields, json);
     if (expect.count !== undefined || expect.items) {
       const value: Record<string, unknown>[] = Array.from({ length: expect.count ?? 0 }, () => ({}));
@@ -120,7 +121,7 @@ describe("the live conformance runner", () => {
     return tm1;
   }
 
-  it.each(["subsets", "members", "edges", "member-sets"])("runs the %s scenario, one request per step", async (name) => {
+  it.each(["subsets", "members", "edges", "member-sets", "content", "encryption", "git"])("runs the %s scenario, one request per step", async (name) => {
     const s = live.scenarios().find((x) => x.name === name)!;
     const names = live.namesFor(s);
     const tm1 = answeringAsExpected(s, names);

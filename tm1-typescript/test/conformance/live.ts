@@ -121,6 +121,8 @@ async function outcome(client: any, step: Step, names: Record<string, string>): 
   try {
     let value: any = service[step.method](...args);
     value = value && typeof value.toArray === "function" ? await value.toArray() : await value;
+    // A stream of bytes, such as a document's content, as its bytes however they're split
+    if (Array.isArray(value) && value.length > 0 && value.every((v) => v instanceof Uint8Array)) value = Buffer.concat(value);
     return { result: codec.result(value) };
   } catch (e) {
     if (e instanceof codec.Unknown) throw e;

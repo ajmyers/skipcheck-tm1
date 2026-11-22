@@ -95,6 +95,8 @@ describe("conformance with the Java client's recorded calls", () => {
           let value: any = method.apply(service, args);
           if (value && typeof value.toArray === "function") value = await value.toArray();
           else value = await value;
+          // A stream of bytes, recorded as its bytes however they're split
+          if (c.result && typeof c.result === "object" && "$bytes" in c.result && Array.isArray(value)) value = Buffer.concat(value);
           outcome = { result: codec.result(value) };
         } catch (e) {
           if (e instanceof codec.Unknown) throw e;
@@ -112,7 +114,7 @@ describe("conformance with the Java client's recorded calls", () => {
           );
         } else {
           expect("result" in outcome, "a result, not " + JSON.stringify(outcome)).toBe(true);
-          expect(codec.normal((outcome as { result: any }).result, true)).toEqual(codec.normal(codec.expectedResult(c.result), true));
+          expect(codec.normal(codec.withoutTypes((outcome as { result: any }).result), true)).toEqual(codec.normal(codec.expectedResult(c.result), true));
         }
       });
     }
