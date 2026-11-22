@@ -1,8 +1,13 @@
 package examples;
 
+import java.time.Duration;
+import java.util.Map;
+
 import net.ajmyers.tm1.client.Tm1Client;
 import net.ajmyers.tm1.client.model.Cube;
+import net.ajmyers.tm1.client.model.ProcessExecuteResult;
 import net.ajmyers.tm1.client.odata.ODataQuery;
+import reactor.core.publisher.Mono;
 
 /**
  * Examples for {@link Tm1Client}, quoted in its Javadoc.
@@ -22,6 +27,16 @@ final class ClientExamples {
 			.doOnNext(System.out::println)
 			.then(tm1.close()) // close after the list completes, not alongside it
 			.block(); // block only in a standalone main(), never in reactive code
+		// @end
+	}
+
+	Mono<ProcessExecuteResult> async(Tm1Client tm1) {
+		// @start region = async
+		// TM1 runs it in the background and the client polls for the result, so no
+		// request stays open. Cancelling the subscription stops the process on TM1.
+		return tm1.withAsync(Duration.ofSeconds(2))
+			.processes()
+			.executeWithReturn("Rebuild Forecast", Map.of(), ODataQuery.none());
 		// @end
 	}
 

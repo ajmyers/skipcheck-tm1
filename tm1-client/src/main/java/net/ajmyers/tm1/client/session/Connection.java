@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
@@ -14,6 +15,7 @@ import java.util.function.LongSupplier;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.ClientResponse;
@@ -448,21 +450,122 @@ final class Connection {
 	 */
 	private Mono<Throwable> errorOf(ClientResponse response, String method, URI uri) {
 		int status = response.statusCode().value();
-		return response.bodyToMono(byte[].class).defaultIfEmpty(new byte[0]).map(body -> {
-			ODataError error = null;
-			if (body.length > 0) {
+		return response.bodyToMono(byte[].class)
+			.defaultIfEmpty(new byte[0])
+			.map(body -> errorFrom(status, body, method, uri));
+	}
+
+	/** The exception for an error status and its body, wherever the body came from. */
+	Tm1ApiException errorFrom(int status, byte[] body, String method, URI uri) {
+		ODataError error = null;
+		if (body.length > 0) {
+			try {
+				error = ODataError.from(mapper.readTree(body));
+			}
+			catch (JacksonException e) {
+				// Not JSON: TM1 sends some errors as plain text, read below
+			}
+			if (error == null) {
+				error = ODataError.fromText(new String(body, StandardCharsets.UTF_8));
+			}
+		}
+		return Tm1ApiException.of(status, error, method, uri.toString(), classifier);
+	}
+
+	/**
+	 * Reads a response that arrived whole, as a status and body: the result an async
+	 * monitor unwraps, or an item of a batch. An error status becomes its exception, as
+	 * for a response on the wire.
+	 */
+	<T> Flux<T> decode(Tm1Request<T> request, URI uri, int status, byte[] body) {
+		String method = request.method().name();
+		if (status >= 400) {
+			return Flux.error(errorFrom(status, body, method, uri));
+		}
+		return switch (request.response()) {
+			case NONE -> Flux.empty();
+			case TEXT -> Flux.just(request.type().cast(new String(body, StandardCharsets.UTF_8)));
+			case BYTES -> Flux.just(request.type().cast(DefaultDataBufferFactory.sharedInstance.wrap(body)));
+			case SINGLE -> {
+				if (body.length == 0) {
+					yield Flux.empty();
+				}
 				try {
-					error = ODataError.from(mapper.readTree(body));
+					yield Flux.just(mapper.readValue(body, request.type()));
 				}
 				catch (JacksonException e) {
-					// Not JSON: TM1 sends some errors as plain text, read below
-				}
-				if (error == null) {
-					error = ODataError.fromText(new String(body, StandardCharsets.UTF_8));
+					yield Flux.error(new Tm1ProtocolException(
+							"TM1 sent a response that isn't valid JSON for " + request.type().getSimpleName(), null,
+							method, uri.toString(), e));
 				}
 			}
-			return Tm1ApiException.of(status, error, method, uri.toString(), classifier);
+			case COLLECTION ->
+				ODataCollectionDecoder
+					.decode(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(body)), mapper, request.type(),
+							method, uri.toString())
+					.handle((event, sink) -> {
+						if (event instanceof ODataCollectionDecoder.Event.Item<T> item && item.value() != null) {
+							sink.next(item.value());
+						}
+					});
+		};
+	}
+
+	/**
+	 * Sends {@code request} with {@code Prefer: respond-async}. If TM1 accepts it (202,
+	 * with the monitor's {@code Location}), polls the monitor every {@code every} until
+	 * it holds the result, an {@code application/http} message, and reads that as the
+	 * request's response. If TM1 answers at once, reads that. Cancelling before the
+	 * result deletes the monitor, which stops the work on TM1.
+	 */
+	<T> Flux<T> async(Tm1Request<T> request, Duration every) {
+		URI uri = uri(request.relativeUri());
+		return exchange(request.withHeader("Prefer", "respond-async"), uri, response -> {
+			if (response.statusCode().value() != 202) {
+				// TM1 answered at once: read it as an ordinary response
+				return request.response() == Tm1Request.Response.COLLECTION
+						? response.bodyToMono(byte[].class)
+							.defaultIfEmpty(new byte[0])
+							.flatMapMany(body -> decode(request, uri, response.statusCode().value(), body))
+						: read(request, uri, response).flux();
+			}
+			String location = response.headers().asHttpHeaders().getFirst(HttpHeaders.LOCATION);
+			if (location == null) {
+				return response.releaseBody()
+					.thenMany(Flux.error(new Tm1ProtocolException("TM1 accepted an async request without a Location",
+							null, request.method().name(), uri.toString(), null)));
+			}
+			// The Location is relative to the request's URL: ../_async('id')
+			return response.releaseBody().thenMany(monitor(request, uri, uri.resolve(location), every));
 		});
+	}
+
+	private <T> Flux<T> monitor(Tm1Request<T> request, URI uri, URI monitor, Duration every) {
+		Tm1Request<DataBuffer> poll = Tm1Request.bytes(ODataPath.link(URI.create(root).relativize(monitor).getPath()));
+		AtomicBoolean finished = new AtomicBoolean();
+		Mono<byte[]> once = exchange(poll, monitor, response -> {
+			if (response.statusCode().value() == 202) {
+				return response.releaseBody().thenMany(Flux.<byte[]>empty());
+			}
+			return response.bodyToMono(byte[].class).defaultIfEmpty(new byte[0]).flux();
+		}).next();
+		Flux<T> result = Mono.defer(() -> once)
+			.repeatWhenEmpty(Integer.MAX_VALUE, polls -> polls.concatMap(n -> Mono.delay(every)))
+			.doOnNext(message -> finished.set(true))
+			.flatMapMany(message -> {
+				AsyncResult unwrapped = AsyncResult.parse(message);
+				return decode(request, uri, unwrapped.status(), unwrapped.body());
+			});
+		// Deleting the monitor before the result is what stops the work on TM1
+		return Flux.usingWhen(Mono.just(monitor), m -> result, m -> Mono.empty(), (m, e) -> Mono.empty(),
+				m -> finished.get() ? Mono.empty()
+						: exchange(Tm1Request.delete(poll.path()), m,
+								response -> response.releaseBody().<Void>thenMany(Flux.empty()))
+							.then()
+							.onErrorResume(e -> {
+								log.debug("Couldn't delete the async monitor {}", m, e);
+								return Mono.empty();
+							}));
 	}
 
 	private <R> Mono<R> error(ClientResponse response, String method, URI uri) {

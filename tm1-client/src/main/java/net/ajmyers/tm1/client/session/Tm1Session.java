@@ -1,6 +1,7 @@
 package net.ajmyers.tm1.client.session;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.LongSupplier;
@@ -70,14 +71,18 @@ public final class Tm1Session {
 
 	private final @Nullable String changeSet;
 
+	private final @Nullable Duration async;
+
 	Tm1Session(Connection connection) {
-		this(connection, null, null);
+		this(connection, null, null, null);
 	}
 
-	private Tm1Session(Connection connection, @Nullable String sandbox, @Nullable String changeSet) {
+	private Tm1Session(Connection connection, @Nullable String sandbox, @Nullable String changeSet,
+			@Nullable Duration async) {
 		this.connection = Objects.requireNonNull(connection, "connection");
 		this.sandbox = sandbox;
 		this.changeSet = changeSet;
+		this.async = async;
 	}
 
 	/**
@@ -107,7 +112,8 @@ public final class Tm1Session {
 			return Mono.error(new IllegalArgumentException(
 					"Collection and byte requests are streamed: use stream() for " + request));
 		}
-		Mono<T> send = connection.execute(inSandbox(request));
+		Mono<T> send = async != null && request.response() != Tm1Request.Response.BYTES
+				? connection.async(inSandbox(request), async).next() : connection.execute(inSandbox(request));
 		return request.requirement().map(needed -> connection.require(needed).then(send)).orElse(send);
 	}
 
@@ -127,7 +133,8 @@ public final class Tm1Session {
 			return Flux.error(new IllegalArgumentException(
 					"Only collection requests are streamed: use execute() for " + request));
 		}
-		Flux<T> send = connection.stream(inSandbox(request));
+		Flux<T> send = async != null && request.response() == Tm1Request.Response.COLLECTION
+				? connection.async(inSandbox(request), async) : connection.stream(inSandbox(request));
 		return request.requirement().map(needed -> connection.require(needed).thenMany(send)).orElse(send);
 	}
 
@@ -171,7 +178,7 @@ public final class Tm1Session {
 		if (name.isBlank()) {
 			throw new IllegalArgumentException("sandbox name is blank");
 		}
-		return new Tm1Session(connection, name, changeSet);
+		return new Tm1Session(connection, name, changeSet, async);
 	}
 
 	/**
@@ -179,7 +186,46 @@ public final class Tm1Session {
 	 * @return the view, or this session if it has no sandbox
 	 */
 	public Tm1Session withoutSandbox() {
-		return sandbox == null ? this : new Tm1Session(connection, null, changeSet);
+		return sandbox == null ? this : new Tm1Session(connection, null, changeSet, async);
+	}
+
+	/**
+	 * A view of this session whose requests TM1 runs asynchronously (OData's
+	 * {@code Prefer: respond-async}): each returns at once with a monitor, which the
+	 * client polls every {@code every} until the result is there, so a long process or
+	 * chore never holds a request open for its whole run. Methods return what they always
+	 * do. Cancelling the subscription before the result deletes the monitor, which stops
+	 * the work on TM1: a process run ends as {@code TM1UserException: Cancel}.
+	 *
+	 * <p>
+	 * Raw byte requests (document content) aren't sent async. TM1 (11.8) sends no
+	 * {@code Retry-After}, so {@code every} is the only pace.
+	 * @param every how long to wait between polls of the monitor
+	 * @return the view
+	 * @throws IllegalArgumentException if {@code every} isn't positive
+	 */
+	public Tm1Session withAsync(Duration every) {
+		Objects.requireNonNull(every, "every");
+		if (every.isNegative() || every.isZero()) {
+			throw new IllegalArgumentException("The poll interval must be positive: " + every);
+		}
+		return new Tm1Session(connection, sandbox, changeSet, every);
+	}
+
+	/**
+	 * A view of this session whose requests run synchronously, as usual.
+	 * @return the view, or this session if it isn't async
+	 */
+	public Tm1Session withoutAsync() {
+		return async == null ? this : new Tm1Session(connection, sandbox, changeSet, null);
+	}
+
+	/**
+	 * How often this view polls an async request's monitor, if it's async.
+	 * @return the interval, or empty for a synchronous view
+	 */
+	public Optional<Duration> async() {
+		return Optional.ofNullable(async);
 	}
 
 	/**
@@ -204,7 +250,7 @@ public final class Tm1Session {
 		if (id.isBlank()) {
 			throw new IllegalArgumentException("change set ID is blank");
 		}
-		return new Tm1Session(connection, sandbox, id);
+		return new Tm1Session(connection, sandbox, id, async);
 	}
 
 	/**
@@ -212,7 +258,7 @@ public final class Tm1Session {
 	 * @return the view, or this session if it has no change set
 	 */
 	public Tm1Session withoutChangeSet() {
-		return changeSet == null ? this : new Tm1Session(connection, sandbox, null);
+		return changeSet == null ? this : new Tm1Session(connection, sandbox, null, async);
 	}
 
 	/**
