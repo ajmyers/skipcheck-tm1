@@ -107,7 +107,8 @@ class ProcessDebugTm1Test {
 		assertThat(debug.list(ODataQuery.none()).collectList().block(WAIT)).as("lists none").isEmpty();
 
 		assertThat(debug.stepOver(id, ODataQuery.none()).block(WAIT).status())
-			.isEqualTo(ProcessDebugContextStatus.RUNNING);
+			.as("TM1 answers before or after the step lands, whichever comes first")
+			.isIn(ProcessDebugContextStatus.RUNNING, ProcessDebugContextStatus.PAUSED);
 		ProcessDebugContext done = debug.finish(id).block(WAIT);
 		assertThat(done.status()).isEqualTo(ProcessDebugContextStatus.COMPLETE);
 		assertThat(done.result().processExecuteStatusCode()).isEqualTo(ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY);
