@@ -29,7 +29,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -e './tm1-python[test]'
+      # tm1-testcontainers too: the live tests start TM1 with it (skipped here, with no TM1 source)
+      - run: pip install -e './tm1-python[test]' -e './tm1-python/testcontainers[test]'
       - run: pytest tm1-python
 
   # The .NET client, generated from spec/tm1-api.json at build time

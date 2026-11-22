@@ -1,8 +1,9 @@
 """Tests against a real TM1, as the Java client's ``*Tm1Test`` classes. The server is either:
 
-* started in Docker for the run, from the same TM1 sources the Java tests use
-  (``TM1_PRIVATE_IMAGE``, ``TM1_HOME_DIR``, ``TM1_INSTALL_VOLUME``, ``TM1_BUNDLE_DIR``,
-  ``TM1_BUNDLE_URL``: see ``tm1_container.py``); its login is ``admin`` with no password;
+* started in Docker for the run by tm1-testcontainers (``tm1-python/testcontainers``), as Java's
+  ``@RequiresTm1`` tests start theirs: :meth:`Tm1ServerContainer.shared`, from the same TM1
+  sources (``TM1_PRIVATE_IMAGE``, ``TM1_HOME_DIR``, ``TM1_INSTALL_VOLUME``, ``TM1_BUNDLE_DIR``,
+  ``TM1_BUNDLE_URL``), one container for the whole run, logging in as ``admin`` with no password;
 * or one already running: ``TM1_URL``, the REST API's root, such as
   ``https://localhost:8010/api/v1``, with ``TM1_USER`` and ``TM1_PASSWORD`` (default ``admin``
   and ``apple``), ``TM1_NAMESPACE`` for CAM, and ``TM1_VERIFY=false`` to accept a self-signed
@@ -22,37 +23,34 @@ import pytest
 
 from tm1_client import Tm1Client
 
-from . import tm1_container
-
-_SOURCE = tm1_container.discover()  # raises if a source is set but wrong, as Java's does
 _RUNNING = os.environ.get("TM1_URL")
+_ALREADY_RUNNING = " Or set TM1_URL for a server that's already running."
 
-CONFIGURED = bool(_RUNNING) or (_SOURCE is not None and tm1_container.docker_available())
-"""Whether there's a TM1 to test against: the tests skip without one."""
-
-REASON = tm1_container.NO_SOURCE_MESSAGE if _SOURCE is None else "Docker isn't available, so there's no TM1 to test against"
+try:
+    from tm1_testcontainers import RequiresTm1, Tm1ServerContainer, Tm1Source, docker_available
+    from tm1_testcontainers.plugin import NO_DOCKER_MESSAGE
+except ImportError:  # tm1-testcontainers isn't installed: only TM1_URL
+    _SOURCE = None
+    CONFIGURED = bool(_RUNNING)
+    REASON = "Install tm1-testcontainers (pip install -e tm1-python/testcontainers) to start TM1 in Docker." + _ALREADY_RUNNING
+else:
+    _SOURCE = Tm1Source.discover()  # raises if a source is set but wrong, as Java's does
+    CONFIGURED = bool(_RUNNING) or (_SOURCE is not None and docker_available())
+    """Whether there's a TM1 to test against: the tests skip without one."""
+    REASON = RequiresTm1.NO_SOURCE_MESSAGE + _ALREADY_RUNNING if _SOURCE is None else NO_DOCKER_MESSAGE
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
-_container: tm1_container.Tm1Container | None = None
-
 
 def target() -> tuple[str, str, str]:
-    """The REST root and login of the TM1 to test against, starting its container the first time."""
-    global _container
+    """The REST root and login of the TM1 to test against, starting its container the first time
+    (one for the run, removed at its end by tm1-testcontainers' pytest plugin)."""
     if _RUNNING:
         return _RUNNING, os.environ.get("TM1_USER", "admin"), os.environ.get("TM1_PASSWORD", "apple")
     if not CONFIGURED or _SOURCE is None:
         pytest.skip(REASON)
-    if _container is None:
-        _container = tm1_container.Tm1Container(_SOURCE).start()
-    assert _container.url is not None
-    return _container.url, _container.username, _container.password
-
-
-def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
-    if _container is not None:
-        _container.stop()
+    container = Tm1ServerContainer.shared()
+    return container.rest_url, container.username, container.password
 
 
 def _builder(builder: Any) -> Any:

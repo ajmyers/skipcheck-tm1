@@ -1,0 +1,141 @@
+"""The pytest plugin: Java's ``@RequiresTm1``, ``@RequiresCognos``, ``@RequiresTm1Web`` and
+``@RequiresPaw`` as markers, and their parameters as session fixtures.
+
+* ``@pytest.mark.requires_tm1`` skips a test when Docker isn't running or no TM1 source is
+  configured; a source that's configured but wrong fails it instead. ``requires_cognos``,
+  ``requires_tm1_web`` and ``requires_paw`` need TM1 too, and their own source (and, for PAW,
+  IBM's license accepted).
+* The fixtures ``tm1_server`` (:meth:`Tm1ServerContainer.shared`), ``tm1_web``
+  (:meth:`Tm1WebContainer.shared`), ``paw`` (:meth:`PawContainer.shared`) and ``cognos`` (the
+  configured :class:`CognosSource`, as Java's ``@RequiresCognos`` injects) skip and fail the same
+  way, so a test needs only the fixture.
+
+The shared containers are removed when the session ends, unless reuse is enabled
+(``testcontainers.reuse.enable=true`` in ``~/.testcontainers.properties``).
+"""
+
+from __future__ import annotations
+
+import functools
+from typing import Any, Callable, Optional
+
+import pytest
+
+from ._container import docker_available, reuse_enabled
+from .cognos import NO_SOURCE_MESSAGE as NO_COGNOS_MESSAGE
+from .paw import NO_LICENSE_MESSAGE as NO_PAW_LICENSE_MESSAGE
+from .paw import NO_SOURCE_MESSAGE as NO_PAW_MESSAGE
+from .paw import PawContainer
+from .sources import CognosSource, PawSource, Tm1Source, Tm1WebSource
+from .tm1 import NO_SOURCE_MESSAGE as NO_TM1_MESSAGE
+from .tm1 import Tm1ServerContainer
+from .web import NO_SOURCE_MESSAGE as NO_TM1_WEB_MESSAGE
+from .web import Tm1WebContainer
+
+NO_DOCKER_MESSAGE = "Docker isn't available, so there's no TM1 to test against"
+
+_MARKERS = {
+    "requires_tm1": "needs a TM1 server in Docker: skipped without Docker or a TM1 source (Java's @RequiresTm1)",
+    "requires_cognos": "needs TM1 and a Cognos source (Java's @RequiresCognos)",
+    "requires_tm1_web": "needs TM1 and a TM1 Web source (Java's @RequiresTm1Web)",
+    "requires_paw": "needs TM1, a PAW Local zip and its license accepted (Java's @RequiresPaw)",
+}
+
+
+@functools.lru_cache(maxsize=None)
+def _docker() -> bool:
+    return docker_available()
+
+
+def tm1_skip_reason() -> Optional[str]:
+    """Why a TM1 test is skipped, or None when it runs; raises when a source is set but wrong."""
+    if not _docker():
+        return NO_DOCKER_MESSAGE
+    # Raises if a source is set but invalid: a wrong setting should fail, not skip
+    return None if Tm1Source.discover() is not None else NO_TM1_MESSAGE
+
+
+def cognos_skip_reason() -> Optional[str]:
+    return tm1_skip_reason() or (None if CognosSource.discover() is not None else NO_COGNOS_MESSAGE)
+
+
+def tm1_web_skip_reason() -> Optional[str]:
+    return tm1_skip_reason() or (None if Tm1WebSource.discover() is not None else NO_TM1_WEB_MESSAGE)
+
+
+def paw_skip_reason() -> Optional[str]:
+    reason = tm1_skip_reason()
+    if reason is not None:
+        return reason
+    if PawSource.discover() is None:
+        return NO_PAW_MESSAGE
+    if not PawContainer.license_accepted_by_setting():
+        return NO_PAW_LICENSE_MESSAGE
+    return None
+
+
+_CONDITIONS: dict[str, Callable[[], Optional[str]]] = {
+    "requires_tm1": tm1_skip_reason,
+    "requires_cognos": cognos_skip_reason,
+    "requires_tm1_web": tm1_web_skip_reason,
+    "requires_paw": paw_skip_reason,
+}
+
+
+def pytest_configure(config: Any) -> None:
+    for name, help_text in _MARKERS.items():
+        config.addinivalue_line("markers", f"{name}: {help_text}")
+
+
+def pytest_runtest_setup(item: Any) -> None:
+    names = {marker.name for marker in item.iter_markers()}
+    for name, condition in _CONDITIONS.items():
+        if name in names:
+            reason = condition()
+            if reason is not None:
+                pytest.skip(reason)
+
+
+def pytest_unconfigure(config: Any) -> None:
+    # Not left to the end of the process: removed as the session ends, unless kept for reuse
+    if reuse_enabled():
+        return
+    for shared in (PawContainer._shared, Tm1WebContainer._shared, Tm1ServerContainer._shared):
+        if shared is not None:
+            shared.stop()
+
+
+def _require(condition: Callable[[], Optional[str]]) -> None:
+    reason = condition()
+    if reason is not None:
+        pytest.skip(reason)
+
+
+@pytest.fixture(scope="session")
+def tm1_server() -> Tm1ServerContainer:
+    """The shared TM1 server (Java's ``Tm1ServerContainer`` parameter under ``@RequiresTm1``)."""
+    _require(tm1_skip_reason)
+    return Tm1ServerContainer.shared()
+
+
+@pytest.fixture(scope="session")
+def cognos() -> CognosSource:
+    """The configured Cognos source (Java's ``CognosSource`` parameter under ``@RequiresCognos``)."""
+    _require(cognos_skip_reason)
+    source = CognosSource.discover()
+    assert source is not None
+    return source
+
+
+@pytest.fixture(scope="session")
+def tm1_web() -> Tm1WebContainer:
+    """The shared TM1 Web, listing the shared TM1 server (Java's ``@RequiresTm1Web``)."""
+    _require(tm1_web_skip_reason)
+    return Tm1WebContainer.shared()
+
+
+@pytest.fixture(scope="session")
+def paw() -> PawContainer:
+    """The shared PAW, logging on to the shared TM1 server (Java's ``@RequiresPaw``)."""
+    _require(paw_skip_reason)
+    return PawContainer.shared()

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tm1-testcontainers"
+version = "0.1.0.dev0"
+description = "Testcontainers support for running IBM Planning Analytics (TM1) servers in tests"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.10"
+dependencies = [
+    # Tm1Version is part of this package's API (Tm1ServerContainer.with_expected_version)
+    "tm1-client",
+    "testcontainers>=4.15",
+    "httpx>=0.27",
+    "typing-extensions>=4.7",
+    # The markers and fixtures are a pytest plugin, as Java's are JUnit extensions
+    "pytest>=8",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.entry-points.pytest11]
+tm1_testcontainers = "tm1_testcontainers.plugin"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tm1_testcontainers"]
+
+# PawContainer runs docker/paw/paw-local.sh in its runner container, so ship it, as the Java
+# build puts it in the jar. An editable install reads it from the repository instead.
+[tool.hatch.build.targets.wheel.force-include]
+"../../docker/paw/paw-local.sh" = "tm1_testcontainers/paw-local.sh"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md"]
+
+[tool.hatch.build.targets.sdist.force-include]
+"../../docker/paw/paw-local.sh" = "src/tm1_testcontainers/paw-local.sh"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
