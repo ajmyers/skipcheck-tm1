@@ -103,7 +103,7 @@ body {
 /* Wide code scrolls inside its block rather than widening the page, which stock Javadoc does on
    phones: the content column is a flex item, which otherwise grows to fit its widest line */
 .main-grid main { min-width: 0; }
-pre { overflow-x: auto; }
+pre { overflow-x: auto; tab-size: 4; }
 
 /* One column for the masthead, Javadoc's bars and content, and the footer: the site's gutters,
    but wider than the site's reading width, since API pages carry a sidebar and wide tables */

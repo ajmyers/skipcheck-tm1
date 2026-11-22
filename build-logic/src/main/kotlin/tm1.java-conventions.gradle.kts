@@ -31,6 +31,9 @@ tasks.withType<JavaCompile>().configureEach {
 		option("NullAway:OnlyNullMarked", "true")
 		option("NullAway:JSpecifyMode", "true")
 		check("NullAway", if (name.contains("Test")) CheckSeverity.OFF else CheckSeverity.ERROR)
+		// It takes every {@snippet} without an inline body for a mistake, but the usage examples are
+		// external snippets ({@snippet class=... region=...}), which have none by design
+		disable("InvalidSnippet")
 	}
 	options.encoding = "UTF-8"
 	options.compilerArgs.addAll(listOf("-parameters", "-Xlint:all,-serial,-processing,-options"))
