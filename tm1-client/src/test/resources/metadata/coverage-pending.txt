@@ -20,15 +20,9 @@ Action ProcessDebugContext/StepOut
 Action ProcessDebugContext/StepOver
 Action RelationalDrillthrough/Execute
 Action RelationalDrillthrough/ExecuteWithRowset
-Action Sandbox/DiscardChanges
-Action Sandbox/Load
-Action Sandbox/Merge
-Action Sandbox/Publish
-Action Sandbox/Unload
 Action Session/Close
 Action Thread/CancelOperation
 Action User/Disconnect
-ActionImport BeginChangeSet
 ActionImport CompileProcess
 ActionImport ConfigureEncryptionAtRest
 ActionImport DecryptDataFile
@@ -37,7 +31,6 @@ ActionImport DeleteAnnotationArtifacts
 ActionImport DisableEncryptionAtRest
 ActionImport EncryptDataFile
 ActionImport EncryptDataModel
-ActionImport EndChangeSet
 ActionImport ExecuteChore
 ActionImport ExecuteCubeDrillthrough
 ActionImport ExecuteProcess
@@ -53,7 +46,6 @@ ActionImport GitUninit
 ActionImport RemoveOIDCKeyFromCache
 ActionImport RotateDataEncryptionKey
 ActionImport RotateDataModelKey
-ActionImport UndoChangeSet
 EntitySet Annotations
 EntitySet ApplicationContextFacets
 EntitySet AuditLogEntries
@@ -70,7 +62,6 @@ EntitySet ProcessDebugContexts
 EntitySet Processes
 EntitySet Rowsets
 EntitySet SQLDataSources
-EntitySet Sandboxes
 EntitySet Sessions
 EntitySet Threads
 EntitySet TransactionLogEntries
