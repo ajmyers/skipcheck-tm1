@@ -1,24 +1,15 @@
 # Endpoints not implemented yet. This list only shrinks: implementing an endpoint means
 # taking it off. A new $metadata snapshot's new endpoints go here or in coverage-excluded.txt.
 # See CoverageGateTest.
-Action GitPullPlan/Execute
-Action GitPushPlan/Execute
 ActionImport ConfigureEncryptionAtRest
 ActionImport DecryptDataFile
 ActionImport DecryptDataModel
 ActionImport DisableEncryptionAtRest
 ActionImport EncryptDataFile
 ActionImport EncryptDataModel
-ActionImport GitDeploy
-ActionImport GitInit
-ActionImport GitPull
-ActionImport GitPush
-ActionImport GitStatus
-ActionImport GitUninit
 ActionImport RemoveOIDCKeyFromCache
 ActionImport RotateDataEncryptionKey
 ActionImport RotateDataModelKey
-EntitySet GitPlans
 EntitySet SQLDataSources
 FunctionImport GetOIDCKeys
 FunctionImport ValidateEncryptionAtRestSettings
