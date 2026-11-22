@@ -17,6 +17,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.function.BiConsumer;
 
 import org.jspecify.annotations.Nullable;
 import org.testcontainers.containers.GenericContainer;
@@ -100,6 +101,8 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	private @Nullable CognosContainer cognos;
 
 	private List<String> camAdmins = List.of();
+
+	private @Nullable Tm1AdminServerContainer adminServer;
 
 	/**
 	 * A container on the default {@code tm1-server} image (or {@code TM1_SERVER_IMAGE}),
@@ -230,12 +233,57 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 			throw new IllegalArgumentException("Name at least one of the Cognos test users as a TM1 administrator");
 		}
 		this.camAdmins = List.of(admins);
-		if (cognos.getNetwork() == null) {
-			cognos.withNetwork(Network.newNetwork());
-		}
-		withNetwork(cognos.getNetwork());
+		shareNetwork(this, cognos);
 		dependsOn(cognos);
 		return self();
+	}
+
+	/**
+	 * Registers this server with a separate Admin Server, as in a deployment with several
+	 * TM1 servers, instead of running one inside this container ({@code TM1_ADMIN_HOST}).
+	 * TM1 Web and PAW pointed at that Admin Server list every server registered with it.
+	 *
+	 * <p>
+	 * The two containers share a Docker network (see {@link #withCamSecurity}), and
+	 * starting this server starts the Admin Server first.
+	 * @param admin the Admin Server to register with
+	 * @return this container
+	 */
+	public Tm1ServerContainer withAdminServer(Tm1AdminServerContainer admin) {
+		this.adminServer = Objects.requireNonNull(admin, "admin");
+		shareNetwork(this, admin);
+		dependsOn(admin);
+		withEnv("TM1_ADMIN_HOST", Tm1AdminServerContainer.NETWORK_ALIAS);
+		return self();
+	}
+
+	/**
+	 * The Admin Server set with {@link #withAdminServer}.
+	 * @return the Admin Server, or {@code null} if this container runs its own
+	 */
+	public @Nullable Tm1AdminServerContainer getAdminServer() {
+		return adminServer;
+	}
+
+	/**
+	 * Puts two containers that talk to each other on one Docker network: the one either
+	 * already has, or a new one. Fails if they're on different networks, since neither
+	 * could then reach the other by name.
+	 */
+	static void shareNetwork(GenericContainer<?> a, GenericContainer<?> b) {
+		Network network = a.getNetwork() != null ? a.getNetwork() : b.getNetwork();
+		if (network == null) {
+			network = Network.newNetwork();
+		}
+		for (GenericContainer<?> container : List.of(a, b)) {
+			if (container.getNetwork() == null) {
+				container.withNetwork(network);
+			}
+			else if (!container.getNetwork().equals(network)) {
+				throw new IllegalStateException("Containers that work together must share one Network, but "
+						+ container.getClass().getSimpleName() + " is on another. Give them the same Network.");
+			}
+		}
 	}
 
 	/**
@@ -344,8 +392,17 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		logger().info("TM1 {} is up at {} ({})", version, getRestUrl(), source.describe());
 	}
 
-	// An if-chain rather than a pattern switch: the libraries target Java 17 (see #8)
 	private void applySource() {
+		mountSource(source, binds, this::withEnv);
+	}
+
+	/**
+	 * Mounts a TM1 source into a {@code tm1-server} container: the install, the bundle
+	 * folder and cache, or the download settings. Shared with
+	 * {@link Tm1AdminServerContainer}, which runs the same image.
+	 */
+	// An if-chain rather than a pattern switch: the libraries target Java 17 (see #8)
+	static void mountSource(Tm1Source source, List<Bind> binds, BiConsumer<String, String> withEnv) {
 		if (source instanceof Tm1Source.InstallDir dir) {
 			binds.add(new Bind(dir.dir().toString(), new Volume(INSTALL_PATH), AccessMode.ro));
 		}
@@ -355,14 +412,14 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		else if (source instanceof Tm1Source.Bundle bundle) {
 			binds.add(new Bind(bundle.dir().toString(), new Volume("/ibm"), AccessMode.ro));
 			if (bundle.file() != null) {
-				withEnv("TM1_BUNDLE", bundle.file());
+				withEnv.accept("TM1_BUNDLE", bundle.file());
 			}
 			binds.add(new Bind(CACHE_VOLUME, new Volume("/tm1/cache")));
 		}
 		else if (source instanceof Tm1Source.BundleUrl url) {
-			withEnv("TM1_BUNDLE_URL", url.url().toString());
+			withEnv.accept("TM1_BUNDLE_URL", url.url().toString());
 			if (url.sha256() != null) {
-				withEnv("TM1_BUNDLE_SHA256", url.sha256());
+				withEnv.accept("TM1_BUNDLE_SHA256", url.sha256());
 			}
 			binds.add(new Bind(CACHE_VOLUME, new Volume("/tm1/cache")));
 		}
@@ -424,7 +481,7 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		}
 	}
 
-	private static DockerImageName defaultImage(Tm1Source source) {
+	static DockerImageName defaultImage(Tm1Source source) {
 		if (source instanceof Tm1Source.PrivateImage image) {
 			return DockerImageName.parse(image.image()).asCompatibleSubstituteFor(DEFAULT_IMAGE);
 		}

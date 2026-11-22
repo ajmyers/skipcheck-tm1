@@ -14,8 +14,8 @@ import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
  *
  * <p>
  * Each container is an independent TM1 server with its own Admin Server, on its own
- * mapped ports. (Servers that register with one shared Admin Server, like a real
- * multi-server setup, are planned as {@code Tm1Stack} in issue #16.)
+ * mapped ports. For servers that register with one shared Admin Server, like a real
+ * multi-server setup, see {@link SharedAdminServerExampleTest}.
  */
 @RequiresTm1
 class TwoServersExampleTest {
