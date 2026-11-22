@@ -21,9 +21,12 @@ tasks.withType<Javadoc>().configureEach {
 		// Report every gap, not just the first 100
 		addStringOption("Xmaxwarns", "10000")
 		links("https://docs.spring.io/spring-framework/docs/current/javadoc-api/")
+		// Colours the code in {@snippet} tags and <pre><code> blocks (JDK 25+, with a bundled highlight.js)
+		addBooleanOption("-syntax-highlight", true)
 	}
 }
 
 tasks.named("check") {
 	dependsOn(tasks.named("javadoc"))
 }
+
