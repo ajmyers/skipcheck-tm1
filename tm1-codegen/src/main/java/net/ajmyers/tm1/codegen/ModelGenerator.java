@@ -122,6 +122,15 @@ public final class ModelGenerator {
 	 */
 	private static final String DYNAMIC = "*";
 
+	/**
+	 * Properties TM1 sends in another type than {@code $metadata} declares, by
+	 * {@code Type/Property}, with what it does instead. Their components are
+	 * {@code JsonNode}, so either form reads; each was found against a server (plan
+	 * §16.5).
+	 */
+	static final Map<String, String> DEPARTURES = Map.of("CAMSettings/ClientPingCAMPassport",
+			"TM1 (11.8) sends it as a number in {@code StaticConfiguration} and as an ISO 8601 duration in {@code ActiveConfiguration}, though {@code $metadata} declares {@code Edm.Int32}, so it's JSON");
+
 	private static final ClassName JSON_NODE = ClassName.get("tools.jackson.databind", "JsonNode");
 
 	private static final Set<String> KEYWORDS = Set.of("abstract", "assert", "boolean", "break", "byte", "case",
@@ -298,9 +307,13 @@ public final class ModelGenerator {
 		}
 		for (CsdlStructuredType level : rootFirst) {
 			for (CsdlProperty property : level.properties()) {
-				javaType(property.type()).ifPresent(t -> components
-					.add(new Component(unique(componentName(property.name()), names), t, property.name(),
-							paramText(property.annotations(), property.name()), revisions(property.annotations()))));
+				String departure = DEPARTURES.get(level.name() + "/" + property.name());
+				javaType(property.type()).map(t -> departure == null ? t : (TypeName) JSON_NODE)
+					.ifPresent(t -> components
+						.add(new Component(unique(componentName(property.name()), names), t, property.name(),
+								paramText(property.annotations(), property.name())
+										+ (departure == null ? "" : ". " + departure),
+								revisions(property.annotations()))));
 			}
 			for (CsdlNavigationProperty navigation : level.navigationProperties()) {
 				javaType(navigation.type()).ifPresent(t -> components
@@ -513,7 +526,8 @@ public final class ModelGenerator {
 		Set<String> names = new HashSet<>(Set.of("build"));
 		List<PatchProperty> properties = new ArrayList<>();
 		for (CsdlProperty property : type.properties()) {
-			patchType(property.type())
+			boolean departs = DEPARTURES.containsKey(type.name() + "/" + property.name());
+			patchType(property.type()).map(t -> departs ? (TypeName) ClassName.get(Object.class) : t)
 				.ifPresent(t -> properties.add(new PatchProperty(unique(componentName(property.name()), names), t,
 						property.name(), paramText(property.annotations(), property.name()), false,
 						property.type().collection(), revisions(property.annotations()))));

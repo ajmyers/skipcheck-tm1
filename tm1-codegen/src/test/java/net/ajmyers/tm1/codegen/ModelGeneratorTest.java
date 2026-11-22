@@ -234,6 +234,26 @@ class ModelGeneratorTest {
 		assertThat(source(sample(), "Cube")).doesNotContain("dynamicProperties");
 	}
 
+	@Test
+	void makesAPropertyTm1SendsInAnotherTypeJson() {
+		String sample = """
+				<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+				  <edmx:DataServices>
+				    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="ibm.tm1.api.v1" Alias="tm1">
+				      <ComplexType Name="CAMSettings">
+				        <Property Name="ClientPingCAMPassport" Type="Edm.Int32"/>
+				      </ComplexType>
+				    </Schema>
+				  </edmx:DataServices>
+				</edmx:Edmx>
+				""";
+		ModelGenerator generator = new ModelGenerator(CsdlParser.parse(sample));
+		assertThat(source(generator, "CAMSettings")).contains("@Nullable JsonNode clientPingCAMPassport")
+			.contains("ISO 8601 duration");
+		assertThat(source(generator, "CAMSettingsPatch"))
+			.contains("public Builder clientPingCAMPassport(@Nullable Object");
+	}
+
 	private static ModelGenerator sample() {
 		return new ModelGenerator(CsdlParser.parse(SAMPLE));
 	}
