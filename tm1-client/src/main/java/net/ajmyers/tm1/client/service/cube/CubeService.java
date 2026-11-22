@@ -61,6 +61,28 @@ public final class CubeService {
 	}
 
 	/**
+	 * {@code ModelCubes()}: the cubes that aren't control cubes (whose names start with
+	 * <code>&#125;</code>), streamed.
+	 * @param query what to select, expand, filter and order
+	 * @return the model cubes
+	 */
+	@Tm1Endpoint("FunctionImport ModelCubes")
+	public Flux<Cube> modelCubes(ODataQuery query) {
+		return session.stream(Tm1Request.list(ODataPath.functionImport("ModelCubes", Map.of()), query, Cube.class));
+	}
+
+	/**
+	 * {@code ControlCubes()}: the control cubes, such as <code>&#125;ClientGroups</code>,
+	 * streamed.
+	 * @param query what to select, expand, filter and order
+	 * @return the control cubes
+	 */
+	@Tm1Endpoint("FunctionImport ControlCubes")
+	public Flux<Cube> controlCubes(ODataQuery query) {
+		return session.stream(Tm1Request.list(ODataPath.functionImport("ControlCubes", Map.of()), query, Cube.class));
+	}
+
+	/**
 	 * {@code GET Cubes('name')}.
 	 * @param name the cube's name
 	 * @param query what to select and expand
@@ -278,6 +300,7 @@ public final class CubeService {
 	 */
 	@Tm1Endpoint("Action Cube/TraceCellCalculation")
 	@Tm1Endpoint("Navigation CalculationComponent/Cube")
+	@Tm1Endpoint("Navigation CalculationComponent/Tuple")
 	public Mono<CalculationComponent> traceCellCalculation(String name, Map<String, String> tuple, ODataQuery query) {
 		return session.execute(action(Tm1Operations.CUBE_TRACE_CELL_CALCULATION, name,
 				Map.of("Tuple@odata.bind", bindings(tuple)), CalculationComponent.class)
@@ -296,6 +319,7 @@ public final class CubeService {
 	 */
 	@Tm1Endpoint("Action Cube/TraceFeeders")
 	@Tm1Endpoint("Navigation FedCellDescriptor/Cube")
+	@Tm1Endpoint("Navigation FedCellDescriptor/Tuple")
 	public Mono<FeederTrace> traceFeeders(String name, Map<String, String> tuple, ODataQuery query) {
 		return session.execute(action(Tm1Operations.CUBE_TRACE_FEEDERS, name,
 				Map.of("Tuple@odata.bind", bindings(tuple)), FeederTrace.class)
@@ -313,6 +337,7 @@ public final class CubeService {
 	 */
 	@Tm1Endpoint("Action Cube/CheckFeeders")
 	@Tm1Endpoint("Navigation FedCellDescriptor/Cube")
+	@Tm1Endpoint("Navigation FedCellDescriptor/Tuple")
 	public Flux<FedCellDescriptor> checkFeeders(String name, Map<String, String> tuple, CheckFeedersSelection selection,
 			ODataQuery query) {
 		Tm1Operation operation = Tm1Operations.CUBE_CHECK_FEEDERS;

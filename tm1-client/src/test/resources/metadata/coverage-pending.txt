@@ -40,8 +40,6 @@ ActionImport EncryptDataModel
 ActionImport EndChangeSet
 ActionImport ExecuteChore
 ActionImport ExecuteCubeDrillthrough
-ActionImport ExecuteMDXSetExpression
-ActionImport ExecuteMDXStatement
 ActionImport ExecuteProcess
 ActionImport ExecuteProcessWithReturn
 ActionImport ExecuteRelationalDrillthrough
@@ -66,7 +64,6 @@ EntitySet ErrorLogFiles
 EntitySet GitPlans
 EntitySet Groups
 EntitySet Loggers
-EntitySet MemberSets
 EntitySet MessageLogEntries
 EntitySet ProcessAttributes
 EntitySet ProcessDebugContexts
@@ -78,12 +75,8 @@ EntitySet Sessions
 EntitySet Threads
 EntitySet TransactionLogEntries
 EntitySet Users
-FunctionImport ControlCubes
-FunctionImport ControlDimensions
 FunctionImport GetOIDCKeys
 FunctionImport MessageLog
-FunctionImport ModelCubes
-FunctionImport ModelDimensions
 FunctionImport TailAuditLog
 FunctionImport TailMessageLog
 FunctionImport TailTransactionLog
@@ -95,7 +88,6 @@ Navigation Annotation/DimensionalContext
 Navigation ApplicationContextFacet/Values
 Navigation ApplicationContextFacetValue/Facet
 Navigation AuditLogEntry/AuditDetails
-Navigation CalculationComponent/Tuple
 Navigation CellsetCell/Annotations
 Navigation CellsetCell/DrillthroughScripts
 Navigation Chore/LocalizedAttributes
@@ -109,7 +101,6 @@ Navigation DimensionReference/Dimension
 Navigation DocumentReference/Document
 Navigation Entry/ContainedBy
 Navigation Entry/LocalizedAttributes
-Navigation FedCellDescriptor/Tuple
 Navigation Folder/Contents
 Navigation Folder/PrivateContents
 Navigation Group/Users

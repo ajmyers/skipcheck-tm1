@@ -53,6 +53,30 @@ public final class DimensionService {
 	}
 
 	/**
+	 * {@code ModelDimensions()}: the dimensions that aren't control dimensions (whose
+	 * names start with <code>&#125;</code>), streamed.
+	 * @param query what to select, expand, filter and order
+	 * @return the model dimensions
+	 */
+	@Tm1Endpoint("FunctionImport ModelDimensions")
+	public Flux<Dimension> modelDimensions(ODataQuery query) {
+		return session
+			.stream(Tm1Request.list(ODataPath.functionImport("ModelDimensions", Map.of()), query, Dimension.class));
+	}
+
+	/**
+	 * {@code ControlDimensions()}: the control dimensions, such as
+	 * <code>&#125;Clients</code>, streamed.
+	 * @param query what to select, expand, filter and order
+	 * @return the control dimensions
+	 */
+	@Tm1Endpoint("FunctionImport ControlDimensions")
+	public Flux<Dimension> controlDimensions(ODataQuery query) {
+		return session
+			.stream(Tm1Request.list(ODataPath.functionImport("ControlDimensions", Map.of()), query, Dimension.class));
+	}
+
+	/**
 	 * {@code GET Dimensions('name')}.
 	 * @param name the dimension's name
 	 * @param query what to select and expand

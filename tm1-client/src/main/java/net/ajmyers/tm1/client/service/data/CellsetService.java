@@ -75,6 +75,23 @@ public final class CellsetService {
 	}
 
 	/**
+	 * {@code ExecuteMDXStatement}: runs an MDX statement for its effect, keeping no
+	 * cellset. Needs schema 11.8.20. TM1 (11.8) runs a {@code SELECT} and returns
+	 * nothing, and rejects {@code CREATE SET} as a syntax error (code 501).
+	 * @param mdx the statement
+	 * @return completes when it's run
+	 */
+	@Tm1Endpoint("ActionImport ExecuteMDXStatement")
+	public Mono<Void> executeStatement(String mdx) {
+		Tm1Operation operation = Tm1Operations.EXECUTE_MDX_STATEMENT;
+		return session
+			.execute(Tm1Request
+				.post(ODataPath.of(Objects.requireNonNull(operation.importName())),
+						Map.of("MDX", Objects.requireNonNull(mdx, "mdx")), Void.class)
+				.requires(operation.capability()));
+	}
+
+	/**
 	 * {@code tm1.Execute} on a native or MDX view: its cellset, left on the server until
 	 * {@link #delete}.
 	 * @param cube the cube's name
