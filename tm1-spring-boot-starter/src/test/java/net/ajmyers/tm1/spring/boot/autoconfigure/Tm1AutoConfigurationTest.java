@@ -57,6 +57,15 @@ class Tm1AutoConfigurationTest {
 	}
 
 	@Test
+	void getsCamPassportsFromCognosWhenItsUrlIsSet() {
+		runner
+			.withPropertyValues("tm1.address=http://tm1:8010", "tm1.user=alice", "tm1.password=secret",
+					"tm1.namespace=LDAP", "tm1.cognos-url=http://cognos:9300")
+			.run(context -> assertThat(context.getBean(Tm1ConnectionDetails.class).getAuthenticator().describe())
+				.isEqualTo("CAMPassport from Cognos LDAP/alice"));
+	}
+
+	@Test
 	void explainsAMissingUser() {
 		runner.withPropertyValues("tm1.address=http://tm1:8010")
 			.run(context -> assertThat(context).hasFailed()

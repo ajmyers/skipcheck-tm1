@@ -8,12 +8,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import net.ajmyers.tm1.testcontainers.RequiresTm1;
 import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
+import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -301,6 +304,37 @@ class Tm1SessionBehaviorTest {
 
 	private static String scratchName() {
 		return "zz_session_" + UUID.randomUUID().toString().substring(0, 8);
+	}
+
+	/**
+	 * TM1 closes a kept-alive connection that's idle for about 90 seconds, though
+	 * {@code IdleConnectionTimeOut} is 0, and a request sent on it as it closes gets no
+	 * response at all (#52). The default connector closes idle connections after 60
+	 * seconds ({@code Tm1Session.MAX_IDLE}) so that never happens. Busy connections
+	 * aren't closed: 2000 requests on one were fine.
+	 */
+	@Test
+	void closesAConnectionIdleForNinetySeconds(Tm1ServerContainer server) throws InterruptedException {
+		ConnectionProvider one = ConnectionProvider.builder("idle-probe").maxConnections(1).build();
+		CompletableFuture<Long> closedAfter = new CompletableFuture<>();
+		long[] used = { System.nanoTime() };
+		HttpClient http = HttpClient.create(one)
+			.doOnChannelInit((observer, channel, address) -> channel.closeFuture()
+				.addListener(f -> closedAfter.complete((System.nanoTime() - used[0]) / 1_000_000_000L)))
+			.headers(h -> h.set("Authorization", server.getAuthorization()));
+		try {
+			assertThat(http.get()
+				.uri(server.getRestUrl() + "Server?%24select=Name")
+				.responseSingle((response, body) -> body.asString().thenReturn(response.status().code()))
+				.block(Duration.ofSeconds(30))).isEqualTo(200);
+			used[0] = System.nanoTime();
+			assertThat(closedAfter.orTimeout(150, TimeUnit.SECONDS).join()).as("seconds idle before TM1 closed it")
+				.isBetween(80L, 100L);
+			assertThat(Tm1Session.MAX_IDLE).isLessThan(Duration.ofSeconds(80));
+		}
+		finally {
+			one.dispose();
+		}
 	}
 
 }

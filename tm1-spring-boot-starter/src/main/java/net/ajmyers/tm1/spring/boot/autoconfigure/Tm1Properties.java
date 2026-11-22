@@ -26,6 +26,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param password the password, or none for an empty one
  * @param namespace the CAM namespace, for CAM security (TM1 security mode 5); with it,
  * the client logs in with {@code CAMNamespace} rather than Basic
+ * @param cognosUrl the Cognos dispatcher TM1 is pointed at, such as
+ * {@code http://cognos:9300}; with it and {@code namespace}, the client logs on to Cognos
+ * for a CAM passport at each login, so only Cognos sees the password
  * @param sessionContext the label TM1 shows for the sessions in {@code Sessions} and
  * {@code Threads}; {@code spring.application.name} unless set
  * @param timeouts timeouts by kind of work
@@ -34,8 +37,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties("tm1")
 public record Tm1Properties(@Nullable String address, @Nullable String baseUrl, @Nullable String user,
-		@Nullable String password, @Nullable String namespace, @Nullable String sessionContext,
-		@DefaultValue Timeouts timeouts, @DefaultValue Ssl ssl, @DefaultValue Pool pool) {
+		@Nullable String password, @Nullable String namespace, @Nullable String cognosUrl,
+		@Nullable String sessionContext, @DefaultValue Timeouts timeouts, @DefaultValue Ssl ssl,
+		@DefaultValue Pool pool) {
 
 	/**
 	 * Timeouts by kind of work; unset ones keep the client's defaults (see
