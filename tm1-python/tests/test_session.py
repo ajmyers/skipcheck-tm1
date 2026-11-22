@@ -141,3 +141,14 @@ def test_a_compound_key(client: Tm1Client, fake: FakeTm1) -> None:
     assert target(fake.last) == "GET Dimensions('d')/Hierarchies('h')/Edges(ParentName='Total',ComponentName='Q1')"
     with pytest.raises(ValueError):
         client.api.dimensions["d"].hierarchies["h"].edges["Total"]
+
+
+def test_the_generated_api_takes_patches_too(client: Tm1Client, fake: FakeTm1) -> None:
+    from tm1_client.model import CubePatch, ProcessPatch
+
+    fake.respond = lambda r: {"Name": "p"}
+    client.api.processes.create(ProcessPatch.builder().name("p").build())
+    assert json.loads(fake.last.content) == {"Name": "p"}
+    fake.respond = lambda r: None
+    client.api.cubes["c"].update(CubePatch.builder().rules(None).build())
+    assert json.loads(fake.last.content) == {"Rules": None}

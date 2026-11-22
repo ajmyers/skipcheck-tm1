@@ -181,6 +181,15 @@ def _structured(value: Any) -> bool:
 # The calls
 
 
+def _write(value: Any) -> Any:
+    """A write's body: a model by what was set, a patch (``CubePatch.builder()…build()``), or a
+    mapping (``Bind`` values become ``@odata.bind``)."""
+    from .request import body_of
+
+    return body_of(value)
+
+
+
 def action(
     path: ODataPath,
     name: str,
@@ -219,7 +228,7 @@ def get_entity(path: ODataPath, query: ODataQuery | None, model: type[Tm1Model])
 
 
 def update(path: ODataPath, changes: Any, if_match: str | None) -> Call:
-    body = changes.to_odata() if isinstance(changes, Tm1Model) else to_odata(dict(changes))
+    body = _write(changes)
     return Call("PATCH", str(path), json_body=body, headers={"If-Match": if_match} if if_match else {})
 
 
@@ -241,7 +250,7 @@ def count(path: ODataPath, filter: str | None) -> Call:
 
 
 def create(path: ODataPath, entity: Any, model: type[Tm1Model]) -> Call:
-    body = entity.to_odata() if isinstance(entity, Tm1Model) else to_odata(dict(entity))
+    body = _write(entity)
 
     def read(reply: Reply) -> Any:
         doc = reply.json()
