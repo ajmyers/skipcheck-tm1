@@ -27,7 +27,6 @@ EntitySet AuditLogEntries
 EntitySet Contents
 EntitySet ErrorLogFiles
 EntitySet GitPlans
-EntitySet Loggers
 EntitySet MessageLogEntries
 EntitySet SQLDataSources
 EntitySet TransactionLogEntries
@@ -57,7 +56,3 @@ Navigation Folder/PrivateContents
 Navigation ProcessReference/Process
 Navigation SubsetReference/Subset
 Navigation ViewReference/View
-Singleton ActiveConfiguration
-Singleton Configuration
-Singleton Server
-Singleton StaticConfiguration

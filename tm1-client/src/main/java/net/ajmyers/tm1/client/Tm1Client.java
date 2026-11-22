@@ -32,6 +32,7 @@ import net.ajmyers.tm1.client.service.security.GroupService;
 import net.ajmyers.tm1.client.service.security.SessionService;
 import net.ajmyers.tm1.client.service.security.ThreadService;
 import net.ajmyers.tm1.client.service.security.UserService;
+import net.ajmyers.tm1.client.service.server.ServerService;
 import net.ajmyers.tm1.client.session.Tm1Session;
 import net.ajmyers.tm1.client.session.Tm1Timeouts;
 import net.ajmyers.tm1.client.version.Tm1Dialect;
@@ -107,6 +108,8 @@ public final class Tm1Client {
 
 	private final ThreadService threads;
 
+	private final ServerService server;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -133,6 +136,7 @@ public final class Tm1Client {
 		this.groups = new GroupService(session);
 		this.sessions = new SessionService(session);
 		this.threads = new ThreadService(session);
+		this.server = new ServerService(session);
 	}
 
 	/**
@@ -351,6 +355,14 @@ public final class Tm1Client {
 	 */
 	public ThreadService threads() {
 		return threads;
+	}
+
+	/**
+	 * The server.
+	 * @return the server service, on this client's session
+	 */
+	public ServerService server() {
+		return server;
 	}
 
 	/**
