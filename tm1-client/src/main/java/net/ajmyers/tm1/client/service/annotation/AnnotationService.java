@@ -80,10 +80,13 @@ public final class AnnotationService {
 	}
 
 	/**
-	 * {@code GET Annotations('id')}.
+	 * {@code GET Annotations('id')}. TM1 (11.8) answers 404 only for an ID it once gave
+	 * out, such as a deleted annotation's. Any other text is refused as a
+	 * {@code Tm1BadRequestException} (400, code 248, "Invalid annotation id!").
 	 * @param id the annotation's ID
 	 * @param query what to select and expand
-	 * @return the annotation, or a {@code Tm1NotFoundException} if there's none
+	 * @return the annotation; a {@code Tm1NotFoundException} if it's gone, or a
+	 * {@code Tm1BadRequestException} for an ID that was never TM1's
 	 */
 	@Tm1Endpoint("EntitySet Annotations")
 	public Mono<Annotation> get(String id, ODataQuery query) {

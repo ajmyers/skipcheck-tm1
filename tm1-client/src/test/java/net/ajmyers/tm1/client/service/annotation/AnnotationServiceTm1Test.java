@@ -12,6 +12,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import net.ajmyers.tm1.client.Tm1Client;
+import net.ajmyers.tm1.client.error.Tm1BadRequestException;
+import net.ajmyers.tm1.client.error.Tm1ErrorKind;
 import net.ajmyers.tm1.client.error.Tm1NotFoundException;
 import net.ajmyers.tm1.client.model.Annotation;
 import net.ajmyers.tm1.client.model.AnnotationPatch;
@@ -114,6 +116,10 @@ class AnnotationServiceTm1Test {
 		}
 		assertThatThrownBy(() -> tm1.annotations().get(id, ODataQuery.none()).block(WAIT))
 			.isInstanceOf(Tm1NotFoundException.class);
+		assertThatThrownBy(() -> tm1.annotations().get("no-such-annotation", ODataQuery.none()).block(WAIT))
+			.as("an ID TM1 never gave out is a bad request, not a missing annotation")
+			.isInstanceOfSatisfying(Tm1BadRequestException.class,
+					e -> assertThat(e.kind()).isEqualTo(Tm1ErrorKind.INVALID_UNIQUE_NAME));
 	}
 
 	@Test

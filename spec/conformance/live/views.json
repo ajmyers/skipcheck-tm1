@@ -36,7 +36,7 @@
 			"service" : "views",
 			"method" : "create",
 			"params" : [ "cube", "scope", "view" ],
-			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PRIVATE", "json" : "PRIVATE" }, { "$patch" : "NativeViewPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "Name" : "${native}", "SuppressEmptyRows" : true } } ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PRIVATE", "json" : "PRIVATE" }, { "$patch" : "NativeViewPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "Name" : "${native}", "SuppressEmptyRows" : true, "Columns" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${month}')/Hierarchies('${month}')", "Expression" : "{TM1SUBSETALL([${month}].[${month}])}" } } ], "Rows" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${region}')/Hierarchies('${region}')", "Expression" : "{TM1SUBSETALL([${region}].[${region}])}" } } ] } } ],
 			"expect" : { "fields" : { "Name" : "${native}" } }
 		},
 		{

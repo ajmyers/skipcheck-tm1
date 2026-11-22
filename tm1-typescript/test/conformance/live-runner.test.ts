@@ -14,7 +14,7 @@ function fake(names: Record<string, string>): FakeTm1 {
     if (r.method === "POST" && (r.target === "Dimensions" || r.target === "Cubes")) return FakeTm1.reply(201, { Name: body.Name });
     const get = /^Cubes\('([^']*)'\)(\?.*)?$/.exec(r.target);
     if (r.method === "GET" && get) return get[1] === names["missing"] ? FakeTm1.reply(404, { error: { code: "278", message: "no" } }) : { Name: get[1] };
-    if (r.method === "GET" && r.target.endsWith("/Dimensions?$select=Name")) return FakeTm1.collection({ Name: names["region"] }, { Name: names["month"] });
+    if (r.method === "GET" && r.target.endsWith("/Dimensions?$select=Name")) return FakeTm1.collection({ Name: "Sandboxes" }, { Name: names["region"] }, { Name: names["month"] });
     if (r.target.endsWith("tm1.CheckRules")) return FakeTm1.collection();
     return null;
   };
@@ -99,7 +99,7 @@ describe("the live conformance runner", () => {
     if (expect.error) {
       const statuses: Record<string, number> = { NOT_FOUND: 404, CONFLICT: 409, PRECONDITION_FAILED: 412 };
       const status = expect.error.status ?? statuses[expect.error.kind] ?? 400;
-      return FakeTm1.reply(status, { error: { code: "278", message: expect.error.kind === "NOT_FOUND" ? "can not be found" : "refused" } }, json);
+      return FakeTm1.reply(status, { error: { code: expect.error.kind === "INVALID_UNIQUE_NAME" ? "248" : "278", message: expect.error.kind === "NOT_FOUND" ? "can not be found" : "refused" } }, json);
     }
     if (expect.fields?.$bytes !== undefined) return FakeTm1.reply(200, Uint8Array.from(Buffer.from(expect.fields.$bytes, "base64")), { "content-type": "application/octet-stream" });
     if (expect.fields) return FakeTm1.reply(200, expect.fields, json);

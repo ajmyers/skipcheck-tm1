@@ -32,7 +32,7 @@ def _tm1(names: dict[str, str]) -> FakeTm1:
         if request.method == "GET" and (m := re.fullmatch(r"Cubes\('([^']*)'\)(\?.*)?", target)):
             return httpx.Response(404, json={"error": {"code": "278", "message": "no"}}) if m[1] == names["missing"] else {"Name": m[1]}
         if request.method == "GET" and target.endswith("/Dimensions?$select=Name"):
-            return {"value": [{"Name": names["region"]}, {"Name": names["month"]}]}
+            return {"value": [{"Name": "Sandboxes"}, {"Name": names["region"]}, {"Name": names["month"]}]}
         if target.endswith("tm1.CheckRules"):
             return {"value": []}
         return None
@@ -99,7 +99,8 @@ def _expected(expect: dict[str, Any]) -> httpx.Response:
         error = expect["error"]
         status = error.get("status") or {"NOT_FOUND": 404, "CONFLICT": 409, "PRECONDITION_FAILED": 412}.get(error.get("kind"), 400)
         message = "can not be found" if error.get("kind") == "NOT_FOUND" else "refused"
-        return httpx.Response(status, json={"error": {"code": "278", "message": message}})
+        code = "248" if error.get("kind") == "INVALID_UNIQUE_NAME" else "278"
+        return httpx.Response(status, json={"error": {"code": code, "message": message}})
     if "$bytes" in expect.get("fields", {}):
         content = base64.b64decode(expect["fields"]["$bytes"])
         return httpx.Response(200, content=content, headers={"Content-Type": "application/octet-stream"})

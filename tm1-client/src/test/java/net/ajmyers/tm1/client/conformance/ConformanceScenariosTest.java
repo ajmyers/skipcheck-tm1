@@ -71,8 +71,8 @@ class ConformanceScenariosTest {
 					: json(200, "{\"Name\":\"" + get.group(1) + "\"}");
 		}
 		if (method.equals("GET") && target.endsWith("/Dimensions?$select=Name")) {
-			return json(200, "{\"value\":[{\"Name\":\"" + names.get("region") + "\"},{\"Name\":\"" + names.get("month")
-					+ "\"}]}");
+			return json(200, "{\"value\":[{\"Name\":\"Sandboxes\"},{\"Name\":\"" + names.get("region")
+					+ "\"},{\"Name\":\"" + names.get("month") + "\"}]}");
 		}
 		if (target.endsWith("tm1.CheckRules")) {
 			return json(200, "{\"value\":[]}");
@@ -144,7 +144,8 @@ class ConformanceScenariosTest {
 				default -> 400;
 			};
 			String message = error.path("kind").asString().equals("NOT_FOUND") ? "can not be found" : "refused";
-			return json(status, "{\"error\":{\"code\":\"278\",\"message\":\"" + message + "\"}}");
+			String code = error.path("kind").asString().equals("INVALID_UNIQUE_NAME") ? "248" : "278";
+			return json(status, "{\"error\":{\"code\":\"" + code + "\",\"message\":\"" + message + "\"}}");
 		}
 		if (expect.has("fields") && expect.get("fields").has("$bytes")) {
 			return ClientResponse.create(HttpStatus.OK)

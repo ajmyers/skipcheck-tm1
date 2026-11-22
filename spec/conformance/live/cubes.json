@@ -37,7 +37,7 @@
 			"method" : "dimensions",
 			"params" : [ "name", "query" ],
 			"args" : [ "${cube}", { "$query" : { "select" : [ "Name" ] } } ],
-			"expect" : { "items" : { "Name" : [ "${region}", "${month}" ] } }
+			"expect" : { "items" : { "Name" : [ "Sandboxes", "${region}", "${month}" ] } }
 		},
 		{
 			"service" : "cubes",

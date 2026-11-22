@@ -28,7 +28,7 @@ public class ConformanceLiveRunnerTests
             }
             if (r.Method == "GET" && r.Target.EndsWith("/Dimensions?$select=Name", System.StringComparison.Ordinal))
             {
-                return FakeTm1.Collection(new { Name = names["region"] }, new { Name = names["month"] });
+                return FakeTm1.Collection(new { Name = "Sandboxes" }, new { Name = names["region"] }, new { Name = names["month"] });
             }
             return r.Target.EndsWith("tm1.CheckRules", System.StringComparison.Ordinal) ? FakeTm1.Collection() : null;
         },
@@ -146,7 +146,7 @@ public class ConformanceLiveRunnerTests
             var kind = error["kind"]?.GetValue<string>();
             var status = error["status"]?.GetValue<int>() ?? kind switch { "NOT_FOUND" => 404, "CONFLICT" => 409, "PRECONDITION_FAILED" => 412, _ => 400 };
             var message = kind == "NOT_FOUND" ? "can not be found" : "refused";
-            return Reply((HttpStatusCode)status, new JsonObject { ["error"] = new JsonObject { ["code"] = "278", ["message"] = message } });
+            return Reply((HttpStatusCode)status, new JsonObject { ["error"] = new JsonObject { ["code"] = kind == "INVALID_UNIQUE_NAME" ? "248" : "278", ["message"] = message } });
         }
         if (expect["fields"] is JsonObject { } bytes && bytes["$bytes"] is JsonValue content)
         {
