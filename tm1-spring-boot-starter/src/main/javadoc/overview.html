@@ -8,7 +8,11 @@ configured from <code>tm1.*</code> properties.
 <h1>Getting started</h1>
 
 <ol>
-<li><p><b>Add the starter.</b> Gradle:</p>
+<li><p><b>Have a TM1 server to talk to.</b> To run one on your own computer in Docker, follow
+<a href="https://ajmyers.net/tm1/">Run TM1 on your own computer</a>. You need your own licensed
+copy of TM1 Server.</p></li>
+
+<li><p><b>Add the starter to a Spring Boot 4 application.</b> Gradle:</p>
 <pre><code class="language-kotlin">implementation("net.ajmyers.tm1:tm1-spring-boot-starter:{{version}}")</code></pre>
 <p>Maven:</p>
 <pre><code class="language-xml">&lt;dependency&gt;
@@ -17,8 +21,22 @@ configured from <code>tm1.*</code> properties.
   &lt;version&gt;{{version}}&lt;/version&gt;
 &lt;/dependency&gt;</code></pre></li>
 
-<li><p><b>Point it at TM1, and inject the client.</b></p>
-{@snippet class = examples.Tm1AutoConfigurationExamples region = inject}</li>
+<li><p><b>Tell it where TM1 is.</b> The starter connects with the <code>tm1.*</code> properties;
+these are the defaults of a server set up with the link above:</p>
+{@snippet file = examples/application.properties}
+<p>For a server elsewhere, change the address. Keep a real password out of the file, for example
+with <code>tm1.password=${TM1_PASSWORD}</code> and an environment variable.
+{@link net.ajmyers.tm1.spring.boot.autoconfigure.Tm1Properties} lists every property.</p></li>
+
+<li><p><b>Say hello.</b> The starter builds a <code>Tm1Client</code> from those properties; ask
+for it, and use it. This prints the server's version and lists its cubes when the application
+starts:</p>
+{@snippet class = examples.HelloTm1Application region = hello-app}
+<p>Run it with <code>./gradlew bootRun</code> (or <code>mvn spring-boot:run</code>):</p>
+<pre><code class="language-plaintext">Hello from TM1 11.8.03500.6
+  Plan_BudgetPlan
+  SalesCube
+  ...</code></pre></li>
 </ol>
 
 <h1>Where next</h1>
