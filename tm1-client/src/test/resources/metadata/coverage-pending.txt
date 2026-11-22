@@ -127,9 +127,7 @@ Navigation ChoreTask/Chore
 Navigation ChoreTask/Process
 Navigation Cube/Annotations
 Navigation Cube/LocalizedAttributes
-Navigation Cube/PrivateViews
 Navigation Cube/ViewAttributes
-Navigation Cube/Views
 Navigation CubeReference/Cube
 Navigation CubeUpdate/ReferenceCell
 Navigation CubeUpdate/ReferenceCube
@@ -160,12 +158,8 @@ Navigation SubsetReference/Subset
 Navigation Thread/Session
 Navigation User/Groups
 Navigation User/Sessions
-Navigation View/Cube
 Navigation View/LocalizedAttributes
-Navigation ViewAxisSelection/Subset
 Navigation ViewReference/View
-Navigation ViewTitle/Selected
-Navigation ViewTitle/Subset
 Singleton ActiveConfiguration
 Singleton ActiveSession
 Singleton ActiveUser

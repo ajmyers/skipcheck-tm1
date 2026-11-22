@@ -11,6 +11,7 @@ import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
 import net.ajmyers.tm1.client.service.attribute.AttributeService;
 import net.ajmyers.tm1.client.service.attribute.LocalizedAttributeService;
 import net.ajmyers.tm1.client.service.cube.CubeService;
+import net.ajmyers.tm1.client.service.cube.ViewService;
 import net.ajmyers.tm1.client.service.dimension.DimensionService;
 import net.ajmyers.tm1.client.service.dimension.EdgeService;
 import net.ajmyers.tm1.client.service.dimension.ElementService;
@@ -65,6 +66,8 @@ public final class Tm1Client {
 
 	private final CubeService cubes;
 
+	private final ViewService views;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -77,6 +80,7 @@ public final class Tm1Client {
 		this.attributes = new AttributeService(session);
 		this.localizedAttributes = new LocalizedAttributeService(session);
 		this.cubes = new CubeService(session);
+		this.views = new ViewService(session);
 	}
 
 	/**
@@ -183,6 +187,14 @@ public final class Tm1Client {
 	 */
 	public CubeService cubes() {
 		return cubes;
+	}
+
+	/**
+	 * Views.
+	 * @return the view service, on this client's session
+	 */
+	public ViewService views() {
+		return views;
 	}
 
 	/**

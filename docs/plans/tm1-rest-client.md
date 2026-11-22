@@ -821,7 +821,7 @@ affects ("TM1 (11.8) …"), so it's explained where it's used, and pinned by a t
 | Chore task `Step` is server-assigned. `Active` changes only through `Activate`/`Deactivate`. A chore task must list every process parameter. | Builders enforce this |
 | Cube `Rules` and process code are saved even when they don't compile | `CheckRules` / `Compile` helpers, and an optional check before save |
 | An annotation over about 48 KB returns 201 and stores nothing. Missing or sandbox-only annotations return **400**, not 404. | Typed not-found. Optional read-back verification. |
-| The `tm1.NativeView` type-cast expand fails on MDX views | Read the base type, then re-read native views |
+| The `tm1.NativeView` type-cast expand fails on MDX views. (Reported by a production client; **not reproduced on 11.8.35**, where `tm1.NativeView/Columns/Subset` works on a mixed list.) | `ViewService.getNative` reads one view through the cast path; a test pins the 11.8.35 behaviour |
 | Application entries are keyed by name plus a suffix (`.blob`, `.extr`, `.process`) and don't support PATCH (use `tm1.Move`) | Modeled in `Contents` keys |
 | Read models carry server-computed fields | Never send a read model back as a write; that's why separate patch and create builders exist |
 | A new cube grant isn't seen by a held session until it recycles (code 65) | Documented. A session-recycle hook is available. |
