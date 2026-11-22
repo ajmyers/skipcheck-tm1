@@ -52,16 +52,27 @@ public static class Live
     public static string Url => Target().Url;
 
     /// <summary>A new client of the TM1 to test against.</summary>
-    public static Tm1Client Client()
+    public static Tm1Client Client() => Builder().Build();
+
+    /// <summary>Settings for a client of the TM1 to test against, logging in as <see cref="Target"/>
+    /// (or as <paramref name="user"/>, with TM1's own security), with the TM1_NAMESPACE and
+    /// TM1_VERIFY of a running server.</summary>
+    public static Tm1ClientBuilder Builder(string? user = null, string? password = null)
     {
         if (string.IsNullOrWhiteSpace(Running))
         {
-            return Tm1ServerFixture.ClientOf(Tm1ServerContainer.SharedAsync().GetAwaiter().GetResult());
+            var tm1 = Tm1ServerContainer.SharedAsync().GetAwaiter().GetResult();
+            var own = tm1.CamNamespace is { } cam && user is null
+                ? Tm1Authenticator.CamNamespace(tm1.Username, tm1.Password, cam.Id())
+                : Tm1Authenticator.Basic(user ?? tm1.Username, user is null ? tm1.Password : password);
+            return Tm1Client.Builder().BaseUrl(tm1.RestUrl).Authenticator(own);
         }
-        var (url, user, password) = Target();
+        var (url, liveUser, livePassword) = Target();
         var ns = Environment.GetEnvironmentVariable("TM1_NAMESPACE");
-        var builder = Tm1Client.Builder().BaseUrl(url)
-            .Authenticator(ns is null ? Tm1Authenticator.Basic(user, password) : Tm1Authenticator.CamNamespace(user, password, ns));
+        var builder = Tm1Client.Builder().BaseUrl(url).Authenticator(
+            user is not null ? Tm1Authenticator.Basic(user, password)
+            : string.IsNullOrWhiteSpace(ns) ? Tm1Authenticator.Basic(liveUser, livePassword)
+            : Tm1Authenticator.CamNamespace(liveUser, livePassword, ns));
         if (Environment.GetEnvironmentVariable("TM1_VERIFY") == "false")
         {
             builder.HttpHandler(new SocketsHttpHandler
@@ -70,7 +81,7 @@ public static class Live
                 SslOptions = { RemoteCertificateValidationCallback = (_, _, _, _) => true },
             });
         }
-        return builder.Build();
+        return builder;
     }
 
     /// <summary>A name for a test's objects.</summary>

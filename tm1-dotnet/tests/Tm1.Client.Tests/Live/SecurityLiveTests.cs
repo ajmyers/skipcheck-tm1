@@ -10,15 +10,13 @@ using ServerThread = AjMyers.Tm1.Client.Model.Thread;
 
 namespace AjMyers.Tm1.Client.Tests.Live;
 
-/// <summary>Clients beside <see cref="Live.Client"/>, logging in to the same TM1 with Basic security:
-/// as another session, or as another user.</summary>
+/// <summary>Clients beside <see cref="Live.Client"/>, logging in to the same TM1: as another session
+/// (as Live.Client does), or as another user (with TM1's own security).</summary>
 internal static class OtherClient
 {
     public static Tm1Client Build(Func<Tm1ClientBuilder, Tm1ClientBuilder>? configure = null, string? user = null, string? password = null)
     {
-        var (url, liveUser, livePassword) = Live.Target();
-        var builder = Tm1Client.Builder().BaseUrl(url).BasicAuth(user ?? liveUser, user is null ? livePassword : password);
-        return (configure ?? (b => b))(builder).Build();
+        return (configure ?? (b => b))(Live.Builder(user, password)).Build();
     }
 }
 
