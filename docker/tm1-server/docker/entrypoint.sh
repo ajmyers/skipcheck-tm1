@@ -38,6 +38,12 @@
 #   TM1_SERVER_NAME     ServerName                             (default: tm1)
 #   TM1_USE_SSL         UseSSL, T/F                            (default: F, plain HTTP)
 #   TM1_CFG_<Param>     Any tm1s.cfg parameter, e.g. TM1_CFG_EnableTIDebugging=T
+#   TM1_CAM_URI         Cognos (CAM) security against this Cognos, e.g. http://cognos:9300
+#                       (a cognos-server container): sets IntegratedSecurityMode
+#                       (TM1_SECURITY_MODE, default 5), ServerCAMURI, ClientCAMURI, CAMUseSSL
+#   TM1_CAM_ADMINS      Cognos users to make TM1 administrators, e.g. "admin"
+#   TM1_CAM_GROUPS      Cognos groups to add to TM1, e.g. "Analysts Readers"
+#   TM1_CAM_NAMESPACE   the Cognos namespace ID (default LDAP)
 #   TM1_SEED            empty | sdata | 24retail - objects to put in an EMPTY /tm1/data
 #   TM1_ADMIN_HOST      host of a separate Admin Server (e.g. a container running
 #                       `admin`); sets AdminHost and turns the embedded one off
@@ -218,6 +224,15 @@ apply_named() {  # apply_named Key EnvVar Default
 }
 apply_named ServerName     TM1_SERVER_NAME tm1
 apply_named UseSSL         TM1_USE_SSL     F
+# CAM security against a Cognos dispatcher (TM1_CFG_* below can still override).
+if [ -n "${TM1_CAM_URI:-}" ]; then
+  cam=${TM1_CAM_URI%/}
+  case "${TM1_SECURITY_MODE:-5}" in 4|5) ;; *) die "TM1_SECURITY_MODE must be 4 or 5 with TM1_CAM_URI" ;; esac
+  set_cfg IntegratedSecurityMode "${TM1_SECURITY_MODE:-5}" "TM1_CAM_URI"
+  set_cfg ServerCAMURI "$cam/p2pd/servlet/dispatch" "TM1_CAM_URI"
+  set_cfg ClientCAMURI "$cam/bi/v1/disp" "TM1_CAM_URI"
+  case "$cam" in https://*) set_cfg CAMUseSSL T "TM1_CAM_URI" ;; *) set_cfg CAMUseSSL F "TM1_CAM_URI" ;; esac
+fi
 # Generic passthrough: TM1_CFG_Foo=bar -> Foo=bar
 while IFS='=' read -r name value; do
   [[ $name == TM1_CFG_* ]] || continue
@@ -245,11 +260,14 @@ fi
 # Warned: settings that probably won't work in a container. Left as they are.
 WARNINGS=0
 case "$(get_cfg IntegratedSecurityMode)" in
-  4|5) warn "IntegratedSecurityMode=$(get_cfg IntegratedSecurityMode) uses IBM Cognos (CAM) security, which this container doesn't provide. Logins will fail unless a CAM server is reachable. Use 1 for native TM1 users." ;;
+  4|5)
+    v=$(get_cfg ServerCAMURI)
+    if [ -z "$v" ]; then
+      warn "IntegratedSecurityMode=$(get_cfg IntegratedSecurityMode) uses IBM Cognos (CAM) security but ServerCAMURI isn't set. Set TM1_CAM_URI to a Cognos dispatcher, e.g. a cognos-server container."
+    elif ! curl -s -o /dev/null -m 5 "$v"; then
+      warn "ServerCAMURI=$v isn't reachable yet. CAM logons fail until it is (Cognos takes a few minutes to start)."
+    fi ;;
 esac
-for key in ServerCAMURI ClientCAMURI; do
-  v=$(get_cfg "$key"); [ -n "$v" ] && warn "$key=$v must be reachable from inside the container."
-done
 for key in IndexStoreDirectory ODBCLibraryPath 'FileRetry\.FileSpec'; do
   v=$(get_cfg "$key")
   case "$v" in /*) [ -e "$v" ] || warn "${key//\\/}=$v doesn't exist in the container. Mount it, or point it under /tm1/data or /tm1/logs." ;; esac
@@ -298,6 +316,34 @@ if [ "$EMBED_ADMIN" = "T" ]; then
   # Writes tm1admsrv.log into bin64/ when the install is writable (skipped if mounted :ro).
   ./tm1admsrv.exe
   ADMIN_PID=$(daemon_pid '^\./tm1admsrv\.exe$') || log "WARNING: embedded Admin Server did not start"
+fi
+
+# ---- CAM administrators and groups -------------------------------------------
+# In CAM security nobody can administer TM1 until a Cognos user is in its ADMIN
+# group, and only a native admin can put one there. So, once per change of the
+# lists, TM1 starts briefly in native security on a private port, cam-setup.py
+# adds the users and groups, and TM1 saves and stops before the real start.
+if [ -n "${TM1_CAM_ADMINS:-}${TM1_CAM_GROUPS:-}" ]; then
+  want="admins=${TM1_CAM_ADMINS:-};groups=${TM1_CAM_GROUPS:-};namespace=${TM1_CAM_NAMESPACE:-LDAP}"
+  if [ "$(cat "$DATA/.tm1-server-cam" 2>/dev/null)" = "$want" ]; then
+    log "CAM administrators and groups already set up"
+  else
+    log "Setting up CAM administrators and groups (TM1 starts briefly in native security)"
+    boot=/tmp/tm1-cam-setup
+    rm -rf "$boot"; mkdir -p "$boot"
+    cp "$RUN_CONF/tm1s.cfg" "$RUN_CONF/tm1s-log.properties" "$boot/"
+    sed -i -E 's/^[[:space:]]*(IntegratedSecurityMode|HTTPPortNumber|PortNumber|ClientMessagePortNumber)[[:space:]]*=.*$/#&/I' "$boot/tm1s.cfg"
+    printf 'IntegratedSecurityMode=1\nHTTPPortNumber=18010\nPortNumber=12355\nClientMessagePortNumber=12356\n' >> "$boot/tm1s.cfg"
+    ./tm1s.exe -w -z"$boot"
+    BOOT_PID=$(daemon_pid "^\./tm1s\.exe -w -z$boot\$" || true)
+    [ -n "$BOOT_PID" ] || { log "TM1 didn't start for the CAM setup"; tail -30 "$LOGS/tm1server.log" || true; exit 1; }
+    scheme=https; case "${USE_SSL:-F}" in F|f|FALSE|false|False) scheme=http ;; esac
+    rc=0; python3 "$DEFAULTS/cam-setup.py" "$scheme://localhost:18010" || rc=$?
+    kill -INT "$BOOT_PID" 2>/dev/null || true
+    while kill -0 "$BOOT_PID" 2>/dev/null; do sleep 1; done
+    [ "$rc" = 0 ] || { log "CAM setup failed"; exit 1; }
+    echo "$want" > "$DATA/.tm1-server-cam"
+  fi
 fi
 
 # ---- tm1 server -------------------------------------------------------------

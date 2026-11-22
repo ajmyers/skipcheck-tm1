@@ -34,7 +34,7 @@ ENV LANG=en_US.UTF-8 \
 
 COPY docker/entrypoint.sh /usr/local/bin/tm1-entrypoint
 COPY docker/install-tm1.sh /usr/local/bin/tm1-install
-COPY docker/unpack-tm1.py /usr/local/lib/tm1-server/unpack-tm1.py
+COPY docker/unpack-tm1.py docker/cam-setup.py /usr/local/lib/tm1-server/
 COPY docker/healthcheck.sh /usr/local/bin/tm1-healthcheck
 COPY docker/tm1s-log.properties docker/tm1s.cfg.default docker/banner.txt /usr/local/lib/tm1-server/
 RUN chmod 755 /usr/local/bin/tm1-*

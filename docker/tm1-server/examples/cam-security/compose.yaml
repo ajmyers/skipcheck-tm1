@@ -1,0 +1,55 @@
+# TM1 with Cognos (CAM) security: a cognos-server with three test users, and a
+# TM1 server that takes its users from it. See "Cognos (CAM) security" in
+# ../../README.md.
+#
+#   docker compose up -d     # Cognos takes a few minutes; TM1 waits for it
+#
+# Put your IBM downloads in ./bundles (or set IBM_DIR): the TM1 bundle
+# (tm1server-*_bundle.tar.gz) and the Cognos repository zip (casrv-*-linuxi38664h.zip).
+# Docker needs at least 12 GB of memory.
+#
+# Then log on to TM1 (http://localhost:8010/api/v1/) with CAMNamespace credentials:
+#   curl -H "Authorization: CAMNamespace $(printf analyst:analystpw:LDAP | base64)" \
+#        http://localhost:8010/api/v1/ActiveUser
+#
+# admin is a TM1 administrator; analyst is in Analysts and Readers; viewer in Readers.
+
+services:
+  cognos:
+    image: ${COGNOS_SERVER_IMAGE:-ghcr.io/ajmyers/cognos-server:latest}
+    platform: linux/amd64
+    hostname: cognos          # TM1 reaches Cognos at http://cognos:9300
+    stop_grace_period: 3m
+    environment:
+      COGNOS_USERS: ${COGNOS_USERS:-admin:adminpw:Admins analyst:analystpw:Analysts,Readers viewer:viewerpw:Readers}
+    ports:
+      - "9300:9300"
+    volumes:
+      - cognos-install:/opt/ibm/cognos/analytics
+      - cognos-content-store:/cognos/postgres
+      - ${IBM_DIR:-./bundles}:/ibm:ro
+
+  tm1:
+    image: ${TM1_SERVER_IMAGE:-ghcr.io/ajmyers/tm1-server:latest}
+    platform: linux/amd64
+    stop_signal: SIGINT
+    stop_grace_period: 2m
+    depends_on:
+      cognos:
+        condition: service_healthy
+    environment:
+      TM1_CAM_URI: http://cognos:9300
+      TM1_CAM_ADMINS: ${TM1_CAM_ADMINS:-admin}
+      TM1_CAM_GROUPS: ${TM1_CAM_GROUPS:-Admins Analysts Readers}
+    ports:
+      - "8010:8010"
+    volumes:
+      - tm1-install:/opt/ibm/cognos/tm1_64
+      - tm1-data:/tm1/data
+      - ${IBM_DIR:-./bundles}:/ibm:ro
+
+volumes:
+  cognos-install:
+  cognos-content-store:
+  tm1-install:
+  tm1-data:
