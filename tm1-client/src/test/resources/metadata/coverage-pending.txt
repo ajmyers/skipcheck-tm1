@@ -9,11 +9,6 @@ Action Entry/Copy
 Action Entry/Move
 Action GitPullPlan/Execute
 Action GitPushPlan/Execute
-Action Process/Debug
-Action ProcessDebugContext/Continue
-Action ProcessDebugContext/StepIn
-Action ProcessDebugContext/StepOut
-Action ProcessDebugContext/StepOver
 Action Session/Close
 Action Thread/CancelOperation
 Action User/Disconnect
@@ -46,7 +41,6 @@ EntitySet Groups
 EntitySet Loggers
 EntitySet MessageLogEntries
 EntitySet ProcessAttributes
-EntitySet ProcessDebugContexts
 EntitySet SQLDataSources
 EntitySet Sessions
 EntitySet Threads
@@ -81,13 +75,6 @@ Navigation Folder/Contents
 Navigation Folder/PrivateContents
 Navigation Group/Users
 Navigation Process/LocalizedAttributes
-Navigation ProcessDebugContext/Breakpoints
-Navigation ProcessDebugContext/CallStack
-Navigation ProcessDebugContext/CurrentBreakpoint
-Navigation ProcessDebugContext/Process
-Navigation ProcessDebugContext/Thread
-Navigation ProcessDebugContextStackFrame/Process
-Navigation ProcessDebugContextStackFrame/Variables
 Navigation ProcessReference/Process
 Navigation Session/Threads
 Navigation Session/User
