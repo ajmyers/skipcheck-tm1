@@ -25,6 +25,7 @@ import net.ajmyers.tm1.client.service.dimension.HierarchyService;
 import net.ajmyers.tm1.client.service.dimension.LevelService;
 import net.ajmyers.tm1.client.service.dimension.MemberService;
 import net.ajmyers.tm1.client.service.dimension.SubsetService;
+import net.ajmyers.tm1.client.service.process.ProcessService;
 import net.ajmyers.tm1.client.session.Tm1Session;
 import net.ajmyers.tm1.client.session.Tm1Timeouts;
 import net.ajmyers.tm1.client.version.Tm1Dialect;
@@ -86,6 +87,8 @@ public final class Tm1Client {
 
 	private final DrillthroughService drillthrough;
 
+	private final ProcessService processes;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -105,6 +108,7 @@ public final class Tm1Client {
 		this.sandboxes = new SandboxService(session);
 		this.changeSets = new ChangeSetService(session);
 		this.drillthrough = new DrillthroughService(session);
+		this.processes = new ProcessService(session);
 	}
 
 	/**
@@ -267,6 +271,14 @@ public final class Tm1Client {
 	 */
 	public DrillthroughService drillthrough() {
 		return drillthrough;
+	}
+
+	/**
+	 * Processes.
+	 * @return the processe service, on this client's session
+	 */
+	public ProcessService processes() {
+		return processes;
 	}
 
 	/**

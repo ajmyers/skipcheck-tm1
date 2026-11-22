@@ -9,10 +9,7 @@ Action Entry/Copy
 Action Entry/Move
 Action GitPullPlan/Execute
 Action GitPushPlan/Execute
-Action Process/Compile
 Action Process/Debug
-Action Process/Execute
-Action Process/ExecuteWithReturn
 Action ProcessDebugContext/Continue
 Action ProcessDebugContext/StepIn
 Action ProcessDebugContext/StepOut
@@ -20,7 +17,6 @@ Action ProcessDebugContext/StepOver
 Action Session/Close
 Action Thread/CancelOperation
 Action User/Disconnect
-ActionImport CompileProcess
 ActionImport ConfigureEncryptionAtRest
 ActionImport DecryptDataFile
 ActionImport DecryptDataModel
@@ -29,8 +25,6 @@ ActionImport DisableEncryptionAtRest
 ActionImport EncryptDataFile
 ActionImport EncryptDataModel
 ActionImport ExecuteChore
-ActionImport ExecuteProcess
-ActionImport ExecuteProcessWithReturn
 ActionImport GitDeploy
 ActionImport GitInit
 ActionImport GitPull
@@ -53,7 +47,6 @@ EntitySet Loggers
 EntitySet MessageLogEntries
 EntitySet ProcessAttributes
 EntitySet ProcessDebugContexts
-EntitySet Processes
 EntitySet SQLDataSources
 EntitySet Sessions
 EntitySet Threads
@@ -87,7 +80,6 @@ Navigation Entry/LocalizedAttributes
 Navigation Folder/Contents
 Navigation Folder/PrivateContents
 Navigation Group/Users
-Navigation Process/ErrorLogs
 Navigation Process/LocalizedAttributes
 Navigation ProcessDebugContext/Breakpoints
 Navigation ProcessDebugContext/CallStack
@@ -96,7 +88,6 @@ Navigation ProcessDebugContext/Process
 Navigation ProcessDebugContext/Thread
 Navigation ProcessDebugContextStackFrame/Process
 Navigation ProcessDebugContextStackFrame/Variables
-Navigation ProcessExecuteResult/ErrorLogFile
 Navigation ProcessReference/Process
 Navigation Session/Threads
 Navigation Session/User
