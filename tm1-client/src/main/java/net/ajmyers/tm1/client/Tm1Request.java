@@ -115,6 +115,20 @@ public final class Tm1Request<T> {
 	}
 
 	/**
+	 * {@code POST} whose response is a collection, read item by item as {@code itemType}:
+	 * an action returning {@code Collection(...)}, such as {@code tm1.CheckRules}.
+	 * @param <T> the type each item is read as
+	 * @param path the action's path
+	 * @param body the parameters, written as JSON
+	 * @param itemType the class each item is read as
+	 * @return the request
+	 */
+	public static <T> Tm1Request<T> postList(ODataPath path, Object body, Class<T> itemType) {
+		return new Tm1Request<>(HttpMethod.POST, path, ODataQuery.none(), Map.of(),
+				Objects.requireNonNull(body, "body"), Response.COLLECTION, itemType, null, null);
+	}
+
+	/**
 	 * {@code POST}: create an entity, or invoke an action. Actions always get a JSON body
 	 * (an empty object if there are no parameters), since TM1 refuses an action without a
 	 * JSON content type. With {@code Void.class} the response is ignored.
