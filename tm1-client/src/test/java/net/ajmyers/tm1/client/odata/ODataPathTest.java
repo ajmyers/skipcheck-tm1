@@ -120,4 +120,12 @@ class ODataPathTest {
 		return literal.substring(1, literal.length() - 1).replace("''", "'");
 	}
 
+	@Test
+	void callsAFunctionImportFromTheServiceRoot() {
+		assertThat(ODataPath.functionImport("ModelCubes", Map.of())).hasToString("ModelCubes()");
+		Map<String, Object> top = new LinkedHashMap<>();
+		top.put("Top", 10);
+		assertThat(ODataPath.functionImport("TailMessageLog", top)).hasToString("TailMessageLog(Top=10)");
+	}
+
 }
