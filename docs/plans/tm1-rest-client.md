@@ -644,7 +644,7 @@ These are concerns the requirements don't name, but that need deciding early:
 |---|---|---|
 | **0. Foundation** (#27; steps #28–#32 and #15, as stacked PRs) | `tm1-testcontainers` (#14), before anything else. Metadata snapshot, CSDL parser and coverage gate. The `odata` layer: paths, literals, query and filter builder, streaming collection decoder, errors, `Tm1Request`. `Tm1Session`: Basic auth, cookie, single-flight re-login, close, request context, raw `odata()` access. The identity-keyed `Tm1SessionPool` and `Tm1Authenticator` SPI (Q11). `Tm1Capabilities`, `Tm1Version`, the `V11` dialect. Starter auto-configuration with `Tm1ConnectionDetails` and `@ServiceConnection` (#15). | On a Testcontainers TM1: connect, read `Server`, close, with no session left behind. Coverage report generated, all endpoints pending. |
 | **1. Codegen** (#61; steps #62–#67, done) | Generator: records, sealed hierarchies, enums, patch builders, field constants, `@Since`/`@Deprecated`, operation catalog. | Generated model compiles; round-trip tests on captured payloads. |
-| **2. Dimensions** | Dimensions, Hierarchies, Elements, Edges, Levels, Members, Subsets (public, private, session), element/hierarchy/subset attributes, locks and reservations | Integration tests green |
+| **2. Dimensions** (#79; steps #80–#85, done) | Dimensions, Hierarchies, Elements, Edges, Levels, Members, Subsets (public, private, session), element/hierarchy/subset attributes, locks and reservations | Integration tests green |
 | **3. Cubes and views** | Cubes, Native and MDX views (public, private), rules, CheckRules/CheckFeeders/Trace\*, Load/Unload, ReorderDimensions, locks and reservations, cube attributes | Integration tests green |
 | **4. Data** | ExecuteMDX\*, Cellsets (streamed, auto-deleted), Update/UpdateCells, Sandboxes, change sets, drillthrough, ModelCubes/ControlCubes | Integration tests green |
 | **5. Processes and chores** | Processes (CRUD, Compile, ExecuteWithReturn with async, deprecated Execute), error logs, debugging (contexts, breakpoints, stepping), Chores and tasks | Integration tests green |
@@ -799,7 +799,8 @@ of it is assumed for other versions.
 ### 16.5 TM1 departures from its own metadata (§8.3, §9)
 
 The generated model and the services must encode these: strip or reject fields TM1 ignores,
-and document the replace-vs-append semantics.
+and document the replace-vs-append semantics. Each one is also in the Javadoc of the method it
+affects ("TM1 (11.8) …"), so it's explained where it's used, and pinned by a test.
 
 | Behavior (11.8) | Handling |
 |---|---|
