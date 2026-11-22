@@ -164,7 +164,7 @@ def test_writes_through_a_cellset_and_saves_it_as_a_view(tm1: Tm1Client, cells_c
 # CellsetServiceTm1Test: a 4 x 2 cube, cell (row r, column c) holding r * 2 + c + 1
 
 REGIONS = ["B", "C", "E", "F"]
-MEASURES = ["Count", "Sum"]
+MEASURES = ["Amount", "Count"]
 
 
 @pytest.fixture
