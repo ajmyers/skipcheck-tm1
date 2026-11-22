@@ -1,8 +1,4 @@
 # Java service-package classes not yet ported: each comes off as it's done (test/java-parity.test.ts).
-AnnotationService
-AttributeOwner
-AttributeService
-AttributeSet
 CellService
 CellsetService
 ChangeSetService
@@ -15,18 +11,11 @@ EncryptionService
 GitCommitDetails
 GitCredentials
 GitService
-GroupService
-LocalizedAttributeService
 LogService
-OidcKeyService
 ProcessDebugService
 ProcessService
 SandboxService
 ServerService
-SessionService
 SqlDataSourceService
-ThreadService
 Tuples
-UserService
-ViewScope
 ViewService
