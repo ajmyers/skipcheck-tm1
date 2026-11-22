@@ -1,0 +1,14 @@
+{
+  "@odata.context" : "$metadata#Server",
+  "Name" : "tm1",
+  "ProductVersion" : "11.8.03500.6",
+  "PortNumber" : 12345,
+  "ClientMessagePortNumber" : 12346,
+  "HTTPPortNumber" : 8010,
+  "UsingSSL" : false,
+  "SecurityPackageName" : "",
+  "ServicePrincipalName" : "",
+  "IntegratedSecurityMode" : "Basic",
+  "ClientCAMURI" : "",
+  "ClientPingCAMPassport" : 0
+}

@@ -1,0 +1,12 @@
+{
+  "@odata.context" : "../$metadata#Cubes('RoundTrip')/Views",
+  "value" : [ {
+    "@odata.etag" : "W/\"3fd023ba71f83260f025ed0a9dfe80423f5ddea4\"",
+    "@odata.type" : "#ibm.tm1.api.v1.MDXView",
+    "Name" : "By region",
+    "Attributes" : {
+      "Caption" : "By region"
+    },
+    "MDX" : "SELECT {[RoundTripMeasure].[RoundTripMeasure].Members} ON 0, {[RoundTrip].[RoundTrip].Members} ON 1 FROM [RoundTrip]"
+  } ]
+}

@@ -643,7 +643,7 @@ These are concerns the requirements don't name, but that need deciding early:
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | **0. Foundation** (#27; steps #28–#32 and #15, as stacked PRs) | `tm1-testcontainers` (#14), before anything else. Metadata snapshot, CSDL parser and coverage gate. The `odata` layer: paths, literals, query and filter builder, streaming collection decoder, errors, `Tm1Request`. `Tm1Session`: Basic auth, cookie, single-flight re-login, close, request context, raw `odata()` access. The identity-keyed `Tm1SessionPool` and `Tm1Authenticator` SPI (Q11). `Tm1Capabilities`, `Tm1Version`, the `V11` dialect. Starter auto-configuration with `Tm1ConnectionDetails` and `@ServiceConnection` (#15). | On a Testcontainers TM1: connect, read `Server`, close, with no session left behind. Coverage report generated, all endpoints pending. |
-| **1. Codegen** | Generator: records, sealed hierarchies, enums, patch builders, field constants, `@Since`/`@Deprecated`, operation catalog. | Generated model compiles; round-trip tests on captured payloads. |
+| **1. Codegen** (#61; steps #62–#67, done) | Generator: records, sealed hierarchies, enums, patch builders, field constants, `@Since`/`@Deprecated`, operation catalog. | Generated model compiles; round-trip tests on captured payloads. |
 | **2. Dimensions** | Dimensions, Hierarchies, Elements, Edges, Levels, Members, Subsets (public, private, session), element/hierarchy/subset attributes, locks and reservations | Integration tests green |
 | **3. Cubes and views** | Cubes, Native and MDX views (public, private), rules, CheckRules/CheckFeeders/Trace\*, Load/Unload, ReorderDimensions, locks and reservations, cube attributes | Integration tests green |
 | **4. Data** | ExecuteMDX\*, Cellsets (streamed, auto-deleted), Update/UpdateCells, Sandboxes, change sets, drillthrough, ModelCubes/ControlCubes | Integration tests green |
@@ -804,6 +804,8 @@ and document the replace-vs-append semantics.
 | Behavior (11.8) | Handling |
 |---|---|
 | Element PATCH silently ignores `Name` (no rename). Hierarchy PATCH ignores `Visible`. | Patch builders omit them. Javadoc. |
+| The `Server` singleton has no `@odata.etag`. A cube's `Dimensions` lists the virtual `Sandboxes` dimension first. (Seen in phase 1.) | Don't rely on either; tests pin both |
+| TM1 writes durations its own way (`P1DT00H00M00S`, `P0DT00H00M00S`) but accepts standard ISO 8601 (`PT24H`). (Seen in phase 1.) | `java.time.Duration` reads and writes them as is |
 | Element and Process PATCH **reject** `Attributes` | Element attributes are written as cells of `}ElementAttributes_<dim>` |
 | Hierarchy PATCH with `Elements`/`Edges` **replaces** the collection (deletes elements not listed). Subset and Chore PATCH **append**. | Separate, explicitly named methods: `replace…` and `add…` |
 | `SetElement`/`SetComponent` with null `Before` put the element **last**; `$metadata` says first | Documented, and pinned by a test |

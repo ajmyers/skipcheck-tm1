@@ -1,0 +1,12 @@
+{
+  "@odata.context" : "$metadata#Groups",
+  "value" : [ {
+    "Name" : "ADMIN"
+  }, {
+    "Name" : "DataAdmin"
+  }, {
+    "Name" : "OperationsAdmin"
+  }, {
+    "Name" : "SecurityAdmin"
+  } ]
+}
