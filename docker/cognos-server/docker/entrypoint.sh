@@ -20,6 +20,13 @@
 #   COGNOS_CS_HOST set    an external PostgreSQL: COGNOS_CS_PORT, COGNOS_CS_NAME,
 #                         COGNOS_CS_SCHEMA, COGNOS_CS_USER, COGNOS_CS_PASSWORD
 #
+# Users (an LDAP namespace for logons):
+#   COGNOS_USERS          user:password[:group,group] entries, separated by spaces or
+#                         newlines, e.g. "alice:pw1:Admins bob:pw2:Writers,Readers"
+#   COGNOS_USERS_FILE     a file with more entries in the same format
+#   With users, an LDAP directory runs in the container, Cognos gets a namespace
+#   (COGNOS_NAMESPACE, default LDAP) and anonymous access is off (COGNOS_ANONYMOUS).
+#
 # Other environment:
 #   COGNOS_HOST           host name in the dispatcher URIs (default: the container's
 #                         hostname). Others on the Docker network reach Cognos by it.
@@ -109,7 +116,16 @@ else
   done
 fi
 
-stop_pg() { [ "$EMBEDDED_PG" = T ] && /usr/local/bin/cognos-postgres stop; true; }
+stop_pg() { [ "$EMBEDDED_PG" = T ] && /usr/local/bin/cognos-postgres stop; [ "$EMBEDDED_LDAP" = T ] && /usr/local/bin/cognos-ldap stop; true; }
+
+# ---- users: an embedded LDAP directory and namespace -----------------------------
+EMBEDDED_LDAP=F
+if [ -n "${COGNOS_USERS:-}" ] || [ -n "${COGNOS_USERS_FILE:-}" ]; then
+  ldap_env=$(/usr/local/bin/cognos-ldap start) || { stop_pg; die "couldn't start the LDAP directory"; }
+  EMBEDDED_LDAP=T
+  while IFS='=' read -r key value; do export "$key=$value"; done <<<"$ldap_env"
+  log "Users log on through namespace ${COGNOS_NAMESPACE:-LDAP}; anonymous access $([ "${COGNOS_ANONYMOUS:-F}" = T ] && echo on || echo off)"
+fi
 
 # ---- configuration --------------------------------------------------------------
 cd "$COGNOS_HOME"

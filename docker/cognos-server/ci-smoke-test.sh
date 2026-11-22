@@ -31,8 +31,9 @@ pass "image contains no IBM software"
 # 3. What Cognos needs from the image
 run --entrypoint sh "$image" -c 'command -v tini >/dev/null && command -v python3 >/dev/null && command -v curl >/dev/null \
   && ls /usr/lib/postgresql/*/bin/postgres >/dev/null && ls /usr/local/lib/cognos-server/drivers/postgresql-*.jar >/dev/null \
-  && ldconfig -p | grep -q "libfreetype.so.6 "' \
-  || fail "missing runtime dependency (tini / python3 / curl / PostgreSQL / JDBC driver / freetype)"
+  && ldconfig -p | grep -q "libfreetype.so.6 " && ldconfig -p | grep -q "libnss3.so " && ldconfig -p | grep -q "libnspr4.so " \
+  && command -v slapd >/dev/null' \
+  || fail "missing runtime dependency (tini / python3 / curl / PostgreSQL / JDBC driver / freetype / NSS / slapd)"
 pass "runtime dependencies present"
 
 # 4. The unpacker follows a manifest: installables, installablesRef, tar.gz, zip
@@ -129,18 +130,45 @@ out=$(run --entrypoint sh "$image" -c '
 <crn:parameter name="serverCommonName"><crn:value xsi:type="xsd:string">localhost</crn:value></crn:parameter>
 <crn:parameter name="sanDNSName"><crn:value xsi:type="xsd:string">localhost</crn:value></crn:parameter>
 <crn:instances name="database"><crn:instance class="DB2" name="Content Store"><crn:parameter name="name"><crn:value>cm</crn:value></crn:parameter></crn:instance></crn:instances>
-<crn:parameter name="dispatcherMaxMemory"><crn:value xsi:type="xsd:unsignedInt">8192</crn:value></crn:parameter></crn:parameters>
+<crn:parameter name="dispatcherMaxMemory"><crn:value xsi:type="xsd:unsignedInt">8192</crn:value></crn:parameter>
+<crn:instances name="authProvider"><crn:instance class="Cognos" name="Cognos">
+<!-- comment -->
+<crn:parameter name="allowAnon"><crn:value xsi:type="xsd:boolean">true</crn:value></crn:parameter></crn:instance></crn:instances></crn:parameters>
 XML
   python3 /usr/local/lib/cognos-server/configure-cognos.py template /tmp/in.xml /tmp/t.xml >/dev/null &&
   COGNOS_HOST=cog COGNOS_CS_HOST=db COGNOS_MAX_MEMORY=4096 python3 /usr/local/lib/cognos-server/configure-cognos.py render /tmp/t.xml /tmp/out.xml &&
-  cat /tmp/out.xml' 2>&1) || fail "template/render failed: $out"
+  cat /tmp/out.xml &&
+  COGNOS_CS_HOST=db COGNOS_LDAP_HOST=127.0.0.1 COGNOS_LDAP_BIND_DN=cn=admin,dc=cognos,dc=local COGNOS_LDAP_BIND_PASSWORD=pw \
+    python3 /usr/local/lib/cognos-server/configure-cognos.py render /tmp/t.xml /tmp/ldap.xml && cat /tmp/ldap.xml' 2>&1) || fail "template/render failed: $out"
 for want in "http://cog:9300/p2pd/servlet/dispatch" "http://localhost:9510/pmpsvc" "GRP_cog" '"cfg:hostOnly">cog<' 'name="hostName"><crn:value xsi:type="xsd:string">cog<' 'class="PostgreSQL"' "db:5432" ">4096<" \
   'name="serverCommonName"><crn:value xsi:type="xsd:string">cog<' 'name="sanDNSName"><crn:value xsi:type="xsd:string">cog localhost<'; do
   grep -qF -- "$want" <<<"$out" || fail "rendered cogstartup.xml lacks $want: $out"
 done
 grep -qF '<username>abc123</username>' <<<"$out" || fail "a value that only equals the install hostname was changed: $out"
-[ "$(grep -o abc123 <<<"$out" | wc -l)" -eq 1 ] || fail "install hostname left in rendered cogstartup.xml: $out"
-pass "cogstartup.xml template and render"
+# Two renders follow; in each, only the look-alike username may still say abc123.
+[ "$(grep -o abc123 <<<"$out" | wc -l)" -eq 2 ] || fail "install hostname left in rendered cogstartup.xml: $out"
+for want in 'name="allowAnon"><crn:value xsi:type="xsd:boolean">false<' '<crn:instance class="LDAP" name="LDAP">' '>127.0.0.1:389<' \
+  '>uid=${userID},ou=people,dc=cognos,dc=local<' '<username>cn=admin,dc=cognos,dc=local</username>'; do
+  grep -qF -- "$want" <<<"$out" || fail "rendered cogstartup.xml with users lacks $want: $out"
+done
+grep -qF 'name="allowAnon"><crn:value xsi:type="xsd:boolean">true<' <<<"$out" || fail "anonymous access should stay on without users: $out"
+pass "cogstartup.xml template and render (with and without an LDAP namespace)"
+
+# 5b. Test users become an LDAP directory: each logs on with its own password,
+#     a wrong one is refused, groups list their members, and hashes aren't readable
+out=$(run -e COGNOS_USERS="admin:adminpw:Admins analyst:analystpw:Analysts,Readers viewer:viewerpw:Readers" --entrypoint bash "$image" -c '
+  cognos-ldap start >/dev/null 2>&1 || exit 1
+  b=dc=cognos,dc=local
+  for u in admin:adminpw analyst:analystpw viewer:viewerpw; do
+    ldapwhoami -x -H ldap://127.0.0.1 -D "uid=${u%%:*},ou=people,$b" -w "${u#*:}" >/dev/null || exit 1
+  done
+  ldapwhoami -x -H ldap://127.0.0.1 -D "uid=viewer,ou=people,$b" -w wrong >/dev/null 2>&1 && exit 1
+  ldapsearch -x -LLL -H ldap://127.0.0.1 -b "ou=groups,$b" "(uniqueMember=uid=analyst,ou=people,$b)" cn | grep "^cn:" | sort | tr "\n" " "
+  ldapsearch -x -LLL -H ldap://127.0.0.1 -b "ou=people,$b" userPassword | grep -c "^userPassword" || true' 2>&1) || fail "embedded LDAP directory doesn't work: $out"
+grep -qx "cn: Analysts cn: Readers 0" <<<"$out" || fail "unexpected LDAP groups or readable passwords: $out"
+out=$(run -e COGNOS_USERS="bad user:pw" --entrypoint cognos-ldap "$image" start 2>&1) && fail "bad user entry accepted"
+grep -q "bad user entry\|bad user name" <<<"$out" || fail "missing user entry error: $out"
+pass "test users become an LDAP directory (logons, wrong password refused, groups, hashes hidden)"
 
 # 6. The embedded PostgreSQL starts, and the content store role can log in over TCP
 out=$(run --entrypoint sh "$image" -c '

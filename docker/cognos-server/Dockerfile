@@ -24,12 +24,15 @@ ARG POSTGRESQL_JDBC_VERSION=42.7.4
 RUN mkdir -p /etc/postgresql-common/createcluster.d \
  && echo 'create_main_cluster = false' > /etc/postgresql-common/createcluster.d/no-main.conf \
  && apt-get update \
+ && echo 'slapd slapd/no_configuration boolean true' | debconf-set-selections \
  && apt-get install -y --no-install-recommends \
       ca-certificates tini procps curl tzdata locales python3 \
-      fontconfig libfreetype6 libnsl2 postgresql \
+      fontconfig libfreetype6 libnsl2 libnss3 postgresql slapd ldap-utils \
  && sed -i 's/^# *en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen \
  && rm -rf /var/lib/apt/lists/*
 
+# libnss3: Cognos's LDAP namespace provider (libCAM_AAA_AuthLDAP.so) links against
+# NSS/NSPR, and fails with CAM-AAA-0022 without them.
 # Cognos ships no PostgreSQL JDBC driver. It's BSD-licensed, so the image carries it.
 RUN mkdir -p /usr/local/lib/cognos-server/drivers \
  && curl -fsSL -o /usr/local/lib/cognos-server/drivers/postgresql-${POSTGRESQL_JDBC_VERSION}.jar \
@@ -43,8 +46,9 @@ ENV LANG=en_US.UTF-8 \
 COPY docker/entrypoint.sh /usr/local/bin/cognos-entrypoint
 COPY docker/install-cognos.sh /usr/local/bin/cognos-install
 COPY docker/embedded-postgres.sh /usr/local/bin/cognos-postgres
+COPY docker/embedded-ldap.sh /usr/local/bin/cognos-ldap
 COPY docker/healthcheck.sh /usr/local/bin/cognos-healthcheck
-COPY docker/unpack-cognos.py docker/configure-cognos.py docker/banner.txt /usr/local/lib/cognos-server/
+COPY docker/unpack-cognos.py docker/configure-cognos.py docker/users.py docker/banner.txt /usr/local/lib/cognos-server/
 RUN chmod 755 /usr/local/bin/cognos-*
 
 # Deliberately no VOLUME: unmounted paths stay in the container and go away with it.

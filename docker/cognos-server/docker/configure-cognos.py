@@ -14,6 +14,10 @@ render: writes the cogstartup.xml Cognos runs from, using environment variables:
   COGNOS_CS_HOST, COGNOS_CS_PORT (5432), COGNOS_CS_NAME (cm), COGNOS_CS_SCHEMA (public),
   COGNOS_CS_USER (cognos), COGNOS_CS_PASSWORD (cognos)     PostgreSQL content store
   COGNOS_MAX_MEMORY (6144)                  dispatcher JVM heap, MB
+  COGNOS_LDAP_HOST, COGNOS_LDAP_PORT (389), COGNOS_LDAP_BASE,
+  COGNOS_LDAP_BIND_DN, COGNOS_LDAP_BIND_PASSWORD, COGNOS_NAMESPACE (LDAP)
+                                            an LDAP namespace (when COGNOS_LDAP_HOST is set)
+  COGNOS_ANONYMOUS (T, or F with a namespace)   allow anonymous access
 
 Edits are textual, so IBM's comments and layout survive. cogconfig encrypts the
 credentials when it saves the file.
@@ -88,6 +92,45 @@ def set_value(xml, name, value):
         lambda m: m.group(1) + ">" + escape(value) + "</crn:value>", xml, name)
 
 
+def ldap_namespace():
+    ns = env("COGNOS_NAMESPACE") or "LDAP"
+    if not re.fullmatch(r"[A-Za-z0-9_]+", ns):
+        raise SystemExit(f"COGNOS_NAMESPACE must be letters, digits and _, not '{ns}'")
+    base = env("COGNOS_LDAP_BASE") or "dc=cognos,dc=local"
+    lookup = env("COGNOS_LDAP_USER_LOOKUP") or f"uid=${{userID}},ou=people,{base}"
+    params = [
+        ("id", "xsd:string", ns),
+        ("connection", "cfg:hostPort", f"{env('COGNOS_LDAP_HOST')}:{env('COGNOS_LDAP_PORT') or '389'}"),
+        ("baseDN", "xsd:string", base),
+        ("userLookup", "xsd:string", lookup),
+        ("useBindCredentialsForSearch", "xsd:boolean", "true" if env("COGNOS_LDAP_BIND_DN") else "false"),
+    ]
+    xml = "".join(f"""
+                    <crn:parameter name="{n}">
+                        <crn:value xsi:type="{t}">{escape(v)}</crn:value>
+                    </crn:parameter>""" for n, t, v in params)
+    if env("COGNOS_LDAP_BIND_DN"):
+        xml += f"""
+                    <crn:parameter name="bindCredentials">
+                        <crn:value xsi:type="cfg:credential">
+                            <credential>
+                                <username>{escape(env('COGNOS_LDAP_BIND_DN'))}</username>
+                                <password>{escape(env('COGNOS_LDAP_BIND_PASSWORD') or '')}</password>
+                            </credential>
+                        </crn:value>
+                    </crn:parameter>"""
+    return f"""
+                <crn:instance class="LDAP" name="{ns}">{xml}
+                </crn:instance>"""
+
+
+def flag(name, default):
+    value = (env(name) or default).upper()
+    if value not in ("T", "F", "TRUE", "FALSE"):
+        raise SystemExit(f"{name} must be T or F, not '{env(name)}'")
+    return "true" if value.startswith("T") else "false"
+
+
 def render(xml):
     if HOST_MARKER not in xml:
         raise SystemExit(f"template has no {HOST_MARKER}: was it made by 'configure-cognos.py template'?")
@@ -103,6 +146,13 @@ def render(xml):
     memory = env("COGNOS_MAX_MEMORY") or "6144"
     if not memory.isdigit():
         raise SystemExit(f"COGNOS_MAX_MEMORY must be a number of MB, not '{memory}'")
+    namespace = bool(env("COGNOS_LDAP_HOST"))
+    xml = sub_once(
+        r'(<crn:instance class="Cognos" name="Cognos">(?:\s|<!--.*?-->)*<crn:parameter name="allowAnon">\s*<crn:value [^>]*>)\w+(</crn:value>)',
+        lambda m: m.group(1) + flag("COGNOS_ANONYMOUS", "F" if namespace else "T") + m.group(2), xml, "allowAnon")
+    if namespace:
+        xml = sub_once(r'(<crn:instances name="authProvider">.*?</crn:instance>)',
+                       lambda m: m.group(1) + ldap_namespace(), xml, "the authentication providers")
     xml = sub_once(
         r'(<crn:parameter name="dispatcherMaxMemory">\s*<crn:value [^>]*>)\d+(</crn:value>)',
         lambda m: m.group(1) + memory + m.group(2), xml, "dispatcherMaxMemory")
