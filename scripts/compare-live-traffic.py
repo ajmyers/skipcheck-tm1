@@ -9,7 +9,7 @@ text | bytes}, "status"}). The session's own requests (login, close, $metadata, 
 left out by the runners.
 
 This script normalizes every log the same way: the run's names back to their placeholders
-(${cube}), entity tags left out, and each run of requests a scenario's step marks "unordered" (a
+(${cube}), entity tags left out, the ID TM1 made up for a cellset as <id>, and each run of requests a scenario's step marks "unordered" (a
 regular expression on "METHOD target", for requests a client has in flight at once, such as a
 cellset stream's pages) put in one order; then requires every language's log of a scenario to be
 equal, request for request, and prints the first difference. With fewer than two logs of a scenario,
@@ -29,6 +29,10 @@ from pathlib import Path
 from typing import Any
 
 ETAG_HEADERS = ("if-match", "if-none-match")
+
+# A cellset's ID is TM1's, new for every run, and a scenario can't name it. One a scenario does
+# name (a missing cellset) is a placeholder by now, and stays.
+CELLSET_ID = re.compile(r"Cellsets\('(?!\$\{)[^']*'\)")
 
 SCENARIOS = Path(__file__).resolve().parents[1] / "spec" / "conformance" / "live"
 
@@ -68,7 +72,9 @@ def normalize(header: dict[str, Any], exchanges: list[dict[str, Any]]) -> list[d
         request = dict(exchange["request"])
         headers = {k: ("<etag>" if k in ETAG_HEADERS else v) for k, v in request.get("headers", {}).items()}
         request["headers"] = headers
-        out.append({"step": exchange.get("step"), "request": _replace(request, names), "status": exchange.get("status")})
+        request = _replace(request, names)
+        request["target"] = CELLSET_ID.sub("Cellsets('<id>')", request["target"])
+        out.append({"step": exchange.get("step"), "request": request, "status": exchange.get("status")})
     return out
 
 
