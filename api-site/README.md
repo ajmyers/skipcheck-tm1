@@ -54,5 +54,8 @@ The workflow deploys with `wrangler deploy`. It needs two repository secrets:
   and `onclick` handlers into its tables. The CSP allows exactly those, by hash, with
   `'unsafe-hashes'` for the handlers.
 - **The theme follows the OS.** The site has no light/dark switch, so the theme hides Javadoc's.
+- **Pages are never revalidated against the Javadoc file.** A page is the file plus the site's
+  partials, so the file's `ETag` doesn't identify it. The Worker always fetches pages in full and
+  sends them without validators (`Cache-Control: no-cache`). CSS, scripts and images keep theirs.
 - **The masthead is a `<div>` in the docs.** Javadoc's script measures the first `<header>` on the
   page to place its sticky navigation bar, so the Worker renames the site's masthead element.

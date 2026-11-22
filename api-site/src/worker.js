@@ -38,7 +38,20 @@ export default {
 			return fetch(new URL(url.pathname + url.search, env.SITE_ORIGIN), request);
 		}
 
-		const response = await env.ASSETS.fetch(request);
+		// A page is the Javadoc file plus the site's partials, so the file's ETag doesn't identify it:
+		// answering a browser's revalidation from the file alone would keep an old masthead or
+		// footer in its cache after the site changes. Pages are always fetched in full, and sent
+		// without the file's validators.
+		// A page is an .html file or a directory (served as its index.html); a path with no extension
+		// is taken for a directory and gets its trailing slash.
+		const isPage = !/\.(?!html$)[^/.]+$/.test(url.pathname);
+		if (isPage && !url.pathname.endsWith('/') && !url.pathname.endsWith('.html')) {
+			return Response.redirect(`${url.origin}${url.pathname}/${url.search}`, 301);
+		}
+		const asset = new URL(url);
+		if (asset.pathname.endsWith('/')) asset.pathname += 'index.html';
+		const assetRequest = new Request(asset, request);
+		const response = await env.ASSETS.fetch(isPage ? unconditional(assetRequest) : assetRequest);
 		if (response.status === 404) return notFound(env);
 		if (!(response.headers.get('Content-Type') ?? '').startsWith('text/html')) {
 			return withSecurityHeaders(response);
@@ -53,7 +66,11 @@ export default {
 				},
 			})
 			.transform(response);
-		return withSecurityHeaders(page);
+		const secured = withSecurityHeaders(page);
+		secured.headers.delete('ETag');
+		secured.headers.delete('Last-Modified');
+		secured.headers.set('Cache-Control', 'no-cache');
+		return secured;
 	},
 };
 
@@ -72,6 +89,13 @@ async function partial(env, name) {
 	} catch {
 		return null;
 	}
+}
+
+function unconditional(request) {
+	const headers = new Headers(request.headers);
+	headers.delete('If-None-Match');
+	headers.delete('If-Modified-Since');
+	return new Request(request, { headers });
 }
 
 async function notFound(env) {
