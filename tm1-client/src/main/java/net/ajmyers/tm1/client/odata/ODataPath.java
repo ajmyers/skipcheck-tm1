@@ -141,7 +141,23 @@ public final class ODataPath {
 	 * @return a new path with the segment added
 	 */
 	public ODataPath function(String qualifiedName, Map<String, ?> parameters) {
-		StringBuilder call = new StringBuilder(qualified(qualifiedName)).append('(');
+		return append(call(qualified(qualifiedName), parameters));
+	}
+
+	/**
+	 * A function import called from the service root, e.g. {@code ModelCubes()} or
+	 * {@code TailMessageLog(Top=10)}.
+	 * @param name the import's name, unqualified
+	 * @param parameters the parameter names and values, in order, as for
+	 * {@link #function}
+	 * @return the path
+	 */
+	public static ODataPath functionImport(String name, Map<String, ?> parameters) {
+		return new ODataPath(List.of()).append(call(identifier(name), parameters));
+	}
+
+	private static String call(String function, Map<String, ?> parameters) {
+		StringBuilder call = new StringBuilder(function).append('(');
 		boolean first = true;
 		for (Map.Entry<String, ?> p : parameters.entrySet()) {
 			if (!first) {
@@ -153,7 +169,7 @@ public final class ODataPath {
 				.append('=')
 				.append(value instanceof Alias alias ? alias.name() : ODataEncoding.pathValue(ODataLiterals.of(value)));
 		}
-		return append(call.append(')').toString());
+		return call.append(')').toString();
 	}
 
 	/**
