@@ -2,8 +2,10 @@
   <Folder Name="/src/">
     <Project Path="src/Tm1.Client/Tm1.Client.csproj" />
     <Project Path="src/Tm1.Codegen/Tm1.Codegen.csproj" />
+    <Project Path="src/Tm1.Testcontainers/Tm1.Testcontainers.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Tm1.Client.Tests/Tm1.Client.Tests.csproj" />
+    <Project Path="tests/Tm1.Testcontainers.Tests/Tm1.Testcontainers.Tests.csproj" />
   </Folder>
 </Solution>
