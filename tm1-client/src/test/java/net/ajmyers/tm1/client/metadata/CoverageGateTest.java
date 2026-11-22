@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,6 +17,10 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.junit.jupiter.api.Test;
+
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
+import net.ajmyers.tm1.client.service.Tm1Endpoint;
 
 /**
  * The endpoint coverage gate (plan §12.3): every endpoint in the snapshot must be
@@ -58,9 +63,10 @@ class CoverageGateTest {
 
 		NavigableSet<String> unknown = new TreeSet<>(pending);
 		unknown.addAll(excluded.keySet());
+		unknown.addAll(implemented);
 		unknown.removeAll(endpoints);
 		assertThat(unknown)
-			.as("entries in the coverage lists that $metadata doesn't define (typos, or removed endpoints)")
+			.as("endpoints in the coverage lists or @Tm1Endpoint that $metadata doesn't define (typos, or removed endpoints)")
 			.isEmpty();
 
 		NavigableSet<String> stillPending = new TreeSet<>(implemented);
@@ -87,12 +93,21 @@ class CoverageGateTest {
 	}
 
 	/**
-	 * Endpoints the client implements. None yet: the services that implement them, and
-	 * the way they declare which endpoints they cover, start with the first endpoint
-	 * service.
+	 * Endpoints the client implements: what the services' public methods declare with
+	 * {@link Tm1Endpoint}.
 	 */
-	private static Set<String> implemented() {
-		return Set.of();
+	static Set<String> implemented() {
+		Set<String> result = new TreeSet<>();
+		new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+			.importPackages("net.ajmyers.tm1.client.service")
+			.forEach(c -> {
+				for (Method method : c.reflect().getDeclaredMethods()) {
+					for (Tm1Endpoint endpoint : method.getAnnotationsByType(Tm1Endpoint.class)) {
+						result.add(endpoint.value());
+					}
+				}
+			});
+		return result;
 	}
 
 	private static Map<String, String> excluded() throws IOException {

@@ -1,5 +1,7 @@
 package net.ajmyers.tm1.client;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import java.util.List;
@@ -8,10 +10,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.lang.ArchCondition;
+import net.ajmyers.tm1.client.service.Tm1Endpoint;
+import net.ajmyers.tm1.client.session.Tm1Session;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -26,6 +34,11 @@ class ArchitectureTest {
 	private static final JavaClasses LIBRARY = new ClassFileImporter()
 		.withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
 		.importPackages("net.ajmyers.tm1.client");
+
+	private static final DescribedPredicate<JavaClass> SERVICES = DescribedPredicate.describe(
+			"services (classes named *Service in net.ajmyers.tm1.client.service..)",
+			c -> c.getPackageName().startsWith("net.ajmyers.tm1.client.service")
+					&& c.getSimpleName().endsWith("Service"));
 
 	private static final List<String> MONO_BLOCKING = List.of("block", "blockOptional", "toFuture");
 
@@ -91,6 +104,48 @@ class ArchitectureTest {
 					"net.ajmyers.tm1.client.version..")
 			.because("the odata layer is TM1-agnostic (plan §3.2): OData correctness lives in one place and doesn't "
 					+ "depend on sessions, requests or TM1 versions")
+			.check(LIBRARY);
+	}
+
+	@Test
+	void servicesAreStatelessFinalClassesBuiltFromASession() {
+		classes().that(SERVICES)
+			.should()
+			.haveModifier(JavaModifier.FINAL)
+			.andShould(
+					ArchCondition.from(DescribedPredicate.describe("have one public constructor, taking a Tm1Session",
+							(JavaClass c) -> c.getConstructors().size() == 1 && c.getConstructors()
+								.stream()
+								.allMatch(k -> k.getModifiers().contains(JavaModifier.PUBLIC)
+										&& k.getRawParameterTypes().size() == 1
+										&& k.getRawParameterTypes().get(0).isEquivalentTo(Tm1Session.class)))))
+			.andShould(ArchCondition
+				.from(DescribedPredicate.describe("hold no state but the session (static final constants apart)",
+						(JavaClass c) -> c.getFields()
+							.stream()
+							.allMatch(f -> f.getModifiers().contains(JavaModifier.FINAL)
+									&& (f.getModifiers().contains(JavaModifier.STATIC)
+											|| f.getRawType().isEquivalentTo(Tm1Session.class))))))
+			.because("services are free to create and safe to share (plan §6): everything they need is the session")
+			.allowEmptyShould(true)
+			.check(LIBRARY);
+	}
+
+	@Test
+	void serviceMethodsAreReactiveAndDeclareTheirEndpoints() {
+		methods().that()
+			.areDeclaredInClassesThat(SERVICES)
+			.and()
+			.arePublic()
+			.should(ArchCondition.from(DescribedPredicate.describe("return a Mono or a Flux",
+					(JavaMethod m) -> m.getRawReturnType().isEquivalentTo(Mono.class)
+							|| m.getRawReturnType().isEquivalentTo(Flux.class))))
+			.andShould(ArchCondition.from(DescribedPredicate.describe("declare the endpoints they implement",
+					(JavaMethod m) -> m.isAnnotatedWith(Tm1Endpoint.class)
+							|| m.isAnnotatedWith(Tm1Endpoint.List.class))))
+			.because("each service method is one REST call that never blocks (plan §6, §7), and the coverage gate "
+					+ "counts what's implemented from @Tm1Endpoint (plan §12.3)")
+			.allowEmptyShould(true)
 			.check(LIBRARY);
 	}
 
