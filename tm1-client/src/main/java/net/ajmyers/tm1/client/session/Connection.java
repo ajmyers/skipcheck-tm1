@@ -225,6 +225,11 @@ final class Connection {
 		}
 	}
 
+	/** The JSON mapper the session reads and writes with. */
+	ObjectMapper mapper() {
+		return mapper;
+	}
+
 	/** Sends one request and reads a single response: an entity, text, or nothing. */
 	<T> Mono<T> execute(Tm1Request<T> request) {
 		URI uri = uri(request.relativeUri());
@@ -700,7 +705,7 @@ final class Connection {
 
 	// Helpers
 
-	private URI uri(String relative) {
+	URI uri(String relative) {
 		// Already encoded by ODataPath and ODataQuery: never through a URI template,
 		// which would
 		// read the braces in TM1 control object names as variables (plan §16.2)
@@ -725,7 +730,7 @@ final class Connection {
 		}
 	}
 
-	private byte[] json(Object body) {
+	byte[] json(Object body) {
 		if (body instanceof byte[] bytes) {
 			return bytes;
 		}

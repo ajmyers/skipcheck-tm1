@@ -445,6 +445,16 @@ public final class Tm1Client {
 	}
 
 	/**
+	 * Starts a JSON {@code $batch} on this client's session: calls made through
+	 * {@link Tm1Batch#client()} are queued, and {@link Tm1Batch#run()} sends them
+	 * together.
+	 * @return the batch
+	 */
+	public Tm1Batch batch() {
+		return new Tm1Batch(session.batch());
+	}
+
+	/**
 	 * A client on an async view of this client's session ({@link Tm1Session#withAsync}):
 	 * every service's methods work as usual, but TM1 runs each request asynchronously and
 	 * the client polls for the result, so a long process or chore holds no request open.

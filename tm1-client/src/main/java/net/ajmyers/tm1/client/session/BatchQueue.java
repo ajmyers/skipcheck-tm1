@@ -1,0 +1,180 @@
+package net.ajmyers.tm1.client.session;
+
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.jspecify.annotations.Nullable;
+
+import net.ajmyers.tm1.client.Tm1Request;
+import net.ajmyers.tm1.client.error.Tm1ProtocolException;
+import net.ajmyers.tm1.client.odata.ODataPath;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
+
+/**
+ * The requests of a batch, queued as they're made, and sent as JSON {@code $batch}
+ * requests when the batch runs. Each request's result is held for its caller, so a caller
+ * can subscribe before or after the run.
+ */
+final class BatchQueue {
+
+	private final Connection connection;
+
+	private final ObjectMapper mapper;
+
+	private final List<Entry> entries = new ArrayList<>();
+
+	private boolean ran;
+
+	BatchQueue(Connection connection, ObjectMapper mapper) {
+		this.connection = connection;
+		this.mapper = mapper;
+	}
+
+	/** Queues a request, and returns its result, there once the batch has run. */
+	<T> Flux<T> add(Tm1Request<T> request) {
+		if (request.response() == Tm1Request.Response.BYTES || request.body() instanceof Tm1Request.Bytes) {
+			return Flux.error(new IllegalArgumentException("Raw bytes can't go in a JSON batch: " + request));
+		}
+		Sinks.One<Item> sink = Sinks.one();
+		synchronized (this) {
+			if (ran) {
+				return Flux.error(new IllegalStateException(
+						"The batch has already run, so this call can't join it: a call whose request depends on "
+								+ "another's result can't be batched. " + request));
+			}
+			entries.add(new Entry(String.valueOf(entries.size() + 1), request, sink));
+		}
+		URI uri = connection.uri(request.relativeUri());
+		return sink.asMono().flatMapMany(item -> connection.decode(request, uri, item.status(), item.body()));
+	}
+
+	/** How many requests are queued. */
+	synchronized int size() {
+		return entries.size();
+	}
+
+	/** Sends the queued requests, at most {@code perRequest} to each {@code $batch}. */
+	Mono<Void> run(int perRequest) {
+		return Mono.defer(() -> {
+			List<Entry> all;
+			synchronized (this) {
+				if (ran) {
+					return Mono.error(new IllegalStateException("The batch has already run"));
+				}
+				ran = true;
+				all = List.copyOf(entries);
+			}
+			List<List<Entry>> chunks = new ArrayList<>();
+			for (int i = 0; i < all.size(); i += perRequest) {
+				chunks.add(all.subList(i, Math.min(all.size(), i + perRequest)));
+			}
+			return Flux.fromIterable(chunks).concatMap(this::send).then();
+		});
+	}
+
+	private Mono<Void> send(List<Entry> chunk) {
+		ObjectNode body = mapper.createObjectNode();
+		ArrayNode requests = body.putArray("requests");
+		for (Entry entry : chunk) {
+			requests.add(json(entry));
+		}
+		return connection.execute(Tm1Request.post(ODataPath.batch(), body, JsonNode.class))
+			.doOnNext(response -> deliver(chunk, response))
+			.doOnError(e -> chunk.forEach(entry -> entry.sink().tryEmitError(e)))
+			.onErrorResume(e -> Mono.empty())
+			.then();
+	}
+
+	private ObjectNode json(Entry entry) {
+		Tm1Request<?> request = entry.request();
+		ObjectNode json = mapper.createObjectNode();
+		json.put("id", entry.id());
+		json.put("method", request.method().name());
+		json.put("url", request.relativeUri());
+		ObjectNode headers = json.putObject("headers");
+		request.headers().forEach(headers::put);
+		Object payload = request.body();
+		if (payload != null) {
+			headers.put("content-type", "application/json");
+			json.set("body", mapper.readTree(connection.json(payload)));
+		}
+		return json;
+	}
+
+	private void deliver(List<Entry> chunk, JsonNode response) {
+		Map<String, JsonNode> byId = new LinkedHashMap<>();
+		for (JsonNode item : response.path("responses")) {
+			byId.put(item.path("id").asString(""), item);
+		}
+		for (Entry entry : chunk) {
+			JsonNode item = byId.get(entry.id());
+			if (item == null) {
+				entry.sink()
+					.tryEmitError(
+							new Tm1ProtocolException("TM1's batch response has no answer for request " + entry.id(),
+									null, entry.request().method().name(), entry.request().relativeUri(), null));
+				continue;
+			}
+			entry.sink().tryEmitValue(new Item(item.path("status").asInt(0), bytes(item.get("body"))));
+		}
+	}
+
+	private byte[] bytes(@Nullable JsonNode body) {
+		if (body == null || body.isNull() || body.isMissingNode()) {
+			return new byte[0];
+		}
+		if (body.isString()) {
+			return body.asString().getBytes(StandardCharsets.UTF_8);
+		}
+		try {
+			return mapper.writeValueAsBytes(body);
+		}
+		catch (JacksonException e) {
+			throw new IllegalStateException("A batch item's body can't be written back as JSON", e);
+		}
+	}
+
+	private record Entry(String id, Tm1Request<?> request, Sinks.One<Item> sink) {
+	}
+
+	/**
+	 * One answer of a batch: its status, and its body as the bytes TM1 would have sent.
+	 */
+	private static final class Item {
+
+		private final int status;
+
+		private final byte[] body;
+
+		Item(int status, byte[] body) {
+			this.status = status;
+			this.body = body;
+		}
+
+		int status() {
+			return status;
+		}
+
+		byte[] body() {
+			return body;
+		}
+
+	}
+
+	@Override
+	public String toString() {
+		return "BatchQueue[" + size() + " requests" + (ran ? ", ran" : "") + "]";
+	}
+
+}
