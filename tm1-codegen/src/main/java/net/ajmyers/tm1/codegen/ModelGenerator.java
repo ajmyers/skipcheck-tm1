@@ -113,6 +113,15 @@ public final class ModelGenerator {
 
 	private static final ClassName TM1_OPERATION = ClassName.get("net.ajmyers.tm1.client", "Tm1Operation");
 
+	private static final ClassName JSON_ANY_SETTER = ClassName.get("com.fasterxml.jackson.annotation", "JsonAnySetter");
+
+	private static final ClassName JSON_ANY_GETTER = ClassName.get("com.fasterxml.jackson.annotation", "JsonAnyGetter");
+
+	/**
+	 * The json name marking the component that holds an open type's dynamic properties.
+	 */
+	private static final String DYNAMIC = "*";
+
 	private static final ClassName JSON_NODE = ClassName.get("tools.jackson.databind", "JsonNode");
 
 	private static final Set<String> KEYWORDS = Set.of("abstract", "assert", "boolean", "break", "byte", "case",
@@ -300,7 +309,22 @@ public final class ModelGenerator {
 							revisions(navigation.annotations()))));
 			}
 		}
+		if (open(type)) {
+			components.add(new Component(unique("dynamicProperties", names),
+					ParameterizedTypeName.get(ClassName.get(Map.class), ClassName.get(String.class), JSON_NODE),
+					DYNAMIC,
+					"the properties {@code $metadata} doesn't declare, which an open type can have, such as attribute values",
+					Revisions.NONE));
+		}
 		return components;
+	}
+
+	/**
+	 * Whether a type, or a type it derives from, is open: it can have undeclared
+	 * properties.
+	 */
+	private boolean open(CsdlStructuredType type) {
+		return metadata.typeHierarchy(qualified(type)).stream().anyMatch(CsdlStructuredType::openType);
 	}
 
 	private TypeSpec.Builder record(CsdlStructuredType type, @Nullable CsdlStructuredType root) {
@@ -642,6 +666,22 @@ public final class ModelGenerator {
 		for (PatchProperty own : patchProperties(type)) {
 			addPatchMethods(b, builder, own, false);
 		}
+		if (open(type)) {
+			MethodSpec.Builder dynamic = MethodSpec.methodBuilder("property")
+				.addModifiers(Modifier.PUBLIC)
+				.addParameter(String.class, "name")
+				.addParameter(ClassName.get(Object.class).annotated(AnnotationSpec.builder(NULLABLE).build()), "value")
+				.returns(builder)
+				.addJavadoc(
+						"Sets a property {@code $$metadata} doesn't declare, which this open type can have, such as an attribute's value.\n@param name the property's name, as TM1 writes it\n@param value the value; {@code null} sends an explicit {@code null}\n@return this builder\n");
+			if (root != null && open(root)) {
+				dynamic.addAnnotation(Override.class).addStatement("super.property(name, value)");
+			}
+			else {
+				dynamic.addStatement("this.values.put($T.requireNonNull(name, $S), value)", Objects.class, "name");
+			}
+			b.addMethod(dynamic.addStatement("return this").build());
+		}
 		MethodSpec.Builder build = MethodSpec.methodBuilder("build")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(name)
@@ -897,8 +937,13 @@ public final class ModelGenerator {
 	}
 
 	private static ParameterSpec component(TypeName type, String name, String json) {
-		return ParameterSpec.builder(type.annotated(AnnotationSpec.builder(NULLABLE).build()), name)
-			.addAnnotation(AnnotationSpec.builder(JSON_PROPERTY).addMember("value", "$S", json).build())
+		ParameterSpec.Builder component = ParameterSpec
+			.builder(type.annotated(AnnotationSpec.builder(NULLABLE).build()), name);
+		if (DYNAMIC.equals(json)) {
+			// Read through the constructor parameter, written through the accessor
+			return component.addAnnotation(JSON_ANY_SETTER).addAnnotation(JSON_ANY_GETTER).build();
+		}
+		return component.addAnnotation(AnnotationSpec.builder(JSON_PROPERTY).addMember("value", "$S", json).build())
 			.build();
 	}
 

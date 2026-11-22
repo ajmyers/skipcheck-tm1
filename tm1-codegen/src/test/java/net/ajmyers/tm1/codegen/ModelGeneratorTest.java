@@ -36,7 +36,7 @@ class ModelGeneratorTest {
 			        </Member>
 			        <Member Name="Unknown" Value="2"/>
 			      </EnumType>
-			      <ComplexType Name="Box">
+			      <ComplexType Name="Box" OpenType="true">
 			        <Property Name="UIData" Type="Edm.String"/>
 			        <Property Name="Default" Type="Edm.Int64"/>
 			      </ComplexType>
@@ -223,6 +223,15 @@ class ModelGeneratorTest {
 			.contains(
 					"public static final Tm1Operation PING = new Tm1Operation(Tm1Operation.Kind.FUNCTION, \"tm1.Ping\", null, \"Ping\", List.of(), \"Collection(Edm.String)\", null, null);")
 			.contains("public static final List<Tm1Operation> ALL = List.of(CUBE_RESERVE, PING);");
+	}
+
+	@Test
+	void keepsAnOpenTypesUndeclaredPropertiesAndLetsAPatchSetThem() {
+		assertThat(source(sample(), "Box"))
+			.contains("@JsonAnySetter @JsonAnyGetter @Nullable Map<String, JsonNode> dynamicProperties");
+		assertThat(source(sample(), "BoxPatch"))
+			.contains("public Builder property(String name, @Nullable Object value)");
+		assertThat(source(sample(), "Cube")).doesNotContain("dynamicProperties");
 	}
 
 	private static ModelGenerator sample() {

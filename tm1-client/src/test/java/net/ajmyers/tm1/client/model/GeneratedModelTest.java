@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -47,11 +48,15 @@ class GeneratedModelTest {
 			.isInstanceOf(NativeView.class);
 		assertThat(JSON.readValue("{\"Name\":\"b\",\"MDX\":\"SELECT\",\"@odata.type\":\"#tm1.MDXView\"}", View.class))
 			.as("by alias, and with the type after other properties")
-			.isEqualTo(new MDXView(null, "b", null, null, null, "SELECT"));
+			.isEqualTo(new MDXView(null, "b", null, null, null, "SELECT", Map.of()));
 		assertThat(
 				JSON.readValue("{\"@odata.type\":\"#ibm.tm1.api.v1.FutureView\",\"Name\":\"c\",\"X\":1}", View.class))
 			.as("a subtype a newer server added")
-			.isEqualTo(new View.Unknown(null, "c", null, null, null));
+			.isInstanceOfSatisfying(View.Unknown.class, v -> {
+				assertThat(v.name()).isEqualTo("c");
+				assertThat(v.dynamicProperties()).as("views are open: what it doesn't know is kept")
+					.containsOnlyKeys("X");
+			});
 		assertThat(JSON.readValue("{\"Name\":\"d\"}", View.class)).isInstanceOf(View.Unknown.class);
 	}
 
@@ -64,7 +69,7 @@ class GeneratedModelTest {
 
 	@Test
 	void sendsASubtypeWithItsOdataTypeAndWithoutNulls() {
-		assertThat(JSON.writeValueAsString(new MDXView(null, "v", null, null, null, "SELECT")))
+		assertThat(JSON.writeValueAsString(new MDXView(null, "v", null, null, null, "SELECT", null)))
 			.isEqualTo("{\"@odata.type\":\"#ibm.tm1.api.v1.MDXView\",\"Name\":\"v\",\"MDX\":\"SELECT\"}");
 	}
 
@@ -132,6 +137,19 @@ class GeneratedModelTest {
 		assertThat(asRoot.json()).containsKey("@odata.type");
 		assertThat(JSON.writeValueAsString(CubePatch.builder().views(List.of(view)).build()))
 			.contains("#ibm.tm1.api.v1.MDXView");
+	}
+
+	@Test
+	void keepsAttributeValuesBeyondTheCaption() {
+		String json = "{\"Caption\":\"North\",\"Region Code\":\"N\",\"}TM1_DefaultDisplayValue\":\"North\",\"Rank\":3}";
+		Attributes attributes = JSON.readValue(json, Attributes.class);
+		assertThat(attributes.caption()).isEqualTo("North");
+		assertThat(attributes.dynamicProperties()).containsOnlyKeys("Region Code", "}TM1_DefaultDisplayValue", "Rank");
+		assertThat(attributes.dynamicProperties().get("Rank").asInt()).isEqualTo(3);
+		assertThat(JSON.readTree(JSON.writeValueAsString(attributes))).isEqualTo(JSON.readTree(json));
+		assertThat(
+				JSON.writeValueAsString(AttributesPatch.builder().caption("Nord").property("Region Code", "N").build()))
+			.isEqualTo("{\"Caption\":\"Nord\",\"Region Code\":\"N\"}");
 	}
 
 }

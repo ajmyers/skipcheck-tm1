@@ -64,7 +64,7 @@ class GeneratedModelTm1Test {
 			View created = session
 				.execute(Tm1Request.post(views,
 						new MDXView(null, name, null, null, null,
-								"SELECT {[}Groups].[}Groups].MEMBERS} ON 0 FROM [}ClientGroups]"),
+								"SELECT {[}Groups].[}Groups].MEMBERS} ON 0 FROM [}ClientGroups]", null),
 						View.class))
 				.block(WAIT);
 			assertThat(created).isInstanceOfSatisfying(MDXView.class, v -> assertThat(v.mdx()).contains("}Groups"));
