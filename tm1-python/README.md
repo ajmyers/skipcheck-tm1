@@ -1,89 +1,70 @@
-# tm1-client (Python), a prototype
+# tm1-client (Python)
 
-A Python client for the **IBM Planning Analytics (TM1) REST API**. It's generated from the same language-neutral spec as the Java client ([`spec/tm1-api.json`](../spec)), so it covers every endpoint the spec lists: 242 of 242 for schema 11.8.35.
+A Python client for the **IBM Planning Analytics (TM1) REST API**, with the same API as the Java client (`tm1-client`): the same services, methods, parameters, queries, patches, session views and errors, named the Python way. Its model is generated from the same language-neutral spec ([`spec/tm1-api.json`](../spec)).
 
-Requires Python 3.10+, [httpx](https://www.python-httpx.org/) and [pydantic](https://docs.pydantic.dev/) 2.
+It comes in two flavors with one API: sync (`tm1_client`) and asyncio (`tm1_client.aio`). Requires Python 3.10+, [httpx](https://www.python-httpx.org/) and [pydantic](https://docs.pydantic.dev/) 2.
 
 ```python
-from tm1_client import Bind, Tm1Client
-from tm1_client.model import Cube
+from tm1_client import Filter, ODataPath, ODataQuery, Tm1Client
+from tm1_client.model import Cube, CubePatch
 
-with Tm1Client.connect("https://tm1:8010/api/v1", user="admin", password="apple") as tm1:
-    print(tm1.product_version())
-
-    for cube in tm1.cubes.list(select=["Name"], filter="startswith(Name,'Sales')"):
+with Tm1Client.builder().base_url("http://localhost:8010/api/v1/").basic_auth("admin", "apple").build() as tm1:
+    for cube in tm1.cubes.model_cubes(ODataQuery.none().select(Cube.NAME).filter(Filter.starts_with(Cube.NAME, "Sales"))):
         print(cube.name)
 
-    tm1.cubes.create(Cube(name="Plan", dimensions=[Bind("Dimensions('Region')"), Bind("Dimensions('Year')")]))
-    sales = tm1.cubes["Sales"]
-    sales.update(Cube(rules="SKIPCHECK;"), if_match=sales.get().etag)
-    view = sales.views["Default"].get()            # a NativeView or an MDXView, by @odata.type
-    sales.reserve(release_existing=True)           # POST Cubes('Sales')/tm1.Reserve
-    print(tm1.mdx_values("SELECT {[Year].[2026]} ON 0 FROM [Sales]"))
+    dimensions = ODataPath.of("Dimensions")
+    tm1.cubes.create(CubePatch.builder().name("Plan").bind_dimensions(dimensions.key("Region"), dimensions.key("Year")).build())
+
+    rules = "SKIPCHECK;\n['Margin'] = N: ['Revenue'] - ['Cost'];"
+    if not tm1.cubes.check_rules("Plan", rules):
+        tm1.cubes.update("Plan", CubePatch.builder().rules(rules).build())
+
+    # A long process, run asynchronously by TM1 and polled; interrupting the wait stops it on TM1
+    tm1.with_async(2).processes.execute_with_return("Rebuild Forecast")
 ```
 
-For CAM security, pass `namespace=`, or build a `Tm1Session` with `auth.cam_passport(...)`.
-
-### asyncio
-
-The same API, generated from the same spec, with `await` on everything that sends a request:
+The same with asyncio:
 
 ```python
 from tm1_client.aio import AsyncTm1Client
 
-async with AsyncTm1Client.connect("https://tm1:8010/api/v1", user="admin", password="apple") as tm1:
-    cubes = await tm1.cubes.list(select="Name")
-    async for element in tm1.dimensions["Year"].hierarchies["Year"].elements.iter():
-        ...
+async with AsyncTm1Client.builder().base_url("http://localhost:8010/api/v1/").basic_auth("admin", "apple").build() as tm1:
+    cubes = await tm1.cubes.model_cubes(ODataQuery.none().select(Cube.NAME))
 ```
 
-### Sandboxes, change sets, long operations and batches
+## From the Java client
 
-Each is a *view* of the client, sharing its login, as in the Java client:
+| Java | Python |
+|---|---|
+| `tm1.cubes().modelCubes(query)` | `tm1.cubes.model_cubes(query)`; services are properties, methods snake case |
+| `Mono<T>` | `T` (asyncio: a coroutine of `T`) |
+| `Flux<T>` | `list[T]`; log tails and cellset streams are iterators |
+| `ODataQuery query` parameter | `query: ODataQuery | None = None`, and keyword shortcuts (`select=…`, `top=…`) |
+| Overloads (`update(name, patch)`, `update(name, patch, etag)`) | Optional parameters (`update(name, patch, etag=None)`) |
+| `CubePatch.builder().name("x").build()` | the same, in snake case; a model instance (`Cube(name="x")`) works too |
+| `Cube.NAME`, `Filter.and(…)` | `Cube.NAME`, `Filter.and_(…)` (`and`, `or`, `not` are keywords) |
+| `Tm1Client.builder()…build()`, `withSandbox`, `withAsync`, `batch()` | `Tm1Client.builder()…build()`, `with_sandbox`, `with_async`, `batch()` |
+| `Tm1SessionPool`, `Tm1Identity`, `Tm1Timeouts`, `Tm1ErrorClassifier` | the same names |
+| `Tm1NotFoundException` | `Tm1NotFoundError` |
+| Micrometer observations | the `tm1_client` logger |
 
-```python
-whatif = tm1.with_sandbox("What if")                 # every request gets !sandbox
-with tm1.change_set() as recorded:                   # writes get !ChangeSet; ended either way
-    recorded.cubes["Sales"].update_cells(updates=[CubeUpdate(tuple=[odata.element("Year", "2026"), odata.element("Region", "North")], value=42)])
-    change_set = recorded.session.change_set
-tm1.undo_change_set(change_set_id=change_set)
-
-# Prefer: respond-async: TM1 answers at once with a monitor, polled every 2 s until done.
-# Interrupting the wait deletes the monitor, which stops the process on TM1.
-result = tm1.with_async(2).processes["Load"].execute_with_return()
-
-# JSON $batch: calls through batch.client are queued, and return Deferred results
-with tm1.batch() as batch:
-    a = batch.client.cubes["A"].get()
-    b = batch.client.cubes["B"].get()
-print(a.result().name, b.result().name)              # each has its own value or error
-```
-
-### Capability checks
-
-Before calling an operation, the session checks the server's own `$metadata` (read once) has it, and refuses one it doesn't, saying which schema added it: `Action Cube/Reserve isn't in this server's $metadata (schema 11.8.20); TM1 added it in schema 11.8.34`. Reading entities isn't checked. Pass `check_capabilities=False` to skip it.
+`tm1.api` adds what Java doesn't have: a generated member for every endpoint (`tm1.api.cubes["Sales"].views.list()`). It honours `$metadata`'s containment: through a reference, such as `users["u"].groups["g"]`, it reads only, since on TM1 a delete through it deletes the group itself.
 
 ## How it's made
 
 | Part | Where | How |
 |---|---|---|
-| Model: an enum or pydantic model per CSDL type | `tm1_client._generated.model` (also `tm1_client.model`) | Generated |
-| API: a resource class per entity type, and the root `Tm1Api`, with a member per endpoint | `tm1_client._generated.api`, and `aio_api` for asyncio | Generated |
-| Runtime: requests as values (`_protocol`, `_calls`), sessions and their views, auth, errors, OData encoding, resource base classes | `tm1_client/*.py`, `tm1_client/aio/` | Hand-written |
-| Conveniences (`Tm1Client`) | `tm1_client/client.py` | Hand-written, on top of the generated API |
+| Model: an enum or pydantic model per CSDL type, patch builders, `Tm1Operations` | `tm1_client.model` | Generated from the spec at build time |
+| Generated API (`tm1.api`) | `tm1_client._generated.api`, `aio_api` | Generated from the spec at build time |
+| Services, session, pool, client | `tm1_client/aio/` | Hand-written, asyncio: the source of truth |
+| The same, sync | `tm1_client/_sync/` | Generated from `aio/` by `tm1_pygen.unasync` at build time |
+| Queries, requests, errors, versions, value types | `tm1_client/*.py` | Hand-written, shared by both flavors |
 
-The generator ([`codegen/tm1_pygen`](codegen/tm1_pygen)) needs only the standard library. The build runs it (`hatch_build.py`) into `src/tm1_client/_generated/`, which is never committed, the same way Gradle generates the Java model. To regenerate by hand:
+Nothing generated is committed: the build (`hatch_build.py`) runs [`codegen/tm1_pygen`](codegen/tm1_pygen), which needs only the standard library. To regenerate by hand:
 
 ```sh
 PYTHONPATH=codegen python -m tm1_pygen ../spec/tm1-api.json src/tm1_client
 ```
-
-### Rules the generated code follows
-
-- **Reads are lenient.** Every field is optional, since `$select` can leave any out. Unknown properties are ignored, an enum value a newer server added reads as `UNKNOWN`, and a subtype is chosen by `@odata.type`. Departures listed in the overlay (`CAMSettings.ClientPingCAMPassport`, `MessageLogEntry.TimeStamp`) read leniently.
-- **Writes send only what was set**, an explicit `None` included, so one model class serves for reading and for `PATCH`/`POST`. Don't send a model read from TM1 back as a write: it carries server-computed fields.
-- **Names follow TM1's**, in snake case. Where an operation's name is taken by a generic method it gets its kind: the bound action `Cube/Update` is `update_action`, since `update` is the generic PATCH.
-- **References are read-only.** A navigation that refers to entities kept elsewhere (`Cube/Dimensions`, `User/Groups`) only reads, so `tm1.users["u"].groups["g"].delete()` raises instead of deleting the group, which is what TM1 would do. Change those entities through their own collection.
 
 ## Tests
 
@@ -92,18 +73,11 @@ pip install -e '.[test]'
 pytest
 ```
 
-- `test_coverage_gate.py`: every endpoint of the spec is implemented, excluded or pending, by the same rules as the Java client's gate, for the sync and the asyncio API separately.
-- `test_contract.py`: works out a route to every endpoint from the spec alone, calls it through the generated API (both flavors) against a fake TM1, and checks the method, path, parameters and body.
-- `test_views.py`: sandboxes, change sets, async operations (the monitor, gzip, deleting it when interrupted), batches, and capability checks; also that the `$metadata` reader makes exactly the spec's inventory.
-- `test_generator.py`: the generator is deterministic, and the asyncio API matches the sync one member for member.
-- `test_model.py`: reads and writes back the payloads the Java client captured from a real TM1, unchanged.
-- `test_conformance.py`: the OData encoding cases the Java client also passes (`spec/conformance`).
-- `test_session.py`: login and re-login, cookies, paging, sandboxes, `If-Match`, error classification, and refusing what TM1 would get wrong.
+- `test_java_parity.py` and `runtime/test_java_parity_runtime.py` read the Java sources and require every public class and method, with the same `@Tm1Endpoint` IDs and parameters.
+- `test_coverage_gate.py` holds each flavor to the spec's 242 endpoints, by the Java gate's rules.
+- `test_contract.py` calls every endpoint through the generated API, in both flavors, against a fake TM1, and checks the request.
+- `services/` and `runtime/` port the Java client's unit tests, in both flavors.
+- `test_model.py` round-trips the payloads the Java client captured from a real TM1; `test_conformance.py` shares OData encoding cases with Java and .NET.
+- `live/` ports the Java live tests. They're skipped unless `TM1_URL` is set (with `TM1_USER`, `TM1_PASSWORD`, `TM1_NAMESPACE`, and `TM1_VERIFY=false` for a self-signed certificate); start a server with [`docker/tm1-server`](../docker/tm1-server).
 
-- `tests/live/`: against a real TM1, skipped unless `TM1_URL` is set (with `TM1_USER`, `TM1_PASSWORD`, `TM1_NAMESPACE`, `TM1_VERIFY=false` for a self-signed certificate). Start one with [`docker/tm1-server`](../docker/tm1-server). They check the server's `$metadata` against the spec, read every entity set and singleton, and round-trip a cube, a cell, a batch and a sandbox.
-
-## Not yet
-
-- The live tests haven't run against a real server yet; nothing else here has either, beyond the captured payloads.
-- More hand-written services for TM1's quirks, as the Java client has: cellset paging by rows, impersonation, session pools, process debugging.
-- Deprecation warnings: the spec carries `deprecated` for everything, but calling a deprecated endpoint doesn't warn.
+The live tests haven't yet run against a real TM1.

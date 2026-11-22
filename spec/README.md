@@ -9,7 +9,8 @@ spec/tm1-overlay.json                              what TM1 does differently fro
         ▼
 spec/tm1-api.json                                  the language-neutral spec (generated, committed)
         ├── Java:   tm1-codegen's ModelGenerator  → tm1-client's model (at build time)
-        └── Python: tm1-python/codegen (tm1_pygen) → tm1_client._generated (at build time)
+        ├── Python: tm1-python/codegen (tm1_pygen) → tm1_client._generated (at build time)
+        └── .NET:   tm1-dotnet/src/Tm1.Codegen    → AjMyers.Tm1.Client.Model (at build time)
 spec/conformance/*.json                            cases every client's tests must pass
 ```
 
@@ -32,7 +33,10 @@ Every client has a coverage gate over this list. An endpoint is implemented, exc
 | Client | Gate | Lists | Implemented |
 |---|---|---|---|
 | Java | `tm1-client` `CoverageGateTest` | `tm1-client/src/test/resources/metadata/coverage-*.txt` | 240 (2 excluded as duplicates) |
-| Python (sync and asyncio, counted separately) | `tm1-python/tests/test_coverage_gate.py` | `tm1-python/coverage/*.txt` | 242 each |
+| Python (sync and asyncio, counted separately) | `tm1-python/tests/test_coverage_gate.py` | `tm1-python/coverage/*.txt` | 242 each (the generated `tm1.api`; the services match Java's 240) |
+| .NET | `tm1-dotnet/tests/.../CoverageGateTests.cs` | `tm1-dotnet/coverage/*.txt` | as Java's: 240, the same 2 excluded |
+
+Beyond counting endpoints, each client has a parity gate that reads the Java sources: every public service class and method, with the same endpoints and parameters (`tm1-python/tests/test_java_parity.py`, `tm1-dotnet/tests/.../JavaParityTests.cs`), and the runtime's public API (`test_java_parity_runtime.py`, `JavaParityRuntimeTests.cs`).
 
 Python also runs `test_contract.py`, which works out a route from the root to every endpoint from the spec alone, calls it through both generated APIs against a fake server, and checks the request each sends. And it reads the `$metadata` snapshot itself, as a server's capabilities, into exactly the spec's 242 IDs.
 

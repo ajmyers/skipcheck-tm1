@@ -1,6 +1,6 @@
 # TM1 / Planning Analytics Developer Tools
 
-Libraries and tools for the **IBM Planning Analytics (TM1) REST API**: a Java client, and a prototype Python client generated from the same spec.
+Libraries and tools for the **IBM Planning Analytics (TM1) REST API**: a Java client, and Python and .NET clients with the same API, all generated from one spec.
 
 | Module | What it is |
 |---|---|
@@ -9,13 +9,14 @@ Libraries and tools for the **IBM Planning Analytics (TM1) REST API**: a Java cl
 | [`tm1-testcontainers`](tm1-testcontainers) | Real TM1 servers in Docker for your tests, with [Testcontainers](https://testcontainers.com). Bring your own licensed TM1. |
 | [`tm1-bom`](tm1-bom) | Keeps the module versions aligned. |
 | [`spec`](spec) | The language-neutral API spec every client is generated from and counts its coverage against, exported from TM1's `$metadata` by `tm1-codegen`. |
-| [`tm1-python`](tm1-python) | Python client (prototype), generated from the spec: every endpoint. |
+| [`tm1-python`](tm1-python) | Python client (sync and asyncio), with the Java client's API. |
+| [`tm1-dotnet`](tm1-dotnet) | .NET client, with the Java client's API. |
 | [`tools/`](tools) | Applications built on the libraries (not published). |
 | [`docker/tm1-server`](docker/tm1-server) | Docker image for TM1 Server, for local development and tests. You supply your own licensed TM1; no IBM software is included. **[Getting started](docker/tm1-server/GETTING-STARTED.md)** |
 | [`docker/tm1-web`](docker/tm1-web) | Docker image for TM1 Web (Planning Analytics Spreadsheet Services), to run alongside `tm1-server`. You supply your own licensed TM1 Web; no IBM software is included. |
 | [`docker/paw`](docker/paw) | Runs IBM's Planning Analytics Workspace Local images from your own PAW zip, next to `tm1-server`. No IBM software is included. |
 
-The Java libraries require Java 17+; the Python client requires Python 3.10+.
+The Java libraries require Java 17+, the Python client Python 3.10+, the .NET client .NET 10.
 
 ## Building
 
@@ -25,6 +26,7 @@ The Java libraries require Java 17+; the Python client requires Python 3.10+.
 ./gradlew publishToMavenLocal            # try the libraries from another project
 ./gradlew :tm1-codegen:exportSpec        # refresh spec/tm1-api.json after changing the snapshot or overlay
 pip install -e './tm1-python[test]' && pytest tm1-python
+dotnet test tm1-dotnet/Tm1.slnx
 ```
 
 Builds use JDK 27 via Gradle toolchains; published libraries target Java 17 bytecode.
