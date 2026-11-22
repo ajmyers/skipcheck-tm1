@@ -22,11 +22,6 @@ Action Cube/Unlock
 Action Cube/Update
 Action Cube/UpdateCells
 Action CubeDrillthrough/Execute
-Action Element/Lock
-Action Element/Release
-Action Element/Reserve
-Action Element/SetComponent
-Action Element/Unlock
 Action Entry/Copy
 Action Entry/Move
 Action GitPullPlan/Execute
@@ -162,14 +157,7 @@ Navigation Dimension/HierarchyAttributes
 Navigation Dimension/LocalizedAttributes
 Navigation DimensionReference/Dimension
 Navigation DocumentReference/Document
-Navigation Edge/Component
-Navigation Edge/Hierarchy
-Navigation Edge/Parent
-Navigation Element/Components
-Navigation Element/Edges
-Navigation Element/Hierarchy
 Navigation Element/LocalizedAttributes
-Navigation Element/Parents
 Navigation Entry/ContainedBy
 Navigation Entry/LocalizedAttributes
 Navigation FedCellDescriptor/Cube
@@ -177,9 +165,7 @@ Navigation FedCellDescriptor/Tuple
 Navigation Folder/Contents
 Navigation Folder/PrivateContents
 Navigation Group/Users
-Navigation Hierarchy/Edges
 Navigation Hierarchy/ElementAttributes
-Navigation Hierarchy/Elements
 Navigation Hierarchy/Levels
 Navigation Hierarchy/LocalizedAttributes
 Navigation Hierarchy/Members
