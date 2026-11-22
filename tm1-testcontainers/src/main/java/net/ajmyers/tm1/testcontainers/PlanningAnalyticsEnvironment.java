@@ -20,20 +20,10 @@ import net.ajmyers.tm1.testcontainers.CognosContainer.Namespace;
 /**
  * A whole Planning Analytics environment for tests, wired together on one Docker network:
  * any number of named TM1 servers, and optionally an Admin Server, TM1 Web, PAW, and
- * Cognos (CAM) security with LDAP and OIDC test users.
+ * Cognos (CAM) security with LDAP and OIDC test users. Two servers and TM1 Web, with a
+ * client for each server:
  *
- * <pre>{@code
- * try (var env = PlanningAnalyticsEnvironment.builder()
- *         .tm1("planning", tm1 -> tm1.withSeed(Tm1Seed.SDATA))
- *         .tm1("reporting")
- *         .tm1Web()
- *         .cognos(cognos -> cognos.withUser("admin", "adminpw", "Admins").withUser("viewer", "viewerpw", "Readers"))
- *         .build()) {
- *     env.start();
- *     String planning = env.tm1("planning").getRestUrl();
- *     String viewer = env.cognos().camAuthorization("viewer");
- * }
- * }</pre>
+ * {@snippet class = examples.PlanningAnalyticsEnvironmentExamples region = servers}
  *
  * <p>
  * Every part is optional, but TM1 Web, PAW and Cognos need at least one TM1 server. Each
@@ -63,6 +53,11 @@ import net.ajmyers.tm1.testcontainers.CognosContainer.Namespace;
  * <p>
  * Where IBM's software comes from is found from the environment, as for each container
  * ({@link Tm1Source#discover()} and the like), unless set on the builder.
+ *
+ * <p>
+ * With Cognos, each test user logs in to every server as themselves:
+ *
+ * {@snippet class = examples.PlanningAnalyticsEnvironmentExamples region = cam-security}
  */
 public final class PlanningAnalyticsEnvironment implements Startable {
 

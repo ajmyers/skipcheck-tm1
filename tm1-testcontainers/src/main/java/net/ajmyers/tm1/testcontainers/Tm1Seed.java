@@ -4,6 +4,11 @@ package net.ajmyers.tm1.testcontainers;
  * Objects the image puts into an empty database on first start (its {@code TM1_SEED}
  * setting). The samples come from the TM1 install itself, so they're only available where
  * the install includes them.
+ *
+ * <p>
+ * A server seeded with IBM's SData sample:
+ *
+ * {@snippet class = examples.Tm1ServerContainerExamples region = sample}
  */
 public enum Tm1Seed {
 

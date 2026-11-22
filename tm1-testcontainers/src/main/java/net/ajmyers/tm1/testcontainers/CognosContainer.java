@@ -38,18 +38,10 @@ import com.github.dockerjava.api.model.Volume;
  * <p>
  * Give it test users, and the container builds an LDAP directory with them and a Cognos
  * namespace ({@value #NAMESPACE}) for it. Then run a {@link Tm1ServerContainer} against
- * it with {@link Tm1ServerContainer#withCamSecurity}:
+ * it with {@link Tm1ServerContainer#withCamSecurity}, and log in to TM1 as each test
+ * user:
  *
- * <pre>{@code
- * try (var cognos = new CognosContainer(cognosSource)
- *          .withUser("admin", "adminpw", "Admins")
- *          .withUser("analyst", "analystpw", "Analysts", "Readers")
- *          .withUser("viewer", "viewerpw", "Readers");
- *      var tm1 = new Tm1ServerContainer(tm1Source).withCamSecurity(cognos, "admin")) {
- *     tm1.start();   // starts Cognos first
- *     String auth = cognos.camAuthorization("analyst");   // CAMNamespace ...
- * }
- * }</pre>
+ * {@snippet class = examples.CognosContainerExamples region = cam-security}
  *
  * <p>
  * Cognos is heavy: it takes about two minutes to start and uses about 8 GB of memory, so

@@ -11,6 +11,11 @@ import net.ajmyers.tm1.client.auth.Tm1Authenticator;
  * pool. By default it comes from the {@code tm1.*} properties; a bean of your own, or
  * {@code @ServiceConnection} on a {@code Tm1ServerContainer} (with
  * {@code tm1-spring-boot-testcontainers}), takes its place.
+ *
+ * <p>
+ * A bean of your own, for credentials the properties can't describe:
+ *
+ * {@snippet class = examples.Tm1ConnectionDetailsExamples region = own-bean}
  */
 public interface Tm1ConnectionDetails extends ConnectionDetails {
 
