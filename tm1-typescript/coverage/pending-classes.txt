@@ -10,16 +10,12 @@ ChoreService
 ContentPath
 ContentScope
 ContentService
-DimensionService
 DrillthroughService
-ElementService
 EncryptionService
 GitCommitDetails
 GitCredentials
 GitService
 GroupService
-HierarchyService
-LevelService
 LocalizedAttributeService
 LogService
 OidcKeyService
