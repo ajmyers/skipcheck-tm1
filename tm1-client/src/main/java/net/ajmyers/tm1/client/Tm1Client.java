@@ -27,6 +27,7 @@ import net.ajmyers.tm1.client.service.dimension.HierarchyService;
 import net.ajmyers.tm1.client.service.dimension.LevelService;
 import net.ajmyers.tm1.client.service.dimension.MemberService;
 import net.ajmyers.tm1.client.service.dimension.SubsetService;
+import net.ajmyers.tm1.client.service.encryption.EncryptionService;
 import net.ajmyers.tm1.client.service.git.GitService;
 import net.ajmyers.tm1.client.service.process.ChoreService;
 import net.ajmyers.tm1.client.service.process.ProcessDebugService;
@@ -112,6 +113,8 @@ public final class Tm1Client {
 
 	private final GitService git;
 
+	private final EncryptionService encryption;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -143,6 +146,7 @@ public final class Tm1Client {
 		this.contents = new ContentService(session);
 		this.annotations = new AnnotationService(session);
 		this.git = new GitService(session);
+		this.encryption = new EncryptionService(session);
 	}
 
 	/**
@@ -401,6 +405,14 @@ public final class Tm1Client {
 	 */
 	public GitService git() {
 		return git;
+	}
+
+	/**
+	 * Encryption at rest.
+	 * @return the encryption at rest service, on this client's session
+	 */
+	public EncryptionService encryption() {
+		return encryption;
 	}
 
 	/**
