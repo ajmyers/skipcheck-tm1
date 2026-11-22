@@ -1,3 +1,5 @@
+import { ODataError, Tm1ApiException, Tm1ProtocolException } from "../errors/index.js";
+
 function base64(text: string): string {
   let binary = "";
   for (const b of new TextEncoder().encode(text)) binary += String.fromCharCode(b);
@@ -58,16 +60,21 @@ export abstract class Tm1Authenticator {
   }
 }
 
+/** Credentials that don't change: Basic and CAMNamespace. The value is a private field, so neither
+ * `JSON.stringify` nor `console.log` shows it. */
 class Fixed extends Tm1Authenticator {
+  readonly #value: string;
+
   constructor(
-    private readonly value: string,
+    value: string,
     private readonly description: string,
   ) {
     super();
+    this.#value = value;
   }
 
   authorization(): Promise<string> {
-    return Promise.resolve(this.value);
+    return Promise.resolve(this.#value);
   }
 
   describe(): string {
@@ -92,18 +99,108 @@ class Passport extends Tm1Authenticator {
   }
 }
 
-/** Passports from Cognos, for {@link Tm1Authenticator.camPassport}, as the Java client's
- * `CognosPassports`. */
+/** One logon parameter, as Cognos takes it: `{"name":…,"value":…}`. The value only ever goes to
+ * Cognos: never into logs, errors or `toString()`. */
+interface Parameter {
+  readonly name: string;
+  readonly value: string;
+}
+
+/** @internal Cognos's session resource, on the dispatcher, with or without a `/bi` path. */
+export function cognosSession(dispatcher: string): string {
+  return dispatcher.replace(/\/+$/, "").replace(/\/bi$/, "") + "/api/v1/session";
+}
+
+function cookieNamed(response: Response, name: string): string | undefined {
+  // getSetCookie() keeps each Set-Cookie apart; a fetch without it joins them with commas, split
+  // here before each name=
+  const all = typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : (response.headers.get("set-cookie") ?? "").split(/,(?=\s*[^;,=\s]+=)/);
+  for (const header of all) {
+    const first = header.split(";")[0] ?? "";
+    const eq = first.indexOf("=");
+    if (eq > 0 && first.slice(0, eq).trim() === name) {
+      return first
+        .slice(eq + 1)
+        .trim()
+        .replace(/^"|"$/g, "");
+    }
+  }
+  return undefined;
+}
+
+function requireString(value: unknown, name: string): void {
+  if (typeof value !== "string") throw new TypeError(name + " is required");
+}
+
+function logon(dispatcher: string, namespace: string, credentials: (signal?: AbortSignal) => Promise<Parameter[]>, fetchFn: typeof globalThis.fetch | undefined): (signal?: AbortSignal) => Promise<string> {
+  requireString(dispatcher, "dispatcher");
+  requireString(namespace, "namespace");
+  const session = cognosSession(dispatcher);
+  return async (signal?: AbortSignal) => {
+    const parameters: Parameter[] = [{ name: "CAMNamespace", value: namespace }, ...(await credentials(signal))];
+    const send = fetchFn ?? globalThis.fetch;
+    const init: RequestInit = {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parameters: parameters.map((p) => ({ name: p.name, value: p.value })) }),
+      redirect: "manual",
+      credentials: "omit",
+    };
+    if (signal) init.signal = signal;
+    const response = await send(session, init);
+    const status = response.status;
+    // Read to the end, so the connection can be reused
+    await response.arrayBuffer().catch(() => undefined);
+    if (status === 401 || status === 403) {
+      throw Tm1ApiException.of(status, "CredentialRejected", ODataError.fromText("Cognos refused the logon"), "PUT", session);
+    }
+    const passport = status < 300 ? cookieNamed(response, "cam_passport") : undefined;
+    if (passport === undefined || !passport.trim()) {
+      throw new Tm1ProtocolException(`Cognos answered the logon with ${status} and no cam_passport cookie`, undefined, "PUT", session);
+    }
+    return passport;
+  };
+}
+
+/** CAM passports from Cognos, for {@link Tm1Authenticator.camPassport}, as the Java client's
+ * `CognosPassports`: the client logs on to Cognos itself, rather than being handed a passport. Each
+ * supplier logs on again every time it's asked, so every TM1 login (including the one after TM1
+ * drops a session) gets a fresh passport, and an expired one is never reused.
+ *
+ * Both log on with Cognos's REST API: `PUT <dispatcher>/api/v1/session` with the logon parameters,
+ * answered with the passport in a `cam_passport` cookie. The dispatcher is the address TM1 itself
+ * is pointed at (`ServerCAMURI`, such as `http://cognos:9300`), reachable from the client; TM1 names
+ * it when it refuses a login (`WWW-Authenticate: CAMPassport http://cognos:9300/bi/v1/disp`).
+ *
+ * A logon Cognos refuses (401, 403) fails with a `Tm1AuthenticationException`
+ * (`CredentialRejected`), which the session doesn't retry. They send with `fetch`: the argument, or
+ * the global one. A browser never lets a page read `Set-Cookie`, so in a browser the `fetch` given
+ * must be one that can (through a proxy of the application's own, say); otherwise the logon fails
+ * with a `Tm1ProtocolException`. */
 export const CognosPassports = {
-  /** A passport for a user name and password, from Cognos's `bi/v1/login`. */
-  password(dispatcher: string, namespace: string, user: string, password: string, fetch?: typeof globalThis.fetch): Tm1Supplier {
-    void [dispatcher, namespace, user, password, fetch];
-    return () => Promise.reject(new Error("CognosPassports isn't ported to TypeScript yet"));
+  /** Passports for a user name and password in a namespace, such as an LDAP one (`CAMNamespace`,
+   * `CAMUsername`, `CAMPassword`): a supplier that logs on each time it's asked.
+   * @param dispatcher the Cognos dispatcher's address, such as `http://cognos:9300`
+   * @param namespace the namespace's ID, such as `LDAP`
+   * @param fetch the `fetch` to send with; the global one by default */
+  password(dispatcher: string, namespace: string, user: string, password: string, fetch?: typeof globalThis.fetch): (signal?: AbortSignal) => Promise<string> {
+    requireString(user, "user");
+    requireString(password, "password");
+    const parameters: Parameter[] = [
+      { name: "CAMUsername", value: user },
+      { name: "CAMPassword", value: password },
+    ];
+    return logon(dispatcher, namespace, () => Promise.resolve(parameters), fetch);
   },
 
-  /** A passport for an OpenID Connect ID token. */
-  idToken(dispatcher: string, namespace: string, idToken: Tm1Supplier, fetch?: typeof globalThis.fetch): Tm1Supplier {
-    void [dispatcher, namespace, idToken, fetch];
-    return () => Promise.reject(new Error("CognosPassports isn't ported to TypeScript yet"));
+  /** Passports for an OpenID Connect ID token the application already holds, through Cognos's OIDC
+   * namespace (`CAMNamespace`, `CAMOIDCIdToken`): no password ever reaches the client.
+   * @param dispatcher the Cognos dispatcher's address, such as `http://cognos:9300`
+   * @param namespace the OIDC namespace's ID, such as `OIDC`
+   * @param idToken supplies a current ID token; asked at each logon
+   * @param fetch the `fetch` to send with; the global one by default */
+  idToken(dispatcher: string, namespace: string, idToken: Tm1Supplier, fetch?: typeof globalThis.fetch): (signal?: AbortSignal) => Promise<string> {
+    if (typeof idToken !== "function") throw new TypeError("idToken is required");
+    return logon(dispatcher, namespace, async (signal) => [{ name: "CAMOIDCIdToken", value: await idToken(signal) }], fetch);
   },
 } as const;

@@ -1,5 +1,5 @@
 function positive(value: number, name: string): void {
-  if (!(value > 0) || !Number.isFinite(value)) throw new RangeError(`${name} must be positive: ${value}`);
+  if (!(value > 0) || !Number.isFinite(value)) throw new RangeError(`${name} timeout must be positive: ${value}`);
 }
 
 /** How long a session waits, in milliseconds, as the Java client's `Tm1Timeouts`: to connect, for a
@@ -34,6 +34,18 @@ export class Tm1Timeouts {
 
   toBuilder(): Tm1Timeouts.Builder {
     return new Tm1Timeouts.Builder(this);
+  }
+
+  /** Whether `other` has the same timeouts (Java's record equality). */
+  equals(other: unknown): boolean {
+    return (
+      other instanceof Tm1Timeouts &&
+      other.connect === this.connect &&
+      other.login === this.login &&
+      other.request === this.request &&
+      other.close === this.close &&
+      other.refusedLogin === this.refusedLogin
+    );
   }
 
   toString(): string {

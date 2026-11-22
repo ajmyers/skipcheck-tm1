@@ -1,5 +1,5 @@
 import { Tm1Authenticator } from "../auth/index.js";
-import { Tm1ErrorClassifier, Tm1Exception, Tm1ProtocolException } from "../errors/index.js";
+import { ODataError, Tm1ErrorClassifier, Tm1ProtocolException } from "../errors/index.js";
 import { readAs, writeJson } from "../json.js";
 import { Json } from "../model.js";
 import { ODataEncoding, ODataPath, ODataQuery } from "../odata/index.js";
@@ -141,12 +141,8 @@ export class Tm1Session implements AsyncDisposable {
   async execute<T>(request: Tm1Request<T>, options?: Tm1CallOptions): Promise<T> {
     if (!(request instanceof Tm1Request)) throw new TypeError("execute() takes a Tm1Request");
     if (request.response === "Collection") throw new TypeError("Collection requests are streamed: use stream() for " + request.toString());
-    if (this.queue) {
-      const queue = this.queue;
-      const entry = queue.add(this, request, (r) => this.read(request, r));
-      await this.check(request.requirement(), options);
-      return (await entry) as T;
-    }
+    // A batched request joins the batch as it is, as Java's: TM1 answers for it in the batch
+    if (this.queue) return (await this.queue.add(this, request, (r) => this.read(request, r))) as T;
     await this.check(request.requirement(), options);
     const reply = await this.send(request, this.target(request.relativeUri()), options?.signal);
     return this.read(request, reply);
@@ -160,10 +156,7 @@ export class Tm1Session implements AsyncDisposable {
     const signal = options?.signal;
     if (this.queue) {
       const page = this.queue.add(this, request, (r) => readPage(request, r)) as Promise<Page<T>>;
-      const checked = this.check(request.requirement(), options);
-      checked.catch(() => undefined);
       return Tm1Stream.from(async function* () {
-        await checked;
         const p = await page;
         if (p.nextLink !== undefined) throw new Tm1ProtocolException(`${request.toString()}: TM1 sent more than one page, which a batch can't follow; ask for fewer with top()`);
         yield* p.items;
@@ -225,26 +218,23 @@ export class Tm1Session implements AsyncDisposable {
     if (!location) throw new Tm1ProtocolException("TM1 accepted an async request without a Location", undefined, method, url);
     // The Location is relative to the request's URL: ../_async('id')
     const monitor = new URL(location, url).toString();
-    let finished = false;
     try {
-      for (;;) {
-        await delay(every, signal);
+      // The first poll at once, then one every `every` until the result is there
+      for (let first = true; ; first = false) {
+        if (!first) await delay(every, signal);
         const polled = this.connection.check("GET", monitor, await this.connection.send("GET", monitor, undefined, undefined, {}, "*/*", undefined, signal));
-        if (polled.status !== 202) {
-          finished = true;
-          return await asyncResult(polled.body);
-        }
+        if (polled.status !== 202) return await asyncResult(polled.body);
       }
-    } finally {
-      if (!finished) {
-        // Deleting the monitor is what stops the work on TM1
+    } catch (e) {
+      // Cancelled before the result: deleting the monitor is what stops the work on TM1
+      if (signal?.aborted) {
         try {
           await this.connection.send("DELETE", monitor, undefined, undefined, {}, JSON_ACCEPT, undefined, undefined);
-        } catch (e) {
-          // The work may already be gone
-          if (!(e instanceof Tm1Exception)) throw e;
+        } catch {
+          // The work may already be gone; the caller gets the cancellation either way
         }
       }
+      throw e;
     }
   }
 
@@ -282,15 +272,24 @@ function encode(request: Tm1Request<unknown>): [Uint8Array | undefined, string |
     const ct = Object.entries(request.headers).find(([k]) => k.toLowerCase() === "content-type")?.[1];
     return [request.body, ct ?? "application/octet-stream"];
   }
-  return [utf8.encode(writeJson(request.body)), "application/json; charset=utf-8"];
+  return [utf8.encode(writeJson(request.body)), "application/json"];
 }
 
+/** A collection's page, as Java's `ODataCollectionDecoder`: its items (nulls dropped) and its next
+ * link. An error, or anything but a collection, is a {@link Tm1ProtocolException}. */
 function readPage<T>(request: Tm1Request<T>, reply: Reply): Page<T> {
-  const doc = parse(request, reply) as Record<string, unknown> | null;
-  const items = doc && typeof doc === "object" ? doc["value"] : undefined;
-  if (!Array.isArray(items)) throw new Tm1ProtocolException(`${request.toString()}: expected a collection`);
-  const next = doc!["@odata.nextLink"];
-  return { items: items.map((i) => readAs(request.type, i)), nextLink: typeof next === "string" ? next : undefined };
+  if (reply.body.length === 0) throw new Tm1ProtocolException(`TM1 sent an empty response where a collection was expected for ${request.toString()}`);
+  const doc = parse(request, reply);
+  if (typeof doc !== "object" || doc === null || Array.isArray(doc)) throw new Tm1ProtocolException(`TM1 sent something other than a collection for ${request.toString()}`);
+  const d = doc as Record<string, unknown>;
+  const items = d["value"];
+  if (!Array.isArray(items)) {
+    const error = "error" in d ? ODataError.from(d) : undefined;
+    if (error) throw new Tm1ProtocolException(`TM1 sent an error instead of a collection for ${request.toString()}: ${error.message}`, error);
+    throw new Tm1ProtocolException(`TM1 sent an object without a value collection for ${request.toString()}`);
+  }
+  const next = d["@odata.nextLink"];
+  return { items: items.filter((i) => i !== null && i !== undefined).map((i) => readAs(request.type, i)), nextLink: typeof next === "string" ? next : undefined };
 }
 
 /** A JSON `$batch`, as the Java client's `Tm1SessionBatch`: requests through {@link session} are
@@ -311,18 +310,22 @@ export class Tm1SessionBatch {
     return this.queue.count();
   }
 
-  /** Sends the queued requests, at most `perRequest` to each `$batch`. */
+  /** Sends the queued requests, at most `perRequest` to each `$batch`, one `$batch` after another. A
+   * batch runs once; a call made through it afterwards fails.
+   * @returns settles when every request has its result; rejects only if it ran already
+   * @throws RangeError if `perRequest` isn't positive */
   run(perRequest: number = Tm1SessionBatch.DEFAULT_PER_REQUEST, options?: Tm1CallOptions): Promise<void> {
+    if (!Number.isInteger(perRequest) || perRequest < 1) throw new RangeError("A batch needs room for at least one request: " + perRequest);
     return this.queue.run(perRequest, options?.signal);
   }
 }
 
 interface Entry {
+  id: string;
   method: string;
   url: string;
   headers: Readonly<Record<string, string>>;
   body: unknown;
-  accept: string;
   read: (reply: Reply) => unknown;
   resolve: (value: unknown) => void;
   reject: (error: unknown) => void;
@@ -350,38 +353,36 @@ export class BatchQueue {
     });
     // Each caller awaits its own result; one nobody awaits isn't an unhandled rejection
     result.catch(() => undefined);
-    this.entries.push({ method: request.method, url: view.contextual(request.relativeUri()), headers: request.headers, body: request.body, accept: request.accept(), read, resolve, reject });
+    this.entries.push({ id: String(this.entries.length + 1), method: request.method, url: view.contextual(request.relativeUri()), headers: request.headers, body: request.body, read, resolve, reject });
     return result;
   }
 
   async run(perRequest: number, signal: AbortSignal | undefined): Promise<void> {
     if (this.ran) throw new Error("The batch has already run");
-    if (!(perRequest > 0)) throw new RangeError("perRequest must be positive: " + perRequest);
     this.ran = true;
     const all = [...this.entries];
     const connection = this.sender.connection;
     for (let start = 0; start < all.length; start += perRequest) {
       const chunk = all.slice(start, start + perRequest);
-      const requests = chunk.map((e, i) => {
-        const headers: Record<string, string> = { ...e.headers, Accept: e.accept };
-        const item: Record<string, unknown> = { id: String(i + 1), method: e.method, url: e.url };
+      const requests = chunk.map((e) => {
+        const headers: Record<string, string> = { ...e.headers };
+        const item: Record<string, unknown> = { id: e.id, method: e.method, url: e.url, headers };
         if (e.body !== undefined) {
-          headers["Content-Type"] = "application/json";
+          headers["content-type"] = "application/json";
           item["body"] = e.body;
         }
-        item["headers"] = headers;
         return item;
       });
       try {
         const reply = (await this.sender.execute(Tm1Request.post(ODataPath.batch(), { requests }, Json), { signal })) as Record<string, unknown> | undefined;
         const byId = new Map<string, Record<string, unknown>>();
         if (reply && Array.isArray(reply["responses"])) for (const r of reply["responses"] as Record<string, unknown>[]) byId.set(String(r["id"]), r);
-        chunk.forEach((e, i) => {
+        for (const e of chunk) {
           const url = connection.url(e.url);
-          const item = byId.get(String(i + 1));
+          const item = byId.get(e.id);
           if (!item) {
-            e.reject(new Tm1ProtocolException(`TM1's batch response has no answer for ${e.method} ${url}`));
-            return;
+            e.reject(new Tm1ProtocolException(`TM1's batch response has no answer for request ${e.id}`, undefined, e.method, e.url));
+            continue;
           }
           const status = typeof item["status"] === "number" ? item["status"] : 0;
           const b = item["body"];
@@ -391,7 +392,7 @@ export class BatchQueue {
           } catch (error) {
             e.reject(error);
           }
-        });
+        }
       } catch (error) {
         for (const e of chunk) e.reject(error);
       }
@@ -402,7 +403,6 @@ export class BatchQueue {
 /** A session's settings one by one, as the Java client's `Tm1Session.Builder`. */
 export class Tm1SessionBuilder {
   private root: string | undefined;
-  private addressValue: string | undefined;
   private dialectValue: Tm1Dialect = Tm1Dialect.V11;
   private authenticatorValue: Tm1Authenticator | undefined;
   private impersonated: string | undefined;
@@ -414,23 +414,36 @@ export class Tm1SessionBuilder {
   private check = true;
   private clockValue: (() => number) | undefined;
 
-  /** The REST API's root, such as `http://tm1:8010/api/v1/`. */
+  /** The service root, such as `http://localhost:8010/api/v1/`: an absolute URL with no query or
+   * fragment. A missing trailing `/` is added.
+   * @throws RangeError if `baseUrl` isn't absolute or has a query or fragment */
   baseUrl(baseUrl: string): this {
     if (typeof baseUrl !== "string") throw new TypeError("baseUrl is required");
-    this.root = baseUrl;
-    this.addressValue = undefined;
+    let url: URL | undefined;
+    try {
+      url = new URL(baseUrl);
+    } catch {
+      url = undefined;
+    }
+    if (!url || !/^[a-z][a-z0-9+.-]*:\/\//i.test(baseUrl) || url.search || url.hash || baseUrl.includes("?") || baseUrl.includes("#")) {
+      throw new RangeError("baseUrl must be an absolute URL with no query or fragment: " + baseUrl);
+    }
+    this.root = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
     return this;
   }
 
-  /** The server's address, read by the dialect: `http://tm1:8010`. */
+  /** The server's address, such as `http://tm1:8010`: its scheme, host and HTTP port. The service
+   * root comes from the dialect, {@link Tm1Dialect.V11} unless set (before this), which adds
+   * `/api/v1/`. Use {@link baseUrl} to give the service root itself.
+   * @throws RangeError if the address doesn't fit the dialect */
   address(address: string): this {
     if (typeof address !== "string") throw new TypeError("address is required");
-    this.addressValue = address;
-    this.root = undefined;
-    return this;
+    return this.baseUrl(this.dialectValue.serviceRoot(address));
   }
 
+  /** The kind of deployment, for {@link address}: {@link Tm1Dialect.V11} unless set. */
   dialect(dialect: Tm1Dialect): this {
+    if (!(dialect instanceof Tm1Dialect)) throw new TypeError("dialect is a Tm1Dialect");
     this.dialectValue = dialect;
     return this;
   }
@@ -502,13 +515,13 @@ export class Tm1SessionBuilder {
 
   /** @internal The service root, or a placeholder if it isn't set yet, for the pool's messages. */
   baseUrlOrUnset(): string {
-    return this.root ?? (this.addressValue !== undefined ? this.dialectValue.serviceRoot(this.addressValue) : "(no base URL)");
+    return this.root ?? "(no base URL)";
   }
 
   build(): Tm1Session {
-    const root = this.root ?? (this.addressValue !== undefined ? this.dialectValue.serviceRoot(this.addressValue) : undefined);
-    if (root === undefined) throw new Error("Give the server: baseUrl or address");
-    if (!this.authenticatorValue) throw new Error("Give the login: basicAuth or authenticator");
+    const root = this.root;
+    if (root === undefined) throw new Error("baseUrl is required");
+    if (!this.authenticatorValue) throw new Error("credentials are required: call basicAuth or authenticator");
     const connection = new Connection(
       root,
       this.authenticatorValue,

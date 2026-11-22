@@ -11,7 +11,7 @@ export interface Reply extends Tm1HttpResponse {}
 export const COOKIE = "TM1SessionId";
 export const IMPERSONATE = "TM1-Impersonate";
 export const SESSION_CONTEXT = "TM1-SessionContext";
-export const JSON_ACCEPT = "application/json;odata.metadata=minimal";
+export const JSON_ACCEPT = "application/json";
 const LOGIN_PATH = "ActiveSession?$select=ID";
 const CLOSE_PATH = "ActiveSession/tm1.Close";
 const utf8 = new TextEncoder();
@@ -211,7 +211,7 @@ export class Connection {
       const all: Record<string, string> = this.baseHeaders(accept);
       for (const [name, value] of Object.entries(headers)) if (name.toLowerCase() !== "content-type") all[name] = value;
       if (session.cookie !== undefined && !this.transport.keepsCookies) all["Cookie"] = `${COOKIE}=${session.cookie}`;
-      if (body !== undefined) all["Content-Type"] = contentType ?? "application/json; charset=utf-8";
+      if (body !== undefined) all["Content-Type"] = contentType ?? "application/json";
       const reply = await this.sendRaw(method, url, all, body, timeout ?? this.timeouts.request, Tm1Request.isIdempotentMethod(method), signal);
       if (reply.status === 401) {
         if (attempt > 1) throw Tm1ApiException.of(401, "Unauthenticated", undefined, method, url);
@@ -361,11 +361,31 @@ const CONNECT_CODES = new Set([
   "ERR_TLS_CERT_ALTNAME_INVALID",
 ]);
 
+/** Whether `failure` is one below HTTP, as Java's `Transport.isTransport`: what `fetch` throws for a
+ * network failure (a `TypeError`, "fetch failed" in Node, "Failed to fetch" and the like in
+ * browsers), a system or TLS error with its code (`ECONNRESET`, `UND_ERR_SOCKET`,
+ * `CERT_HAS_EXPIRED`), or a DOM network or timeout error. Anything else, such as a bug in a
+ * transport, isn't, so it isn't mistaken for a network failure. */
+function isTransport(failure: unknown): boolean {
+  if (failure instanceof Tm1TransportException) return true;
+  if (typeof failure !== "object" || failure === null) return false;
+  const code = (failure as { code?: unknown }).code;
+  if (typeof code === "string" && /^(E[A-Z0-9_]+|UND_ERR_[A-Z_]+|ERR_TLS_[A-Z_]+|ERR_SSL_[A-Z_]+|[A-Z_]*CERT[A-Z_]*)$/.test(code)) return true;
+  const name = (failure as { name?: unknown }).name;
+  if (name === "NetworkError" || name === "TimeoutError") return true;
+  if (failure instanceof TypeError) {
+    return /fetch|network|load failed/i.test(failure.message) || isTransport((failure as { cause?: unknown }).cause);
+  }
+  return false;
+}
+
 /** A failure to get a response, as Java's `Transport.map`: before sending (refused, unknown host,
- * unreachable, TLS handshake) is the connect phase; anything later, the response phase. */
-export function transport(failure: unknown, method: string, url: string, idempotent: boolean): Tm1TransportException {
+ * unreachable, TLS handshake) is the connect phase; anything later, the response phase. A failure
+ * that isn't below HTTP is returned unchanged. */
+export function transport(failure: unknown, method: string, url: string, idempotent: boolean): unknown {
+  if (failure instanceof Tm1TransportException || !isTransport(failure)) return failure;
   let connect = false;
-  for (let t: unknown = failure; t && !connect; t = (t as { cause?: unknown }).cause) {
+  for (let t: unknown = failure, depth = 0; t && !connect && depth < 32; t = (t as { cause?: unknown }).cause, depth++) {
     const code = (t as { code?: unknown }).code;
     connect = typeof code === "string" && CONNECT_CODES.has(code);
   }
@@ -382,10 +402,11 @@ export function sessionCookie(reply: Tm1HttpResponse): string | undefined {
     const eq = first.indexOf("=");
     if (eq < 0 || first.slice(0, eq).trim() !== COOKIE) continue;
     if (parts.slice(1).some((p) => p.replace(/ /g, "").toLowerCase() === "max-age=0")) continue;
-    return first
+    const value = first
       .slice(eq + 1)
       .trim()
       .replace(/^"|"$/g, "");
+    if (value) return value;
   }
   return undefined;
 }

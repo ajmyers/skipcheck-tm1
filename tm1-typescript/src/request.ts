@@ -168,9 +168,9 @@ export class Tm1Request<T> {
       case "Bytes":
         return "*/*";
       case "Text":
-        return "text/plain";
+        return "text/plain, application/json";
       default:
-        return "application/json;odata.metadata=minimal";
+        return "application/json";
     }
   }
 

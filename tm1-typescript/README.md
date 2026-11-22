@@ -20,7 +20,7 @@ if ((await tm1.cubes.checkRules("Plan", rules).toArray()).length === 0) {
 }
 ```
 
-**Status:** the foundation. The model, the runtime (session, views, batches, async operations, capabilities, errors, auth) and `CubeService` are done; the other services are stubs, listed in [`coverage/pending-classes.txt`](coverage/pending-classes.txt), as are their endpoints in [`coverage/pending.txt`](coverage/pending.txt). `Tm1SessionPool`, `Tm1Identity` and `CognosPassports` aren't ported yet either.
+**Status:** the foundation. The model, the runtime (session, views, batches, async operations, capabilities, errors, auth) and `CubeService` are done; the other services are stubs, listed in [`coverage/pending-classes.txt`](coverage/pending-classes.txt), as are their endpoints in [`coverage/pending.txt`](coverage/pending.txt).
 
 ## From the Java client
 
@@ -69,6 +69,7 @@ npm run build
 - `test/coverage-gate.test.ts` holds the client to the spec's 242 endpoints, by the Java gate's rules.
 - `test/conformance.test.ts` shares OData encoding cases with Java, Python and .NET; `test/payload.test.ts` reads the payloads the Java client captured from a real TM1.
 - `test/services/` ports the Java client's unit tests, against a fake TM1 (`test/support/fake-tm1.ts`).
+- `test/runtime/` ports the Java client's unit tests of the session, pool, auth, error, OData, request and version classes, against a scripted TM1 (`test/support/scripted-tm1.ts`, the Java tests' `FakeTm1`).
 - `test/live/` ports the Java live tests (`*Tm1Test`), against `TM1_URL` (with `TM1_USER`, `TM1_PASSWORD`, `TM1_NAMESPACE`, `TM1_VERIFY=false`); without it they're skipped. Starting TM1 in Docker from the Java tests' sources comes with the testcontainers port (`Live.containerTarget`).
 
 ## Porting a service

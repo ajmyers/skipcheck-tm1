@@ -59,7 +59,7 @@ const JAVA_ONLY: Record<string, string> = {
 };
 
 /** The Java runtime classes not yet ported: each comes off as it's done, and must fall short until then. */
-const PENDING = new Set(["Tm1SessionPool", "Tm1SessionPool.Builder", "Tm1Identity"]);
+const PENDING = new Set<string>([]);
 
 const JAVA = Repo.javaClient;
 

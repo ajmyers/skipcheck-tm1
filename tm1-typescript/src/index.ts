@@ -13,6 +13,8 @@ export { Tm1Patch, Tm1PatchBuilder } from "./patch.js";
 export { Tm1Request, Tm1Response } from "./request.js";
 export * from "./services/index.js";
 export { Tm1Session, Tm1SessionBatch, Tm1SessionBuilder, type Tm1CallOptions } from "./session/session.js";
+export { Tm1Identity } from "./session/identity.js";
+export { Tm1Clock, Tm1SessionPool, Tm1SessionPoolBuilder } from "./session/pool.js";
 export { Tm1Timeouts } from "./session/timeouts.js";
 export { fetchTransport, type FetchTransportOptions, type Tm1HttpRequest, type Tm1HttpResponse, type Tm1Transport } from "./session/transport.js";
 export { Tm1Stream } from "./stream.js";

@@ -43,7 +43,13 @@ export interface FetchTransportOptions {
 const isBrowser = typeof (globalThis as { document?: unknown }).document !== "undefined";
 
 /** The default transport: `fetch`. In Node it sends the `TM1SessionId` cookie itself; in a browser
- * (or with `browserCookies`) it leaves the cookie to the browser. */
+ * (or with `browserCookies`) it leaves the cookie to the browser.
+ *
+ * Idle connections: TM1 (11.8) closes a kept-alive connection after about 90 seconds idle, and a
+ * request sent on it as it closes gets no response at all, so the Java client retires its idle
+ * connections after 60 seconds. `fetch` already does better: Node's (undici) keeps an idle
+ * connection for 4 seconds unless the server asks for longer, and browsers manage their own. A
+ * `dispatcher` of your own (in `init`) should keep its `keepAliveTimeout` under 90 seconds too. */
 export function fetchTransport(options: FetchTransportOptions = {}): Tm1Transport {
   const browserCookies = options.browserCookies ?? isBrowser;
   return {
