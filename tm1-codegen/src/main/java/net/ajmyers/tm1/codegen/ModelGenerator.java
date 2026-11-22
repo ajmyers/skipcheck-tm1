@@ -16,6 +16,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -40,6 +41,7 @@ import net.ajmyers.tm1.csdl.CsdlEntityType;
 import net.ajmyers.tm1.csdl.CsdlEnumType;
 import net.ajmyers.tm1.csdl.CsdlNavigationProperty;
 import net.ajmyers.tm1.csdl.CsdlProperty;
+import net.ajmyers.tm1.csdl.CsdlRevision;
 import net.ajmyers.tm1.csdl.CsdlStructuredType;
 import net.ajmyers.tm1.csdl.CsdlTypeRef;
 
@@ -99,6 +101,12 @@ public final class ModelGenerator {
 
 	private static final ClassName ODATA_PATH = ClassName.get("net.ajmyers.tm1.client.odata", "ODataPath");
 
+	private static final ClassName SINCE = ClassName.get("net.ajmyers.tm1.client.version", "Since");
+
+	private static final AnnotationSpec SUPPRESS_DEPRECATION = AnnotationSpec.builder(SuppressWarnings.class)
+		.addMember("value", "$S", "deprecation")
+		.build();
+
 	private static final ClassName JSON_NODE = ClassName.get("tools.jackson.databind", "JsonNode");
 
 	private static final Set<String> KEYWORDS = Set.of("abstract", "assert", "boolean", "break", "byte", "case",
@@ -148,14 +156,15 @@ public final class ModelGenerator {
 			.stream()
 			.flatMap(s -> s.enumTypes().stream())
 			.sorted(Comparator.comparing(CsdlEnumType::name))
-			.forEach(e -> files.add(file(enumType(e))));
+			.forEach(e -> files.add(file(revised(enumType(e), e.annotations()))));
 		metadata.structuredTypes().sorted(Comparator.comparing(CsdlStructuredType::name)).forEach(t -> {
 			List<CsdlStructuredType> subtypes = hierarchies.get(qualified(t));
-			files.add(file(subtypes != null ? hierarchy(t, subtypes) : record(t, roots.get(qualified(t)))));
+			files.add(file(revised(subtypes != null ? hierarchy(t, subtypes) : record(t, roots.get(qualified(t))),
+					t.annotations())));
 		});
 		metadata.structuredTypes()
 			.sorted(Comparator.comparing(CsdlStructuredType::name))
-			.forEach(t -> files.add(file(patch(t))));
+			.forEach(t -> files.add(file(revised(patch(t), t.annotations()))));
 		return files;
 	}
 
@@ -179,7 +188,7 @@ public final class ModelGenerator {
 		Files.writeString(packageDir.resolve("package-info.java"), packageInfo(), StandardCharsets.UTF_8);
 	}
 
-	private TypeSpec enumType(CsdlEnumType type) {
+	private TypeSpec.Builder enumType(CsdlEnumType type) {
 		ClassName name = ClassName.get(PACKAGE, javaTypeName(type.name()));
 		Set<String> constants = new LinkedHashSet<>();
 		TypeSpec.Builder spec = TypeSpec.enumBuilder(name)
@@ -190,9 +199,12 @@ public final class ModelGenerator {
 					+ "\n\n<p>\nGenerated from {@code $metadata}; the fallback constant stands for a value this client doesn't know, such as one a newer server added. It's never sent.\n"));
 		for (CsdlEnumType.Member member : type.members()) {
 			String constant = unique(constantName(member.name()), constants);
+			Revisions revisions = revisions(member.annotations());
 			spec.addEnumConstant(constant, TypeSpec.anonymousClassBuilder("$S", member.name())
 				.addJavadoc("$L",
-						javadoc(description(member.annotations()).orElse("{@code " + member.name() + "}.") + "\n"))
+						javadoc(description(member.annotations()).orElse("{@code " + member.name() + "}.") + "\n")
+								+ revisions.tag())
+				.addAnnotations(revisions.annotations())
 				.build());
 		}
 		String fallback = constants.contains("UNKNOWN") ? "UNRECOGNIZED" : "UNKNOWN";
@@ -246,11 +258,11 @@ public final class ModelGenerator {
 				.endControlFlow()
 				.addStatement("return $L", fallback)
 				.build());
-		return spec.build();
+		return spec;
 	}
 
 	/** A record component, or a hierarchy interface's accessor. */
-	private record Component(String name, TypeName type, String json, String doc) {
+	private record Component(String name, TypeName type, String json, String doc, Revisions revisions) {
 	}
 
 	/**
@@ -266,24 +278,25 @@ public final class ModelGenerator {
 		if (type instanceof CsdlEntityType) {
 			names.add("etag");
 			components.add(new Component("etag", ClassName.get(String.class), "@odata.etag",
-					"the entity's ETag ({@code @odata.etag}), for {@code If-Match}"));
+					"the entity's ETag ({@code @odata.etag}), for {@code If-Match}", Revisions.NONE));
 		}
 		for (CsdlStructuredType level : rootFirst) {
 			for (CsdlProperty property : level.properties()) {
-				javaType(property.type())
-					.ifPresent(t -> components.add(new Component(unique(componentName(property.name()), names), t,
-							property.name(), paramText(property.annotations(), property.name()))));
+				javaType(property.type()).ifPresent(t -> components
+					.add(new Component(unique(componentName(property.name()), names), t, property.name(),
+							paramText(property.annotations(), property.name()), revisions(property.annotations()))));
 			}
 			for (CsdlNavigationProperty navigation : level.navigationProperties()) {
 				javaType(navigation.type()).ifPresent(t -> components
 					.add(new Component(unique(componentName(navigation.name()), names), t, navigation.name(),
-							paramText(navigation.annotations(), navigation.name()) + " (when expanded)")));
+							paramText(navigation.annotations(), navigation.name()) + " (when expanded)",
+							revisions(navigation.annotations()))));
 			}
 		}
 		return components;
 	}
 
-	private TypeSpec record(CsdlStructuredType type, @Nullable CsdlStructuredType root) {
+	private TypeSpec.Builder record(CsdlStructuredType type, @Nullable CsdlStructuredType root) {
 		String head = description(type.annotations()).orElse("The {@code " + type.name() + "} "
 				+ (type instanceof CsdlEntityType ? "entity" : "complex") + " type of the TM1 REST API.");
 		TypeSpec.Builder spec = recordSpec(ClassName.get(PACKAGE, javaTypeName(type.name())),
@@ -302,7 +315,7 @@ public final class ModelGenerator {
 					.build())
 				.addAnnotation(AnnotationSpec.builder(JSON_TYPE_NAME).addMember("value", "$S", typeId(type)).build());
 		}
-		return spec.build();
+		return spec;
 	}
 
 	private String kindNote(CsdlStructuredType type, @Nullable CsdlStructuredType root) {
@@ -317,8 +330,15 @@ public final class ModelGenerator {
 			.append(" Null components aren't sent.\n\n");
 		MethodSpec.Builder constructor = MethodSpec.constructorBuilder();
 		for (Component component : components) {
-			constructor.addParameter(component(component.type(), component.name(), component.json()));
-			doc.append("@param ").append(component.name()).append(' ').append(component.doc()).append('\n');
+			constructor.addParameter(component(component.type(), component.name(), component.json()).toBuilder()
+				.addAnnotations(component.revisions().annotations())
+				.build());
+			doc.append("@param ")
+				.append(component.name())
+				.append(' ')
+				.append(component.doc())
+				.append(component.revisions().note())
+				.append('\n');
 		}
 		return TypeSpec.recordBuilder(name)
 			.addModifiers(Modifier.PUBLIC)
@@ -337,7 +357,7 @@ public final class ModelGenerator {
 	 * {@code Plain} when the root isn't abstract (a {@code Member} that's just a member),
 	 * and {@code Unknown} when it is (a subtype a newer server added).
 	 */
-	private TypeSpec hierarchy(CsdlStructuredType root, List<CsdlStructuredType> subtypes) {
+	private TypeSpec.Builder hierarchy(CsdlStructuredType root, List<CsdlStructuredType> subtypes) {
 		ClassName name = ClassName.get(PACKAGE, javaTypeName(root.name()));
 		boolean entity = root instanceof CsdlEntityType;
 		ClassName fallback = name.nestedClass(root.isAbstract() ? "Unknown" : "Plain");
@@ -391,7 +411,8 @@ public final class ModelGenerator {
 				.returns(component.type().annotated(AnnotationSpec.builder(NULLABLE).build()))
 				.addJavadoc("$L",
 						capitalize(component.doc()) + (component.doc().endsWith(".") ? "" : ".") + "\n@return "
-								+ component.doc() + "\n")
+								+ component.doc() + "\n" + component.revisions().tag())
+				.addAnnotations(component.revisions().annotations())
 				.build());
 		}
 
@@ -408,7 +429,7 @@ public final class ModelGenerator {
 					AnnotationSpec.builder(JSON_TYPE_INFO).addMember("use", "$T.Id.NONE", JSON_TYPE_INFO).build());
 		}
 		spec.addType(nested.build());
-		return spec.build();
+		return spec;
 	}
 
 	/**
@@ -421,23 +442,25 @@ public final class ModelGenerator {
 		for (CsdlProperty property : type.properties()) {
 			if (javaType(property.type()).isPresent()) {
 				fields.add(constant(unique(constantName(property.name()), names), property.name(),
-						paramText(property.annotations(), property.name())));
+						paramText(property.annotations(), property.name()), revisions(property.annotations())));
 			}
 		}
 		for (CsdlNavigationProperty navigation : type.navigationProperties()) {
 			if (javaType(navigation.type()).isPresent()) {
 				fields.add(constant(unique(constantName(navigation.name()), names), navigation.name(),
 						paramText(navigation.annotations(), navigation.name())
-								+ " (a navigation property, for {@code $expand})"));
+								+ " (a navigation property, for {@code $expand})",
+						revisions(navigation.annotations())));
 			}
 		}
 		return fields;
 	}
 
-	private static FieldSpec constant(String name, String property, String doc) {
+	private static FieldSpec constant(String name, String property, String doc, Revisions revisions) {
 		return FieldSpec.builder(ODATA_PROPERTY, name, Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
 			.initializer("$T.of($S)", ODATA_PROPERTY, property)
-			.addJavadoc("{@code $L}, for queries: $L\n", property, doc)
+			.addJavadoc("{@code $L}, for queries: $L\n$L", property, doc, revisions.tag())
+			.addAnnotations(revisions.annotations())
 			.build();
 	}
 
@@ -452,21 +475,23 @@ public final class ModelGenerator {
 
 	/** A setter or bind method of a patch builder, for one property. */
 	private record PatchProperty(String method, TypeName type, String json, String doc, boolean navigation,
-			boolean collection) {
+			boolean collection, Revisions revisions) {
 	}
 
 	private List<PatchProperty> patchProperties(CsdlStructuredType type) {
 		Set<String> names = new HashSet<>(Set.of("build"));
 		List<PatchProperty> properties = new ArrayList<>();
 		for (CsdlProperty property : type.properties()) {
-			patchType(property.type()).ifPresent(t -> properties
-				.add(new PatchProperty(unique(componentName(property.name()), names), t, property.name(),
-						paramText(property.annotations(), property.name()), false, property.type().collection())));
+			patchType(property.type())
+				.ifPresent(t -> properties.add(new PatchProperty(unique(componentName(property.name()), names), t,
+						property.name(), paramText(property.annotations(), property.name()), false,
+						property.type().collection(), revisions(property.annotations()))));
 		}
 		for (CsdlNavigationProperty navigation : type.navigationProperties()) {
-			patchType(navigation.type()).ifPresent(t -> properties
-				.add(new PatchProperty(unique(componentName(navigation.name()), names), t, navigation.name(),
-						paramText(navigation.annotations(), navigation.name()), true, navigation.type().collection())));
+			patchType(navigation.type())
+				.ifPresent(t -> properties.add(new PatchProperty(unique(componentName(navigation.name()), names), t,
+						navigation.name(), paramText(navigation.annotations(), navigation.name()), true,
+						navigation.type().collection(), revisions(navigation.annotations()))));
 		}
 		return properties;
 	}
@@ -508,7 +533,7 @@ public final class ModelGenerator {
 	 * can't do that, since it can't tell "not set" from "set to null". A subtype's patch
 	 * extends its root's and writes {@code @odata.type} first.
 	 */
-	private TypeSpec patch(CsdlStructuredType type) {
+	private TypeSpec.Builder patch(CsdlStructuredType type) {
 		ClassName name = patchName(type);
 		if (metadata.structuredTypes().anyMatch(t -> javaTypeName(t.name()).equals(name.simpleName()))) {
 			throw new IllegalArgumentException(name.simpleName() + " is a CSDL type, so its patch needs another name");
@@ -620,7 +645,7 @@ public final class ModelGenerator {
 		}
 		b.addMethod(build.build());
 		spec.addType(b.build());
-		return spec.build();
+		return spec;
 	}
 
 	private static void addPatchMethods(TypeSpec.Builder builder, ClassName builderName, PatchProperty property,
@@ -631,9 +656,10 @@ public final class ModelGenerator {
 			.addParameter(nullable, property.method())
 			.returns(builderName)
 			.addJavadoc(
-					"Sets {@code $L}: $L$L\n@param $L the value; {@code null} sends an explicit {@code null}\n@return this builder\n",
+					"Sets {@code $L}: $L$L\n@param $L the value; {@code null} sends an explicit {@code null}\n@return this builder\n$L",
 					property.json(), property.doc(), property.navigation() ? " (nested, for a deep insert)" : "",
-					property.method());
+					property.method(), property.revisions().tag())
+			.addAnnotations(property.revisions().annotations());
 		if (inherited) {
 			set.addAnnotation(Override.class).addStatement("super.$L($L)", property.method(), property.method());
 		}
@@ -651,7 +677,8 @@ public final class ModelGenerator {
 		String bind = "bind" + capitalize(property.method());
 		MethodSpec.Builder bindMethod = MethodSpec.methodBuilder(bind)
 			.addModifiers(Modifier.PUBLIC)
-			.returns(builderName);
+			.returns(builderName)
+			.addAnnotations(property.revisions().annotations());
 		if (property.collection()) {
 			bindMethod.addParameter(ArrayTypeName.of(ODATA_PATH), "targets")
 				.varargs()
@@ -678,7 +705,63 @@ public final class ModelGenerator {
 				bindMethod.addStatement("this.values.put($S, target.toString())", property.json() + "@odata.bind");
 			}
 		}
-		builder.addMethod(bindMethod.addStatement("return this").build());
+		builder.addMethod(bindMethod.addJavadoc("$L", property.revisions().tag()).addStatement("return this").build());
+	}
+
+	/**
+	 * What {@code Core.Revisions} says about an element: the version that added it, and
+	 * the one that deprecated it with IBM's reason.
+	 */
+	private record Revisions(@Nullable String since, @Nullable String deprecatedIn, @Nullable String reason) {
+
+		static final Revisions NONE = new Revisions(null, null, null);
+
+		/** {@code @Since} and {@code @Deprecated(since = …)}, as they apply. */
+		List<AnnotationSpec> annotations() {
+			List<AnnotationSpec> annotations = new ArrayList<>();
+			if (since != null) {
+				annotations.add(AnnotationSpec.builder(SINCE).addMember("value", "$S", since).build());
+			}
+			if (deprecatedIn != null) {
+				annotations
+					.add(AnnotationSpec.builder(Deprecated.class).addMember("since", "$S", deprecatedIn).build());
+			}
+			return annotations;
+		}
+
+		/** The Javadoc {@code @deprecated} tag, or nothing. */
+		String tag() {
+			return deprecatedIn == null ? "" : "@deprecated " + deprecation() + "\n";
+		}
+
+		/** A note for an {@code @param}, which can't carry tags of its own. */
+		String note() {
+			return (since == null ? "" : " (since " + since + ")") + (deprecatedIn == null ? "" : ". " + deprecation());
+		}
+
+		private String deprecation() {
+			return "Deprecated in TM1 schema " + deprecatedIn + (reason == null ? "." : ": " + reason);
+		}
+
+	}
+
+	private static Revisions revisions(List<CsdlAnnotation> annotations) {
+		String reason = CsdlRevision.of(annotations)
+			.stream()
+			.filter(r -> r.kind() == CsdlRevision.Kind.DEPRECATED && r.description() != null)
+			.map(r -> escape(Objects.requireNonNull(r.description()).strip()))
+			.findFirst()
+			.orElse(null);
+		return new Revisions(CsdlRevision.addedIn(annotations).orElse(null),
+				CsdlRevision.deprecatedIn(annotations).orElse(null), reason);
+	}
+
+	/**
+	 * A type with its revisions: {@code @Since}, {@code @Deprecated} and the Javadoc tag.
+	 */
+	private static TypeSpec.Builder revised(TypeSpec.Builder type, List<CsdlAnnotation> annotations) {
+		Revisions revisions = revisions(annotations);
+		return type.addAnnotations(revisions.annotations()).addJavadoc("$L", revisions.tag());
 	}
 
 	private String typeId(CsdlStructuredType type) {
@@ -840,8 +923,15 @@ public final class ModelGenerator {
 		return candidate;
 	}
 
-	private static JavaFile file(TypeSpec type) {
-		return JavaFile.builder(PACKAGE, type).skipJavaLangImports(true).indent("\t").build();
+	/**
+	 * The file for a type, built here because JavaPoet's toBuilder() drops a record's
+	 * components.
+	 */
+	private static JavaFile file(TypeSpec.Builder type) {
+		return JavaFile.builder(PACKAGE, type.addAnnotation(SUPPRESS_DEPRECATION).build())
+			.skipJavaLangImports(true)
+			.indent("\t")
+			.build();
 	}
 
 	private static String packageInfo() {

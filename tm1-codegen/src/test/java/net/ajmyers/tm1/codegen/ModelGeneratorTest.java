@@ -31,7 +31,9 @@ class ModelGeneratorTest {
 			    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="ibm.tm1.api.v1" Alias="tm1">
 			      <EnumType Name="CubeKind">
 			        <Member Name="Standard" Value="0"/>
-			        <Member Name="NativeView" Value="1"/>
+			        <Member Name="NativeView" Value="1">
+			          <Annotation Term="Core.Revisions"><Collection><Record><PropertyValue Property="Version"><String>11.8.10</String></PropertyValue><PropertyValue Property="Kind"><EnumMember>Core.RevisionKind/Added</EnumMember></PropertyValue></Record></Collection></Annotation>
+			        </Member>
 			        <Member Name="Unknown" Value="2"/>
 			      </EnumType>
 			      <ComplexType Name="Box">
@@ -39,11 +41,14 @@ class ModelGeneratorTest {
 			        <Property Name="Default" Type="Edm.Int64"/>
 			      </ComplexType>
 			      <EntityType Name="Cube">
+			        <Annotation Term="Core.Revisions"><Collection><Record><PropertyValue Property="Version"><String>10.2.2.0</String></PropertyValue><PropertyValue Property="Kind"><EnumMember>Core.RevisionKind/Added</EnumMember></PropertyValue></Record></Collection></Annotation>
 			        <Key><PropertyRef Name="Name"/></Key>
 			        <Property Name="Name" Type="Edm.String" Nullable="false">
 			          <Annotation Term="Core.Description"><String>The cube's name &amp; key. Unique in a server.</String></Annotation>
 			        </Property>
-			        <Property Name="Kind" Type="tm1.CubeKind"/>
+			        <Property Name="Kind" Type="tm1.CubeKind">
+			          <Annotation Term="Core.Revisions"><Collection><Record><PropertyValue Property="Version"><String>11.8.20</String></PropertyValue><PropertyValue Property="Kind"><EnumMember>Core.RevisionKind/Added</EnumMember></PropertyValue></Record><Record><PropertyValue Property="Version"><String>11.8.30</String></PropertyValue><PropertyValue Property="Kind"><EnumMember>Core.RevisionKind/Deprecated</EnumMember></PropertyValue><PropertyValue Property="Description"><String>Use Box instead.</String></PropertyValue></Record></Collection></Annotation>
+			        </Property>
 			        <Property Name="Sizes" Type="Collection(Edm.Double)"/>
 			        <Property Name="Box" Type="tm1.Box"/>
 			        <Property Name="Content" Type="Edm.Stream"/>
@@ -94,7 +99,7 @@ class ModelGeneratorTest {
 			.contains("public record Cube(")
 			.contains("@JsonProperty(\"@odata.etag\") @Nullable String etag")
 			.contains("@JsonProperty(\"Name\") @Nullable String name")
-			.contains("@JsonProperty(\"Kind\") @Nullable CubeKind kind")
+			.contains("@Nullable CubeKind kind")
 			.contains("@JsonProperty(\"Sizes\") @Nullable List<Double> sizes")
 			.contains("@JsonProperty(\"Box\") @Nullable Box box")
 			.as("a hierarchy, by its interface")
@@ -181,6 +186,21 @@ class ModelGeneratorTest {
 			.as("inherited setters keep the subtype's builder")
 			.contains("@Override public Builder name(@Nullable String name) { super.name(name); return this; }")
 			.contains("@Override public NativeViewPatch build()");
+	}
+
+	@Test
+	void marksWhatRevisionsAddedAndDeprecatedWithIbmsReason() {
+		String cube = source(sample(), "Cube");
+		assertThat(cube).contains("@Since(\"10.2.2.0\") @SuppressWarnings(\"deprecation\") public record Cube(")
+			.contains(
+					"@JsonProperty(\"Kind\") @Since(\"11.8.20\") @Deprecated(since = \"11.8.30\") @Nullable CubeKind kind")
+			.contains(
+					"@param kind the {@code Kind} property (since 11.8.20). Deprecated in TM1 schema 11.8.30: Use Box instead.")
+			.contains(
+					"@deprecated Deprecated in TM1 schema 11.8.30: Use Box instead. */ @Since(\"11.8.20\") @Deprecated(since = \"11.8.30\") public static final ODataProperty KIND");
+		assertThat(source(sample(), "CubeKind")).contains("@Since(\"11.8.10\") NATIVE_VIEW(\"NativeView\")");
+		assertThat(source(sample(), "CubePatch"))
+			.contains("@Since(\"11.8.20\") @Deprecated(since = \"11.8.30\") public Builder kind(");
 	}
 
 	private static ModelGenerator sample() {
