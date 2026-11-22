@@ -12,6 +12,8 @@ import net.ajmyers.tm1.client.service.dimension.DimensionService;
 import net.ajmyers.tm1.client.service.dimension.EdgeService;
 import net.ajmyers.tm1.client.service.dimension.ElementService;
 import net.ajmyers.tm1.client.service.dimension.HierarchyService;
+import net.ajmyers.tm1.client.service.dimension.LevelService;
+import net.ajmyers.tm1.client.service.dimension.MemberService;
 import net.ajmyers.tm1.client.session.Tm1Session;
 import net.ajmyers.tm1.client.session.Tm1Timeouts;
 import net.ajmyers.tm1.client.version.Tm1Dialect;
@@ -47,12 +49,18 @@ public final class Tm1Client {
 
 	private final EdgeService edges;
 
+	private final LevelService levels;
+
+	private final MemberService members;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
 		this.hierarchies = new HierarchyService(session);
 		this.elements = new ElementService(session);
 		this.edges = new EdgeService(session);
+		this.levels = new LevelService(session);
+		this.members = new MemberService(session);
 	}
 
 	/**
@@ -111,6 +119,22 @@ public final class Tm1Client {
 	 */
 	public EdgeService edges() {
 		return edges;
+	}
+
+	/**
+	 * Levels.
+	 * @return the level service, on this client's session
+	 */
+	public LevelService levels() {
+		return levels;
+	}
+
+	/**
+	 * Members.
+	 * @return the member service, on this client's session
+	 */
+	public MemberService members() {
+		return members;
 	}
 
 	/**
