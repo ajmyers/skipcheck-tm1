@@ -652,7 +652,7 @@ These are concerns the requirements don't name, but that need deciding early:
 | **6. Security and runtime** (#139; steps #140–#141, done) | Users, Groups, ActiveUser, Sessions, ActiveSession, Threads (CancelOperation), Disconnect | Integration tests green |
 | **7. Server, configuration and logs** (#145; steps #146–#147, done) | Server, Static/ActiveConfiguration, deprecated Configuration, Loggers, Message/Transaction/Audit logs with delta `tail` Flux, ErrorLogFiles | Integration tests green |
 | **8. Contents and annotations** (#152; steps #153–#154, done) | Contents/Folders/Documents/Links/References (Copy/Move), Annotations, ApplicationContextFacets, DeleteAnnotationArtifacts | Integration tests green |
-| **9. Infrastructure endpoints** | Git (Init/Status/Pull/Push/Deploy/Plans), encryption at rest, OIDC keys, SQLDataSources | Implemented, with tagged and skipped tests where the container can't host them |
+| **9. Infrastructure endpoints** (#162; steps #163–#165, done) | Git (Init/Status/Pull/Push/Deploy/Plans), encryption at rest, OIDC keys, SQLDataSources | Implemented, with tagged and skipped tests where the container can't host them |
 | **10. Protocol extras** | Public async API. JSON `$batch` (public, Q8), whose `Tm1Request` / `request()` shape is set in phase 0. | Coverage gate shows zero pending endpoints |
 | **11. Authentication flows** (#158) | Every TM1-side flow, tested against CAM test containers: Basic, `CAMNamespace` (LDAP, and OIDC by password), and CAM passports the client obtains from Cognos (by logon, or by exchanging an OIDC ID token), refreshed when they expire. Starter properties for each. | Integration tests green against `@RequiresCognos` containers (LDAP and OIDC namespaces) |
 
