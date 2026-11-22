@@ -136,7 +136,8 @@ curl -X PUT http://localhost:9300/api/v1/session -H 'Content-Type: application/j
 
 Cognos sees users as `CAMID("LDAP:u:uid=analyst,ou=people")` and groups as
 `CAMID("LDAP:g:cn=analysts,ou=groups")`, which is what TM1 shows in CAM security
-mode. Different groups give you different TM1 security profiles to test.
+mode. Different groups give you different TM1 security profiles to test: see
+[Cognos (CAM) security](../tm1-server/README.md#cognos-cam-security) in `tm1-server`.
 
 **Every user is a Cognos administrator.** A new content store puts `Everyone` in
 Cognos's System Administrators role. That's convenient for tests, and it doesn't

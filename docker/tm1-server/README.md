@@ -205,7 +205,7 @@ except for three groups of settings:
 | Group | Settings | What happens |
 |-------|----------|--------------|
 | **Enforced**: the container depends on them | `DataBaseDirectory` = `/tm1/data`, `LoggingDirectory` = `/tm1/logs`, `RunningInBackground` = `T`, `HTTPPortNumber` = `8010`, `PortNumber` = `12345`, `ClientMessagePortNumber` = `12346`, `AdminHost` = `TM1_ADMIN_HOST` or `localhost`; `IPAddress`/`IPAddressV4`/`IPAddressV6` are commented out | Always set. Each change is logged with its old value. |
-| **Warned**: likely to break in a container | `IntegratedSecurityMode` 4 or 5 (Cognos/CAM security, not provided), `ServerCAMURI`/`ClientCAMURI`, absolute `IndexStoreDirectory`/`ODBCLibraryPath`/`FileRetry.FileSpec` paths that don't exist in the container, `StartupChores` | Left as they are, with a warning at startup. |
+| **Warned**: likely to break in a container | `IntegratedSecurityMode` 4 or 5 without a `ServerCAMURI`, or with one that isn't reachable yet ([Cognos (CAM) security](#cognos-cam-security)), absolute `IndexStoreDirectory`/`ODBCLibraryPath`/`FileRetry.FileSpec` paths that don't exist in the container, `StartupChores` | Left as they are, with a warning at startup. |
 | **Passed through** | Everything else: `ServerName`, `UseSSL`, tuning, logging, ... | Unchanged. |
 
 The file is only rewritten when something actually changes, and CRLF line
@@ -238,12 +238,57 @@ ports, so parallel test runs never collide.
 | `TM1_SERVER_NAME` | `tm1` | `ServerName` |
 | `TM1_USE_SSL` | `F` | `UseSSL`. Plain HTTP by default; `T` switches TM1 to HTTPS only. |
 | `TM1_CFG_<Param>` | | Any `tm1s.cfg` parameter, e.g. `TM1_CFG_MaximumCubeLoadThreads=4` (enforced settings still win) |
+| `TM1_CAM_URI` | | Cognos (CAM) security against this Cognos, e.g. `http://cognos:9300` ([below](#cognos-cam-security)) |
+| `TM1_SECURITY_MODE` | `5` | `IntegratedSecurityMode` with `TM1_CAM_URI`: `5` (Cognos users, TM1 and Cognos groups) or `4` |
+| `TM1_CAM_ADMINS` | | Cognos users to make TM1 administrators, e.g. `admin` |
+| `TM1_CAM_GROUPS` | | Cognos groups to add to TM1, e.g. `Analysts Readers` |
+| `TM1_CAM_NAMESPACE` | `LDAP` | The Cognos namespace ID, for building CAMIDs from short names |
+| `TM1_NATIVE_ADMIN_PASSWORD` | | Password of TM1's native `Admin`, if your database has one (used to set up CAM admins) |
 | `TM1_SEED` | `empty` | `empty`, `sdata` or `24retail`. Objects to copy into an **empty** `/tm1/data`, taken from the samples in your install. |
 | `TM1_ADMIN_HOST` | | Host of a separate Admin Server (e.g. a container running `admin`). Sets `AdminHost` and turns the embedded Admin Server off. |
 | `TM1_ADMIN_SERVER` | `T`, or `F` when `TM1_ADMIN_HOST` is set | Run an embedded Admin Server in this container |
 
 `TM1_SERVER_NAME` and `TM1_USE_SSL` defaults only apply when the container creates
 `tm1s.cfg`. For an existing file, they change it only if you set them.
+
+### Cognos (CAM) security
+
+TM1 can take its users from IBM Cognos Analytics (`IntegratedSecurityMode=5`).
+For tests, run [`cognos-server`](../cognos-server/README.md) with a few test users,
+and point TM1 at it on the same Docker network:
+
+```sh
+docker network create pa
+docker run -d --name cognos --hostname cognos --network pa -p 9300:9300 --stop-timeout 180 \
+  -e COGNOS_USERS="admin:adminpw:Admins analyst:analystpw:Analysts,Readers viewer:viewerpw:Readers" \
+  -v cognos-install:/opt/ibm/cognos/analytics ghcr.io/ajmyers/cognos-server
+docker run -d --name tm1 --network pa -p 8010:8010 \
+  -v /path/to/tm1_64:/opt/ibm/cognos/tm1_64:ro \
+  -e TM1_CAM_URI=http://cognos:9300 \
+  -e TM1_CAM_ADMINS=admin -e "TM1_CAM_GROUPS=Admins Analysts Readers" \
+  ghcr.io/ajmyers/tm1-server
+```
+
+Or run both with [`examples/cam-security/compose.yaml`](examples/cam-security/compose.yaml).
+
+- **`TM1_CAM_URI`** sets `IntegratedSecurityMode=5`, `ServerCAMURI`
+  (`…/p2pd/servlet/dispatch`), `ClientCAMURI` (`…/bi/v1/disp`) and `CAMUseSSL`.
+  TM1 can start before Cognos is ready; CAM logons work once it is.
+- **Logging on:** `Authorization: CAMNamespace <base64 of user:password:namespace>`,
+  e.g. `analyst:analystpw:LDAP`. Native TM1 logons are refused. TM1 knows users by
+  their CAMID, e.g. `CAMID("LDAP:u:uid=analyst,ou=people")`.
+- **Administrators (`TM1_CAM_ADMINS`).** In CAM security, nobody can administer
+  TM1 until a Cognos user is in TM1's `ADMIN` group, and only a native admin can
+  put one there. So when the list changes, TM1 first starts briefly in native
+  security on a private port, the users are added to `ADMIN`, and TM1 saves and
+  stops before the real start. That takes a few seconds, once.
+- **Groups (`TM1_CAM_GROUPS`).** A Cognos group becomes a TM1 group named by its
+  CAMID, e.g. `CAMID("LDAP:g:cn=analysts,ou=groups")`. At each logon, TM1 puts users
+  into the groups Cognos says they belong to, so give each group the security it
+  needs (cube, dimension, element, ...) to test different profiles. An
+  administrator can add more groups the same way later.
+- Short names assume `cognos-server`'s directory layout. For any other Cognos
+  namespace, give full `CAMID("...")` values.
 
 ## Roles
 
@@ -285,8 +330,8 @@ Tested on Apple Silicon. The image's files keep LF line endings on Windows
 
 ## Notes and limitations
 
-- Only TM1 Server and Admin Server are included. TM1 Web, PAW and Cognos (CAM)
-  security are not. Security mode is 1 (native TM1 users).
+- Only TM1 Server and Admin Server are included. Security mode is 1 (native TM1
+  users) unless you use [Cognos (CAM) security](#cognos-cam-security).
 - `tm1s.exe` and `tm1admsrv.exe` both daemonize themselves, so the entrypoint
   tracks the daemons' PIDs. On `docker stop`, it sends TM1 SIGINT, which makes it
   save data and shut down cleanly.
