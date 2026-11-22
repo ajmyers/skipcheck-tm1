@@ -1,5 +1,6 @@
 package net.ajmyers.tm1.client;
 
+import java.time.Duration;
 import java.util.Objects;
 
 import org.springframework.http.client.reactive.ClientHttpConnector;
@@ -52,6 +53,10 @@ import tools.jackson.databind.ObjectMapper;
  * {@link #session()} sends any request, for what has no service yet.
  *
  * {@snippet class = examples.ClientExamples region = connect}
+ *
+ * <p>
+ * Run a long process asynchronously, so no request stays open for its whole run:
+ * {@snippet class = examples.ClientExamples region = async}
  */
 public final class Tm1Client {
 
@@ -437,6 +442,27 @@ public final class Tm1Client {
 	 */
 	public SqlDataSourceService sqlDataSources() {
 		return sqlDataSources;
+	}
+
+	/**
+	 * A client on an async view of this client's session ({@link Tm1Session#withAsync}):
+	 * every service's methods work as usual, but TM1 runs each request asynchronously and
+	 * the client polls for the result, so a long process or chore holds no request open.
+	 * Cancelling a subscription before its result stops the work on TM1.
+	 * @param every how long to wait between polls
+	 * @return the client
+	 */
+	public Tm1Client withAsync(Duration every) {
+		return new Tm1Client(session.withAsync(every));
+	}
+
+	/**
+	 * A client on a synchronous view of this client's session
+	 * ({@link Tm1Session#withoutAsync}).
+	 * @return the client
+	 */
+	public Tm1Client withoutAsync() {
+		return new Tm1Client(session.withoutAsync());
 	}
 
 	/**

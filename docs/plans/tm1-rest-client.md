@@ -599,7 +599,11 @@ These are concerns the requirements don't name, but that need deciding early:
       `continue-on-error`. So a batch is a list of independent requests.
     - **Results per item:** the outer response is 200 even when every inner request failed
       (§16.3). Each item gets its own result or error, never one exception for the batch.
-    - **Shape:** every service gets a `request()` view that builds the same `Tm1Request<T>` as
+    - **Shape (revised in phase 10, #173):** batching and async are client views, like
+      `withSandbox`: `tm1.batch().client()` queues the calls made through it, and
+      `tm1.withAsync(every)` runs every request async, so every service method works through
+      them unchanged and nothing is duplicated. First proposed as:
+      every service gets a `request()` view that builds the same `Tm1Request<T>` as
       its direct method, without sending it. Direct methods are those requests run on their
       own, so batching duplicates nothing and the coverage gate covers both.
       `tm1.batch().add(request)` returns a `Mono<T>` that completes with that item's result when
@@ -809,6 +813,7 @@ affects ("TM1 (11.8) …"), so it's explained where it's used, and pinned by a t
 | Element PATCH silently ignores `Name` (no rename). Hierarchy PATCH ignores `Visible`. | Patch builders omit them. Javadoc. |
 | A dimension PATCH returns success but ignores `Hierarchies` and `AllLeavesHierarchyName`. A stale `If-Match` gets 412 (code 278). (Seen in phase 2.) | `DimensionService.update` says so; hierarchies change through `HierarchyService`. Pinned by a test |
 | A hierarchy has an `AllMember` only with a single root (then it's that root); with several roots TM1 sends 204. (Seen in phase 2.) | `HierarchyService.allMember` completes empty |
+| OData async: `Prefer: respond-async` answers 202 with `Location: ../_async('id')`, relative to the request URL, and no `Retry-After`; GETs run async too. The monitor answers 202 until done, then 200 with an `application/http` message whose inner body is gzip-compressed when the request accepted gzip, though the monitor's own response isn't. Deleting the monitor while a process runs stops it (the result becomes 500 `TM1UserException: Cancel`). (Seen in phase 10.) | `Tm1Session.withAsync` polls at its own interval, unwraps and decompresses the result, and deletes the monitor on cancel |
 | Encryption at rest's local key file provider needs GSKit's `gsk9capicmd_64`, which the test image lacks (validation reports "Could not generate a new key using the local GSKit installation"). On an unencrypted server the changing actions fail with a bare 400 naming an error code: `DataModelConversion`, `DataFileConversion`, `DataEncryptionKeyRotationFailed`, `RotateDataModelKey`. (Seen in phase 9.) | `EncryptionService` says so; its test pins the refusals on a TM1 of its own |
 | Git plans belong to the session that made them and are used up by `Execute`; `GitPlans('id')` has no `@odata.type` (the list does). TM1 can't make a repository's first commit or push no change ("Cannot create bare commit"); `file://` remotes can't push or pull (no shallow fetch on the local transport) and must be owned by TM1's user. A pull compares commits, not the model (a local delete is skipped), and the first pull after the remote moves plans the old commit. `GitDeploy` is refused while initialized. (Seen in phase 9.) | `GitService` says so; `plan(id)` reads the list; tests use a `git daemon` container in TM1's network namespace |
 | `GET Annotations` lists none, though `Cubes('c')/Annotations` and a cellset cell's `Annotations` show them. An annotation's `ApplicationContext` reads back empty, though its facet value exists. PAW's `objectName`/`commentValue`/`commentType`/`commentLocation` are undeclared open properties, and a PATCH of `Text` leaves `commentValue` as it was. (Seen in phase 8.) | `AnnotationService` says so, and finds annotations by cube, cell or ID |
