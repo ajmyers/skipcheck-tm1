@@ -147,6 +147,68 @@ The directory listens only inside the container (127.0.0.1:389), under
 `dc=cognos,dc=local` (`COGNOS_LDAP_BASE`): users in `ou=people`, groups in
 `ou=groups`.
 
+## OIDC
+
+Cognos can also log users on through an OpenID Connect provider. For tests, run
+[Keycloak](https://www.keycloak.org) next to it and point `COGNOS_KEYCLOAK_URL` at it:
+the container builds a Keycloak realm from the same [`COGNOS_USERS`](#users) list (users,
+groups, clients, a `groups` claim) on every start, and adds an `OIDC` namespace for it,
+next to `LDAP`.
+
+```sh
+docker network create pa
+docker run -d --name keycloak --network pa -p 8180:8080 \
+  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin -e KC_HTTP_ENABLED=true \
+  -e KC_HOSTNAME=http://localhost:8180 -e KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true \
+  quay.io/keycloak/keycloak:26.4 start-dev
+docker run -d --name cognos --hostname cognos --network pa -p 9300:9300 --stop-timeout 180 \
+  -e COGNOS_USERS="admin:adminpw:Admins analyst:analystpw:Analysts,Readers viewer:viewerpw:Readers" \
+  -e COGNOS_KEYCLOAK_URL=http://keycloak:8080 \
+  -v cognos-install:/opt/ibm/cognos/analytics ghcr.io/ajmyers/cognos-server
+```
+
+**Keycloak's two addresses.** Browsers reach Keycloak at `http://localhost:8180` and
+Cognos at `http://keycloak:8080`, but both must see the same token issuer.
+`KC_HOSTNAME` fixes the browser address, which is also the issuer, and
+`KC_HOSTNAME_BACKCHANNEL_DYNAMIC` lets Cognos use the in-network one. `COGNOS_PUBLIC_URL`
+(default `http://localhost:9300`) is Cognos's address for browsers, where Keycloak sends
+them back to.
+
+Three ways to log on, all ending in a CAM passport that TM1 accepts
+([`tm1-server`'s CAM security](../tm1-server/README.md#cognos-cam-security)):
+
+| Logon | How | |
+|---|---|---|
+| **Interactive** | A browser opens http://localhost:9300/bi/, picks `OIDC`, and logs on at Keycloak | The authorization-code flow with PKCE |
+| **Password** | `CAMNamespace` `OIDC`, `CAMUsername`, `CAMPassword`, e.g. TM1's `Authorization: CAMNamespace <base64 user:password:OIDC>` | Cognos does a password grant at Keycloak |
+| **Token** | An app that already has a user's ID token logs on to Cognos with `CAMNamespace` `OIDC` and `CAMOIDCIdToken`, then sends TM1 `Authorization: CAMPassport <passport>` | No browser and no password |
+
+The token route, from the command line:
+
+```sh
+id_token=$(curl -s -d grant_type=password -d client_id=tm1-app -d username=viewer -d password=viewerpw \
+  -d scope=openid http://localhost:8180/realms/cognos/protocol/openid-connect/token | jq -r .id_token)
+curl -s -c jar -X PUT http://localhost:9300/api/v1/session -H 'Content-Type: application/json' \
+  -d "{\"parameters\":[{\"name\":\"CAMNamespace\",\"value\":\"OIDC\"},{\"name\":\"CAMOIDCIdToken\",\"value\":\"$id_token\"}]}"
+passport=$(awk '/cam_passport/ {print $7}' jar)      # TM1: Authorization: CAMPassport $passport
+```
+
+**Cognos checks a token's audience** against its own client (`cognos`), and refuses others
+("Audience in ID token does not match configured client ID"). The realm's `tm1-app` client
+is for apps: a public client whose tokens carry `cognos` in their audience. A real
+provider needs the same: an audience mapper, or tokens issued to Cognos's client. Tokens
+are also checked against the provider's signing keys (JWKS) and issuer.
+
+Users are `CAMID("OIDC:u:<username>")` and groups `CAMID("OIDC:g:<group, lower case>")`.
+Cognos only knows a user's groups from their token, so it can't list or search groups.
+
+**Another OIDC provider:** set `COGNOS_OIDC_DISCOVERY_URL`, `COGNOS_OIDC_CLIENT_ID` and
+`COGNOS_OIDC_CLIENT_SECRET` instead of `COGNOS_KEYCLOAK_URL`. Register
+`<COGNOS_PUBLIC_URL>/bi/completeAuth.jsp` as a redirect URI, allow the password grant if
+you want password logons, and send the groups in a claim (`COGNOS_OIDC_GROUPS_CLAIM`,
+default `groups`). Users are named by `COGNOS_OIDC_CAMID_CLAIM` (default
+`preferred_username`). This has only been tested with Keycloak.
+
 ## Environment variables
 
 | Variable | Default | |
@@ -161,6 +223,14 @@ The directory listens only inside the container (127.0.0.1:389), under
 | `COGNOS_NAMESPACE` | `LDAP` | The namespace's ID, the `CAMNamespace` users log on with |
 | `COGNOS_ANONYMOUS` | `F` with users, else `T` | Allow anonymous access |
 | `COGNOS_LDAP_BASE` | `dc=cognos,dc=local` | Base DN of the embedded directory |
+| `COGNOS_KEYCLOAK_URL` | | A Keycloak, as the container reaches it: builds a realm from the users and an `OIDC` namespace ([OIDC](#oidc)) |
+| `COGNOS_KEYCLOAK_ADMIN` / `COGNOS_KEYCLOAK_ADMIN_PASSWORD` | `admin` / `admin` | Keycloak's admin login |
+| `COGNOS_KEYCLOAK_REALM` | `cognos` | The realm, rebuilt on every start |
+| `COGNOS_OIDC_DISCOVERY_URL`, `COGNOS_OIDC_CLIENT_ID`, `COGNOS_OIDC_CLIENT_SECRET` | | Any other OIDC provider, by hand |
+| `COGNOS_OIDC_NAMESPACE` | `OIDC` | The OIDC namespace's ID |
+| `COGNOS_OIDC_SCOPE` | `openid profile email` | Scopes Cognos asks for |
+| `COGNOS_OIDC_CAMID_CLAIM` / `COGNOS_OIDC_GROUPS_CLAIM` | `preferred_username` / `groups` | The claims users are named by, and their groups come from |
+| `COGNOS_PUBLIC_URL` | `http://localhost:9300` | Cognos as browsers reach it: OIDC providers send them back to `/bi/completeAuth.jsp` there |
 | `COGNOS_HOST` | the container's hostname | Host name in Cognos's dispatcher URIs. Other containers on the network reach Cognos by it, so keep it a name they can resolve. |
 | `COGNOS_MAX_MEMORY` | `6144` | Dispatcher JVM heap, in MB. 2048 is too small: Cognos's apps fail to start. |
 | `COGNOS_CS_HOST` | | External PostgreSQL host. Unset: the embedded one. |
@@ -196,9 +266,9 @@ behind; the next start removes it.
 
 Without [users](#users), Cognos allows **anonymous access**: anyone who can reach
 port 9300 has full access. With users, logons are required, but every user is a
-Cognos administrator, and the passwords are whatever you listed. This is a test
-server: keep it on your machine or a private network. OIDC namespaces are coming;
-see [#44](https://github.com/ajmyers/tm1-pa-developer-tools/issues/44).
+Cognos administrator, and the passwords are whatever you listed. Keycloak runs in
+development mode with an `admin`/`admin` login. This is a test setup: keep it on your
+machine or a private network.
 
 ## Image
 

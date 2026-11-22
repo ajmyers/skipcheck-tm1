@@ -1,0 +1,75 @@
+# TM1 with Cognos (CAM) security through OpenID Connect: Keycloak as the identity
+# provider, a cognos-server whose OIDC namespace uses it, and TM1 taking its users
+# from that namespace. The same three test users are in Keycloak and Cognos's LDAP
+# namespace. See "OIDC" in ../../../cognos-server/README.md.
+#
+#   docker compose up -d     # Keycloak, then Cognos (a few minutes), then TM1
+#
+# Put your IBM downloads in ./bundles (or set IBM_DIR): the TM1 bundle and the Cognos
+# repository zip. Docker needs at least 12 GB of memory.
+#
+# Logging on to TM1 (http://localhost:8010/api/v1/):
+#   password: Authorization: CAMNamespace $(printf analyst:analystpw:OIDC | base64)
+#   token:    an ID token from Keycloak's tm1-app client, exchanged at Cognos for a
+#             passport (CAMOIDCIdToken), then Authorization: CAMPassport <passport>
+#   browser:  http://localhost:9300/bi/, namespace OIDC, Keycloak's login page
+# Keycloak's own console: http://localhost:8180 (admin / admin).
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:${KEYCLOAK_VERSION:-26.4}
+    command: ["start-dev"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_ENABLED: "true"
+      # Browsers and Cognos must see the same token issuer: the browser address is
+      # fixed (and is the issuer); Cognos uses http://keycloak:8080 for the back channel.
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    ports:
+      - "8180:8080"
+
+  cognos:
+    image: ${COGNOS_SERVER_IMAGE:-ghcr.io/ajmyers/cognos-server:latest}
+    platform: linux/amd64
+    hostname: cognos
+    stop_grace_period: 3m
+    depends_on: [keycloak]   # cognos-server waits for Keycloak itself
+    environment:
+      COGNOS_USERS: ${COGNOS_USERS:-admin:adminpw:Admins analyst:analystpw:Analysts,Readers viewer:viewerpw:Readers}
+      COGNOS_KEYCLOAK_URL: http://keycloak:8080
+      COGNOS_PUBLIC_URL: http://localhost:9300
+    ports:
+      - "9300:9300"
+    volumes:
+      - cognos-install:/opt/ibm/cognos/analytics
+      - cognos-content-store:/cognos/postgres
+      - ${IBM_DIR:-./bundles}:/ibm:ro
+
+  tm1:
+    image: ${TM1_SERVER_IMAGE:-ghcr.io/ajmyers/tm1-server:latest}
+    platform: linux/amd64
+    stop_signal: SIGINT
+    stop_grace_period: 2m
+    depends_on:
+      cognos:
+        condition: service_healthy
+    environment:
+      TM1_CAM_URI: http://cognos:9300
+      TM1_CAM_NAMESPACE: OIDC
+      TM1_CAM_NAMESPACE_TYPE: oidc
+      TM1_CAM_ADMINS: ${TM1_CAM_ADMINS:-admin}
+      TM1_CAM_GROUPS: ${TM1_CAM_GROUPS:-Admins Analysts Readers}
+    ports:
+      - "8010:8010"
+    volumes:
+      - tm1-install:/opt/ibm/cognos/tm1_64
+      - tm1-data:/tm1/data
+      - ${IBM_DIR:-./bundles}:/ibm:ro
+
+volumes:
+  cognos-install:
+  cognos-content-store:
+  tm1-install:
+  tm1-data:
