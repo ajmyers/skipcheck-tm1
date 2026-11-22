@@ -136,6 +136,8 @@ pre { overflow-x: auto; tab-size: 4; }
 }
 
 h2, h3, h4 { font-family: var(--sans); font-style: normal; letter-spacing: -0.01em; }
+/* The overview page's own sections (doclint wants them as <h1>) */
+.block h1 { margin: 1.6em 0 0.6em; font-size: 1.35em; letter-spacing: -0.02em; }
 
 /* Signatures and code in the site's monospace */
 code, pre, .member-signature, .type-signature { font-family: var(--mono); }

@@ -41,6 +41,25 @@ val examples = sourceSets.create("examples") {
 tasks.named("check") {
 	dependsOn(tasks.named(examples.compileJavaTaskName))
 }
+// A module's overview page (src/main/javadoc/overview.html) is the first page of its Javadoc:
+// where its Getting started goes. {{version}} in it becomes the version being built, so the
+// dependency it shows can be copied as is.
+val overviewSource = layout.projectDirectory.file("src/main/javadoc/overview.html")
+val overview = layout.buildDirectory.file("javadoc-overview/overview.html")
+val javadocOverview = tasks.register<Copy>("javadocOverview") {
+	val version = project.version.toString()
+	inputs.property("version", version)
+	from(overviewSource)
+	into(overview.map { it.asFile.parentFile })
+	filter { line: String -> line.replace("{{version}}", version) }
+}
+tasks.withType<Javadoc>().configureEach {
+	if (overviewSource.asFile.isFile) {
+		dependsOn(javadocOverview)
+		inputs.file(overview)
+		(options as StandardJavadocDocletOptions).overview = overview.get().asFile.path
+	}
+}
 val examplesDir = layout.projectDirectory.dir("src/examples/java")
 tasks.withType<Javadoc>().configureEach {
 	if (examplesDir.asFile.isDirectory) {
