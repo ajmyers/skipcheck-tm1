@@ -5,7 +5,6 @@ Action Chore/Activate
 Action Chore/Deactivate
 Action Chore/Execute
 Action Chore/SetServerLocalStartTime
-Action CubeDrillthrough/Execute
 Action Entry/Copy
 Action Entry/Move
 Action GitPullPlan/Execute
@@ -18,8 +17,6 @@ Action ProcessDebugContext/Continue
 Action ProcessDebugContext/StepIn
 Action ProcessDebugContext/StepOut
 Action ProcessDebugContext/StepOver
-Action RelationalDrillthrough/Execute
-Action RelationalDrillthrough/ExecuteWithRowset
 Action Session/Close
 Action Thread/CancelOperation
 Action User/Disconnect
@@ -32,11 +29,8 @@ ActionImport DisableEncryptionAtRest
 ActionImport EncryptDataFile
 ActionImport EncryptDataModel
 ActionImport ExecuteChore
-ActionImport ExecuteCubeDrillthrough
 ActionImport ExecuteProcess
 ActionImport ExecuteProcessWithReturn
-ActionImport ExecuteRelationalDrillthrough
-ActionImport ExecuteRelationalDrillthroughWithRowset
 ActionImport GitDeploy
 ActionImport GitInit
 ActionImport GitPull
@@ -60,7 +54,6 @@ EntitySet MessageLogEntries
 EntitySet ProcessAttributes
 EntitySet ProcessDebugContexts
 EntitySet Processes
-EntitySet Rowsets
 EntitySet SQLDataSources
 EntitySet Sessions
 EntitySet Threads
@@ -80,7 +73,6 @@ Navigation ApplicationContextFacet/Values
 Navigation ApplicationContextFacetValue/Facet
 Navigation AuditLogEntry/AuditDetails
 Navigation CellsetCell/Annotations
-Navigation CellsetCell/DrillthroughScripts
 Navigation Chore/LocalizedAttributes
 Navigation Chore/Tasks
 Navigation ChoreReference/Chore
@@ -106,7 +98,6 @@ Navigation ProcessDebugContextStackFrame/Process
 Navigation ProcessDebugContextStackFrame/Variables
 Navigation ProcessExecuteResult/ErrorLogFile
 Navigation ProcessReference/Process
-Navigation Rowset/Rows
 Navigation Session/Threads
 Navigation Session/User
 Navigation SubsetReference/Subset

@@ -15,6 +15,7 @@ import net.ajmyers.tm1.client.service.cube.ViewService;
 import net.ajmyers.tm1.client.service.data.CellService;
 import net.ajmyers.tm1.client.service.data.CellsetService;
 import net.ajmyers.tm1.client.service.data.ChangeSetService;
+import net.ajmyers.tm1.client.service.data.DrillthroughService;
 import net.ajmyers.tm1.client.service.data.MemberSetService;
 import net.ajmyers.tm1.client.service.data.SandboxService;
 import net.ajmyers.tm1.client.service.dimension.DimensionService;
@@ -83,6 +84,8 @@ public final class Tm1Client {
 
 	private final ChangeSetService changeSets;
 
+	private final DrillthroughService drillthrough;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -101,6 +104,7 @@ public final class Tm1Client {
 		this.memberSets = new MemberSetService(session);
 		this.sandboxes = new SandboxService(session);
 		this.changeSets = new ChangeSetService(session);
+		this.drillthrough = new DrillthroughService(session);
 	}
 
 	/**
@@ -255,6 +259,14 @@ public final class Tm1Client {
 	 */
 	public ChangeSetService changeSets() {
 		return changeSets;
+	}
+
+	/**
+	 * Drillthrough.
+	 * @return the drillthrough service, on this client's session
+	 */
+	public DrillthroughService drillthrough() {
+		return drillthrough;
 	}
 
 	/**
