@@ -102,6 +102,8 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 
 	private List<String> camAdmins = List.of();
 
+	private CognosContainer.Namespace camNamespace = CognosContainer.Namespace.LDAP;
+
 	private @Nullable Tm1AdminServerContainer adminServer;
 
 	/**
@@ -228,6 +230,25 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	 * @throws IllegalArgumentException if no admin is given
 	 */
 	public Tm1ServerContainer withCamSecurity(CognosContainer cognos, String... admins) {
+		return withCamSecurity(cognos, CognosContainer.Namespace.LDAP, admins);
+	}
+
+	/**
+	 * Runs TM1 in Cognos (CAM) security against {@code cognos}, through one of its
+	 * namespaces: {@link CognosContainer.Namespace#OIDC} needs
+	 * {@link CognosContainer#withKeycloak}. See
+	 * {@link #withCamSecurity(CognosContainer, String...)}; this container's own login
+	 * goes through that namespace too.
+	 * @param cognos the Cognos to take users from
+	 * @param namespace the namespace TM1's administrators and groups are in
+	 * @param admins names of {@code cognos}'s test users to make TM1 administrators; at
+	 * least one
+	 * @return this container
+	 * @throws IllegalArgumentException if no admin is given
+	 */
+	public Tm1ServerContainer withCamSecurity(CognosContainer cognos, CognosContainer.Namespace namespace,
+			String... admins) {
+		this.camNamespace = Objects.requireNonNull(namespace, "namespace");
 		this.cognos = Objects.requireNonNull(cognos, "cognos");
 		if (admins.length == 0) {
 			throw new IllegalArgumentException("Name at least one of the Cognos test users as a TM1 administrator");
@@ -302,7 +323,7 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	 */
 	public String getAuthorization() {
 		if (cognos != null) {
-			return CognosContainer.camAuthorization(username, password, CognosContainer.NAMESPACE);
+			return CognosContainer.camAuthorization(username, password, camNamespace.id());
 		}
 		return "Basic "
 				+ Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
@@ -375,7 +396,11 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		}
 		withCredentials(admin.name(), admin.password());
 		withEnv("TM1_CAM_URI", cognos.getNetworkUrl());
-		withEnv("TM1_CAM_NAMESPACE", CognosContainer.NAMESPACE);
+		if (camNamespace == CognosContainer.Namespace.OIDC && cognos.getKeycloak() == null) {
+			throw new IllegalStateException("CAM security through OIDC needs the Cognos to have withKeycloak");
+		}
+		withEnv("TM1_CAM_NAMESPACE", camNamespace.id());
+		withEnv("TM1_CAM_NAMESPACE_TYPE", camNamespace.type());
 		withEnv("TM1_CAM_ADMINS", String.join(" ", camAdmins));
 		if (!cognos.getGroups().isEmpty()) {
 			withEnv("TM1_CAM_GROUPS", String.join(" ", cognos.getGroups()));

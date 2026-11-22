@@ -1,5 +1,11 @@
 package net.ajmyers.tm1.testcontainers;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -14,6 +20,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.jspecify.annotations.Nullable;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
@@ -74,6 +81,42 @@ public class CognosContainer extends GenericContainer<CognosContainer> {
 	/** The ID of the LDAP namespace the test users are in: the {@code CAMNamespace}. */
 	public static final String NAMESPACE = "LDAP";
 
+	/**
+	 * A namespace the test users are in, and how {@code tm1-server} names its users and
+	 * groups (CAMIDs) in it.
+	 */
+	public enum Namespace {
+
+		/** The LDAP directory, always there with test users. */
+		LDAP("LDAP", "ldap"),
+
+		/** OpenID Connect through Keycloak, with {@link #withKeycloak}. */
+		OIDC("OIDC", "oidc");
+
+		private final String id;
+
+		private final String type;
+
+		Namespace(String id, String type) {
+			this.id = id;
+			this.type = type;
+		}
+
+		/**
+		 * The namespace's ID: the {@code CAMNamespace} users log on with.
+		 * @return the ID
+		 */
+		public String id() {
+			return id;
+		}
+
+		/** The image's {@code TM1_CAM_NAMESPACE_TYPE}. */
+		String type() {
+			return type;
+		}
+
+	}
+
 	private static final Pattern NAME = Pattern.compile("[A-Za-z0-9._-]+");
 
 	private static final String INSTALL_PATH = "/opt/ibm/cognos/analytics";
@@ -85,6 +128,8 @@ public class CognosContainer extends GenericContainer<CognosContainer> {
 	private final List<Bind> binds = new ArrayList<>();
 
 	private final Map<String, User> users = new LinkedHashMap<>();
+
+	private @Nullable KeycloakContainer keycloak;
 
 	/**
 	 * A test user.
@@ -167,6 +212,29 @@ public class CognosContainer extends GenericContainer<CognosContainer> {
 	}
 
 	/**
+	 * Adds an OIDC namespace ({@link Namespace#OIDC}) through {@code keycloak}: when
+	 * Cognos starts, it builds a realm there from the test users. The two containers
+	 * share a Docker network, and Keycloak starts first.
+	 * @param keycloak the Keycloak to use
+	 * @return this container
+	 */
+	public CognosContainer withKeycloak(KeycloakContainer keycloak) {
+		this.keycloak = Objects.requireNonNull(keycloak, "keycloak");
+		Tm1ServerContainer.shareNetwork(this, keycloak);
+		dependsOn(keycloak);
+		withEnv("COGNOS_KEYCLOAK_URL", keycloak.getNetworkUrl());
+		return self();
+	}
+
+	/**
+	 * The Keycloak set with {@link #withKeycloak}.
+	 * @return the Keycloak, or {@code null} if there's no OIDC namespace
+	 */
+	public @Nullable KeycloakContainer getKeycloak() {
+		return keycloak;
+	}
+
+	/**
 	 * The test users, in the order they were added.
 	 * @return the users
 	 */
@@ -232,7 +300,59 @@ public class CognosContainer extends GenericContainer<CognosContainer> {
 	 * @throws IllegalArgumentException if there's no such user
 	 */
 	public String camAuthorization(String user) {
-		return camAuthorization(user, getUser(user).password(), NAMESPACE);
+		return camAuthorization(user, Namespace.LDAP);
+	}
+
+	/**
+	 * The {@code Authorization} header for a test user's CAM logon through a namespace.
+	 * Through {@link Namespace#OIDC}, Cognos checks the password with Keycloak.
+	 * @param user a test user's name
+	 * @param namespace the namespace to log on through
+	 * @return the header value
+	 * @throws IllegalArgumentException if there's no such user
+	 */
+	public String camAuthorization(String user, Namespace namespace) {
+		return camAuthorization(user, getUser(user).password(), namespace.id());
+	}
+
+	/**
+	 * Logs a user on to Cognos with an ID token they already hold (the OIDC namespace's
+	 * {@code CAMOIDCIdToken}), and returns their CAM passport. TM1 in CAM security takes
+	 * it as {@code Authorization: CAMPassport <passport>}.
+	 * @param idToken an ID token from the OIDC provider, e.g.
+	 * {@link KeycloakContainer#idToken}
+	 * @return the passport
+	 * @throws IllegalStateException if Cognos refuses the token
+	 */
+	public String passport(String idToken) {
+		String body = "{\"parameters\":[{\"name\":\"CAMNamespace\",\"value\":\"" + Namespace.OIDC.id()
+				+ "\"},{\"name\":\"CAMOIDCIdToken\",\"value\":\"" + idToken + "\"}]}";
+		HttpRequest request = HttpRequest
+			.newBuilder(URI.create("http://" + getHost() + ":" + getMappedPort(DISPATCHER_PORT) + "/api/v1/session"))
+			.header("Content-Type", "application/json")
+			.timeout(Duration.ofSeconds(60))
+			.PUT(HttpRequest.BodyPublishers.ofString(body))
+			.build();
+		try {
+			HttpResponse<String> response = HttpClient.newHttpClient()
+				.send(request, HttpResponse.BodyHandlers.ofString());
+			return response.headers()
+				.allValues("Set-Cookie")
+				.stream()
+				.map(cookie -> cookie.split(";", 2)[0].strip())
+				.filter(cookie -> cookie.startsWith("cam_passport="))
+				.map(cookie -> cookie.substring("cam_passport=".length()))
+				.findFirst()
+				.orElseThrow(() -> new IllegalStateException(
+						"Cognos refused the ID token (HTTP " + response.statusCode() + "): " + response.body()));
+		}
+		catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException(e);
+		}
 	}
 
 	/**

@@ -74,6 +74,7 @@ run on every build where TM1 is configured, so they always work as written.
 | Skip the extension: plain assumptions and a throwaway server, e.g. for a test that damages its server | [`WithoutTheExtensionExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/WithoutTheExtensionExampleTest.java) |
 | Run TM1 Web against a TM1 server of its own | [`Tm1WebExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/Tm1WebExampleTest.java) |
 | Test Cognos (CAM) security: three users, three TM1 security profiles | [`CamSecurityExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/CamSecurityExampleTest.java) |
+| Log on to TM1 through OIDC: a password, or an ID token exchanged for a CAM passport | [`OidcExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/OidcExampleTest.java) |
 
 Spring Boot tests will connect with `@ServiceConnection` once #15 lands.
 
@@ -166,6 +167,30 @@ class SecurityTest {
   each group the rights the test needs.
 - **Logging on:** `cognos.camAuthorization(user)` is the `Authorization: CAMNamespace …`
   header for that user. Native logons are refused.
+
+### OIDC
+
+`withKeycloak(new KeycloakContainer())` gives Cognos an OIDC namespace too, through Keycloak:
+Cognos builds a realm there from its test users. `withCamSecurity(cognos, Namespace.OIDC,
+"admin")` points TM1 at that namespace instead of LDAP:
+
+```java
+try (var keycloak = new KeycloakContainer();
+     var cognos = new CognosContainer(cognosSource).withUser("viewer", "viewerpw", "Readers")
+         .withUser("admin", "adminpw", "Admins").withKeycloak(keycloak);
+     var tm1 = new Tm1ServerContainer(tm1Source).withCamSecurity(cognos, Namespace.OIDC, "admin")) {
+    tm1.start();
+    // A password, which Cognos checks with Keycloak:
+    String byPassword = cognos.camAuthorization("viewer", Namespace.OIDC);
+    // A token an app already holds, exchanged at Cognos for a CAM passport:
+    String byToken = "CAMPassport " + cognos.passport(keycloak.idToken("viewer", "viewerpw"));
+}
+```
+
+`keycloak.idToken(user, password)` gets a user's ID token from the realm's `tm1-app` client,
+whose tokens Cognos accepts (Cognos requires its own client in a token's audience). Keycloak's
+issuer is its in-network address, `http://keycloak:8080`, so the interactive browser logon
+isn't wrapped: a browser would need to reach that address. `KEYCLOAK_IMAGE` swaps the image.
 
 `@RequiresCognos` includes `@RequiresTm1` and also skips without a Cognos source. It injects
 the `CognosSource` found. There's no shared Cognos: it takes about two minutes to start, and
