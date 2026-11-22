@@ -28,6 +28,7 @@ export { ServerService } from "./server/ServerService.js";
 export { SessionService } from "./security/SessionService.js";
 export { SqlDataSourceService } from "./process/SqlDataSourceService.js";
 export { SubsetService } from "./dimension/SubsetService.js";
+export { SubsetScope } from "./dimension/SubsetScope.js";
 export { ThreadService } from "./security/ThreadService.js";
 export { UserService } from "./security/UserService.js";
 export { ViewService } from "./cube/ViewService.js";

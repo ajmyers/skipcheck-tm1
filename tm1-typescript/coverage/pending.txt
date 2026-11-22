@@ -24,7 +24,6 @@ Action Entry/Copy
 Action Entry/Move
 Action GitPullPlan/Execute
 Action GitPushPlan/Execute
-Action Hierarchy/CreateSessionSubset
 Action Hierarchy/SaveAs
 Action Hierarchy/SetElement
 Action MDXView/Execute
@@ -45,8 +44,6 @@ Action Sandbox/Merge
 Action Sandbox/Publish
 Action Sandbox/Unload
 Action Session/Close
-Action Subset/SaveAs
-Action Subset/SetElement
 Action Thread/CancelOperation
 Action User/Disconnect
 ActionImport BeginChangeSet
@@ -61,7 +58,6 @@ ActionImport EncryptDataModel
 ActionImport EndChangeSet
 ActionImport ExecuteCubeDrillthrough
 ActionImport ExecuteMDX
-ActionImport ExecuteMDXSetExpression
 ActionImport ExecuteMDXStatement
 ActionImport ExecuteProcess
 ActionImport ExecuteProcessWithReturn
@@ -91,7 +87,6 @@ EntitySet ErrorLogFiles
 EntitySet GitPlans
 EntitySet Groups
 EntitySet Loggers
-EntitySet MemberSets
 EntitySet MessageLogEntries
 EntitySet ProcessAttributes
 EntitySet ProcessDebugContexts
@@ -152,9 +147,6 @@ Navigation Dimension/HierarchyAttributes
 Navigation Dimension/LocalizedAttributes
 Navigation DimensionReference/Dimension
 Navigation DocumentReference/Document
-Navigation Edge/Component
-Navigation Edge/Hierarchy
-Navigation Edge/Parent
 Navigation Element/Components
 Navigation Element/Edges
 Navigation Element/Hierarchy
@@ -168,24 +160,14 @@ Navigation Group/Users
 Navigation Hierarchy/AllMember
 Navigation Hierarchy/DefaultMember
 Navigation Hierarchy/Dimension
-Navigation Hierarchy/Edges
 Navigation Hierarchy/ElementAttributes
 Navigation Hierarchy/Elements
 Navigation Hierarchy/Levels
 Navigation Hierarchy/LocalizedAttributes
-Navigation Hierarchy/Members
-Navigation Hierarchy/PrivateSubsets
-Navigation Hierarchy/SessionSubsets
 Navigation Hierarchy/SubsetAttributes
-Navigation Hierarchy/Subsets
 Navigation Level/Hierarchy
 Navigation Level/Members
-Navigation Member/Children
-Navigation Member/Element
-Navigation Member/Hierarchy
-Navigation Member/Level
 Navigation Member/LocalizedAttributes
-Navigation Member/Parent
 Navigation Process/ErrorLogs
 Navigation Process/LocalizedAttributes
 Navigation ProcessDebugContext/Breakpoints
@@ -200,8 +182,6 @@ Navigation ProcessReference/Process
 Navigation Rowset/Rows
 Navigation Session/Threads
 Navigation Session/User
-Navigation Subset/Elements
-Navigation Subset/Hierarchy
 Navigation Subset/LocalizedAttributes
 Navigation SubsetReference/Subset
 Navigation Thread/Session

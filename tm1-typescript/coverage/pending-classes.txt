@@ -12,7 +12,6 @@ ContentScope
 ContentService
 DimensionService
 DrillthroughService
-EdgeService
 ElementService
 EncryptionService
 GitCommitDetails
@@ -23,8 +22,6 @@ HierarchyService
 LevelService
 LocalizedAttributeService
 LogService
-MemberService
-MemberSetService
 OidcKeyService
 ProcessDebugService
 ProcessService
@@ -32,8 +29,6 @@ SandboxService
 ServerService
 SessionService
 SqlDataSourceService
-SubsetScope
-SubsetService
 ThreadService
 Tuples
 UserService
