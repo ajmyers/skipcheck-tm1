@@ -345,8 +345,11 @@ committed. It generates enums (with an `UNKNOWN` fallback), a record per complex
 records are read by `@odata.type`, which Jackson writes when one is sent, and a nested `Plain`
 (concrete root, such as `Member`) or `Unknown` (abstract root, such as `View`) record takes a
 value no known subtype stands for. Every type also has field constants for queries (`Cube.NAME`),
-its enums write their own literals for filters, and a patch builder (§8.3) does writes (#65). The
-operation catalog with revision annotations (#66) follows.
+its enums write their own literals for filters, and a patch builder (§8.3) does writes (#65).
+Everything carries `@Since` and `@Deprecated(since = …)` from `Core.Revisions`, with IBM's reason
+in the Javadoc, and `Tm1Operations` catalogs the 105 actions and functions as `Tm1Operation`
+descriptors. Each descriptor gives the `Tm1Capability` a request checks and the endpoint name the
+coverage gate uses (#66).
 
 **Services stay hand-written.** Their names, parameter order and grouping are API design that
 a generator would do badly. Generating them is still possible later.
