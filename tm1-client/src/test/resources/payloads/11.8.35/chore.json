@@ -1,0 +1,42 @@
+{
+  "@odata.context" : "$metadata#Chores(Tasks(Process))/$entity",
+  "@odata.etag" : "W/\"5c1cf11bf5f32f94ea734db0d5708e9964d3ca9e\"",
+  "Name" : "RoundTrip",
+  "StartTime" : "2026-01-01T02:00Z",
+  "DSTSensitive" : false,
+  "Active" : false,
+  "ExecutionMode" : "SingleCommit",
+  "Frequency" : "P1DT00H00M00S",
+  "Attributes" : {
+    "Caption" : "RoundTrip"
+  },
+  "Tasks" : [ {
+    "Step" : 0,
+    "Parameters" : [ {
+      "Name" : "pRegion",
+      "Value" : "South"
+    } ],
+    "Process" : {
+      "@odata.etag" : "W/\"974ff35711586fdd8a69bb052d415cba85bd9f55\"",
+      "Name" : "RoundTrip",
+      "HasSecurityAccess" : false,
+      "PrologProcedure" : "nRows = 0;\r\n",
+      "MetadataProcedure" : "",
+      "DataProcedure" : "",
+      "EpilogProcedure" : "",
+      "DataSource" : {
+        "Type" : "None"
+      },
+      "Parameters" : [ {
+        "Name" : "pRegion",
+        "Prompt" : "Region",
+        "Value" : "North",
+        "Type" : "String"
+      } ],
+      "Variables" : [ ],
+      "Attributes" : {
+        "Caption" : "RoundTrip"
+      }
+    }
+  } ]
+}

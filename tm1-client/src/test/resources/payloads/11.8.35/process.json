@@ -1,0 +1,23 @@
+{
+  "@odata.context" : "$metadata#Processes/$entity",
+  "@odata.etag" : "W/\"974ff35711586fdd8a69bb052d415cba85bd9f55\"",
+  "Name" : "RoundTrip",
+  "HasSecurityAccess" : false,
+  "PrologProcedure" : "nRows = 0;\r\n",
+  "MetadataProcedure" : "",
+  "DataProcedure" : "",
+  "EpilogProcedure" : "",
+  "DataSource" : {
+    "Type" : "None"
+  },
+  "Parameters" : [ {
+    "Name" : "pRegion",
+    "Prompt" : "Region",
+    "Value" : "North",
+    "Type" : "String"
+  } ],
+  "Variables" : [ ],
+  "Attributes" : {
+    "Caption" : "RoundTrip"
+  }
+}

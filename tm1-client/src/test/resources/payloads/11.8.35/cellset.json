@@ -1,0 +1,166 @@
+{
+  "@odata.context" : "$metadata#Cellsets(Cube,Axes(Tuples+(Members)),Cells)/$entity",
+  "ID" : "qZMOsF4AAIAbAAAg",
+  "Cube" : {
+    "@odata.etag" : "W/\"dcf7ce85529e63aaad8987b7e222e36a79d2b326\"",
+    "Name" : "RoundTrip",
+    "Rules" : "SKIPCHECK;\n['Total', 'Note'] = S: 'consolidated';\n",
+    "DrillthroughRules" : null,
+    "LastSchemaUpdate" : "2026-11-22T00:14:39.223Z",
+    "LastDataUpdate" : "2026-11-22T00:14:39.244Z",
+    "Attributes" : {
+      "Caption" : "RoundTrip"
+    }
+  },
+  "Axes" : [ {
+    "Ordinal" : 0,
+    "Cardinality" : 2,
+    "Tuples" : [ {
+      "Ordinal" : 0,
+      "Members" : [ {
+        "Name" : "Amount",
+        "UniqueName" : "[RoundTripMeasure].[RoundTripMeasure].[Amount]",
+        "Type" : "Regular",
+        "Ordinal" : 1,
+        "IsPlaceholder" : false,
+        "Weight" : 0,
+        "Attributes" : {
+          "Caption" : "Amount"
+        },
+        "DisplayInfo" : 0,
+        "DisplayInfoAbove" : 0
+      } ]
+    }, {
+      "Ordinal" : 1,
+      "Members" : [ {
+        "Name" : "Note",
+        "UniqueName" : "[RoundTripMeasure].[RoundTripMeasure].[Note]",
+        "Type" : "Regular",
+        "Ordinal" : 2,
+        "IsPlaceholder" : false,
+        "Weight" : 0,
+        "Attributes" : {
+          "Caption" : "Note"
+        },
+        "DisplayInfo" : 0,
+        "DisplayInfoAbove" : 0
+      } ]
+    } ]
+  }, {
+    "Ordinal" : 1,
+    "Cardinality" : 4,
+    "Tuples" : [ {
+      "Ordinal" : 0,
+      "Members" : [ {
+        "Name" : "Total",
+        "UniqueName" : "[RoundTrip].[RoundTrip].[Total]",
+        "Type" : "Regular",
+        "Ordinal" : 1,
+        "IsPlaceholder" : false,
+        "Weight" : 0,
+        "Attributes" : {
+          "Caption" : "Total"
+        },
+        "DisplayInfo" : 65536,
+        "DisplayInfoAbove" : 0
+      } ]
+    }, {
+      "Ordinal" : 1,
+      "Members" : [ {
+        "Name" : "North",
+        "UniqueName" : "[RoundTrip].[RoundTrip].[North]",
+        "Type" : "Regular",
+        "Ordinal" : 2,
+        "IsPlaceholder" : false,
+        "Weight" : 1,
+        "Attributes" : {
+          "Caption" : "North"
+        },
+        "DisplayInfo" : 262401,
+        "DisplayInfoAbove" : 131072
+      } ]
+    }, {
+      "Ordinal" : 2,
+      "Members" : [ {
+        "Name" : "South",
+        "UniqueName" : "[RoundTrip].[RoundTrip].[South]",
+        "Type" : "Regular",
+        "Ordinal" : 3,
+        "IsPlaceholder" : false,
+        "Weight" : 1,
+        "Attributes" : {
+          "Caption" : "South"
+        },
+        "DisplayInfo" : 131329,
+        "DisplayInfoAbove" : 0
+      } ]
+    }, {
+      "Ordinal" : 3,
+      "Members" : [ {
+        "Name" : "Label",
+        "UniqueName" : "[RoundTrip].[RoundTrip].[Label]",
+        "Type" : "Regular",
+        "Ordinal" : 4,
+        "IsPlaceholder" : false,
+        "Weight" : 0,
+        "Attributes" : {
+          "Caption" : "Label"
+        },
+        "DisplayInfo" : 0,
+        "DisplayInfoAbove" : 0
+      } ]
+    } ]
+  }, {
+    "Ordinal" : 2,
+    "Cardinality" : 1,
+    "Tuples" : [ {
+      "Ordinal" : 0,
+      "Members" : [ {
+        "Name" : "Base",
+        "UniqueName" : "[Sandboxes].[Sandboxes].[Base]",
+        "Type" : "Regular",
+        "Ordinal" : 1,
+        "IsPlaceholder" : false,
+        "Weight" : 0,
+        "Attributes" : {
+          "Caption" : "Base"
+        },
+        "DisplayInfo" : 0,
+        "DisplayInfoAbove" : 0
+      } ]
+    } ]
+  } ],
+  "Cells" : [ {
+    "Ordinal" : 0,
+    "Value" : 42,
+    "FormattedValue" : "42.00"
+  }, {
+    "Ordinal" : 1,
+    "Value" : "consolidated",
+    "FormattedValue" : "consolidated"
+  }, {
+    "Ordinal" : 2,
+    "Value" : 42,
+    "FormattedValue" : "42.00"
+  }, {
+    "Ordinal" : 3,
+    "Value" : "",
+    "FormattedValue" : ""
+  }, {
+    "Ordinal" : 4,
+    "Value" : null,
+    "FormattedValue" : "0.00"
+  }, {
+    "Ordinal" : 5,
+    "Value" : "",
+    "FormattedValue" : ""
+  }, {
+    "Ordinal" : 6,
+    "Value" : null,
+    "FormattedValue" : "0.00"
+  }, {
+    "Ordinal" : 7,
+    "Value" : "",
+    "FormattedValue" : ""
+  } ]
+}

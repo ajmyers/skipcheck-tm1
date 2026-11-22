@@ -1,0 +1,30 @@
+{
+  "@odata.context" : "$metadata#Sessions(User,Threads)/$entity",
+  "ID" : 8,
+  "Context" : "",
+  "Active" : true,
+  "User" : {
+    "Name" : "Admin",
+    "FriendlyName" : "Admin",
+    "Password" : null,
+    "Type" : "Admin",
+    "IsActive" : true,
+    "Enabled" : true
+  },
+  "Threads" : [ {
+    "ID" : 140735542195904,
+    "Type" : "User",
+    "Name" : "Admin",
+    "Context" : "",
+    "State" : "Run",
+    "Function" : "GET /api/v1/ActiveSession",
+    "ObjectType" : "",
+    "ObjectName" : "",
+    "RLocks" : 7,
+    "IXLocks" : 0,
+    "WLocks" : 0,
+    "ElapsedTime" : "P0DT00H00M00S",
+    "WaitTime" : "P0DT00H00M00S",
+    "Info" : ""
+  } ]
+}

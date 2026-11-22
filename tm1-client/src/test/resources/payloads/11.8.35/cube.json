@@ -1,0 +1,46 @@
+{
+  "@odata.context" : "$metadata#Cubes(Dimensions,Views)/$entity",
+  "@odata.etag" : "W/\"dcf7ce85529e63aaad8987b7e222e36a79d2b326\"",
+  "Name" : "RoundTrip",
+  "Rules" : "SKIPCHECK;\n['Total', 'Note'] = S: 'consolidated';\n",
+  "DrillthroughRules" : null,
+  "LastSchemaUpdate" : "2026-11-22T00:14:39.223Z",
+  "LastDataUpdate" : "2026-11-22T00:14:39.244Z",
+  "Attributes" : {
+    "Caption" : "RoundTrip"
+  },
+  "Dimensions" : [ {
+    "@odata.etag" : "W/\"0c68c7e37e2af861d90aeedb2f77c2d843f9415f\"",
+    "Name" : "Sandboxes",
+    "UniqueName" : "[Sandboxes]",
+    "AllLeavesHierarchyName" : "",
+    "Attributes" : {
+      "Caption" : "Sandboxes"
+    }
+  }, {
+    "@odata.etag" : "W/\"ff6b756a1325e525833bfb38b8cee45b82abc3a4\"",
+    "Name" : "RoundTrip",
+    "UniqueName" : "[RoundTrip]",
+    "AllLeavesHierarchyName" : "",
+    "Attributes" : {
+      "Caption" : "RoundTrip"
+    }
+  }, {
+    "@odata.etag" : "W/\"a477eee26e1a45babbe3766330711dec28fed43d\"",
+    "Name" : "RoundTripMeasure",
+    "UniqueName" : "[RoundTripMeasure]",
+    "AllLeavesHierarchyName" : "",
+    "Attributes" : {
+      "Caption" : "RoundTripMeasure"
+    }
+  } ],
+  "Views" : [ {
+    "@odata.etag" : "W/\"3fd023ba71f83260f025ed0a9dfe80423f5ddea4\"",
+    "@odata.type" : "#ibm.tm1.api.v1.MDXView",
+    "Name" : "By region",
+    "Attributes" : {
+      "Caption" : "By region"
+    },
+    "MDX" : "SELECT {[RoundTripMeasure].[RoundTripMeasure].Members} ON 0, {[RoundTrip].[RoundTrip].Members} ON 1 FROM [RoundTrip]"
+  } ]
+}

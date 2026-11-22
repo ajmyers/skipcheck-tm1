@@ -1,0 +1,14 @@
+{
+  "@odata.context" : "$metadata#Users(Groups)",
+  "value" : [ {
+    "Name" : "Admin",
+    "FriendlyName" : "Admin",
+    "Password" : null,
+    "Type" : "Admin",
+    "IsActive" : true,
+    "Enabled" : true,
+    "Groups" : [ {
+      "Name" : "ADMIN"
+    } ]
+  } ]
+}

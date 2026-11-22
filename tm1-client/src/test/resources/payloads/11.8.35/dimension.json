@@ -1,0 +1,140 @@
+{
+  "@odata.context" : "$metadata#Dimensions(Hierarchies(Elements+(Parents,Components),Edges,Subsets,ElementAttributes))/$entity",
+  "@odata.etag" : "W/\"ff6b756a1325e525833bfb38b8cee45b82abc3a4\"",
+  "Name" : "RoundTrip",
+  "UniqueName" : "[RoundTrip]",
+  "AllLeavesHierarchyName" : "",
+  "Attributes" : {
+    "Caption" : "RoundTrip"
+  },
+  "Hierarchies" : [ {
+    "@odata.etag" : "W/\"dda549a0bedf66c2626d4c839c8e4743bf70a507\"",
+    "Name" : "RoundTrip",
+    "UniqueName" : "[RoundTrip].[RoundTrip]",
+    "Cardinality" : 4,
+    "Structure" : 2,
+    "Visible" : true,
+    "Attributes" : {
+      "Caption" : "RoundTrip"
+    },
+    "Elements" : [ {
+      "@odata.etag" : "W/\"ff0320d5acb3ce4533d154df97defee30b55fd41\"",
+      "Name" : "North",
+      "UniqueName" : "[RoundTrip].[RoundTrip].[North]",
+      "Type" : "Numeric",
+      "Level" : 0,
+      "Index" : 1,
+      "Attributes" : {
+        "Caption" : "North"
+      },
+      "Parents" : [ {
+        "@odata.etag" : "W/\"14bd44ea71603c0b69f798200a91d68b3fa611ba\"",
+        "Name" : "Total",
+        "UniqueName" : "[RoundTrip].[RoundTrip].[Total]",
+        "Type" : "Consolidated",
+        "Level" : 1,
+        "Index" : 3,
+        "Attributes" : {
+          "Caption" : "Total"
+        }
+      } ],
+      "Components" : [ ]
+    }, {
+      "@odata.etag" : "W/\"323d6be150a32fc604164cd1a1a5e36505789a65\"",
+      "Name" : "South",
+      "UniqueName" : "[RoundTrip].[RoundTrip].[South]",
+      "Type" : "Numeric",
+      "Level" : 0,
+      "Index" : 2,
+      "Attributes" : {
+        "Caption" : "South"
+      },
+      "Parents" : [ {
+        "@odata.etag" : "W/\"14bd44ea71603c0b69f798200a91d68b3fa611ba\"",
+        "Name" : "Total",
+        "UniqueName" : "[RoundTrip].[RoundTrip].[Total]",
+        "Type" : "Consolidated",
+        "Level" : 1,
+        "Index" : 3,
+        "Attributes" : {
+          "Caption" : "Total"
+        }
+      } ],
+      "Components" : [ ]
+    }, {
+      "@odata.etag" : "W/\"14bd44ea71603c0b69f798200a91d68b3fa611ba\"",
+      "Name" : "Total",
+      "UniqueName" : "[RoundTrip].[RoundTrip].[Total]",
+      "Type" : "Consolidated",
+      "Level" : 1,
+      "Index" : 3,
+      "Attributes" : {
+        "Caption" : "Total"
+      },
+      "Parents" : [ ],
+      "Components" : [ {
+        "@odata.etag" : "W/\"ff0320d5acb3ce4533d154df97defee30b55fd41\"",
+        "Name" : "North",
+        "UniqueName" : "[RoundTrip].[RoundTrip].[North]",
+        "Type" : "Numeric",
+        "Level" : 0,
+        "Index" : 1,
+        "Attributes" : {
+          "Caption" : "North"
+        }
+      }, {
+        "@odata.etag" : "W/\"323d6be150a32fc604164cd1a1a5e36505789a65\"",
+        "Name" : "South",
+        "UniqueName" : "[RoundTrip].[RoundTrip].[South]",
+        "Type" : "Numeric",
+        "Level" : 0,
+        "Index" : 2,
+        "Attributes" : {
+          "Caption" : "South"
+        }
+      } ]
+    }, {
+      "@odata.etag" : "W/\"13b0fc5ac07c63b82f94ef66488994a84ee73aa0\"",
+      "Name" : "Label",
+      "UniqueName" : "[RoundTrip].[RoundTrip].[Label]",
+      "Type" : "String",
+      "Level" : 0,
+      "Index" : 4,
+      "Attributes" : {
+        "Caption" : "Label"
+      },
+      "Parents" : [ ],
+      "Components" : [ ]
+    } ],
+    "Edges" : [ {
+      "ParentName" : "Total",
+      "ComponentName" : "North",
+      "Weight" : 1
+    }, {
+      "ParentName" : "Total",
+      "ComponentName" : "South",
+      "Weight" : 1
+    } ],
+    "Subsets" : [ {
+      "@odata.etag" : "W/\"b15cc6ed230b244979a503b5e44e4d4793f45eb3\"",
+      "Name" : "All",
+      "UniqueName" : "[RoundTrip].[RoundTrip].[All]",
+      "Expression" : "{TM1SUBSETALL([RoundTrip].[RoundTrip])}",
+      "Attributes" : {
+        "Caption" : "All"
+      }
+    }, {
+      "@odata.etag" : "W/\"d2f6ec9a9f316d1c6973060b55e26119450fd268\"",
+      "Name" : "Leaves",
+      "UniqueName" : "[RoundTrip].[RoundTrip].[Leaves]",
+      "Expression" : null,
+      "Attributes" : {
+        "Caption" : "Leaves"
+      }
+    } ],
+    "ElementAttributes" : [ {
+      "Name" : "Caption",
+      "Type" : "String"
+    } ]
+  } ]
+}

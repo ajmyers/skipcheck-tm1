@@ -1,0 +1,44 @@
+{
+  "@odata.context" : "../../$metadata#Dimensions('RoundTrip')/Hierarchies('RoundTrip')/Members",
+  "value" : [ {
+    "Name" : "Total",
+    "UniqueName" : "[RoundTrip].[RoundTrip].[Total]",
+    "Type" : "Regular",
+    "Ordinal" : 1,
+    "IsPlaceholder" : false,
+    "Weight" : 0,
+    "Attributes" : {
+      "Caption" : "Total"
+    }
+  }, {
+    "Name" : "North",
+    "UniqueName" : "[RoundTrip].[RoundTrip].[North]",
+    "Type" : "Regular",
+    "Ordinal" : 2,
+    "IsPlaceholder" : false,
+    "Weight" : 1,
+    "Attributes" : {
+      "Caption" : "North"
+    }
+  }, {
+    "Name" : "South",
+    "UniqueName" : "[RoundTrip].[RoundTrip].[South]",
+    "Type" : "Regular",
+    "Ordinal" : 3,
+    "IsPlaceholder" : false,
+    "Weight" : 1,
+    "Attributes" : {
+      "Caption" : "South"
+    }
+  }, {
+    "Name" : "Label",
+    "UniqueName" : "[RoundTrip].[RoundTrip].[Label]",
+    "Type" : "Regular",
+    "Ordinal" : 4,
+    "IsPlaceholder" : false,
+    "Weight" : 0,
+    "Attributes" : {
+      "Caption" : "Label"
+    }
+  } ]
+}
