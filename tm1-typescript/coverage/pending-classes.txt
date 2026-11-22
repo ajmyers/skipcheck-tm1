@@ -3,14 +3,7 @@ CellService
 CellsetService
 ChangeSetService
 ChoreService
-ContentPath
-ContentScope
-ContentService
 DrillthroughService
-EncryptionService
-GitCommitDetails
-GitCredentials
-GitService
 LogService
 ProcessDebugService
 ProcessService
