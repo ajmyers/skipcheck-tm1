@@ -59,6 +59,15 @@ class ModelGeneratorTest {
 			        <Property Name="Name" Type="Edm.String"/>
 			      </EntityType>
 			      <EntityType Name="NativeView" BaseType="tm1.View"/>
+			      <Action Name="Reserve" IsBound="true">
+			        <Annotation Term="Core.Description"><String>Reserves a cube.</String></Annotation>
+			        <Parameter Name="Cube" Type="tm1.Cube" Nullable="false"/>
+			        <Parameter Name="Until" Type="Edm.DateTimeOffset"/>
+			      </Action>
+			      <Function Name="Ping" IsComposable="false"><ReturnType Type="Collection(Edm.String)"/></Function>
+			      <EntityContainer Name="API">
+			        <FunctionImport Name="Ping" Function="tm1.Ping"/>
+			      </EntityContainer>
 			    </Schema>
 			  </edmx:DataServices>
 			</edmx:Edmx>
@@ -117,7 +126,7 @@ class ModelGeneratorTest {
 	void generatesASealedInterfacePerHierarchyReadByOdataType() {
 		assertThat(sample().generate()).extracting(f -> f.typeSpec().name())
 			.containsExactly("CubeKind", "Box", "Cube", "NativeView", "View", "BoxPatch", "CubePatch",
-					"NativeViewPatch", "ViewPatch");
+					"NativeViewPatch", "ViewPatch", "Tm1Operations");
 		String view = source(sample(), "View");
 		assertThat(view).contains("public sealed interface View permits NativeView, View.Unknown")
 			.contains(
@@ -147,7 +156,8 @@ class ModelGeneratorTest {
 		try (Stream<Path> walk = Files.walk(out)) {
 			sources = walk.filter(p -> p.toString().endsWith(".java")).toList();
 		}
-		assertThat(sources).as("31 enums, 122 records, 7 hierarchies, 129 patches, package-info").hasSize(290);
+		assertThat(sources).as("31 enums, 122 records, 7 hierarchies, 129 patches, the catalog, package-info")
+			.hasSize(291);
 
 		JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
 		DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
@@ -201,6 +211,18 @@ class ModelGeneratorTest {
 		assertThat(source(sample(), "CubeKind")).contains("@Since(\"11.8.10\") NATIVE_VIEW(\"NativeView\")");
 		assertThat(source(sample(), "CubePatch"))
 			.contains("@Since(\"11.8.20\") @Deprecated(since = \"11.8.30\") public Builder kind(");
+	}
+
+	@Test
+	void catalogsEveryOperationByBindingOrImport() {
+		assertThat(source(sample(), "Tm1Operations")).contains("public final class Tm1Operations")
+			.contains(
+					"Reserves a cube. * * <p> * An action, bound to {@code tm1.Cube}. * * <ul> * <li>{@code Until} ({@code Edm.DateTimeOffset}, optional)</li> * </ul>")
+			.contains(
+					"public static final Tm1Operation CUBE_RESERVE = new Tm1Operation(Tm1Operation.Kind.ACTION, \"tm1.Reserve\", \"tm1.Cube\", null, List.of(new Tm1Operation.Parameter(\"Until\", \"Edm.DateTimeOffset\", true)), null, null, null);")
+			.contains(
+					"public static final Tm1Operation PING = new Tm1Operation(Tm1Operation.Kind.FUNCTION, \"tm1.Ping\", null, \"Ping\", List.of(), \"Collection(Edm.String)\", null, null);")
+			.contains("public static final List<Tm1Operation> ALL = List.of(CUBE_RESERVE, PING);");
 	}
 
 	private static ModelGenerator sample() {

@@ -89,6 +89,21 @@ public record Tm1Operation(Kind kind, String name, @Nullable String bindingType,
 	}
 
 	/**
+	 * The endpoint as the coverage gate names it: {@code Action Chore/Activate},
+	 * {@code Function Cube/DimensionsStorageOrder}, {@code ActionImport ExecuteMDX}.
+	 * @return the endpoint's name
+	 */
+	public String endpoint() {
+		String kindName = kind == Kind.ACTION ? "Action" : "Function";
+		return bindingType != null ? kindName + " " + unqualified(bindingType) + "/" + unqualified(name)
+				: kindName + "Import " + importName;
+	}
+
+	private static String unqualified(String name) {
+		return name.substring(name.lastIndexOf('.') + 1);
+	}
+
+	/**
 	 * What a request using it needs the server to have, with the version that added it,
 	 * for {@link Tm1Request#requires}.
 	 * @return the capability

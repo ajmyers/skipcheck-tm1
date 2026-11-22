@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 import com.palantir.javapoet.AnnotationSpec;
 import com.palantir.javapoet.ArrayTypeName;
 import com.palantir.javapoet.ClassName;
+import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.FieldSpec;
 import com.palantir.javapoet.JavaFile;
 import com.palantir.javapoet.MethodSpec;
@@ -40,8 +41,11 @@ import net.ajmyers.tm1.csdl.CsdlDocument;
 import net.ajmyers.tm1.csdl.CsdlEntityType;
 import net.ajmyers.tm1.csdl.CsdlEnumType;
 import net.ajmyers.tm1.csdl.CsdlNavigationProperty;
+import net.ajmyers.tm1.csdl.CsdlOperation;
+import net.ajmyers.tm1.csdl.CsdlParameter;
 import net.ajmyers.tm1.csdl.CsdlProperty;
 import net.ajmyers.tm1.csdl.CsdlRevision;
+import net.ajmyers.tm1.csdl.CsdlSchema;
 import net.ajmyers.tm1.csdl.CsdlStructuredType;
 import net.ajmyers.tm1.csdl.CsdlTypeRef;
 
@@ -107,6 +111,8 @@ public final class ModelGenerator {
 		.addMember("value", "$S", "deprecation")
 		.build();
 
+	private static final ClassName TM1_OPERATION = ClassName.get("net.ajmyers.tm1.client", "Tm1Operation");
+
 	private static final ClassName JSON_NODE = ClassName.get("tools.jackson.databind", "JsonNode");
 
 	private static final Set<String> KEYWORDS = Set.of("abstract", "assert", "boolean", "break", "byte", "case",
@@ -165,6 +171,7 @@ public final class ModelGenerator {
 		metadata.structuredTypes()
 			.sorted(Comparator.comparing(CsdlStructuredType::name))
 			.forEach(t -> files.add(file(revised(patch(t), t.annotations()))));
+		files.add(file(catalog()));
 		return files;
 	}
 
@@ -762,6 +769,110 @@ public final class ModelGenerator {
 	private static TypeSpec.Builder revised(TypeSpec.Builder type, List<CsdlAnnotation> annotations) {
 		Revisions revisions = revisions(annotations);
 		return type.addAnnotations(revisions.annotations()).addJavadoc("$L", revisions.tag());
+	}
+
+	/**
+	 * The operation catalog: a {@code Tm1Operation} per action and function, bound ones
+	 * named after their binding ({@code CHORE_ACTIVATE}) and unbound ones after their
+	 * import ({@code EXECUTE_MDX}), plus {@code ALL}.
+	 */
+	private TypeSpec.Builder catalog() {
+		TypeSpec.Builder spec = TypeSpec.classBuilder(ClassName.get(PACKAGE, "Tm1Operations"))
+			.addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+			.addAnnotation(GENERATED)
+			.addJavadoc("$L",
+					"Every action and function of the TM1 REST API, as {@code $metadata} declares them. Services refer to these, so a request checks the server has the operation ({@code requires(op.capability())}) and the coverage gate knows what's implemented.\n\n<p>\nGenerated from {@code $metadata}.\n")
+			.addMethod(MethodSpec.constructorBuilder().addModifiers(Modifier.PRIVATE).build());
+		Set<String> names = new HashSet<>(Set.of("ALL"));
+		List<String> all = new ArrayList<>();
+		for (CsdlSchema schema : metadata.schemas()) {
+			String prefix = (schema.alias() != null ? schema.alias() : schema.namespace()) + ".";
+			schema.operations()
+				.stream()
+				.filter(CsdlOperation::bound)
+				.sorted(Comparator.comparing((CsdlOperation op) -> op.bindingType().orElseThrow().name())
+					.thenComparing(CsdlOperation::name))
+				.forEach(op -> {
+					String binding = op.bindingType().orElseThrow().name();
+					String constant = unique(constantName(binding.substring(binding.lastIndexOf('.') + 1)) + "_"
+							+ constantName(op.name()), names);
+					spec.addField(operation(constant, op, prefix + op.name(), binding, null));
+					all.add(constant);
+				});
+		}
+		metadata.entityContainer().ifPresent(container -> {
+			List<String[]> imports = new ArrayList<>();
+			container.actionImports().forEach(i -> imports.add(new String[] { i.name(), i.action() }));
+			container.functionImports().forEach(i -> imports.add(new String[] { i.name(), i.function() }));
+			imports.sort(Comparator.comparing((String[] i) -> i[0]));
+			for (String[] i : imports) {
+				metadata.operations(i[1]).stream().filter(op -> !op.bound()).findFirst().ifPresent(op -> {
+					String constant = unique(constantName(i[0]), names);
+					spec.addField(operation(constant, op, i[1], null, i[0]));
+					all.add(constant);
+				});
+			}
+		});
+		spec.addField(FieldSpec
+			.builder(ParameterizedTypeName.get(ClassName.get(List.class), TM1_OPERATION), "ALL", Modifier.PUBLIC,
+					Modifier.STATIC, Modifier.FINAL)
+			.initializer("$T.of($L)", List.class, String.join(", ", all))
+			.addJavadoc("Every operation above, bound ones first.\n")
+			.build());
+		return spec;
+	}
+
+	private static FieldSpec operation(String constant, CsdlOperation op, String name, @Nullable String binding,
+			@Nullable String importName) {
+		Revisions revisions = revisions(op.annotations());
+		String kind = op.kind() == CsdlOperation.Kind.ACTION ? "ACTION" : "FUNCTION";
+		CodeBlock.Builder parameters = CodeBlock.builder();
+		StringBuilder doc = new StringBuilder(
+				description(op.annotations()).orElse("The {@code " + name + "} " + kind.toLowerCase(Locale.ROOT) + "."))
+			.append("\n\n<p>\n")
+			.append(op.kind() == CsdlOperation.Kind.ACTION ? "An action" : "A function")
+			.append(binding != null ? ", bound to {@code " + binding + "}" : ", imported as {@code " + importName + "}")
+			.append(op.returnType() != null
+					? ", returning {@code " + typeText(Objects.requireNonNull(op.returnType())) + "}" : "")
+			.append(".\n");
+		List<CsdlParameter> callerParameters = op.callerParameters();
+		if (!callerParameters.isEmpty()) {
+			doc.append("\n<ul>\n");
+		}
+		for (int i = 0; i < callerParameters.size(); i++) {
+			CsdlParameter p = callerParameters.get(i);
+			parameters.add(i == 0 ? "" : ", ")
+				.add("new $T.Parameter($S, $S, $L)", TM1_OPERATION, p.name(), typeText(p.type()), p.nullable());
+			doc.append("<li>{@code ")
+				.append(p.name())
+				.append("} ({@code ")
+				.append(typeText(p.type()))
+				.append("}")
+				.append(p.nullable() ? ", optional" : "")
+				.append(')')
+				.append(description(p.annotations()).map(d -> ": " + d).orElse(""))
+				.append("</li>\n");
+		}
+		if (!callerParameters.isEmpty()) {
+			doc.append("</ul>\n");
+		}
+		CodeBlock initializer = CodeBlock.of("new $T($T.Kind.$L, $S, $S, $S, $T.of($L), $S, $S, $S)", TM1_OPERATION,
+				TM1_OPERATION, kind, name, binding, importName, List.class, parameters.build(),
+				op.returnType() == null ? null : typeText(Objects.requireNonNull(op.returnType())), revisions.since(),
+				revisions.deprecatedIn());
+		return FieldSpec.builder(TM1_OPERATION, constant, Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+			.initializer(initializer)
+			.addJavadoc("$L", doc + revisions.tag())
+			.addAnnotations(revisions.annotations())
+			.build();
+	}
+
+	/**
+	 * A type as {@code $metadata} writes it: {@code tm1.Cube},
+	 * {@code Collection(Edm.String)}.
+	 */
+	private static String typeText(CsdlTypeRef type) {
+		return type.collection() ? "Collection(" + type.name() + ")" : type.name();
 	}
 
 	private String typeId(CsdlStructuredType type) {

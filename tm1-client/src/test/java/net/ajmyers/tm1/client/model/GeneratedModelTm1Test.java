@@ -14,6 +14,7 @@ import net.ajmyers.tm1.client.Tm1Request;
 import net.ajmyers.tm1.client.odata.ODataPath;
 import net.ajmyers.tm1.client.odata.ODataQuery;
 import net.ajmyers.tm1.client.session.Tm1Session;
+import net.ajmyers.tm1.client.version.Tm1Capabilities;
 import net.ajmyers.tm1.testcontainers.RequiresTm1;
 import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
 
@@ -179,6 +180,22 @@ class GeneratedModelTm1Test {
 		return session.execute(Tm1Request.get(cube, ODataQuery.none().select(Cube.RULES), Cube.class))
 			.block(WAIT)
 			.rules();
+	}
+
+	@Test
+	void theServerHasEveryOperationInTheCatalog(Tm1ServerContainer tm1) {
+		Tm1Session session = Tm1Session.builder()
+			.baseUrl(tm1.getRestUrl())
+			.basicAuth(tm1.getUsername(), tm1.getPassword())
+			.build();
+		try {
+			Tm1Capabilities capabilities = session.capabilities().block(WAIT);
+			assertThat(Tm1Operations.ALL)
+				.allSatisfy(op -> assertThat(capabilities.supports(op.capability())).as("%s", op.endpoint()).isTrue());
+		}
+		finally {
+			session.close().block(WAIT);
+		}
 	}
 
 }
