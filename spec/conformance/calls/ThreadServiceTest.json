@@ -1,0 +1,364 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.security.ThreadServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "ThreadServiceTest#aFinishedThreadIsNotFound#1",
+			"service" : "threads",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				31,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Threads(31)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'31' can not be found in collection of type 'Thread'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ThreadServiceTest#cancelsAThreadsOperation#1",
+			"service" : "threads",
+			"method" : "cancel",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				31
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Threads(31)/tm1.CancelOperation",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ThreadServiceTest#cancelsAThreadsOperation#2",
+			"service" : "threads",
+			"method" : "cancel",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				32
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Threads(32)/tm1.CancelOperation",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'32' can not be found in collection of type 'Thread'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ThreadServiceTest#getsAThread#1",
+			"service" : "threads",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				31,
+				{
+					"$query" : {
+						"select" : [
+							"ID",
+							"State"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Threads(31)?$select=ID,State",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : 31,
+							"State" : "Idle"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Thread",
+				"json" : {
+					"ID" : 31,
+					"State" : "Idle"
+				}
+			}
+		},
+		{
+			"id" : "ThreadServiceTest#listsThreads#1",
+			"service" : "threads",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Threads",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 31,
+									"Type" : "User",
+									"Name" : "Admin",
+									"State" : "Run",
+									"Function" : "POST /api/v1/Processes('Load')/tm1.ExecuteWithReturn",
+									"ObjectType" : "",
+									"ObjectName" : "",
+									"ElapsedTime" : "P0DT00H00M03S"
+								},
+								{
+									"ID" : 32,
+									"State" : "Idle",
+									"ElapsedTime" : "P1DT02H00M03.5S",
+									"WaitTime" : "P0DT00H00M00S"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Thread",
+					"json" : {
+						"ID" : 31,
+						"Type" : "User",
+						"Name" : "Admin",
+						"State" : "Run",
+						"Function" : "POST /api/v1/Processes('Load')/tm1.ExecuteWithReturn",
+						"ObjectType" : "",
+						"ObjectName" : "",
+						"ElapsedTime" : "PT3S"
+					}
+				},
+				{
+					"$model" : "Thread",
+					"json" : {
+						"ID" : 32,
+						"State" : "Idle",
+						"ElapsedTime" : "PT26H3.5S",
+						"WaitTime" : "PT0S"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ThreadServiceTest#listsThreads#2",
+			"service" : "threads",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"ID"
+						],
+						"filter" : "contains(Function,'Processes(''Load'')/tm1.ExecuteWithReturn')",
+						"orderBy" : [
+							"ID desc"
+						],
+						"top" : 1
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Threads?$select=ID&$filter=contains(Function,'Processes(''Load'')/tm1.ExecuteWithReturn')&$orderby=ID%20desc&$top=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 31
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Thread",
+					"json" : {
+						"ID" : 31
+					}
+				}
+			]
+		},
+		{
+			"id" : "ThreadServiceTest#readsAThreadsSession#1",
+			"service" : "threads",
+			"method" : "session",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				31,
+				{
+					"$query" : {
+						"select" : [
+							"ID",
+							"Context"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Threads(31)/Session?$select=ID,Context",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : 7,
+							"Context" : "Nightly load"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Session",
+				"json" : {
+					"ID" : 7,
+					"Context" : "Nightly load"
+				}
+			}
+		}
+	]
+}

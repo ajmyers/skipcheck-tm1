@@ -384,56 +384,31 @@ public static class ConformanceCodec
         double or float or decimal => JsonValue.Create(Convert.ToDouble(value, CultureInfo.InvariantCulture)),
         IList list => new JsonArray(list.Cast<object?>().Select(Result).ToArray()),
         _ when value.GetType().Namespace == "AjMyers.Tm1.Client.Model" && !value.GetType().IsEnum =>
-            new JsonObject { ["$model"] = value.GetType().Name, ["json"] = ModelJson(value) },
+            new JsonObject { ["$model"] = value.GetType().Name, ["json"] = WithoutTypes(JsonNode.Parse(Tm1Json.Write(value).GetRawText())) },
         _ => JsonNode.Parse(Tm1Json.Write(value).GetRawText()),
     };
 
-    /// <summary>The client's JSON options, with dates and times written as Java's Jackson writes an
-    /// <c>OffsetDateTime</c> (<c>2026-11-22T12:59:39Z</c>), for comparing models by their JSON.</summary>
-    private static readonly Lazy<JsonSerializerOptions> JavaDates = new(() =>
+    /// <summary>A model's JSON without <c>@odata.type</c>, throughout: the type is <c>$model</c>'s, as
+    /// the Java recorder writes it.</summary>
+    private static JsonNode? WithoutTypes(JsonNode? node)
     {
-        var options = new JsonSerializerOptions(Tm1Json.Options);
-        options.Converters.Insert(0, new JavaDateTimeConverter());
-        options.MakeReadOnly(populateMissingResolver: true);
-        return options;
-    });
-
-    private sealed class JavaDateTimeConverter : System.Text.Json.Serialization.JsonConverter<DateTimeOffset>
-    {
-        public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-            DateTimeOffset.Parse(reader.GetString()!, CultureInfo.InvariantCulture);
-
-        public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)
+        switch (node)
         {
-            var fraction = value.ToString("fffffff", CultureInfo.InvariantCulture).TrimEnd('0');
-            var offset = value.Offset == TimeSpan.Zero ? "Z" : value.ToString("zzz", CultureInfo.InvariantCulture);
-            writer.WriteStringValue(value.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture) + (fraction.Length > 0 ? "." + fraction : "") + offset);
+            case JsonObject o:
+                o.Remove("@odata.type");
+                foreach (var (_, v) in o.ToList())
+                {
+                    WithoutTypes(v);
+                }
+                break;
+            case JsonArray a:
+                foreach (var v in a)
+                {
+                    WithoutTypes(v);
+                }
+                break;
         }
-    }
-
-    /// <summary>A model's JSON without <c>@odata.type</c>, at any depth, as the Java recorder writes it
-    /// (its <c>$model</c> is its type), with dates as Java's Jackson writes them.</summary>
-    private static JsonNode? ModelJson(object value) =>
-        WithoutTypes(JsonNode.Parse(JsonSerializer.SerializeToElement(value, value.GetType(), JavaDates.Value).GetRawText()));
-
-    private static JsonNode? WithoutTypes(JsonNode? json)
-    {
-        if (json is JsonObject o)
-        {
-            o.Remove("@odata.type");
-            foreach (var (_, member) in o.ToList())
-            {
-                WithoutTypes(member);
-            }
-        }
-        else if (json is JsonArray a)
-        {
-            foreach (var item in a)
-            {
-                WithoutTypes(item);
-            }
-        }
-        return json;
+        return node;
     }
 
     /// <summary>How a call failed, as the Java recorder writes it (kinds in Java's constant case).</summary>

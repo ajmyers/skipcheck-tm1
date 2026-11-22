@@ -31,14 +31,14 @@ public class AnnotationLiveTests
             Assert.Contains(id, await tm1.Annotations.CubeAnnotationsAsync(Cube).Select(a => a.Id).ToListAsync());
 
             var mdx = $"SELECT {{[}}Clients].[Admin]}} ON 0, {{[}}Groups].[ADMIN]}} ON 1 FROM [{Cube}]";
-            var cellset = await tm1.Session.ExecuteAsync(Tm1Request.Post<Cellset>(ODataPath.Of("ExecuteMDX"), new Dictionary<string, object?> { ["MDX"] = mdx }));
+            var cellset = await tm1.Cellsets.ExecuteAsync(mdx);
             try
             {
                 Assert.Equal([id], await tm1.Annotations.CellAnnotationsAsync(cellset.Id!, 0).Select(a => a.Id).ToListAsync());
             }
             finally
             {
-                await tm1.Session.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Cellsets").Key(cellset.Id!)));
+                await tm1.Cellsets.DeleteAsync(cellset.Id!);
             }
 
             Assert.Equal(

@@ -54,6 +54,62 @@ export const Tm1Duration = {
   },
 } as const;
 
+const NANOS = 1_000_000_000n;
+
+/** A duration as the Java client reads it and writes it back (`Duration.toString`): TM1's
+ * `P1DT02H00M03.5S`, or bare seconds, as `PT26H3.5S`; hours, minutes and seconds, never days. A
+ * string Java couldn't read (years, months, weeks) stays as it is. */
+function javaDuration(value: unknown): unknown {
+  let nanos: bigint;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return value;
+    nanos = BigInt(Math.round(value * 1e9));
+  } else if (typeof value === "string") {
+    const m = /^([-+])?P(?:([-+]?\d+)D)?(?:T(?:([-+]?\d+)H)?(?:([-+]?\d+)M)?(?:([-+]?)(\d+)(?:[.,](\d{0,9}))?S)?)?$/i.exec(value.trim());
+    if (!m || /T$/i.test(value.trim()) || /^[-+]?P$/i.test(value.trim())) return value;
+    const n = (s: string | undefined): bigint => (s ? BigInt(s) : 0n);
+    let seconds = ((n(m[2]) * 24n + n(m[3])) * 60n + n(m[4])) * 60n;
+    const s = n(m[6]) * NANOS + (m[7] ? BigInt(m[7].padEnd(9, "0")) : 0n);
+    seconds = seconds * NANOS + (m[5] === "-" ? -s : s);
+    nanos = m[1] === "-" ? -seconds : seconds;
+  } else {
+    return value;
+  }
+  if (nanos === 0n) return "PT0S";
+  // As Java's Duration: whole seconds (rounded down) and a positive fraction
+  let seconds = nanos / NANOS;
+  let fraction = nanos % NANOS;
+  if (fraction < 0n) {
+    fraction += NANOS;
+    seconds -= 1n;
+  }
+  const total = seconds < 0n && fraction > 0n ? seconds + 1n : seconds;
+  const hours = total / 3600n;
+  const minutes = (total % 3600n) / 60n;
+  const secs = total % 60n;
+  let out = "PT";
+  if (hours !== 0n) out += hours + "H";
+  if (minutes !== 0n) out += minutes + "M";
+  if (secs === 0n && fraction === 0n && out.length > 2) return out;
+  out += seconds < 0n && fraction > 0n && secs === 0n ? "-0" : String(secs);
+  if (fraction > 0n) out += "." + String(seconds < 0n ? 2n * NANOS - fraction : fraction + NANOS).slice(1).replace(/0+$/, "");
+  return out + "S";
+}
+
+/** A date-time as the Java client reads it and writes it back: its instant in UTC, with the
+ * fraction of a second as given but for trailing zeros (`2026-01-02T03:04:00.120+05:30` →
+ * `2026-01-01T21:34:00.12Z`). A string that isn't one stays as it is. */
+function javaDateTime(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)(?::(\d\d))?(?:\.(\d{1,9}))?(Z|[+-]\d\d:\d\d)$/i.exec(value);
+  if (!m) return value;
+  const offset = m[8]!.toUpperCase() === "Z" ? 0 : (m[8]![0] === "-" ? -1 : 1) * (Number(m[8]!.slice(1, 3)) * 60 + Number(m[8]!.slice(4, 6)));
+  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0)) - offset * 60_000;
+  if (Number.isNaN(ms)) return value;
+  const fraction = (m[7] ?? "").replace(/0+$/, "");
+  return new Date(ms).toISOString().slice(0, 19) + (fraction ? "." + fraction : "") + "Z";
+}
+
 function readEnum(name: string, value: unknown): unknown {
   const e = schema.enums[name];
   if (!e || typeof value !== "string") return value;
@@ -106,6 +162,32 @@ export function readAs<T>(type: Tm1Model<T> | undefined, value: unknown): T {
     return v as T;
   }
   return readType(type.$type, value) as T;
+}
+
+function javaValue(kind: string, value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map((v) => javaValue(kind, v));
+  if (kind === "d") return javaDuration(value);
+  if (kind === "dt" || kind === "l") return javaDateTime(value);
+  if (kind.startsWith("t:")) return javaForm(kind.slice(2), value);
+  return value;
+}
+
+/** @internal A model read as `name`, with its durations and date-times written as the Java client
+ * writes the values it read: for comparing what this client read with what Java did. Reading
+ * itself keeps TM1's text. Returns a copy. */
+export function javaForm(name: string, value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((v) => javaForm(name, v));
+  if (typeof value !== "object" || value === null) return value;
+  const record = { ...(value as Record<string, unknown>) };
+  for (let t: string | undefined = chosen(name, record); t; t = schema.types[t]?.base) {
+    const info = schema.types[t];
+    if (!info) break;
+    for (const [property, kind] of Object.entries(info.properties)) {
+      if (property in record) record[property] = javaValue(kind, record[property]);
+    }
+  }
+  return record;
 }
 
 /** The subtype `type` names a value as, by its `@odata.type`: for checks such as

@@ -117,7 +117,9 @@ class ConformanceScenariosTest {
 		ConformanceTm1 plumbing = new ConformanceTm1();
 		Deque<ClientResponse> answers = new ArrayDeque<>();
 		for (JsonNode step : scenario.get("steps")) {
-			answers.add(answer(ConformanceScenarios.substitute(step.get("expect"), names)));
+			if (sends(step)) {
+				answers.add(answer(ConformanceScenarios.substitute(step.get("expect"), names)));
+			}
 		}
 		scenario.path("finally").forEach(step -> answers.add(ClientResponse.create(HttpStatus.NO_CONTENT).build()));
 		return request -> {
@@ -175,7 +177,8 @@ class ConformanceScenariosTest {
 	}
 
 	@ParameterizedTest(name = "{0}")
-	@ValueSource(strings = { "subsets", "members", "edges", "member-sets", "content", "encryption", "git" })
+	@ValueSource(strings = { "subsets", "members", "edges", "member-sets", "content", "encryption", "git", "users",
+			"sessions", "attributes", "annotations" })
 	void runsAScenarioSendingOneRequestPerStep(String name) {
 		JsonNode scenario = ConformanceScenarios.load(ConformanceScenarios.directory().resolve(name + ".json"));
 		Map<String, String> names = ConformanceScenarios.names(scenario);
@@ -183,7 +186,20 @@ class ConformanceScenariosTest {
 		List<String> failures = ConformanceScenarios.run(client(traffic, expected(scenario, names)), traffic, scenario,
 				names);
 		assertThat(failures).isEmpty();
-		assertThat(traffic.exchanges()).hasSize(scenario.get("steps").size() + scenario.path("finally").size());
+		long sending = 0;
+		for (JsonNode step : scenario.get("steps")) {
+			sending += sends(step) ? 1 : 0;
+		}
+		assertThat(traffic.exchanges()).hasSize((int) sending + scenario.path("finally").size());
+	}
+
+	/**
+	 * Whether a step sends a request: all but those refused before one (an argument
+	 * error).
+	 */
+	private static boolean sends(JsonNode step) {
+		JsonNode error = step.path("expect").path("error");
+		return error.isMissingNode() || error.path("category").asString().equals("api");
 	}
 
 	/**

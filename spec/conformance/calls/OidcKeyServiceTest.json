@@ -1,0 +1,218 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.security.OidcKeyServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "OidcKeyServiceTest#anUncachedKeyIsNotFound#1",
+			"service" : "oidcKeys",
+			"method" : "remove",
+			"params" : [
+				"keyIds"
+			],
+			"args" : [
+				[
+					"not-cached"
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "RemoveOIDCKeyFromCache",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"KeyId" : [
+								"not-cached"
+							]
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "55",
+								"message" : "ObjectNotFound: the key isn't cached"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 400,
+				"code" : "55"
+			}
+		},
+		{
+			"id" : "OidcKeyServiceTest#listsTheCachedKeys#1",
+			"service" : "oidcKeys",
+			"method" : "keys",
+			"params" : [ ],
+			"args" : [ ],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "GetOIDCKeys()",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.context" : "$metadata#Collection(Edm.String)",
+							"value" : [
+								"k1",
+								"k2"
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				"k1",
+				"k2"
+			]
+		},
+		{
+			"id" : "OidcKeyServiceTest#listsTheCachedKeys#2",
+			"service" : "oidcKeys",
+			"method" : "keys",
+			"params" : [ ],
+			"args" : [ ],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "GetOIDCKeys()",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "OidcKeyServiceTest#refusesAMissingKey#1",
+			"service" : "oidcKeys",
+			"method" : "remove",
+			"params" : [
+				"keyIds"
+			],
+			"args" : [
+				[
+					"k1",
+					null
+				]
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "OidcKeyServiceTest#removesKeys#1",
+			"service" : "oidcKeys",
+			"method" : "remove",
+			"params" : [
+				"keyIds"
+			],
+			"args" : [
+				[
+					"k1",
+					"k/2 '3'"
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "RemoveOIDCKeyFromCache",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"KeyId" : [
+								"k1",
+								"k/2 '3'"
+							]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "OidcKeyServiceTest#removesKeys#2",
+			"service" : "oidcKeys",
+			"method" : "remove",
+			"params" : [
+				"keyIds"
+			],
+			"args" : [
+				[ ]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "RemoveOIDCKeyFromCache",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"KeyId" : [ ]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

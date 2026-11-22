@@ -116,7 +116,8 @@ function emitType(spec: Spec, t: SpecType): string {
 }
 
 /** schema.ts: what reading needs, by type name. A property is listed when reading changes it: a
- * structured type ("t:Name"), an enum ("e:Name"), a duration ("d") or a lenient date ("l"). */
+ * structured type ("t:Name"), an enum ("e:Name"), a duration ("d"), a date-time ("dt") or a
+ * lenient date ("l"). */
 export function emitSchema(spec: Spec): string {
   let out = HEADER;
   out += 'import type { Tm1Schema } from "../json.js";\n\n';
@@ -135,6 +136,7 @@ export function emitSchema(spec: Spec): string {
       let kind: string | undefined;
       if (p.lenientDate) kind = "l";
       else if (p.type === "Edm.Duration") kind = "d";
+      else if (p.type === "Edm.DateTimeOffset") kind = "dt";
       else if (spec.typeByName.has(p.type)) kind = "t:" + spec.typeByName.get(p.type)!.name;
       else if (spec.enumByName.has(p.type) && !spec.enumByName.get(p.type)!.flags) kind = "e:" + spec.enumByName.get(p.type)!.name;
       if (kind) props.push(`${Names.key(p.name)}: ${JSON.stringify(kind)}`);

@@ -50,6 +50,7 @@ public static class Tm1Json
         };
         options.Converters.Add(new Tm1EnumConverterFactory());
         options.Converters.Add(new Iso8601TimeSpanConverter());
+        options.Converters.Add(new Iso8601DateTimeOffsetConverter());
         options.Converters.Add(new Tm1PatchConverter());
         options.Converters.Add(new Tm1PolymorphicConverterFactory());
         options.MakeReadOnly(populateMissingResolver: true);
@@ -135,20 +136,78 @@ public sealed class Iso8601TimeSpanConverter : JsonConverter<TimeSpan>
         _ => XmlConvert.ToTimeSpan(reader.GetString()!),
     };
 
-    public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options) => writer.WriteStringValue(XmlConvert.ToString(value));
+    public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options) => writer.WriteStringValue(Format(value));
+
+    /// <summary>As the Java client writes a duration (<c>Duration.toString</c>): hours, minutes and
+    /// seconds, never days (<c>PT26H3.5S</c>, <c>PT1H30M</c>, <c>PT0S</c>).</summary>
+    internal static string Format(TimeSpan value)
+    {
+        const long PerSecond = TimeSpan.TicksPerSecond;
+        var ticks = value.Ticks;
+        if (ticks == 0)
+        {
+            return "PT0S";
+        }
+        // As Java's Duration: whole seconds (rounded down) and a positive fraction
+        var seconds = Math.DivRem(ticks, PerSecond, out var fraction);
+        if (fraction < 0)
+        {
+            fraction += PerSecond;
+            seconds--;
+        }
+        var total = seconds < 0 && fraction > 0 ? seconds + 1 : seconds;
+        var hours = total / 3600;
+        var minutes = total % 3600 / 60;
+        var secs = total % 60;
+        var b = new System.Text.StringBuilder("PT");
+        if (hours != 0)
+        {
+            b.Append(hours.ToString(CultureInfo.InvariantCulture)).Append('H');
+        }
+        if (minutes != 0)
+        {
+            b.Append(minutes.ToString(CultureInfo.InvariantCulture)).Append('M');
+        }
+        if (secs == 0 && fraction == 0 && b.Length > 2)
+        {
+            return b.ToString();
+        }
+        b.Append(seconds < 0 && fraction > 0 && secs == 0 ? "-0" : secs.ToString(CultureInfo.InvariantCulture));
+        if (fraction > 0)
+        {
+            var digits = (seconds < 0 ? 2 * PerSecond - fraction : fraction + PerSecond).ToString(CultureInfo.InvariantCulture);
+            b.Append('.').Append(digits[1..].TrimEnd('0'));
+        }
+        return b.Append('S').ToString();
+    }
+}
+
+/// <summary>Date-times as the Java client has them: read as their instant in UTC, written in ISO 8601
+/// with the fraction of a second without trailing zeros and <c>Z</c> for UTC
+/// (<c>2026-01-02T03:04:00.12Z</c>).</summary>
+public sealed class Iso8601DateTimeOffsetConverter : JsonConverter<DateTimeOffset>
+{
+    public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetDateTimeOffset().ToUniversalTime();
+
+    public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(Format(value));
+
+    internal static string Format(DateTimeOffset value) => value.ToString(
+        value.Offset == TimeSpan.Zero ? "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'" : "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture);
 }
 
 /// <summary>A date-time TM1 sometimes sends something else in (<c>0000-00-00T00:00Z</c>): read as null.</summary>
 public sealed class LenientDateTimeOffsetConverter : JsonConverter<DateTimeOffset?>
 {
     public override DateTimeOffset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-        reader.TokenType == JsonTokenType.String && DateTimeOffset.TryParse(reader.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d) ? d : null;
+        reader.TokenType == JsonTokenType.String && DateTimeOffset.TryParse(reader.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d) ? d.ToUniversalTime() : null;
 
     public override void Write(Utf8JsonWriter writer, DateTimeOffset? value, JsonSerializerOptions options)
     {
         if (value is { } v)
         {
-            writer.WriteStringValue(v);
+            writer.WriteStringValue(Iso8601DateTimeOffsetConverter.Format(v));
         }
         else
         {

@@ -1,0 +1,1132 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.security.UserServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "UserServiceTest#aMissingUserIsNotFound#1",
+			"service" : "users",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"nobody",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Users('nobody')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'nobody' can not be found in collection of type 'User'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "UserServiceTest#anExistingUserIsRefused#1",
+			"service" : "users",
+			"method" : "create",
+			"params" : [
+				"user"
+			],
+			"args" : [
+				{
+					"$patch" : "UserPatch",
+					"json" : {
+						"Name" : "alice"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Users",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "alice"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "User 'alice' already exists."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "UserServiceTest#createsAUserInGroups#1",
+			"service" : "users",
+			"method" : "create",
+			"params" : [
+				"user"
+			],
+			"args" : [
+				{
+					"$patch" : "UserPatch",
+					"json" : {
+						"Name" : "alice",
+						"FriendlyName" : "Alice",
+						"Password" : "initial-password",
+						"Groups@odata.bind" : [
+							"Groups('Planners')",
+							"Groups('%7DSales%20%26%20Co')"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Users",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "alice",
+							"FriendlyName" : "Alice",
+							"Password" : "initial-password",
+							"Groups@odata.bind" : [
+								"Groups('Planners')",
+								"Groups('%7DSales%20%26%20Co')"
+							]
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "alice",
+							"Type" : "User"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "User",
+				"json" : {
+					"Name" : "alice",
+					"Type" : "User"
+				}
+			}
+		},
+		{
+			"id" : "UserServiceTest#deletesAUser#1",
+			"service" : "users",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"alice"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Users('alice')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "UserServiceTest#deletesAUser#2",
+			"service" : "users",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"nobody"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Users('nobody')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'nobody' can not be found in collection of type 'User'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "UserServiceTest#disconnectsAUser#1",
+			"service" : "users",
+			"method" : "disconnect",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"alice"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Users('alice')/tm1.Disconnect",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "UserServiceTest#escapesAUsersName#1",
+			"service" : "users",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"O'Neil / Ünï #1",
+				{
+					"$query" : {
+						"expand" : {
+							"Groups" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Users('O''Neil%20%2F%20%C3%9Cn%C3%AF%20%231')?$expand=Groups",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "O'Neil / Ünï #1"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "User",
+				"json" : {
+					"Name" : "O'Neil / Ünï #1"
+				}
+			}
+		},
+		{
+			"id" : "UserServiceTest#followsNextLinks#1",
+			"service" : "users",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Users?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "a"
+								}
+							],
+							"@odata.nextLink" : "Users?$skiptoken=1"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Users?$skiptoken=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "b"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "User",
+					"json" : {
+						"Name" : "a"
+					}
+				},
+				{
+					"$model" : "User",
+					"json" : {
+						"Name" : "b"
+					}
+				}
+			]
+		},
+		{
+			"id" : "UserServiceTest#getsAUser#1",
+			"service" : "users",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"alice",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"FriendlyName"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Users('alice')?$select=Name,FriendlyName",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "alice",
+							"FriendlyName" : "Alice",
+							"Type" : "User",
+							"IsActive" : false,
+							"Enabled" : true
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "User",
+				"json" : {
+					"Name" : "alice",
+					"FriendlyName" : "Alice",
+					"Type" : "User",
+					"IsActive" : false,
+					"Enabled" : true
+				}
+			}
+		},
+		{
+			"id" : "UserServiceTest#listsUsers#1",
+			"service" : "users",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Users",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Admin",
+									"Type" : "Admin"
+								},
+								{
+									"Name" : "alice",
+									"Type" : "User"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "User",
+					"json" : {
+						"Name" : "Admin",
+						"Type" : "Admin"
+					}
+				},
+				{
+					"$model" : "User",
+					"json" : {
+						"Name" : "alice",
+						"Type" : "User"
+					}
+				}
+			]
+		},
+		{
+			"id" : "UserServiceTest#listsUsers#2",
+			"service" : "users",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"expand" : {
+							"Groups" : {
+								"select" : [
+									"Name"
+								]
+							}
+						},
+						"filter" : "Enabled eq true",
+						"orderBy" : [
+							"Name"
+						],
+						"top" : 10
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Users?$select=Name&$expand=Groups($select%3DName)&$filter=Enabled%20eq%20true&$orderby=Name&$top=10",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "alice",
+									"Groups" : [
+										{
+											"Name" : "Planners"
+										}
+									]
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "User",
+					"json" : {
+						"Name" : "alice",
+						"Groups" : [
+							{
+								"Name" : "Planners"
+							}
+						]
+					}
+				}
+			]
+		},
+		{
+			"id" : "UserServiceTest#readsAUsersGroupsAndSessions#1",
+			"service" : "users",
+			"method" : "groups",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"alice",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Users('alice')/Groups?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "ADMIN"
+								},
+								{
+									"Name" : "Planners"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Group",
+					"json" : {
+						"Name" : "ADMIN"
+					}
+				},
+				{
+					"$model" : "Group",
+					"json" : {
+						"Name" : "Planners"
+					}
+				}
+			]
+		},
+		{
+			"id" : "UserServiceTest#readsAUsersGroupsAndSessions#2",
+			"service" : "users",
+			"method" : "sessions",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"alice",
+				{
+					"$query" : {
+						"expand" : {
+							"Threads" : {
+								"select" : [
+									"ID",
+									"State"
+								]
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Users('alice')/Sessions?$expand=Threads($select%3DID,State)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 7,
+									"Context" : "Nightly load"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Session",
+					"json" : {
+						"ID" : 7,
+						"Context" : "Nightly load"
+					}
+				}
+			]
+		},
+		{
+			"id" : "UserServiceTest#readsAUsersGroupsAndSessions#3",
+			"service" : "users",
+			"method" : "sessions",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"O'Neil",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Users('O''Neil')/Sessions",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "UserServiceTest#readsTheActiveUser#1",
+			"service" : "users",
+			"method" : "activeUser",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"expand" : {
+							"Groups" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ActiveUser?$expand=Groups",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Admin",
+							"Type" : "Admin",
+							"Groups" : [
+								{
+									"Name" : "ADMIN"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "User",
+				"json" : {
+					"Name" : "Admin",
+					"Type" : "Admin",
+					"Groups" : [
+						{
+							"Name" : "ADMIN"
+						}
+					]
+				}
+			}
+		},
+		{
+			"id" : "UserServiceTest#readsTheActiveUser#2",
+			"service" : "users",
+			"method" : "activeUser",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ActiveUser",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Admin"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "User",
+				"json" : {
+					"Name" : "Admin"
+				}
+			}
+		},
+		{
+			"id" : "UserServiceTest#refusesAMissingGroup#1",
+			"service" : "users",
+			"method" : "setGroups",
+			"params" : [
+				"name",
+				"groups"
+			],
+			"args" : [
+				"alice",
+				[
+					"Planners",
+					null
+				]
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "UserServiceTest#refusesAMissingName#1",
+			"service" : "users",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "UserServiceTest#refusesAMissingName#2",
+			"service" : "users",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "UserServiceTest#refusesAMissingName#3",
+			"service" : "users",
+			"method" : "disconnect",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "UserServiceTest#refusesAnUpdateThatSetsGroups#1",
+			"service" : "users",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch"
+			],
+			"args" : [
+				"alice",
+				{
+					"$patch" : "UserPatch",
+					"json" : {
+						"Groups@odata.bind" : [
+							"Groups('Planners')"
+						]
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "UserServiceTest#refusesAnUpdateThatSetsGroups#2",
+			"service" : "users",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch"
+			],
+			"args" : [
+				"alice",
+				{
+					"$patch" : "UserPatch",
+					"json" : {
+						"Groups" : [
+							{
+								"Name" : "Planners"
+							}
+						]
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "UserServiceTest#setsGroupsWhole#1",
+			"service" : "users",
+			"method" : "setGroups",
+			"params" : [
+				"name",
+				"groups"
+			],
+			"args" : [
+				"alice",
+				[
+					"Planners",
+					"O'Neil's / }Team"
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Users('alice')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Groups@odata.bind" : [
+								"Groups('Planners')",
+								"Groups('O''Neil''s%20%2F%20%7DTeam')"
+							]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "UserServiceTest#setsGroupsWhole#2",
+			"service" : "users",
+			"method" : "setGroups",
+			"params" : [
+				"name",
+				"groups"
+			],
+			"args" : [
+				"alice",
+				[ ]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Users('alice')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Groups@odata.bind" : [ ]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "UserServiceTest#updatesAUser#1",
+			"service" : "users",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch"
+			],
+			"args" : [
+				"alice",
+				{
+					"$patch" : "UserPatch",
+					"json" : {
+						"FriendlyName" : null,
+						"Enabled" : false
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Users('alice')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"FriendlyName" : null,
+							"Enabled" : false
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "UserServiceTest#updatesAUser#2",
+			"service" : "users",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch"
+			],
+			"args" : [
+				"O'Neil",
+				{
+					"$patch" : "UserPatch",
+					"json" : {
+						"Password" : "new"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Users('O''Neil')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Password" : "new"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

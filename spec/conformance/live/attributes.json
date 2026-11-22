@@ -1,0 +1,104 @@
+{
+	"specVersion" : 1,
+	"name" : "attributes",
+	"description" : "Attributes of a fresh dimension's elements and hierarchies: define, read, translate an element into French, read it through the member, a locale created twice, delete, a missing attribute.",
+	"names" : [ "dimension", "code", "label", "missing" ],
+	"steps" : [
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${dimension}", "Hierarchies" : [ { "Name" : "${dimension}", "Elements" : [ { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${dimension}" } }
+		},
+		{
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [ "set", "attribute" ],
+			"args" : [ { "$type" : "AttributeSet", "factory" : "elements", "args" : [ "${dimension}", "${dimension}" ] }, { "$patch" : "AttributeDefinitionPatch", "json" : { "Name" : "${label}", "Type" : "String" } } ],
+			"expect" : { "fields" : { "Name" : "${label}", "Type" : "String" } }
+		},
+		{
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [ "set", "name", "query" ],
+			"args" : [ { "$type" : "AttributeSet", "factory" : "elements", "args" : [ "${dimension}", "${dimension}" ] }, "${label}", { "$query" : { } } ],
+			"expect" : { "fields" : { "Name" : "${label}", "Type" : "String" } }
+		},
+		{
+			"service" : "attributes",
+			"method" : "list",
+			"params" : [ "set", "query" ],
+			"args" : [ { "$type" : "AttributeSet", "factory" : "elements", "args" : [ "${dimension}", "${dimension}" ] }, { "$query" : { "select" : [ "Name" ], "filter" : "Name eq '${label}'" } } ],
+			"expect" : { "items" : { "Name" : [ "${label}" ] } }
+		},
+		{
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [ "owner", "translations" ],
+			"args" : [ { "$type" : "AttributeOwner", "factory" : "element", "args" : [ "${dimension}", "${dimension}", "North" ] }, { "$patch" : "LocalizedAttributesPatch", "json" : { "LocaleID" : "fr", "Attributes" : { "${label}" : "Nord" } } } ],
+			"expect" : { "fields" : { "LocaleID" : "fr" } }
+		},
+		{
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [ "owner", "locale", "query" ],
+			"args" : [ { "$type" : "AttributeOwner", "factory" : "element", "args" : [ "${dimension}", "${dimension}", "North" ] }, "fr", { "$query" : { } } ],
+			"expect" : { "fields" : { "LocaleID" : "fr" } }
+		},
+		{
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [ "owner", "query" ],
+			"args" : [ { "$type" : "AttributeOwner", "factory" : "member", "args" : [ "${dimension}", "${dimension}", "North" ] }, { "$query" : { "select" : [ "LocaleID" ] } } ],
+			"expect" : { "items" : { "LocaleID" : [ "fr" ] } }
+		},
+		{
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [ "owner", "translations" ],
+			"args" : [ { "$type" : "AttributeOwner", "factory" : "element", "args" : [ "${dimension}", "${dimension}", "North" ] }, { "$patch" : "LocalizedAttributesPatch", "json" : { "LocaleID" : "fr", "Attributes" : { "${label}" : "Le Nord" } } } ],
+			"expect" : { "error" : { "category" : "api", "status" : 400 } }
+		},
+		{
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [ "set", "attribute" ],
+			"args" : [ { "$type" : "AttributeSet", "factory" : "hierarchies", "args" : [ "${dimension}" ] }, { "$patch" : "AttributeDefinitionPatch", "json" : { "Name" : "${code}", "Type" : "String" } } ],
+			"expect" : { "fields" : { "Name" : "${code}", "Type" : "String" } }
+		},
+		{
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [ "owner", "translations" ],
+			"args" : [ { "$type" : "AttributeOwner", "factory" : "hierarchy", "args" : [ "${dimension}", "${dimension}" ] }, { "$patch" : "LocalizedAttributesPatch", "json" : { "LocaleID" : "de", "Attributes" : { "${code}" : "Region" } } } ],
+			"expect" : { "fields" : { "LocaleID" : "de" } }
+		},
+		{
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [ "set", "name" ],
+			"args" : [ { "$type" : "AttributeSet", "factory" : "hierarchies", "args" : [ "${dimension}" ] }, "${code}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [ "set", "name" ],
+			"args" : [ { "$type" : "AttributeSet", "factory" : "elements", "args" : [ "${dimension}", "${dimension}" ] }, "${label}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [ "set", "name", "query" ],
+			"args" : [ { "$type" : "AttributeSet", "factory" : "elements", "args" : [ "${dimension}", "${dimension}" ] }, "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		}
+	],
+	"finally" : [
+		{ "service" : "attributes", "method" : "delete", "params" : [ "set", "name" ], "args" : [ { "$type" : "AttributeSet", "factory" : "elements", "args" : [ "${dimension}", "${dimension}" ] }, "${label}" ] },
+		{ "service" : "attributes", "method" : "delete", "params" : [ "set", "name" ], "args" : [ { "$type" : "AttributeSet", "factory" : "hierarchies", "args" : [ "${dimension}" ] }, "${code}" ] },
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${dimension}" ] }
+	]
+}

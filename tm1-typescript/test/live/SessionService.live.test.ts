@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { ODataPath, ProcessExecuteResult, ProcessPatch, Tm1Operations, Tm1Request, Tm1ServerException, type Thread, type Tm1Client, type Tm1ClientBuilder } from "../../src/index.js";
+import { ProcessPatch, Tm1ServerException, type Thread, type Tm1Client, type Tm1ClientBuilder } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 /** A client beside `Live.client()`, of the same TM1 with the same settings, as another session. */
@@ -7,8 +7,6 @@ async function otherClient(configure?: (b: Tm1ClientBuilder) => Tm1ClientBuilder
   const builder = await Live.builder();
   return (configure?.(builder) ?? builder).build();
 }
-
-const PROCESSES = ODataPath.of("Processes");
 
 /** SessionService and ThreadService against a real TM1, with a second client to look at, close and
  * interrupt: the Java client's `SessionAndThreadTm1Test`. */
@@ -47,10 +45,9 @@ describe("SessionService and ThreadService on TM1" + liveReason, () => {
 
   tm1Test("cancels a running process through its thread", { timeout: 180_000 }, async () => {
     const process = Live.name();
-    // Processes through the session until ProcessService is ported
-    await tm1.session.execute(Tm1Request.post(PROCESSES, ProcessPatch.builder().name(process).prologProcedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n").build()));
+    await tm1.processes.create(ProcessPatch.builder().name(process).prologProcedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n").build());
     const runner = await otherClient();
-    const run = runner.session.execute(Tm1Request.post(PROCESSES.key(process).action(Tm1Operations.ProcessExecuteWithReturn.name), {}, ProcessExecuteResult));
+    const run = runner.processes.executeWithReturn(process);
     const ran = run.then(
       () => undefined,
       (e: unknown) => e,
@@ -63,7 +60,7 @@ describe("SessionService and ThreadService on TM1" + liveReason, () => {
         if (!running) await new Promise((r) => setTimeout(r, 100));
       }
       expect(running, "the process's thread").toBeDefined();
-      expect(running!.ObjectName,"a process run through REST shows as its request").toBe("");
+      expect(running!.ObjectName, "a process run through REST shows as its request").toBe("");
       expect((await tm1.threads.get(running!.ID!)).Function).toContain(process);
       expect((await tm1.threads.session(running!.ID!)).ID).toBeDefined();
       await tm1.threads.cancel(running!.ID!);
@@ -73,7 +70,7 @@ describe("SessionService and ThreadService on TM1" + liveReason, () => {
     } finally {
       await ran;
       await runner.close().catch(() => undefined);
-      await tm1.session.execute(Tm1Request.delete(PROCESSES.key(process)));
+      await tm1.processes.delete(process);
     }
   });
 });

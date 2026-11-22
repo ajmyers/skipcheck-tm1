@@ -1,0 +1,548 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.security.SessionServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "SessionServiceTest#aClosedSessionIsNotFound#1",
+			"service" : "sessions",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				99,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Sessions(99)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'99' can not be found in collection of type 'Session'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "SessionServiceTest#closesAnotherSession#1",
+			"service" : "sessions",
+			"method" : "close",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				7
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sessions(7)/tm1.Close",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SessionServiceTest#closesAnotherSession#2",
+			"service" : "sessions",
+			"method" : "close",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				99
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sessions(99)/tm1.Close",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'99' can not be found in collection of type 'Session'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "SessionServiceTest#getsASessionById#1",
+			"service" : "sessions",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				7,
+				{
+					"$query" : {
+						"expand" : {
+							"Threads" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Sessions(7)?$expand=Threads",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : 7,
+							"Context" : "Nightly load",
+							"Active" : true
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Session",
+				"json" : {
+					"ID" : 7,
+					"Context" : "Nightly load",
+					"Active" : true
+				}
+			}
+		},
+		{
+			"id" : "SessionServiceTest#listsSessionsWithTheirUsers#1",
+			"service" : "sessions",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Sessions",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 1,
+									"Context" : ""
+								},
+								{
+									"ID" : 7,
+									"Context" : "Nightly load"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Session",
+					"json" : {
+						"ID" : 1,
+						"Context" : ""
+					}
+				},
+				{
+					"$model" : "Session",
+					"json" : {
+						"ID" : 7,
+						"Context" : "Nightly load"
+					}
+				}
+			]
+		},
+		{
+			"id" : "SessionServiceTest#listsSessionsWithTheirUsers#2",
+			"service" : "sessions",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"ID",
+							"Context"
+						],
+						"expand" : {
+							"User" : {
+								"select" : [
+									"Name"
+								]
+							}
+						},
+						"filter" : "Context eq 'Nightly load'"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Sessions?$select=ID,Context&$expand=User($select%3DName)&$filter=Context%20eq%20'Nightly%20load'",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 7,
+									"Context" : "Nightly load",
+									"User" : {
+										"Name" : "alice"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Session",
+					"json" : {
+						"ID" : 7,
+						"Context" : "Nightly load",
+						"User" : {
+							"Name" : "alice"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "SessionServiceTest#readsASessionsUserAndThreads#1",
+			"service" : "sessions",
+			"method" : "user",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				7,
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Sessions(7)/User?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "alice"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "User",
+				"json" : {
+					"Name" : "alice"
+				}
+			}
+		},
+		{
+			"id" : "SessionServiceTest#readsASessionsUserAndThreads#2",
+			"service" : "sessions",
+			"method" : "threads",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				7,
+				{
+					"$query" : {
+						"filter" : "State ne 'Idle'",
+						"orderBy" : [
+							"ID"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Sessions(7)/Threads?$filter=State%20ne%20'Idle'&$orderby=ID",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 31,
+									"State" : "Run",
+									"Function" : "GET /api/v1/Cubes"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Thread",
+					"json" : {
+						"ID" : 31,
+						"State" : "Run",
+						"Function" : "GET /api/v1/Cubes"
+					}
+				}
+			]
+		},
+		{
+			"id" : "SessionServiceTest#readsASessionsUserAndThreads#3",
+			"service" : "sessions",
+			"method" : "threads",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				1,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Sessions(1)/Threads",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "SessionServiceTest#readsTheActiveSession#1",
+			"service" : "sessions",
+			"method" : "activeSession",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"expand" : {
+							"User" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ActiveSession?$expand=User",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : 1,
+							"Context" : "",
+							"User" : {
+								"Name" : "Admin"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Session",
+				"json" : {
+					"ID" : 1,
+					"Context" : "",
+					"User" : {
+						"Name" : "Admin"
+					}
+				}
+			}
+		},
+		{
+			"id" : "SessionServiceTest#readsTheActiveSession#2",
+			"service" : "sessions",
+			"method" : "activeSession",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ActiveSession",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : 1
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Session",
+				"json" : {
+					"ID" : 1
+				}
+			}
+		}
+	]
+}

@@ -1,0 +1,549 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.security.GroupServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "GroupServiceTest#aMissingGroupIsNotFound#1",
+			"service" : "groups",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Groups('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Group'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "GroupServiceTest#anExistingGroupIsRefused#1",
+			"service" : "groups",
+			"method" : "create",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Planners"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Groups",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Planners"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Group 'Planners' already exists."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "GroupServiceTest#createsAGroup#1",
+			"service" : "groups",
+			"method" : "create",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Planners"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Groups",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Planners"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Planners"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Group",
+				"json" : {
+					"Name" : "Planners"
+				}
+			}
+		},
+		{
+			"id" : "GroupServiceTest#deletesAGroup#1",
+			"service" : "groups",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"O'Neil"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Groups('O''Neil')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "GroupServiceTest#getsAGroup#1",
+			"service" : "groups",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Planners",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Groups('Planners')?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Planners"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Group",
+				"json" : {
+					"Name" : "Planners"
+				}
+			}
+		},
+		{
+			"id" : "GroupServiceTest#getsAGroup#2",
+			"service" : "groups",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"}Sales & O'Neil/1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Groups('%7DSales%20%26%20O''Neil%2F1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "}Sales & O'Neil/1"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Group",
+				"json" : {
+					"Name" : "}Sales & O'Neil/1"
+				}
+			}
+		},
+		{
+			"id" : "GroupServiceTest#listsAGroupsUsers#1",
+			"service" : "groups",
+			"method" : "users",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Planners",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Groups('Planners')/Users?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "alice"
+								},
+								{
+									"Name" : "bob"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "User",
+					"json" : {
+						"Name" : "alice"
+					}
+				},
+				{
+					"$model" : "User",
+					"json" : {
+						"Name" : "bob"
+					}
+				}
+			]
+		},
+		{
+			"id" : "GroupServiceTest#listsAGroupsUsers#2",
+			"service" : "groups",
+			"method" : "users",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Empty",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Groups('Empty')/Users",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "GroupServiceTest#listsGroups#1",
+			"service" : "groups",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Groups",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "ADMIN"
+								},
+								{
+									"Name" : "Planners"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Group",
+					"json" : {
+						"Name" : "ADMIN"
+					}
+				},
+				{
+					"$model" : "Group",
+					"json" : {
+						"Name" : "Planners"
+					}
+				}
+			]
+		},
+		{
+			"id" : "GroupServiceTest#listsGroups#2",
+			"service" : "groups",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"expand" : {
+							"Users" : {
+								"select" : [
+									"Name"
+								]
+							}
+						},
+						"orderBy" : [
+							"Name"
+						],
+						"skip" : 1
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Groups?$select=Name&$expand=Users($select%3DName)&$orderby=Name&$skip=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Planners",
+									"Users" : [
+										{
+											"Name" : "alice"
+										}
+									]
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Group",
+					"json" : {
+						"Name" : "Planners",
+						"Users" : [
+							{
+								"Name" : "alice"
+							}
+						]
+					}
+				}
+			]
+		},
+		{
+			"id" : "GroupServiceTest#refusesAMissingName#1",
+			"service" : "groups",
+			"method" : "create",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "GroupServiceTest#refusesAMissingName#2",
+			"service" : "groups",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "GroupServiceTest#refusesAMissingName#3",
+			"service" : "groups",
+			"method" : "users",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		}
+	]
+}

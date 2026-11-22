@@ -26,13 +26,12 @@ def test_annotates_a_cell_and_finds_it_by_cube_cell_and_id(tm1: Tm1Client) -> No
 
         assert tm1.annotations.list() == [], "TM1 lists none here"
         assert id in [a.id for a in tm1.annotations.cube_annotations(CUBE)]
-        # Through the generated API, so this doesn't depend on CellsetService
         mdx = f"SELECT {{[}}Clients].[Admin]}} ON 0, {{[}}Groups].[ADMIN]}} ON 1 FROM [{CUBE}]"
-        cellset = tm1.api.execute_mdx(mdx=mdx, query=ODataQuery.none().select("ID"))
+        cellset = tm1.cellsets.execute(mdx, ODataQuery.none().select("ID"))
         try:
             assert [a.id for a in tm1.annotations.cell_annotations(cellset.id, 0)] == [id]
         finally:
-            tm1.api.cellsets[cellset.id].delete()
+            tm1.cellsets.delete(cellset.id)
 
         members = tm1.annotations.dimensional_context(id, ODataQuery.none().select("UniqueName"))
         assert [m.unique_name for m in members] == ["[}Clients].[}Clients].[Admin]", "[}Groups].[}Groups].[ADMIN]"]

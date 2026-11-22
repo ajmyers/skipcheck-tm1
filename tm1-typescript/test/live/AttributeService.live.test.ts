@@ -30,7 +30,6 @@ import {
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
-// Dimensions, subsets, views, processes and chores through the session until their services are ported
 const DIMENSIONS = ODataPath.of("Dimensions");
 
 function createDimension(tm1: Tm1Client, name: string, elements: string[]): Promise<unknown> {
@@ -38,16 +37,15 @@ function createDimension(tm1: Tm1Client, name: string, elements: string[]): Prom
     .name(name)
     .elements(elements.map((e) => ElementPatch.builder().name(e).type(ElementType.Numeric).build()))
     .build();
-  return tm1.session.execute(Tm1Request.post(DIMENSIONS, DimensionPatch.builder().name(name).hierarchies([hierarchy]).build()));
+  return tm1.dimensions.create(DimensionPatch.builder().name(name).hierarchies([hierarchy]).build());
 }
 
 function createSubset(tm1: Tm1Client, dimension: string, subset: SubsetPatch): Promise<unknown> {
-  const path = DIMENSIONS.key(dimension).nav("Hierarchies").key(dimension).nav(SubsetScope.navigation(SubsetScope.Public));
-  return tm1.session.execute(Tm1Request.post(path, subset));
+  return tm1.subsets.create(dimension, dimension, SubsetScope.Public, subset);
 }
 
 function deleteDimension(tm1: Tm1Client, name: string): Promise<void> {
-  return tm1.session.execute(Tm1Request.delete(DIMENSIONS.key(name)));
+  return tm1.dimensions.delete(name);
 }
 
 const shortId = (): string => randomUUID().slice(0, 4);
@@ -153,11 +151,10 @@ describe("Cube and view attributes on TM1" + liveReason, () => {
     tm1 = await Live.client();
     for (const d of dimensions) await createDimension(tm1, d, ["X"]);
     await tm1.cubes.create(CubePatch.builder().name(cube).bindDimensions(...dimensions.map((d) => DIMENSIONS.key(d))).build());
-    const views = ODataPath.of("Cubes").key(cube).nav(ViewScope.navigation(ViewScope.Public));
     const [a, b] = dimensions as [string, string];
-    await tm1.session.execute(Tm1Request.post(views, MDXViewPatch.builder().name("V").mdx(`SELECT {[${a}].[${a}].Members} ON 0 FROM [${cube}]`).build()));
+    await tm1.views.create(cube, ViewScope.Public, MDXViewPatch.builder().name("V").mdx(`SELECT {[${a}].[${a}].Members} ON 0 FROM [${cube}]`).build());
     for (const d of dimensions) await createSubset(tm1, d, SubsetPatch.builder().name("All").expression(`{TM1SUBSETALL([${d}].[${d}])}`).build());
-    await tm1.session.execute(Tm1Request.post(views, NativeViewPatch.builder().name("N").columns([axis(a)]).rows([axis(b)]).build()));
+    await tm1.views.create(cube, ViewScope.Public, NativeViewPatch.builder().name("N").columns([axis(a)]).rows([axis(b)]).build());
   });
 
   afterAll(async () => {
@@ -192,12 +189,11 @@ describe("Process and chore attributes on TM1" + liveReason, () => {
   const process = Live.name();
   const chore = Live.name();
   const processes = ODataPath.of("Processes");
-  const chores = ODataPath.of("Chores");
 
   beforeAll(async () => {
     if (!Live.configured) return;
     tm1 = await Live.client();
-    await tm1.session.execute(Tm1Request.post(processes, ProcessPatch.builder().name(process).prologProcedure("nX = 1;\n").build()));
+    await tm1.processes.create(ProcessPatch.builder().name(process).prologProcedure("nX = 1;\n").build());
     const definition = ChorePatch.builder()
       .name(chore)
       .startTime("2026-01-01T02:00:00Z")
@@ -207,13 +203,13 @@ describe("Process and chore attributes on TM1" + liveReason, () => {
       .frequency(Tm1Duration.ofMillis(24 * 60 * 60 * 1000))
       .tasks([ChoreTaskPatch.builder().bindProcess(processes.key(process)).build()])
       .build();
-    await tm1.session.execute(Tm1Request.post(chores, definition));
+    await tm1.chores.create(definition);
   });
 
   afterAll(async () => {
     if (!tm1) return;
-    await tm1.session.execute(Tm1Request.delete(chores.key(chore)));
-    await tm1.session.execute(Tm1Request.delete(processes.key(process)));
+    await tm1.chores.delete(chore);
+    await tm1.processes.delete(process);
     await tm1.close();
   });
 

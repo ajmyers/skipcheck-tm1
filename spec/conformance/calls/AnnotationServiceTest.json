@@ -1,0 +1,1226 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.annotation.AnnotationServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "AnnotationServiceTest#aMissingAnnotationIsNotFound#1",
+			"service" : "annotations",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"C}x~y",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Annotations('C%7Dx~y')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'C}x~y' can not be found in collection of type 'Annotation'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#annotatesACellAsWorkspaceDoes#1",
+			"service" : "annotations",
+			"method" : "create",
+			"params" : [
+				"cube",
+				"elements",
+				"text"
+			],
+			"args" : [
+				"}ClientGroups",
+				{
+					"$map" : {
+						"}Clients" : "Admin",
+						"}Groups" : "O'Neil / Ünï"
+					}
+				},
+				"first note"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Annotations",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Text" : "first note",
+							"ApplicationContext" : [
+								{
+									"Facet@odata.bind" : "ApplicationContextFacets('%7DCubes')",
+									"Value" : "}ClientGroups"
+								}
+							],
+							"DimensionalContext@odata.bind" : [
+								"Dimensions('%7DClients')/Hierarchies('%7DClients')/Members('Admin')",
+								"Dimensions('%7DGroups')/Hierarchies('%7DGroups')/Members('O''Neil%20%2F%20%C3%9Cn%C3%AF')"
+							],
+							"objectName" : "}ClientGroups",
+							"commentValue" : "first note",
+							"commentType" : "ANNOTATION",
+							"commentLocation" : "Admin,O'Neil / Ünï"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "C}ClientGroups~B.B~7uA_4TxLwG",
+							"Text" : "first note",
+							"Creator" : "Admin",
+							"Created" : "2026-01-02T03:04:05.123Z",
+							"LastUpdatedBy" : "Admin",
+							"LastUpdated" : "2026-01-02T03:04:05Z",
+							"objectName" : "}ClientGroups",
+							"commentValue" : "first note",
+							"commentType" : "ANNOTATION",
+							"commentLocation" : "Admin,ADMIN"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Annotation",
+				"json" : {
+					"ID" : "C}ClientGroups~B.B~7uA_4TxLwG",
+					"Text" : "first note",
+					"Creator" : "Admin",
+					"Created" : "2026-01-02T03:04:05.123Z",
+					"LastUpdatedBy" : "Admin",
+					"LastUpdated" : "2026-01-02T03:04:05Z",
+					"commentLocation" : "Admin,ADMIN",
+					"commentType" : "ANNOTATION",
+					"commentValue" : "first note",
+					"objectName" : "}ClientGroups"
+				}
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#annotatesWithNoCellElements#1",
+			"service" : "annotations",
+			"method" : "create",
+			"params" : [
+				"cube",
+				"elements",
+				"text"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$map" : { }
+				},
+				"cube note"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Annotations",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Text" : "cube note",
+							"ApplicationContext" : [
+								{
+									"Facet@odata.bind" : "ApplicationContextFacets('%7DCubes')",
+									"Value" : "Sales"
+								}
+							],
+							"DimensionalContext@odata.bind" : [ ],
+							"objectName" : "Sales",
+							"commentValue" : "cube note",
+							"commentType" : "ANNOTATION",
+							"commentLocation" : ""
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "C}Sales~~x",
+							"Text" : "cube note"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Annotation",
+				"json" : {
+					"ID" : "C}Sales~~x",
+					"Text" : "cube note"
+				}
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#createsAnAnnotationBuiltByHand#1",
+			"service" : "annotations",
+			"method" : "create",
+			"params" : [
+				"annotation"
+			],
+			"args" : [
+				{
+					"$patch" : "AnnotationPatch",
+					"json" : {
+						"Text" : "by hand",
+						"ApplicationContext" : [
+							{
+								"Facet@odata.bind" : "ApplicationContextFacets('%7DCubes')",
+								"Value" : "Sales"
+							}
+						],
+						"DimensionalContext@odata.bind" : [
+							"Dimensions('Region')/Hierarchies('Region')/Members('North')"
+						],
+						"commentValue" : "by hand"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Annotations",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Text" : "by hand",
+							"ApplicationContext" : [
+								{
+									"Facet@odata.bind" : "ApplicationContextFacets('%7DCubes')",
+									"Value" : "Sales"
+								}
+							],
+							"DimensionalContext@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Members('North')"
+							],
+							"commentValue" : "by hand"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "C}Sales~a",
+							"Text" : "by hand"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Annotation",
+				"json" : {
+					"ID" : "C}Sales~a",
+					"Text" : "by hand"
+				}
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#deletesAnAnnotation#1",
+			"service" : "annotations",
+			"method" : "delete",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"C}ClientGroups~B.B~7uA_4TxLwG"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Annotations('C%7DClientGroups~B.B~7uA_4TxLwG')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AnnotationServiceTest#deletesAnAnnotation#2",
+			"service" : "annotations",
+			"method" : "delete",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"gone"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Annotations('gone')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'gone' can not be found in collection of type 'Annotation'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#deletesEveryAnnotationArtifact#1",
+			"service" : "annotations",
+			"method" : "deleteAnnotationArtifacts",
+			"params" : [ ],
+			"args" : [ ],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "DeleteAnnotationArtifacts",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AnnotationServiceTest#findsAnnotationsByCubeAndByCell#1",
+			"service" : "annotations",
+			"method" : "cubeAnnotations",
+			"params" : [
+				"cube",
+				"query"
+			],
+			"args" : [
+				"}ClientGroups",
+				{
+					"$query" : {
+						"select" : [
+							"ID",
+							"Text"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('%7DClientGroups')/Annotations?$select=ID,Text",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : "C}ClientGroups~B.B~7uA_4TxLwG",
+									"Text" : "first note",
+									"Creator" : "Admin",
+									"Created" : "2026-01-02T03:04:05.123Z",
+									"LastUpdatedBy" : "Admin",
+									"LastUpdated" : "2026-01-02T03:04:05Z",
+									"objectName" : "}ClientGroups",
+									"commentValue" : "first note",
+									"commentType" : "ANNOTATION",
+									"commentLocation" : "Admin,ADMIN"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Annotation",
+					"json" : {
+						"ID" : "C}ClientGroups~B.B~7uA_4TxLwG",
+						"Text" : "first note",
+						"Creator" : "Admin",
+						"Created" : "2026-01-02T03:04:05.123Z",
+						"LastUpdatedBy" : "Admin",
+						"LastUpdated" : "2026-01-02T03:04:05Z",
+						"commentLocation" : "Admin,ADMIN",
+						"commentType" : "ANNOTATION",
+						"commentValue" : "first note",
+						"objectName" : "}ClientGroups"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AnnotationServiceTest#findsAnnotationsByCubeAndByCell#2",
+			"service" : "annotations",
+			"method" : "cellAnnotations",
+			"params" : [
+				"cellset",
+				"ordinal",
+				"query"
+			],
+			"args" : [
+				"iAAAAJ7x",
+				3,
+				{
+					"$query" : {
+						"select" : [
+							"ID"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('iAAAAJ7x')/Cells(3)/Annotations?$select=ID",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : "C}ClientGroups~B.B~7uA_4TxLwG"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Annotation",
+					"json" : {
+						"ID" : "C}ClientGroups~B.B~7uA_4TxLwG"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AnnotationServiceTest#getsAnAnnotationById#1",
+			"service" : "annotations",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"C}ClientGroups~B.B~7uA_4TxLwG",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Annotations('C%7DClientGroups~B.B~7uA_4TxLwG')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "C}ClientGroups~B.B~7uA_4TxLwG",
+							"Text" : "first note",
+							"Creator" : "Admin",
+							"Created" : "2026-01-02T03:04:05.123Z",
+							"LastUpdatedBy" : "Admin",
+							"LastUpdated" : "2026-01-02T03:04:05Z",
+							"objectName" : "}ClientGroups",
+							"commentValue" : "first note",
+							"commentType" : "ANNOTATION",
+							"commentLocation" : "Admin,ADMIN"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Annotation",
+				"json" : {
+					"ID" : "C}ClientGroups~B.B~7uA_4TxLwG",
+					"Text" : "first note",
+					"Creator" : "Admin",
+					"Created" : "2026-01-02T03:04:05.123Z",
+					"LastUpdatedBy" : "Admin",
+					"LastUpdated" : "2026-01-02T03:04:05Z",
+					"commentLocation" : "Admin,ADMIN",
+					"commentType" : "ANNOTATION",
+					"commentValue" : "first note",
+					"objectName" : "}ClientGroups"
+				}
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#getsAnAnnotationById#2",
+			"service" : "annotations",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"C}ClientGroups~B.B~7uA_4TxLwG",
+				{
+					"$query" : {
+						"select" : [
+							"ID",
+							"Text"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Annotations('C%7DClientGroups~B.B~7uA_4TxLwG')?$select=ID,Text",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "C}ClientGroups~B.B~7uA_4TxLwG",
+							"Text" : "first note",
+							"Created" : "2026-01-02T03:04:00.120+05:30",
+							"LastUpdated" : "2026-01-02T03:04:05.000001Z"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Annotation",
+				"json" : {
+					"ID" : "C}ClientGroups~B.B~7uA_4TxLwG",
+					"Text" : "first note",
+					"Created" : "2026-01-01T21:34:00.12Z",
+					"LastUpdated" : "2026-01-02T03:04:05.000001Z"
+				}
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#listsAnnotations#1",
+			"service" : "annotations",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Annotations",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "AnnotationServiceTest#listsAnnotations#2",
+			"service" : "annotations",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"expand" : {
+							"DimensionalContext" : {
+								"select" : [
+									"UniqueName"
+								]
+							}
+						},
+						"filter" : "Creator eq 'Admin'"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Annotations?$expand=DimensionalContext($select%3DUniqueName)&$filter=Creator%20eq%20'Admin'",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : "C}ClientGroups~B.B~7uA_4TxLwG",
+									"Text" : "first note",
+									"Creator" : "Admin",
+									"Created" : "2026-01-02T03:04:05.123Z",
+									"LastUpdatedBy" : "Admin",
+									"LastUpdated" : "2026-01-02T03:04:05Z",
+									"objectName" : "}ClientGroups",
+									"commentValue" : "first note",
+									"commentType" : "ANNOTATION",
+									"commentLocation" : "Admin,ADMIN"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Annotation",
+					"json" : {
+						"ID" : "C}ClientGroups~B.B~7uA_4TxLwG",
+						"Text" : "first note",
+						"Creator" : "Admin",
+						"Created" : "2026-01-02T03:04:05.123Z",
+						"LastUpdatedBy" : "Admin",
+						"LastUpdated" : "2026-01-02T03:04:05Z",
+						"commentLocation" : "Admin,ADMIN",
+						"commentType" : "ANNOTATION",
+						"commentValue" : "first note",
+						"objectName" : "}ClientGroups"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AnnotationServiceTest#readsAnAnnotationsContextsAndAttachments#1",
+			"service" : "annotations",
+			"method" : "applicationContext",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"C}ClientGroups~B.B~7uA_4TxLwG",
+				{
+					"$query" : {
+						"expand" : {
+							"Facet" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Annotations('C%7DClientGroups~B.B~7uA_4TxLwG')/ApplicationContext?$expand=Facet",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "AnnotationServiceTest#readsAnAnnotationsContextsAndAttachments#2",
+			"service" : "annotations",
+			"method" : "dimensionalContext",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"C}ClientGroups~B.B~7uA_4TxLwG",
+				{
+					"$query" : {
+						"select" : [
+							"UniqueName"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Annotations('C%7DClientGroups~B.B~7uA_4TxLwG')/DimensionalContext?$select=UniqueName",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Admin",
+									"UniqueName" : "[}Clients].[}Clients].[Admin]"
+								},
+								{
+									"Name" : "ADMIN",
+									"UniqueName" : "[}Groups].[}Groups].[ADMIN]"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "Admin",
+						"UniqueName" : "[}Clients].[}Clients].[Admin]"
+					}
+				},
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "ADMIN",
+						"UniqueName" : "[}Groups].[}Groups].[ADMIN]"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AnnotationServiceTest#readsAnAnnotationsContextsAndAttachments#3",
+			"service" : "annotations",
+			"method" : "attachments",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"C}ClientGroups~B.B~7uA_4TxLwG",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Annotations('C%7DClientGroups~B.B~7uA_4TxLwG')/Attachments",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "plan.pdf",
+									"ContentType" : "application/pdf",
+									"Size" : 1024
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Attachment",
+					"json" : {
+						"Name" : "plan.pdf",
+						"ContentType" : "application/pdf",
+						"Size" : 1024
+					}
+				}
+			]
+		},
+		{
+			"id" : "AnnotationServiceTest#readsFacetsAndTheirValues#1",
+			"service" : "annotations",
+			"method" : "facets",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"expand" : {
+							"Values" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ApplicationContextFacets?$expand=Values",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "}Cubes",
+									"Values" : [
+										{
+											"Value" : "}ClientGroups"
+										}
+									]
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "ApplicationContextFacet",
+					"json" : {
+						"Name" : "}Cubes",
+						"Values" : [
+							{
+								"Value" : "}ClientGroups"
+							}
+						]
+					}
+				}
+			]
+		},
+		{
+			"id" : "AnnotationServiceTest#readsFacetsAndTheirValues#2",
+			"service" : "annotations",
+			"method" : "facetValues",
+			"params" : [
+				"facet",
+				"query"
+			],
+			"args" : [
+				"}Cubes",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ApplicationContextFacets('%7DCubes')/Values",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Value" : "}ClientGroups"
+								},
+								{
+									"Value" : "Sales"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "ApplicationContextFacetValue",
+					"json" : {
+						"Value" : "}ClientGroups"
+					}
+				},
+				{
+					"$model" : "ApplicationContextFacetValue",
+					"json" : {
+						"Value" : "Sales"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AnnotationServiceTest#readsFacetsAndTheirValues#3",
+			"service" : "annotations",
+			"method" : "facet",
+			"params" : [
+				"facet",
+				"value",
+				"query"
+			],
+			"args" : [
+				"}Cubes",
+				"O'Neil's cube",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ApplicationContextFacets('%7DCubes')/Values('O''Neil''s%20cube')/Facet?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "}Cubes"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ApplicationContextFacet",
+				"json" : {
+					"Name" : "}Cubes"
+				}
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#refusesMissingArguments#1",
+			"service" : "annotations",
+			"method" : "create",
+			"params" : [
+				"cube",
+				"elements",
+				"text"
+			],
+			"args" : [
+				null,
+				{
+					"$map" : {
+						"}Clients" : "Admin",
+						"}Groups" : "O'Neil / Ünï"
+					}
+				},
+				"text"
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#refusesMissingArguments#2",
+			"service" : "annotations",
+			"method" : "create",
+			"params" : [
+				"cube",
+				"elements",
+				"text"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$map" : {
+						"}Clients" : "Admin",
+						"}Groups" : "O'Neil / Ünï"
+					}
+				},
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#refusesMissingArguments#3",
+			"service" : "annotations",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#refusesMissingArguments#4",
+			"service" : "annotations",
+			"method" : "facetValues",
+			"params" : [
+				"facet",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "AnnotationServiceTest#updatesAnAnnotation#1",
+			"service" : "annotations",
+			"method" : "update",
+			"params" : [
+				"id",
+				"patch"
+			],
+			"args" : [
+				"C}ClientGroups~B.B~7uA_4TxLwG",
+				{
+					"$patch" : "AnnotationPatch",
+					"json" : {
+						"Text" : "second note",
+						"commentValue" : "second note"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Annotations('C%7DClientGroups~B.B~7uA_4TxLwG')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Text" : "second note",
+							"commentValue" : "second note"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AnnotationServiceTest#updatesAnAnnotation#2",
+			"service" : "annotations",
+			"method" : "update",
+			"params" : [
+				"id",
+				"patch"
+			],
+			"args" : [
+				"C}ClientGroups~B.B~7uA_4TxLwG",
+				{
+					"$patch" : "AnnotationPatch",
+					"json" : {
+						"LastUpdated" : "2026-01-02T03:04:00.12+05:30",
+						"Created" : "2026-01-02T03:04:05Z"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Annotations('C%7DClientGroups~B.B~7uA_4TxLwG')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LastUpdated" : "2026-01-02T03:04:00.12+05:30",
+							"Created" : "2026-01-02T03:04:05Z"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

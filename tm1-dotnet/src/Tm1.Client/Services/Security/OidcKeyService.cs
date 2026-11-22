@@ -37,7 +37,7 @@ public sealed class OidcKeyService : Tm1Service
     public Task RemoveAsync(IReadOnlyList<string> keyIds, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.RemoveOidcKeyFromCache;
-        var body = new Dictionary<string, object?> { ["KeyId"] = Require(keyIds, nameof(keyIds)).ToList() };
+        var body = new Dictionary<string, object?> { ["KeyId"] = Require(keyIds, nameof(keyIds)).Select(key => Require(key, nameof(keyIds))).ToList() };
         return Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of(operation.ImportName!), body)
             .Requires(operation.Capability()), cancellationToken);
     }

@@ -8,24 +8,33 @@ the attribute and dimension services."""
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Iterator
 
 import pytest
 
 from tm1_client import ODataPath, ODataQuery, Tm1BadRequestError, Tm1Client, Tm1Request
 from tm1_client._sync.services.attribute import AttributeOwner, AttributeSet
+from tm1_client._sync.services.cube import ViewScope
 from tm1_client._sync.services.dimension import SubsetScope
 from tm1_client.model import (
     AttributeDefinitionPatch,
     AttributesPatch,
     AttributeType,
+    ChoreExecutionMode,
+    ChorePatch,
+    ChoreTaskPatch,
     CubePatch,
     DimensionPatch,
     ElementPatch,
     ElementType,
     HierarchyPatch,
     LocalizedAttributesPatch,
+    MDXViewPatch,
+    NativeViewPatch,
+    ProcessPatch,
     SubsetPatch,
+    ViewAxisSelectionPatch,
 )
 
 from .conftest import CONFIGURED, REASON
@@ -149,22 +158,13 @@ def cube(tm1: Tm1Client, name: str) -> Iterator[str]:
     try:
         dimensions = ODataPath.of("Dimensions")
         tm1.cubes.create(CubePatch.builder().name(name).bind_dimensions(dimensions.key(dims[0]), dimensions.key(dims[1])).build())
-        views = ODataPath.of("Cubes").key(name).nav("Views")
-        tm1.session.execute(Tm1Request.post(views, {
-            "@odata.type": "#ibm.tm1.api.v1.MDXView",
-            "Name": "V",
-            "MDX": f"SELECT {{[{dims[0]}].[{dims[0]}].Members}} ON 0 FROM [{name}]",
-        }))
+        mdx = f"SELECT {{[{dims[0]}].[{dims[0]}].Members}} ON 0 FROM [{name}]"
+        tm1.views.create(name, ViewScope.PUBLIC, MDXViewPatch.builder().name("V").mdx(mdx).build())
 
-        def axis(dim: str) -> dict[str, str]:
-            return {"Subset@odata.bind": str(dimensions.key(dim).nav("Hierarchies").key(dim).nav("Subsets").key("All"))}
+        def axis(dim: str) -> ViewAxisSelectionPatch:
+            return ViewAxisSelectionPatch.builder().bind_subset(dimensions.key(dim).nav("Hierarchies").key(dim).nav("Subsets").key("All")).build()
 
-        tm1.session.execute(Tm1Request.post(views, {
-            "@odata.type": "#ibm.tm1.api.v1.NativeView",
-            "Name": "N",
-            "Columns": [axis(dims[0])],
-            "Rows": [axis(dims[1])],
-        }))
+        tm1.views.create(name, ViewScope.PUBLIC, NativeViewPatch.builder().name("N").columns([axis(dims[0])]).rows([axis(dims[1])]).build())
         yield name
     finally:
         try:
@@ -177,7 +177,7 @@ def cube(tm1: Tm1Client, name: str) -> Iterator[str]:
 @pytest.mark.parametrize("kind", ["cube", "view"])
 def test_defines_and_translates_cube_and_view_attributes(tm1: Tm1Client, cube: str, kind: str) -> None:
     attribute_set = AttributeSet.cubes() if kind == "cube" else AttributeSet.views(cube)
-    owner = AttributeOwner.cube(cube) if kind == "cube" else AttributeOwner.view(cube, "Views", "V")
+    owner = AttributeOwner.cube(cube) if kind == "cube" else AttributeOwner.view(cube, ViewScope.PUBLIC, "V")
     attribute = label()
     tm1.attributes.create(attribute_set, string_attribute(attribute))
     try:
@@ -194,23 +194,25 @@ def test_defines_and_translates_cube_and_view_attributes(tm1: Tm1Client, cube: s
 @pytest.fixture
 def process_and_chore(tm1: Tm1Client, name: str) -> Iterator[tuple[str, str]]:
     process, chore = name, name + "-chore"
-    tm1.session.execute(Tm1Request.post(ODataPath.of("Processes"), {"Name": process, "PrologProcedure": "nX = 1;\n"}))
+    tm1.processes.create(ProcessPatch.builder().name(process).prolog_procedure("nX = 1;\n").build())
     try:
-        tm1.session.execute(Tm1Request.post(ODataPath.of("Chores"), {
-            "Name": chore,
-            "StartTime": "2026-01-01T02:00:00Z",
-            "DSTSensitive": False,
-            "Active": False,
-            "ExecutionMode": "SingleCommit",
-            "Frequency": "P1D",
-            "Tasks": [{"Process@odata.bind": str(ODataPath.of("Processes").key(process))}],
-        }))
+        tm1.chores.create(
+            ChorePatch.builder()
+            .name(chore)
+            .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=timezone.utc))
+            .dst_sensitive(False)
+            .active(False)
+            .execution_mode(ChoreExecutionMode.SINGLE_COMMIT)
+            .frequency(timedelta(days=1))
+            .tasks([ChoreTaskPatch.builder().bind_process(ODataPath.of("Processes").key(process)).build()])
+            .build()
+        )
         try:
             yield process, chore
         finally:
-            tm1.session.execute(Tm1Request.delete(ODataPath.of("Chores").key(chore)))
+            tm1.chores.delete(chore)
     finally:
-        tm1.session.execute(Tm1Request.delete(ODataPath.of("Processes").key(process)))
+        tm1.processes.delete(process)
 
 
 @pytest.mark.parametrize("kind", ["process", "chore"])

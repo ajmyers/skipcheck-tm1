@@ -113,20 +113,26 @@ describe("the live conformance runner", () => {
     return null;
   }
 
+  /** Whether a step sends a request: all but those refused before one (an argument error). */
+  function sends(step: live.Scenario["steps"][number]): boolean {
+    const error = (step.expect as Record<string, any>).error;
+    return !error || error.category === "api";
+  }
+
   /** Answers each step's one request with what the step expects, and a finally step's with 204. */
   function answeringAsExpected(s: live.Scenario, names: Record<string, string>): FakeTm1 {
-    const answers = [...s.steps.map((step) => expected(live.substitute(step.expect, names))), ...(s.finally ?? []).map(() => null)];
+    const answers = [...s.steps.filter(sends).map((step) => expected(live.substitute(step.expect, names))), ...(s.finally ?? []).map(() => null)];
     const tm1 = new FakeTm1();
     tm1.respond = () => (answers.length ? answers.shift() : FakeTm1.reply(599, "unscripted"));
     return tm1;
   }
 
-  it.each(["subsets", "members", "edges", "member-sets", "content", "encryption", "git"])("runs the %s scenario, one request per step", async (name) => {
+  it.each(["subsets", "members", "edges", "member-sets", "content", "encryption", "git", "users", "sessions", "attributes", "annotations"])("runs the %s scenario, one request per step", async (name) => {
     const s = live.scenarios().find((x) => x.name === name)!;
     const names = live.namesFor(s);
     const tm1 = answeringAsExpected(s, names);
     const traffic = new live.Traffic(tm1, FakeTm1.BASE);
     expect(await live.run(tm1.client((b) => b.transport(traffic)), traffic, s, names)).toEqual([]);
-    expect(traffic.exchanges).toHaveLength(s.steps.length + (s.finally?.length ?? 0));
+    expect(traffic.exchanges).toHaveLength(s.steps.filter(sends).length + (s.finally?.length ?? 0));
   });
 });

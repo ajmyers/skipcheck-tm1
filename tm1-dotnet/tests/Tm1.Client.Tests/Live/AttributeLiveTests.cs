@@ -134,22 +134,10 @@ public class AttributeLiveTests
                 await tm1.Subsets.CreateAsync(dim, dim, SubsetScope.Public, SubsetPatch.Builder().Name("All").Expression($"{{TM1SUBSETALL([{dim}].[{dim}])}}").Build());
             }
             await tm1.Cubes.CreateAsync(CubePatch.Builder().Name(name).BindDimensions(dimensions.Key(dims[0]), dimensions.Key(dims[1])).Build());
-            var views = ODataPath.Of("Cubes").Key(name).Nav("Views");
-            await tm1.Session.ExecuteAsync(Tm1Request.Post(views, new Dictionary<string, object?>
-            {
-                ["@odata.type"] = "#ibm.tm1.api.v1.MDXView",
-                ["Name"] = "V",
-                ["MDX"] = $"SELECT {{[{dims[0]}].[{dims[0]}].Members}} ON 0 FROM [{name}]",
-            }));
-            Dictionary<string, object?> Axis(string dim) => new() { ["Subset@odata.bind"] = dimensions.Key(dim).Nav("Hierarchies").Key(dim).Nav("Subsets").Key("All").ToString() };
+            await tm1.Views.CreateAsync(name, ViewScope.Public, MDXViewPatch.Builder().Name("V").Mdx($"SELECT {{[{dims[0]}].[{dims[0]}].Members}} ON 0 FROM [{name}]").Build());
+            ViewAxisSelectionPatch Axis(string dim) => ViewAxisSelectionPatch.Builder().BindSubset(dimensions.Key(dim).Nav("Hierarchies").Key(dim).Nav("Subsets").Key("All")).Build();
             // A view attribute needs a public native view
-            await tm1.Session.ExecuteAsync(Tm1Request.Post(views, new Dictionary<string, object?>
-            {
-                ["@odata.type"] = "#ibm.tm1.api.v1.NativeView",
-                ["Name"] = "N",
-                ["Columns"] = new[] { Axis(dims[0]) },
-                ["Rows"] = new[] { Axis(dims[1]) },
-            }));
+            await tm1.Views.CreateAsync(name, ViewScope.Public, NativeViewPatch.Builder().Name("N").Columns([Axis(dims[0])]).Rows([Axis(dims[1])]).Build());
 
             foreach (var (set, owner) in new[] { (AttributeSet.Cubes(), AttributeOwner.Cube(name)), (AttributeSet.Views(name), AttributeOwner.View(name, ViewScope.Public, "V")) })
             {
@@ -199,19 +187,18 @@ public class AttributeLiveTests
         await using var tm1 = Live.Client();
         var process = Live.Name();
         var chore = process + "-chore";
-        await tm1.Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Processes"), new Dictionary<string, object?> { ["Name"] = process, ["PrologProcedure"] = "nX = 1;\n" }));
+        await tm1.Processes.CreateAsync(ProcessPatch.Builder().Name(process).PrologProcedure("nX = 1;\n").Build());
         try
         {
-            await tm1.Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Chores"), new Dictionary<string, object?>
-            {
-                ["Name"] = chore,
-                ["StartTime"] = "2026-01-01T02:00:00Z",
-                ["DSTSensitive"] = false,
-                ["Active"] = false,
-                ["ExecutionMode"] = "SingleCommit",
-                ["Frequency"] = "P1D",
-                ["Tasks"] = new[] { new Dictionary<string, object?> { ["Process@odata.bind"] = ODataPath.Of("Processes").Key(process).ToString() } },
-            }));
+            await tm1.Chores.CreateAsync(ChorePatch.Builder()
+                .Name(chore)
+                .StartTime(new DateTimeOffset(2026, 1, 1, 2, 0, 0, TimeSpan.Zero))
+                .DstSensitive(false)
+                .Active(false)
+                .ExecutionMode(ChoreExecutionMode.SingleCommit)
+                .Frequency(TimeSpan.FromDays(1))
+                .Tasks([ChoreTaskPatch.Builder().BindProcess(ODataPath.Of("Processes").Key(process)).Build()])
+                .Build());
             try
             {
                 foreach (var (set, owner) in new[] { (AttributeSet.Processes(), AttributeOwner.Process(process)), (AttributeSet.Chores(), AttributeOwner.Chore(chore)) })
@@ -232,12 +219,12 @@ public class AttributeLiveTests
             }
             finally
             {
-                await tm1.Session.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Chores").Key(chore)));
+                await tm1.Chores.DeleteAsync(chore);
             }
         }
         finally
         {
-            await tm1.Session.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Processes").Key(process)));
+            await tm1.Processes.DeleteAsync(process);
         }
     }
 }

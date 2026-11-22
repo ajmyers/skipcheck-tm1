@@ -288,7 +288,8 @@ class OidcKeyService(Service):
         the call with a ``Tm1NotFoundError``: TM1 answers 400 with ``ObjectNotFound`` (code 55),
         which the client reads as not found."""
         operation = Tm1Operations.REMOVE_OIDC_KEY_FROM_CACHE
-        request = Tm1Request.post(ODataPath.of(_import_name(operation)), {"KeyId": list(key_ids)}, None)
+        keys = [_require(key, "key_ids") for key in _require(key_ids, "key_ids")]
+        request = Tm1Request.post(ODataPath.of(_import_name(operation)), {"KeyId": keys}, None)
         await self._session.execute(request.requires(operation.capability()))
 
 

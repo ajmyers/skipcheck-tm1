@@ -171,7 +171,7 @@ def test_reads_departures_and_lenient_dates_from_the_overlay() -> None:
 def test_durations_read_tm1s_way_and_write_iso() -> None:
     chore = m.Chore.model_validate({"Frequency": "P1DT00H00M00S"})
     assert chore.frequency == timedelta(days=1)
-    assert m.Chore(frequency=timedelta(hours=24)).to_odata() == {"Frequency": "P1D"}
+    assert m.Chore(frequency=timedelta(hours=24)).to_odata() == {"Frequency": "PT24H"}  # as Java's Duration.toString
     assert m.Chore(frequency=timedelta(minutes=90)).to_odata() == {"Frequency": "PT1H30M"}
     assert m.Chore(frequency=timedelta(0)).to_odata() == {"Frequency": "PT0S"}
 

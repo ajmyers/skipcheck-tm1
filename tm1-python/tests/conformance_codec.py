@@ -176,6 +176,16 @@ def result(value: Any) -> Any:
     raise Unknown(f"can't encode a result of type {type(value).__name__}")
 
 
+def _without_types(value: Any) -> Any:
+    """A model's JSON without ``@odata.type``, throughout: the type is ``$model``'s, as the Java
+    recorder writes it."""
+    if isinstance(value, dict):
+        return {k: _without_types(v) for k, v in value.items() if k != "@odata.type"}
+    if isinstance(value, list):
+        return [_without_types(v) for v in value]
+    return value
+
+
 def error(exc: BaseException) -> dict[str, Any]:
     """How a call failed, as the Java recorder writes it."""
     out: dict[str, Any] = {"exception": type(exc).__name__}

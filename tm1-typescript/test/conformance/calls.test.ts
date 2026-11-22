@@ -114,7 +114,7 @@ describe("conformance with the Java client's recorded calls", () => {
           );
         } else {
           expect("result" in outcome, "a result, not " + JSON.stringify(outcome)).toBe(true);
-          expect(codec.normal(codec.withoutTypes((outcome as { result: any }).result), true)).toEqual(codec.normal(codec.expectedResult(c.result), true));
+          expect(codec.normal(codec.javaResult((outcome as { result: any }).result, c.result), true)).toEqual(codec.normal(codec.expectedResult(c.result), true));
         }
       });
     }

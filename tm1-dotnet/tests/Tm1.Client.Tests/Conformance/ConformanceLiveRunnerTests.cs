@@ -183,10 +183,14 @@ public class ConformanceLiveRunnerTests
     }
 
     /// <summary>Answers each step's one request with what the step expects, and a finally step's with 204.</summary>
+    /// <summary>Whether a step sends a request: all but those refused before one (an argument error).</summary>
+    private static bool Sends(JsonNode? step) =>
+        step!["expect"]?["error"] is not JsonObject error || error["category"]?.GetValue<string>() == "api";
+
     private static FakeTm1 AnsweringAsExpected(JsonObject scenario, System.Collections.Generic.IReadOnlyDictionary<string, string> names)
     {
         var answers = new System.Collections.Generic.Queue<System.Net.Http.HttpResponseMessage>(
-            scenario["steps"]!.AsArray().Select(s => Expected(ConformanceLive.Substitute(s!["expect"], names)!.AsObject()))
+            scenario["steps"]!.AsArray().Where(Sends).Select(s => Expected(ConformanceLive.Substitute(s!["expect"], names)!.AsObject()))
                 .Concat((scenario["finally"]?.AsArray() ?? []).Select(_ => new System.Net.Http.HttpResponseMessage(HttpStatusCode.NoContent))));
         return new FakeTm1 { Respond = _ => answers.Count > 0 ? answers.Dequeue() : new System.Net.Http.HttpResponseMessage((HttpStatusCode)599) };
     }
@@ -199,6 +203,10 @@ public class ConformanceLiveRunnerTests
     [InlineData("content")]
     [InlineData("encryption")]
     [InlineData("git")]
+    [InlineData("users")]
+    [InlineData("sessions")]
+    [InlineData("attributes")]
+    [InlineData("annotations")]
     public async Task RunsAScenarioSendingOneRequestPerStep(string name)
     {
         var scenario = ConformanceLive.Load(name);
@@ -206,6 +214,6 @@ public class ConformanceLiveRunnerTests
         var fake = AnsweringAsExpected(scenario, names);
         var traffic = new ConformanceLive.Traffic(fake, FakeTm1.Base);
         Assert.Empty(await ConformanceLive.Run(fake.Client(b => b.HttpHandler(traffic)), traffic, scenario, names));
-        Assert.Equal(scenario["steps"]!.AsArray().Count + (scenario["finally"]?.AsArray().Count ?? 0), traffic.Exchanges.Count);
+        Assert.Equal(scenario["steps"]!.AsArray().Count(Sends) + (scenario["finally"]?.AsArray().Count ?? 0), traffic.Exchanges.Count);
     }
 }

@@ -20,15 +20,24 @@ from __future__ import annotations
 import enum
 import math
 import uuid
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Annotated, Any, ClassVar
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, TypeAdapter, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    TypeAdapter,
+    ValidationError,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from .odata import Bind, duration, string_literal
 
-__all__ = ["LenientDateTime", "Tm1Enum", "Tm1Model", "Tm1Patch", "to_odata"]
+__all__ = ["LenientDateTime", "Tm1Enum", "Tm1Model", "Tm1Patch", "iso_datetime", "to_odata"]
 
 
 class Tm1Enum(str, enum.Enum):
@@ -57,6 +66,18 @@ class Tm1Enum(str, enum.Enum):
 
 
 _DATETIME = TypeAdapter(datetime)
+
+
+def iso_datetime(value: datetime) -> str:
+    """A date-time as the Java client writes it (``ISO_OFFSET_DATE_TIME``): the fraction of a
+    second without trailing zeros, and ``Z`` for UTC: ``2026-01-02T03:04:00.12+05:30``."""
+    text = value.replace(microsecond=0).isoformat()
+    offset = ""
+    if value.tzinfo is not None:
+        text, offset = text[:19], text[19:]
+        offset = "Z" if offset in ("+00:00", "-00:00") else offset
+    fraction = f".{value.microsecond:06d}".rstrip("0") if value.microsecond else ""
+    return text + fraction + offset
 
 
 def _lenient_datetime(value: Any) -> Any:
@@ -103,6 +124,22 @@ class Tm1Model(BaseModel):
                 if sub is not None and sub is not cls:
                     return sub.model_validate(data)
         return handler(data)
+
+    @field_validator("*", mode="after")
+    @classmethod
+    def _in_utc(cls, value: Any) -> Any:
+        # The Java client reads every date-time as its instant in UTC
+        if isinstance(value, datetime) and value.tzinfo is not None:
+            return value.astimezone(timezone.utc)
+        return value
+
+    @field_serializer("*", mode="wrap", when_used="json")
+    def _as_java(self, value: Any, handler: Any) -> Any:
+        if isinstance(value, datetime):
+            return iso_datetime(value)
+        if isinstance(value, timedelta):
+            return duration(value)
+        return handler(value)
 
     def to_odata(self) -> dict[str, Any]:
         """The properties set, as TM1's JSON: ``@odata.bind`` for :class:`Bind` values, and
@@ -202,7 +239,7 @@ def to_odata(value: Any) -> Any:
     if isinstance(value, Decimal):
         return int(value) if value == value.to_integral_value() else float(value)
     if isinstance(value, datetime):
-        return value.isoformat().replace("+00:00", "Z")
+        return iso_datetime(value)
     if isinstance(value, (date, time)):
         return value.isoformat()
     if isinstance(value, timedelta):

@@ -306,7 +306,7 @@ def test_chores(api: Api, fake: FakeTm1) -> None:
         "Name": "Nightly",
         "StartTime": "2026-01-01T02:00:00Z",
         "DSTSensitive": False,
-        "Frequency": "P1D",
+        "Frequency": "PT24H",
         "ExecutionMode": "SingleCommit",
         "Active": False,
         "Tasks": [{"Process@odata.bind": "Processes('Load%20Sales')", "Parameters": [{"Name": "pVersion", "Value": "Actual"}]}],

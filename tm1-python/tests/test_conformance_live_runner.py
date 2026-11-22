@@ -116,19 +116,25 @@ def _expected(expect: dict[str, Any]) -> httpx.Response:
     return httpx.Response(204)
 
 
+def _sends(step: dict[str, Any]) -> bool:
+    """Whether a step sends a request: all but those refused before one (an argument error)."""
+    error = step["expect"].get("error")
+    return error is None or error.get("category") == "api"
+
+
 def _answering_as_expected(scenario: dict[str, Any], names: dict[str, str]) -> FakeTm1:
     """Answers each step's one request with what the step expects, and a finally step's with 204."""
-    answers = [_expected(live.substitute(step["expect"], names)) for step in scenario["steps"]]
+    answers = [_expected(live.substitute(step["expect"], names)) for step in scenario["steps"] if _sends(step)]
     answers += [httpx.Response(204) for _ in scenario.get("finally", [])]
     fake = FakeTm1()
     fake.respond = lambda request: answers.pop(0) if answers else httpx.Response(599, text="unscripted")
     return fake
 
 
-@pytest.mark.parametrize("name", ["subsets", "members", "edges", "member-sets", "content", "encryption", "git"])
+@pytest.mark.parametrize("name", ["subsets", "members", "edges", "member-sets", "content", "encryption", "git", "users", "sessions", "attributes", "annotations"])
 def test_runs_a_scenario_in_both_flavors_sending_one_request_per_step(traffic_dir: Path, name: str) -> None:
     scenario = json.loads((live.SCENARIOS / f"{name}.json").read_text(encoding="utf-8"))
-    expected = len(scenario["steps"]) + len(scenario.get("finally", []))
+    expected = len([s for s in scenario["steps"] if _sends(s)]) + len(scenario.get("finally", []))
 
     names = live.names_for(scenario)
     traffic = live.Traffic(BASE)

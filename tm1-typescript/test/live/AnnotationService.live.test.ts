@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { AnnotationPatch, Cellset, ODataPath, ODataQuery, Tm1NotFoundException, Tm1Operations, Tm1Request, type Tm1Client } from "../../src/index.js";
+import { AnnotationPatch, ODataQuery, Tm1NotFoundException, type Tm1Client } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 const CUBE = "}ClientGroups";
@@ -34,13 +34,11 @@ describe("AnnotationService on TM1" + liveReason, () => {
 
       expect(await tm1.annotations.list().toArray(), "TM1 lists none here").toEqual([]);
       expect((await tm1.annotations.cubeAnnotations(CUBE).toArray()).map((a) => a.ID)).toContain(id);
-      // Cellsets through the session until CellsetService is ported
-      const mdx = `SELECT {[}Clients].[Admin]} ON 0, {[}Groups].[ADMIN]} ON 1 FROM [${CUBE}]`;
-      const cellset = await tm1.session.execute(Tm1Request.post(ODataPath.of(Tm1Operations.ExecuteMdx.importName!), { MDX: mdx }, Cellset));
+      const cellset = await tm1.cellsets.execute(`SELECT {[}Clients].[Admin]} ON 0, {[}Groups].[ADMIN]} ON 1 FROM [${CUBE}]`);
       try {
         expect((await tm1.annotations.cellAnnotations(cellset.ID!, 0).toArray()).map((a) => a.ID)).toEqual([id]);
       } finally {
-        await tm1.session.execute(Tm1Request.delete(ODataPath.of("Cellsets").key(cellset.ID!)));
+        await tm1.cellsets.delete(cellset.ID!);
       }
 
       expect((await tm1.annotations.dimensionalContext(id, ODataQuery.none().select("UniqueName")).toArray()).map((m) => m.UniqueName)).toEqual([

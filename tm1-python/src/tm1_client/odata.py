@@ -70,24 +70,29 @@ class Raw:
 
 
 def duration(value: timedelta) -> str:
-    """A ``timedelta`` as ISO 8601 (``P1D``, ``PT1H30M``, ``PT0S``), which TM1 accepts."""
+    """A ``timedelta`` in ISO 8601 as the Java client writes it (``Duration.toString``), which TM1
+    accepts: hours, minutes and seconds, never days (``PT26H3.5S``, ``PT1H30M``, ``PT0S``)."""
     micros = value // timedelta(microseconds=1)
-    sign = "-" if micros < 0 else ""
-    micros = abs(micros)
-    days, micros = divmod(micros, 86_400_000_000)
-    hours, micros = divmod(micros, 3_600_000_000)
-    minutes, micros = divmod(micros, 60_000_000)
-    seconds, micros = divmod(micros, 1_000_000)
-    time_part = ""
-    if hours:
-        time_part += f"{hours}H"
-    if minutes:
-        time_part += f"{minutes}M"
-    if seconds or micros:
-        time_part += (f"{seconds}.{micros:06d}".rstrip("0") if micros else str(seconds)) + "S"
-    if not days and not time_part:
+    if micros == 0:
         return "PT0S"
-    return sign + "P" + (f"{days}D" if days else "") + ("T" + time_part if time_part else "")
+    # As Java's Duration: whole seconds (rounded down) and a positive fraction
+    seconds, fraction = divmod(micros, 1_000_000)
+    total = seconds + 1 if seconds < 0 and fraction > 0 else seconds
+    hours = int(total / 3600)
+    minutes = int((total - hours * 3600) / 60)
+    secs = total - hours * 3600 - minutes * 60
+    out = "PT"
+    if hours:
+        out += f"{hours}H"
+    if minutes:
+        out += f"{minutes}M"
+    if secs == 0 and fraction == 0 and len(out) > 2:
+        return out
+    out += ("-0" if secs == 0 else str(secs)) if seconds < 0 and fraction > 0 else str(secs)
+    if fraction > 0:
+        digits = f"{(2_000_000 - fraction) if seconds < 0 else (fraction + 1_000_000)}"[1:].rstrip("0")
+        out += "." + digits
+    return out + "S"
 
 
 def literal(value: Any) -> str:
