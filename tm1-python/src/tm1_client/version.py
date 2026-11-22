@@ -36,7 +36,13 @@ class Tm1Version:
         trimmed = text.strip()
         if not _FORMAT.match(trimmed):
             raise ValueError(f"Not a TM1 version: {text!r} (expected numbers separated by dots, like 11.8.03500.6)")
-        return Tm1Version(trimmed, tuple(int(p) for p in trimmed.split(".")))
+        parts = []
+        for part in trimmed.split("."):
+            value = int(part)
+            if value > 2**31 - 1:
+                raise ValueError(f"Not a TM1 version: {text!r} (part {part!r} is too large)")
+            parts.append(value)
+        return Tm1Version(trimmed, tuple(parts))
 
     def _key(self) -> tuple[int, ...]:
         parts = list(self._parts)
@@ -192,6 +198,8 @@ class Tm1Capabilities:
         aliases: dict[str, str] = {}
         version = None
         schemas = list(root.iter(f"{_EDM}Schema"))
+        if not schemas:
+            raise Tm1ProtocolError("TM1 sent $metadata that isn't valid CSDL")
         for schema in schemas:
             if schema.get("Alias"):
                 aliases[schema.get("Alias", "")] = schema.get("Namespace", "")
@@ -296,9 +304,7 @@ class Tm1Capabilities:
             message += f", product version {self._product_version}"
         if not added:
             message += ")"
-        error = Tm1UnsupportedOperationError(message)
-        error.missing = missing  # type: ignore[attr-defined]
-        return error
+        return Tm1UnsupportedOperationError(message, missing)
 
     def __repr__(self) -> str:
         return f"Tm1Capabilities[schema {self._schema_version or 'unknown'}, product {self._product_version or 'unknown'}]"

@@ -22,18 +22,29 @@ from it (``tm1_pygen.unasync``).
 
 from __future__ import annotations
 
+import inspect
 import logging
+import time
 from datetime import timedelta
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Callable
 
 import httpx
 
 from .. import _protocol as p
 from ..auth import Authenticator, basic
-from ..errors import Tm1ErrorClassifier
+from ..errors import (
+    ODataError,
+    Tm1ApiError,
+    Tm1ErrorClassifier,
+    Tm1ErrorKind,
+    Tm1ProtocolError,
+    Tm1SessionClosedError,
+    Tm1TransportError,
+    api_error,
+)
+from ..identity import check_impersonated
 from ..timeouts import Tm1Timeouts
 from ..version import Tm1Dialect
-from ..errors import Tm1ProtocolError, Tm1TransportError, api_error
 from ..odata import ODataPath, ODataQuery
 from .._compat import AsyncIO as runtime
 from .._views import CAPABILITIES, Queue, as_call, capability_of, items_only, poll_interval, settle
@@ -45,49 +56,227 @@ __all__ = ["AsyncTm1Session", "AsyncTm1SessionBatch", "AsyncTm1SessionBuilder"]
 log = logging.getLogger("tm1_client")
 
 
+_IDEMPOTENT = ("GET", "PUT", "DELETE", "HEAD")
+
+
+def _check_session_context(session_context: str | None) -> str | None:
+    if session_context is not None and len(session_context) > 250:
+        raise ValueError(f"TM1 keeps at most 250 characters of session context, got {len(session_context)}")
+    return session_context
+
+
+def _refusal(error: BaseException) -> bool:
+    """A login TM1 refused (wrong credentials, an unknown or disabled user, impersonation not
+    allowed), as opposed to one that failed for another reason, such as TM1 being unreachable."""
+    return isinstance(error, Tm1ApiError) and error.status in (400, 401, 403)
+
+
+def _transport(error: BaseException, method: str, url: str) -> Tm1TransportError:
+    """A failure to send or to get a whole answer, by phase: before sending (couldn't connect,
+    TLS, no connection free) or after (a timeout, a dropped connection)."""
+    phase = (
+        Tm1TransportError.Phase.CONNECT
+        if isinstance(error, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, httpx.UnsupportedProtocol))
+        else Tm1TransportError.Phase.RESPONSE
+    )
+    return Tm1TransportError(phase, method.upper() in _IDEMPOTENT, method, url, error)
+
+
 class _AsyncConnection:
+    """The login, cookie and HTTP connections every view of a session shares, as the Java
+    client's ``Connection``.
+
+    * One login at a time, shared: concurrent first requests wait for it.
+    * A 401 on a request means the session expired or was killed: it logs in again, once for
+      every request that saw the same expiry, sending the cookie TM1 set with the 401 (TM1
+      opened a session along with it, so that one is logged in rather than another opened),
+      and the request is replayed once, POSTs included (TM1 refuses a request on a dead session
+      before running it). A 401 on the replay is final.
+    * A login TM1 refused (400, 401, 403) is remembered for ``timeouts.refused_login``, so
+      requests meanwhile fail at once with the same error: each login attempt leaves a session
+      behind on TM1, and retrying a refusal at once would pile them up. Any other failure is
+      forgotten, so the next request tries again.
+    * After :meth:`close`, it sends nothing more.
+    """
+
     def __init__(
         self,
         base_url: str,
         authenticator: Authenticator,
         session_context: str | None,
+        impersonate: str | None,
+        timeouts: Tm1Timeouts,
+        classifier: Tm1ErrorClassifier,
         http: httpx.AsyncClient,
         owns_http: bool,
         check_capabilities: bool,
+        clock: Callable[[], float],
     ):
         self.base_url = base_url if base_url.endswith("/") else base_url + "/"
         self.authenticator = authenticator
         self.session_context = session_context
+        self.impersonate = impersonate
+        self.timeouts = timeouts
+        self.classifier = classifier
         self.http = http
         self.owns_http = owns_http
         self.check_capabilities = check_capabilities
+        self.clock = clock
         self.cookie: str | None = None
+        self.session_id: int | None = None
+        self.generation = 0
+        self.refused: tuple[BaseException, float] | None = None
+        self.closed = False
         self.lock = runtime.Lock()
         self.version: Tm1Version | None = None
+        self.version_for = -1
 
     def url(self, relative: str) -> str:
         return str(httpx.URL(self.base_url).join(relative))
 
-    async def login(self, expired: str | None = None) -> str:
+    def check(self, method: str, url: str, reply: p.Reply) -> p.Reply:
+        """The reply, or the error for a refusal, classified by this session's classifier."""
+        if reply.status >= 400:
+            raise api_error(method, url, reply.status, reply.content, self.classifier)
+        return reply
+
+    def _timeout(self, seconds: float | None) -> httpx.Timeout:
+        return httpx.Timeout(self.timeouts.request if seconds is None else seconds, connect=self.timeouts.connect)
+
+    def _require_open(self) -> None:
+        if self.closed:
+            raise Tm1SessionClosedError(self.base_url)
+
+    def _refused_recently(self) -> bool:
+        refused = self.refused
+        return refused is not None and self.clock() - refused[1] < self.timeouts.refused_login
+
+    async def logged_in(self, expired: str | None = None, seed: str | None = None) -> str:
+        """The session's cookie, logging in first if there's none (or only ``expired``)."""
+        self._require_open()
+        cookie = self.cookie
+        if cookie is not None and cookie != expired:
+            return cookie
+        if self._refused_recently():
+            assert self.refused is not None
+            raise self.refused[0]
+        # Shielded: a caller giving up doesn't abandon a login TM1 may already have made, so
+        # close() can still end it
+        return await runtime.shield(self._login_locked(expired, seed))
+
+    async def _login_locked(self, expired: str | None, seed: str | None) -> str:
         async with self.lock:
+            self._require_open()
             if self.cookie is not None and self.cookie != expired:
                 return self.cookie
-            url = self.base_url + p.LOGIN
-            headers = p.headers(self.session_context, extra={"Authorization": self.authenticator.authorization()})
+            if self._refused_recently():
+                assert self.refused is not None
+                raise self.refused[0]
+            self.refused = None
+            reason = "initial" if expired is None else "relogin"
             try:
-                response = await self.http.get(url, headers=headers)
-            except httpx.HTTPError as e:
-                raise Tm1TransportError(
-                    f"Logging in to {self.base_url} as {self.authenticator.describe()} failed: {e}"
-                ) from e
-            self.http.cookies.clear()
-            if response.status_code >= 400:
-                raise api_error("GET", url, response.status_code, response.content)
-            cookie = p.session_cookie(response.headers.get_list("set-cookie"))
-            if not cookie:
-                raise Tm1ProtocolError(f"TM1 at {self.base_url} accepted the login but set no {p.COOKIE} cookie")
-            self.cookie = cookie
+                cookie, session_id = await self._login(seed)
+            except Exception as e:
+                if _refusal(e) and self.timeouts.refused_login > 0:
+                    self.refused = (e, self.clock())
+                    log.warning(
+                        "TM1 at %s refused the login as %s%s; not trying again for %ss",
+                        self.base_url,
+                        self.authenticator.describe(),
+                        "" if self.impersonate is None else " impersonating a user",
+                        self.timeouts.refused_login,
+                    )
+                raise
+            self.cookie, self.session_id = cookie, session_id
+            self.generation += 1
+            log.info(
+                "Logged in to TM1 at %s as %s (session %s, %s)", self.base_url, self.authenticator.describe(), session_id, reason
+            )
             return cookie
+
+    async def _login(self, seed: str | None) -> tuple[str, int]:
+        url = self.base_url + p.LOGIN
+        # The authenticator's own failures (say, a passport it couldn't get) reach the caller unchanged
+        authorization = self.authenticator.authorization()
+        if inspect.isawaitable(authorization):
+            authorization = await authorization
+        if not authorization:
+            raise RuntimeError(f"The authenticator {self.authenticator.describe()} supplied no credentials")
+        extra = {"Authorization": authorization}
+        if self.impersonate is not None:
+            # At login only: TM1 decides the identity then and ignores the header afterwards
+            extra[p.IMPERSONATE] = self.impersonate
+        if seed is not None:
+            # Log in the session TM1 opened for a 401, rather than opening another
+            extra["Cookie"] = f"{p.COOKIE}={seed}"
+        try:
+            response = await self.http.get(
+                url, headers=p.headers(self.session_context, p.JSON, extra), timeout=self._timeout(self.timeouts.login)
+            )
+        except httpx.HTTPError as e:
+            raise _transport(e, "GET", url) from e
+        self.http.cookies.clear()
+        status = response.status_code
+        if status == 401:
+            # TM1 answers a disabled impersonated user exactly like wrong credentials
+            why = (
+                None
+                if self.impersonate is None
+                else ODataError(
+                    "", f"The credentials were refused, or the user being impersonated ({self.impersonate}) is disabled"
+                )
+            )
+            raise Tm1ApiError.of_kind(401, Tm1ErrorKind.CREDENTIAL_REJECTED, why, "GET", url)
+        if status >= 400:
+            raise self._impersonation_error(api_error("GET", url, status, response.content, self.classifier), url)
+        cookie = p.session_cookie(response.headers.get_list("set-cookie")) or seed
+        if cookie is None:
+            raise Tm1ProtocolError(f"TM1 accepted the login but set no {p.COOKIE} cookie", None, "GET", url)
+        try:
+            doc = response.json()
+        except ValueError as e:
+            raise Tm1ProtocolError("TM1 accepted the login but its response isn't JSON", None, "GET", url) from e
+        session_id = doc.get("ID") if isinstance(doc, dict) else None
+        if isinstance(session_id, str) and session_id.isdigit():
+            session_id = int(session_id)
+        if not isinstance(session_id, int) or isinstance(session_id, bool):
+            raise Tm1ProtocolError("TM1 accepted the login but didn't return the session ID", None, "GET", url)
+        return cookie, session_id
+
+    def _impersonation_error(self, error: Tm1ApiError, url: str) -> Tm1ApiError:
+        """A login that impersonates and gets a 400 or 403 was refused for the impersonation:
+        the user doesn't exist (400), or may not be impersonated (403), however TM1 words it."""
+        if self.impersonate is None:
+            return error
+        if error.status == 400 and error.kind is not Tm1ErrorKind.UNKNOWN_USER:
+            return Tm1ApiError.of_kind(400, Tm1ErrorKind.UNKNOWN_USER, error.error, "GET", url)
+        if error.status == 403 and error.kind is not Tm1ErrorKind.IMPERSONATION_REFUSED:
+            return Tm1ApiError.of_kind(403, Tm1ErrorKind.IMPERSONATION_REFUSED, error.error, "GET", url)
+        return error
+
+    async def _send_once(
+        self,
+        method: str,
+        url: str,
+        content: bytes | None,
+        headers: dict[str, str],
+        accept: str,
+        timeout: float | None,
+        cookie: str,
+    ) -> httpx.Response:
+        try:
+            response = await self.http.request(
+                method,
+                url,
+                content=content,
+                headers=p.headers(None, accept, {**headers, "Cookie": f"{p.COOKIE}={cookie}"}),
+                timeout=self._timeout(timeout),
+            )
+        except httpx.HTTPError as e:
+            raise _transport(e, method, url) from e
+        # The session cookie is this session's to send, not the HTTP client's jar
+        self.http.cookies.clear()
+        return response
 
     async def send(
         self,
@@ -98,60 +287,80 @@ class _AsyncConnection:
         accept: str,
         timeout: float | None = None,
     ) -> p.Reply:
-        cookie = self.cookie or await self.login()
-        for attempt in (1, 2):
-            try:
-                response = await self.http.request(
-                    method,
-                    url,
-                    content=content,
-                    headers=p.headers(self.session_context, accept, {**headers, "Cookie": f"{p.COOKIE}={cookie}"}),
-                    **({} if timeout is None else {"timeout": timeout}),
-                )
-            except httpx.HTTPError as e:
-                raise Tm1TransportError(f"{method} {url} failed: {e}") from e
-            self.http.cookies.clear()
-            if response.status_code == 401 and attempt == 1:
-                cookie = await self.login(expired=cookie)
-                continue
-            return p.Reply(response.status_code, {k.lower(): v for k, v in response.headers.items()}, response.content)
-        raise AssertionError("unreachable")
+        """Sends a request on the logged-in session, logging in again and replaying it once on a 401."""
+        cookie = await self.logged_in()
+        response = await self._send_once(method, url, content, headers, accept, timeout, cookie)
+        if response.status_code == 401:
+            seed = p.session_cookie(response.headers.get_list("set-cookie"))
+            log.info("TM1 session at %s expired or was closed on the server; logging in again", self.base_url)
+            cookie = await self.logged_in(expired=cookie, seed=seed)
+            response = await self._send_once(method, url, content, headers, accept, timeout, cookie)
+            if response.status_code == 401:
+                raise Tm1ApiError.of_kind(401, Tm1ErrorKind.UNAUTHENTICATED, None, method, url)
+        return p.Reply(response.status_code, {k.lower(): v for k, v in response.headers.items()}, response.content)
 
     async def product_version(self) -> Tm1Version:
-        """The server's version (``Configuration/ProductVersion``), read once per connection."""
-        if self.version is None:
-            url = self.base_url + "Configuration?$select=ProductVersion"
-            doc = p.check("GET", url, await self.send("GET", url, None, {}, p.JSON)).json()
-            text = doc.get("ProductVersion") if isinstance(doc, dict) else None
-            if not text:
-                raise Tm1ProtocolError(f"TM1 at {self.base_url} didn't report its ProductVersion")
-            self.version = Tm1Version.parse(text)
+        """The server's version, read from ``Server`` inside the session (an anonymous read
+        would open a session of its own), once per login: a server that restarted, perhaps
+        upgraded, makes the session log in again."""
+        if self.version is not None and self.version_for == self.generation:
+            return self.version
+        url = self.base_url + "Server?$select=ProductVersion"
+        doc = self.check("GET", url, await self.send("GET", url, None, {}, p.JSON)).json()
+        text = doc.get("ProductVersion") if isinstance(doc, dict) else None
+        if not isinstance(text, str):
+            raise Tm1ProtocolError("TM1 didn't report its ProductVersion", None, "GET", url)
+        self.version = Tm1Version.parse(text)
+        self.version_for = self.generation
         return self.version
 
     async def capabilities(self) -> Tm1Capabilities:
         """What the server's ``$metadata`` defines: read once per server and version, for
-        every session in the process (a server that's upgraded reports a new version)."""
+        every session in the process (a server that's upgraded reports a new version). A
+        failed read isn't kept."""
         version = await self.product_version()
         key = (self.base_url, str(version))
         cached = CAPABILITIES.get(key)
         if cached is None:
             url = self.base_url + p.METADATA
-            reply = p.check("GET", url, await self.send("GET", url, None, {}, "application/xml"))
+            reply = self.check("GET", url, await self.send("GET", url, None, {}, "application/xml"))
             cached = Tm1Capabilities.parse(reply.content, version)
             CAPABILITIES[key] = cached
         return cached
 
     async def close(self) -> None:
-        cookie, self.cookie = self.cookie, None
+        """Waits for a login in progress, then sends ``tm1.Close``; nothing if no login ever
+        succeeded. Afterwards the connection refuses requests. A 401 means the session was
+        already gone, which is what close wants."""
+        if self.closed:
+            return
+        self.closed = True
         try:
-            if cookie is not None:
-                try:
-                    await self.http.post(
-                        self.base_url + p.CLOSE,
-                        headers=p.headers(self.session_context, extra={"Cookie": f"{p.COOKIE}={cookie}"}),
-                    )
-                except httpx.HTTPError as e:
-                    log.debug("Closing the TM1 session failed: %s", e)
+            async with self.lock:
+                cookie, self.cookie = self.cookie, None
+            if cookie is None:
+                return
+            url = self.base_url + p.CLOSE
+            headers = p.headers(
+                None,
+                p.JSON,
+                {
+                    "Cookie": f"{p.COOKIE}={cookie}",
+                    "Content-Type": "application/json",
+                    # TM1 sometimes drops the connection that carried a close: don't reuse it
+                    "Connection": "close",
+                },
+            )
+            try:
+                response = await self.http.post(
+                    url, content=b"{}", headers=headers, timeout=self._timeout(self.timeouts.close)
+                )
+            except httpx.HTTPError as e:
+                log.warning("Couldn't close TM1 session %s at %s: %s", self.session_id, self.base_url, e)
+                raise _transport(e, "POST", url) from e
+            if response.status_code >= 400 and response.status_code != 401:
+                raise api_error("POST", url, response.status_code, response.content, self.classifier)
+            log.info("Closed TM1 session %s at %s", self.session_id, self.base_url)
         finally:
             if self.owns_http:
                 await self.http.aclose()
@@ -174,14 +383,14 @@ class AsyncTm1Session:
         user: str | None = None,
         password: str | None = None,
         impersonate: str | None = None,
-        session_context: str | None = "tm1-client (Python)",
+        session_context: str | None = None,
         sandbox: str | None = None,
         timeouts: Tm1Timeouts | None = None,
         error_classifier: Tm1ErrorClassifier | None = None,
         check_capabilities: bool = True,
         verify: bool | str = True,
-        timeout: float | httpx.Timeout | None = None,
         client: httpx.AsyncClient | None = None,
+        clock: Callable[[], float] | None = None,
     ):
         """The server is ``base_url`` (the service root), or ``address`` read by ``dialect``
         (``http://tm1:8010`` → ``http://tm1:8010/api/v1/``). The login is ``authenticator``,
@@ -196,14 +405,20 @@ class AsyncTm1Session:
             if user is None:
                 raise ValueError("Give an authenticator, or a user (and password) for basic authentication")
             authenticator = basic(user, password)
-        self._settings = {
-            "impersonate": impersonate,
-            "timeouts": timeouts or Tm1Timeouts.DEFAULTS,
-            "error_classifier": error_classifier or Tm1ErrorClassifier.defaults(),
-        }
-        http = client or runtime.HttpClient(verify=verify, timeout=timeout if timeout is not None else 600.0)
+        _check_session_context(session_context)
+        timeouts = timeouts or Tm1Timeouts.DEFAULTS
+        http = client or runtime.HttpClient(verify=verify, timeout=httpx.Timeout(timeouts.request, connect=timeouts.connect))
         self._connection = _AsyncConnection(
-            base_url, authenticator, session_context, http, client is None, check_capabilities
+            base_url,
+            authenticator,
+            session_context,
+            None if impersonate is None else check_impersonated(impersonate),
+            timeouts,
+            error_classifier or Tm1ErrorClassifier.defaults(),
+            http,
+            client is None,
+            check_capabilities,
+            clock or time.monotonic,
         )
         self._context = p.Context(sandbox=sandbox)
         self._async_every: float | None = None
@@ -270,11 +485,26 @@ class AsyncTm1Session:
 
     @property
     def logged_in(self) -> bool:
+        """Whether it holds a login now (it logs in on the first request)."""
         return self._connection.cookie is not None
 
     @property
-    def session_id(self) -> str | None:
-        return self._connection.cookie
+    def is_closed(self) -> bool:
+        """Whether :meth:`close` was called: it sends nothing more."""
+        return self._connection.closed
+
+    @property
+    def impersonating(self) -> str | None:
+        """The user this session impersonates, if any."""
+        return self._connection.impersonate
+
+    @property
+    def timeouts(self) -> Tm1Timeouts:
+        return self._connection.timeouts
+
+    @property
+    def error_classifier(self) -> Tm1ErrorClassifier:
+        return self._connection.classifier
 
     async def __aenter__(self) -> AsyncTm1Session:
         return self
@@ -282,11 +512,31 @@ class AsyncTm1Session:
     async def __aexit__(self, *exc: object) -> None:
         await self.close()
 
+    async def connect(self) -> AsyncTm1Session:
+        """Logs in now, rather than on the first request, and returns this session."""
+        await self._connection.logged_in()
+        return self
+
     async def login(self) -> None:
-        await self._connection.login()
+        """Logs in now (see :meth:`connect`)."""
+        await self._connection.logged_in()
+
+    async def session_id(self) -> int:
+        """The TM1 session's ID (``ActiveSession``'s), logging in first if needed."""
+        await self._connection.logged_in()
+        assert self._connection.session_id is not None
+        return self._connection.session_id
 
     async def close(self) -> None:
+        """Ends the TM1 session (``ActiveSession/tm1.Close``), for every view: waits for a
+        login in progress, and sends nothing if none ever succeeded. Afterwards the session
+        refuses requests with ``Tm1SessionClosedError``."""
         await self._connection.close()
+
+    def __repr__(self) -> str:
+        sandbox = "" if self._context.sandbox is None else f", sandbox={self._context.sandbox}"
+        change_set = "" if self._context.change_set is None else f", changeSet={self._context.change_set}"
+        return f"{type(self).__name__}[{self._connection.base_url}{sandbox}{change_set}]"
 
     async def version(self) -> Tm1Version:
         """The server's product version, such as ``11.8.03500.6``."""
@@ -322,7 +572,7 @@ class AsyncTm1Session:
             reply = await self._send_async(call.method, url, content, headers, call.accept)
         else:
             reply = await self._connection.send(call.method, url, content, headers, call.accept, call.timeout)
-        return call.read(p.check(call.method, url, reply))
+        return call.read(self._connection.check(call.method, url, reply))
 
     def stream(self, request: Tm1Request[Any] | p.Call) -> AsyncIterator[Any]:
         """The items of a collection, fetching pages as they're needed (Java's ``stream``)."""
@@ -364,7 +614,7 @@ class AsyncTm1Session:
         try:
             while True:
                 await runtime.sleep(self._async_every)
-                polled = p.check("GET", monitor, await connection.send("GET", monitor, None, {}, "*/*"))
+                polled = connection.check("GET", monitor, await connection.send("GET", monitor, None, {}, "*/*"))
                 if polled.status != 202:
                     finished = True
                     return p.async_result(polled.content)
@@ -410,7 +660,7 @@ class AsyncTm1SessionBatch:
     batch work, and :meth:`run` splits a bigger queue.
     """
 
-    DEFAULT_PER_REQUEST = 1000
+    DEFAULT_PER_REQUEST = 500
 
     def __init__(self, queue: Queue, sender: AsyncTm1Session, session: AsyncTm1Session):
         self._queue = queue
@@ -444,6 +694,10 @@ class AsyncTm1SessionBatch:
             await self.run()
 
     async def run(self, per_request: int = DEFAULT_PER_REQUEST) -> None:
+        """Sends the queued requests, at most ``per_request`` to each ``$batch``; each
+        request's result (or error) is in its ``Deferred``. Runs once."""
+        if per_request < 1:
+            raise ValueError(f"A batch needs room for at least one request: {per_request}")
         for chunk in self._queue.chunks(per_request):
             body = p.batch_body([(call, context) for call, context, _ in chunk])
             try:
@@ -452,7 +706,7 @@ class AsyncTm1SessionBatch:
                 for _, _, deferred in chunk:
                     deferred._fail(e)
                 continue
-            settle(chunk, reply, self._sender._connection.url)
+            settle(chunk, reply, self._sender._connection.url, self._sender._connection.classifier)
 
 
 class AsyncTm1SessionBuilder:
@@ -493,15 +747,19 @@ class AsyncTm1SessionBuilder:
         return self._set(authenticator=authenticator)
 
     def impersonate(self, user: str) -> AsyncTm1SessionBuilder:
-        """Logs in as the service account but acts as ``user`` (``TM1-Impersonate``)."""
-        return self._set(impersonate=user)
+        """Logs in as the service account but acts as ``user`` (``TM1-Impersonate``, sent at
+        login only). Refuses a name TM1 would misread: blank, or not printable ASCII."""
+        return self._set(impersonate=check_impersonated(user))
 
     def without_impersonation(self) -> AsyncTm1SessionBuilder:
         self._settings.pop("impersonate", None)
         return self
 
     def session_context(self, session_context: str) -> AsyncTm1SessionBuilder:
-        return self._set(session_context=session_context)
+        """A label for the TM1 session, shown as its ``Context`` in ``Sessions`` and
+        ``Threads``, such as the application's name; sent with the login. It's a setting of the
+        session, not of a view: TM1 keeps one label per session. At most 250 characters."""
+        return self._set(session_context=_check_session_context(session_context))
 
     def timeouts(self, timeouts: Tm1Timeouts) -> AsyncTm1SessionBuilder:
         return self._set(timeouts=timeouts)
@@ -519,6 +777,15 @@ class AsyncTm1SessionBuilder:
 
     def check_capabilities(self, check: bool) -> AsyncTm1SessionBuilder:
         return self._set(check_capabilities=check)
+
+    def clock(self, clock: Callable[[], float]) -> AsyncTm1SessionBuilder:
+        """The clock refused logins are timed by, in seconds (Java's ``nanoTime``): tests pass
+        one they move."""
+        return self._set(clock=clock)
+
+    def base_url_or_unset(self) -> str:
+        """The server, for messages: the base URL or address set, or a placeholder."""
+        return str(self._settings.get("base_url") or self._settings.get("address") or "(no server set)")
 
     def build(self) -> AsyncTm1Session:
         return AsyncTm1Session(**self._settings)

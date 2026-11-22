@@ -20,7 +20,10 @@ COOKIE = "TM1SessionId"
 LOGIN = "ActiveSession?$select=ID"
 CLOSE = "ActiveSession/tm1.Close"
 METADATA = "$metadata"
-JSON = "application/json;odata.metadata=minimal"
+JSON = "application/json"
+TEXT = "text/plain, application/json"
+IMPERSONATE = "TM1-Impersonate"
+SESSION_CONTEXT = "TM1-SessionContext"
 
 T = TypeVar("T")
 
@@ -83,7 +86,7 @@ class Call:
         """The body to send, and the headers that go with it."""
         headers = dict(self.headers)
         if self.json_body is not None:
-            headers.setdefault("Content-Type", "application/json; charset=utf-8")
+            headers.setdefault("Content-Type", "application/json")
             return json.dumps(self.json_body, separators=(",", ":"), ensure_ascii=False).encode("utf-8"), headers
         return self.content, headers
 
@@ -124,7 +127,7 @@ def relative_url(path: str, query: ODataQuery | None, context: Context) -> str:
 def headers(session_context: str | None, accept: str = JSON, extra: Mapping[str, str] | None = None) -> dict[str, str]:
     out = {"OData-Version": "4.0", "OData-MaxVersion": "4.0", "Accept": accept}
     if session_context:
-        out["TM1-SessionContext"] = session_context
+        out[SESSION_CONTEXT] = session_context
     if extra:
         out.update(extra)
     return out
@@ -143,10 +146,10 @@ def session_cookie(set_cookies: Iterable[str]) -> str | None:
     return None
 
 
-def check(method: str, url: str, reply: Reply) -> Reply:
+def check(method: str, url: str, reply: Reply, classifier: Any = None) -> Reply:
     """The reply, or the :class:`~tm1_client.errors.Tm1ApiError` for a refusal."""
     if reply.status >= 400:
-        raise api_error(method, url, reply.status, reply.content)
+        raise api_error(method, url, reply.status, reply.content, classifier)
     return reply
 
 
@@ -247,12 +250,12 @@ class Deferred(Generic[T]):
             raise self._error
         return self._value
 
-    def _settle(self, url: str, reply: Reply | None) -> None:
+    def _settle(self, url: str, reply: Reply | None, classifier: Any = None) -> None:
         self._done = True
         try:
             if reply is None:
-                raise Tm1ProtocolError(f"TM1's batch response has no answer for {self._call.method} {url}")
-            self._value = self._call.read(check(self._call.method, url, reply))
+                raise Tm1ProtocolError("TM1's batch response has no answer for this request", None, self._call.method, url)
+            self._value = self._call.read(check(self._call.method, url, reply, classifier))
         except BaseException as e:  # noqa: BLE001 (kept for result())
             self._error = e
 

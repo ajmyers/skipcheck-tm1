@@ -84,9 +84,9 @@ class Queue:
             yield self.entries[start : start + per_request]
 
 
-def settle(chunk: list[tuple[p.Call, p.Context, p.Deferred[Any]]], reply: p.Reply, url: Any) -> None:
+def settle(chunk: list[tuple[p.Call, p.Context, p.Deferred[Any]]], reply: p.Reply, url: Any, classifier: Any = None) -> None:
     replies = p.batch_replies(reply.json(), len(chunk))
     for (call, context, deferred), item in zip(chunk, replies):
-        deferred._settle(url(p.target(call, context)), item)
+        deferred._settle(url(p.target(call, context)), item, classifier)
 
 

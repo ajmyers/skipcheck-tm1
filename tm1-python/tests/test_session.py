@@ -32,7 +32,7 @@ def test_logs_in_once_then_sends_only_the_cookie(client: Tm1Client, fake: FakeTm
         assert "authorization" not in request.headers
         assert request.headers["cookie"] == "TM1SessionId=s1"
         assert request.headers["odata-version"] == "4.0"
-        assert request.headers["tm1-sessioncontext"] == "tm1-client (Python)"
+        assert "tm1-sessioncontext" not in request.headers  # sent with the login only, as Java
 
 
 def test_logs_in_again_when_the_session_expired(client: Tm1Client, fake: FakeTm1) -> None:

@@ -151,6 +151,10 @@ class Tm1Request(Generic[T]):
     def if_match(self, etag: str) -> Tm1Request[T]:
         return self.with_header("If-Match", etag)
 
+    def is_idempotent(self) -> bool:
+        """Whether sending it twice has the effect of sending it once: GET, PUT, DELETE, HEAD."""
+        return self.method.upper() in ("GET", "PUT", "DELETE", "HEAD")
+
     def relative_uri(self) -> str:
         q = self.query.to_query_string()
         return str(self.path) + ("?" + q if q else "")
@@ -200,10 +204,10 @@ class Tm1Request(Generic[T]):
 
 
 def _accept(response: Tm1Request.Response) -> str:
-    from ._protocol import JSON
+    from ._protocol import JSON, TEXT
 
     if response is Tm1Request.Response.BYTES:
         return "*/*"
     if response is Tm1Request.Response.TEXT:
-        return "text/plain"
+        return TEXT
     return JSON

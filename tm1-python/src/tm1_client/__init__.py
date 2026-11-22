@@ -31,10 +31,12 @@ from .errors import (
     Tm1TransportError,
     Tm1UnsupportedOperationError,
     Tm1ErrorClassifier,
+    Tm1SessionClosedError,
 )
 from .odata import Bind, Filter, ODataPath, ODataProperty, ODataQuery, Raw
 from .resources import UNSET
-from .session import Tm1Session, Tm1SessionBatch, Tm1SessionBuilder
+from .session import Tm1PoolStats, Tm1Session, Tm1SessionBatch, Tm1SessionBuilder, Tm1SessionPool, Tm1SessionPoolBuilder
+from .identity import Tm1Identity
 from .request import Tm1Request
 from .operation import Tm1Operation
 from .timeouts import Tm1Timeouts
@@ -53,8 +55,13 @@ __all__ = [
     "Tm1ErrorClassifier",
     "Tm1Operation",
     "Tm1Request",
+    "Tm1Identity",
+    "Tm1PoolStats",
     "Tm1SessionBatch",
     "Tm1SessionBuilder",
+    "Tm1SessionClosedError",
+    "Tm1SessionPool",
+    "Tm1SessionPoolBuilder",
     "Tm1Timeouts",
     "Tm1Version",
     "ODataPath",

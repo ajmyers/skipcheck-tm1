@@ -9,6 +9,7 @@
 """
 
 from .client import AsyncTm1Batch, AsyncTm1Client, AsyncTm1ClientBuilder
+from .pool import AsyncTm1SessionPool, AsyncTm1SessionPoolBuilder, Tm1PoolStats
 from .session import AsyncTm1Session, AsyncTm1SessionBatch, AsyncTm1SessionBuilder
 
 __all__ = [
@@ -18,4 +19,7 @@ __all__ = [
     "AsyncTm1Session",
     "AsyncTm1SessionBatch",
     "AsyncTm1SessionBuilder",
+    "AsyncTm1SessionPool",
+    "AsyncTm1SessionPoolBuilder",
+    "Tm1PoolStats",
 ]

@@ -40,15 +40,23 @@ class FakeTm1:
         self.metadata = SNAPSHOT.read_bytes() if metadata is None else metadata
         self.product_version = "11.8.03500.6"
         self.respond: Callable[[httpx.Request], Any] = lambda request: {}
+        self.login_requests: list[httpx.Request] = []
+        self.on_login: Callable[[httpx.Request], Any] | None = None
+        """Answers logins instead of the default (``ID`` n, cookie ``s<n>``), when set."""
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         path = request.url.raw_path.decode()
         if path.startswith("/api/v1/ActiveSession?$select=ID") and "authorization" in request.headers:
             self.logins += 1
+            self.login_requests.append(request)
+            if self.on_login is not None:
+                answer = self.on_login(request)
+                if answer is not None:
+                    return answer
             return httpx.Response(
                 200, json={"ID": self.logins}, headers={"Set-Cookie": f"TM1SessionId=s{self.logins}; Path=/api/; HttpOnly"}
             )
-        if path == "/api/v1/Configuration?$select=ProductVersion":
+        if path == "/api/v1/Server?$select=ProductVersion":
             return httpx.Response(200, json={"ProductVersion": self.product_version})
         if path == "/api/v1/$metadata":
             self.metadata_reads += 1
