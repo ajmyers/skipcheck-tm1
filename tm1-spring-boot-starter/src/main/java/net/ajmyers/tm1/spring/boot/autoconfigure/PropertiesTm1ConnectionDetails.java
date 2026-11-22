@@ -37,9 +37,12 @@ final class PropertiesTm1ConnectionDetails implements Tm1ConnectionDetails {
 			throw new IllegalStateException("Set tm1.user to log in to TM1");
 		}
 		String namespace = properties.namespace();
+		String password = properties.password() == null ? "" : properties.password();
+		if (namespace != null && properties.cognosUrl() != null) {
+			return Tm1Authenticator.cognosLogon(properties.cognosUrl(), namespace, user, password);
+		}
 		if (namespace != null) {
-			return Tm1Authenticator.camNamespace(user, properties.password() == null ? "" : properties.password(),
-					namespace);
+			return Tm1Authenticator.camNamespace(user, password, namespace);
 		}
 		return Tm1Authenticator.basic(user, properties.password());
 	}

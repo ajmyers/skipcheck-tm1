@@ -23,6 +23,7 @@ import reactor.core.publisher.Mono;
  * Tm1Authenticator.basic("admin", "apple");                       // TM1's own security
  * Tm1Authenticator.camNamespace("alice", "secret", "LDAP");       // CAM, with a user and password
  * Tm1Authenticator.camPassport(() -&gt; passports.current());       // CAM, with a passport
+ * Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "alice", "secret"); // a passport from Cognos
  * </pre>
  *
  * <p>
@@ -101,6 +102,58 @@ public interface Tm1Authenticator {
 			@Override
 			public String toString() {
 				return "Tm1Authenticator[CAMPassport]";
+			}
+		};
+	}
+
+	/**
+	 * CAM security with a passport the client gets from Cognos itself, logging on with a
+	 * user name and password ({@link CognosPassports#password}): a fresh passport for
+	 * each login. Unlike {@link #camNamespace}, TM1 never sees the password, only Cognos
+	 * does.
+	 * @param dispatcher the Cognos dispatcher's address, such as
+	 * {@code http://cognos:9300}
+	 * @param namespace the namespace's ID, such as {@code LDAP}
+	 * @param user the user name
+	 * @param password the password
+	 * @return the authenticator
+	 */
+	static Tm1Authenticator cognosLogon(String dispatcher, String namespace, String user, String password) {
+		Tm1Authenticator passports = camPassport(CognosPassports.password(dispatcher, namespace, user, password));
+		return described(passports, "CAMPassport from Cognos " + namespace + "/" + user);
+	}
+
+	/**
+	 * CAM security with a passport the client gets from Cognos for an OpenID Connect ID
+	 * token it already holds ({@link CognosPassports#idToken}): a fresh passport for each
+	 * login.
+	 * @param dispatcher the Cognos dispatcher's address, such as
+	 * {@code http://cognos:9300}
+	 * @param namespace the OIDC namespace's ID, such as {@code OIDC}
+	 * @param idToken supplies a current ID token; asked at each login
+	 * @return the authenticator
+	 */
+	static Tm1Authenticator cognosIdToken(String dispatcher, String namespace, Supplier<Mono<String>> idToken) {
+		Tm1Authenticator passports = camPassport(CognosPassports.idToken(dispatcher, namespace, idToken));
+		return described(passports, "CAMPassport from Cognos " + namespace + " (ID token)");
+	}
+
+	private static Tm1Authenticator described(Tm1Authenticator authenticator, String description) {
+		return new Tm1Authenticator() {
+
+			@Override
+			public Mono<String> authorization() {
+				return authenticator.authorization();
+			}
+
+			@Override
+			public String describe() {
+				return description;
+			}
+
+			@Override
+			public String toString() {
+				return "Tm1Authenticator[" + description + "]";
 			}
 		};
 	}
