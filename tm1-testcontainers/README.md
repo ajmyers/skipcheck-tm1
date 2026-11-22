@@ -69,6 +69,7 @@ run on every build where TM1 is configured, so they always work as written.
 | Run your own database (a fixture model in `src/test/resources`) | [`OwnDatabaseExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/OwnDatabaseExampleTest.java) |
 | Require one TM1 version, or skip tests on versions without a feature | [`PinnedVersionExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/PinnedVersionExampleTest.java) |
 | Run two servers at once, e.g. to test a migration or comparison | [`TwoServersExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/TwoServersExampleTest.java) |
+| Start a whole environment in one object: several servers, TM1 Web, Cognos with LDAP and OIDC | [`EnvironmentExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/EnvironmentExampleTest.java) |
 | Register several servers with one Admin Server, and list them all in TM1 Web | [`SharedAdminServerExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/SharedAdminServerExampleTest.java) |
 | Choose where TM1 comes from in code: install folder, bundle, download link, Docker volume or private image | [`ExplicitSourceExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/ExplicitSourceExampleTest.java) |
 | Skip the extension: plain assumptions and a throwaway server, e.g. for a test that damages its server | [`WithoutTheExtensionExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/WithoutTheExtensionExampleTest.java) |
@@ -108,6 +109,40 @@ build. By default the image's tag matches this library's version, and `edge` for
 **Apple Silicon:** TM1 runs under Rosetta, as with compose. Turn on *Use Rosetta for
 x86_64/amd64 emulation* in Docker Desktop (see the [getting-started
 guide](../docker/tm1-server/GETTING-STARTED.md#step-1-install-docker)).
+
+## A whole environment
+
+`PlanningAnalyticsEnvironment` starts and wires any mix of the containers below on one Docker
+network, every part optional:
+
+```java
+try (var env = PlanningAnalyticsEnvironment.builder()
+        .tm1("planning", tm1 -> tm1.withSeed(Tm1Seed.SDATA))
+        .tm1("reporting")
+        .tm1Web()
+        .cognos(cognos -> cognos.withUser("admin", "adminpw", "Admins").withUser("viewer", "viewerpw", "Readers"))
+        .keycloak()                               // adds Cognos's OIDC namespace
+        .camSecurity(Namespace.OIDC, "admin")     // default: LDAP, the first test user as admin
+        .build()) {
+    env.start();
+    env.tm1("planning").getRestUrl();
+    env.tm1Web().getUrl();
+    env.cognos().camAuthorization("viewer", Namespace.OIDC);
+}
+```
+
+- **Every builder method takes a customizer** that receives the ordinary container
+  (`Tm1ServerContainer`, `Tm1WebContainer`, `PawContainer`, `CognosContainer`, ...), so all
+  their settings are available. Customizers run after the environment's wiring, so they can
+  change it. Cognos's runs first, because the TM1 servers are wired from its test users.
+- **Servers** are named (`TM1_SERVER_NAME`) and reachable by name on the network. With more
+  than one, or with `adminServer()`, they share a `Tm1AdminServerContainer`, and TM1 Web and
+  PAW list them all.
+- **With `cognos(...)`, every server runs in CAM security**
+  ([below](#cognos-cam-security)). PAW with CAM security isn't supported yet.
+- **Sources** are discovered from the environment, as for each container, unless set with
+  `tm1Source(...)`, `cognosSource(...)` and so on. `start()` starts parts in dependency
+  order, in parallel where it can; `close()` stops everything and removes the network.
 
 ## Several servers, one Admin Server
 
