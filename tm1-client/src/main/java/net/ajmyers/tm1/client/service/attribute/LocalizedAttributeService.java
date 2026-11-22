@@ -28,6 +28,14 @@ import reactor.core.publisher.Mono;
  * supports no PATCH or DELETE on them and refuses to create a locale twice. Changing or
  * removing translations goes through the <code>&#125;Localized…Attributes</code> control
  * cubes, as cell writes.
+ *
+ * <p>
+ * Translate an element's attribute into French:
+ * {@snippet class = examples.LocalizedAttributeServiceExamples region = translate}
+ *
+ * <p>
+ * Read the translation back:
+ * {@snippet class = examples.LocalizedAttributeServiceExamples region = read}
  */
 public final class LocalizedAttributeService {
 

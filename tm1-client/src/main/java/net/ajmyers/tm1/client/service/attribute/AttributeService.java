@@ -15,6 +15,14 @@ import reactor.core.publisher.Mono;
  * Attribute definitions: which attributes a kind of object has, and their types, for each
  * {@link AttributeSet}. Creating one adds it to every object of that kind; the values are
  * cells of the matching <code>&#125;…Attributes</code> control cube.
+ *
+ * <p>
+ * Add an attribute to every element of a hierarchy:
+ * {@snippet class = examples.AttributeServiceExamples region = create}
+ *
+ * <p>
+ * List the attributes a kind of object has, here cubes:
+ * {@snippet class = examples.AttributeServiceExamples region = list}
  */
 public final class AttributeService {
 
