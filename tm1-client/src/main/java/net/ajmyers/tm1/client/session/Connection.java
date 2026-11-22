@@ -715,11 +715,16 @@ final class Connection {
 	private static void odataHeaders(HttpHeaders headers, Tm1Request.Response response) {
 		headers.set("OData-Version", "4.0");
 		headers.set("OData-MaxVersion", "4.0");
-		headers.set(HttpHeaders.ACCEPT, switch (response) {
+		headers.set(HttpHeaders.ACCEPT, accept(response));
+	}
+
+	/** The media types a request accepts, by how its response is read. */
+	static String accept(Tm1Request.Response response) {
+		return switch (response) {
 			case TEXT -> "text/plain, application/json";
 			case BYTES -> "*/*";
 			default -> MediaType.APPLICATION_JSON_VALUE;
-		});
+		};
 	}
 
 	private static void responseTimeout(Object nativeRequest, Duration timeout) {

@@ -200,10 +200,13 @@ def batch_body(calls: list[tuple[Call, Context]]) -> dict[str, Any]:
             "id": str(i),
             "method": call.method,
             "url": target(call, context),
-            "headers": {"Accept": call.accept, **dict(call.headers)},
+            # TM1 (11.8) gives a request of a batch the batch's own Accept unless it has one, and
+            # refuses plain text ($count, $value) under the batch's application/json. It reads a
+            # header's name as written, and only knows this one in lower case.
+            "headers": {"accept": call.accept, **dict(call.headers)},
         }
         if call.json_body is not None:
-            item["headers"]["Content-Type"] = "application/json"
+            item["headers"]["content-type"] = "application/json"
             item["body"] = call.json_body
         requests.append(item)
     return {"requests": requests}

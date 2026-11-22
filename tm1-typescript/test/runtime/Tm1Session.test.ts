@@ -623,7 +623,7 @@ describe("Tm1Session batches", () => {
     const created = batch.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), { Name: "d" }).ifMatch("*"));
     await batch.run();
     await created;
-    expect(tm1.requests(BATCH)[0]!.json.requests[0]).toEqual({ id: "1", method: "POST", url: "Dimensions", headers: { "If-Match": "*", "content-type": "application/json" }, body: { Name: "d" } });
+    expect(tm1.requests(BATCH)[0]!.json.requests[0]).toEqual({ id: "1", method: "POST", url: "Dimensions", headers: { accept: "application/json", "If-Match": "*", "content-type": "application/json" }, body: { Name: "d" } });
   });
 
   it("refuses calls after it ran", async () => {

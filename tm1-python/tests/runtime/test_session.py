@@ -5,6 +5,7 @@ Tm1SessionCapabilitiesTest: the same behaviour, in both flavors."""
 from __future__ import annotations
 
 import base64
+import json
 import time
 
 import httpx
@@ -468,6 +469,8 @@ def test_sends_queued_requests_together_and_hands_each_its_result(rt: Runtime) -
     assert deleted.result() is None
     assert [c["Name"] for c in listed.result()] == ["a", "b"]
     assert len(rt.fake.requests) == 1, "one $batch"
+    sent = json.loads(rt.fake.requests[0].content)["requests"]
+    assert [r["headers"] for r in sent] == [{"accept": "application/json"}] * 4, "each asks for its own media type, in lower case"
 
 
 def test_refuses_calls_after_it_ran(rt: Runtime) -> None:

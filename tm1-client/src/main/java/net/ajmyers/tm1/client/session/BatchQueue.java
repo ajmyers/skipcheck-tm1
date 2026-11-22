@@ -103,6 +103,10 @@ final class BatchQueue {
 		json.put("method", request.method().name());
 		json.put("url", request.relativeUri());
 		ObjectNode headers = json.putObject("headers");
+		// TM1 (11.8) gives a request of a batch the batch's own Accept unless it has one,
+		// and refuses plain text ($count, $value) under the batch's application/json. It
+		// reads a header's name as written, and only knows this one in lower case.
+		headers.put("accept", Connection.accept(request.response()));
 		request.headers().forEach(headers::put);
 		Object payload = request.body();
 		if (payload != null) {

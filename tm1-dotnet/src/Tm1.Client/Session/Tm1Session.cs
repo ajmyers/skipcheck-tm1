@@ -416,10 +416,17 @@ internal sealed class BatchQueue
                     ["method"] = e.Method,
                     ["url"] = e.Url,
                 };
-                var headers = new Dictionary<string, string>(e.Headers) { ["Accept"] = e.Accept };
+                // TM1 (11.8) gives a request of a batch the batch's own Accept unless it has one, and
+                // refuses plain text ($count, $value) under the batch's application/json. It reads a
+                // header's name as written, and only knows this one in lower case.
+                var headers = new Dictionary<string, string> { ["accept"] = e.Accept };
+                foreach (var header in e.Headers)
+                {
+                    headers[header.Key] = header.Value;
+                }
                 if (e.Body is not null)
                 {
-                    headers["Content-Type"] = "application/json";
+                    headers["content-type"] = "application/json";
                     item["body"] = e.Body;
                 }
                 item["headers"] = headers;

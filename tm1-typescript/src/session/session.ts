@@ -324,6 +324,7 @@ interface Entry {
   id: string;
   method: string;
   url: string;
+  accept: string;
   headers: Readonly<Record<string, string>>;
   body: unknown;
   read: (reply: Reply) => unknown;
@@ -353,7 +354,7 @@ export class BatchQueue {
     });
     // Each caller awaits its own result; one nobody awaits isn't an unhandled rejection
     result.catch(() => undefined);
-    this.entries.push({ id: String(this.entries.length + 1), method: request.method, url: view.contextual(request.relativeUri()), headers: request.headers, body: request.body, read, resolve, reject });
+    this.entries.push({ id: String(this.entries.length + 1), method: request.method, url: view.contextual(request.relativeUri()), accept: request.accept(), headers: request.headers, body: request.body, read, resolve, reject });
     return result;
   }
 
@@ -365,7 +366,10 @@ export class BatchQueue {
     for (let start = 0; start < all.length; start += perRequest) {
       const chunk = all.slice(start, start + perRequest);
       const requests = chunk.map((e) => {
-        const headers: Record<string, string> = { ...e.headers };
+        // TM1 (11.8) gives a request of a batch the batch's own Accept unless it has one, and
+        // refuses plain text ($count, $value) under the batch's application/json. It reads a
+        // header's name as written, and only knows this one in lower case.
+        const headers: Record<string, string> = { accept: e.accept, ...e.headers };
         const item: Record<string, unknown> = { id: e.id, method: e.method, url: e.url, headers };
         if (e.body !== undefined) {
           headers["content-type"] = "application/json";

@@ -22,6 +22,7 @@ import net.ajmyers.tm1.client.model.HierarchyPatch;
 import net.ajmyers.tm1.client.model.ProcessExecuteResult;
 import net.ajmyers.tm1.client.model.ProcessExecuteStatusCode;
 import net.ajmyers.tm1.client.model.ProcessPatch;
+import net.ajmyers.tm1.client.odata.ODataPath;
 import net.ajmyers.tm1.client.odata.ODataQuery;
 import net.ajmyers.tm1.testcontainers.RequiresTm1;
 import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
@@ -71,7 +72,14 @@ class Tm1BatchTm1Test {
 				.create(dimension, dimension, ElementPatch.builder().name("North").build());
 			Flux<Element> listed = queued.elements().list(dimension, dimension, ODataQuery.none());
 			Mono<ProcessExecuteResult> run = queued.processes().executeWithReturn(process, Map.of(), ODataQuery.none());
-			assertThat(batch.size()).isEqualTo(6);
+			Mono<String> count = queued.session()
+				.execute(Tm1Request.text(ODataPath.of("Dimensions")
+					.key(dimension)
+					.nav("Hierarchies")
+					.key(dimension)
+					.nav("Elements")
+					.count()));
+			assertThat(batch.size()).isEqualTo(7);
 
 			batch.run().block(WAIT);
 
@@ -83,6 +91,8 @@ class Tm1BatchTm1Test {
 				.containsExactly("North");
 			assertThat(run.block(WAIT).processExecuteStatusCode())
 				.isEqualTo(ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY);
+			assertThat(count.block(WAIT)).as("plain text, which TM1 refuses under the batch's own Accept")
+				.isEqualTo("1");
 		}
 		finally {
 			tm1.processes().delete(process).block(WAIT);

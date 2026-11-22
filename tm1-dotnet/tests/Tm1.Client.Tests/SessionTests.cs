@@ -94,6 +94,8 @@ public class SessionTests
             Assert.Equal("$batch", r.Target);
             var requests = r.Json.GetProperty("requests").EnumerateArray().ToList();
             Assert.Equal(["Cubes('a')?!sandbox=s", "Cubes('b')?!sandbox=s"], requests.Select(q => q.GetProperty("url").GetString()));
+            // Each asks for its own media type, in lower case
+            Assert.All(requests, q => Assert.Equal("application/json", q.GetProperty("headers").GetProperty("accept").GetString()));
             return new Dictionary<string, object?>
             {
                 ["responses"] = new object[]
