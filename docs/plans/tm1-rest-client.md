@@ -285,8 +285,8 @@ logs, and file or document content. The rules:
   - the cellset is always deleted at the end.
   - Paging uses TM1's own mechanism (§16.3). `ExecuteMDX` takes `Cells($top=N;$select=…)`
     inline, so axes and the first page arrive in one round trip. Later pages use
-    `Cellsets('id')/tm1.GetPartition(Begin=…,End=…)`, which is inclusive and must keep the same
-    cell `$select`. A small, bounded number of pages are fetched in parallel, in order
+    `Cellsets('id')/tm1.GetPartition(Begin=…,End=…)`, whose `Begin` and `End` are the top-left and bottom-right cells of a rectangle (so pages are
+    whole rows; seen in phase 4), and must keep the same cell `$select`. A small, bounded number of pages are fetched in parallel, in order
     (`flatMapSequential`).
 
 - `Mono<T>` for single results, `Mono<Void>` for no content, `Flux<T>` for collections.
@@ -807,6 +807,7 @@ affects ("TM1 (11.8) …"), so it's explained where it's used, and pinned by a t
 | Element PATCH silently ignores `Name` (no rename). Hierarchy PATCH ignores `Visible`. | Patch builders omit them. Javadoc. |
 | A dimension PATCH returns success but ignores `Hierarchies` and `AllLeavesHierarchyName`. A stale `If-Match` gets 412 (code 278). (Seen in phase 2.) | `DimensionService.update` says so; hierarchies change through `HierarchyService`. Pinned by a test |
 | A hierarchy has an `AllMember` only with a single root (then it's that root); with several roots TM1 sends 204. (Seen in phase 2.) | `HierarchyService.allMember` completes empty |
+| `GetPartition(Begin, End)` returns the rectangle between two cells, not a range of ordinals: `2..4` over two columns is cells 2 and 4. `Cellsets` lists none, though each reads by ID. A cellset has a slicer axis even without `WHERE` (holding `Sandboxes`), and a cell's members start with `Sandboxes`' `Base`. (Seen in phase 4.) | `CellsetService.stream` pages whole rows; the Javadoc of `partition`, `list`, `axes` and `cellMembers` says so |
 | A native view must place every cube dimension on columns, rows or titles. View attributes can't be defined until the cube has a public native view; an MDX view doesn't count. (Seen in phase 3.) | `ViewService.create` and `AttributeSet.views` say so |
 | `$expand` into a complex property needs a path (`FedCells/Tuple`); nested options (`FedCells($expand=Tuple)`) get 400. Operations returning a primitive wrap it as `{"value": …}`. (Seen in phase 3.) | `traceFeeders` Javadoc; services unwrap `value` |
 | `LocalizedAttributes` can be created once per locale and read; TM1 refuses PATCH, DELETE and a second POST, and a member's are read only. Only defined attributes translate (`Caption` too). (Seen in phase 2.) | `LocalizedAttributeService` has list, get and create; changes go through the `}Localized…Attributes` cubes |
