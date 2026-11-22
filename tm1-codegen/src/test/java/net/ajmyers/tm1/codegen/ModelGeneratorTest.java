@@ -254,6 +254,26 @@ class ModelGeneratorTest {
 			.contains("public Builder clientPingCAMPassport(@Nullable Object");
 	}
 
+	@Test
+	void readsADateTimeTm1FillsWithNonsenseLeniently() {
+		String sample = """
+				<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+				  <edmx:DataServices>
+				    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="ibm.tm1.api.v1" Alias="tm1">
+				      <EntityType Name="MessageLogEntry">
+				        <Key><PropertyRef Name="ID"/></Key>
+				        <Property Name="ID" Type="Edm.Int64" Nullable="false"/>
+				        <Property Name="TimeStamp" Type="Edm.DateTimeOffset"/>
+				      </EntityType>
+				    </Schema>
+				  </edmx:DataServices>
+				</edmx:Edmx>
+				""";
+		assertThat(source(new ModelGenerator(CsdlParser.parse(sample)), "MessageLogEntry"))
+			.contains("@JsonDeserialize(using = LenientOffsetDateTimeDeserializer.class)")
+			.contains("0000-00-00T00:00Z");
+	}
+
 	private static ModelGenerator sample() {
 		return new ModelGenerator(CsdlParser.parse(SAMPLE));
 	}

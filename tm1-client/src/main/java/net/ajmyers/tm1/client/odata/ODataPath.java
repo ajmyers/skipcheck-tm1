@@ -145,6 +145,27 @@ public final class ODataPath {
 	}
 
 	/**
+	 * A path a server returned, such as a delta link
+	 * ({@code MessageLogEntries/!delta('…')}), relative to the service root and not yet
+	 * encoded: each segment is percent-encoded as it is (keeping {@code !}, {@code (},
+	 * {@code )} and {@code '}), without checking it's an identifier.
+	 * @param link the path, without a query
+	 * @return the path
+	 * @throws IllegalArgumentException if it's empty, absolute or has a query
+	 */
+	public static ODataPath link(String link) {
+		Objects.requireNonNull(link, "link");
+		if (link.isEmpty() || link.startsWith("/") || link.contains("://") || link.contains("?")) {
+			throw new IllegalArgumentException("Not a relative path without a query: " + link);
+		}
+		List<String> segments = new ArrayList<>();
+		for (String segment : link.split("/", -1)) {
+			segments.add(ODataEncoding.linkSegment(segment));
+		}
+		return new ODataPath(List.copyOf(segments));
+	}
+
+	/**
 	 * A function import called from the service root, e.g. {@code ModelCubes()} or
 	 * {@code TailMessageLog(Top=10)}.
 	 * @param name the import's name, unqualified

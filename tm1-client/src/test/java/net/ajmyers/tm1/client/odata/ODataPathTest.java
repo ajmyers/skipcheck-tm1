@@ -128,4 +128,12 @@ class ODataPathTest {
 		assertThat(ODataPath.functionImport("TailMessageLog", top)).hasToString("TailMessageLog(Top=10)");
 	}
 
+	@Test
+	void followsAServerLinkEncodingEachSegment() {
+		assertThat(ODataPath.link("MessageLogEntries/!delta('0[4096]38@11!19')"))
+			.hasToString("MessageLogEntries/!delta('0%5B4096%5D38%4011!19')");
+		assertThatIllegalArgumentException().isThrownBy(() -> ODataPath.link("Cubes?$top=1"));
+		assertThatIllegalArgumentException().isThrownBy(() -> ODataPath.link("/api/v1/Cubes"));
+	}
+
 }
