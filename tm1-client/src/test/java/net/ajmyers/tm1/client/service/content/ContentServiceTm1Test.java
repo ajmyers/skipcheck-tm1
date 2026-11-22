@@ -104,7 +104,7 @@ class ContentServiceTm1Test {
 			assertThat(made).as("a document made in an application is a reference")
 				.isInstanceOf(DocumentReference.class);
 			assertThat(made.id()).as("found by ID, the name plus a suffix").isEqualTo("notes.txt.blob");
-			ContentPath notes = folder.child(made.id());
+			ContentPath notes = folder.child(made);
 			assertThatThrownBy(() -> tm1.contents().get(folder.child("notes.txt"), ODataQuery.none()).block(WAIT))
 				.as("not by name")
 				.isInstanceOf(Tm1NotFoundException.class);

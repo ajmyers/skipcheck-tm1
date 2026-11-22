@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import net.ajmyers.tm1.client.model.Entry;
 import net.ajmyers.tm1.client.odata.ODataPath;
 
 /**
@@ -64,6 +65,35 @@ public final class ContentPath {
 	 */
 	public ContentPath child(String id) {
 		return child(id, ContentScope.PUBLIC);
+	}
+
+	/**
+	 * A public child of this folder, as TM1 returned it, such as from
+	 * {@code ContentService.create}: found by its {@code ID}, which {@code $metadata}
+	 * deprecates but TM1 (11.8) still keys entries by, so callers needn't read it.
+	 * @param entry the entry
+	 * @return the child's path
+	 * @throws IllegalArgumentException if the entry has no ID (it was selected away)
+	 */
+	public ContentPath child(Entry entry) {
+		return child(entry, ContentScope.PUBLIC);
+	}
+
+	/**
+	 * A child of this folder as TM1 returned it, public or private: see
+	 * {@link #child(Entry)}.
+	 * @param entry the entry
+	 * @param scope which of the folder's collections holds it
+	 * @return the child's path
+	 * @throws IllegalArgumentException if the entry has no ID
+	 */
+	@SuppressWarnings("deprecation") // ID is deprecated in $metadata, yet it's TM1's key
+	public ContentPath child(Entry entry, ContentScope scope) {
+		String id = entry.id();
+		if (id == null) {
+			throw new IllegalArgumentException("The entry has no ID to find it by: " + entry);
+		}
+		return child(id, scope);
 	}
 
 	/**
