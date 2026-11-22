@@ -10,10 +10,7 @@ import net.ajmyers.tm1.client.odata.ODataPath;
 /**
  * Where an entry is in the contents tree: a root folder, then each folder's child by ID.
  *
- * <pre>{@code
- * ContentPath.applications().child("Planning").child("notes.txt.blob")
- *     // Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')
- * }</pre>
+ * {@snippet class = examples.ContentServiceExamples region = path}
  *
  * <p>
  * Children are found by their {@code ID}, not their {@code Name}, though

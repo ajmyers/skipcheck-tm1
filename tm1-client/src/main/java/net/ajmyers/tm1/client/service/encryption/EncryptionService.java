@@ -40,6 +40,14 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code DataEncryptionKeyRotationFailed} and {@code RotateDataModelKey}.</li>
  * <li>Each must be run by a full administrator.</li>
  * </ul>
+ *
+ * <p>
+ * Encrypt the model with a key from IBM Key Protect, checking the settings first:
+ * {@snippet class = examples.EncryptionServiceExamples region = configure}
+ *
+ * <p>
+ * Rotate the data encryption key:
+ * {@snippet class = examples.EncryptionServiceExamples region = rotate}
  */
 public final class EncryptionService {
 

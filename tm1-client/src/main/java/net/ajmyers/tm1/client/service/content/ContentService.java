@@ -41,6 +41,22 @@ import reactor.core.publisher.Mono;
  * resource"), so there's no update. To rename one, copy it with a new name and delete the
  * original.</li>
  * </ul>
+ *
+ * <p>
+ * Build an application: a folder, a link and a cube reference:
+ * {@snippet class = examples.ContentServiceExamples region = application}
+ *
+ * <p>
+ * Upload a document from a file:
+ * {@snippet class = examples.ContentServiceExamples region = upload}
+ *
+ * <p>
+ * Download a document's content to a file:
+ * {@snippet class = examples.ContentServiceExamples region = download}
+ *
+ * <p>
+ * List the cubes an application refers to:
+ * {@snippet class = examples.ContentServiceExamples region = cubes}
  */
 public final class ContentService {
 

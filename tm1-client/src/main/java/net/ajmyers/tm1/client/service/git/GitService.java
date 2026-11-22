@@ -53,6 +53,18 @@ import reactor.core.publisher.Mono;
  * <li>The first pull after the remote moves on still plans the commit TM1 had; the next
  * pull plans the new one. Check the plan's {@code Commit} before executing it.</li>
  * </ul>
+ *
+ * <p>
+ * Tie the model to a repository:
+ * {@snippet class = examples.GitServiceExamples region = init}
+ *
+ * <p>
+ * Push the model's changes:
+ * {@snippet class = examples.GitServiceExamples region = push}
+ *
+ * <p>
+ * Pull a branch, once the plan is for the commit wanted:
+ * {@snippet class = examples.GitServiceExamples region = pull}
  */
 public final class GitService {
 
