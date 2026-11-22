@@ -31,3 +31,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e './tm1-python[test]'
       - run: pytest tm1-python
+
+  # The .NET client, generated from spec/tm1-api.json at build time
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test tm1-dotnet/Tm1.slnx

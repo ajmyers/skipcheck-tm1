@@ -1,0 +1,4 @@
+# Endpoints the .NET client deliberately doesn't implement, as: <endpoint> | <reason>
+# The same as the Java client's coverage-excluded.txt (CoverageGateTests).
+ActionImport Update | The same tm1.Update as Action Cube/Update, with the cube as a parameter; CellService.UpdateAsync calls the bound one
+ActionImport ExecuteChore | The same tm1.ExecuteChore as Action Chore/Execute, with the chore as a parameter; ChoreService.ExecuteAsync calls the bound one

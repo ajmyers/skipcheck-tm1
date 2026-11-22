@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>AjMyers.Tm1.Client</AssemblyName>
+    <RootNamespace>AjMyers.Tm1.Client</RootNamespace>
+    <PackageId>AjMyers.Tm1.Client</PackageId>
+    <Version>0.1.0-dev</Version>
+    <Description>.NET client for the IBM Planning Analytics (TM1) REST API, generated from its $metadata</Description>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Generated members carry IBM's descriptions, not every one has a doc comment -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <GeneratedDir>$(BaseIntermediateOutputPath)generated/</GeneratedDir>
+    <SpecFile>$(RepositoryRoot)/spec/tm1-api.json</SpecFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AjMyers.Tm1.Client.Tests" />
+    <!-- Built first, never referenced at run time -->
+    <ProjectReference Include="../Tm1.Codegen/Tm1.Codegen.csproj" ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+
+  <!-- The model is generated from the spec at build time, into obj/: never committed, as for
+       the Java (Gradle) and Python (hatch) clients. A spec change shows up as a diff of the spec. -->
+  <Target Name="GenerateTm1Model" BeforeTargets="CoreCompile" Inputs="$(SpecFile);@(Tm1CodegenInputs)" Outputs="$(GeneratedDir).stamp">
+    <MSBuild Projects="../Tm1.Codegen/Tm1.Codegen.csproj" Targets="GetTargetPath">
+      <Output TaskParameter="TargetOutputs" PropertyName="Tm1CodegenDll" />
+    </MSBuild>
+    <Exec Command="dotnet &quot;$(Tm1CodegenDll)&quot; &quot;$(SpecFile)&quot; &quot;$(GeneratedDir)&quot;" />
+    <Touch Files="$(GeneratedDir).stamp" AlwaysCreate="true" />
+  </Target>
+  <Target Name="IncludeTm1Model" BeforeTargets="CoreCompile" AfterTargets="GenerateTm1Model">
+    <ItemGroup>
+      <Compile Remove="$(GeneratedDir)**/*.cs" />
+      <Compile Include="$(GeneratedDir)**/*.cs" />
+    </ItemGroup>
+  </Target>
+  <ItemGroup>
+    <Tm1CodegenInputs Include="../Tm1.Codegen/**/*.cs" />
+  </ItemGroup>
+</Project>
