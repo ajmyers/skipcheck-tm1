@@ -6,7 +6,6 @@ Action GitPushPlan/Execute
 ActionImport ConfigureEncryptionAtRest
 ActionImport DecryptDataFile
 ActionImport DecryptDataModel
-ActionImport DeleteAnnotationArtifacts
 ActionImport DisableEncryptionAtRest
 ActionImport EncryptDataFile
 ActionImport EncryptDataModel
@@ -19,16 +18,7 @@ ActionImport GitUninit
 ActionImport RemoveOIDCKeyFromCache
 ActionImport RotateDataEncryptionKey
 ActionImport RotateDataModelKey
-EntitySet Annotations
-EntitySet ApplicationContextFacets
 EntitySet GitPlans
 EntitySet SQLDataSources
 FunctionImport GetOIDCKeys
 FunctionImport ValidateEncryptionAtRestSettings
-Navigation Annotation/ApplicationContext
-Navigation Annotation/Attachments
-Navigation Annotation/DimensionalContext
-Navigation ApplicationContextFacet/Values
-Navigation ApplicationContextFacetValue/Facet
-Navigation CellsetCell/Annotations
-Navigation Cube/Annotations
