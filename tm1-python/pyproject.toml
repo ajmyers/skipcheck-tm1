@@ -18,15 +18,16 @@ dependencies = [
 test = ["pytest>=8"]
 
 [tool.hatch.build.hooks.custom]
-# hatch_build.py generates src/tm1_client/_generated from ../spec/tm1-api.json
+# hatch_build.py generates src/tm1_client/_generated from ../spec/tm1-api.json, and
+# src/tm1_client/_sync (the sync flavor) from src/tm1_client/aio
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tm1_client"]
-artifacts = ["src/tm1_client/_generated/*.py"]
+artifacts = ["src/tm1_client/_generated/*.py", "src/tm1_client/_sync/**/*.py"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src", "codegen", "tests", "coverage", "hatch_build.py"]
-exclude = ["src/tm1_client/_generated"]
+exclude = ["src/tm1_client/_generated", "src/tm1_client/_sync"]
 
 [tool.hatch.build.targets.sdist.force-include]
 # The sdist builds without the repository, so it takes the spec along

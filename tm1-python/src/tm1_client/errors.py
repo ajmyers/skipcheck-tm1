@@ -29,6 +29,8 @@ __all__ = [
     "Tm1ServerError",
     "Tm1TransportError",
     "Tm1UnsupportedOperationError",
+    "Rule",
+    "Tm1ErrorClassifier",
     "classify",
 ]
 
@@ -78,21 +80,82 @@ class ODataError:
         return ODataError(None if code is None else str(code), str(error.get("message", "")), error.get("details"))
 
 
+@dataclass(frozen=True)
+class Rule:
+    """A classification rule: TM1's status, code and message to match (any left None matches
+    anything; at least one is needed), and the kind it means."""
+
+    status: int | None
+    code: str | None
+    message: re.Pattern[str] | None
+    kind: Tm1ErrorKind
+
+    def __post_init__(self) -> None:
+        if self.status is None and self.code is None and self.message is None:
+            raise ValueError("A rule needs at least one condition")
+
+    @staticmethod
+    def of_message(regex: str, kind: Tm1ErrorKind) -> Rule:
+        """Matches TM1's message, case-insensitively (Java's ``Rule.message``)."""
+        return Rule(None, None, re.compile(regex, re.I), kind)
+
+    @staticmethod
+    def of_code(code: str, kind: Tm1ErrorKind) -> Rule:
+        """Matches TM1's error code (Java's ``Rule.code``)."""
+        return Rule(None, code, None, kind)
+
+    def matches(self, status: int, error: ODataError | None) -> bool:
+        if self.status is not None and self.status != status:
+            return False
+        if self.code is not None and (error is None or error.code != self.code):
+            return False
+        return self.message is None or (error is not None and self.message.search(error.message) is not None)
+
+
+class Tm1ErrorClassifier:
+    """What a refusal means, from TM1's status, code and message, as the Java client's
+    ``Tm1ErrorClassifier``: the first rule that matches, else by status. TM1 reports some
+    failures only by message (impersonation, a missing object answered with 400)."""
+
+    def __init__(self, rules: list[Rule]):
+        self._rules = tuple(rules)
+
+    @staticmethod
+    def defaults() -> Tm1ErrorClassifier:
+        return _DEFAULTS
+
+    def with_rule(self, rule: Rule) -> Tm1ErrorClassifier:
+        """This classifier with ``rule`` tried first."""
+        return Tm1ErrorClassifier([rule, *self._rules])
+
+    @property
+    def rules(self) -> tuple[Rule, ...]:
+        return self._rules
+
+    def classify(self, status: int, error: ODataError | None) -> Tm1ErrorKind:
+        for rule in self._rules:
+            if rule.matches(status, error):
+                return rule.kind
+        return _BY_STATUS.get(status, Tm1ErrorKind.OTHER)
+
+
 # Same order and patterns as Tm1ErrorClassifier.defaults() in the Java client
-_RULES: list[tuple[str | None, re.Pattern[str] | None, Tm1ErrorKind]] = [
-    (None, re.compile(r"insufficient rights to impersonate", re.I), Tm1ErrorKind.IMPERSONATION_REFUSED),
-    (None, re.compile(r"administrator to be able to impersonate", re.I), Tm1ErrorKind.IMPERSONATION_REFUSED),
-    (None, re.compile(r"user specified in the impersonation request does not exist", re.I), Tm1ErrorKind.UNKNOWN_USER),
-    (None, re.compile(r"tm1userexception: cancel", re.I), Tm1ErrorKind.CANCELLED),
-    (None, re.compile(r"DataSpreadFailed", re.I), Tm1ErrorKind.DATA_SPREAD_FAILED),
-    ("248", None, Tm1ErrorKind.INVALID_UNIQUE_NAME),
-    ("65", None, Tm1ErrorKind.NO_READ_RIGHTS),
-    (None, re.compile(r"ObjectSecurityNoReadRights", re.I), Tm1ErrorKind.NO_READ_RIGHTS),
-    (None, re.compile(r"can ?not be found|not found|does not exist|doesn't exist|ObjectNotFound", re.I), Tm1ErrorKind.NOT_FOUND),
-    (None, re.compile(r"already exists", re.I), Tm1ErrorKind.ALREADY_EXISTS),
-    (None, re.compile(r"\blocked\b", re.I), Tm1ErrorKind.LOCKED),
-    (None, re.compile(r"\bin use\b|is used by|isbeingusedby|cannot be deleted", re.I), Tm1ErrorKind.IN_USE),
-]
+_DEFAULTS = Tm1ErrorClassifier(
+    [
+        Rule.of_message(r"insufficient rights to impersonate", Tm1ErrorKind.IMPERSONATION_REFUSED),
+        Rule.of_message(r"administrator to be able to impersonate", Tm1ErrorKind.IMPERSONATION_REFUSED),
+        Rule.of_message(r"user specified in the impersonation request does not exist", Tm1ErrorKind.UNKNOWN_USER),
+        Rule.of_message(r"tm1userexception: cancel", Tm1ErrorKind.CANCELLED),
+        Rule.of_message(r"DataSpreadFailed", Tm1ErrorKind.DATA_SPREAD_FAILED),
+        Rule.of_code("248", Tm1ErrorKind.INVALID_UNIQUE_NAME),
+        Rule.of_code("65", Tm1ErrorKind.NO_READ_RIGHTS),
+        Rule.of_message(r"ObjectSecurityNoReadRights", Tm1ErrorKind.NO_READ_RIGHTS),
+        Rule.of_message(r"can ?not be found|not found|does not exist|doesn't exist|ObjectNotFound", Tm1ErrorKind.NOT_FOUND),
+        Rule.of_message(r"already exists", Tm1ErrorKind.ALREADY_EXISTS),
+        Rule.of_message(r"\blocked\b", Tm1ErrorKind.LOCKED),
+        Rule.of_message(r"\bin use\b|is used by|isbeingusedby|cannot be deleted", Tm1ErrorKind.IN_USE),
+    ]
+)
 
 _BY_STATUS = {
     401: Tm1ErrorKind.UNAUTHENTICATED,
@@ -106,14 +169,8 @@ _BY_STATUS = {
 
 
 def classify(status: int, error: ODataError | None) -> Tm1ErrorKind:
-    """The kind of a refusal: the first rule matching TM1's code or message, else by status."""
-    for code, message, kind in _RULES:
-        if code is not None and (error is None or error.code != code):
-            continue
-        if message is not None and (error is None or not message.search(error.message)):
-            continue
-        return kind
-    return _BY_STATUS.get(status, Tm1ErrorKind.OTHER)
+    """The kind of a refusal by the default rules."""
+    return _DEFAULTS.classify(status, error)
 
 
 class Tm1Error(Exception):
@@ -177,10 +234,12 @@ class Tm1ServerError(Tm1ApiError):
     """5xx."""
 
 
-def api_error(method: str, url: str, status: int, body: bytes | None) -> Tm1ApiError:
+def api_error(
+    method: str, url: str, status: int, body: bytes | None, classifier: Tm1ErrorClassifier | None = None
+) -> Tm1ApiError:
     """The exception for a refused request."""
     error = ODataError.parse(body)
-    kind = classify(status, error)
+    kind = (classifier or _DEFAULTS).classify(status, error)
     cls: type[Tm1ApiError]
     if kind is Tm1ErrorKind.NOT_FOUND:
         cls = Tm1NotFoundError

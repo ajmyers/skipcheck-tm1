@@ -55,3 +55,35 @@ def test_names_members_without_numbers() -> None:
     for cls in _classes(api).values():
         for member in vars(cls):
             assert not re.search(r"[a-z]\d+$", member), f"{cls.__name__}.{member}"
+
+
+def test_unasync_makes_the_sync_flavor() -> None:
+    sys.path.insert(0, str(ROOT / "codegen"))
+    try:
+        from tm1_pygen.unasync import transform
+    finally:
+        sys.path.pop(0)
+    source = (
+        "from .._compat import AsyncIO as runtime\n"
+        "class AsyncTm1Thing:\n"
+        "    async def __aenter__(self) -> AsyncTm1Thing:\n"
+        '        """``async with AsyncTm1Thing() as t: await t.go()``"""\n'
+        "        async with runtime.Lock():\n"
+        "            await runtime.sleep(1)\n"
+        "        return [x async for x in self.items()]  # await AsyncIterator\n"
+        "    async def items(self) -> AsyncIterator[int]:\n"
+        "        await self.http.aclose()\n"
+        '        s = "await t.go() in a string reads right too"\n'
+    )
+    assert transform(source) == (
+        "from .._compat import SyncIO as runtime\n"
+        "class Tm1Thing:\n"
+        "    def __enter__(self) -> Tm1Thing:\n"
+        '        """``with Tm1Thing() as t: t.go()``"""\n'
+        "        with runtime.Lock():\n"
+        "            runtime.sleep(1)\n"
+        "        return [x for x in self.items()]  # Iterator\n"
+        "    def items(self) -> Iterator[int]:\n"
+        "        self.http.close()\n"
+        '        s = "t.go() in a string reads right too"\n'
+    )

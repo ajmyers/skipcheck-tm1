@@ -214,7 +214,7 @@ def call(api: Api, owner: Any, method: str, op: dict[str, Any], endpoint_id: str
 @pytest.mark.parametrize("endpoint_id", endpoint_ids("EntitySet"))
 def test_entity_set(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
     name = endpoint_id.split(" ", 1)[1]
-    collection = getattr(api.client, index.ENTITY_SETS[name])
+    collection = getattr(api.api, index.ENTITY_SETS[name])
     fake.respond = lambda r: {"value": []}
     assert api.run(collection.list()) == []
     assert target(fake.last) == f"GET {name}"
@@ -231,7 +231,7 @@ def test_entity_set(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
 @pytest.mark.parametrize("endpoint_id", endpoint_ids("Singleton"))
 def test_singleton(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
     name = endpoint_id.split(" ", 1)[1]
-    api.run(getattr(api.client, index.SINGLETONS[name]).get(select="ID"))
+    api.run(getattr(api.api, index.SINGLETONS[name]).get(select="ID"))
     assert target(fake.last) == f"GET {name}?$select=ID"
 
 
@@ -248,7 +248,7 @@ def test_navigation(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
         assert getattr(value, field) is not None
         return
     route = ROUTES[e["owner"]]
-    resource = getattr(route.walk(api.client), index.NAVIGATION[(e["owner"], e["name"])])
+    resource = getattr(route.walk(api.api), index.NAVIGATION[(e["owner"], e["name"])])
     if nav["collection"]:
         fake.respond = lambda r: {"value": []}
         api.run(resource.list())
@@ -265,7 +265,7 @@ def test_bound_operation(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
     assert not binding["collection"], "no TM1 operation is bound to a collection yet: route one here"
     route = ROUTES[binding["type"]]
     cls_name, method = index.OPERATIONS[endpoint_id]
-    owner = route.walk(api.client)
+    owner = route.walk(api.api)
     assert type(owner).__name__ == cls_name or cls_name in [c.__name__ for c in type(owner).__mro__]
     fake.respond = lambda r: respond_for(op["returns"])
     expected = call(api, owner, method, op, endpoint_id)
@@ -279,7 +279,7 @@ def test_unbound_operation(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
     cls_name, method = index.OPERATIONS[endpoint_id]
     assert cls_name == "Tm1Api"
     fake.respond = lambda r: respond_for(op["returns"])
-    expected = call(api, api.client, method, op, endpoint_id)
+    expected = call(api, api.api, method, op, endpoint_id)
     check_operation(fake.last, op, e["name"], expected)
 
 
@@ -310,7 +310,7 @@ def arg_text(p: dict[str, Any]) -> str:
     if p["type"] in ENUMS:
         e = ENUMS[p["type"]]
         member = e["members"][0]["name"]
-        return f"'{member}'" if e["flags"] else f"{e['literalPrefix']}'{member}'"
+        return f"'{member}'" if e["flags"] else f"{e['qualifiedName']}'{member}'"
     return SAMPLES[p["type"]][1]
 
 

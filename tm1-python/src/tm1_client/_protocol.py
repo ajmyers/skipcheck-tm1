@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import gzip
 import json
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Generic, Iterable, Mapping, TypeVar
 
@@ -75,6 +74,10 @@ class Call:
     raw: bool = False
     contextual: bool = True
     """Whether the view's ``!sandbox`` and ``!ChangeSet`` are added: not to a link TM1 sent."""
+    requires: Any = None
+    """A :class:`~tm1_client.version.Tm1Capability` the server must have, checked first."""
+    timeout: float | None = None
+    """Seconds to wait for the answer, instead of the session's request timeout."""
 
     def body(self) -> tuple[bytes | None, dict[str, str]]:
         """The body to send, and the headers that go with it."""
@@ -107,8 +110,8 @@ class Context:
 def relative_url(path: str, query: ODataQuery | None, context: Context) -> str:
     """The URL relative to the service root: the path, the query's options, and the view's
     ``!sandbox`` and ``!ChangeSet`` unless the query sets its own."""
-    own = {} if query is None else dict(query.custom)
-    parts = [] if query is None else [query.query_string()]
+    own = {} if query is None else query.custom
+    parts = [] if query is None else [query.to_query_string()]
     for name, value in context.options():
         if name not in own:
             parts.append(f"{name}={query_value(value)}")
@@ -260,61 +263,3 @@ class Deferred(Generic[T]):
     def __repr__(self) -> str:
         state = "pending" if not self._done else ("failed" if self._error else "done")
         return f"Deferred[{self._call.method} {self._call.path}, {state}]"
-
-
-# Capabilities: what the server's own $metadata has
-
-
-_EDM = "{http://docs.oasis-open.org/odata/ns/edm}"
-
-
-@dataclass(frozen=True)
-class Capabilities:
-    """The endpoints a server's ``$metadata`` defines, as coverage-gate IDs, and its schema version."""
-
-    schema_version: str | None
-    endpoints: frozenset[str]
-
-    def supports(self, endpoint_id: str) -> bool:
-        return endpoint_id in self.endpoints
-
-
-def capabilities(metadata: bytes) -> Capabilities:
-    """Reads a ``$metadata`` document the way the spec's inventory is made (``Endpoints`` in
-    the Java client): entity sets, singletons, imports, bound operations and navigation."""
-    try:
-        root = ET.fromstring(metadata)
-    except ET.ParseError as e:
-        raise Tm1ProtocolError(f"TM1's $metadata isn't XML: {e}") from e
-    out: set[str] = set()
-    version = None
-    for schema in root.iter(f"{_EDM}Schema"):
-        for annotation in schema.findall(f"{_EDM}Annotation"):
-            if annotation.get("Term", "").endswith("SchemaVersion"):
-                text = annotation.get("String") or "".join(annotation.itertext()).strip()
-                version = text or version
-        for kind in ("Action", "Function"):
-            for op in schema.findall(f"{_EDM}{kind}"):
-                if op.get("IsBound") != "true":
-                    continue
-                params = op.findall(f"{_EDM}Parameter")
-                if not params:
-                    continue
-                binding = params[0].get("Type", "")
-                collection = binding.startswith("Collection(")
-                simple = binding.removeprefix("Collection(").removesuffix(")").rsplit(".", 1)[-1]
-                out.add(f"{kind} {'Collection(' + simple + ')' if collection else simple}/{op.get('Name')}")
-        for tag in ("EntityType", "ComplexType"):
-            for t in schema.findall(f"{_EDM}{tag}"):
-                for nav in t.findall(f"{_EDM}NavigationProperty"):
-                    out.add(f"Navigation {t.get('Name')}/{nav.get('Name')}")
-        for container in schema.findall(f"{_EDM}EntityContainer"):
-            for tag, kind in (
-                ("EntitySet", "EntitySet"),
-                ("Singleton", "Singleton"),
-                ("ActionImport", "ActionImport"),
-                ("FunctionImport", "FunctionImport"),
-            ):
-                for item in container.findall(f"{_EDM}{tag}"):
-                    out.add(f"{kind} {item.get('Name')}")
-    return Capabilities(version, frozenset(out))

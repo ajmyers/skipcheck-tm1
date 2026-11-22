@@ -9,12 +9,12 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from tm1_client import Tm1ApiError, Tm1Client, Tm1ProtocolError, odata
+from tm1_client import ODataQuery, Tm1ApiError, Tm1Client, Tm1ProtocolError, odata
 from tm1_client._generated import index
 from tm1_client.model import Cube, CubeUpdate, Dimension, Edge, Element, ElementType, Hierarchy
 
 from ..conftest import SPEC
-from .conftest import URL, options
+from .conftest import URL, async_client as _async_client
 
 pytestmark = pytest.mark.skipif(URL is None, reason="no TM1 configured (TM1_URL)")
 
@@ -38,14 +38,14 @@ def test_reads_every_entity_set_and_singleton(tm1: Tm1Client) -> None:
     failures = []
     for name, attr in index.ENTITY_SETS.items():
         try:
-            getattr(tm1, attr).list(top=3)
+            getattr(tm1.api, attr).list(top=3)
         except Tm1ApiError:
             pass
         except (ValidationError, Tm1ProtocolError) as e:
             failures.append(f"{name}: {e}")
     for name, attr in index.SINGLETONS.items():
         try:
-            getattr(tm1, attr).get()
+            getattr(tm1.api, attr).get()
         except Tm1ApiError:
             pass
         except (ValidationError, Tm1ProtocolError) as e:
@@ -56,7 +56,7 @@ def test_reads_every_entity_set_and_singleton(tm1: Tm1Client) -> None:
 def test_a_dimension_a_cube_and_a_cell(tm1: Tm1Client, name: str) -> None:
     year, region = name + "_year", name + "_region"
     for dim, elements in ((year, ["2025", "2026"]), (region, ["North", "South"])):
-        tm1.dimensions.create(
+        tm1.api.dimensions.create(
             Dimension(
                 name=dim,
                 hierarchies=[
@@ -70,17 +70,17 @@ def test_a_dimension_a_cube_and_a_cell(tm1: Tm1Client, name: str) -> None:
             )
         )
     try:
-        tm1.cubes.create(Cube(name=name, dimensions=[odata.Bind(f"Dimensions('{year}')"), odata.Bind(f"Dimensions('{region}')")]))
+        tm1.api.cubes.create(Cube(name=name, dimensions=[odata.Bind(f"Dimensions('{year}')"), odata.Bind(f"Dimensions('{region}')")]))
         try:
             cell = [odata.element(year, "2026"), odata.element(region, "North")]
-            tm1.cubes[name].update_cells(updates=[CubeUpdate(tuple=cell, value=42)])
+            tm1.api.cubes[name].update_cells(updates=[CubeUpdate(tuple=cell, value=42)])
             mdx = f"SELECT {{[{year}].[2026]}} ON 0, {{[{region}].[North], [{region}].[Total]}} ON 1 FROM [{name}]"
-            assert tm1.mdx_values(mdx) == [42, 42]
+            assert _values(tm1.api.execute_mdx(mdx=mdx, query=ODataQuery(expand="Cells($select=Ordinal,Value)"))) == [42, 42]
 
             # A batch reads both dimensions in one request
             with tm1.batch() as batch:
-                a = batch.client.dimensions[year].get(select="Name")
-                b = batch.client.dimensions[region].hierarchies[region].elements.count()
+                a = batch.client.api.dimensions[year].get(select="Name")
+                b = batch.client.api.dimensions[region].hierarchies[region].elements.count()
             assert a.result().name == year
             assert b.result() == 3
 
@@ -88,22 +88,27 @@ def test_a_dimension_a_cube_and_a_cell(tm1: Tm1Client, name: str) -> None:
             async def read() -> Any:
                 from tm1_client.aio import AsyncTm1Client
 
-                async with AsyncTm1Client.connect(URL, **options()) as aio:  # type: ignore[arg-type]
-                    return await aio.mdx_values(mdx)
+                async with _async_client() as aio:
+                    return _values(await aio.api.execute_mdx(mdx=mdx, query=ODataQuery(expand="Cells($select=Ordinal,Value)")))
 
             assert asyncio.run(read()) == [42, 42]
         finally:
-            tm1.cubes[name].delete()
+            tm1.api.cubes[name].delete()
     finally:
-        tm1.dimensions[year].delete()
-        tm1.dimensions[region].delete()
+        tm1.api.dimensions[year].delete()
+        tm1.api.dimensions[region].delete()
 
 
 def test_a_sandbox_keeps_its_writes_to_itself(tm1: Tm1Client, name: str) -> None:
     from tm1_client.model import Sandbox
 
-    tm1.sandboxes.create(Sandbox(name=name))
+    tm1.api.sandboxes.create(Sandbox(name=name))
     try:
-        assert tm1.with_sandbox(name).sandboxes[name].get().name == name
+        assert tm1.with_sandbox(name).api.sandboxes[name].get().name == name
     finally:
-        tm1.sandboxes[name].delete()
+        tm1.api.sandboxes[name].delete()
+
+
+def _values(cellset: object) -> list[object]:
+    cells = sorted(cellset.cells or [], key=lambda c: c.ordinal or 0)  # type: ignore[attr-defined]
+    return [c.value for c in cells]

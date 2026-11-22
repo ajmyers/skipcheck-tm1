@@ -87,8 +87,8 @@ def emit(spec: Spec) -> str:
         "from pydantic import ConfigDict, Field",
         "",
         "from ..base import LenientDateTime, Tm1Enum, Tm1Model",
-        "from ..odata import Bind",
-        "from ..resources import register_endpoint",
+        "from ..odata import Bind, ODataProperty",
+        "from .._calls import register_endpoint",
         "",
         "__all__ = [",
     ]
@@ -145,7 +145,7 @@ def _enum(e: dict[str, Any]) -> list[str]:
         constant = names.unique(names.constant(m["name"]), taken)
         members.append((constant, m))
     fallback = "UNRECOGNIZED" if "UNKNOWN" in taken else "UNKNOWN"
-    out.append(f'    __odata_prefix__ = "{e["literalPrefix"]}"')
+    out.append(f'    __odata_prefix__ = "{e["qualifiedName"]}"')
     out.append(f'    __odata_fallback__ = "{fallback}"')
     out.append("")
     for constant, m in members:
@@ -222,12 +222,80 @@ def _model(spec: Spec, t: dict[str, Any]) -> list[str]:
             doc += " To refer to existing entities in a write, set :class:`~tm1_client.odata.Bind` values."
         out.extend(docstring(doc + revisions(n), "    "))
         constants.append((names.constant(n["name"]), n["name"]))
-    out.append("")
-    out.append("    class Fields:")
-    out.extend(docstring(f"TM1's names of ``{t['name']}``'s own properties, for ``select``, ``expand``, ``filter`` and ``orderby``.", "        "))
+    if constants:
+        out.append("")
+        out.append("    # Its own properties, for queries and filters (Cube.NAME), as in the Java client")
     taken: set[str] = set()
     for constant, prop in constants:
-        out.append(f'        {names.unique(constant, taken)} = "{prop}"')
-    if not constants:
-        out.append("        pass")
+        out.append(f'    {names.unique(constant, taken)}: ClassVar[ODataProperty] = ODataProperty("{prop}")')
     return out
+
+
+def emit_patches(spec: Spec) -> str:
+    """Patch builders, as the Java model's ``CubePatch.builder().name("Sales").build()``: only
+    what's set is sent, explicit ``None`` included, with ``bind_…`` for ``@odata.bind``."""
+    out = [
+        '"""Patch builders for writes, generated from spec/tm1-api.json by tm1_pygen: don\'t edit.',
+        "",
+        "As the Java model's ``CubePatch``: ``CubePatch.builder().name('Sales').bind_dimensions(",
+        "ODataPath.of('Dimensions').key('Region')).build()``. A model instance (``Cube(name=…)``)",
+        "works anywhere a patch does.",
+        '"""',
+        "",
+        "from __future__ import annotations",
+        "",
+        "from typing import Any",
+        "",
+        "from ..base import Tm1Patch",
+        "from ..odata import ODataPath",
+        "",
+    ]
+    names_all = []
+    ordered = sorted(spec.types, key=lambda t: (t.get("baseType") is not None, t["name"]))
+    for t in ordered:
+        name = t["name"] + "Patch"
+        names_all.append(name)
+        base = spec.type_by_name[t["baseType"]]["name"] + "Patch" if t.get("baseType") else "Tm1Patch"
+        out += ["", "", f"class {name}({base}):"]
+        out.append(f'    """A write of ``{t["name"]}``: only the properties set are sent."""')
+        out.append("")
+        out.append(f'    odata_type = {("#" + t["qualifiedName"])!r}' if t.get("baseType") else "    odata_type = None")
+        out.append("")
+        out.append("    @classmethod")
+        out.append(f"    def builder(cls) -> {name}.Builder:")
+        out.append("        return cls.Builder(cls)")
+        out.append("")
+        builder_base = f"{base}.Builder"
+        out.append(f"    class Builder({builder_base}):")
+        out.append(f'        """Builds a ``{name}``; each setter replaces what an earlier call set."""')
+        taken = {"build", "property"}
+        methods = 0
+        for p in t["properties"]:
+            if p["type"] == "Edm.Stream":
+                continue
+            m = names.unique(names.field_name(p["name"]).rstrip("_") if names.field_name(p["name"]).rstrip("_") not in taken else names.field_name(p["name"]), taken)
+            out.append("")
+            out.append(f"        def {m}(self, value: Any) -> {name}.Builder:")
+            out.append(f'            return self._set({p["name"]!r}, value)  # type: ignore[return-value]')
+            methods += 1
+        for n in t["navigationProperties"]:
+            m = names.unique(names.field_name(n["name"]).rstrip("_"), taken)
+            out.append("")
+            out.append(f"        def {m}(self, value: Any) -> {name}.Builder:")
+            out.append(f'            return self._set({n["name"]!r}, value)  # type: ignore[return-value]')
+            if spec.is_entity(n["type"]):
+                bind = names.unique("bind_" + names.field_name(n["name"]).rstrip("_"), taken)
+                out.append("")
+                if n["collection"]:
+                    out.append(f"        def {bind}(self, *targets: ODataPath | str) -> {name}.Builder:")
+                    out.append(f'            return self._bind_all({n["name"]!r}, targets)  # type: ignore[return-value]')
+                else:
+                    out.append(f"        def {bind}(self, target: ODataPath | str) -> {name}.Builder:")
+                    out.append(f'            return self._bind({n["name"]!r}, target)  # type: ignore[return-value]')
+            methods += 1
+        if not methods:
+            out.append("        pass")
+    out.append("")
+    out.append("__all__ = [" + ", ".join(repr(n) for n in names_all) + "]")
+    out.append("")
+    return "\n".join(out)

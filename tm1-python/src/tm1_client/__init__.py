@@ -5,8 +5,8 @@ from TM1's ``$metadata``), so it covers every endpoint the spec lists::
 
     from tm1_client import Tm1Client
 
-    with Tm1Client.connect("https://tm1:8010/api/v1", user="admin", password="apple") as tm1:
-        print(tm1.product_version())
+    with Tm1Client.builder().base_url("https://tm1:8010/api/v1").basic_auth("admin", "apple").build() as tm1:
+        print(tm1.server.product_version())
 
 Not affiliated with or endorsed by IBM.
 """
@@ -14,7 +14,7 @@ Not affiliated with or endorsed by IBM.
 from . import auth
 from . import model
 from .base import Tm1Enum, Tm1Model
-from .client import Tm1Client
+from .client import Tm1Batch, Tm1Client, Tm1ClientBuilder
 from .errors import (
     Tm1ApiError,
     Tm1AuthenticationError,
@@ -30,14 +30,33 @@ from .errors import (
     Tm1ServerError,
     Tm1TransportError,
     Tm1UnsupportedOperationError,
+    Tm1ErrorClassifier,
 )
-from .odata import Bind, ODataPath, ODataQuery, Raw
+from .odata import Bind, Filter, ODataPath, ODataProperty, ODataQuery, Raw
 from .resources import UNSET
-from .session import Tm1Session
+from .session import Tm1Session, Tm1SessionBatch, Tm1SessionBuilder
+from .request import Tm1Request
+from .operation import Tm1Operation
+from .timeouts import Tm1Timeouts
+from .version import Tm1Capabilities, Tm1Capability, Tm1Dialect, Tm1Version
 
 __all__ = [
     "UNSET",
     "Bind",
+    "Filter",
+    "ODataProperty",
+    "Tm1Batch",
+    "Tm1Capabilities",
+    "Tm1Capability",
+    "Tm1ClientBuilder",
+    "Tm1Dialect",
+    "Tm1ErrorClassifier",
+    "Tm1Operation",
+    "Tm1Request",
+    "Tm1SessionBatch",
+    "Tm1SessionBuilder",
+    "Tm1Timeouts",
+    "Tm1Version",
     "ODataPath",
     "ODataQuery",
     "Raw",

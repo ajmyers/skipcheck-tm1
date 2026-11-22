@@ -28,7 +28,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, TypeAdapter, Valida
 
 from .odata import Bind, duration, string_literal
 
-__all__ = ["LenientDateTime", "Tm1Enum", "Tm1Model", "to_odata"]
+__all__ = ["LenientDateTime", "Tm1Enum", "Tm1Model", "Tm1Patch", "to_odata"]
 
 
 class Tm1Enum(str, enum.Enum):
@@ -129,6 +129,57 @@ class Tm1Model(BaseModel):
         return out
 
 
+class Tm1Patch:
+    """A write (the generated ``CubePatch`` and the rest): the properties set, explicit
+    ``None`` included, and ``@odata.bind`` references, in the order they were set. A subtype's
+    patch sends its ``@odata.type`` first."""
+
+    odata_type: str | None = None
+
+    def __init__(self, values: dict[str, Any]):
+        self._values = dict(values)
+
+    def json(self) -> dict[str, Any]:
+        """The properties set, by TM1's names."""
+        return {k: to_odata(v) for k, v in self._values.items()}
+
+    def __eq__(self, other: object) -> bool:
+        return type(other) is type(self) and other._values == self._values  # type: ignore[attr-defined]
+
+    def __hash__(self) -> int:
+        return hash(tuple(sorted(self._values)))
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}{self._values}"
+
+    class Builder:
+        def __init__(self, patch: type[Tm1Patch]):
+            self._patch = patch
+            self._values: dict[str, Any] = {}
+            if patch.odata_type is not None:
+                self._values["@odata.type"] = patch.odata_type
+
+        def _set(self, name: str, value: Any) -> Any:
+            self._values[name] = list(value) if isinstance(value, (list, tuple)) else value
+            return self
+
+        def _bind(self, name: str, target: Any) -> Any:
+            self._values[name + "@odata.bind"] = str(target)
+            return self
+
+        def _bind_all(self, name: str, targets: Any) -> Any:
+            self._values[name + "@odata.bind"] = [str(t) for t in targets]
+            return self
+
+        def property(self, name: str, value: Any) -> Any:
+            """A property ``$metadata`` doesn't declare, which an open type can have."""
+            self._values[name] = value
+            return self
+
+        def build(self) -> Any:
+            return self._patch(self._values)
+
+
 def to_odata(value: Any) -> Any:
     """A value as TM1's JSON: models by :meth:`Tm1Model.to_odata`, enums by name, dates and
     times in ISO 8601."""
@@ -140,6 +191,8 @@ def to_odata(value: Any) -> Any:
         return value
     if isinstance(value, Tm1Model):
         return value.to_odata()
+    if isinstance(value, Tm1Patch):
+        return value.json()
     if isinstance(value, enum.Enum):
         return to_odata(value.value)
     if isinstance(value, float):

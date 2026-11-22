@@ -51,7 +51,7 @@ def endpoint(*ids: str) -> Any:
 
 
 FLAVORS = {
-    "sync": ("tm1_client._generated.api.", "tm1_client._generated.model.", "tm1_client.client."),
+    "sync": ("tm1_client._generated.api.", "tm1_client._generated.model.", "tm1_client._sync."),
     "async": ("tm1_client._generated.aio_api.", "tm1_client._generated.model.", "tm1_client.aio."),
 }
 """Where each flavor's implementations live: the model (complex types' navigation, read
@@ -63,6 +63,7 @@ def implemented_endpoints(flavor: str | None = None) -> dict[str, list[str]]:
     flavor's if given."""
     # Importing them registers what they implement
     from . import aio, client  # noqa: F401
+    from ._sync import client as _sync_client  # noqa: F401
     from ._generated import aio_api, api, model  # noqa: F401
 
     prefixes = None if flavor is None else FLAVORS[flavor]
@@ -99,12 +100,7 @@ def query_of(query: ODataQuery | None, options: Mapping[str, Any]) -> ODataQuery
     """A query from an :class:`ODataQuery`, keyword options (``select=``, ``filter=``, ``top=``…), or both."""
     if not options:
         return query
-    if query is None:
-        return ODataQuery(**options)
-    fields = ("select", "expand", "filter", "orderby", "top", "skip", "count", "search", "custom")
-    merged = {f: getattr(query, f) for f in fields}
-    merged.update(options)
-    return ODataQuery(**merged)
+    return ODataQuery.of(query, **options)
 
 
 @functools.lru_cache(maxsize=None)
@@ -212,8 +208,8 @@ def function(
         if _structured(value):
             aliases["@" + parameter] = json.dumps(to_odata(value), separators=(",", ":"), ensure_ascii=False)
             arguments[parameter] = Alias("@" + parameter)
-    if aliases:
-        query = query_of(query, {"custom": {**(query.custom if query else {}), **aliases}})
+    for alias, json_value in aliases.items():
+        query = (query or ODataQuery.none()).alias(alias, json_value)
     target = path.function(name, arguments) if path.segments else ODataPath.function_import(name, arguments)
     return Call("GET", str(target), query, read=returns.read, operation=operation)
 

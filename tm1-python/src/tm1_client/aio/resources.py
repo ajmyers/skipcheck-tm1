@@ -1,5 +1,21 @@
-"""The asyncio resources: :mod:`tm1_client.resources` with awaitable requests. Navigation
-stays a plain property, since it sends nothing; everything that sends is ``async``."""
+"""Resources: typed handles on paths of the REST API, which the generated API is made of.
+
+A resource sends nothing until a method is called: ``tm1.api.cubes["Sales"]`` is a path;
+``.get()`` sends ``GET Cubes('Sales')``. Navigation is a plain property, since it sends
+nothing; every method that sends a request is a coroutine in the asyncio flavor.
+
+What a resource offers follows OData's rules, made safe:
+
+* An entity set, or a navigation that *contains* its targets (``Cube/Views``), can create,
+  update and delete through its path.
+* A navigation that only *refers* to entities kept elsewhere (``Cube/Dimensions``) reads:
+  changing a dimension goes through ``Dimensions``, its canonical path. On TM1, deleting
+  through such a path deletes the target itself (``Users('u')/Groups('g')`` deletes the
+  group), so it's refused here.
+* The overlay (``spec/tm1-overlay.json``) can forbid more.
+
+The requests are built in :mod:`tm1_client._calls`; these classes only send them.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +25,7 @@ from .. import _calls as c
 from .._calls import UNSET, Returns, Unset, endpoint, query_of
 from ..base import Tm1Model
 from ..odata import ODataQuery
-from ..resources import _Base, _CollectionBase
+from .._resource_base import _Base, _CollectionBase
 from .session import AsyncTm1Session
 
 __all__ = ["UNSET", "CollectionResource", "EntityResource", "Resource", "Returns", "Unset", "endpoint", "query_of"]

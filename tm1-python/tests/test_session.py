@@ -26,7 +26,7 @@ from .conftest import BASE, FakeTm1, target
 def test_logs_in_once_then_sends_only_the_cookie(client: Tm1Client, fake: FakeTm1) -> None:
     fake.respond = lambda r: {"value": []}
     client.cubes.list()
-    client.dimensions.list()
+    client.api.dimensions.list()
     assert fake.logins == 1
     for request in fake.requests:
         assert "authorization" not in request.headers
@@ -46,7 +46,7 @@ def test_logs_in_again_when_the_session_expired(client: Tm1Client, fake: FakeTm1
 def test_closes_the_session_on_the_server(session: Tm1Session, fake: FakeTm1) -> None:
     with Tm1Client(session) as client:
         fake.respond = lambda r: {}
-        client.server.get()
+        client.api.server.get()
     assert target(fake.last) == "POST ActiveSession/tm1.Close"
     assert not session.logged_in
 
@@ -81,14 +81,14 @@ def test_runs_in_a_sandbox(fake: FakeTm1) -> None:
     http = httpx.Client(transport=httpx.MockTransport(fake.handler))
     client = Tm1Client(Tm1Session(BASE, auth.basic("a"), sandbox="What if", client=http))
     fake.respond = lambda r: {}
-    client.cubes["c"].get()
+    client.api.cubes["c"].get()
     assert target(fake.last) == "GET Cubes('c')?!sandbox=What%20if"
 
 
 def test_updates_with_if_match_and_classifies_refusals(client: Tm1Client, fake: FakeTm1) -> None:
     fake.respond = lambda r: httpx.Response(412, json={"error": {"code": "278", "message": "stale"}})
     with pytest.raises(Tm1PreconditionFailedError) as refused:
-        client.cubes["c"].update(m.Cube(rules="SKIPCHECK;"), if_match='W/"1"')
+        client.api.cubes["c"].update(m.Cube(rules="SKIPCHECK;"), if_match='W/"1"')
     assert fake.last.headers["if-match"] == 'W/"1"'
     assert json.loads(fake.last.content) == {"Rules": "SKIPCHECK;"}
     assert refused.value.kind is Tm1ErrorKind.PRECONDITION_FAILED and refused.value.error.code == "278"
@@ -98,7 +98,7 @@ def test_reads_a_400_that_means_not_found_as_not_found(client: Tm1Client, fake: 
     # TM1 (11.8) answers a missing annotation with 400
     fake.respond = lambda r: httpx.Response(400, json={"error": {"message": "Annotation 'x' can not be found"}})
     with pytest.raises(Tm1NotFoundError) as refused:
-        client.annotations["x"].get()
+        client.api.annotations["x"].get()
     assert refused.value.status == 400 and refused.value.kind is Tm1ErrorKind.NOT_FOUND
 
 
@@ -106,7 +106,7 @@ def test_creates_with_binds(client: Tm1Client, fake: FakeTm1) -> None:
     from tm1_client import Bind
 
     fake.respond = lambda r: {"Name": "c"}
-    created = client.cubes.create(m.Cube(name="c", dimensions=[Bind("Dimensions('a')"), Bind("Dimensions('b')")]))
+    created = client.api.cubes.create(m.Cube(name="c", dimensions=[Bind("Dimensions('a')"), Bind("Dimensions('b')")]))
     assert created.name == "c"
     assert target(fake.last) == "POST Cubes"
     assert json.loads(fake.last.content) == {"Name": "c", "Dimensions@odata.bind": ["Dimensions('a')", "Dimensions('b')"]}
@@ -114,14 +114,14 @@ def test_creates_with_binds(client: Tm1Client, fake: FakeTm1) -> None:
 
 def test_refuses_to_delete_through_a_reference(client: Tm1Client, fake: FakeTm1) -> None:
     # DELETE Users('u')/Groups('g') deletes the group itself on TM1
-    group = client.users["u"].groups["g"]
+    group = client.api.users["u"].groups["g"]
     with pytest.raises(Tm1UnsupportedOperationError, match="deletes the group itself"):
         group.delete()
     with pytest.raises(Tm1UnsupportedOperationError):
-        client.users["u"].groups.create(m.Group(name="g"))
+        client.api.users["u"].groups.create(m.Group(name="g"))
     # Any reference, by OData's rules: change dimensions through Dimensions
     with pytest.raises(Tm1UnsupportedOperationError, match="kept elsewhere"):
-        client.cubes["c"].dimensions["d"].delete()
+        client.api.cubes["c"].dimensions["d"].delete()
     assert fake.requests == []
     # Reading through it is fine
     fake.respond = lambda r: {"Name": "g"}
@@ -131,26 +131,13 @@ def test_refuses_to_delete_through_a_reference(client: Tm1Client, fake: FakeTm1)
 
 def test_deletes_through_a_containment(client: Tm1Client, fake: FakeTm1) -> None:
     fake.respond = lambda r: None
-    client.cubes["c"].views["v"].delete()
+    client.api.cubes["c"].views["v"].delete()
     assert target(fake.last) == "DELETE Cubes('c')/Views('v')"
 
 
 def test_a_compound_key(client: Tm1Client, fake: FakeTm1) -> None:
     fake.respond = lambda r: {}
-    client.dimensions["d"].hierarchies["h"].edges["Total", "Q1"].get()
+    client.api.dimensions["d"].hierarchies["h"].edges["Total", "Q1"].get()
     assert target(fake.last) == "GET Dimensions('d')/Hierarchies('h')/Edges(ParentName='Total',ComponentName='Q1')"
     with pytest.raises(ValueError):
-        client.dimensions["d"].hierarchies["h"].edges["Total"]
-
-
-def test_reads_mdx_values_and_deletes_the_cellset(client: Tm1Client, fake: FakeTm1) -> None:
-    def respond(request: httpx.Request) -> object:
-        if request.method == "POST":
-            return {"ID": "cs1", "Cells": [{"Ordinal": 1, "Value": 2.5}, {"Ordinal": 0, "Value": "a"}]}
-        return None
-
-    fake.respond = respond
-    assert client.mdx_values("SELECT {} ON 0 FROM [c]") == ["a", 2.5]
-    assert target(fake.requests[0]) == "POST ExecuteMDX?$select=ID&$expand=Cells($select%3DOrdinal,Value)"
-    assert json.loads(fake.requests[0].content) == {"MDX": "SELECT {} ON 0 FROM [c]"}
-    assert target(fake.last) == "DELETE Cellsets('cs1')"
+        client.api.dimensions["d"].hierarchies["h"].edges["Total"]

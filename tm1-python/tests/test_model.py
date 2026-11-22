@@ -154,7 +154,7 @@ def test_open_types_keep_undeclared_properties() -> None:
 def test_an_unknown_enum_value_reads_as_the_fallback_and_is_never_sent() -> None:
     privilege = m.AccessPrivilege("SomethingNew")
     assert privilege is m.AccessPrivilege.UNKNOWN and not privilege.known
-    assert m.AccessPrivilege.READ.odata_literal() == "tm1.AccessPrivilege'Read'"
+    assert m.AccessPrivilege.READ.odata_literal() == "ibm.tm1.api.v1.AccessPrivilege'Read'"
     with pytest.raises(ValueError):
         m.AccessPrivilege.UNKNOWN.odata_literal()
 
@@ -177,6 +177,12 @@ def test_durations_read_tm1s_way_and_write_iso() -> None:
 
 
 def test_field_constants_name_tm1s_properties() -> None:
-    assert m.Cube.Fields.NAME == "Name"
-    assert m.Cube.Fields.DRILLTHROUGH_RULES == "DrillthroughRules"
-    assert m.Cube.Fields.VIEWS == "Views"
+    """As the Java model's ``Cube.NAME``: ODataProperty constants, for queries and filters."""
+    from tm1_client.odata import ODataProperty, ODataQuery
+
+    assert m.Cube.NAME == ODataProperty("Name")
+    assert m.Cube.DRILLTHROUGH_RULES.path() == "DrillthroughRules"
+    assert str(m.Cube.VIEWS) == "Views"
+    # A subtype has its root's, as the Java root interface does
+    assert m.NativeView.NAME.path() == "Name"
+    assert str(ODataQuery.none().select(m.Cube.NAME).filter(m.Cube.NAME.eq("x"))) == "$select=Name&$filter=(Name eq 'x')"

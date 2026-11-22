@@ -38,6 +38,7 @@ class FakeTm1:
         self.logins = 0
         self.metadata_reads = 0
         self.metadata = SNAPSHOT.read_bytes() if metadata is None else metadata
+        self.product_version = "11.8.03500.6"
         self.respond: Callable[[httpx.Request], Any] = lambda request: {}
 
     def handler(self, request: httpx.Request) -> httpx.Response:
@@ -47,6 +48,8 @@ class FakeTm1:
             return httpx.Response(
                 200, json={"ID": self.logins}, headers={"Set-Cookie": f"TM1SessionId=s{self.logins}; Path=/api/; HttpOnly"}
             )
+        if path == "/api/v1/Configuration?$select=ProductVersion":
+            return httpx.Response(200, json={"ProductVersion": self.product_version})
         if path == "/api/v1/$metadata":
             self.metadata_reads += 1
             return httpx.Response(200, content=self.metadata, headers={"Content-Type": "application/xml"})
@@ -69,6 +72,16 @@ def target(request: httpx.Request) -> str:
     """``METHOD path?query`` of a request, relative to the service root, as sent (encoded)."""
     raw = request.url.raw_path.decode()
     return f"{request.method} {raw.removeprefix('/api/v1/')}"
+
+
+@pytest.fixture(autouse=True)
+def _fresh_capabilities() -> Any:
+    """Capabilities are cached per server for the process: each test starts without them."""
+    from tm1_client._views import CAPABILITIES
+
+    CAPABILITIES.clear()
+    yield
+    CAPABILITIES.clear()
 
 
 @pytest.fixture
@@ -95,6 +108,11 @@ class Api:
     flavor: str
     client: Any
     loop: asyncio.AbstractEventLoop | None
+
+    @property
+    def api(self) -> Any:
+        """The generated API of the client."""
+        return self.client.api
 
     def run(self, value: Any) -> Any:
         if inspect.isawaitable(value):

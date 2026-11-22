@@ -27,7 +27,6 @@ _MODEL_RESERVED = {
     "odata_name",
     "odata_subtypes",
     "to_odata",
-    "Fields",
     "etag",
 }
 
