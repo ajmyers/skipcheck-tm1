@@ -13,7 +13,10 @@
     "binding": "ASSETS",
     // Every request goes through the Worker, which adds the site's masthead, footer and headers
     "run_worker_first": true,
-    "not_found_handling": "none"
+    "not_found_handling": "none",
+    // Serve files at their own paths: Javadoc links to .html, and the default would redirect each
+    // of those to an extensionless URL. The Worker maps a trailing slash to index.html itself.
+    "html_handling": "none"
   },
   "vars": {
     // Where the masthead, footer, styles and 404 page come from
