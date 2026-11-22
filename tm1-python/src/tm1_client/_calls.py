@@ -10,7 +10,7 @@ from typing import Any, ClassVar, Mapping
 
 from pydantic import TypeAdapter
 
-from ._protocol import Call, Reply
+from ._protocol import TEXT, Call, Reply
 from .base import Tm1Model, to_odata
 from .errors import Tm1ProtocolError
 from .odata import Alias, Bind, ODataPath, ODataQuery
@@ -246,7 +246,7 @@ def count(path: ODataPath, filter: str | None) -> Call:
     def read(reply: Reply) -> int:
         return int(reply.text.strip().lstrip("﻿"))
 
-    return Call("GET", str(path.count()), query, accept="text/plain", read=read)
+    return Call("GET", str(path.count()), query, accept=TEXT, read=read)
 
 
 def create(path: ODataPath, entity: Any, model: type[Tm1Model]) -> Call:

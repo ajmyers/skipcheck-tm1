@@ -120,8 +120,8 @@ public sealed record Tm1Request<T>
     internal string Accept => Response switch
     {
         Tm1Response.Bytes => "*/*",
-        Tm1Response.Text => "text/plain",
-        _ => "application/json;odata.metadata=minimal",
+        Tm1Response.Text => "text/plain, application/json",
+        _ => "application/json",
     };
 
     /// <summary>The body as JSON bytes, or as is for bytes.</summary>
@@ -129,7 +129,7 @@ public sealed record Tm1Request<T>
     {
         null => (null, null),
         byte[] bytes => (bytes, Headers.TryGetValue("Content-Type", out var ct) ? ct : "application/octet-stream"),
-        _ => (Json(Body), "application/json; charset=utf-8"),
+        _ => (Json(Body), "application/json"),
     };
 
     private static byte[] Json(object body)

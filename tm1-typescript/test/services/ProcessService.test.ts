@@ -102,7 +102,7 @@ describe("ProcessService", () => {
     tm1.respond = () => "line 1";
     expect(await client.processes.errorLogContent("Load", logs[0]!)).toBe("line 1");
     expect(tm1.last.method).toBe("GET");
-    expect(tm1.last.headers["accept"]).toBe("text/plain");
+    expect(tm1.last.headers["accept"]).toBe("text/plain, application/json");
     // Keyed by the timestamp as Java's OffsetDateTime writes it, quoted
     expect(decodeURIComponent(tm1.last.target)).toBe("Processes('Load')/ErrorLogs('2026-01-02T03:04:05Z')/Content");
     await client.processes.errorLogContent("Load", { Timestamp: "2026-01-02T03:04:00.000+00:00" });

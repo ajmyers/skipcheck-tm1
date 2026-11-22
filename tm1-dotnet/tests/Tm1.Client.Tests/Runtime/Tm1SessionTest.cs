@@ -95,7 +95,7 @@ public class Tm1SessionTest
         var session = _tm1.Session();
         Assert.Equal("11.8.03500.6", await session.ExecuteAsync(Tm1Request.Text(ODataPath.Of("Configuration").Nav("ProductVersion").Value())));
         await session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Cubes").Key("Sales").Action("tm1.Lock"), null));
-        Assert.StartsWith("text/plain", _tm1.Requests("GET Configuration/ProductVersion/$value")[0].Header("Accept"));
+        Assert.Equal("text/plain, application/json", _tm1.Requests("GET Configuration/ProductVersion/$value")[0].Header("Accept"));
         Assert.StartsWith("application/json", _tm1.Requests("POST Cubes('Sales')/tm1.Lock")[0].Header("Content-Type"));
     }
 

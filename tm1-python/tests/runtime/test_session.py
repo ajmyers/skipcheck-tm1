@@ -132,7 +132,7 @@ def test_reads_text_and_no_content_and_sends_json_bodies(rt: Runtime) -> None:
     assert text == "11.8.03500.6"
     assert rt.run(session.execute(Tm1Request.post(ODataPath.of("Cubes").key("Sales").action("tm1.Lock"), None))) is None
     get, lock = rt.fake.requests
-    assert get.headers["accept"].startswith("text/plain")
+    assert get.headers["accept"] == "text/plain, application/json"
     assert lock.headers["content-type"] == "application/json" and lock.content == b"{}"
 
 

@@ -49,7 +49,7 @@ describe("LogService", () => {
     tm1.respond = () => "﻿Error: Prolog procedure line (1): ProcessError";
     expect(await client.logs.errorLogContent("a.log")).toBe("Error: Prolog procedure line (1): ProcessError");
     expect(sent(tm1)).toBe("GET ErrorLogFiles('a.log')/Content");
-    expect(tm1.last.headers["accept"]).toBe("text/plain");
+    expect(tm1.last.headers["accept"]).toBe("text/plain, application/json");
     tm1.respond = () => "no mark";
     expect(await client.logs.errorLogContent("a.log")).toBe("no mark");
   });

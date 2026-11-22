@@ -36,7 +36,7 @@ internal sealed class Connection
     public const string SessionContextHeader = "TM1-SessionContext";
     private const string LoginPath = "ActiveSession?$select=ID";
     private const string ClosePath = "ActiveSession/tm1.Close";
-    internal const string Json = "application/json;odata.metadata=minimal";
+    internal const string Json = "application/json";
 
     /// <summary>TM1 closes a kept-alive connection after about 90 s idle: retire ours first.</summary>
     public static readonly TimeSpan MaxIdle = TimeSpan.FromSeconds(60);
@@ -304,7 +304,7 @@ internal sealed class Connection
             if (content is not null)
             {
                 request.Content = new ByteArrayContent(content);
-                request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType ?? "application/json; charset=utf-8");
+                request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType ?? "application/json");
             }
             var reply = await SendRawAsync(request, timeout ?? Timeouts.Request, url, Tm1Request.IsIdempotent(method), ct).ConfigureAwait(false);
             if (reply.Status == 401)

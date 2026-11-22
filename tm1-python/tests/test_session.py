@@ -35,6 +35,23 @@ def test_logs_in_once_then_sends_only_the_cookie(client: Tm1Client, fake: FakeTm
         assert "tm1-sessioncontext" not in request.headers  # sent with the login only, as Java
 
 
+def test_sends_the_java_clients_headers(session: Tm1Session, fake: FakeTm1) -> None:
+    """The headers the Java client's ``Connection.odataHeaders`` sends, exactly."""
+    from tm1_client import ODataPath, Tm1Request
+
+    cubes = ODataPath.of("Cubes")
+    fake.respond = lambda r: {"Name": "c"}
+    session.execute(Tm1Request.get(cubes.key("c"), None, m.Cube))
+    last = fake.requests[-1].headers
+    assert (last["accept"], last["odata-version"], last["odata-maxversion"]) == ("application/json", "4.0", "4.0")
+    session.execute(Tm1Request.post(cubes, {"Name": "c"}, m.Cube))
+    last = fake.requests[-1].headers
+    assert (last["accept"], last["content-type"]) == ("application/json", "application/json")
+    fake.respond = lambda r: httpx.Response(200, text="SKIPCHECK;")
+    session.execute(Tm1Request.text(cubes.key("c").nav("Rules")))
+    assert fake.requests[-1].headers["accept"] == "text/plain, application/json"
+
+
 def test_logs_in_again_when_the_session_expired(client: Tm1Client, fake: FakeTm1) -> None:
     answers = iter([httpx.Response(401), {"value": [{"Name": "c"}]}])
     fake.respond = lambda r: next(answers)

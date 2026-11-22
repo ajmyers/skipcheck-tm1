@@ -21,6 +21,22 @@ public class SessionTests
 {
     private readonly FakeTm1 _tm1 = new();
 
+    /// <summary>The headers the Java client's <c>Connection.odataHeaders</c> sends, exactly.</summary>
+    [Fact]
+    public async Task SendsTheJavaClientsHeaders()
+    {
+        var session = _tm1.Session();
+        var cubes = ODataPath.Of("Cubes");
+        _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "c" };
+        await session.ExecuteAsync(Tm1Request.Get<Cube>(cubes.Key("c")));
+        Assert.Equal(("application/json", "4.0", "4.0"), (_tm1.Last.Headers["accept"], _tm1.Last.Headers["odata-version"], _tm1.Last.Headers["odata-maxversion"]));
+        await session.ExecuteAsync(Tm1Request.Post<Cube>(cubes, new Dictionary<string, object?> { ["Name"] = "c" }));
+        Assert.Equal(("application/json", "application/json"), (_tm1.Last.Headers["accept"], _tm1.Last.Headers["content-type"]));
+        _tm1.Respond = _ => "SKIPCHECK;";
+        await session.ExecuteAsync(Tm1Request.Text(cubes.Key("c").Nav("Rules")));
+        Assert.Equal("text/plain, application/json", _tm1.Last.Headers["accept"]);
+    }
+
     [Fact]
     public async Task LogsInOnceThenSendsOnlyTheCookie()
     {
