@@ -16,3 +16,18 @@ jobs:
           java-version: '27'
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew build
+
+  # The Python client, generated from spec/tm1-api.json; the build job above fails when that
+  # spec is out of date with the $metadata snapshot (ApiSpecTest)
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e './tm1-python[test]'
+      - run: pytest tm1-python

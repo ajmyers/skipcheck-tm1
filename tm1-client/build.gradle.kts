@@ -71,3 +71,10 @@ val generateModel = tasks.register<JavaExec>("generateModel") {
 sourceSets.main {
 	java.srcDir(generateModel)
 }
+
+// The language-neutral API spec, which ApiSpecInventoryTest holds to this client's coverage gate
+tasks.test {
+	val spec = rootDir.resolve("spec/tm1-api.json")
+	systemProperty("tm1.spec", spec.path)
+	inputs.file(spec).withPathSensitivity(PathSensitivity.RELATIVE)
+}

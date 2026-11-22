@@ -124,20 +124,18 @@ public final class ModelGenerator {
 
 	/**
 	 * Properties TM1 sends in another type than {@code $metadata} declares, by
-	 * {@code Type/Property}, with what it does instead. Their components are
-	 * {@code JsonNode}, so either form reads; each was found against a server (plan
-	 * §16.5).
+	 * {@code Type/Property}, with what it does instead (from the overlay). Their
+	 * components are {@code JsonNode}, so either form reads; each was found against a
+	 * server (plan §16.5).
 	 */
-	static final Map<String, String> DEPARTURES = Map.of("CAMSettings/ClientPingCAMPassport",
-			"TM1 (11.8) sends it as a number in {@code StaticConfiguration} and as an ISO 8601 duration in {@code ActiveConfiguration}, though {@code $metadata} declares {@code Edm.Int32}, so it's JSON");
+	private final Map<String, String> departures;
 
 	/**
 	 * Date-time properties TM1 sometimes sends something else in, by
-	 * {@code Type/Property}, with what: they're read leniently, as {@code null} when the
-	 * text isn't a date-time.
+	 * {@code Type/Property}, with what (from the overlay): they're read leniently, as
+	 * {@code null} when the text isn't a date-time.
 	 */
-	static final Map<String, String> LENIENT_DATES = Map.of("MessageLogEntry/TimeStamp",
-			"TM1 (11.8) sends {@code 0000-00-00T00:00Z} for an entry without a time, such as the first; it's read as {@code null}");
+	private final Map<String, String> lenientDates;
 
 	private static final ClassName JSON_DESERIALIZE = ClassName.get("tools.jackson.databind.annotation",
 			"JsonDeserialize");
@@ -163,13 +161,26 @@ public final class ModelGenerator {
 	private final Map<String, CsdlStructuredType> roots = new HashMap<>();
 
 	/**
-	 * A generator for {@code metadata}.
+	 * A generator for {@code metadata}, with the bundled overlay.
 	 * @param metadata the {@code $metadata} document
 	 * @throws IllegalArgumentException if a type derives from a derived type, which TM1
 	 * doesn't do and the generator doesn't support yet
 	 */
 	public ModelGenerator(CsdlDocument metadata) {
+		this(metadata, Overlay.bundled());
+	}
+
+	/**
+	 * A generator for {@code metadata}.
+	 * @param metadata the {@code $metadata} document
+	 * @param overlay what TM1 does differently from {@code metadata}
+	 * @throws IllegalArgumentException if a type derives from a derived type, which TM1
+	 * doesn't do and the generator doesn't support yet
+	 */
+	public ModelGenerator(CsdlDocument metadata, Overlay overlay) {
 		this.metadata = metadata;
+		this.departures = javadocs(overlay.departures());
+		this.lenientDates = javadocs(overlay.lenientDates());
 		metadata.structuredTypes().sorted(Comparator.comparing(CsdlStructuredType::name)).forEach(type -> {
 			List<CsdlStructuredType> chain = metadata.typeHierarchy(qualified(type));
 			if (chain.size() > 2) {
@@ -182,6 +193,12 @@ public final class ModelGenerator {
 				roots.put(qualified(type), root);
 			}
 		});
+	}
+
+	private static Map<String, String> javadocs(Map<String, String> notes) {
+		Map<String, String> result = new LinkedHashMap<>();
+		notes.forEach((key, note) -> result.put(key, escape(Overlay.javadoc(note)).replace("&#64;code", "@code")));
+		return result;
 	}
 
 	/**
@@ -328,8 +345,8 @@ public final class ModelGenerator {
 		for (CsdlStructuredType level : rootFirst) {
 			for (CsdlProperty property : level.properties()) {
 				String key = level.name() + "/" + property.name();
-				String departure = DEPARTURES.get(key);
-				String lenient = LENIENT_DATES.get(key);
+				String departure = departures.get(key);
+				String lenient = lenientDates.get(key);
 				javaType(property.type()).map(t -> departure == null ? t : (TypeName) JSON_NODE)
 					.ifPresent(t -> components
 						.add(new Component(unique(componentName(property.name()), names), t, property.name(),
@@ -555,7 +572,7 @@ public final class ModelGenerator {
 		Set<String> names = new HashSet<>(Set.of("build"));
 		List<PatchProperty> properties = new ArrayList<>();
 		for (CsdlProperty property : type.properties()) {
-			boolean departs = DEPARTURES.containsKey(type.name() + "/" + property.name());
+			boolean departs = departures.containsKey(type.name() + "/" + property.name());
 			patchType(property.type()).map(t -> departs ? (TypeName) ClassName.get(Object.class) : t)
 				.ifPresent(t -> properties.add(new PatchProperty(unique(componentName(property.name()), names), t,
 						property.name(), paramText(property.annotations(), property.name()), false,

@@ -1,0 +1,36 @@
+{
+	"$comment": "OData encoding every client must agree on, read by the Java client's ODataConformanceTest and the Python client's test_conformance.py. A path is built step by step: [\"of\", name], [\"key\", value], [\"compoundKey\", {part: value}], [\"nav\", name], [\"cast\", type], [\"action\", name], [\"function\", name, {parameter: value}], [\"functionImport\", name, {parameter: value}], [\"value\"], [\"count\"], [\"ref\"]. A literal is {\"value\": …, \"as\": \"double\"} when JSON's number would be ambiguous.",
+	"paths": [
+		{ "steps": [["of", "Dimensions"], ["key", "Region"], ["nav", "Hierarchies"], ["key", "Region"], ["nav", "Elements"]], "expect": "Dimensions('Region')/Hierarchies('Region')/Elements" },
+		{ "steps": [["of", "Cubes"], ["key", "Sales"], ["action", "tm1.Reserve"]], "expect": "Cubes('Sales')/tm1.Reserve" },
+		{ "steps": [["of", "Cubes"], ["key", "Sales"], ["nav", "Views"], ["cast", "tm1.NativeView"]], "expect": "Cubes('Sales')/Views/tm1.NativeView" },
+		{ "steps": [["of", "Configuration"], ["nav", "ProductVersion"], ["value"]], "expect": "Configuration/ProductVersion/$value" },
+		{ "steps": [["of", "Dimensions"], ["count"]], "expect": "Dimensions/$count" },
+		{ "steps": [["of", "Cubes"], ["key", "Sales"], ["nav", "Dimensions"], ["ref"]], "expect": "Cubes('Sales')/Dimensions/$ref" },
+		{ "steps": [["of", "Threads"], ["key", 42]], "expect": "Threads(42)" },
+		{ "steps": [["of", "Edges"], ["compoundKey", { "ParentName": "Total", "ComponentName": "Q1 '26" }]], "expect": "Edges(ParentName='Total',ComponentName='Q1%20''26')" },
+		{ "steps": [["of", "Cellsets"], ["key", "abc"], ["function", "tm1.GetPartition", { "Begin": 0, "End": 99 }]], "expect": "Cellsets('abc')/tm1.GetPartition(Begin=0,End=99)" },
+		{ "steps": [["of", "Dimensions"], ["key", "a/b"]], "expect": "Dimensions('a%2Fb')" },
+		{ "steps": [["of", "Dimensions"], ["key", "O'Neil"]], "expect": "Dimensions('O''Neil')" },
+		{ "steps": [["of", "Dimensions"], ["key", "}Clients"]], "expect": "Dimensions('%7DClients')" },
+		{ "steps": [["of", "Dimensions"], ["key", "a b"]], "expect": "Dimensions('a%20b')" },
+		{ "steps": [["of", "Dimensions"], ["key", "Ünïcödé €"]], "expect": "Dimensions('%C3%9Cn%C3%AFc%C3%B6d%C3%A9%20%E2%82%AC')" },
+		{ "steps": [["functionImport", "ModelCubes", {}]], "expect": "ModelCubes()" },
+		{ "steps": [["functionImport", "TailMessageLog", { "Top": 10 }]], "expect": "TailMessageLog(Top=10)" },
+		{ "steps": [["of", "Cubes"], ["key", "Sales"], ["function", "tm1.Fn", { "Name": "a b/c", "Flag": true }]], "expect": "Cubes('Sales')/tm1.Fn(Name='a%20b%2Fc',Flag=true)" }
+	],
+	"literals": [
+		{ "value": "O'Neil", "expect": "'O''Neil'" },
+		{ "value": "", "expect": "''" },
+		{ "value": true, "expect": "true" },
+		{ "value": false, "expect": "false" },
+		{ "value": null, "expect": "null" },
+		{ "value": 42, "expect": "42" },
+		{ "value": -7, "expect": "-7" },
+		{ "value": 1.5, "as": "double", "expect": "1.5" },
+		{ "value": 2.0, "as": "double", "expect": "2" },
+		{ "value": 100.0, "as": "double", "expect": "100" },
+		{ "value": 0.1, "as": "double", "expect": "0.1" },
+		{ "value": 1e-7, "as": "double", "expect": "0.0000001" }
+	]
+}
