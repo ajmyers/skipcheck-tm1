@@ -2,6 +2,7 @@ package net.ajmyers.tm1.testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -56,6 +57,31 @@ class CognosContainerTest {
 			.containsEntry("TM1_CAM_GROUPS", "Admins Analysts Readers");
 		assertThat(tm1.getNetwork()).isSameAs(cognos.getNetwork());
 		assertThat(tm1.getCognos()).isSameAs(cognos);
+	}
+
+	@Test
+	void tm1ThroughOidcUsesTheOidcNamespace() {
+		var keycloak = new KeycloakContainer();
+		var withOidc = new CognosContainer(new CognosSource.PrivateImage("cognos-server:test"))
+			.withUser("admin", "adminpw", "Admins")
+			.withKeycloak(keycloak);
+		assertThat(withOidc.getEnvMap()).containsEntry("COGNOS_KEYCLOAK_URL", "http://keycloak:8080");
+		assertThat(withOidc.getNetwork()).isSameAs(keycloak.getNetwork());
+
+		var tm1 = new Tm1ServerContainer(new Tm1Source.PrivateImage("tm1-server:test")).withCamSecurity(withOidc,
+				CognosContainer.Namespace.OIDC, "admin");
+		tm1.configure();
+		assertThat(tm1.getEnvMap()).containsEntry("TM1_CAM_NAMESPACE", "OIDC")
+			.containsEntry("TM1_CAM_NAMESPACE_TYPE", "oidc");
+		assertThat(tm1.getAuthorization())
+			.isEqualTo(withOidc.camAuthorization("admin", CognosContainer.Namespace.OIDC));
+	}
+
+	@Test
+	void oidcNeedsKeycloak() {
+		var tm1 = new Tm1ServerContainer(new Tm1Source.PrivateImage("tm1-server:test")).withCamSecurity(cognos,
+				CognosContainer.Namespace.OIDC, "admin");
+		assertThatIllegalStateException().isThrownBy(tm1::configure).withMessageContaining("withKeycloak");
 	}
 
 	@Test
