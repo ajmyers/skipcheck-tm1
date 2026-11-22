@@ -32,7 +32,7 @@ rm -rf build/conformance-live
 for suite in "${suites[@]}"; do
   echo "== $suite"
   case "$suite" in
-    java) ./gradlew test --tests '*Tm1Test' || failed+=(java) ;;
+    java) ./gradlew :tm1-client:test --tests '*Tm1Test' || failed+=(java) ;;
     python) (cd tm1-python && python -m pytest tests/live -rs) || failed+=(python) ;;
     dotnet) dotnet test tm1-dotnet/Tm1.slnx --filter 'FullyQualifiedName~.Live.' || failed+=(dotnet) ;;
     typescript) (cd tm1-typescript && npx vitest run test/live && npm test -w testcontainers) || failed+=(typescript) ;;
