@@ -13,7 +13,8 @@
 #   - COGNOS_ZIP_URL: download the zip instead (e.g. a pre-signed S3 link)
 #   - COGNOS_SERVER_IMAGE: a private image with Cognos built in
 #
-# The content store is a PostgreSQL inside the container, kept in the volume
+# Set COGNOS_USERS in .env for logons (an LDAP namespace); without it, access is
+# anonymous. The content store is a PostgreSQL inside the container, kept in the volume
 # "cognos-content-store". Docker needs at least 12 GB of memory for Cognos.
 
 services:
@@ -29,6 +30,8 @@ services:
       COGNOS_ZIP: ${COGNOS_ZIP:-}
       COGNOS_ZIP_SHA256: ${COGNOS_ZIP_SHA256:-}
       COGNOS_MAX_MEMORY: ${COGNOS_MAX_MEMORY:-6144}
+      # Test users (an LDAP namespace), e.g. "admin:adminpw:Admins viewer:viewerpw:Readers"
+      COGNOS_USERS: ${COGNOS_USERS:-}
     ports:
       - "9300:9300"    # Cognos: http://localhost:9300/bi/
     volumes:

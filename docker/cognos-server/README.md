@@ -105,6 +105,47 @@ docker run -d --name cognos --network cognos -p 9300:9300 --stop-timeout 180 \
   -v cognos-install:/opt/ibm/cognos/analytics ghcr.io/ajmyers/cognos-server
 ```
 
+## Users
+
+List test users, and the container gives Cognos an **LDAP namespace** with them.
+An LDAP directory (OpenLDAP) runs inside the container and is rebuilt from your
+list on every start, so the list is the only thing to maintain:
+
+```sh
+docker run -d --name cognos -p 9300:9300 --stop-timeout 180 \
+  -e COGNOS_USERS="admin:adminpw:Admins analyst:analystpw:Analysts,Readers viewer:viewerpw:Readers" \
+  -v cognos-install:/opt/ibm/cognos/analytics ghcr.io/ajmyers/cognos-server
+```
+
+Each entry is `user:password[:group,group,...]`, separated by spaces or newlines.
+Groups are created from the entries that name them. For a longer list, mount a
+file and set `COGNOS_USERS_FILE` (same format, one per line; `#` at the start of a
+line or after a space starts a comment).
+Names are letters, digits, `.`, `_` and `-`. A password can't contain `:` or
+spaces.
+
+With users, **anonymous access is off** (`COGNOS_ANONYMOUS=T` turns it back on),
+and the namespace is called `LDAP` (`COGNOS_NAMESPACE`). That name is the
+`CAMNamespace` clients log on with:
+
+```sh
+curl -X PUT http://localhost:9300/api/v1/session -H 'Content-Type: application/json' \
+  -d '{"parameters":[{"name":"CAMNamespace","value":"LDAP"},
+                     {"name":"CAMUsername","value":"analyst"},{"name":"CAMPassword","value":"analystpw"}]}'
+```
+
+Cognos sees users as `CAMID("LDAP:u:uid=analyst,ou=people")` and groups as
+`CAMID("LDAP:g:cn=analysts,ou=groups")`, which is what TM1 shows in CAM security
+mode. Different groups give you different TM1 security profiles to test.
+
+**Every user is a Cognos administrator.** A new content store puts `Everyone` in
+Cognos's System Administrators role. That's convenient for tests, and it doesn't
+affect TM1, whose security comes from the groups.
+
+The directory listens only inside the container (127.0.0.1:389), under
+`dc=cognos,dc=local` (`COGNOS_LDAP_BASE`): users in `ou=people`, groups in
+`ou=groups`.
+
 ## Environment variables
 
 | Variable | Default | |
@@ -114,6 +155,11 @@ docker run -d --name cognos --network cognos -p 9300:9300 --stop-timeout 180 \
 | `COGNOS_ZIP_SHA256` | | Expected SHA-256 of the zip. Verified before installing. |
 | `COGNOS_ZIP_DIR` | `/ibm` | Where to look for the zip |
 | `COGNOS_INSTALLABLES` | `CASRVR_DataTier CASRVR_AppTier` | Components to install from the manifest |
+| `COGNOS_USERS` | | Test users, `user:password[:group,group]` separated by spaces ([Users](#users)) |
+| `COGNOS_USERS_FILE` | | A file with more users, one per line |
+| `COGNOS_NAMESPACE` | `LDAP` | The namespace's ID, the `CAMNamespace` users log on with |
+| `COGNOS_ANONYMOUS` | `F` with users, else `T` | Allow anonymous access |
+| `COGNOS_LDAP_BASE` | `dc=cognos,dc=local` | Base DN of the embedded directory |
 | `COGNOS_HOST` | the container's hostname | Host name in Cognos's dispatcher URIs. Other containers on the network reach Cognos by it, so keep it a name they can resolve. |
 | `COGNOS_MAX_MEMORY` | `6144` | Dispatcher JVM heap, in MB. 2048 is too small: Cognos's apps fail to start. |
 | `COGNOS_CS_HOST` | | External PostgreSQL host. Unset: the embedded one. |
@@ -134,7 +180,7 @@ file IBM's installer produced, with the install's host name replaced by
 
 | Command | Runs | Healthy when |
 |---------|------|--------------|
-| `start` (default) | Cognos, and the embedded PostgreSQL unless `COGNOS_CS_HOST` is set | `GET /bi/v1/login` on 9300 returns 200 (no login needed) |
+| `start` (default) | Cognos, the embedded PostgreSQL unless `COGNOS_CS_HOST` is set, and the LDAP directory when users are given | `GET /bi/v1/login` on 9300 returns 200 (anonymous session) or 441 (logon prompt) |
 | `install [SOURCE]` | Installs Cognos from a zip and exits ([above](#getting-cognos-into-the-container)) | – |
 
 Anything else is run as-is (e.g. `docker run --rm -it ... cognos-server bash`).
@@ -147,10 +193,11 @@ behind; the next start removes it.
 
 ## Security
 
-There's no namespace (login) configured yet, so Cognos allows **anonymous access**:
-anyone who can reach port 9300 has full access. Keep it on your machine or a
-private network. Namespaces (LDAP first, then OIDC) are coming, for testing TM1's
-CAM security; see [#44](https://github.com/ajmyers/tm1-pa-developer-tools/issues/44).
+Without [users](#users), Cognos allows **anonymous access**: anyone who can reach
+port 9300 has full access. With users, logons are required, but every user is a
+Cognos administrator, and the passwords are whatever you listed. This is a test
+server: keep it on your machine or a private network. OIDC namespaces are coming;
+see [#44](https://github.com/ajmyers/tm1-pa-developer-tools/issues/44).
 
 ## Image
 
