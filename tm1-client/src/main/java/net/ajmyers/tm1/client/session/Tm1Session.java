@@ -22,6 +22,7 @@ import net.ajmyers.tm1.client.version.Tm1Version;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -350,6 +351,24 @@ public final class Tm1Session {
 	}
 
 	/**
+	 * How long the default connector keeps an idle connection for reuse. TM1 (11.8)
+	 * closes a kept-alive connection after about 90 seconds idle
+	 * ({@code Tm1SessionBehaviorTest}), and a request sent on it as it closes gets no
+	 * response at all, so the client closes it first.
+	 */
+	static final Duration MAX_IDLE = Duration.ofSeconds(60);
+
+	/**
+	 * The default connector's pool, shared by every session that doesn't bring its own,
+	 * as Reactor Netty's global one would be, but closing connections idle for
+	 * {@link #MAX_IDLE}.
+	 */
+	private static final ConnectionProvider CONNECTIONS = ConnectionProvider.builder("tm1-client")
+		.maxIdleTime(MAX_IDLE)
+		.evictInBackground(Duration.ofSeconds(30))
+		.build();
+
+	/**
 	 * Builds a {@link Tm1Session}. Only {@link #baseUrl} and credentials are required.
 	 */
 	public static final class Builder {
@@ -592,7 +611,9 @@ public final class Tm1Session {
 		/**
 		 * The HTTP connector. Unless set, a Reactor Netty connector with gzip and the
 		 * {@linkplain Tm1Timeouts#connect() connect timeout}. With another connector,
-		 * connect and request timeouts are that connector's own settings.
+		 * connect and request timeouts are that connector's own settings, and so is its
+		 * pool: keep its idle connections under TM1's 90 seconds (the default connector
+		 * closes them after 60).
 		 * @param connector the connector
 		 * @return this builder
 		 */
@@ -629,7 +650,7 @@ public final class Tm1Session {
 		}
 
 		private static ClientHttpConnector nettyConnector(Tm1Timeouts timeouts) {
-			HttpClient http = HttpClient.create()
+			HttpClient http = HttpClient.create(CONNECTIONS)
 				.compress(true)
 				.option(ChannelOption.CONNECT_TIMEOUT_MILLIS,
 						(int) Math.min(Integer.MAX_VALUE, timeouts.connect().toMillis()))
