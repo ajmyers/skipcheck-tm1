@@ -14,9 +14,9 @@ from tm1_client._generated import index
 from tm1_client.model import Cube, CubeUpdate, Dimension, Edge, Element, ElementType, Hierarchy
 
 from ..conftest import SPEC
-from .conftest import URL, async_client as _async_client
+from .conftest import CONFIGURED, REASON, async_client as _async_client
 
-pytestmark = pytest.mark.skipif(URL is None, reason="no TM1 configured (TM1_URL)")
+pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 DOC = json.loads(SPEC.read_text(encoding="utf-8"))
 

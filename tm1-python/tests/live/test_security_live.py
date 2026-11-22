@@ -22,9 +22,9 @@ from tm1_client import (
 )
 from tm1_client.model import ProcessPatch, UserPatch, UserType
 
-from .conftest import URL, _builder
+from .conftest import CONFIGURED, REASON, _builder
 
-pytestmark = pytest.mark.skipif(URL is None, reason="no TM1 configured (TM1_URL)")
+pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 ADMIN = os.environ.get("TM1_USER", "admin")
 

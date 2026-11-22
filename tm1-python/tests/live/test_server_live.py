@@ -12,9 +12,9 @@ import pytest
 from tm1_client import ODataPath, ODataQuery, Tm1BadRequestError, Tm1Client, Tm1Request
 from tm1_client.model import LogLevel, ProcessPatch, ServerSettingsPatch
 
-from .conftest import URL, client
+from .conftest import CONFIGURED, REASON, client
 
-pytestmark = pytest.mark.skipif(URL is None, reason="no TM1 configured (TM1_URL)")
+pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 
 def test_reads_the_server_and_its_configurations(tm1: Tm1Client) -> None:

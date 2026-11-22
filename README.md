@@ -27,6 +27,7 @@ The Java libraries require Java 17+, the Python client Python 3.10+, the .NET cl
 ./gradlew :tm1-codegen:exportSpec        # refresh spec/tm1-api.json after changing the snapshot or overlay
 pip install -e './tm1-python[test]' && pytest tm1-python
 dotnet test tm1-dotnet/Tm1.slnx
+scripts/live-tests.sh                    # every client's tests against a real TM1 (bring your own: see the script)
 ```
 
 Builds use JDK 27 via Gradle toolchains; published libraries target Java 17 bytecode.

@@ -34,9 +34,9 @@ from tm1_client import (
 )
 
 from ..conftest import SNAPSHOT
-from .conftest import URL, _builder, client
+from .conftest import CONFIGURED, REASON, _builder, client, target
 
-pytestmark = pytest.mark.skipif(URL is None, reason="no TM1 configured (TM1_URL)")
+pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 SERVER = Tm1Request.get(ODataPath.of("Server"), ODataQuery.none().select("Name"), dict)
 
@@ -169,7 +169,7 @@ def test_reports_a_disabled_user_as_refused_credentials(admin: Tm1Session, user:
 
 
 def test_doesnt_log_in_again_while_a_refusal_is_remembered() -> None:
-    builder = Tm1Session.builder().base_url(URL).authenticator(auth.basic("tm1py_nobody", "wrong"))
+    builder = Tm1Session.builder().base_url(target()[0]).authenticator(auth.basic("tm1py_nobody", "wrong"))
     with builder.timeouts(Tm1Timeouts.builder().refused_login(60).build()).build() as s:
         with pytest.raises(Tm1AuthenticationError) as first:
             s.execute(SERVER)

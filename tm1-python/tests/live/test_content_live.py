@@ -8,9 +8,9 @@ from tm1_client import ODataPath, Tm1BadRequestError, Tm1Client, Tm1NotFoundErro
 from tm1_client._sync.services.content import ContentPath, ContentScope
 from tm1_client.model import CubeReference, CubeReferencePatch, DocumentPatch, DocumentReference, Folder, FolderPatch, Link, LinkPatch
 
-from .conftest import URL
+from .conftest import CONFIGURED, REASON
 
-pytestmark = pytest.mark.skipif(URL is None, reason="no TM1 configured (TM1_URL)")
+pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 
 def test_lists_the_roots(tm1: Tm1Client) -> None:

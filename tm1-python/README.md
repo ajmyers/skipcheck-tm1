@@ -78,6 +78,6 @@ pytest
 - `test_contract.py` calls every endpoint through the generated API, in both flavors, against a fake TM1, and checks the request.
 - `services/` and `runtime/` port the Java client's unit tests, in both flavors.
 - `test_model.py` round-trips the payloads the Java client captured from a real TM1; `test_conformance.py` shares OData encoding cases with Java and .NET.
-- `live/` ports the Java live tests. They're skipped unless `TM1_URL` is set (with `TM1_USER`, `TM1_PASSWORD`, `TM1_NAMESPACE`, and `TM1_VERIFY=false` for a self-signed certificate); start a server with [`docker/tm1-server`](../docker/tm1-server).
+- `live/` ports the Java live tests (`*Tm1Test`). Like the Java ones, they start TM1 in Docker themselves, from the same settings the Java tests read: `TM1_PRIVATE_IMAGE`, `TM1_HOME_DIR`, `TM1_INSTALL_VOLUME`, `TM1_BUNDLE_DIR` or `TM1_BUNDLE_URL` (see `tests/live/tm1_container.py`). `TM1_URL` (with `TM1_USER`, `TM1_PASSWORD`, `TM1_NAMESPACE`, `TM1_VERIFY=false`) uses a server that's already running instead. Without either they're skipped. [`scripts/live-tests.sh`](../scripts/live-tests.sh) runs the Java, Python and .NET live tests together.
 
-The live tests haven't yet run against a real TM1.
+The live tests haven't yet run against a real TM1; the container harness has, against a stand-in.

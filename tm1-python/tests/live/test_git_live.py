@@ -17,11 +17,11 @@ from tm1_client import Tm1BadRequestError, Tm1Client, Tm1Error
 from tm1_client._sync.services.git import GitCommitDetails, GitCredentials
 from tm1_client.model import DimensionPatch, ElementPatch, GitPushPlan, HierarchyPatch
 
-from .conftest import URL
+from .conftest import CONFIGURED, REASON
 
 REMOTE = os.environ.get("TM1_GIT_URL")
 
-pytestmark = pytest.mark.skipif(URL is None or REMOTE is None, reason="no TM1 and Git remote configured (TM1_URL, TM1_GIT_URL)")
+pytestmark = pytest.mark.skipif(not CONFIGURED or REMOTE is None, reason=REASON if not CONFIGURED else "no Git remote configured (TM1_GIT_URL)")
 
 COMMIT = GitCommitDetails("Add a dimension", "tm1-client", "tm1-client@example.com")
 

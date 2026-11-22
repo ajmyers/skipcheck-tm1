@@ -27,10 +27,10 @@ from tm1_client.model import (
     ViewAxisSelectionPatch,
 )
 
-from .conftest import URL
+from .conftest import CONFIGURED, REASON
 from .test_cube_live import dim, dimension, drop, edge, element
 
-pytestmark = pytest.mark.skipif(URL is None, reason="no TM1 configured (TM1_URL)")
+pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 
 def first_value(client: Tm1Client, mdx: str) -> Any:

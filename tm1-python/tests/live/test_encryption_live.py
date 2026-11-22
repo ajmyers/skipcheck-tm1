@@ -11,9 +11,9 @@ import pytest
 from tm1_client import Tm1BadRequestError, Tm1Client, Tm1Error
 from tm1_client.model import EncryptionFileType, LocalKeyFileProviderSettingsPatch
 
-from .conftest import URL
+from .conftest import CONFIGURED, REASON
 
-pytestmark = pytest.mark.skipif(URL is None, reason="no TM1 configured (TM1_URL)")
+pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 LOCAL = LocalKeyFileProviderSettingsPatch.builder().key_ref("/tmp/tm1-client.key").build()
 

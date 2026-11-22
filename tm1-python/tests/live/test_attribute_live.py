@@ -28,9 +28,9 @@ from tm1_client.model import (
     SubsetPatch,
 )
 
-from .conftest import URL
+from .conftest import CONFIGURED, REASON
 
-pytestmark = pytest.mark.skipif(URL is None, reason="no TM1 configured (TM1_URL)")
+pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 
 def label() -> str:
