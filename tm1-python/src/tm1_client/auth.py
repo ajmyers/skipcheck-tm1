@@ -6,10 +6,11 @@ TM1 answers a login with a ``TM1SessionId`` cookie; later requests send only the
 from __future__ import annotations
 
 import base64
+import inspect
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
-__all__ = ["Authenticator", "basic", "cam_namespace", "cam_passport"]
+__all__ = ["Authenticator", "CognosPassports", "basic", "cam_namespace", "cam_passport", "cognos_id_token", "cognos_logon"]
 
 
 class Authenticator(Protocol):
@@ -41,18 +42,29 @@ class _Fixed:
         return f"Authenticator[{self.description}]"
 
 
-@dataclass(frozen=True, repr=False)
 class _Passport:
-    passport: Callable[[], str]
+    """``CAMPassport <passport>``, the passport asked for at each login: from a function, or a
+    coroutine function in the asyncio flavor."""
 
-    def authorization(self) -> str:
-        return "CAMPassport " + self.passport()
+    def __init__(self, passport: Callable[[], Any], description: str = "CAMPassport"):
+        self.passport = passport
+        self.description = description
+
+    def authorization(self) -> Any:
+        value = self.passport()
+        if inspect.isawaitable(value):
+
+            async def prefixed() -> str:
+                return "CAMPassport " + await value
+
+            return prefixed()
+        return "CAMPassport " + value
 
     def describe(self) -> str:
-        return "CAMPassport"
+        return self.description
 
     def __repr__(self) -> str:
-        return "Authenticator[CAMPassport]"
+        return f"Authenticator[{self.description}]"
 
 
 def basic(user: str, password: str | None = None) -> Authenticator:
@@ -65,6 +77,31 @@ def cam_namespace(user: str, password: str, namespace: str) -> Authenticator:
     return _Fixed("CAMNamespace " + _b64(f"{user}:{password}:{namespace}"), f"CAMNamespace {namespace}/{user}")
 
 
-def cam_passport(passport: Callable[[], str]) -> Authenticator:
+def cam_passport(passport: Callable[[], Any]) -> Authenticator:
     """CAM security with a passport, fetched at each login (a passport expires)."""
     return _Passport(passport)
+
+
+def cognos_logon(dispatcher: str, namespace: str, user: str, password: str, **options: Any) -> Authenticator:
+    """CAM security with a passport the client gets from Cognos, by user name and password: a
+    fresh one for each login; TM1 never sees the password. For the asyncio flavor, see
+    :func:`tm1_client.aio.cognos.cognos_logon`."""
+    from ._sync.cognos import cognos_logon as logon
+
+    return logon(dispatcher, namespace, user, password, **options)
+
+
+def cognos_id_token(dispatcher: str, namespace: str, id_token: Callable[[], str], **options: Any) -> Authenticator:
+    """CAM security with a passport the client gets from Cognos for an OpenID Connect ID token."""
+    from ._sync.cognos import cognos_id_token as exchange
+
+    return exchange(dispatcher, namespace, id_token, **options)
+
+
+def __getattr__(name: str) -> Any:
+    # CognosPassports is the sync flavor's, generated from tm1_client.aio.cognos
+    if name == "CognosPassports":
+        from ._sync.cognos import CognosPassports
+
+        return CognosPassports
+    raise AttributeError(name)
