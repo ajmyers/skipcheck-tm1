@@ -111,6 +111,24 @@ public final class AttributeOwner {
 			.key(Objects.requireNonNull(view, "view")));
 	}
 
+	/**
+	 * A process.
+	 * @param process the process's name
+	 * @return the owner
+	 */
+	public static AttributeOwner process(String process) {
+		return new AttributeOwner(ODataPath.of("Processes").key(Objects.requireNonNull(process, "process")));
+	}
+
+	/**
+	 * A chore.
+	 * @param chore the chore's name
+	 * @return the owner
+	 */
+	public static AttributeOwner chore(String chore) {
+		return new AttributeOwner(ODataPath.of("Chores").key(Objects.requireNonNull(chore, "chore")));
+	}
+
 	ODataPath path() {
 		return path;
 	}

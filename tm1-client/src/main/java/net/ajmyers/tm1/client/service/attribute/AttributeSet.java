@@ -85,6 +85,22 @@ public final class AttributeSet {
 		return new AttributeSet(ODataPath.of("Cubes").key(Objects.requireNonNull(cube, "cube")).nav("ViewAttributes"));
 	}
 
+	/**
+	 * Processes' attributes: {@code /ProcessAttributes}.
+	 * @return the set
+	 */
+	public static AttributeSet processes() {
+		return new AttributeSet(ODataPath.of("ProcessAttributes"));
+	}
+
+	/**
+	 * Chores' attributes: {@code /ChoreAttributes}.
+	 * @return the set
+	 */
+	public static AttributeSet chores() {
+		return new AttributeSet(ODataPath.of("ChoreAttributes"));
+	}
+
 	ODataPath path() {
 		return path;
 	}
