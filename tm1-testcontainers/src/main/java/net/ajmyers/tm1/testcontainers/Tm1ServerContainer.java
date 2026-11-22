@@ -330,6 +330,14 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	}
 
 	/**
+	 * The Cognos namespace TM1's users log on through, set with {@link #withCamSecurity}.
+	 * @return the namespace, or {@code null} if TM1 uses its own (native) security
+	 */
+	public CognosContainer.@Nullable Namespace getCamNamespace() {
+		return cognos == null ? null : camNamespace;
+	}
+
+	/**
 	 * The {@code Authorization} header for the container's login: {@code Basic} with
 	 * {@link #getUsername()} and {@link #getPassword()}, or, in CAM security,
 	 * {@code CAMNamespace} for that Cognos user.
