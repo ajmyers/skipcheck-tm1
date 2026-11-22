@@ -10,15 +10,8 @@ Action Chore/Execute
 Action Chore/SetServerLocalStartTime
 Action Cube/CheckFeeders
 Action Cube/CheckRules
-Action Cube/Load
-Action Cube/Lock
-Action Cube/Release
-Action Cube/ReorderDimensions
-Action Cube/Reserve
 Action Cube/TraceCellCalculation
 Action Cube/TraceFeeders
-Action Cube/Unload
-Action Cube/Unlock
 Action Cube/Update
 Action Cube/UpdateCells
 Action CubeDrillthrough/Execute
@@ -84,7 +77,6 @@ EntitySet ChoreAttributes
 EntitySet Chores
 EntitySet Contents
 EntitySet CubeAttributes
-EntitySet Cubes
 EntitySet ErrorLogFiles
 EntitySet GitPlans
 EntitySet Groups
@@ -102,7 +94,6 @@ EntitySet Threads
 EntitySet TransactionLogEntries
 EntitySet Users
 Function Cellset/GetPartition
-Function Cube/DimensionsStorageOrder
 FunctionImport ControlCubes
 FunctionImport ControlDimensions
 FunctionImport GetOIDCKeys
@@ -140,7 +131,6 @@ Navigation ChoreReference/Chore
 Navigation ChoreTask/Chore
 Navigation ChoreTask/Process
 Navigation Cube/Annotations
-Navigation Cube/Dimensions
 Navigation Cube/LocalizedAttributes
 Navigation Cube/PrivateViews
 Navigation Cube/ViewAttributes
