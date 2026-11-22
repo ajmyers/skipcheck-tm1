@@ -102,6 +102,12 @@ public final class LogService {
 	 * {@code GET TransactionLogEntries}, streamed. Besides cell changes, the log holds
 	 * status lines (such as {@code CubeSerialized: …}) with only {@code StatusMessage}
 	 * set.
+	 *
+	 * <p>
+	 * TM1 (11.8) logs a password being set as a change of the {@code PASSWORD} cell of
+	 * {@code }ClientProperties}, and writes the new value, the password's hash, as raw
+	 * bytes that aren't UTF-8. They read as U+FFFD, the replacement character, here and
+	 * in the other transaction log methods.
 	 * @param query what to select, filter (such as on {@code Cube}), order and how many
 	 * @return the entries
 	 */

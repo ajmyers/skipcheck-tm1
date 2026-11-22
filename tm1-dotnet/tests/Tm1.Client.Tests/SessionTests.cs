@@ -87,6 +87,22 @@ public class SessionTests
     }
 
     [Fact]
+    public async Task ReadsBytesThatArentUtf8AsTheReplacementCharacter()
+    {
+        // As TM1's transaction log gives a password's hash, with "é" (two bytes) beside it
+        byte[] hash = [0xe0, 0xec, (byte)'r', 0xff, 0xff];
+        byte[] Body(string start, string end) => [.. Encoding.UTF8.GetBytes(start), .. hash, .. Encoding.UTF8.GetBytes(end)];
+        _tm1.Respond = r => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(r.Target.StartsWith("Cubes(", StringComparison.Ordinal) ? Body("{\"Name\":\"é", "\"}") : Body("{\"value\":[{\"Name\":\"é", "\"}]}")),
+        };
+        var replaced = "é" + new string((char)0xFFFD, 2) + "r" + new string((char)0xFFFD, 2);
+        var tm1 = _tm1.Client();
+        Assert.Equal(replaced, (await tm1.Cubes.GetAsync("c")).Name);
+        Assert.Equal([replaced], (await tm1.Cubes.ListAsync(ODataQuery.None()).ToListAsync()).Select(c => c.Name));
+    }
+
+    [Fact]
     public async Task ABatchSendsItsCallsTogetherEachWithItsOwnResult()
     {
         _tm1.Respond = r =>

@@ -40,7 +40,13 @@ class Reply:
         if self.status == 204 or not self.content:
             return None
         try:
-            return json.loads(self.content)
+            try:
+                return json.loads(self.content)
+            except UnicodeDecodeError:
+                # TM1 (11.8) writes some values as the bytes it holds: the transaction log gives a
+                # password's hash that isn't UTF-8. As the Java client's Utf8Repair, such bytes read
+                # as U+FFFD rather than failing the response.
+                return json.loads(self.content.decode("utf-8", "replace"))
         except ValueError as e:
             raise Tm1ProtocolError(f"TM1 answered {self.status} with something that isn't JSON: {e}") from e
 

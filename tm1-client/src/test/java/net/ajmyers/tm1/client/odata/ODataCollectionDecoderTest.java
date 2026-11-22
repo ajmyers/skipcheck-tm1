@@ -82,6 +82,33 @@ class ODataCollectionDecoderTest {
 	}
 
 	@Test
+	void readsBytesThatArentUtf8AsTheReplacementCharacterHoweverTheyAreSplit() {
+		// As TM1's transaction log gives a password's hash, with "é" (two bytes) beside
+		// it
+		byte[] hash = { (byte) 0xe0, (byte) 0xec, 'r', (byte) 0xff, (byte) 0xff };
+		byte[] start = "{\"value\":[{\"Name\":\"é".getBytes(StandardCharsets.UTF_8);
+		byte[] end = "\",\"Type\":\"é\"}]}".getBytes(StandardCharsets.UTF_8);
+		byte[] bytes = new byte[start.length + hash.length + end.length];
+		System.arraycopy(start, 0, bytes, 0, start.length);
+		System.arraycopy(hash, 0, bytes, start.length, hash.length);
+		System.arraycopy(end, 0, bytes, start.length + hash.length, end.length);
+		for (int split = 1; split < bytes.length; split++) {
+			Flux<DataBuffer> two = Flux.just(buffer(bytes, 0, split), buffer(bytes, split, bytes.length));
+			assertThat(ODataCollectionDecoder.items(two, MAPPER, ELEMENTS, "GET", "x").collectList().block())
+				.as("split at %d", split)
+				.containsExactly(new Element("é\uFFFD\uFFFDr\uFFFD\uFFFD", "é"));
+		}
+		assertThat(new String(Utf8Repair.whole(bytes), StandardCharsets.UTF_8)).as("a body held whole")
+			.contains("é\uFFFD\uFFFDr\uFFFD\uFFFD\"");
+		byte[] cut = Arrays.copyOf(start, start.length - 1);
+		Utf8Repair repair = new Utf8Repair();
+		assertThat(new String(repair.feed(cut), StandardCharsets.UTF_8)).as("a character cut short waits")
+			.endsWith("\"Name\":\"");
+		assertThat(new String(repair.end(), StandardCharsets.UTF_8)).as("and is replaced at the end")
+			.isEqualTo("\uFFFD");
+	}
+
+	@Test
 	void decodesCollectionsOfPrimitives() {
 		Flux<DataBuffer> body = chunks("{\"value\":[\"a\",null,\"b\"]}", 3);
 		// Reactor can't carry nulls, so items() skips them...

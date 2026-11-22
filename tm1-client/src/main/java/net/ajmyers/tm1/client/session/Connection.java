@@ -37,6 +37,7 @@ import net.ajmyers.tm1.client.odata.ODataCollectionDecoder;
 import net.ajmyers.tm1.client.odata.ODataJson;
 import net.ajmyers.tm1.client.odata.ODataPath;
 import net.ajmyers.tm1.client.odata.ODataQuery;
+import net.ajmyers.tm1.client.odata.Utf8Repair;
 import net.ajmyers.tm1.client.version.Tm1Capabilities;
 import net.ajmyers.tm1.client.version.Tm1Capability;
 import net.ajmyers.tm1.client.version.Tm1Version;
@@ -433,7 +434,9 @@ final class Connection {
 			});
 			case SINGLE -> DataBufferUtils.join(response.bodyToFlux(DataBuffer.class)).map(buffer -> {
 				try {
-					return mapper.readValue(buffer.asInputStream(), request.type());
+					byte[] bytes = new byte[buffer.readableByteCount()];
+					buffer.read(bytes);
+					return mapper.readValue(Utf8Repair.whole(bytes), request.type());
 				}
 				catch (JacksonException e) {
 					throw new Tm1ProtocolException(
@@ -496,7 +499,7 @@ final class Connection {
 					yield Flux.empty();
 				}
 				try {
-					yield Flux.just(mapper.readValue(body, request.type()));
+					yield Flux.just(mapper.readValue(Utf8Repair.whole(body), request.type()));
 				}
 				catch (JacksonException e) {
 					yield Flux.error(new Tm1ProtocolException(

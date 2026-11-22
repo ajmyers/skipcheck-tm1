@@ -17,6 +17,8 @@ import net.ajmyers.tm1.client.Tm1Client;
 import net.ajmyers.tm1.client.model.MessageLogEntry;
 import net.ajmyers.tm1.client.model.ProcessExecuteResult;
 import net.ajmyers.tm1.client.model.ProcessPatch;
+import net.ajmyers.tm1.client.model.TransactionLogEntry;
+import net.ajmyers.tm1.client.model.UserPatch;
 import net.ajmyers.tm1.client.odata.ODataQuery;
 import net.ajmyers.tm1.testcontainers.RequiresTm1;
 import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
@@ -104,6 +106,27 @@ class LogServiceTm1Test {
 		assertThat(
 				tm1.logs().tailAuditLog(Duration.ofMillis(300)).take(Duration.ofSeconds(1)).collectList().block(WAIT))
 			.isEmpty();
+	}
+
+	@Test
+	void readsAPasswordsHashThatIsntUtf8AsReplacementCharacters() {
+		String user = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
+		tm1.users().create(UserPatch.builder().name(user).password("pw").build()).block(WAIT);
+		try {
+			List<TransactionLogEntry> newest = tm1.logs()
+				.transactionLog(true, true, ODataQuery.none().top(50))
+				.collectList()
+				.block(WAIT);
+			assertThat(newest)
+				.filteredOn(entry -> "}ClientProperties".equals(entry.cube()) && entry.tuple().contains("PASSWORD")
+						&& entry.tuple().contains(user))
+				.as("the password's hash, which TM1 sends as bytes that aren't UTF-8")
+				.singleElement()
+				.satisfies(entry -> assertThat(entry.newValue().asString()).contains("\uFFFD"));
+		}
+		finally {
+			tm1.users().delete(user).block(WAIT);
+		}
 	}
 
 	@Test

@@ -155,6 +155,15 @@ describe("Tm1Session", () => {
     expect(tm1.requests()).toHaveLength(0);
   });
 
+  it("reads bytes that aren't UTF-8 as the replacement character", async () => {
+    // As TM1's transaction log gives a password's hash, with "é" (two bytes) beside it
+    const utf8 = new TextEncoder();
+    const body = Uint8Array.from([...utf8.encode('{"Name":"é'), 0xe0, 0xec, 0x72, 0xff, 0xff, ...utf8.encode('"}')]);
+    const tm1 = new ScriptedTm1().on("GET Server?$select=Name", () => ScriptedTm1.bytes(200, body, "application/json"));
+    const replacement = String.fromCharCode(0xfffd);
+    expect(await tm1.session().execute(SERVER)).toEqual({ Name: "é" + replacement.repeat(2) + "r" + replacement.repeat(2) });
+  });
+
   it("reports a body that isn't JSON as the caller's mistake, not a transport failure", async () => {
     const unwritable = {
       get Name(): string {

@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from tm1_client import ODataPath, ODataQuery, Tm1BadRequestError, Tm1Client, Tm1Request
-from tm1_client.model import LogLevel, ProcessPatch, ServerSettingsPatch
+from tm1_client.model import LogLevel, ProcessPatch, ServerSettingsPatch, UserPatch
 
 from .conftest import CONFIGURED, REASON, client
 
@@ -83,6 +83,17 @@ def test_follows_the_message_log_without_repeating(tm1: Tm1Client) -> None:
     assert sum("Login Success" in (e.message or "") for e in seen) >= 2
     distinct = {f"{e.time_stamp} {e.thread_id} {e.session_id} {e.message}" for e in seen}
     assert len(distinct) == len(seen), "no entry twice, though each poll returns them all again"
+
+
+def test_reads_a_passwords_hash_that_isnt_utf8_as_replacement_characters(tm1: Tm1Client, name: str) -> None:
+    tm1.users.create(UserPatch.builder().name(name).password("pw").build())
+    try:
+        newest = tm1.logs.transaction_log(True, True, ODataQuery.none().top(50))
+        # The password's hash, which TM1 sends as bytes that aren't UTF-8
+        [entry] = [e for e in newest if e.cube == "}ClientProperties" and "PASSWORD" in e.tuple and name in e.tuple]
+        assert chr(0xFFFD) in str(entry.new_value)
+    finally:
+        tm1.users.delete(name)
 
 
 def test_reads_the_transaction_and_audit_logs(tm1: Tm1Client) -> None:

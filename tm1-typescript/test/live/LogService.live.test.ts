@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { ODataQuery, ProcessPatch, type MessageLogEntry, type Tm1Client, type Tm1Stream } from "../../src/index.js";
+import { ODataQuery, ProcessPatch, UserPatch, type MessageLogEntry, type Tm1Client, type Tm1Stream } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -69,6 +69,20 @@ describe("LogService on TM1" + liveReason, () => {
     expect(seen.filter((e: MessageLogEntry) => e.Message?.includes("Login Success")).length).toBeGreaterThanOrEqual(2);
     const distinct = new Set(seen.map((e) => `${e.TimeStamp} ${e.ThreadID} ${e.SessionID} ${e.Message}`));
     expect(distinct.size, "no entry twice, though each poll returns them all again").toBe(seen.length);
+  });
+
+  tm1Test("reads a password's hash that isn't UTF-8 as replacement characters", async () => {
+    const user = Live.name();
+    await tm1.users.create(UserPatch.builder().name(user).password("pw").build());
+    try {
+      const newest = await tm1.logs.transactionLog(true, true, ODataQuery.none().top(50)).toArray();
+      // The password's hash, which TM1 sends as bytes that aren't UTF-8
+      const entries = newest.filter((e) => e.Cube === "}ClientProperties" && e.Tuple?.includes("PASSWORD") && e.Tuple?.includes(user));
+      expect(entries).toHaveLength(1);
+      expect(String(entries[0]!.NewValue)).toContain(String.fromCharCode(0xfffd));
+    } finally {
+      await tm1.users.delete(user);
+    }
   });
 
   tm1Test("reads the transaction and audit logs", async () => {

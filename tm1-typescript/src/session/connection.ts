@@ -15,6 +15,8 @@ export const JSON_ACCEPT = "application/json";
 const LOGIN_PATH = "ActiveSession?$select=ID";
 const CLOSE_PATH = "ActiveSession/tm1.Close";
 const utf8 = new TextEncoder();
+// Not fatal: bytes that aren't UTF-8 read as U+FFFD, as the Java client's Utf8Repair. TM1 (11.8)
+// sends such bytes in the transaction log, for a password's hash.
 const decoder = new TextDecoder();
 
 export function textOf(body: Uint8Array): string {

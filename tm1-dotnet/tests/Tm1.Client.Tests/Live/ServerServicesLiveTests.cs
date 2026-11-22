@@ -104,6 +104,25 @@ public class ServerServicesLiveTests
     }
 
     [Tm1Fact]
+    public async Task ReadsAPasswordsHashThatIsntUtf8AsReplacementCharacters()
+    {
+        await using var tm1 = Live.Client();
+        var user = Live.Name();
+        await tm1.Users.CreateAsync(UserPatch.Builder().Name(user).Password("pw").Build());
+        try
+        {
+            var newest = await tm1.Logs.TransactionLogAsync(true, true, ODataQuery.None().Top(50)).ToListAsync();
+            // The password's hash, which TM1 sends as bytes that aren't UTF-8
+            var entry = Assert.Single(newest, e => e.Cube == "}ClientProperties" && e.Tuple!.Contains("PASSWORD") && e.Tuple!.Contains(user));
+            Assert.Contains((char)0xFFFD, entry.NewValue!.ToString()!);
+        }
+        finally
+        {
+            await tm1.Users.DeleteAsync(user);
+        }
+    }
+
+    [Tm1Fact]
     public async Task ReadsTheTransactionAndAuditLogs()
     {
         await using var tm1 = Live.Client();

@@ -295,7 +295,7 @@ public sealed class Tm1Session : IAsyncDisposable
         }
         try
         {
-            using var doc = JsonDocument.Parse(reply.Body);
+            using var doc = JsonDocument.Parse(Utf8Repair.Whole(reply.Body));
             return typeof(T) == typeof(JsonElement) ? (T)(object)doc.RootElement.Clone() : Tm1Json.Read<T>(doc.RootElement);
         }
         catch (JsonException e)
@@ -308,7 +308,7 @@ public sealed class Tm1Session : IAsyncDisposable
     {
         try
         {
-            using var doc = JsonDocument.Parse(reply.Body);
+            using var doc = JsonDocument.Parse(Utf8Repair.Whole(reply.Body));
             if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("value", out var items) || items.ValueKind != JsonValueKind.Array)
             {
                 throw new Tm1ProtocolException($"{request}: expected a collection");

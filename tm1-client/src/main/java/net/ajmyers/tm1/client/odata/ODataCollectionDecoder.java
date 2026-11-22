@@ -42,6 +42,10 @@ import tools.jackson.databind.util.TokenBuffer;
  * A body that turns out to be an error, or that ends before the collection is complete,
  * fails with a {@link Tm1ProtocolException}, even if items were already emitted (OData
  * Part 1 §9.5).
+ *
+ * <p>
+ * Bytes that aren't UTF-8 are read as U+FFFD rather than failing the response: TM1 (11.8)
+ * sends them in the transaction log ({@link Utf8Repair}).
  */
 public final class ODataCollectionDecoder {
 
@@ -170,6 +174,8 @@ public final class ODataCollectionDecoder {
 
 		private final ByteArrayFeeder feeder;
 
+		private final Utf8Repair utf8 = new Utf8Repair();
+
 		private boolean started;
 
 		private boolean finished;
@@ -203,6 +209,7 @@ public final class ODataCollectionDecoder {
 				DataBufferUtils.release(buffer);
 			}
 			try {
+				bytes = utf8.feed(bytes);
 				feeder.feedInput(bytes, 0, bytes.length);
 				return drain();
 			}
@@ -214,6 +221,8 @@ public final class ODataCollectionDecoder {
 
 		List<Event<T>> end() {
 			try {
+				byte[] rest = utf8.end();
+				feeder.feedInput(rest, 0, rest.length);
 				feeder.endOfInput();
 				List<Event<T>> events = drain();
 				if (!finished) {

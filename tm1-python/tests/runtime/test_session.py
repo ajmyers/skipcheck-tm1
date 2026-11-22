@@ -137,6 +137,17 @@ def test_reads_text_and_no_content_and_sends_json_bodies(rt: Runtime) -> None:
     assert lock.headers["content-type"] == "application/json" and lock.content == b"{}"
 
 
+def test_reads_bytes_that_arent_utf8_as_the_replacement_character(rt: Runtime) -> None:
+    # As TM1's transaction log gives a password's hash, with "é" (two bytes) beside it
+    hash = b"\xe0\xecr\xff\xff"
+    body = '{"value":[{"Name":"é'.encode() + hash + '","Type":"é"}]}'.encode()
+    rt.fake.respond = lambda r: httpx.Response(200, content=body, headers={"Content-Type": "application/json"})
+    replaced = "é" + chr(0xFFFD) * 2 + "r" + chr(0xFFFD) * 2
+    listed = rt.run(rt.session().collect(Tm1Request.list(ODataPath.of("Elements"), ODataQuery.none(), dict)))
+    assert listed == [{"Name": replaced, "Type": "é"}]
+    assert rt.run(rt.session().execute(Tm1Request.get(ODataPath.of("Elements"), ODataQuery.none(), dict)))["value"][0]["Name"] == replaced
+
+
 def test_streams_collections_across_next_links(rt: Runtime) -> None:
     pages = {
         "GET Dimensions?$select=Name": {
