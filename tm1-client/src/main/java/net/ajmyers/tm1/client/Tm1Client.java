@@ -8,6 +8,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import io.micrometer.observation.ObservationRegistry;
 import net.ajmyers.tm1.client.auth.Tm1Authenticator;
 import net.ajmyers.tm1.client.error.Tm1ErrorClassifier;
+import net.ajmyers.tm1.client.service.annotation.AnnotationService;
 import net.ajmyers.tm1.client.service.attribute.AttributeService;
 import net.ajmyers.tm1.client.service.attribute.LocalizedAttributeService;
 import net.ajmyers.tm1.client.service.content.ContentService;
@@ -116,6 +117,8 @@ public final class Tm1Client {
 
 	private final ContentService contents;
 
+	private final AnnotationService annotations;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -145,6 +148,7 @@ public final class Tm1Client {
 		this.server = new ServerService(session);
 		this.logs = new LogService(session);
 		this.contents = new ContentService(session);
+		this.annotations = new AnnotationService(session);
 	}
 
 	/**
@@ -387,6 +391,14 @@ public final class Tm1Client {
 	 */
 	public ContentService contents() {
 		return contents;
+	}
+
+	/**
+	 * Annotations on cube cells.
+	 * @return the annotations on cube cell service, on this client's session
+	 */
+	public AnnotationService annotations() {
+		return annotations;
 	}
 
 	/**
