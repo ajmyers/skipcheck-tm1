@@ -54,6 +54,10 @@ public sealed class Tm1Capabilities
         {
             throw new Tm1ProtocolException("TM1's $metadata isn't XML: " + e.Message, e);
         }
+        if (doc.Root?.Name.LocalName != "Edmx")
+        {
+            throw new Tm1ProtocolException("TM1's $metadata isn't CSDL: its root is " + doc.Root?.Name.LocalName);
+        }
         var schemas = doc.Descendants(Edm + "Schema").ToList();
         var aliases = schemas.Where(s => s.Attribute("Alias") is not null).ToDictionary(s => (string)s.Attribute("Alias")!, s => (string)s.Attribute("Namespace")!);
         string Qualify(string name)

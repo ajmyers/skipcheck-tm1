@@ -57,6 +57,9 @@ public static class Tm1Request
     public static Tm1Request<NoContent> Patch(ODataPath path, object body) => new("PATCH", path, null, body ?? throw new ArgumentNullException(nameof(body)), Tm1Response.None);
 
     public static Tm1Request<NoContent> Delete(ODataPath path) => new("DELETE", path, null, null, Tm1Response.None);
+
+    /// <summary>GET, PUT, DELETE and HEAD: sending one again does what sending it once did.</summary>
+    internal static bool IsIdempotent(string method) => method.ToUpperInvariant() is "GET" or "PUT" or "DELETE" or "HEAD";
 }
 
 /// <summary>A request whose answer reads as <typeparamref name="T"/>.</summary>
@@ -103,6 +106,10 @@ public sealed record Tm1Request<T>
 
     public Tm1Request<T> IfMatch(string etag) => WithHeader("If-Match", etag);
 
+    /// <summary>Whether sending the request again does what sending it once did (GET, PUT, DELETE,
+    /// HEAD), so it may be retried after a response was lost.</summary>
+    public bool IsIdempotent() => Tm1Request.IsIdempotent(Method);
+
     /// <summary>The path and query, relative to the service root.</summary>
     public string RelativeUri()
     {
@@ -122,8 +129,21 @@ public sealed record Tm1Request<T>
     {
         null => (null, null),
         byte[] bytes => (bytes, Headers.TryGetValue("Content-Type", out var ct) ? ct : "application/octet-stream"),
-        _ => (JsonSerializer.SerializeToUtf8Bytes(Body, Body.GetType(), Tm1Json.Options), "application/json; charset=utf-8"),
+        _ => (Json(Body), "application/json; charset=utf-8"),
     };
+
+    private static byte[] Json(object body)
+    {
+        try
+        {
+            return JsonSerializer.SerializeToUtf8Bytes(body, body.GetType(), Tm1Json.Options);
+        }
+        catch (Exception e) when (e is not ArgumentException)
+        {
+            // The caller's mistake, not a failure talking to TM1
+            throw new ArgumentException("The request body can't be written as JSON: " + body.GetType().FullName, e);
+        }
+    }
 
     public override string ToString() => $"{Method} {RelativeUri()}";
 }

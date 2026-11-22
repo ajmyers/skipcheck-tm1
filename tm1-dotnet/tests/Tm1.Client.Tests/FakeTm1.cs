@@ -85,7 +85,7 @@ public sealed class FakeTm1 : HttpMessageHandler
             login.Headers.Add("Set-Cookie", $"TM1SessionId=s{Logins}; Path=/api/; HttpOnly");
             return login;
         }
-        if (path == "/api/v1/Configuration?$select=ProductVersion")
+        if (path == "/api/v1/Server?$select=ProductVersion")
         {
             return Json(new Dictionary<string, object?> { ["ProductVersion"] = ProductVersion });
         }

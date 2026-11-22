@@ -112,7 +112,7 @@ public sealed class Tm1Session : IAsyncDisposable
     public Task<long> SessionIdAsync(CancellationToken cancellationToken = default) => _connection.LoginAsync(cancellationToken);
 
     /// <summary>Ends the session on the server, for every view.</summary>
-    public Task CloseAsync() => _connection.CloseAsync();
+    public Task CloseAsync(CancellationToken cancellationToken = default) => _connection.CloseAsync().WaitAsync(cancellationToken);
 
     public ValueTask DisposeAsync() => new(CloseAsync());
 
@@ -240,7 +240,7 @@ public sealed class Tm1Session : IAsyncDisposable
         }
         if (!reply.Headers.TryGetValue("location", out var location))
         {
-            throw new Tm1ProtocolException($"TM1 accepted {method} {url} async without a Location");
+            throw new Tm1ProtocolException("TM1 accepted an async request without a Location", null, method, url, null);
         }
         // The Location is relative to the request's URL: ../_async('id')
         var monitor = new Uri(new Uri(url), location).ToString();
@@ -323,7 +323,7 @@ public sealed class Tm1Session : IAsyncDisposable
         }
     }
 
-    public override string ToString() => $"Tm1Session[{_connection.Root}{(_sandbox is null ? "" : ", sandbox " + _sandbox)}]";
+    public override string ToString() => $"Tm1Session[{_connection.Root}{(_sandbox is null ? "" : ", sandbox=" + _sandbox)}{(_changeSet is null ? "" : ", changeSet=" + _changeSet)}]";
 
     internal sealed record Page<T>(IReadOnlyList<T> Items, string? NextLink);
 }
@@ -478,7 +478,8 @@ public class Tm1SessionBuilder
     private Tm1Dialect _dialect = Tm1Dialect.V11;
     private Tm1Authenticator? _authenticator;
     private string? _impersonate;
-    private string? _sessionContext = "tm1-client (.NET)";
+    private string? _sessionContext;
+    private CapabilitiesCache _capabilitiesCache = new();
     private Tm1Timeouts _timeouts = Tm1Timeouts.Defaults;
     private Tm1ErrorClassifier _classifier = Tm1ErrorClassifier.Defaults();
     private HttpMessageHandler? _handler;
@@ -518,7 +519,7 @@ public class Tm1SessionBuilder
     /// <summary>Logs in as the service account but acts as <paramref name="user"/> (<c>TM1-Impersonate</c>).</summary>
     public Tm1SessionBuilder Impersonate(string user)
     {
-        _impersonate = string.IsNullOrWhiteSpace(user) ? throw new ArgumentException("The impersonated user's name is blank") : user;
+        _impersonate = UserNames.CheckImpersonated(user);
         return this;
     }
 
@@ -528,9 +529,13 @@ public class Tm1SessionBuilder
         return this;
     }
 
+    /// <summary>A label TM1 shows for the session (<c>TM1-SessionContext</c>, sent with the login),
+    /// such as the application's name: in TM1's thread and session lists and its audit log.</summary>
+    /// <exception cref="ArgumentException">Longer than 250 characters, which is all TM1 keeps.</exception>
     public Tm1SessionBuilder SessionContext(string sessionContext)
     {
-        _sessionContext = sessionContext;
+        ArgumentNullException.ThrowIfNull(sessionContext);
+        _sessionContext = sessionContext.Length > 250 ? throw new ArgumentException("TM1 keeps at most 250 characters of session context, got " + sessionContext.Length) : sessionContext;
         return this;
     }
 
@@ -568,12 +573,16 @@ public class Tm1SessionBuilder
         return this;
     }
 
+    /// <summary>A copy of these settings, for a pool to build one session per identity.</summary>
     public Tm1SessionBuilder Copy() => (Tm1SessionBuilder)MemberwiseClone();
+
+    /// <summary>The service root, or a placeholder if it isn't set yet, for the pool's messages.</summary>
+    internal string BaseUrlOrUnset() => _root ?? (_address is not null ? _dialect.ServiceRoot(_address) : "(no base URL)");
 
     public Tm1Session Build()
     {
         var root = _root ?? (_address is not null ? _dialect.ServiceRoot(_address) : throw new InvalidOperationException("Give the server: BaseUrl or Address"));
         var authenticator = _authenticator ?? throw new InvalidOperationException("Give the login: BasicAuth or Authenticator");
-        return new Tm1Session(new Connection(root, authenticator, _impersonate, _sessionContext, _timeouts, _classifier, _handler, _checkCapabilities, _clock), null, null, null, null);
+        return new Tm1Session(new Connection(root, authenticator, _impersonate, _sessionContext, _timeouts, _classifier, _handler, _checkCapabilities, _clock, _capabilitiesCache), null, null, null, null);
     }
 }

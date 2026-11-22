@@ -35,11 +35,38 @@ public abstract class Tm1Authenticator
     public static Tm1Authenticator CamPassport(Func<CancellationToken, ValueTask<string>> passport) =>
         new Passport(passport ?? throw new ArgumentNullException(nameof(passport)));
 
+    /// <summary>CAM security with a passport the client gets from Cognos itself, logging on with a
+    /// user name and password (<see cref="CognosPassports.Password"/>): a fresh passport for each
+    /// login. Unlike <see cref="CamNamespace"/>, TM1 never sees the password, only Cognos does.</summary>
+    /// <param name="dispatcher">The Cognos dispatcher's address, such as <c>http://cognos:9300</c>.</param>
+    /// <param name="namespace">The namespace's ID, such as <c>LDAP</c>.</param>
+    /// <param name="user">The user name.</param>
+    /// <param name="password">The password.</param>
+    /// <param name="handler">The handler to reach Cognos through; null for the client's own.</param>
+    public static Tm1Authenticator CognosLogon(string dispatcher, string @namespace, string user, string password, System.Net.Http.HttpMessageHandler? handler = null) =>
+        new Described(CamPassport(CognosPassports.Password(dispatcher, @namespace, user, password, handler)), $"CAMPassport from Cognos {@namespace}/{user}");
+
+    /// <summary>CAM security with a passport the client gets from Cognos for an OpenID Connect ID
+    /// token it already holds (<see cref="CognosPassports.IdToken"/>): a fresh passport for each login.</summary>
+    /// <param name="dispatcher">The Cognos dispatcher's address, such as <c>http://cognos:9300</c>.</param>
+    /// <param name="namespace">The OIDC namespace's ID, such as <c>OIDC</c>.</param>
+    /// <param name="idToken">Supplies a current ID token; asked at each login.</param>
+    /// <param name="handler">The handler to reach Cognos through; null for the client's own.</param>
+    public static Tm1Authenticator CognosIdToken(string dispatcher, string @namespace, Func<CancellationToken, ValueTask<string>> idToken, System.Net.Http.HttpMessageHandler? handler = null) =>
+        new Described(CamPassport(CognosPassports.IdToken(dispatcher, @namespace, idToken, handler)), $"CAMPassport from Cognos {@namespace} (ID token)");
+
     private static string Base64(string text) => Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
 
     private sealed class Fixed(string value, string description) : Tm1Authenticator
     {
         public override ValueTask<string> AuthorizationAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(value);
+
+        public override string Describe() => description;
+    }
+
+    private sealed class Described(Tm1Authenticator inner, string description) : Tm1Authenticator
+    {
+        public override ValueTask<string> AuthorizationAsync(CancellationToken cancellationToken = default) => inner.AuthorizationAsync(cancellationToken);
 
         public override string Describe() => description;
     }
