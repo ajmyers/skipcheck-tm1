@@ -27,6 +27,7 @@ import net.ajmyers.tm1.client.service.dimension.HierarchyService;
 import net.ajmyers.tm1.client.service.dimension.LevelService;
 import net.ajmyers.tm1.client.service.dimension.MemberService;
 import net.ajmyers.tm1.client.service.dimension.SubsetService;
+import net.ajmyers.tm1.client.service.git.GitService;
 import net.ajmyers.tm1.client.service.process.ChoreService;
 import net.ajmyers.tm1.client.service.process.ProcessDebugService;
 import net.ajmyers.tm1.client.service.process.ProcessService;
@@ -119,6 +120,8 @@ public final class Tm1Client {
 
 	private final AnnotationService annotations;
 
+	private final GitService git;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -149,6 +152,7 @@ public final class Tm1Client {
 		this.logs = new LogService(session);
 		this.contents = new ContentService(session);
 		this.annotations = new AnnotationService(session);
+		this.git = new GitService(session);
 	}
 
 	/**
@@ -399,6 +403,14 @@ public final class Tm1Client {
 	 */
 	public AnnotationService annotations() {
 		return annotations;
+	}
+
+	/**
+	 * TM1 Git.
+	 * @return the tm1 git service, on this client's session
+	 */
+	public GitService git() {
+		return git;
 	}
 
 	/**
