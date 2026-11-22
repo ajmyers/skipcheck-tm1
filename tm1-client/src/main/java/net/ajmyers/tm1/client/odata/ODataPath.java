@@ -56,6 +56,15 @@ public final class ODataPath {
 	}
 
 	/**
+	 * The service's batch endpoint, {@code $batch}: a path of its own, as for
+	 * {@link #metadata()}.
+	 * @return the path
+	 */
+	public static ODataPath batch() {
+		return new ODataPath(List.of("$batch"));
+	}
+
+	/**
 	 * Adds a single-part key with a string value: {@code ('Sales')}.
 	 * @param value the key value, any text; quoted and percent-encoded
 	 * @return a new path with the key on its last segment

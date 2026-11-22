@@ -73,16 +73,19 @@ public final class Tm1Session {
 
 	private final @Nullable Duration async;
 
+	private final @Nullable BatchQueue batch;
+
 	Tm1Session(Connection connection) {
-		this(connection, null, null, null);
+		this(connection, null, null, null, null);
 	}
 
 	private Tm1Session(Connection connection, @Nullable String sandbox, @Nullable String changeSet,
-			@Nullable Duration async) {
+			@Nullable Duration async, @Nullable BatchQueue batch) {
 		this.connection = Objects.requireNonNull(connection, "connection");
 		this.sandbox = sandbox;
 		this.changeSet = changeSet;
 		this.async = async;
+		this.batch = batch;
 	}
 
 	/**
@@ -112,6 +115,9 @@ public final class Tm1Session {
 			return Mono.error(new IllegalArgumentException(
 					"Collection and byte requests are streamed: use stream() for " + request));
 		}
+		if (batch != null) {
+			return batch.add(inSandbox(request)).next();
+		}
 		Mono<T> send = async != null && request.response() != Tm1Request.Response.BYTES
 				? connection.async(inSandbox(request), async).next() : connection.execute(inSandbox(request));
 		return request.requirement().map(needed -> connection.require(needed).then(send)).orElse(send);
@@ -132,6 +138,9 @@ public final class Tm1Session {
 		if (request.response() != Tm1Request.Response.COLLECTION && request.response() != Tm1Request.Response.BYTES) {
 			return Flux.error(new IllegalArgumentException(
 					"Only collection requests are streamed: use execute() for " + request));
+		}
+		if (batch != null) {
+			return batch.add(inSandbox(request));
 		}
 		Flux<T> send = async != null && request.response() == Tm1Request.Response.COLLECTION
 				? connection.async(inSandbox(request), async) : connection.stream(inSandbox(request));
@@ -178,7 +187,7 @@ public final class Tm1Session {
 		if (name.isBlank()) {
 			throw new IllegalArgumentException("sandbox name is blank");
 		}
-		return new Tm1Session(connection, name, changeSet, async);
+		return new Tm1Session(connection, name, changeSet, async, batch);
 	}
 
 	/**
@@ -186,7 +195,18 @@ public final class Tm1Session {
 	 * @return the view, or this session if it has no sandbox
 	 */
 	public Tm1Session withoutSandbox() {
-		return sandbox == null ? this : new Tm1Session(connection, null, changeSet, async);
+		return sandbox == null ? this : new Tm1Session(connection, null, changeSet, async, batch);
+	}
+
+	/**
+	 * Starts a JSON {@code $batch}: its {@link Tm1SessionBatch#session() session} is a
+	 * view of this one (same sandbox and change set) whose requests are queued, and
+	 * {@link Tm1SessionBatch#run()} sends them together.
+	 * @return the batch
+	 */
+	public Tm1SessionBatch batch() {
+		BatchQueue queue = new BatchQueue(connection, connection.mapper());
+		return new Tm1SessionBatch(queue, new Tm1Session(connection, sandbox, changeSet, null, queue));
 	}
 
 	/**
@@ -209,7 +229,7 @@ public final class Tm1Session {
 		if (every.isNegative() || every.isZero()) {
 			throw new IllegalArgumentException("The poll interval must be positive: " + every);
 		}
-		return new Tm1Session(connection, sandbox, changeSet, every);
+		return new Tm1Session(connection, sandbox, changeSet, every, batch);
 	}
 
 	/**
@@ -217,7 +237,7 @@ public final class Tm1Session {
 	 * @return the view, or this session if it isn't async
 	 */
 	public Tm1Session withoutAsync() {
-		return async == null ? this : new Tm1Session(connection, sandbox, changeSet, null);
+		return async == null ? this : new Tm1Session(connection, sandbox, changeSet, null, batch);
 	}
 
 	/**
@@ -250,7 +270,7 @@ public final class Tm1Session {
 		if (id.isBlank()) {
 			throw new IllegalArgumentException("change set ID is blank");
 		}
-		return new Tm1Session(connection, sandbox, id, async);
+		return new Tm1Session(connection, sandbox, id, async, batch);
 	}
 
 	/**
@@ -258,7 +278,7 @@ public final class Tm1Session {
 	 * @return the view, or this session if it has no change set
 	 */
 	public Tm1Session withoutChangeSet() {
-		return changeSet == null ? this : new Tm1Session(connection, sandbox, null, async);
+		return changeSet == null ? this : new Tm1Session(connection, sandbox, null, async, batch);
 	}
 
 	/**

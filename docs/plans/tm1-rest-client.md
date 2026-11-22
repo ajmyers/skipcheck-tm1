@@ -609,9 +609,8 @@ These are concerns the requirements don't name, but that need deciding early:
       `tm1.batch().add(request)` returns a `Mono<T>` that completes with that item's result when
       the batch runs. `executeBatched(Flux<Tm1Request<T>>)` chunks a stream of requests into
       several batches and streams `BatchResult<T>` outcomes in order.
-    - **To verify against TM1 first:** whether it stops at the first failure or carries on (the
-      spec and the production evidence point different ways), whether `atomicityGroup` works,
-      and the largest batch it accepts.
+    - **Verified against TM1 (phase 10):** it carries on past a failure, in order;
+      `atomicityGroup` and `dependsOn` are refused; 1000 requests in one batch work (§16.5).
     - **Not the same as TM1's change sets** (`BeginChangeSet`/`EndChangeSet`/`UndoChangeSet`),
       which group cell changes for undo. Those are separate operations with a `usingWhen`
       lifecycle (§7).
@@ -657,7 +656,7 @@ These are concerns the requirements don't name, but that need deciding early:
 | **7. Server, configuration and logs** (#145; steps #146–#147, done) | Server, Static/ActiveConfiguration, deprecated Configuration, Loggers, Message/Transaction/Audit logs with delta `tail` Flux, ErrorLogFiles | Integration tests green |
 | **8. Contents and annotations** (#152; steps #153–#154, done) | Contents/Folders/Documents/Links/References (Copy/Move), Annotations, ApplicationContextFacets, DeleteAnnotationArtifacts | Integration tests green |
 | **9. Infrastructure endpoints** (#162; steps #163–#165, done) | Git (Init/Status/Pull/Push/Deploy/Plans), encryption at rest, OIDC keys, SQLDataSources | Implemented, with tagged and skipped tests where the container can't host them |
-| **10. Protocol extras** | Public async API. JSON `$batch` (public, Q8), whose `Tm1Request` / `request()` shape is set in phase 0. | Coverage gate shows zero pending endpoints |
+| **10. Protocol extras** (#173; steps #174–#175, done) | Public async API. JSON `$batch` (public, Q8), whose `Tm1Request` / `request()` shape is set in phase 0. | Coverage gate shows zero pending endpoints |
 | **11. Authentication flows** (#158) | Every TM1-side flow, tested against CAM test containers: Basic, `CAMNamespace` (LDAP, and OIDC by password), and CAM passports the client obtains from Cognos (by logon, or by exchanging an OIDC ID token), refreshed when they expire. Starter properties for each. | Integration tests green against `@RequiresCognos` containers (LDAP and OIDC namespaces) |
 
 Phases 2 to 9 can proceed in parallel once phases 0 and 1 land.
@@ -813,6 +812,7 @@ affects ("TM1 (11.8) …"), so it's explained where it's used, and pinned by a t
 | Element PATCH silently ignores `Name` (no rename). Hierarchy PATCH ignores `Visible`. | Patch builders omit them. Javadoc. |
 | A dimension PATCH returns success but ignores `Hierarchies` and `AllLeavesHierarchyName`. A stale `If-Match` gets 412 (code 278). (Seen in phase 2.) | `DimensionService.update` says so; hierarchies change through `HierarchyService`. Pinned by a test |
 | A hierarchy has an `AllMember` only with a single root (then it's that root); with several roots TM1 sends 204. (Seen in phase 2.) | `HierarchyService.allMember` completes empty |
+| JSON `$batch` only (multipart refused). TM1 answers 200 and carries on past failed requests, running them in order (a later request sees an earlier one's writes); `atomicityGroup` and `dependsOn` are refused with 400; 1000 requests in one batch work. (Seen in phase 10.) | `Tm1Batch`/`Tm1SessionBatch`: each call gets its own result or error; `run(n)` splits a bigger queue |
 | OData async: `Prefer: respond-async` answers 202 with `Location: ../_async('id')`, relative to the request URL, and no `Retry-After`; GETs run async too. The monitor answers 202 until done, then 200 with an `application/http` message whose inner body is gzip-compressed when the request accepted gzip, though the monitor's own response isn't. Deleting the monitor while a process runs stops it (the result becomes 500 `TM1UserException: Cancel`). (Seen in phase 10.) | `Tm1Session.withAsync` polls at its own interval, unwraps and decompresses the result, and deletes the monitor on cancel |
 | Encryption at rest's local key file provider needs GSKit's `gsk9capicmd_64`, which the test image lacks (validation reports "Could not generate a new key using the local GSKit installation"). On an unencrypted server the changing actions fail with a bare 400 naming an error code: `DataModelConversion`, `DataFileConversion`, `DataEncryptionKeyRotationFailed`, `RotateDataModelKey`. (Seen in phase 9.) | `EncryptionService` says so; its test pins the refusals on a TM1 of its own |
 | Git plans belong to the session that made them and are used up by `Execute`; `GitPlans('id')` has no `@odata.type` (the list does). TM1 can't make a repository's first commit or push no change ("Cannot create bare commit"); `file://` remotes can't push or pull (no shallow fetch on the local transport) and must be owned by TM1's user. A pull compares commits, not the model (a local delete is skipped), and the first pull after the remote moves plans the old commit. `GitDeploy` is refused while initialized. (Seen in phase 9.) | `GitService` says so; `plan(id)` reads the list; tests use a `git daemon` container in TM1's network namespace |
