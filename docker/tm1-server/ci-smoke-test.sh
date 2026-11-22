@@ -74,7 +74,11 @@ for want in 'admin CAMID("LDAP:u:uid=admin,ou=people")' 'admin CAMID("AD:u:uid=x
   grep -qxF -- "$want" <<<"$out" || fail "cam-setup.py --print lacks $want: $out"
 done
 [ "$(grep -c -E '^(admin|group) ' <<<"$out")" -eq 4 ] || fail "cam-setup.py --print split a CAMID: $out"
-pass "CAM setup builds CAMIDs (and keeps full CAMIDs whole)"
+out=$(run -e TM1_CAM_NAMESPACE=OIDC -e TM1_CAM_NAMESPACE_TYPE=oidc -e TM1_CAM_ADMINS=admin -e TM1_CAM_GROUPS=Analysts \
+  --entrypoint python3 "$image" /usr/local/lib/tm1-server/cam-setup.py --print 2>&1) || fail "cam-setup.py --print (oidc) failed: $out"
+grep -qxF 'admin CAMID("OIDC:u:admin")' <<<"$out" && grep -qxF 'group CAMID("OIDC:g:analysts")' <<<"$out" \
+  || fail "cam-setup.py --print lacks OIDC CAMIDs: $out"
+pass "CAM setup builds CAMIDs (LDAP and OIDC, and keeps full CAMIDs whole)"
 
 # 8. The setup scripts show the same banner as the image (each embeds a copy)
 while IFS= read -r line; do
