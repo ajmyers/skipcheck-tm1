@@ -1,0 +1,83 @@
+"""ContentService against a real TM1: a port of the Java client's ContentServiceTm1Test."""
+
+from __future__ import annotations
+
+import pytest
+
+from tm1_client import ODataPath, Tm1BadRequestError, Tm1Client, Tm1NotFoundError, Tm1Request
+from tm1_client._sync.services.content import ContentPath, ContentScope
+from tm1_client.model import CubeReference, CubeReferencePatch, DocumentPatch, DocumentReference, Folder, FolderPatch, Link, LinkPatch
+
+from .conftest import URL
+
+pytestmark = pytest.mark.skipif(URL is None, reason="no TM1 configured (TM1_URL)")
+
+
+def test_lists_the_roots(tm1: Tm1Client) -> None:
+    assert {"Applications", "Blobs"} <= {e.name for e in tm1.contents.roots()}
+
+
+def test_keeps_a_document_in_blobs_behind_a_reference(tm1: Tm1Client, name: str) -> None:
+    folder = ContentPath.applications().child(name)
+    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name).build())
+    try:
+        made = tm1.contents.create(folder, ContentScope.PUBLIC, DocumentPatch.builder().name("notes.txt").build())
+        assert isinstance(made, DocumentReference), "a document made in an application is a reference"
+        assert made.id == "notes.txt.blob", "found by ID, the name plus a suffix"
+        notes = folder.child(made)
+        with pytest.raises(Tm1NotFoundError):
+            tm1.contents.get(folder.child("notes.txt"))  # not by name
+
+        tm1.contents.upload(notes, b"hello there")
+        assert tm1.contents.content(notes) == b"hello there"
+        document = tm1.contents.document(notes)
+        assert document.size == 11
+        assert document.name.startswith("notes_") and document.name.endswith(".txt"), "named by TM1, with a timestamp"
+        blob = ContentPath.blobs().child(document.id)
+        assert tm1.contents.content(blob) == b"hello there"
+
+        copy = tm1.contents.copy(notes, folder, ContentScope.PUBLIC, "copy.txt")
+        assert copy.id == "copy.txt.blob"
+        assert tm1.contents.document(folder.child(copy.id)).id == document.id, "a copy refers to the same document"
+        tm1.contents.delete(notes)
+        assert tm1.contents.content(blob) == b"hello there", "kept while the copy refers to it"
+    finally:
+        tm1.contents.delete(folder)
+
+
+def test_makes_links_and_references_and_moves_them(tm1: Tm1Client, name: str) -> None:
+    folder = ContentPath.applications().child(name)
+    other = ContentPath.applications().child(name + "-2")
+    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name).build())
+    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name + "-2").build())
+    try:
+        link = tm1.contents.create(folder, ContentScope.PUBLIC, LinkPatch.builder().name("ibm").url("https://www.ibm.com").build())
+        assert link.id == "ibm.extr"
+        reference = tm1.contents.create(
+            folder,
+            ContentScope.PUBLIC,
+            CubeReferencePatch.builder().name("}ClientGroups").bind_cube(ODataPath.of("Cubes").key("}ClientGroups")).build(),
+        )
+        assert reference.id == "}ClientGroups.cube"
+        listed = tm1.contents.contents(folder, ContentScope.PUBLIC, expand="tm1.CubeReference/Cube($select=Name)")
+        references = [e for e in listed if isinstance(e, CubeReference)]
+        assert [r.cube.name for r in references] == ["}ClientGroups"]
+        got = tm1.contents.get(folder.child(link.id))
+        assert isinstance(got, Link) and got.url == "https://www.ibm.com"
+        assert tm1.contents.contained_by(folder.child(link.id)).id == name
+
+        with pytest.raises(Tm1BadRequestError):
+            # Entries can't be changed
+            tm1.session.execute(Tm1Request.patch(folder.child(link.id).path(), {"Name": "renamed"}))
+
+        moved = tm1.contents.move(folder.child(link.id), other, ContentScope.PUBLIC, None)
+        assert moved.id == "ibm.extr"
+        assert [e.id for e in tm1.contents.contents(other, ContentScope.PUBLIC)] == ["ibm.extr"]
+
+        tm1.contents.create(folder, ContentScope.PRIVATE, FolderPatch.builder().name("mine").build())
+        assert [e.id for e in tm1.contents.contents(folder, ContentScope.PRIVATE)] == ["mine"]
+        assert isinstance(tm1.contents.get(folder.child("mine", ContentScope.PRIVATE)), Folder)
+        assert tm1.contents.localized_attributes(folder) == []
+    finally:
+        tm1.contents.delete(folder)
+        tm1.contents.delete(other)
