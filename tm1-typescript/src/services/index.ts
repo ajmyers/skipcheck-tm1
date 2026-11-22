@@ -27,7 +27,7 @@ export { LogService } from "./server/LogService.js";
 export { MemberService } from "./dimension/MemberService.js";
 export { MemberSetService } from "./data/MemberSetService.js";
 export { OidcKeyService } from "./security/OidcKeyService.js";
-export { ProcessDebugService } from "./process/ProcessDebugService.js";
+export { ProcessDebugService, type ProcessDebugWork } from "./process/ProcessDebugService.js";
 export { ProcessService } from "./process/ProcessService.js";
 export { SandboxService } from "./data/SandboxService.js";
 export { ServerService } from "./server/ServerService.js";

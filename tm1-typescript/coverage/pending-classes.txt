@@ -2,13 +2,7 @@
 CellService
 CellsetService
 ChangeSetService
-ChoreService
 DrillthroughService
-LogService
-ProcessDebugService
-ProcessService
 SandboxService
-ServerService
-SqlDataSourceService
 Tuples
 ViewService

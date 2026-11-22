@@ -1,0 +1,103 @@
+import { afterAll, beforeAll, describe, expect } from "vitest";
+import {
+  ODataPath,
+  ODataQuery,
+  ProcessDebugContextBreakpoint,
+  ProcessDebugContextLineBreakpointPatch,
+  ProcessPatch,
+  Tm1BadRequestException,
+  Tm1Request,
+  typeOf,
+  type ProcessDebugContextLineBreakpoint,
+  type Tm1Client,
+} from "../../src/index.js";
+import { Live, liveReason, tm1Test } from "./live.js";
+
+/** ProcessDebugService against a real TM1, debugging a process of three lines: nA = 1; nB = nA + 1;
+ * nC = nB + 1. The Java client's `ProcessDebugTm1Test`. */
+describe("ProcessDebugService on TM1" + liveReason, () => {
+  let tm1: Tm1Client;
+  const process = Live.name();
+
+  const line = (id: number, lineNumber: number): ProcessDebugContextLineBreakpointPatch =>
+    ProcessDebugContextLineBreakpointPatch.builder().id(id).processName(process).procedure("Prolog").lineNumber(lineNumber).enabled(true).build();
+
+  beforeAll(async () => {
+    if (!Live.configured) return;
+    tm1 = await Live.client();
+    await tm1.processes.create(ProcessPatch.builder().name(process).prologProcedure("nA = 1;\nnB = nA + 1;\nnC = nB + 1;\n").build());
+  });
+
+  afterAll(async () => {
+    if (!tm1) return;
+    await tm1.processes.delete(process).catch(() => undefined);
+    await tm1.close();
+  });
+
+  tm1Test("stops at a breakpoint, reads the state and runs to the end", async () => {
+    const debug = tm1.processDebugging;
+    const started = await debug.debug(process, {}, ODataQuery.none());
+    const id = started.ID!;
+    expect(started.Status, "paused before the first line").toBe("Paused");
+    await debug.addBreakpoint(id, line(1, 3));
+    const breakpoints = await debug.breakpoints(id, ODataQuery.none()).toArray();
+    expect(breakpoints).toHaveLength(1);
+    expect(typeOf(ProcessDebugContextBreakpoint, breakpoints[0]!)).toBe("ProcessDebugContextLineBreakpoint");
+    expect((breakpoints[0] as ProcessDebugContextLineBreakpoint).LineNumber).toBe(3);
+
+    expect((await debug.resume(id, ODataQuery.none())).Status).toBe("Paused");
+    const current = await debug.currentBreakpoint(id, ODataQuery.none());
+    expect(typeOf(ProcessDebugContextBreakpoint, current!)).toBe("ProcessDebugContextLineBreakpoint");
+    expect((current as ProcessDebugContextLineBreakpoint).LineNumber).toBe(3);
+    const stack = await debug.callStack(id, ODataQuery.none()).toArray();
+    expect(stack.map((f) => [f.Procedure, f.LineNumber])).toEqual([["Prolog", 3]]);
+    const frame = stack[0]!.ID!;
+    const variables = (await debug.variables(id, frame, ODataQuery.none()).toArray()).map((v) => v.Name);
+    expect(variables, "TI's own variables, not the process's").toEqual(expect.arrayContaining(["NVALUE", "DATASOURCETYPE"]));
+    expect(variables).not.toContain("NA");
+    expect(variables).not.toContain("NB");
+    expect((await debug.frameProcess(id, frame, ODataQuery.none())).Name).toBe(process);
+    expect((await debug.process(id, ODataQuery.none())).Name).toBe(process);
+    expect((await debug.thread(id, ODataQuery.none())).ObjectName).toBe(process);
+    expect(await debug.list(ODataQuery.none()).toArray(), "lists none").toEqual([]);
+
+    expect((await debug.stepOver(id, ODataQuery.none())).Status).toBe("Running");
+    const done = await debug.finish(id);
+    expect(done.Status).toBe("Complete");
+    expect(done.Result?.ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
+    expect((await debug.get(id, ODataQuery.none())).Status, "still readable, complete").toBe("Complete");
+    await expect(tm1.session.execute(Tm1Request.delete(ODataPath.of("ProcessDebugContexts").key(id))), "TM1 refuses to delete one").rejects.toBeInstanceOf(Tm1BadRequestException);
+  });
+
+  tm1Test("needs a chosen breakpoint ID, and updates and removes by it", async () => {
+    const debug = tm1.processDebugging;
+    await debug
+      .debugging(process, {}, async (context) => {
+        const id = context.ID!;
+        expect(() => debug.addBreakpoint(id, ProcessDebugContextLineBreakpointPatch.builder().processName(process).lineNumber(2).build())).toThrow(RangeError);
+        await debug.addBreakpoint(id, line(1, 2));
+        await debug.addBreakpoint(id, line(2, 3));
+        await debug.removeBreakpoint(id, 1);
+        await debug.updateBreakpoint(id, 2, ProcessDebugContextLineBreakpointPatch.builder().enabled(false).build());
+        for (const b of await debug.breakpoints(id, ODataQuery.none()).toArray()) {
+          expect(b.ID).toBe(2);
+          expect(b.Enabled).toBe(false);
+        }
+      })
+      .toArray();
+  });
+
+  tm1Test("finishes the run after debugging, even with breakpoints left", async () => {
+    const debug = tm1.processDebugging;
+    let id: string | undefined;
+    await debug
+      .debugging(process, {}, async (context) => {
+        id = context.ID!;
+        await debug.addBreakpoint(id, line(1, 2));
+        await debug.stepIn(id, ODataQuery.none());
+        return 1;
+      })
+      .toArray();
+    expect((await debug.get(id!, ODataQuery.none())).Status).toBe("Complete");
+  });
+});
