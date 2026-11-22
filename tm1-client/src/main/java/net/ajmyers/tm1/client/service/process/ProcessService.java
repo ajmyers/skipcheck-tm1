@@ -149,7 +149,9 @@ public final class ProcessService {
 	/**
 	 * {@code tm1.ExecuteWithReturn}: runs a process and says how it ended. Needs schema
 	 * 11.3.0. A {@code ProcessError}, or a runtime error, ends it {@code Aborted}, with
-	 * an {@code ErrorLogFile} named {@code tm1processerror_<time>_<process>.log}.
+	 * an {@code ErrorLogFile} named {@code tm1processerror_<time>_<process>.log}. A run
+	 * cancelled through its thread ({@code ThreadService.cancel}) fails instead, with a
+	 * {@code Tm1ServerException} ({@code TM1UserException: Cancel}, code 174).
 	 * @param name the process's name
 	 * @param parameters its parameters, by name, in order; may be empty
 	 * @param query what to expand of the result, such as {@code ErrorLogFile} when it

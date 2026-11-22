@@ -8,6 +8,7 @@ import java.util.Objects;
 import net.ajmyers.tm1.client.Tm1Operation;
 import net.ajmyers.tm1.client.Tm1Request;
 import net.ajmyers.tm1.client.model.Group;
+import net.ajmyers.tm1.client.model.Session;
 import net.ajmyers.tm1.client.model.Tm1Operations;
 import net.ajmyers.tm1.client.model.User;
 import net.ajmyers.tm1.client.model.UserPatch;
@@ -134,6 +135,17 @@ public final class UserService {
 	@Tm1Endpoint("Navigation User/Groups")
 	public Flux<Group> groups(String name, ODataQuery query) {
 		return session.stream(Tm1Request.list(user(name).nav("Groups"), query, Group.class));
+	}
+
+	/**
+	 * {@code GET Users('name')/Sessions}, streamed: the user's sessions on the server.
+	 * @param name the user's name
+	 * @param query what to select and expand
+	 * @return the user's sessions
+	 */
+	@Tm1Endpoint("Navigation User/Sessions")
+	public Flux<Session> sessions(String name, ODataQuery query) {
+		return session.stream(Tm1Request.list(user(name).nav("Sessions"), query, Session.class));
 	}
 
 	/**

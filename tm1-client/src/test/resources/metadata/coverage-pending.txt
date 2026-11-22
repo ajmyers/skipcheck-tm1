@@ -5,8 +5,6 @@ Action Entry/Copy
 Action Entry/Move
 Action GitPullPlan/Execute
 Action GitPushPlan/Execute
-Action Session/Close
-Action Thread/CancelOperation
 ActionImport ConfigureEncryptionAtRest
 ActionImport DecryptDataFile
 ActionImport DecryptDataModel
@@ -32,8 +30,6 @@ EntitySet GitPlans
 EntitySet Loggers
 EntitySet MessageLogEntries
 EntitySet SQLDataSources
-EntitySet Sessions
-EntitySet Threads
 EntitySet TransactionLogEntries
 FunctionImport GetOIDCKeys
 FunctionImport MessageLog
@@ -59,14 +55,9 @@ Navigation Entry/LocalizedAttributes
 Navigation Folder/Contents
 Navigation Folder/PrivateContents
 Navigation ProcessReference/Process
-Navigation Session/Threads
-Navigation Session/User
 Navigation SubsetReference/Subset
-Navigation Thread/Session
-Navigation User/Sessions
 Navigation ViewReference/View
 Singleton ActiveConfiguration
-Singleton ActiveSession
 Singleton Configuration
 Singleton Server
 Singleton StaticConfiguration
