@@ -1,8 +1,9 @@
 // Reading TM1's JSON into the model: TM1's own property names stay, so a value read is the JSON it
 // was, except where reading means something: an enum value this client doesn't know becomes the
-// enum's fallback, a duration sent as bare seconds becomes ISO 8601, a lenient date TM1 fills with
-// `0000-00-00T00:00Z` becomes null, and the root of a hierarchy is read as the subtype its
-// `@odata.type` names.
+// enum's fallback, durations and date-times are read as the Java client reads them (a duration in
+// Java's form, `PT26H3.5S`; a date-time as its instant in UTC, `2026-01-01T21:34:00.12Z`), a lenient
+// date TM1 fills with `0000-00-00T00:00Z` becomes null, and the root of a hierarchy is read as the
+// subtype its `@odata.type` names.
 
 import type { Tm1Model } from "./model.js";
 import { schema } from "./generated/schema.js";
@@ -22,7 +23,7 @@ export interface Tm1Schema {
   >;
 }
 
-/** TM1's durations: ISO 8601 (`P1DT00H00M00S` as TM1 writes it), in milliseconds and back. */
+/** Durations: ISO 8601 (TM1 writes `P1DT00H00M00S`, the Java client `PT24H`), in milliseconds and back. */
 export const Tm1Duration = {
   /** `P1DT2H` → 93_600_000. */
   toMillis(iso: string): number {
@@ -33,24 +34,11 @@ export const Tm1Duration = {
     return m[1] ? -ms : ms;
   },
 
-  /** 93_600_000 → `P1DT2H`; 0 → `PT0S`. */
+  /** Milliseconds as the Java client writes a duration (Java's `Duration.toString`): hours,
+   * minutes and seconds, never days. 93_600_000 → `PT26H`; 1500 → `PT1.5S`; 0 → `PT0S`. */
   ofMillis(ms: number): string {
     if (!Number.isFinite(ms)) throw new RangeError("Not a duration: " + ms);
-    const sign = ms < 0 ? "-" : "";
-    let rest = Math.abs(ms);
-    const days = Math.floor(rest / 86_400_000);
-    rest -= days * 86_400_000;
-    const hours = Math.floor(rest / 3_600_000);
-    rest -= hours * 3_600_000;
-    const minutes = Math.floor(rest / 60_000);
-    rest -= minutes * 60_000;
-    const seconds = rest / 1000;
-    let time = "";
-    if (hours) time += hours + "H";
-    if (minutes) time += minutes + "M";
-    if (seconds) time += Number(seconds.toFixed(3)) + "S";
-    if (!days && !time) return "PT0S";
-    return sign + "P" + (days ? days + "D" : "") + (time ? "T" + time : "");
+    return javaDuration(ms / 1000) as string;
   },
 } as const;
 
@@ -119,8 +107,12 @@ function readEnum(name: string, value: unknown): unknown {
 function readValue(kind: string, value: unknown): unknown {
   if (value === null || value === undefined) return value;
   if (Array.isArray(value)) return value.map((v) => readValue(kind, v));
-  if (kind === "d") return typeof value === "number" ? Tm1Duration.ofMillis(value * 1000) : value;
-  if (kind === "l") return typeof value === "string" && !Number.isNaN(Date.parse(value)) && !value.startsWith("0000") ? value : null;
+  // Durations and date-times as the Java client reads them, and so writes them back: a duration as
+  // Java's Duration.toString (hours, never days: TM1's P1DT02H00M03.5S, or bare seconds, as
+  // PT26H3.5S), a date-time as its instant in UTC without trailing zeros (2026-01-01T21:34:00.12Z)
+  if (kind === "d") return javaDuration(value);
+  if (kind === "dt") return javaDateTime(value);
+  if (kind === "l") return typeof value === "string" && !Number.isNaN(Date.parse(value)) && !value.startsWith("0000") ? javaDateTime(value) : null;
   if (kind.startsWith("e:")) return readEnum(kind.slice(2), value);
   if (kind.startsWith("t:")) return readType(kind.slice(2), value);
   return value;
@@ -162,32 +154,6 @@ export function readAs<T>(type: Tm1Model<T> | undefined, value: unknown): T {
     return v as T;
   }
   return readType(type.$type, value) as T;
-}
-
-function javaValue(kind: string, value: unknown): unknown {
-  if (value === null || value === undefined) return value;
-  if (Array.isArray(value)) return value.map((v) => javaValue(kind, v));
-  if (kind === "d") return javaDuration(value);
-  if (kind === "dt" || kind === "l") return javaDateTime(value);
-  if (kind.startsWith("t:")) return javaForm(kind.slice(2), value);
-  return value;
-}
-
-/** @internal A model read as `name`, with its durations and date-times written as the Java client
- * writes the values it read: for comparing what this client read with what Java did. Reading
- * itself keeps TM1's text. Returns a copy. */
-export function javaForm(name: string, value: unknown): unknown {
-  if (Array.isArray(value)) return value.map((v) => javaForm(name, v));
-  if (typeof value !== "object" || value === null) return value;
-  const record = { ...(value as Record<string, unknown>) };
-  for (let t: string | undefined = chosen(name, record); t; t = schema.types[t]?.base) {
-    const info = schema.types[t];
-    if (!info) break;
-    for (const [property, kind] of Object.entries(info.properties)) {
-      if (property in record) record[property] = javaValue(kind, record[property]);
-    }
-  }
-  return record;
 }
 
 /** The subtype `type` names a value as, by its `@odata.type`: for checks such as

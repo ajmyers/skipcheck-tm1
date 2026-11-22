@@ -72,6 +72,32 @@ function unknownProperties(typeName: string, value: unknown, path: string, out: 
   }
 }
 
+/** The payload without its date-times and durations, which reading writes in the Java client's
+ * form; each one goes to `out` as [path, as read, as TM1 sent it]. */
+function temporal(typeName: string, read: unknown, sent: unknown, path: string, out: [string, string, unknown, unknown][]): unknown {
+  if (Array.isArray(read) && Array.isArray(sent)) return read.map((v, i) => temporal(typeName, v, sent[i], `${path}[${i}]`, out));
+  if (typeof read !== "object" || read === null || typeof sent !== "object" || sent === null) return read;
+  const chosen = typeOf({ $type: typeName, qualifiedName: "" } as Tm1Model<unknown>, read);
+  const props = declared(byName.get(chosen)!);
+  const copy: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(read)) {
+    const type = props.get(k);
+    const was = (sent as Record<string, unknown>)[k];
+    if (type === "Edm.Duration" || type === "Edm.DateTimeOffset") {
+      if (v !== null && v !== undefined) out.push([`${path}/${k}`, type, v, was]);
+      continue;
+    }
+    const nested = type === undefined ? undefined : byQualified.get(type);
+    copy[k] = nested ? temporal(nested.name, v, was, `${path}/${k}`, out) : v;
+  }
+  return copy;
+}
+
+/** A duration or date-time as the Java client writes it: a duration in hours, minutes and seconds
+ * (never days), a date-time in UTC, neither with trailing zeros. */
+const JAVA_DURATION = /^-?PT(?:\d+H)?(?:\d+M)?(?:-?\d+(?:\.\d*[1-9])?S)?$/;
+const JAVA_DATE_TIME = /^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d*[1-9])?)?Z$/;
+
 /** The payloads the Java client captured from a real TM1 read into the model and back, as its
  * PayloadRoundTripTest: what reading changes (enum fallbacks) would show as a difference. */
 describe("payloads", () => {
@@ -91,7 +117,7 @@ describe("payloads", () => {
     ["cellset", model.Cellset],
   ];
 
-  it.each(payloads)("reads %s as TM1 sent it", (payload, type) => {
+  it.each(payloads)("reads %s as TM1 sent it, its date-times and durations as Java reads them", (payload, type) => {
     const text = readFileSync(join(Repo.payloads, payload + ".json"), "utf8");
     const doc = JSON.parse(text) as Record<string, unknown>;
     const items = Array.isArray(doc["value"]) ? (doc["value"] as unknown[]) : [doc];
@@ -100,8 +126,22 @@ describe("payloads", () => {
     const originals = Array.isArray(original["value"]) ? (original["value"] as unknown[]) : [original];
     const unknown = new Set<string>();
     items.forEach((item, i) => {
-      const read = readAs(type, item);
-      expect(JSON.parse(JSON.stringify(read))).toEqual(originals[i]);
+      const read = JSON.parse(JSON.stringify(readAs(type, item))) as unknown;
+      // As TM1 sent it, but for date-times and durations: those as the Java client reads them,
+      // standing for the same instant or length
+      const times: [string, string, unknown, unknown][] = [];
+      const left = temporal(type.$type, read, originals[i], `[${i}]`, times);
+      const right = temporal(type.$type, originals[i], originals[i], `[${i}]`, []);
+      expect(left).toEqual(right);
+      for (const [where, kind, got, was] of times) {
+        if (kind === "Edm.Duration") {
+          expect(got, where).toMatch(JAVA_DURATION);
+          expect(Tm1Duration.toMillis(got as string), where).toBe(typeof was === "number" ? was * 1000 : Tm1Duration.toMillis(was as string));
+        } else {
+          expect(got, where).toMatch(JAVA_DATE_TIME);
+          expect(Date.parse(got as string), where).toBe(Date.parse(was as string));
+        }
+      }
       unknownProperties(type.$type, read, `[${i}]`, unknown);
     });
     expect([...unknown]).toEqual([]);
@@ -133,11 +173,19 @@ describe("payloads", () => {
   });
 
   it("reads durations as ISO 8601, bare seconds too", () => {
+    // As the Java client reads them: Duration.toString, hours and never days
     expect(readAs(model.Chore, { Frequency: 3600 }).Frequency).toBe("PT1H");
-    expect(readAs(model.Chore, { Frequency: "P1DT00H00M00S" }).Frequency).toBe("P1DT00H00M00S");
+    expect(readAs(model.Chore, { Frequency: "P1DT00H00M00S" }).Frequency).toBe("PT24H");
+    expect(readAs(model.Chore, { Frequency: "P1DT02H00M03.5S" }).Frequency).toBe("PT26H3.5S");
     expect(Tm1Duration.toMillis("P1DT00H00M00S")).toBe(86_400_000);
-    expect(Tm1Duration.ofMillis(93_600_000)).toBe("P1DT2H");
+    expect(Tm1Duration.ofMillis(93_600_000)).toBe("PT26H");
+    expect(Tm1Duration.ofMillis(1500)).toBe("PT1.5S");
     expect(Tm1Duration.ofMillis(0)).toBe("PT0S");
+  });
+
+  it("reads date-times as their instant in UTC, as the Java client does", () => {
+    expect(readAs(model.Annotation, { Created: "2026-01-02T03:04:00.120+05:30" }).Created).toBe("2026-01-01T21:34:00.12Z");
+    expect(readAs(model.Annotation, { Created: "2026-01-02T03:04:05Z" }).Created).toBe("2026-01-02T03:04:05Z");
   });
 
   it("writes patches as set", () => {

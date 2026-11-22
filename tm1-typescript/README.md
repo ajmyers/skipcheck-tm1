@@ -33,8 +33,9 @@ if ((await tm1.cubes.checkRules("Plan", rules).toArray()).length === 0) {
 | `ODataQuery query` parameter | `query?: ODataQuery \| null` |
 | Overloads (`update(name, patch)`, `update(name, patch, etag)`) | Optional parameters (`update(name, patch, etag?)`), or overload signatures |
 | `Map<String, String>` (a tuple) | `Map` or a plain object (`Tm1Map`); pass a `Map` if a key may look like an integer, which an object would reorder |
-| `Duration` | milliseconds (`withAsync(2000)`, `Tm1Timeouts`); TM1's own durations stay ISO 8601 strings (`Tm1Duration` converts) |
-| `cube.name()`, `Cube.NAME` | `cube.Name`, `Cube.Fields.Name`: the model keeps TM1's property names, so what's read is TM1's JSON |
+| `Duration` | milliseconds (`withAsync(2000)`, `Tm1Timeouts`); TM1's own durations are ISO 8601 strings, read and written in Java's form (`PT24H`, never `P1D`; `Tm1Duration` converts) |
+| `cube.name()`, `Cube.NAME` | `cube.Name`, `Cube.Fields.Name`: the model keeps TM1's property names, so what's read is TM1's JSON, but for date-times and durations (below) |
+| `OffsetDateTime`, `Duration` read from TM1 | strings, as the Java client reads the values: a date-time as its instant in UTC without trailing zeros (`2026-01-02T03:04:00.120+05:30` reads as `2026-01-01T21:34:00.12Z`), a duration as Java's `Duration.toString` (`P1DT02H00M03.5S`, or bare seconds, reads as `PT26H3.5S`). So every client holds the same value; TM1's exact text isn't kept |
 | `CubePatch.builder().name("x").build()` | the same |
 | `Tm1Operations.CUBE_RESERVE` | `Tm1Operations.CubeReserve` |
 | An enum, `ElementType.NUMERIC` | a string union, `"Numeric"`, and its members, `ElementType.Numeric`; `ElementType.literal("Numeric")` for a filter |

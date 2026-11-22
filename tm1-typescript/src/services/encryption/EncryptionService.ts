@@ -121,16 +121,9 @@ function shutdown(timeUntilShutdown: number | null | undefined): Record<string, 
   return timeUntilShutdown == null ? {} : { TimeUntilShutdown: duration(timeUntilShutdown) };
 }
 
-/** Milliseconds as Java's `Duration.toString()` writes them, which is what the Java client sends:
- * hours, minutes and seconds, never days (`PT36H`, `PT30S`, `PT0.5S`). */
+/** Milliseconds as the Java client sends them (`PT36H`, `PT30S`, `PT0.5S`). */
 function duration(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) throw new RangeError("timeUntilShutdown is a number of milliseconds, not negative: " + ms);
-  if (ms >= 86_400_000) {
-    // Tm1Duration writes days; Java doesn't
-    const hours = Math.floor(ms / 3_600_000);
-    const rest = Tm1Duration.ofMillis(ms - hours * 3_600_000);
-    return "PT" + hours + "H" + (rest === "PT0S" ? "" : rest.slice(2));
-  }
   return Tm1Duration.ofMillis(ms);
 }
 

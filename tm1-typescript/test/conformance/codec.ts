@@ -3,7 +3,6 @@
  * client recorded, and the request comparison every runner makes. */
 import { Filter, ODataPath, ODataQuery } from "../../src/index.js";
 import * as Errors from "../../src/errors/index.js";
-import { javaForm } from "../../src/json.js";
 import * as Model from "../../src/generated/model.js";
 import * as Patches from "../../src/generated/patches.js";
 import * as Services from "../../src/services/index.js";
@@ -161,14 +160,8 @@ function ofKind(kind: string, value: Json): Json {
   return value;
 }
 
-/** This client's result, where Java's is a model, as Java writes the model: durations and date-times
- * as Java writes the values it read (reading here keeps TM1's text), and no `@odata.type`, which the
- * recorded `$model` stands for. */
-export function javaResult(value: Json, recorded: Json): Json {
-  if (Array.isArray(value) && Array.isArray(recorded)) return value.map((v, i) => javaResult(v, recorded[i] ?? null));
-  if (recorded !== null && typeof recorded === "object" && !Array.isArray(recorded) && typeof recorded.$model === "string") {
-    return withoutTypes(javaForm(recorded.$model, value) as Json);
-  }
+/** This client's result without `@odata.type`, which the recorded `$model` stands for. */
+export function javaResult(value: Json, _recorded?: Json): Json {
   return withoutTypes(value);
 }
 
