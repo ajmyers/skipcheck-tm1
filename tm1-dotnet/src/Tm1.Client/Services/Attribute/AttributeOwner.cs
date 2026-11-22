@@ -33,20 +33,10 @@ public sealed class AttributeOwner
     /// <summary>A cube.</summary>
     public static AttributeOwner Cube(string cube) => new(ODataPath.Of("Cubes").Key(Required(cube, nameof(cube))));
 
-    /// <summary>A view, in <paramref name="scope"/>: <c>ViewScope.Public</c> (<c>Views</c>) or
-    /// <c>ViewScope.Private</c> (<c>PrivateViews</c>).</summary>
-    public static AttributeOwner View<TScope>(string cube, TScope scope, string view)
-        where TScope : struct, Enum
-    {
-        // ViewScope lives with the views; matched by name, so this needs nothing else from there
-        var navigation = scope.ToString() switch
-        {
-            "Public" => "Views",
-            "Private" => "PrivateViews",
-            var other => throw new ArgumentException("Not a view scope: " + other, nameof(scope)),
-        };
-        return new(ODataPath.Of("Cubes").Key(Required(cube, nameof(cube))).Nav(navigation).Key(Required(view, nameof(view))));
-    }
+    /// <summary>A view, in <paramref name="scope"/>: <see cref="ViewScope.Public"/> (<c>Views</c>) or
+    /// <see cref="ViewScope.Private"/> (<c>PrivateViews</c>).</summary>
+    public static AttributeOwner View(string cube, ViewScope scope, string view) =>
+        new(ODataPath.Of("Cubes").Key(Required(cube, nameof(cube))).Nav(scope.Navigation()).Key(Required(view, nameof(view))));
 
     /// <summary>A process.</summary>
     public static AttributeOwner Process(string process) => new(ODataPath.Of("Processes").Key(Required(process, nameof(process))));

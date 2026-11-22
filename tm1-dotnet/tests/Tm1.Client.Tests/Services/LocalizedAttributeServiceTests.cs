@@ -13,13 +13,6 @@ public class LocalizedAttributeServiceTests
 {
     private readonly FakeTm1 _tm1 = new();
 
-    // Stands in for ViewScope, which AttributeOwner.View matches by name
-    public enum Scope
-    {
-        Public,
-        Private,
-    }
-
     public static IEnumerable<object[]> Owners() =>
     [
         [AttributeOwner.Dimension("Region"), "Dimensions('Region')"],
@@ -28,8 +21,8 @@ public class LocalizedAttributeServiceTests
         [AttributeOwner.Member("Region", "Region", "West"), "Dimensions('Region')/Hierarchies('Region')/Members('West')"],
         [AttributeOwner.Subset("Region", "Region", SubsetScope.Private, "s"), "Dimensions('Region')/Hierarchies('Region')/PrivateSubsets('s')"],
         [AttributeOwner.Cube("Sales"), "Cubes('Sales')"],
-        [AttributeOwner.View("Sales", Scope.Public, "v"), "Cubes('Sales')/Views('v')"],
-        [AttributeOwner.View("Sales", Scope.Private, "v"), "Cubes('Sales')/PrivateViews('v')"],
+        [AttributeOwner.View("Sales", ViewScope.Public, "v"), "Cubes('Sales')/Views('v')"],
+        [AttributeOwner.View("Sales", ViewScope.Private, "v"), "Cubes('Sales')/PrivateViews('v')"],
         [AttributeOwner.Process("Load"), "Processes('Load')"],
         [AttributeOwner.Chore("Nightly"), "Chores('Nightly')"],
     ];
@@ -55,6 +48,9 @@ public class LocalizedAttributeServiceTests
     }
 
     [Fact]
-    public void AViewNeedsAViewScope() =>
-        Assert.Throws<ArgumentException>(() => AttributeOwner.View("Sales", DayOfWeek.Monday, "v"));
+    public void AViewIsInItsScopesCollection()
+    {
+        Assert.Equal("Cubes('Sales')/Views('v')", AttributeOwner.View("Sales", ViewScope.Public, "v").ToString());
+        Assert.Equal("Cubes('Sales')/PrivateViews('v')", AttributeOwner.View("Sales", ViewScope.Private, "v").ToString());
+    }
 }

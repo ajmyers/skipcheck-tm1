@@ -16,12 +16,6 @@ namespace AjMyers.Tm1.Client.Tests.Live;
 /// cube services.</summary>
 public class AttributeLiveTests
 {
-    // Stands in for ViewScope, which AttributeOwner.View matches by name
-    private enum ViewKind
-    {
-        Public,
-    }
-
     private static string Label() => "Label " + Guid.NewGuid().ToString("N")[..4];
 
     private static AttributeDefinitionPatch StringAttribute(string name) => AttributeDefinitionPatch.Builder().Name(name).Type(AttributeType.String).Build();
@@ -157,7 +151,7 @@ public class AttributeLiveTests
                 ["Rows"] = new[] { Axis(dims[1]) },
             }));
 
-            foreach (var (set, owner) in new[] { (AttributeSet.Cubes(), AttributeOwner.Cube(name)), (AttributeSet.Views(name), AttributeOwner.View(name, ViewKind.Public, "V")) })
+            foreach (var (set, owner) in new[] { (AttributeSet.Cubes(), AttributeOwner.Cube(name)), (AttributeSet.Views(name), AttributeOwner.View(name, ViewScope.Public, "V")) })
             {
                 var attribute = Label();
                 await tm1.Attributes.CreateAsync(set, StringAttribute(attribute));
