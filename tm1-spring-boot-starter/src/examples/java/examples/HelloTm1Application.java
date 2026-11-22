@@ -17,7 +17,7 @@ public class HelloTm1Application {
 		SpringApplication.run(HelloTm1Application.class, args);
 	}
 
-	// The starter built the client from the tm1.* properties: just ask for it
+	// The starter built the client from the tm1 settings: just ask for it
 	@Bean
 	ApplicationRunner hello(Tm1Client tm1) {
 		return args -> tm1.session()

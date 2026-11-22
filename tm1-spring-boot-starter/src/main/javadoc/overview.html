@@ -21,14 +21,14 @@ copy of TM1 Server.</p></li>
   &lt;version&gt;{{version}}&lt;/version&gt;
 &lt;/dependency&gt;</code></pre></li>
 
-<li><p><b>Tell it where TM1 is.</b> The starter connects with the <code>tm1.*</code> properties;
+<li><p><b>Tell it where TM1 is.</b> The starter connects with the <code>tm1</code> settings in <code>application.yml</code>;
 these are the defaults of a server set up with the link above:</p>
-{@snippet file = examples/application.properties}
+{@snippet file = examples/application.yml lang = yaml}
 <p>For a server elsewhere, change the address. Keep a real password out of the file, for example
-with <code>tm1.password=${TM1_PASSWORD}</code> and an environment variable.
+with <code>password: ${TM1_PASSWORD}</code> and an environment variable.
 {@link net.ajmyers.tm1.spring.boot.autoconfigure.Tm1Properties} lists every property.</p></li>
 
-<li><p><b>Say hello.</b> The starter builds a <code>Tm1Client</code> from those properties; ask
+<li><p><b>Say hello.</b> The starter builds a <code>Tm1Client</code> from those settings; ask
 for it, and use it. This prints the server's version and lists its cubes when the application
 starts:</p>
 {@snippet class = examples.HelloTm1Application region = hello-app}
