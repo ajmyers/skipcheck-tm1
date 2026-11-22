@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -173,6 +174,104 @@ class ConformanceScenariosTest {
 				names);
 		assertThat(failures).isEmpty();
 		assertThat(traffic.exchanges()).hasSize(scenario.get("steps").size() + scenario.get("finally").size());
+	}
+
+	/**
+	 * Answers as TM1 would for the cellsets, views and sandboxes scenarios: a cellset of
+	 * 3 × 2 cells (and the slicer), names that exist but {@code missing}.
+	 */
+	private static ExchangeFunction data(Map<String, String> names) {
+		ConformanceTm1 plumbing = new ConformanceTm1();
+		return request -> {
+			String target = ConformanceTm1.target(request.url());
+			String key = request.method().name() + " " + target;
+			if (key.startsWith("GET ActiveSession") || key.equals("GET $metadata") || key.startsWith("GET Server?")
+					|| key.startsWith("POST ActiveSession")) {
+				return plumbing.exchange(request);
+			}
+			return ConformanceTm1.body(request).map(body -> data(request.method().name(), target, body, names));
+		};
+	}
+
+	private static String cells(long begin, long end) {
+		StringBuilder out = new StringBuilder("[");
+		for (long n = begin; n <= end; n++) {
+			out.append(n == begin ? "" : ",")
+				.append("{\"Ordinal\":")
+				.append(n)
+				.append(",\"Value\":")
+				.append(n)
+				.append('}');
+		}
+		return out.append(']').toString();
+	}
+
+	/** The match of {@code regex} on the whole target, or null. */
+	private static @Nullable Matcher match(String regex, String target) {
+		Matcher m = Pattern.compile(regex).matcher(target);
+		return m.matches() ? m : null;
+	}
+
+	private static ClientResponse data(String method, String target, byte[] body, Map<String, String> names) {
+		JsonNode json = body.length == 0 ? null : ConformanceCodec.json().readTree(body);
+		boolean get = method.equals("GET");
+		boolean post = method.equals("POST");
+		if (target.contains("('" + names.get("missing") + "')")
+				|| (post && target.startsWith("ExecuteRelationalDrillthrough"))) {
+			return json(404, "{\"error\":{\"code\":\"278\",\"message\":\"no\"}}");
+		}
+		if (post && target.matches("Dimensions|Cubes|Sandboxes|Cubes\\('[^']*'\\)/(Private)?Views")) {
+			return json(201, "{\"Name\":\"" + json.get("Name").asString() + "\"}");
+		}
+		Matcher execute = match("ExecuteMDX(\\?.*)?", target);
+		if (post && execute != null) {
+			if (json.get("MDX").asString().contains("SELEKT")) {
+				return json(400, "{\"error\":{\"code\":\"501\",\"message\":\"syntax\"}}");
+			}
+			Matcher top = match(".*\\$top%3D(\\d+).*", target);
+			return json(200,
+					"{\"ID\":\"cs1\",\"Axes\":[{\"Ordinal\":0,\"Cardinality\":3},{\"Ordinal\":1,\"Cardinality\":2},"
+							+ "{\"Ordinal\":2,\"Cardinality\":1}],\"Cells\":"
+							+ cells(0, top == null ? -1 : Long.parseLong(top.group(1)) - 1) + "}");
+		}
+		if (post && target.endsWith("/tm1.Execute?$select=ID")) {
+			return json(200, "{\"ID\":\"cs2\"}");
+		}
+		Matcher partition = match("Cellsets\\('cs1'\\)/tm1\\.GetPartition\\(Begin=(\\d+),End=(\\d+)\\).*", target);
+		if (get && partition != null) {
+			return json(200, "{\"value\":"
+					+ cells(Long.parseLong(partition.group(1)), Long.parseLong(partition.group(2))) + "}");
+		}
+		Matcher cube = match("Cubes\\('([^']*)'\\)/[A-Za-z]+\\('[^']*'\\)/Cube.*", target);
+		if (get && cube != null) {
+			return json(200, "{\"Name\":\"" + cube.group(1) + "\"}");
+		}
+		Matcher view = match("Cubes\\('[^']*'\\)/(Private)?Views\\('([^']*)'\\).*", target);
+		if (get && view != null) {
+			String nativeView = target.contains("NativeView")
+					? "\"@odata.type\":\"#ibm.tm1.api.v1.NativeView\",\"SuppressEmptyRows\":true," : "";
+			return json(200, "{" + nativeView + "\"Name\":\"" + view.group(2) + "\"}");
+		}
+		if (get && target.matches("Cubes\\('[^']*'\\)/PrivateViews\\?.*")) {
+			return json(200, "{\"value\":[{\"Name\":\"" + names.get("native") + "\"}]}");
+		}
+		Matcher sandbox = match("Sandboxes\\('([^']*)'\\).*", target);
+		if (get && sandbox != null) {
+			return json(200, "{\"Name\":\"" + sandbox.group(1) + "\",\"IsLoaded\":true}");
+		}
+		return ClientResponse.create(HttpStatus.NO_CONTENT).build();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "cellsets", "views", "sandboxes" })
+	void runsTheDataScenarios(String name) {
+		JsonNode scenario = ConformanceScenarios.load(ConformanceScenarios.directory().resolve(name + ".json"));
+		Map<String, String> names = ConformanceScenarios.names(scenario);
+		ConformanceScenarios.Traffic traffic = new ConformanceScenarios.Traffic(ConformanceTm1.ROOT);
+		List<String> failures = ConformanceScenarios.run(client(traffic, data(names)), traffic, scenario, names);
+		assertThat(failures).isEmpty();
+		assertThat(traffic.exchanges().stream().map(e -> e.get("step").asString()).distinct())
+			.hasSize(scenario.get("steps").size() + scenario.get("finally").size());
 	}
 
 	@Test

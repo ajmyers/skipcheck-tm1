@@ -33,6 +33,7 @@ The Java client is the definition of how a call behaves. Its unit tests record e
 }
 ```
 
+- An entry of `exchanges` may instead be a group whose order is free, `{"unordered": [exchange, …]}`: for requests a call has in flight at once, such as a cellset stream's pages. Its requests may come in any order, each answered with the answer recorded for the equal request, and all of them before the next entry. Everything outside a group is in order.
 - A request's `target` is its path and query relative to the service root, exactly as sent (encoded).
 - Its `headers` are the ones that are the call's, not the session's: `accept`, `content-type`, `if-match`, `if-none-match`, `odata-version`, `odata-maxversion`, `prefer`, and any `tm1-*` except `tm1-sessioncontext`. Cookies, credentials and the user agent aren't compared.
 - A body is `json`, `text` or `bytes` (base64), by its content type, or absent.
@@ -56,17 +57,18 @@ A JSON value stands for itself. Anything else is an object with one `$` tag:
 | `$duration`, `$dateTime`, `$date`, `$time` | `java.time` values | `{"$duration": "PT1H"}` |
 | `$bytes` | `byte[]` | `{"$bytes": "AAEC"}` |
 | `$type` | a service package's helper type, by its static factory | `{"$type": "AttributeOwner", "factory": "view", "args": ["Sales", {"$enum": "ViewScope", ...}, "v"]}` |
+| `$handler` | a handler every runner knows by name (`ConformanceHandler`) | `{"$handler": "cells"}`: a cellset stream's handler that gives back its cells, `(cellset, cells) -> cells` |
 
-Each runner rebuilds a query with its own query builder (`select`, `expand`, `Filter.raw`, `orderBy` or `orderByDescending`, and so on), and a patch from its JSON. A value the recorder can't encode, or a tag a runner doesn't know, is an error, never a skip. A helper type needs an encoder registered with `ConformanceCodec.register(type, value -> ConformanceCodec.factory("AttributeOwner", "view", ...))`. A call whose argument is a function (a cellset handler, a change set's work) can't be recorded: test it with plain Java unit tests, and port those by hand.
+Each runner rebuilds a query with its own query builder (`select`, `expand`, `Filter.raw`, `orderBy` or `orderByDescending`, and so on), and a patch from its JSON. A value the recorder can't encode, or a tag a runner doesn't know, is an error, never a skip. A helper type needs an encoder registered with `ConformanceCodec.register(type, value -> ConformanceCodec.factory("AttributeOwner", "view", ...))`. A call whose argument is a function (a change set's work, a cellset handler other than the named ones) can't be recorded: test it with plain Java unit tests, and port those by hand.
 
 ### What each runner checks
 
 For every case, in each client (`tm1-python/tests/test_conformance_calls.py` in both flavours, `tm1-dotnet/tests/.../Conformance/ConformanceCallsTests.cs`, `tm1-typescript/test/conformance/calls.test.ts`):
 
 1. It decodes the arguments and calls the service's method by its own name for Java's (`model_cubes`, `ModelCubesAsync`, `modelCubes`), binding them by Java's parameter names (TypeScript, positionally in Java's order, which its ports keep).
-2. It answers each request with the recorded answers, in order.
-3. Each request must equal the recorded one: method, target, the headers above, and the body. JSON bodies are compared with their members in order.
-4. It must send exactly as many requests.
+2. It answers each request with the recorded answers, in order; within an `unordered` group, with the answer of the group's equal request not yet answered.
+3. Each request must equal the recorded one it was answered for: method, target, the headers above, and the body. JSON bodies are compared with their members in order.
+4. It must send exactly as many requests (a group's count as its members).
 5. The result must equal the recorded one (models by their JSON, with null members left out, as clients differ on writing them), or the error must match its category, kind, status and code.
 
 A case a language can't express goes in that client's `conformance/unsupported.txt`, with the reason. The runner fails if the list names a case no fixture has.
@@ -88,7 +90,15 @@ A case a language can't express goes in that client's `conformance/unsupported.t
    }
    ```
 
-   `conformance.call` calls the method by name, so what's recorded is what ran; `conformance.fail` does the same for a call that must fail, and returns the error. Script one answer per request (`json`, `text`, `bytes`, `status`, `error`): a call that leaves answers unused fails. Assert what Java does as you would anyway; the fixture holds the rest.
+   `conformance.call` calls the method by name, so what's recorded is what ran; `conformance.fail` does the same for a call that must fail, and returns the error. Script one answer per request (`json`, `text`, `bytes`, `status`, `error`): a call that leaves answers unused fails. Requests that may come in any order are scripted as a group, each answer for its `METHOD target`, and recorded in the order scripted:
+
+   ```java
+   conformance.tm1().unordered(pages -> pages
+       .json("GET Cellsets('c1')/tm1.GetPartition(Begin=3,End=5)?$select=Ordinal,Value", "{\"value\":[…]}")
+       .json("GET Cellsets('c1')/tm1.GetPartition(Begin=6,End=8)?$select=Ordinal,Value", "{\"value\":[…]}"));
+   ```
+
+   Keep a group to what's really in flight at once: everything else stays in order. Assert what Java does as you would anyway; the fixture holds the rest.
 2. Record: `./gradlew :tm1-client:test --tests '*<Name>ServiceTest' -PrecordConformance`. It writes `spec/conformance/calls/<Name>ServiceTest.json`. Only a whole class records, and only if all its tests pass.
 3. Run each runner: `pytest tests/test_conformance_calls.py` (tm1-python), `dotnet test --filter FullyQualifiedName~Conformance` (tm1-dotnet), `npx vitest run test/conformance` (tm1-typescript).
 4. Where a client differs, fix the client, not the fixture.
@@ -114,6 +124,7 @@ A scenario is steps every client runs against a real TM1, with names made fresh 
 ```
 
 - Arguments use the same encoding as the fixtures. `${name}` placeholders are replaced in every string.
+- A step whose requests may go out in any order (a cellset stream's pages) names them with `"unordered"`, a regular expression matching `METHOD target` (after names become placeholders): each run of the step's consecutive requests that match it is compared as a set. The step's other requests, and every other step's, are compared in order.
 - Each step has one expectation:
   - `{"none": true}`: the call returns nothing.
   - `{"count": n}`: a list of `n` items.
@@ -124,7 +135,7 @@ A scenario is steps every client runs against a real TM1, with names made fresh 
 
 The runners are Java's `ConformanceScenarioTm1Test`, Python's `tests/live/test_conformance_scenarios.py` (sync and async), .NET's `Live/ConformanceScenarioLiveTests.cs` and TypeScript's `test/live/conformance-scenarios.live.test.ts`. Each runs with its client's live harness (testcontainers, or `TM1_URL`) and records what it sends to `build/conformance-live/<language>/<scenario>.jsonl`. The session's own requests are left out of the record.
 
-[`scripts/compare-live-traffic.py`](../../scripts/compare-live-traffic.py) normalizes the logs: names go back to placeholders and entity tags are dropped. It then requires every language to have sent the same requests, with the same statuses, in the same order. [`scripts/live-tests.sh`](../../scripts/live-tests.sh) runs it after the suites. Each runner also has an offline test that runs the cubes scenario against a fake TM1, and one that runs other scenarios (subsets, members, edges, member-sets) against a fake answering each step's one request with what the step expects.
+[`scripts/compare-live-traffic.py`](../../scripts/compare-live-traffic.py) normalizes the logs: names go back to placeholders and entity tags are dropped. It then requires every language to have sent the same requests, with the same statuses, in the same order, but for a step's `unordered` runs. [`scripts/live-tests.sh`](../../scripts/live-tests.sh) runs it after the suites. Each runner also has offline tests: the cubes scenario against a fake TM1; the data scenarios (cellsets, views, sandboxes) against a fake that answers as TM1 would; and other scenarios (subsets, members, edges, member-sets and more) against a fake answering each step's one request with what the step expects.
 
 ### Adding a scenario
 

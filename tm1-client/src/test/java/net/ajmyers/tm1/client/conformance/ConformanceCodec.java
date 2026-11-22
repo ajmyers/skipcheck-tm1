@@ -79,6 +79,9 @@ public final class ConformanceCodec {
 		if (registered != null) {
 			return registered.apply(value);
 		}
+		if (value instanceof ConformanceHandler h) {
+			return tagged("$handler", NODES.stringNode(h.name()));
+		}
 		if (value instanceof String s) {
 			return NODES.stringNode(s);
 		}
@@ -174,12 +177,12 @@ public final class ConformanceCodec {
 	}
 
 	/**
-	 * A model's name: a polymorphic type's own variant ({@code Member.Plain}) by its
-	 * type's name ({@code Member}).
+	 * A model's name: a polymorphic type read as itself ({@code Member.Plain},
+	 * {@code View.Unknown}) by its type's name ({@code Member}, {@code View}).
 	 */
 	private static String modelName(Class<?> type) {
 		Class<?> enclosing = type.getEnclosingClass();
-		if (type.getSimpleName().equals("Plain") && enclosing != null && enclosing.isInterface()) {
+		if (enclosing != null && enclosing.isInterface()) {
 			return enclosing.getSimpleName();
 		}
 		return type.getSimpleName();

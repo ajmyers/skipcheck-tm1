@@ -1,0 +1,672 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.data.CellServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "CellServiceTest#needsAValueInEveryUpdate#1",
+			"service" : "cells",
+			"method" : "updateCells",
+			"params" : [
+				"cube",
+				"updates"
+			],
+			"args" : [
+				"Sales",
+				[
+					{
+						"$patch" : "CubeUpdatePatch",
+						"json" : {
+							"Tuple@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+								"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+							]
+						}
+					}
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.UpdateCells",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Updates" : [
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+									]
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Value is required"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "CellServiceTest#quotesNamesThatNeedIt#1",
+			"service" : "cells",
+			"method" : "update",
+			"params" : [
+				"cube",
+				"tuple",
+				"value"
+			],
+			"args" : [
+				"Joe's Cube",
+				{
+					"$map" : {
+						"Sales Region" : "Joe's",
+						"Measure" : "100%"
+					}
+				},
+				1
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Joe''s%20Cube')/tm1.Update",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Cells" : [
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Sales%20Region')/Hierarchies('Sales%20Region')/Elements('Joe''s')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('100%25')"
+									]
+								}
+							],
+							"Value" : 1
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellServiceTest#refusesAConsolidatedCellOrAMissingCube#1",
+			"service" : "cells",
+			"method" : "update",
+			"params" : [
+				"cube",
+				"tuple",
+				"value"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$map" : {
+						"Region" : "Total",
+						"Measure" : "Amount"
+					}
+				},
+				1
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.Update",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Cells" : [
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('Total')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+									]
+								}
+							],
+							"Value" : 1
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "CubeCellWriteStatusElementIsConsolidated",
+								"message" : "consolidated"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "CubeCellWriteStatusElementIsConsolidated"
+			}
+		},
+		{
+			"id" : "CellServiceTest#refusesAConsolidatedCellOrAMissingCube#2",
+			"service" : "cells",
+			"method" : "update",
+			"params" : [
+				"cube",
+				"tuple",
+				"value"
+			],
+			"args" : [
+				"Nope",
+				{
+					"$map" : {
+						"Region" : "North",
+						"Measure" : "Amount"
+					}
+				},
+				1
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Nope')/tm1.Update",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Cells" : [
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+									]
+								}
+							],
+							"Value" : 1
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Cube'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "CellServiceTest#refusesAMissingCube#1",
+			"service" : "cells",
+			"method" : "update",
+			"params" : [
+				"cube",
+				"tuple",
+				"value"
+			],
+			"args" : [
+				null,
+				{
+					"$map" : {
+						"Region" : "North",
+						"Measure" : "Amount"
+					}
+				},
+				1
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "CellServiceTest#writesACellByItsTuple#1",
+			"service" : "cells",
+			"method" : "update",
+			"params" : [
+				"cube",
+				"tuple",
+				"value"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$map" : {
+						"Region" : "North",
+						"Measure" : "Amount"
+					}
+				},
+				42
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.Update",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Cells" : [
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+									]
+								}
+							],
+							"Value" : 42
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellServiceTest#writesManyCellsInOneRequest#1",
+			"service" : "cells",
+			"method" : "updateCells",
+			"params" : [
+				"cube",
+				"updates"
+			],
+			"args" : [
+				"Sales",
+				[
+					{
+						"$patch" : "CubeUpdatePatch",
+						"json" : {
+							"Tuple@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+								"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+							],
+							"Value" : 1
+						}
+					},
+					{
+						"$patch" : "CubeUpdatePatch",
+						"json" : {
+							"Tuple@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Elements('South')"
+							],
+							"Value" : "x"
+						}
+					},
+					{
+						"$patch" : "CubeUpdatePatch",
+						"json" : {
+							"Tuple@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+								"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+							],
+							"Value" : 2,
+							"ReferenceCube@odata.bind" : "Cubes('Plan')",
+							"ReferenceCell@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Elements('South')",
+								"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+							]
+						}
+					}
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.UpdateCells",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Updates" : [
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+									],
+									"Value" : 1
+								},
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('South')"
+									],
+									"Value" : "x"
+								},
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+									],
+									"Value" : 2,
+									"ReferenceCube@odata.bind" : "Cubes('Plan')",
+									"ReferenceCell@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('South')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+									]
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellServiceTest#writesManyCellsInOneRequest#2",
+			"service" : "cells",
+			"method" : "updateCells",
+			"params" : [
+				"cube",
+				"updates",
+				"order"
+			],
+			"args" : [
+				"Sales",
+				[
+					{
+						"$patch" : "CubeUpdatePatch",
+						"json" : {
+							"Tuple@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+								"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+							],
+							"Value" : 1
+						}
+					}
+				],
+				{
+					"$enum" : "UpdateOrder",
+					"name" : "BY_LEVEL",
+					"json" : "ByLevel"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.UpdateCells",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Updates" : [
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+									],
+									"Value" : 1
+								}
+							],
+							"Order" : "ByLevel"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellServiceTest#writesManyCellsInOneRequest#3",
+			"service" : "cells",
+			"method" : "updateCells",
+			"params" : [
+				"cube",
+				"updates"
+			],
+			"args" : [
+				"Sales",
+				[ ]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.UpdateCells",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Updates" : [ ]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellServiceTest#writesTextDecimalsAndNulls#1",
+			"service" : "cells",
+			"method" : "update",
+			"params" : [
+				"cube",
+				"tuple",
+				"value"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$map" : {
+						"Region" : "North",
+						"Measure" : "Note"
+					}
+				},
+				"it's"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.Update",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Cells" : [
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('Note')"
+									]
+								}
+							],
+							"Value" : "it's"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellServiceTest#writesTextDecimalsAndNulls#2",
+			"service" : "cells",
+			"method" : "update",
+			"params" : [
+				"cube",
+				"tuple",
+				"value"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$map" : {
+						"Region" : "North",
+						"Measure" : "Amount"
+					}
+				},
+				{
+					"$double" : 12.5
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.Update",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Cells" : [
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+									]
+								}
+							],
+							"Value" : 12.5
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellServiceTest#writesTextDecimalsAndNulls#3",
+			"service" : "cells",
+			"method" : "update",
+			"params" : [
+				"cube",
+				"tuple",
+				"value"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$map" : {
+						"Region" : "North",
+						"Measure" : "Amount"
+					}
+				},
+				null
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.Update",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Cells" : [
+								{
+									"Tuple@odata.bind" : [
+										"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+										"Dimensions('Measure')/Hierarchies('Measure')/Elements('Amount')"
+									]
+								}
+							],
+							"Value" : null
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

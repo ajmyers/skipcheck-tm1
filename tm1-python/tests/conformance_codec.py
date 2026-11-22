@@ -80,12 +80,31 @@ def decode(value: Any) -> Any:
         return dt.time.fromisoformat(value["$time"])
     if tag == "$bytes":
         return base64.b64decode(value["$bytes"])
+    if tag == "$handler":
+        if value["$handler"] not in _HANDLERS:
+            raise Unknown(f"no handler {value['$handler']}")
+        return _HANDLERS[value["$handler"]]
     if tag == "$type":
         cls = getattr(_services(), value["$type"], None) or getattr(tm1_client, value["$type"], None)
         if cls is None:
             raise Unknown(f"no type {value['$type']}")
         return getattr(cls, snake(value["factory"]))(*[decode(a) for a in value["args"]])
     raise Unknown(f"unknown tag {tag}")
+
+
+def _cells(cellset: Any, cells: Any) -> Any:
+    """``(cellset, cells) -> cells``: a cellset stream's cells, in either flavor."""
+    if hasattr(cells, "__aiter__"):
+
+        async def collect() -> list[Any]:
+            return [c async for c in cells]
+
+        return collect()
+    return list(cells)
+
+
+# The handlers every runner knows by name (Java's ConformanceHandler)
+_HANDLERS = {"cells": _cells}
 
 
 def _enum(value: dict[str, Any]) -> Any:

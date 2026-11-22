@@ -137,9 +137,11 @@ def test_every_java_class_has_its_python_counterpart(package: str, path: Path) -
         names = [p.name for p in parameters if p.kind not in (p.VAR_KEYWORD, p.VAR_POSITIONAL)]
         for overload in method.overloads:
             expected = [snake(n) for t, n in overload if t != "ODataQuery"]
-            if any(t == "ODataQuery" for t, _ in overload) and "query" not in names:
+            # A query is "query", or by Java's name (a stream's cell_query)
+            queries = {"query", *(snake(n) for t, n in overload if t == "ODataQuery")}
+            if any(t == "ODataQuery" for t, _ in overload) and not queries & set(names):
                 wrong.append(f"{py_name}: no query parameter")
-            got = [n for n in names if n not in ("query",)]
+            got = [n for n in names if n not in queries]
             if got[: len(expected)] != expected and not _subsequence(expected, got):
                 wrong.append(f"{py_name}: parameters {got}, Java {expected}")
     assert not missing and not wrong, "\n".join(["missing:", *missing, "different:", *wrong])

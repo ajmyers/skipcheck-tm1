@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Tm1Client, type Tm1Session } from "../../src/index.js";
+import { Tm1Client, Tm1ServerException, type Tm1Session } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 function fake(): FakeTm1 {
@@ -62,6 +62,20 @@ describe("ChangeSetService", () => {
     tm1.requests.length = 0;
     await expect(tm1.client().changeSets.within(async () => Promise.reject(new Error("later"))).toArray()).rejects.toThrow("later");
     expect(tm1.requests.map((r) => r.target)).toEqual(["BeginChangeSet", "EndChangeSet"]);
+  });
+
+  it("does no work if the change set can't begin", async () => {
+    // Java: doesNoWorkIfTheChangeSetCantBegin
+    const tm1 = new FakeTm1();
+    tm1.respond = () => FakeTm1.reply(500, { error: { code: "1", message: "down" } }, { "content-type": "application/json" });
+    let ran = false;
+    const work = async (): Promise<string> => {
+      ran = true;
+      return "never";
+    };
+    await expect(tm1.client().changeSets.within(work).toArray()).rejects.toBeInstanceOf(Tm1ServerException);
+    expect(ran).toBe(false);
+    expect(tm1.requests.map((r) => r.target)).toEqual(["BeginChangeSet"]);
   });
 
   it("streams within a change set, and ends it however the stream ends", async () => {

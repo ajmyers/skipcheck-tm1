@@ -1,0 +1,3163 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.data.CellsetServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "CellsetServiceTest#aDeletedCellsetIsNotFound#1",
+			"service" : "cellsets",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"c1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'c1' can not be found in collection of type 'Cellset'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#aDeletedCellsetIsNotFound#2",
+			"service" : "cellsets",
+			"method" : "delete",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"c1"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cellsets('c1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "gone"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#aStreamFailsOnABadQueryAndHasNothingToDelete#1",
+			"service" : "cellsets",
+			"method" : "stream",
+			"params" : [
+				"mdx",
+				"cellQuery",
+				"pageSize",
+				"handler"
+			],
+			"args" : [
+				"SELEKT",
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Value"
+						]
+					}
+				},
+				2,
+				{
+					"$handler" : "cells"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDX?$expand=Axes($expand%3DHierarchies($select%3DName),Tuples($expand%3DMembers($select%3DName,UniqueName))),Cells($select%3DOrdinal,Value;$top%3D2)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELEKT"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "501",
+								"message" : "Syntax error"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "501"
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#aStreamNeedsAPositivePageSize#1",
+			"service" : "cellsets",
+			"method" : "stream",
+			"params" : [
+				"mdx",
+				"cellQuery",
+				"pageSize",
+				"handler"
+			],
+			"args" : [
+				"SELECT {[Month].[Jan]} ON 0 FROM [Sales]",
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Value"
+						]
+					}
+				},
+				0,
+				{
+					"$handler" : "cells"
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#aStreamOfACellsetWithoutAnIdHasNothingToPageOrDelete#1",
+			"service" : "cellsets",
+			"method" : "stream",
+			"params" : [
+				"mdx",
+				"cellQuery",
+				"pageSize",
+				"handler"
+			],
+			"args" : [
+				"SELECT {[Month].[Jan]} ON 0 FROM [Sales]",
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Value"
+						]
+					}
+				},
+				2,
+				{
+					"$handler" : "cells"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDX?$expand=Axes($expand%3DHierarchies($select%3DName),Tuples($expand%3DMembers($select%3DName,UniqueName))),Cells($select%3DOrdinal,Value;$top%3D2)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELECT {[Month].[Jan]} ON 0 FROM [Sales]"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Axes" : [
+								{
+									"Ordinal" : 0,
+									"Cardinality" : 2
+								},
+								{
+									"Ordinal" : 1,
+									"Cardinality" : 1
+								}
+							],
+							"Cells" : [
+								{
+									"Ordinal" : 0,
+									"Value" : 0
+								},
+								{
+									"Ordinal" : 1,
+									"Value" : 1
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 0,
+						"Value" : 0
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 1,
+						"Value" : 1
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#aStreamThatFitsInOnePageMakesNoMoreRequests#1",
+			"service" : "cellsets",
+			"method" : "stream",
+			"params" : [
+				"mdx",
+				"cellQuery",
+				"pageSize",
+				"handler"
+			],
+			"args" : [
+				"SELECT {[Month].[Jan]} ON 0 FROM [Sales]",
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Value"
+						]
+					}
+				},
+				10,
+				{
+					"$handler" : "cells"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDX?$expand=Axes($expand%3DHierarchies($select%3DName),Tuples($expand%3DMembers($select%3DName,UniqueName))),Cells($select%3DOrdinal,Value;$top%3D10)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELECT {[Month].[Jan]} ON 0 FROM [Sales]"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c1",
+							"Axes" : [
+								{
+									"Ordinal" : 0,
+									"Cardinality" : 2
+								},
+								{
+									"Ordinal" : 1,
+									"Cardinality" : 2
+								}
+							],
+							"Cells" : [
+								{
+									"Ordinal" : 0,
+									"Value" : 0
+								},
+								{
+									"Ordinal" : 1,
+									"Value" : 1
+								},
+								{
+									"Ordinal" : 2,
+									"Value" : 2
+								},
+								{
+									"Ordinal" : 3,
+									"Value" : 3
+								}
+							]
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cellsets('c1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 0,
+						"Value" : 0
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 1,
+						"Value" : 1
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 2,
+						"Value" : 2
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 3,
+						"Value" : 3
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#aStreamWhosePageFailsStillDeletesItsCellset#1",
+			"service" : "cellsets",
+			"method" : "stream",
+			"params" : [
+				"mdx",
+				"cellQuery",
+				"pageSize",
+				"handler"
+			],
+			"args" : [
+				"SELECT {[Month].[Jan]} ON 0 FROM [Sales]",
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Value"
+						]
+					}
+				},
+				2,
+				{
+					"$handler" : "cells"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDX?$expand=Axes($expand%3DHierarchies($select%3DName),Tuples($expand%3DMembers($select%3DName,UniqueName))),Cells($select%3DOrdinal,Value;$top%3D2)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELECT {[Month].[Jan]} ON 0 FROM [Sales]"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c1",
+							"Axes" : [
+								{
+									"Ordinal" : 0,
+									"Cardinality" : 2
+								},
+								{
+									"Ordinal" : 1,
+									"Cardinality" : 2
+								}
+							],
+							"Cells" : [
+								{
+									"Ordinal" : 0,
+									"Value" : 0
+								},
+								{
+									"Ordinal" : 1,
+									"Value" : 1
+								}
+							]
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')/tm1.GetPartition(Begin=2,End=3)?$select=Ordinal,Value",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'c1' can not be found in collection of type 'Cellset'."
+							}
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cellsets('c1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#badMdxIsABadRequest#1",
+			"service" : "cellsets",
+			"method" : "execute",
+			"params" : [
+				"mdx",
+				"query"
+			],
+			"args" : [
+				"SELEKT",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDX",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELEKT"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "501",
+								"message" : "Syntax error in MDX"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "501"
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#executesMdxAndExpandsItsAxesAndCells#1",
+			"service" : "cellsets",
+			"method" : "execute",
+			"params" : [
+				"mdx",
+				"query"
+			],
+			"args" : [
+				"SELECT {[Month].[Jan]} ON 0 FROM [Sales]",
+				{
+					"$query" : {
+						"expand" : {
+							"Axes" : {
+								"expand" : {
+									"Tuples" : {
+										"expand" : {
+											"Members" : {
+												"select" : [
+													"Name"
+												]
+											}
+										}
+									}
+								}
+							},
+							"Cells" : {
+								"select" : [
+									"Ordinal",
+									"Value"
+								],
+								"top" : 10
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDX?$expand=Axes($expand%3DTuples($expand%3DMembers($select%3DName))),Cells($select%3DOrdinal,Value;$top%3D10)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELECT {[Month].[Jan]} ON 0 FROM [Sales]"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c1",
+							"Cells" : [
+								{
+									"Ordinal" : 0,
+									"Value" : 5
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cellset",
+				"json" : {
+					"ID" : "c1",
+					"Cells" : [
+						{
+							"Ordinal" : 0,
+							"Value" : 5
+						}
+					]
+				}
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#executesMdxAndExpandsItsAxesAndCells#2",
+			"service" : "cellsets",
+			"method" : "execute",
+			"params" : [
+				"mdx",
+				"query"
+			],
+			"args" : [
+				"SELECT {} ON 0 FROM [Joe's]",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDX",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELECT {} ON 0 FROM [Joe's]"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c2"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cellset",
+				"json" : {
+					"ID" : "c2"
+				}
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#executesPublicAndPrivateViews#1",
+			"service" : "cellsets",
+			"method" : "executeView",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"By Region",
+				{
+					"$query" : {
+						"expand" : {
+							"Cells" : {
+								"select" : [
+									"Value"
+								]
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/Views('By%20Region')/tm1.Execute?$expand=Cells($select%3DValue)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c1"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cellset",
+				"json" : {
+					"ID" : "c1"
+				}
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#executesPublicAndPrivateViews#2",
+			"service" : "cellsets",
+			"method" : "executeView",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"query"
+			],
+			"args" : [
+				"Joe's",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"Mine",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Joe''s')/PrivateViews('Mine')/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c2"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cellset",
+				"json" : {
+					"ID" : "c2"
+				}
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#executesPublicAndPrivateViews#3",
+			"service" : "cellsets",
+			"method" : "executeView",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Gone",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/Views('Gone')/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Gone' can not be found in collection of type 'View'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#listsGetsAndDeletesCellsets#1",
+			"service" : "cellsets",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"ID"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets?$select=ID",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "CellsetServiceTest#listsGetsAndDeletesCellsets#2",
+			"service" : "cellsets",
+			"method" : "get",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"c1",
+				{
+					"$query" : {
+						"expand" : {
+							"Cells" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')?$expand=Cells",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c1",
+							"Cells" : [ ]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cellset",
+				"json" : {
+					"ID" : "c1",
+					"Cells" : [ ]
+				}
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#listsGetsAndDeletesCellsets#3",
+			"service" : "cellsets",
+			"method" : "delete",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"c1"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cellsets('c1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellsetServiceTest#quotesAnApostropheInAViewName#1",
+			"service" : "cellsets",
+			"method" : "executeView",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Joe's view",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/Views('Joe''s%20view')/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c1"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cellset",
+				"json" : {
+					"ID" : "c1"
+				}
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#quotesAnIdWithAnApostrophe#1",
+			"service" : "cellsets",
+			"method" : "delete",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"c'1"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cellsets('c''1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellsetServiceTest#readsAPartition#1",
+			"service" : "cellsets",
+			"method" : "partition",
+			"params" : [
+				"id",
+				"begin",
+				"end",
+				"query"
+			],
+			"args" : [
+				"c1",
+				2,
+				4,
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Value"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')/tm1.GetPartition(Begin=2,End=4)?$select=Ordinal,Value",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Ordinal" : 2,
+									"Value" : 1
+								},
+								{
+									"Ordinal" : 4,
+									"Value" : 2
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 2,
+						"Value" : 1
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 4,
+						"Value" : 2
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#readsAxesHierarchiesTuplesAndTheirMembers#1",
+			"service" : "cellsets",
+			"method" : "axes",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"c1",
+				{
+					"$query" : {
+						"expand" : {
+							"Tuples" : {
+								"expand" : {
+									"Members" : { }
+								}
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')/Axes?$expand=Tuples($expand%3DMembers)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Ordinal" : 0,
+									"Cardinality" : 2
+								},
+								{
+									"Ordinal" : 1,
+									"Cardinality" : 1
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "CellsetAxis",
+					"json" : {
+						"Ordinal" : 0,
+						"Cardinality" : 2
+					}
+				},
+				{
+					"$model" : "CellsetAxis",
+					"json" : {
+						"Ordinal" : 1,
+						"Cardinality" : 1
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#readsAxesHierarchiesTuplesAndTheirMembers#2",
+			"service" : "cellsets",
+			"method" : "hierarchies",
+			"params" : [
+				"id",
+				"axis",
+				"query"
+			],
+			"args" : [
+				"c1",
+				0,
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')/Axes(0)/Hierarchies?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Month"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Hierarchy",
+					"json" : {
+						"Name" : "Month"
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#readsAxesHierarchiesTuplesAndTheirMembers#3",
+			"service" : "cellsets",
+			"method" : "tuples",
+			"params" : [
+				"id",
+				"axis",
+				"query"
+			],
+			"args" : [
+				"c1",
+				1,
+				{
+					"$query" : {
+						"top" : 2
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')/Axes(1)/Tuples?$top=2",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Ordinal" : 0
+								},
+								{
+									"Ordinal" : 1
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "CellsetAxisTuple",
+					"json" : {
+						"Ordinal" : 0
+					}
+				},
+				{
+					"$model" : "CellsetAxisTuple",
+					"json" : {
+						"Ordinal" : 1
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#readsAxesHierarchiesTuplesAndTheirMembers#4",
+			"service" : "cellsets",
+			"method" : "tupleMembers",
+			"params" : [
+				"id",
+				"axis",
+				"tuple",
+				"query"
+			],
+			"args" : [
+				"c1",
+				0,
+				1,
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"UniqueName"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')/Axes(0)/Tuples(1)/Members?$select=Name,UniqueName",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Jan",
+									"UniqueName" : "[Month].[Month].[Jan]"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "Jan",
+						"UniqueName" : "[Month].[Month].[Jan]"
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#readsCellsTheirMembersAndTheCube#1",
+			"service" : "cellsets",
+			"method" : "cells",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"c1",
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Value"
+						],
+						"top" : 1,
+						"skip" : 3
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')/Cells?$select=Ordinal,Value&$top=1&$skip=3",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Ordinal" : 3,
+									"Value" : "x"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 3,
+						"Value" : "x"
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#readsCellsTheirMembersAndTheCube#2",
+			"service" : "cellsets",
+			"method" : "cellMembers",
+			"params" : [
+				"id",
+				"ordinal",
+				"query"
+			],
+			"args" : [
+				"c1",
+				7,
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')/Cells(7)/Members?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Base"
+								},
+								{
+									"Name" : "Jan"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "Base"
+					}
+				},
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "Jan"
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#readsCellsTheirMembersAndTheCube#3",
+			"service" : "cellsets",
+			"method" : "cube",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"c1",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')/Cube?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Sales"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cube",
+				"json" : {
+					"Name" : "Sales"
+				}
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#runsAStatementForItsEffect#1",
+			"service" : "cellsets",
+			"method" : "executeStatement",
+			"params" : [
+				"mdx"
+			],
+			"args" : [
+				"SELECT {} ON 0 FROM [}ClientGroups]"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDXStatement",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELECT {} ON 0 FROM [}ClientGroups]"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellsetServiceTest#runsAStatementForItsEffect#2",
+			"service" : "cellsets",
+			"method" : "executeStatement",
+			"params" : [
+				"mdx"
+			],
+			"args" : [
+				"CREATE SET [x] AS {}"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDXStatement",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "CREATE SET [x] AS {}"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "501",
+								"message" : "Syntax error"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "501"
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#savesItsQueryAsAView#1",
+			"service" : "cellsets",
+			"method" : "saveViewAs",
+			"params" : [
+				"id",
+				"name"
+			],
+			"args" : [
+				"c1",
+				"Saved"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/tm1.SaveViewAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Saved"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Saved"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "View",
+				"json" : {
+					"Name" : "Saved"
+				}
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#savesItsQueryAsAView#2",
+			"service" : "cellsets",
+			"method" : "saveViewAs",
+			"params" : [
+				"id",
+				"name",
+				"overwrite",
+				"makePrivate"
+			],
+			"args" : [
+				"c1",
+				"Mine",
+				true,
+				true
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/tm1.SaveViewAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Mine",
+							"Overwrite" : true,
+							"MakePrivate" : true
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Mine"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "View",
+				"json" : {
+					"Name" : "Mine"
+				}
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#savesItsQueryAsAView#3",
+			"service" : "cellsets",
+			"method" : "saveViewAs",
+			"params" : [
+				"id",
+				"name",
+				"overwrite",
+				"makePrivate"
+			],
+			"args" : [
+				"c1",
+				"Public",
+				false,
+				false
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/tm1.SaveViewAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Public",
+							"Overwrite" : false,
+							"MakePrivate" : false
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Public"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "View",
+				"json" : {
+					"Name" : "Public"
+				}
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#savesItsQueryAsAView#4",
+			"service" : "cellsets",
+			"method" : "saveViewAs",
+			"params" : [
+				"id",
+				"name"
+			],
+			"args" : [
+				"c1",
+				"Saved"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/tm1.SaveViewAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Saved"
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Saved' already exists"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#streamsAtLeastARowPerPage#1",
+			"service" : "cellsets",
+			"method" : "stream",
+			"params" : [
+				"mdx",
+				"cellQuery",
+				"pageSize",
+				"handler"
+			],
+			"args" : [
+				"SELECT {[Month].[Jan]} ON 0 FROM [Sales]",
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Value"
+						]
+					}
+				},
+				2,
+				{
+					"$handler" : "cells"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDX?$expand=Axes($expand%3DHierarchies($select%3DName),Tuples($expand%3DMembers($select%3DName,UniqueName))),Cells($select%3DOrdinal,Value;$top%3D2)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELECT {[Month].[Jan]} ON 0 FROM [Sales]"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c1",
+							"Axes" : [
+								{
+									"Ordinal" : 0,
+									"Cardinality" : 4
+								},
+								{
+									"Ordinal" : 1,
+									"Cardinality" : 2
+								}
+							],
+							"Cells" : [
+								{
+									"Ordinal" : 0,
+									"Value" : 0
+								},
+								{
+									"Ordinal" : 1,
+									"Value" : 1
+								}
+							]
+						}
+					}
+				},
+				{
+					"unordered" : [
+						{
+							"request" : {
+								"method" : "GET",
+								"target" : "Cellsets('c1')/tm1.GetPartition(Begin=0,End=3)?$select=Ordinal,Value",
+								"headers" : {
+									"accept" : "application/json",
+									"odata-maxversion" : "4.0",
+									"odata-version" : "4.0"
+								}
+							},
+							"response" : {
+								"status" : 200,
+								"headers" : {
+									"content-type" : "application/json"
+								},
+								"json" : {
+									"value" : [
+										{
+											"Ordinal" : 0,
+											"Value" : 0
+										},
+										{
+											"Ordinal" : 1,
+											"Value" : 1
+										},
+										{
+											"Ordinal" : 2,
+											"Value" : 2
+										},
+										{
+											"Ordinal" : 3,
+											"Value" : 3
+										}
+									]
+								}
+							}
+						},
+						{
+							"request" : {
+								"method" : "GET",
+								"target" : "Cellsets('c1')/tm1.GetPartition(Begin=4,End=7)?$select=Ordinal,Value",
+								"headers" : {
+									"accept" : "application/json",
+									"odata-maxversion" : "4.0",
+									"odata-version" : "4.0"
+								}
+							},
+							"response" : {
+								"status" : 200,
+								"headers" : {
+									"content-type" : "application/json"
+								},
+								"json" : {
+									"value" : [
+										{
+											"Ordinal" : 4,
+											"Value" : 4
+										},
+										{
+											"Ordinal" : 5,
+											"Value" : 5
+										},
+										{
+											"Ordinal" : 6,
+											"Value" : 6
+										},
+										{
+											"Ordinal" : 7,
+											"Value" : 7
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cellsets('c1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 0,
+						"Value" : 0
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 1,
+						"Value" : 1
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 2,
+						"Value" : 2
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 3,
+						"Value" : 3
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 4,
+						"Value" : 4
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 5,
+						"Value" : 5
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 6,
+						"Value" : 6
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 7,
+						"Value" : 7
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#streamsManyRowsPerPage#1",
+			"service" : "cellsets",
+			"method" : "stream",
+			"params" : [
+				"mdx",
+				"cellQuery",
+				"pageSize",
+				"handler"
+			],
+			"args" : [
+				"SELECT {[Month].[Jan]} ON 0 FROM [Sales]",
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Value"
+						]
+					}
+				},
+				4,
+				{
+					"$handler" : "cells"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDX?$expand=Axes($expand%3DHierarchies($select%3DName),Tuples($expand%3DMembers($select%3DName,UniqueName))),Cells($select%3DOrdinal,Value;$top%3D4)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELECT {[Month].[Jan]} ON 0 FROM [Sales]"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c1",
+							"Axes" : [
+								{
+									"Ordinal" : 0,
+									"Cardinality" : 2
+								},
+								{
+									"Ordinal" : 1,
+									"Cardinality" : 7
+								}
+							],
+							"Cells" : [
+								{
+									"Ordinal" : 0,
+									"Value" : 0
+								},
+								{
+									"Ordinal" : 1,
+									"Value" : 1
+								},
+								{
+									"Ordinal" : 2,
+									"Value" : 2
+								},
+								{
+									"Ordinal" : 3,
+									"Value" : 3
+								}
+							]
+						}
+					}
+				},
+				{
+					"unordered" : [
+						{
+							"request" : {
+								"method" : "GET",
+								"target" : "Cellsets('c1')/tm1.GetPartition(Begin=4,End=7)?$select=Ordinal,Value",
+								"headers" : {
+									"accept" : "application/json",
+									"odata-maxversion" : "4.0",
+									"odata-version" : "4.0"
+								}
+							},
+							"response" : {
+								"status" : 200,
+								"headers" : {
+									"content-type" : "application/json"
+								},
+								"json" : {
+									"value" : [
+										{
+											"Ordinal" : 4,
+											"Value" : 4
+										},
+										{
+											"Ordinal" : 5,
+											"Value" : 5
+										},
+										{
+											"Ordinal" : 6,
+											"Value" : 6
+										},
+										{
+											"Ordinal" : 7,
+											"Value" : 7
+										}
+									]
+								}
+							}
+						},
+						{
+							"request" : {
+								"method" : "GET",
+								"target" : "Cellsets('c1')/tm1.GetPartition(Begin=8,End=11)?$select=Ordinal,Value",
+								"headers" : {
+									"accept" : "application/json",
+									"odata-maxversion" : "4.0",
+									"odata-version" : "4.0"
+								}
+							},
+							"response" : {
+								"status" : 200,
+								"headers" : {
+									"content-type" : "application/json"
+								},
+								"json" : {
+									"value" : [
+										{
+											"Ordinal" : 8,
+											"Value" : 8
+										},
+										{
+											"Ordinal" : 9,
+											"Value" : 9
+										},
+										{
+											"Ordinal" : 10,
+											"Value" : 10
+										},
+										{
+											"Ordinal" : 11,
+											"Value" : 11
+										}
+									]
+								}
+							}
+						},
+						{
+							"request" : {
+								"method" : "GET",
+								"target" : "Cellsets('c1')/tm1.GetPartition(Begin=12,End=13)?$select=Ordinal,Value",
+								"headers" : {
+									"accept" : "application/json",
+									"odata-maxversion" : "4.0",
+									"odata-version" : "4.0"
+								}
+							},
+							"response" : {
+								"status" : 200,
+								"headers" : {
+									"content-type" : "application/json"
+								},
+								"json" : {
+									"value" : [
+										{
+											"Ordinal" : 12,
+											"Value" : 12
+										},
+										{
+											"Ordinal" : 13,
+											"Value" : 13
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cellsets('c1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 0,
+						"Value" : 0
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 1,
+						"Value" : 1
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 2,
+						"Value" : 2
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 3,
+						"Value" : 3
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 4,
+						"Value" : 4
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 5,
+						"Value" : 5
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 6,
+						"Value" : 6
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 7,
+						"Value" : 7
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 8,
+						"Value" : 8
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 9,
+						"Value" : 9
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 10,
+						"Value" : 10
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 11,
+						"Value" : 11
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 12,
+						"Value" : 12
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 13,
+						"Value" : 13
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#streamsMoreAxesBySkipAndTop#1",
+			"service" : "cellsets",
+			"method" : "stream",
+			"params" : [
+				"mdx",
+				"cellQuery",
+				"pageSize",
+				"handler"
+			],
+			"args" : [
+				"SELECT {[Month].[Jan]} ON 0 FROM [Sales]",
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Value"
+						]
+					}
+				},
+				3,
+				{
+					"$handler" : "cells"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDX?$expand=Axes($expand%3DHierarchies($select%3DName),Tuples($expand%3DMembers($select%3DName,UniqueName))),Cells($select%3DOrdinal,Value;$top%3D3)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELECT {[Month].[Jan]} ON 0 FROM [Sales]"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c1",
+							"Axes" : [
+								{
+									"Ordinal" : 0,
+									"Cardinality" : 2
+								},
+								{
+									"Ordinal" : 1,
+									"Cardinality" : 2
+								},
+								{
+									"Ordinal" : 2,
+									"Cardinality" : 2
+								}
+							],
+							"Cells" : [
+								{
+									"Ordinal" : 0,
+									"Value" : 0
+								},
+								{
+									"Ordinal" : 1,
+									"Value" : 1
+								},
+								{
+									"Ordinal" : 2,
+									"Value" : 2
+								}
+							]
+						}
+					}
+				},
+				{
+					"unordered" : [
+						{
+							"request" : {
+								"method" : "GET",
+								"target" : "Cellsets('c1')/Cells?$select=Ordinal,Value&$top=3&$skip=3",
+								"headers" : {
+									"accept" : "application/json",
+									"odata-maxversion" : "4.0",
+									"odata-version" : "4.0"
+								}
+							},
+							"response" : {
+								"status" : 200,
+								"headers" : {
+									"content-type" : "application/json"
+								},
+								"json" : {
+									"value" : [
+										{
+											"Ordinal" : 3,
+											"Value" : 3
+										},
+										{
+											"Ordinal" : 4,
+											"Value" : 4
+										},
+										{
+											"Ordinal" : 5,
+											"Value" : 5
+										}
+									]
+								}
+							}
+						},
+						{
+							"request" : {
+								"method" : "GET",
+								"target" : "Cellsets('c1')/Cells?$select=Ordinal,Value&$top=3&$skip=6",
+								"headers" : {
+									"accept" : "application/json",
+									"odata-maxversion" : "4.0",
+									"odata-version" : "4.0"
+								}
+							},
+							"response" : {
+								"status" : 200,
+								"headers" : {
+									"content-type" : "application/json"
+								},
+								"json" : {
+									"value" : [
+										{
+											"Ordinal" : 6,
+											"Value" : 6
+										},
+										{
+											"Ordinal" : 7,
+											"Value" : 7
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cellsets('c1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 0,
+						"Value" : 0
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 1,
+						"Value" : 1
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 2,
+						"Value" : 2
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 3,
+						"Value" : 3
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 4,
+						"Value" : 4
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 5,
+						"Value" : 5
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 6,
+						"Value" : 6
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 7,
+						"Value" : 7
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#streamsTwoAxesInPagesOfWholeRowsAndDeletesTheCellset#1",
+			"service" : "cellsets",
+			"method" : "stream",
+			"params" : [
+				"mdx",
+				"cellQuery",
+				"pageSize",
+				"handler"
+			],
+			"args" : [
+				"SELECT {[Month].[Jan]} ON 0 FROM [Sales]",
+				{
+					"$query" : {
+						"select" : [
+							"Ordinal",
+							"Value"
+						]
+					}
+				},
+				5,
+				{
+					"$handler" : "cells"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteMDX?$expand=Axes($expand%3DHierarchies($select%3DName),Tuples($expand%3DMembers($select%3DName,UniqueName))),Cells($select%3DOrdinal,Value;$top%3D5)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"MDX" : "SELECT {[Month].[Jan]} ON 0 FROM [Sales]"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "c1",
+							"Axes" : [
+								{
+									"Ordinal" : 0,
+									"Cardinality" : 3
+								},
+								{
+									"Ordinal" : 1,
+									"Cardinality" : 4
+								},
+								{
+									"Ordinal" : 2,
+									"Cardinality" : 1
+								}
+							],
+							"Cells" : [
+								{
+									"Ordinal" : 0,
+									"Value" : 0
+								},
+								{
+									"Ordinal" : 1,
+									"Value" : 1
+								},
+								{
+									"Ordinal" : 2,
+									"Value" : 2
+								},
+								{
+									"Ordinal" : 3,
+									"Value" : 3
+								},
+								{
+									"Ordinal" : 4,
+									"Value" : 4
+								}
+							]
+						}
+					}
+				},
+				{
+					"unordered" : [
+						{
+							"request" : {
+								"method" : "GET",
+								"target" : "Cellsets('c1')/tm1.GetPartition(Begin=3,End=5)?$select=Ordinal,Value",
+								"headers" : {
+									"accept" : "application/json",
+									"odata-maxversion" : "4.0",
+									"odata-version" : "4.0"
+								}
+							},
+							"response" : {
+								"status" : 200,
+								"headers" : {
+									"content-type" : "application/json"
+								},
+								"json" : {
+									"value" : [
+										{
+											"Ordinal" : 3,
+											"Value" : 3
+										},
+										{
+											"Ordinal" : 4,
+											"Value" : 4
+										},
+										{
+											"Ordinal" : 5,
+											"Value" : 5
+										}
+									]
+								}
+							}
+						},
+						{
+							"request" : {
+								"method" : "GET",
+								"target" : "Cellsets('c1')/tm1.GetPartition(Begin=6,End=8)?$select=Ordinal,Value",
+								"headers" : {
+									"accept" : "application/json",
+									"odata-maxversion" : "4.0",
+									"odata-version" : "4.0"
+								}
+							},
+							"response" : {
+								"status" : 200,
+								"headers" : {
+									"content-type" : "application/json"
+								},
+								"json" : {
+									"value" : [
+										{
+											"Ordinal" : 6,
+											"Value" : 6
+										},
+										{
+											"Ordinal" : 7,
+											"Value" : 7
+										},
+										{
+											"Ordinal" : 8,
+											"Value" : 8
+										}
+									]
+								}
+							}
+						},
+						{
+							"request" : {
+								"method" : "GET",
+								"target" : "Cellsets('c1')/tm1.GetPartition(Begin=9,End=11)?$select=Ordinal,Value",
+								"headers" : {
+									"accept" : "application/json",
+									"odata-maxversion" : "4.0",
+									"odata-version" : "4.0"
+								}
+							},
+							"response" : {
+								"status" : 200,
+								"headers" : {
+									"content-type" : "application/json"
+								},
+								"json" : {
+									"value" : [
+										{
+											"Ordinal" : 9,
+											"Value" : 9
+										},
+										{
+											"Ordinal" : 10,
+											"Value" : 10
+										},
+										{
+											"Ordinal" : 11,
+											"Value" : 11
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cellsets('c1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 0,
+						"Value" : 0
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 1,
+						"Value" : 1
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 2,
+						"Value" : 2
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 3,
+						"Value" : 3
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 4,
+						"Value" : 4
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 5,
+						"Value" : 5
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 6,
+						"Value" : 6
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 7,
+						"Value" : 7
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 8,
+						"Value" : 8
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 9,
+						"Value" : 9
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 10,
+						"Value" : 10
+					}
+				},
+				{
+					"$model" : "CellsetCell",
+					"json" : {
+						"Ordinal" : 11,
+						"Value" : 11
+					}
+				}
+			]
+		},
+		{
+			"id" : "CellsetServiceTest#writesManyCellsAndRefusesAConsolidation#1",
+			"service" : "cellsets",
+			"method" : "updateCells",
+			"params" : [
+				"id",
+				"updates"
+			],
+			"args" : [
+				"c1",
+				[
+					{
+						"$patch" : "CellsetUpdatePatch",
+						"json" : {
+							"Ordinal" : 0,
+							"Value" : "x"
+						}
+					},
+					{
+						"$patch" : "CellsetUpdatePatch",
+						"json" : {
+							"Ordinal" : 1,
+							"Value" : 2.5
+						}
+					},
+					{
+						"$patch" : "CellsetUpdatePatch",
+						"json" : {
+							"Ordinal" : 2,
+							"Value" : 1,
+							"ReferenceCube@odata.bind" : "Cubes('Plan')"
+						}
+					}
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/tm1.UpdateCells",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Updates" : [
+								{
+									"Ordinal" : 0,
+									"Value" : "x"
+								},
+								{
+									"Ordinal" : 1,
+									"Value" : 2.5
+								},
+								{
+									"Ordinal" : 2,
+									"Value" : 1,
+									"ReferenceCube@odata.bind" : "Cubes('Plan')"
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellsetServiceTest#writesManyCellsAndRefusesAConsolidation#2",
+			"service" : "cellsets",
+			"method" : "updateCells",
+			"params" : [
+				"id",
+				"updates"
+			],
+			"args" : [
+				"c1",
+				[
+					{
+						"$patch" : "CellsetUpdatePatch",
+						"json" : {
+							"Ordinal" : 3,
+							"Value" : 1
+						}
+					}
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/tm1.UpdateCells",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Updates" : [
+								{
+									"Ordinal" : 3,
+									"Value" : 1
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "CubeCellWriteStatusElementIsConsolidated",
+								"message" : "consolidated"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "CubeCellWriteStatusElementIsConsolidated"
+			}
+		},
+		{
+			"id" : "CellsetServiceTest#writesNumbersTextAndNullsByOrdinal#1",
+			"service" : "cellsets",
+			"method" : "update",
+			"params" : [
+				"id",
+				"ordinal",
+				"value"
+			],
+			"args" : [
+				"c1",
+				0,
+				4
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/tm1.Update",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"BeginOrdinal" : 0,
+							"EndOrdinal" : 0,
+							"Value" : 4
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellsetServiceTest#writesNumbersTextAndNullsByOrdinal#2",
+			"service" : "cellsets",
+			"method" : "update",
+			"params" : [
+				"id",
+				"ordinal",
+				"value"
+			],
+			"args" : [
+				"c1",
+				5,
+				"it's"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/tm1.Update",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"BeginOrdinal" : 5,
+							"EndOrdinal" : 5,
+							"Value" : "it's"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellsetServiceTest#writesNumbersTextAndNullsByOrdinal#3",
+			"service" : "cellsets",
+			"method" : "update",
+			"params" : [
+				"id",
+				"ordinal",
+				"value"
+			],
+			"args" : [
+				"c1",
+				1,
+				{
+					"$double" : 2.5
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/tm1.Update",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"BeginOrdinal" : 1,
+							"EndOrdinal" : 1,
+							"Value" : 2.5
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CellsetServiceTest#writesNumbersTextAndNullsByOrdinal#4",
+			"service" : "cellsets",
+			"method" : "update",
+			"params" : [
+				"id",
+				"ordinal",
+				"value"
+			],
+			"args" : [
+				"c1",
+				1,
+				null
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/tm1.Update",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"BeginOrdinal" : 1,
+							"EndOrdinal" : 1,
+							"Value" : null
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

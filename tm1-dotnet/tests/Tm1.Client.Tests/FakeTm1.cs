@@ -103,7 +103,10 @@ public sealed class FakeTm1 : HttpMessageHandler
             }
         }
         var recorded = new Recorded(request.Method.Method, path["/api/v1/".Length..], headers, body);
-        Requests.Add(recorded);
+        lock (Requests)
+        {
+            Requests.Add(recorded);
+        }
         return Respond(recorded) switch
         {
             HttpResponseMessage m => m,

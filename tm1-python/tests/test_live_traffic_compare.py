@@ -80,3 +80,21 @@ def test_main_passes_alone_and_fails_on_a_difference(tool: ModuleType, tmp_path:
     _write(tmp_path, "typescript", _log("typescript", {"cube": "tm1conf_3_cube"}, _get("tm1conf_3_cube") | {"target": "Cubes"}))
     assert tool.main(["x", str(tmp_path)]) == 1
     assert "request 1 differs" in capsys.readouterr().out
+
+
+def test_a_steps_unordered_requests_compare_in_any_order_but_only_those(tool: ModuleType) -> None:
+    def page(n: int) -> dict[str, Any]:
+        return {"method": "GET", "target": f"Cellsets('c')/tm1.GetPartition(Begin={n},End={n})", "headers": {}}
+
+    post = {"method": "POST", "target": "ExecuteMDX", "headers": {}}
+    delete = {"method": "DELETE", "target": "Cellsets('c')", "headers": {}}
+    pages = tool.unordered({"steps": [{"unordered": r"^GET Cellsets\('[^']*'\)/tm1\.GetPartition\("}]})
+
+    def log(patterns: Any, *requests: dict[str, Any]) -> list[dict[str, Any]]:
+        head = {"scenario": "cellsets", "language": "x", "names": {}}
+        return tool.reorder(tool.normalize(head, [{"step": "steps[0]", "request": r, "status": 200} for r in requests]), patterns)
+
+    assert tool.compare({"java": log(pages, post, page(1), page(2), delete), "dotnet": log(pages, post, page(2), page(1), delete)}) == []
+    assert len(tool.compare({"java": log(pages, post, page(1), delete), "dotnet": log(pages, page(1), post, delete)})) == 1, "the rest keeps its order"
+    assert len(tool.compare({"java": log({}, page(1), page(2)), "dotnet": log({}, page(2), page(1))})) == 1, "only a marked step's"
+    assert tool.unordered(json.loads((Path(tool.__file__).parents[1] / "spec/conformance/live/cellsets.json").read_text()))

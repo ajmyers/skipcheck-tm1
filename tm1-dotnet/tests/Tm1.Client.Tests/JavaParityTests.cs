@@ -96,7 +96,7 @@ public partial class JavaParityTests
             foreach (var overload in method.Overloads)
             {
                 var expected = overload.Select(p => p.Type == "ODataQuery" ? "query" : p.Name).ToList();
-                if (!overloads.Any(o => Subsequence(expected, o.GetParameters().Select(p => p.Name!).Where(n => n != "cancellationToken").ToList())))
+                if (!overloads.Any(o => Subsequence(expected, o.GetParameters().Select(p => p.ParameterType == typeof(OData.ODataQuery) ? "query" : p.Name!).Where(n => n != "cancellationToken").ToList())))
                 {
                     problems.Add($"{dotnet}: no overload takes ({string.Join(", ", expected)}); has " + string.Join(" | ", overloads.Select(o => "(" + string.Join(", ", o.GetParameters().Select(p => p.Name)) + ")")));
                 }

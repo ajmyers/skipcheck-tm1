@@ -207,7 +207,7 @@ public sealed class CellsetService : Tm1Service
     /// }
     /// </code></summary>
     /// <param name="mdx">The query.</param>
-    /// <param name="query">What to select of each cell; include <c>Ordinal</c> to place them.</param>
+    /// <param name="cellQuery">What to select of each cell; include <c>Ordinal</c> to place them.</param>
     /// <param name="pageSize">How many cells to fetch per request.</param>
     /// <param name="handler">Given the cellset (its <c>ID</c> and expanded <c>Axes</c>) and its cells, in
     /// ordinal order; its result is this method's.</param>
@@ -215,16 +215,16 @@ public sealed class CellsetService : Tm1Service
     [Tm1Endpoint("ActionImport ExecuteMDX")]
     [Tm1Endpoint("Function Cellset/GetPartition")]
     [Tm1Endpoint("EntitySet Cellsets")]
-    public IAsyncEnumerable<R> StreamAsync<R>(string mdx, ODataQuery query, int pageSize, Func<Cellset, IAsyncEnumerable<CellsetCell>, IAsyncEnumerable<R>> handler, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<R> StreamAsync<R>(string mdx, ODataQuery cellQuery, int pageSize, Func<Cellset, IAsyncEnumerable<CellsetCell>, IAsyncEnumerable<R>> handler, CancellationToken cancellationToken = default)
     {
         Require(mdx, nameof(mdx));
-        Require(query, nameof(query));
+        Require(cellQuery, nameof(cellQuery));
         Require(handler, nameof(handler));
         if (pageSize < 1)
         {
             throw new ArgumentException("pageSize must be positive: " + pageSize, nameof(pageSize));
         }
-        return Stream(mdx, query, pageSize, handler, cancellationToken);
+        return Stream(mdx, cellQuery, pageSize, handler, cancellationToken);
     }
 
     private async IAsyncEnumerable<R> Stream<R>(string mdx, ODataQuery query, int pageSize, Func<Cellset, IAsyncEnumerable<CellsetCell>, IAsyncEnumerable<R>> handler, [EnumeratorCancellation] CancellationToken cancellationToken)

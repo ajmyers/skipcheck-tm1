@@ -9,8 +9,10 @@ text | bytes}, "status"}). The session's own requests (login, close, $metadata, 
 left out by the runners.
 
 This script normalizes every log the same way: the run's names back to their placeholders
-(${cube}), entity tags left out; then requires every language's log of a scenario to be equal,
-request for request, and prints the first difference. With fewer than two logs of a scenario,
+(${cube}), entity tags left out, and each run of requests a scenario's step marks "unordered" (a
+regular expression on "METHOD target", for requests a client has in flight at once, such as a
+cellset stream's pages) put in one order; then requires every language's log of a scenario to be
+equal, request for request, and prints the first difference. With fewer than two logs of a scenario,
 there's nothing to compare: it says so and passes.
 
     scripts/compare-live-traffic.py [build/conformance-live]
@@ -21,11 +23,14 @@ Exits 1 if any two languages sent something different. Standard library only.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
 
 ETAG_HEADERS = ("if-match", "if-none-match")
+
+SCENARIOS = Path(__file__).resolve().parents[1] / "spec" / "conformance" / "live"
 
 
 def load(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -67,6 +72,34 @@ def normalize(header: dict[str, Any], exchanges: list[dict[str, Any]]) -> list[d
     return out
 
 
+def unordered(scenario: dict[str, Any]) -> dict[str, re.Pattern[str]]:
+    """The steps whose matching requests may go out in any order: step label to pattern."""
+    return {f"steps[{i}]": re.compile(step["unordered"]) for i, step in enumerate(scenario.get("steps", [])) if "unordered" in step}
+
+
+def reorder(exchanges: list[dict[str, Any]], patterns: dict[str, re.Pattern[str]]) -> list[dict[str, Any]]:
+    """A normalized log with each run of a step's consecutive requests that match its pattern
+    sorted, so runs sent in different orders compare equal. Everything else keeps its order."""
+
+    def free(x: dict[str, Any]) -> bool:
+        pattern = patterns.get(x.get("step") or "")
+        return bool(pattern and pattern.search(f"{x['request']['method']} {x['request']['target']}"))
+
+    out: list[dict[str, Any]] = []
+    i = 0
+    while i < len(exchanges):
+        j = i
+        while j < len(exchanges) and free(exchanges[j]) and exchanges[j].get("step") == exchanges[i].get("step"):
+            j += 1
+        if j > i:
+            out.extend(sorted(exchanges[i:j], key=lambda x: json.dumps(x, sort_keys=True)))
+            i = j
+        else:
+            out.append(exchanges[i])
+            i += 1
+    return out
+
+
 def _ordered(value: Any) -> Any:
     """For comparing: JSON with its members' order kept."""
     if isinstance(value, dict):
@@ -104,7 +137,9 @@ def main(argv: list[str]) -> int:
     scenarios: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for log in sorted(root.glob("*/*.jsonl")):
         header, exchanges = load(log)
-        scenarios.setdefault(log.stem, {})[log.parent.name] = normalize(header, exchanges)
+        spec = SCENARIOS / f"{log.stem}.json"
+        patterns = unordered(json.loads(spec.read_text(encoding="utf-8"))) if spec.is_file() else {}
+        scenarios.setdefault(log.stem, {})[log.parent.name] = reorder(normalize(header, exchanges), patterns)
     failed = False
     for scenario, logs in sorted(scenarios.items()):
         problems = compare(logs)

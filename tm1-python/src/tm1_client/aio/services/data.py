@@ -328,14 +328,13 @@ class CellsetService(Service):
     async def stream(
         self,
         mdx: str,
-        query: ODataQuery | None,
+        cell_query: ODataQuery | None,
         page_size: int,
         handler: Callable[[Cellset, AsyncIterator[CellsetCell]], Awaitable[Any]],
     ) -> Any:
         """Runs an MDX query, gives ``handler`` the cellset (its ``ID`` and expanded ``Axes``)
         and its cells in ordinal order, then deletes the cellset however the handler finishes.
-        ``query`` (Java's ``cellQuery``) is what to select of each cell; include ``Ordinal`` to
-        place them. The handler's result is this method's.
+        ``cell_query`` is what to select of each cell; include ``Ordinal`` to place them. The handler's result is this method's.
 
         One round trip brings the axes (hierarchies by name, tuples with their members' names
         and unique names) and the first ``page_size`` cells; the rest come in pages of
@@ -344,7 +343,7 @@ class CellsetService(Service):
         one fetches each page when it's needed.)"""
         if page_size < 1:
             raise ValueError(f"page_size must be positive: {page_size}")
-        cell_query = query or ODataQuery.none()
+        cell_query = cell_query or ODataQuery.none()
         first = (
             ODataQuery.none()
             .expand(

@@ -107,6 +107,7 @@ public final class ConformanceDecoder {
 			case "$date" -> LocalDate.parse(body.asString());
 			case "$time" -> LocalTime.parse(body.asString());
 			case "$bytes" -> Base64.getDecoder().decode(body.asString());
+			case "$handler" -> ConformanceHandler.named(body.asString());
 			case "$type" -> factory(raw, node.get("factory").asString(), node.get("args"));
 			default -> throw new IllegalArgumentException("Unknown tag " + tag);
 		};

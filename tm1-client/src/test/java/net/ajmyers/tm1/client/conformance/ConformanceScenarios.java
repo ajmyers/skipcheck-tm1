@@ -240,6 +240,14 @@ public final class ConformanceScenarios {
 		return out;
 	}
 
+	/** Equal, numbers by their value: an expected {@code 0} is a {@code long} 0. */
+	private static boolean same(JsonNode expected, @Nullable JsonNode got) {
+		return got != null && expected.equals(
+				(a, b) -> a.equals(b)
+						|| (a.isNumber() && b.isNumber() && a.decimalValue().compareTo(b.decimalValue()) == 0) ? 0 : 1,
+				got);
+	}
+
 	/** Why the outcome doesn't meet the expectation, or null if it does. */
 	static @Nullable String check(JsonNode expect, JsonNode outcome) {
 		if (expect.has("error")) {
@@ -264,7 +272,7 @@ public final class ConformanceScenarios {
 		}
 		if (expect.has("fields")) {
 			for (var f : expect.get("fields").properties()) {
-				if (!f.getValue().equals(json.get(f.getKey()))) {
+				if (!same(f.getValue(), json.get(f.getKey()))) {
 					return "expected the fields " + expect.get("fields") + ", got " + result;
 				}
 			}
@@ -273,7 +281,7 @@ public final class ConformanceScenarios {
 			for (var f : expect.get("items").properties()) {
 				ArrayNode got = ConformanceCodec.json().createArrayNode();
 				result.forEach(item -> got.add((item.has("$model") ? item.get("json") : item).path(f.getKey())));
-				if (!f.getValue().equals(got)) {
+				if (!same(f.getValue(), got)) {
 					return "expected the items' " + f.getKey() + " " + f.getValue() + ", got " + got;
 				}
 			}

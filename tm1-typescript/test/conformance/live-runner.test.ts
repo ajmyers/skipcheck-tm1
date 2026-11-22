@@ -21,6 +21,50 @@ function fake(names: Record<string, string>): FakeTm1 {
   return tm1;
 }
 
+/** Answers as TM1 would for the cellsets, views and sandboxes scenarios: a cellset of 3 × 2 cells
+ * (and the slicer), names that exist but `missing`. */
+function dataFake(names: Record<string, string>): FakeTm1 {
+  const tm1 = new FakeTm1();
+  const cells = (begin: number, end: number) => Array.from({ length: end - begin + 1 }, (_, i) => ({ Ordinal: begin + i, Value: begin + i }));
+  tm1.respond = (r) => {
+    const { method, target } = r;
+    const body = r.body.length ? r.json : {};
+    let m: RegExpExecArray | null;
+    if (target.includes(`('${names["missing"]}')`) || (method === "POST" && target.startsWith("ExecuteRelationalDrillthrough"))) {
+      return FakeTm1.reply(404, { error: { code: "278", message: "no" } }, { "content-type": "application/json" });
+    }
+    if (method === "POST" && /^(Dimensions|Cubes|Sandboxes|Cubes\('[^']*'\)\/(Private)?Views)$/.test(target)) return FakeTm1.reply(201, { Name: body.Name }, { "content-type": "application/json" });
+    if (method === "POST" && target.split("?")[0] === "ExecuteMDX") {
+      if (String(body.MDX).includes("SELEKT")) return FakeTm1.reply(400, { error: { code: "501", message: "syntax" } }, { "content-type": "application/json" });
+      const top = Number(/\$top%3D(\d+)/.exec(target)![1]);
+      return { ID: "cs1", Axes: [{ Ordinal: 0, Cardinality: 3 }, { Ordinal: 1, Cardinality: 2 }, { Ordinal: 2, Cardinality: 1 }], Cells: cells(0, top - 1) };
+    }
+    if (method === "POST" && target.endsWith("/tm1.Execute?$select=ID")) return { ID: "cs2" };
+    if (method === "GET" && (m = /^Cellsets\('cs1'\)\/tm1\.GetPartition\(Begin=(\d+),End=(\d+)\)/.exec(target))) return FakeTm1.collection(...cells(Number(m[1]), Number(m[2])));
+    if (method === "GET" && (m = /^Cubes\('([^']*)'\)\/[A-Za-z]+\('[^']*'\)\/Cube/.exec(target))) return { Name: m[1] };
+    if (method === "GET" && (m = /^Cubes\('[^']*'\)\/(Private)?Views\('([^']*)'\)/.exec(target))) {
+      return target.includes("NativeView") ? { "@odata.type": "#ibm.tm1.api.v1.NativeView", SuppressEmptyRows: true, Name: m[2] } : { Name: m[2] };
+    }
+    if (method === "GET" && /^Cubes\('[^']*'\)\/PrivateViews\?/.test(target)) return FakeTm1.collection({ Name: names["native"] });
+    if (method === "GET" && (m = /^Sandboxes\('([^']*)'\)/.exec(target))) return { Name: m[1], IsLoaded: true };
+    return null;
+  };
+  return tm1;
+}
+
+describe("the live conformance runner, on the data scenarios", () => {
+  for (const name of ["cellsets", "views", "sandboxes"]) {
+    it(`runs the ${name} scenario`, async () => {
+      const scenario = live.scenarios().find((s) => s.name === name)!;
+      const names = live.namesFor(scenario);
+      const tm1 = dataFake(names);
+      const traffic = new live.Traffic(tm1, FakeTm1.BASE);
+      expect(await live.run(tm1.client((b) => b.transport(traffic)), traffic, scenario, names)).toEqual([]);
+      expect(new Set(traffic.exchanges.map((e) => e["step"])).size).toBe(scenario.steps.length + (scenario.finally?.length ?? 0));
+    });
+  }
+});
+
 describe("the live conformance runner", () => {
   const scenario = live.scenarios().find((s) => s.name === "cubes")!;
 

@@ -1,0 +1,113 @@
+{
+	"specVersion" : 1,
+	"name" : "views",
+	"description" : "Views of a fresh cube: a public MDX view and a private native one, read, listed, updated, executed, their cube, deleted, and a missing view.",
+	"names" : [ "region", "month", "cube", "mdx", "native", "missing" ],
+	"steps" : [
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${region}", "Hierarchies" : [ { "Name" : "${region}", "Elements" : [ { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${region}" } }
+		},
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${month}", "Hierarchies" : [ { "Name" : "${month}", "Elements" : [ { "Name" : "Jan", "Type" : "Numeric" }, { "Name" : "Feb", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${month}" } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "create",
+			"params" : [ "cube" ],
+			"args" : [ { "$patch" : "CubePatch", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${region}')", "Dimensions('${month}')" ] } } ],
+			"expect" : { "fields" : { "Name" : "${cube}" } }
+		},
+		{
+			"service" : "views",
+			"method" : "create",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "MDXViewPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.MDXView", "Name" : "${mdx}", "MDX" : "SELECT {[${month}].[${month}].[Jan]} ON 0, {[${region}].[${region}].[North]} ON 1 FROM [${cube}]" } } ],
+			"expect" : { "fields" : { "Name" : "${mdx}" } }
+		},
+		{
+			"service" : "views",
+			"method" : "create",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PRIVATE", "json" : "PRIVATE" }, { "$patch" : "NativeViewPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "Name" : "${native}", "SuppressEmptyRows" : true } } ],
+			"expect" : { "fields" : { "Name" : "${native}" } }
+		},
+		{
+			"service" : "views",
+			"method" : "get",
+			"params" : [ "cube", "scope", "view", "query" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${mdx}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "${mdx}" } }
+		},
+		{
+			"service" : "views",
+			"method" : "list",
+			"params" : [ "cube", "scope", "query" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PRIVATE", "json" : "PRIVATE" }, { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "${native}" ] } }
+		},
+		{
+			"service" : "views",
+			"method" : "getNative",
+			"params" : [ "cube", "scope", "view", "query" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PRIVATE", "json" : "PRIVATE" }, "${native}", { "$query" : { "select" : [ "Name", "SuppressEmptyRows" ] } } ],
+			"expect" : { "fields" : { "Name" : "${native}", "SuppressEmptyRows" : true } }
+		},
+		{
+			"service" : "views",
+			"method" : "update",
+			"params" : [ "cube", "scope", "view", "patch" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${mdx}", { "$patch" : "MDXViewPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.MDXView", "MDX" : "SELECT {[${month}].[${month}].[Feb]} ON 0, {[${region}].[${region}].[South]} ON 1 FROM [${cube}]" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "views",
+			"method" : "cube",
+			"params" : [ "cube", "scope", "view", "query" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${mdx}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "${cube}" } }
+		},
+		{
+			"service" : "cellsets",
+			"method" : "executeView",
+			"params" : [ "cube", "scope", "view", "query" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${mdx}", { "$query" : { "select" : [ "ID" ] } } ],
+			"expect" : { "fields" : { } }
+		},
+		{
+			"service" : "views",
+			"method" : "get",
+			"params" : [ "cube", "scope", "view", "query" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "views",
+			"method" : "delete",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PRIVATE", "json" : "PRIVATE" }, "${native}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "views",
+			"method" : "delete",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${mdx}" ],
+			"expect" : { "none" : true }
+		}
+	],
+	"finally" : [
+		{ "service" : "views", "method" : "delete", "params" : [ "cube", "scope", "view" ], "args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PRIVATE", "json" : "PRIVATE" }, "${native}" ] },
+		{ "service" : "views", "method" : "delete", "params" : [ "cube", "scope", "view" ], "args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${mdx}" ] },
+		{ "service" : "cubes", "method" : "delete", "params" : [ "name" ], "args" : [ "${cube}" ] },
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${region}" ] },
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${month}" ] }
+	]
+}

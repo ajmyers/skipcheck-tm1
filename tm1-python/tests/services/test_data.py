@@ -224,6 +224,33 @@ def test_a_failing_handler_still_deletes_the_cellset(api: Api, fake: FakeTm1) ->
         api.run(api.client.cellsets.stream("SELECT", None, 0, handler(api)))
 
 
+def test_a_handler_that_stops_reading_early_still_deletes_the_cellset(api: Api, fake: FakeTm1) -> None:
+    # Java: deletesTheCellsetWhenTheStreamIsCancelled
+    fake.respond = _cellset_server([3, 4], inline=3)
+    if api.flavor == "async":
+
+        async def first_four(cellset: Any, cells: Any) -> Any:
+            out = []
+            async for c in cells:
+                out.append(c.ordinal)
+                if len(out) == 4:
+                    break
+            return out
+
+    else:
+
+        def first_four(cellset: Any, cells: Any) -> Any:
+            out = []
+            for c in cells:
+                out.append(c.ordinal)
+                if len(out) == 4:
+                    break
+            return out
+
+    assert api.run(api.client.cellsets.stream("SELECT", ODataQuery.none().select(CellsetCell.ORDINAL), 3, first_four)) == [0, 1, 2, 3]
+    assert target(fake.last) == "DELETE Cellsets('cs1')"
+
+
 # Member sets
 
 
@@ -340,6 +367,26 @@ def test_within_records_the_work_and_ends_however_it_finishes(api: Api, fake: Fa
     with pytest.raises(RuntimeError):
         api.run(api.client.change_sets.within(fail))
     assert [target(r) for r in fake.requests] == ["POST BeginChangeSet", "POST EndChangeSet"]
+
+
+def test_within_does_no_work_if_the_change_set_cant_begin(api: Api, fake: FakeTm1) -> None:
+    # Java: doesNoWorkIfTheChangeSetCantBegin
+    from tm1_client import Tm1ServerError
+
+    fake.respond = lambda request: httpx.Response(500, json={"error": {"code": "1", "message": "down"}})
+    ran = []
+
+    def work(session: Any) -> Any:
+        ran.append(session)
+        return "never"
+
+    async def awork(session: Any) -> Any:
+        return work(session)
+
+    with pytest.raises(Tm1ServerError):
+        api.run(api.client.change_sets.within(awork if api.flavor == "async" else work))
+    assert ran == []
+    assert [target(r) for r in fake.requests] == ["POST BeginChangeSet"]
 
 
 def test_recording_is_within_as_a_context_manager(client: Any, fake: FakeTm1) -> None:

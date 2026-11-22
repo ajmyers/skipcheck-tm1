@@ -50,6 +50,80 @@ public class ConformanceLiveRunnerTests
         Assert.Equal("Dimensions", lines[1]["request"]!["target"]!.GetValue<string>());
     }
 
+    /// <summary>Answers as TM1 would for the cellsets, views and sandboxes scenarios: a cellset of
+    /// 3 × 2 cells (and the slicer), names that exist but <c>missing</c>.</summary>
+    private static FakeTm1 DataFake(System.Collections.Generic.IReadOnlyDictionary<string, string> names) => new()
+    {
+        Respond = r =>
+        {
+            static object[] Cells(long begin, long end) =>
+                Enumerable.Range((int)begin, (int)(end - begin + 1)).Select(object (n) => new { Ordinal = n, Value = n }).ToArray();
+            var (method, target) = (r.Method, r.Target);
+            if (target.Contains("('" + names["missing"] + "')", System.StringComparison.Ordinal)
+                || (method == "POST" && target.StartsWith("ExecuteRelationalDrillthrough", System.StringComparison.Ordinal)))
+            {
+                return FakeTm1.Json(new { error = new { code = "278", message = "no" } }, HttpStatusCode.NotFound);
+            }
+            if (method == "POST" && Regex.IsMatch(target, @"^(Dimensions|Cubes|Sandboxes|Cubes\('[^']*'\)/(Private)?Views)$"))
+            {
+                return FakeTm1.Json(new { Name = r.Json.GetProperty("Name").GetString() }, HttpStatusCode.Created);
+            }
+            if (method == "POST" && target.Split('?')[0] == "ExecuteMDX")
+            {
+                if (r.Json.GetProperty("MDX").GetString()!.Contains("SELEKT", System.StringComparison.Ordinal))
+                {
+                    return FakeTm1.Json(new { error = new { code = "501", message = "syntax" } }, HttpStatusCode.BadRequest);
+                }
+                var top = long.Parse(Regex.Match(target, @"\$top%3D(\d+)").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                return new { ID = "cs1", Axes = new[] { new { Ordinal = 0, Cardinality = 3 }, new { Ordinal = 1, Cardinality = 2 }, new { Ordinal = 2, Cardinality = 1 } }, Cells = Cells(0, top - 1) };
+            }
+            if (method == "POST" && target.EndsWith("/tm1.Execute?$select=ID", System.StringComparison.Ordinal))
+            {
+                return new { ID = "cs2" };
+            }
+            Match m;
+            if (method == "GET" && (m = Regex.Match(target, @"^Cellsets\('cs1'\)/tm1\.GetPartition\(Begin=(\d+),End=(\d+)\)")).Success)
+            {
+                return FakeTm1.Collection(Cells(long.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), long.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture)));
+            }
+            if (method == "GET" && (m = Regex.Match(target, @"^Cubes\('([^']*)'\)/[A-Za-z]+\('[^']*'\)/Cube")).Success)
+            {
+                return new { Name = m.Groups[1].Value };
+            }
+            if (method == "GET" && (m = Regex.Match(target, @"^Cubes\('[^']*'\)/(Private)?Views\('([^']*)'\)")).Success)
+            {
+                return target.Contains("NativeView", System.StringComparison.Ordinal)
+                    ? new System.Collections.Generic.Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.NativeView", ["SuppressEmptyRows"] = true, ["Name"] = m.Groups[2].Value }
+                    : new System.Collections.Generic.Dictionary<string, object?> { ["Name"] = m.Groups[2].Value };
+            }
+            if (method == "GET" && Regex.IsMatch(target, @"^Cubes\('[^']*'\)/PrivateViews\?"))
+            {
+                return FakeTm1.Collection(new { Name = names["native"] });
+            }
+            if (method == "GET" && (m = Regex.Match(target, @"^Sandboxes\('([^']*)'\)")).Success)
+            {
+                return new { Name = m.Groups[1].Value, IsLoaded = true };
+            }
+            return null;
+        },
+    };
+
+    [Theory]
+    [InlineData("cellsets")]
+    [InlineData("views")]
+    [InlineData("sandboxes")]
+    public async Task RunsTheDataScenarios(string name)
+    {
+        ConformanceLive.TrafficDirectory = Directory.CreateTempSubdirectory("conformance-").FullName;
+        var scenario = ConformanceLive.Load(name);
+        var names = ConformanceLive.NamesFor(scenario);
+        var fake = DataFake(names);
+        var traffic = new ConformanceLive.Traffic(fake, FakeTm1.Base);
+        var failures = await ConformanceLive.Run(fake.Client(b => b.HttpHandler(traffic)), traffic, scenario, names);
+        Assert.True(failures.Count == 0, string.Join("; ", failures));
+        Assert.Equal(scenario["steps"]!.AsArray().Count + scenario["finally"]!.AsArray().Count, traffic.Exchanges.Select(e => e["step"]!.GetValue<string>()).Distinct().Count());
+    }
+
     [Fact]
     public async Task StopsAtAStepThatMissesItsExpectationAndStillCleansUp()
     {

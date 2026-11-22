@@ -60,19 +60,39 @@ def test_unsupported_lists_only_real_cases() -> None:
     assert not set(_unsupported()) - ids, "unsupported.txt lists cases no fixture has"
 
 
+def _flat(exchanges: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The exchanges, an unordered group's in its place."""
+    return [x for entry in exchanges for x in entry.get("unordered", [entry])]
+
+
 class Replay:
-    """The fake TM1 answering each request with the recorded answer, in order."""
+    """The fake TM1 answering each request with the recorded answer, in order; within an
+    unordered group, with the answer of the group's equal request."""
 
     def __init__(self, session: dict[str, Any], case: dict[str, Any]):
         self.fake = FakeTm1()
         self.fake.product_version = session["productVersion"]
-        self.answers = [x["response"] for x in case["exchanges"]]
+        self.entries = [list(entry["unordered"]) if "unordered" in entry else [entry] for entry in case["exchanges"]]
+        self.expected: list[dict[str, Any]] = []
         self.fake.respond = self._answer
 
+    def _next(self, request: httpx.Request) -> dict[str, Any] | None:
+        while self.entries and not self.entries[0]:
+            self.entries.pop(0)
+        if not self.entries:
+            return None
+        group = self.entries[0]
+        sent = codec.request_of(request.method, _target(request), _headers(request), request.content)
+        match = next((x for x in group if codec.same_request(x["request"], sent)), group[0])
+        group.remove(match)
+        return match
+
     def _answer(self, request: httpx.Request) -> httpx.Response:
-        if not self.answers:
+        exchange = self._next(request)
+        if exchange is None:
             return httpx.Response(599, text=f"unscripted request {request.method} {request.url}")
-        r = self.answers.pop(0)
+        self.expected.append(exchange["request"])
+        r = exchange["response"]
         headers = dict(r.get("headers", {}))
         if "json" in r:
             return httpx.Response(r["status"], content=json.dumps(r["json"]).encode(), headers=headers)
@@ -85,12 +105,15 @@ class Replay:
         return httpx.Response(r["status"], headers=headers)
 
     def sent(self) -> list[dict[str, Any]]:
-        out = []
-        for request in self.fake.requests:
-            target = request.url.raw_path.decode().removeprefix("/api/v1/")
-            headers = {k.lower(): v for k, v in request.headers.items()}
-            out.append(codec.request_of(request.method, target, headers, request.content))
-        return out
+        return [codec.request_of(r.method, _target(r), _headers(r), r.content) for r in self.fake.requests]
+
+
+def _target(request: httpx.Request) -> str:
+    return request.url.raw_path.decode().removeprefix("/api/v1/")
+
+
+def _headers(request: httpx.Request) -> dict[str, str]:
+    return {k.lower(): v for k, v in request.headers.items()}
 
 
 def _call(service: Any, case: dict[str, Any]) -> Any:
@@ -146,11 +169,13 @@ def test_replays_the_java_call(session: dict[str, Any], case: dict[str, Any], fl
             loop.run_until_complete(http.aclose())
             loop.close()
 
-    expected = [x["request"] for x in case["exchanges"]]
+    # Each request against the recorded one it was answered with
+    expected = replay.expected
     sent = replay.sent()
     for i, (want, got) in enumerate(zip(expected, sent)):
         assert codec.same_request(want, got), f"request {i + 1} differs from Java's:\n  Java:   {want}\n  Python: {got}"
-    assert len(sent) == len(expected), f"sent {len(sent)} requests, Java sent {len(expected)}: {sent[len(expected):] or expected[len(sent):]}"
+    recorded = [x["request"] for x in _flat(case["exchanges"])]
+    assert len(sent) == len(recorded), f"sent {len(sent)} requests, Java sent {len(recorded)}: {sent[len(recorded):] or recorded[len(sent):]}"
 
     if "error" in case:
         assert "error" in outcome, f"Java failed with {case['error']}, Python gave {outcome.get('result')!r}"

@@ -62,6 +62,22 @@ public class ChangeSetServiceTests
     }
 
     [Fact]
+    public async Task DoesNoWorkIfTheChangeSetCantBegin()
+    {
+        // Java: doesNoWorkIfTheChangeSetCantBegin
+        _tm1.Respond = _ => FakeTm1.Json(new Dictionary<string, object?> { ["error"] = new Dictionary<string, object?> { ["code"] = "1", ["message"] = "down" } }, System.Net.HttpStatusCode.InternalServerError);
+        var ran = false;
+        Func<Tm1Session, Task<int>> work = _ =>
+        {
+            ran = true;
+            return Task.FromResult(1);
+        };
+        await Assert.ThrowsAsync<AjMyers.Tm1.Client.Errors.Tm1ServerException>(() => _tm1.Client().ChangeSets.WithinAsync(work));
+        Assert.False(ran);
+        Assert.Equal(["BeginChangeSet"], _tm1.Requests.Select(r => r.Target));
+    }
+
+    [Fact]
     public async Task StreamsWithinAChangeSetAndEndsItHoweverTheStreamEnds()
     {
         var tm1 = _tm1.Client();

@@ -66,8 +66,34 @@ public class ConformanceCallsTests
         }
         var (session, c) = All.Value[id];
         var fake = new FakeTm1 { ProductVersion = session["productVersion"]!.GetValue<string>() };
-        var answers = new Queue<JsonNode>(c["exchanges"]!.AsArray().Select(x => x!["response"]!));
-        fake.Respond = _ => answers.Count == 0 ? new HttpResponseMessage((HttpStatusCode)599) : Answer(answers.Dequeue());
+        // Each entry a list of exchanges: one, or an unordered group's, answered by the equal request
+        var entries = new Queue<List<JsonNode>>(c["exchanges"]!.AsArray()
+            .Select(x => x!["unordered"] is JsonArray group ? group.Select(g => g!).ToList() : [x!]));
+        var answered = new List<(JsonNode Sent, JsonNode Expected)>();
+        fake.Respond = r =>
+        {
+            lock (answered)
+            {
+                return Respond(r);
+            }
+        };
+        HttpResponseMessage Respond(FakeTm1.Recorded r)
+        {
+            while (entries.Count > 0 && entries.Peek().Count == 0)
+            {
+                entries.Dequeue();
+            }
+            if (entries.Count == 0)
+            {
+                return new HttpResponseMessage((HttpStatusCode)599);
+            }
+            var group = entries.Peek();
+            var sent = ConformanceCodec.Request(r.Method, r.Target, r.Headers, r.Body);
+            var exchange = group.FirstOrDefault(x => ConformanceCodec.Comparable(x["request"]) == ConformanceCodec.Comparable(sent)) ?? group[0];
+            group.Remove(exchange);
+            answered.Add((sent, exchange["request"]!));
+            return Answer(exchange["response"]!);
+        }
         var client = fake.Client();
 
         var service = typeof(Tm1Client).GetProperty(ConformanceCodec.Pascal(c["service"]!.GetValue<string>()))?.GetValue(client)
@@ -90,13 +116,13 @@ public class ConformanceCallsTests
             outcome = new JsonObject { ["error"] = ConformanceCodec.Error(e) };
         }
 
-        var expected = c["exchanges"]!.AsArray().Select(x => x!["request"]!).ToList();
-        var sent = fake.Requests.Select(r => ConformanceCodec.Request(r.Method, r.Target, r.Headers, r.Body)).ToList();
-        for (var i = 0; i < Math.Min(expected.Count, sent.Count); i++)
+        // Each request against the recorded one it was answered with
+        var recorded = c["exchanges"]!.AsArray().Sum(x => x!["unordered"] is JsonArray group ? group.Count : 1);
+        foreach (var (sent, expected) in answered)
         {
-            Assert.Equal(ConformanceCodec.Comparable(expected[i]), ConformanceCodec.Comparable(sent[i]));
+            Assert.Equal(ConformanceCodec.Comparable(expected), ConformanceCodec.Comparable(sent));
         }
-        Assert.Equal(expected.Count, sent.Count);
+        Assert.Equal(recorded, fake.Requests.Count);
 
         if (c["error"] is JsonObject error)
         {

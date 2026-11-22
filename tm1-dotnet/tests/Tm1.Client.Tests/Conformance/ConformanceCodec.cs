@@ -141,6 +141,12 @@ public static class ConformanceCodec
                 return TimeOnly.Parse(body!.GetValue<string>(), CultureInfo.InvariantCulture);
             case "$bytes":
                 return Convert.FromBase64String(body!.GetValue<string>());
+            case "$handler":
+                {
+                    var handler = Handler(body!.GetValue<string>());
+                    return target.IsInstanceOfType(handler.Value) ? handler.Value
+                        : throw new UnknownConformanceValueException($"handler {body} for a {target}");
+                }
             case "$type":
                 {
                     var name = body!.GetValue<string>();
@@ -156,6 +162,15 @@ public static class ConformanceCodec
         }
         throw new UnknownConformanceValueException("unknown tag " + tag);
     }
+
+    /// <summary>The handlers every runner knows by name (Java's <c>ConformanceHandler</c>): the
+    /// delegate, and the type it gives, for a generic method's type argument.</summary>
+    private static (object Value, Type Result) Handler(string name) => name switch
+    {
+        // (cellset, cells) => cells: a cellset stream's cells
+        "cells" => (new Func<Cellset, IAsyncEnumerable<CellsetCell>, IAsyncEnumerable<CellsetCell>>((_, cells) => cells), typeof(CellsetCell)),
+        _ => throw new UnknownConformanceValueException("no handler " + name),
+    };
 
     /// <summary>JSON as plain values, as a patch holds them.</summary>
     private static object? Plain(JsonNode? node) => node switch
@@ -185,8 +200,19 @@ public static class ConformanceCodec
     public static (MethodInfo, object?[]) Bind(Type type, string name, List<string> names, JsonArray args)
     {
         var fits = new List<(MethodInfo, object?[])>();
-        foreach (var m in type.GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(m => m.Name == name))
+        foreach (var declared in type.GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(m => m.Name == name))
         {
+            var m = declared;
+            if (m.IsGenericMethodDefinition)
+            {
+                // A generic method's type argument is what the handler it's given gives
+                var handlers = args.OfType<JsonObject>().Where(a => a.ContainsKey("$handler")).ToList();
+                if (handlers.Count != 1 || m.GetGenericArguments().Length != 1)
+                {
+                    continue;
+                }
+                m = m.MakeGenericMethod(Handler(handlers[0]["$handler"]!.GetValue<string>()).Result);
+            }
             var parameters = m.GetParameters();
             if (names.Any(n => parameters.All(p => p.Name != n)))
             {

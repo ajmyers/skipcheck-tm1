@@ -1,0 +1,87 @@
+{
+	"specVersion" : 1,
+	"name" : "cellsets",
+	"description" : "Cells of a fresh cube: write one and many, stream a query's cells in pages, run a statement, a bad query, a missing cellset and a missing cube.",
+	"names" : [ "region", "month", "cube", "missing" ],
+	"steps" : [
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${region}", "Hierarchies" : [ { "Name" : "${region}", "Elements" : [ { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${region}" } }
+		},
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${month}", "Hierarchies" : [ { "Name" : "${month}", "Elements" : [ { "Name" : "Jan", "Type" : "Numeric" }, { "Name" : "Feb", "Type" : "Numeric" }, { "Name" : "Mar", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${month}" } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "create",
+			"params" : [ "cube" ],
+			"args" : [ { "$patch" : "CubePatch", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${region}')", "Dimensions('${month}')" ] } } ],
+			"expect" : { "fields" : { "Name" : "${cube}" } }
+		},
+		{
+			"service" : "cells",
+			"method" : "update",
+			"params" : [ "cube", "tuple", "value" ],
+			"args" : [ "${cube}", { "$map" : { "${region}" : "North", "${month}" : "Jan" } }, 1 ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "cells",
+			"method" : "updateCells",
+			"params" : [ "cube", "updates" ],
+			"args" : [ "${cube}", [
+				{ "$patch" : "CubeUpdatePatch", "json" : { "Tuple@odata.bind" : [ "Dimensions('${region}')/Hierarchies('${region}')/Elements('South')", "Dimensions('${month}')/Hierarchies('${month}')/Elements('Feb')" ], "Value" : 2 } },
+				{ "$patch" : "CubeUpdatePatch", "json" : { "Tuple@odata.bind" : [ "Dimensions('${region}')/Hierarchies('${region}')/Elements('South')", "Dimensions('${month}')/Hierarchies('${month}')/Elements('Mar')" ], "Value" : 3 } }
+			] ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "cellsets",
+			"method" : "stream",
+			"params" : [ "mdx", "cellQuery", "pageSize", "handler" ],
+			"args" : [ "SELECT {[${month}].[${month}].[Jan], [${month}].[${month}].[Feb], [${month}].[${month}].[Mar]} ON 0, {[${region}].[${region}].[North], [${region}].[${region}].[South]} ON 1 FROM [${cube}]", { "$query" : { "select" : [ "Ordinal", "Value" ] } }, 2, { "$handler" : "cells" } ],
+			"unordered" : "^GET Cellsets\\('[^']*'\\)/tm1\\.GetPartition\\(",
+			"expect" : { "items" : { "Ordinal" : [ 0, 1, 2, 3, 4, 5 ] } }
+		},
+		{
+			"service" : "cellsets",
+			"method" : "executeStatement",
+			"params" : [ "mdx" ],
+			"args" : [ "SELECT {[${month}].[${month}].[Jan]} ON 0 FROM [${cube}]" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "cellsets",
+			"method" : "execute",
+			"params" : [ "mdx", "query" ],
+			"args" : [ "SELEKT nothing FROM [${cube}]", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api" } }
+		},
+		{
+			"service" : "cellsets",
+			"method" : "get",
+			"params" : [ "id", "query" ],
+			"args" : [ "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "cells",
+			"method" : "update",
+			"params" : [ "cube", "tuple", "value" ],
+			"args" : [ "${missing}", { "$map" : { "${region}" : "North", "${month}" : "Jan" } }, 1 ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		}
+	],
+	"finally" : [
+		{ "service" : "cubes", "method" : "delete", "params" : [ "name" ], "args" : [ "${cube}" ] },
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${region}" ] },
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${month}" ] }
+	]
+}

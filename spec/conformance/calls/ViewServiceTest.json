@@ -1,0 +1,994 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.cube.ViewServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "ViewServiceTest#aMissingViewIsNotFound#1",
+			"service" : "views",
+			"method" : "get",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Gone",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/Views('Gone')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Gone' can not be found in collection of type 'View'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ViewServiceTest#aViewThatExistsIsAConflictAndAStaleEtagIsRefused#1",
+			"service" : "views",
+			"method" : "create",
+			"params" : [
+				"cube",
+				"scope",
+				"view"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$patch" : "MDXViewPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.MDXView",
+						"Name" : "Mdx",
+						"MDX" : "SELECT"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/Views",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.MDXView",
+							"Name" : "Mdx",
+							"MDX" : "SELECT"
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Mdx' already exists"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ViewServiceTest#aViewThatExistsIsAConflictAndAStaleEtagIsRefused#2",
+			"service" : "views",
+			"method" : "update",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Mdx",
+				{
+					"$patch" : "MDXViewPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.MDXView",
+						"MDX" : "SELECT"
+					}
+				},
+				"W/\"0\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Cubes('Sales')/Views('Mdx')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"0\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.MDXView",
+							"MDX" : "SELECT"
+						}
+					},
+					"response" : {
+						"status" : 412,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "stale"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1PreconditionFailedException",
+				"category" : "api",
+				"kind" : "PRECONDITION_FAILED",
+				"status" : 412,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ViewServiceTest#createsUpdatesAndDeletes#1",
+			"service" : "views",
+			"method" : "create",
+			"params" : [
+				"cube",
+				"scope",
+				"view"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$patch" : "MDXViewPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.MDXView",
+						"Name" : "Mdx",
+						"MDX" : "SELECT {} ON 0 FROM [Sales]"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/Views",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.MDXView",
+							"Name" : "Mdx",
+							"MDX" : "SELECT {} ON 0 FROM [Sales]"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Mdx",
+							"MDX" : "SELECT {} ON 0 FROM [Sales]"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "View",
+				"json" : {
+					"Name" : "Mdx",
+					"MDX" : "SELECT {} ON 0 FROM [Sales]"
+				}
+			}
+		},
+		{
+			"id" : "ViewServiceTest#createsUpdatesAndDeletes#2",
+			"service" : "views",
+			"method" : "create",
+			"params" : [
+				"cube",
+				"scope",
+				"view"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				{
+					"$patch" : "NativeViewPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.NativeView",
+						"Name" : "Native",
+						"SuppressEmptyRows" : true
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/PrivateViews",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.NativeView",
+							"Name" : "Native",
+							"SuppressEmptyRows" : true
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Native"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "View",
+				"json" : {
+					"Name" : "Native"
+				}
+			}
+		},
+		{
+			"id" : "ViewServiceTest#createsUpdatesAndDeletes#3",
+			"service" : "views",
+			"method" : "update",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"patch"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Mdx",
+				{
+					"$patch" : "MDXViewPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.MDXView",
+						"MDX" : "SELECT {[Month].[Jan]} ON 0 FROM [Sales]"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Cubes('Sales')/Views('Mdx')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.MDXView",
+							"MDX" : "SELECT {[Month].[Jan]} ON 0 FROM [Sales]"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ViewServiceTest#createsUpdatesAndDeletes#4",
+			"service" : "views",
+			"method" : "update",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"Native",
+				{
+					"$patch" : "ViewPatch",
+					"json" : {
+						"Name" : "Renamed"
+					}
+				},
+				"W/\"3\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Cubes('Sales')/PrivateViews('Native')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"3\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Renamed"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ViewServiceTest#createsUpdatesAndDeletes#5",
+			"service" : "views",
+			"method" : "delete",
+			"params" : [
+				"cube",
+				"scope",
+				"view"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Joe's view"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cubes('Sales')/Views('Joe''s%20view')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ViewServiceTest#createsUpdatesAndDeletes#6",
+			"service" : "views",
+			"method" : "delete",
+			"params" : [
+				"cube",
+				"scope",
+				"view"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"Renamed"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cubes('Sales')/PrivateViews('Renamed')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ViewServiceTest#getsANativeViewByItsCast#1",
+			"service" : "views",
+			"method" : "getNative",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Native",
+				{
+					"$query" : {
+						"expand" : {
+							"Columns" : {
+								"expand" : {
+									"Subset" : {
+										"select" : [
+											"Name"
+										]
+									}
+								}
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/Views('Native')/ibm.tm1.api.v1.NativeView?$expand=Columns($expand%3DSubset($select%3DName))",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.NativeView",
+							"Name" : "Native",
+							"SuppressEmptyRows" : true,
+							"Columns" : [
+								{
+									"Subset" : {
+										"Name" : "Months"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "NativeView",
+				"json" : {
+					"@odata.type" : "#ibm.tm1.api.v1.NativeView",
+					"Name" : "Native",
+					"Columns" : [
+						{
+							"Subset" : {
+								"Name" : "Months"
+							}
+						}
+					],
+					"SuppressEmptyRows" : true
+				}
+			}
+		},
+		{
+			"id" : "ViewServiceTest#getsANativeViewByItsCast#2",
+			"service" : "views",
+			"method" : "getNative",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"Joe's",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/PrivateViews('Joe''s')/ibm.tm1.api.v1.NativeView",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.type" : "#ibm.tm1.api.v1.NativeView",
+							"Name" : "Mine"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "NativeView",
+				"json" : {
+					"@odata.type" : "#ibm.tm1.api.v1.NativeView",
+					"Name" : "Mine"
+				}
+			}
+		},
+		{
+			"id" : "ViewServiceTest#listsAndGetsInEitherScope#1",
+			"service" : "views",
+			"method" : "list",
+			"params" : [
+				"cube",
+				"scope",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/Views",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.MDXView",
+									"Name" : "Mdx",
+									"MDX" : "SELECT"
+								},
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.NativeView",
+									"Name" : "Native"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "MDXView",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.MDXView",
+						"Name" : "Mdx",
+						"MDX" : "SELECT"
+					}
+				},
+				{
+					"$model" : "NativeView",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.NativeView",
+						"Name" : "Native"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ViewServiceTest#listsAndGetsInEitherScope#2",
+			"service" : "views",
+			"method" : "list",
+			"params" : [
+				"cube",
+				"scope",
+				"query"
+			],
+			"args" : [
+				"Joe's",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"top" : 5
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Joe''s')/PrivateViews?$select=Name&$top=5",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Mine"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "View",
+					"json" : {
+						"Name" : "Mine"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ViewServiceTest#listsAndGetsInEitherScope#3",
+			"service" : "views",
+			"method" : "get",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"By Region",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/Views('By%20Region')?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.etag" : "W/\"3\"",
+							"Name" : "By Region"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "View",
+				"json" : {
+					"@odata.etag" : "W/\"3\"",
+					"Name" : "By Region"
+				}
+			}
+		},
+		{
+			"id" : "ViewServiceTest#listsAndGetsInEitherScope#4",
+			"service" : "views",
+			"method" : "get",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"Mine",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/PrivateViews('Mine')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Mine"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "View",
+				"json" : {
+					"Name" : "Mine"
+				}
+			}
+		},
+		{
+			"id" : "ViewServiceTest#readsTheViewsCube#1",
+			"service" : "views",
+			"method" : "cube",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Mdx",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/Views('Mdx')/Cube?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Sales"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cube",
+				"json" : {
+					"Name" : "Sales"
+				}
+			}
+		},
+		{
+			"id" : "ViewServiceTest#readsTheViewsCube#2",
+			"service" : "views",
+			"method" : "cube",
+			"params" : [
+				"cube",
+				"scope",
+				"view",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"Mine",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/PrivateViews('Mine')/Cube",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Sales"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cube",
+				"json" : {
+					"Name" : "Sales"
+				}
+			}
+		},
+		{
+			"id" : "ViewServiceTest#refusesAMissingViewName#1",
+			"service" : "views",
+			"method" : "delete",
+			"params" : [
+				"cube",
+				"scope",
+				"view"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$enum" : "ViewScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		}
+	]
+}

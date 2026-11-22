@@ -60,6 +60,11 @@ export function decode(value: Json): unknown {
       return v[tag];
     case "$bytes":
       return Uint8Array.from(Buffer.from(v.$bytes, "base64"));
+    case "$handler": {
+      const handler = HANDLERS[v.$handler as string];
+      if (!handler) throw new Unknown("no handler " + v.$handler);
+      return handler;
+    }
     case "$type": {
       const type = (Services as Record<string, any>)[v.$type];
       if (type === undefined || typeof type[v.factory] !== "function") throw new Unknown(`no factory ${v.$type}.${v.factory}`);
@@ -69,6 +74,12 @@ export function decode(value: Json): unknown {
       throw new Unknown("unknown tag " + tag);
   }
 }
+
+/** The handlers every runner knows by name (Java's ConformanceHandler). */
+const HANDLERS: Record<string, unknown> = {
+  // A cellset stream's cells
+  cells: (_cellset: unknown, cells: unknown) => cells,
+};
 
 /** A query rebuilt from its parts, with this client's own query builder. */
 export function query(parts: Record<string, any>): ODataQuery {

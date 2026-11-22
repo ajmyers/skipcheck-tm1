@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Consumer;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.buffer.DataBufferUtils;
@@ -69,9 +70,11 @@ public final class ConformanceTm1 implements ExchangeFunction {
 
 	private static final byte[] SNAPSHOT = snapshot();
 
-	private final Deque<Answer> answers = new ArrayDeque<>();
+	/** Each an {@link Answer}, or an {@link Unordered} group of them. */
+	private final Deque<Object> answers = new ArrayDeque<>();
 
-	private final List<ObjectNode> exchanges = new ArrayList<>();
+	/** Each an exchange, or the {@link Unordered} group it belongs to. */
+	private final List<Object> exchanges = new ArrayList<>();
 
 	private final List<Recorded> requests = new ArrayList<>();
 
@@ -146,9 +149,78 @@ public final class ConformanceTm1 implements ExchangeFunction {
 
 	/** Answers the next request with a TM1 error. */
 	public ConformanceTm1 error(int status, String code, String message) {
+		return json(status, errorJson(code, message));
+	}
+
+	/**
+	 * Answers the next requests, which may come in any order, each by its
+	 * {@code METHOD target}: for requests a call has in flight at once, such as a cellset
+	 * stream's pages. They're recorded as one {@code {"unordered": [...]}} entry of the
+	 * case's exchanges, in the order scripted here, and every runner answers each request
+	 * of the group with the answer for the equal request. All of them come before the
+	 * next scripted answer.
+	 * @param script scripts the group's answers
+	 * @return this fake
+	 */
+	public ConformanceTm1 unordered(Consumer<Unordered> script) {
+		Unordered group = new Unordered();
+		script.accept(group);
+		if (group.answers.isEmpty()) {
+			throw new IllegalArgumentException("An unordered group needs answers");
+		}
+		answers.add(group);
+		return this;
+	}
+
+	/** Answers that may be asked for in any order, each for its {@code METHOD target}. */
+	public static final class Unordered {
+
+		private final Map<String, Answer> answers = new LinkedHashMap<>();
+
+		private final Map<String, ObjectNode> answered = new LinkedHashMap<>();
+
+		private boolean recorded;
+
+		/** Answers {@code key} ({@code METHOD target}) with JSON. */
+		public Unordered json(String key, int status, String json) {
+			return add(key,
+					new Answer(status, Map.of("content-type", "application/json"), JSON.readTree(json), null, null));
+		}
+
+		/** Answers {@code key} ({@code METHOD target}) with {@code 200} and JSON. */
+		public Unordered json(String key, String json) {
+			return json(key, 200, json);
+		}
+
+		/** Answers {@code key} ({@code METHOD target}) with a TM1 error. */
+		public Unordered error(String key, int status, String code, String message) {
+			return json(key, status, errorJson(code, message));
+		}
+
+		private Unordered add(String key, Answer answer) {
+			if (answers.putIfAbsent(key, answer) != null) {
+				throw new IllegalArgumentException("Two answers in an unordered group for " + key);
+			}
+			return this;
+		}
+
+		private int remaining() {
+			return answers.size() - answered.size();
+		}
+
+		private ObjectNode node() {
+			ObjectNode node = JSON.createObjectNode();
+			var list = node.putArray("unordered");
+			answers.keySet().stream().filter(answered::containsKey).forEach(k -> list.add(answered.get(k)));
+			return node;
+		}
+
+	}
+
+	private static String errorJson(String code, String message) {
 		ObjectNode error = JSON.createObjectNode();
 		error.putObject("error").put("code", code).put("message", message);
-		return json(status, error.toString());
+		return error.toString();
 	}
 
 	/** The call's requests, the session's own left out. */
@@ -165,14 +237,16 @@ public final class ConformanceTm1 implements ExchangeFunction {
 
 	/** The exchanges since the last call to this, in order, and forgets them. */
 	List<ObjectNode> takeExchanges() {
-		List<ObjectNode> taken = List.copyOf(exchanges);
+		List<ObjectNode> taken = exchanges.stream()
+			.map(x -> x instanceof Unordered group ? group.node() : (ObjectNode) x)
+			.toList();
 		exchanges.clear();
 		return taken;
 	}
 
 	/** Answers left over: a call that sends fewer requests than scripted is a mistake. */
 	int unanswered() {
-		return answers.size();
+		return answers.stream().mapToInt(a -> a instanceof Unordered group ? group.remaining() : 1).sum();
 	}
 
 	void reset() {
@@ -222,9 +296,20 @@ public final class ConformanceTm1 implements ExchangeFunction {
 		});
 		putBody(req, headers.get("content-type"), body);
 
-		Answer answer = answers.poll();
-		if (answer == null) {
-			throw new IllegalStateException("No scripted answer for " + recorded.key());
+		Unordered group = answers.peek() instanceof Unordered u ? u : null;
+		Answer answer;
+		if (group != null) {
+			answer = group.answered.containsKey(recorded.key()) ? null : group.answers.get(recorded.key());
+			if (answer == null) {
+				throw new IllegalStateException("No answer in the unordered group for " + recorded.key() + ", only for "
+						+ group.answers.keySet() + " (answered: " + group.answered.keySet() + ")");
+			}
+		}
+		else {
+			answer = (Answer) answers.poll();
+			if (answer == null) {
+				throw new IllegalStateException("No scripted answer for " + recorded.key());
+			}
 		}
 		ObjectNode res = JSON.createObjectNode();
 		res.put("status", answer.status());
@@ -247,7 +332,19 @@ public final class ConformanceTm1 implements ExchangeFunction {
 		ObjectNode exchange = JSON.createObjectNode();
 		exchange.set("request", req);
 		exchange.set("response", res);
-		exchanges.add(exchange);
+		if (group != null) {
+			group.answered.put(recorded.key(), exchange);
+			if (!group.recorded) {
+				group.recorded = true;
+				exchanges.add(group);
+			}
+			if (group.remaining() == 0) {
+				answers.poll();
+			}
+		}
+		else {
+			exchanges.add(exchange);
+		}
 		return response.build();
 	}
 

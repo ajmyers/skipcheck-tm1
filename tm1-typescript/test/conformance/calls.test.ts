@@ -16,13 +16,16 @@ interface Exchange {
   response: { status: number; headers?: Record<string, string>; json?: unknown; text?: string; bytes?: string };
 }
 
+/** An exchange, or a group of them whose requests may come in any order. */
+type Entry = Exchange | { unordered: Exchange[] };
+
 interface Case {
   id: string;
   service: string;
   method: string;
   params: string[];
   args: any[];
-  exchanges: Exchange[];
+  exchanges: Entry[];
   result?: any;
   error?: codec.EncodedError;
 }
@@ -65,10 +68,18 @@ describe("conformance with the Java client's recorded calls", () => {
       (reason ? it.skip : it)(c.id, async () => {
         const tm1 = new FakeTm1();
         tm1.productVersion = fixture.session.productVersion;
-        const answers = c.exchanges.map((x) => x.response);
-        tm1.respond = () => {
-          const r = answers.shift();
-          if (!r) return FakeTm1.reply(599, "unscripted request");
+        // Each entry a list of exchanges: one, or an unordered group's, answered by the equal request
+        const entries = c.exchanges.map((x) => ("unordered" in x ? [...x.unordered] : [x]));
+        const answered: [sent: Record<string, unknown>, expected: Record<string, unknown>][] = [];
+        tm1.respond = (request) => {
+          while (entries.length > 0 && entries[0]!.length === 0) entries.shift();
+          const group = entries[0];
+          if (!group) return FakeTm1.reply(599, "unscripted request");
+          const sent = codec.requestOf(request.method, request.target, request.headers, request.body);
+          const exchange = group.find((x) => codec.comparable(x.request) === codec.comparable(sent)) ?? group[0]!;
+          group.splice(group.indexOf(exchange), 1);
+          answered.push([sent, exchange.request]);
+          const r = exchange.response;
           const body = r.json !== undefined ? utf8.encode(JSON.stringify(r.json)) : r.text !== undefined ? r.text : r.bytes !== undefined ? Uint8Array.from(Buffer.from(r.bytes, "base64")) : undefined;
           return FakeTm1.reply(r.status, body, r.headers ?? {});
         };
@@ -90,12 +101,10 @@ describe("conformance with the Java client's recorded calls", () => {
           outcome = { error: codec.error(e) };
         }
 
-        const sent = tm1.requests.map((r) => codec.requestOf(r.method, r.target, r.headers, r.body));
-        const expected = c.exchanges.map((x) => x.request);
-        for (let i = 0; i < Math.min(sent.length, expected.length); i++) {
-          expect(codec.comparable(sent[i]!), `request ${i + 1}`).toBe(codec.comparable(expected[i]!));
-        }
-        expect(sent.length, "requests sent").toBe(expected.length);
+        // Each request against the recorded one it was answered with
+        answered.forEach(([sent, expected], i) => expect(codec.comparable(sent), `request ${i + 1}`).toBe(codec.comparable(expected)));
+        const recorded = c.exchanges.reduce((n, x) => n + ("unordered" in x ? x.unordered.length : 1), 0);
+        expect(tm1.requests.length, "requests sent").toBe(recorded);
 
         if (c.error) {
           expect("error" in outcome ? outcome.error : outcome, "the error").toSatisfy(

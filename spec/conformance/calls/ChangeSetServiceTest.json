@@ -1,0 +1,224 @@
+{
+	"specVersion" : 1,
+	"source" : "net.ajmyers.tm1.client.service.data.ChangeSetServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "ChangeSetServiceTest#anUnknownChangeSetIsNotFound#1",
+			"service" : "changeSets",
+			"method" : "undo",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"x's"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "UndoChangeSet",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"ChangeSetID" : "x's"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'x' can not be found"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ChangeSetServiceTest#anUnknownChangeSetIsNotFound#2",
+			"service" : "changeSets",
+			"method" : "end",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"x"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "EndChangeSet",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"ChangeSetID" : "x"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'x' can not be found"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ChangeSetServiceTest#beginsEndsAndUndoes#1",
+			"service" : "changeSets",
+			"method" : "begin",
+			"params" : [ ],
+			"args" : [ ],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "BeginChangeSet",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.context" : "$metadata#Edm.String",
+							"value" : "7"
+						}
+					}
+				}
+			],
+			"result" : "7"
+		},
+		{
+			"id" : "ChangeSetServiceTest#beginsEndsAndUndoes#2",
+			"service" : "changeSets",
+			"method" : "end",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"7"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "EndChangeSet",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"ChangeSetID" : "7"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.context" : "$metadata#Edm.Int64",
+							"value" : 3
+						}
+					}
+				}
+			],
+			"result" : 3
+		},
+		{
+			"id" : "ChangeSetServiceTest#beginsEndsAndUndoes#3",
+			"service" : "changeSets",
+			"method" : "undo",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"7"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "UndoChangeSet",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"ChangeSetID" : "7"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ChangeSetServiceTest#refusesAMissingId#1",
+			"service" : "changeSets",
+			"method" : "end",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		}
+	]
+}
