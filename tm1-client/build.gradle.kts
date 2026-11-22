@@ -77,4 +77,13 @@ tasks.test {
 	val spec = rootDir.resolve("spec/tm1-api.json")
 	systemProperty("tm1.spec", spec.path)
 	inputs.file(spec).withPathSensitivity(PathSensitivity.RELATIVE)
+	// Conformance fixtures (spec/conformance/calls): the tests check them, or with
+	// -PrecordConformance rewrite them from what the tests record
+	val calls = rootDir.resolve("spec/conformance/calls")
+	val record = providers.gradleProperty("recordConformance").isPresent
+	systemProperty("tm1.conformance.record", record)
+	inputs.dir(calls).withPathSensitivity(PathSensitivity.RELATIVE).optional()
+	if (record) {
+		outputs.upToDateWhen { false }
+	}
 }

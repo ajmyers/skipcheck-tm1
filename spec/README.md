@@ -22,6 +22,8 @@ spec/conformance/*.json                            cases every client's tests mu
 | `tm1-overlay.json` | TM1's departures from `$metadata` (plan §16.5): properties sent in another type (`departures`), dates TM1 sometimes garbles (`lenientDates`), and notes about endpoints, with generic requests a client mustn't offer (`forbid`). Notes are Markdown. | Hand |
 | `tm1-api.json` | The snapshot as plain JSON, with the overlay merged in: `enums`, `types`, `operations`, `container`, and `endpoints`, the coverage inventory. Sorted and versioned (`specVersion`), so a TM1 upgrade shows up as a readable diff. | `./gradlew :tm1-codegen:exportSpec` |
 | `conformance/odata-encoding.json` | Paths and literals every client must build identically. | Hand |
+| `conformance/calls/*.json` | Service calls the Java unit tests record, with every request and answer, which every other client replays exactly ([format](conformance/README.md)). | `./gradlew :tm1-client:test -PrecordConformance` |
+| `conformance/live/*.json` | Scenarios every client runs against a real TM1; `scripts/compare-live-traffic.py` compares what each sent ([format](conformance/README.md#live-scenarios-live)). | Hand |
 
 `tm1-api.json` is committed so clients in other languages build without a JVM. The `build` job fails when it's out of date (`ApiSpecTest`).
 
@@ -39,6 +41,8 @@ Every client has a coverage gate over this list. An endpoint is implemented, exc
 | TypeScript | `tm1-typescript/test/coverage-gate.test.ts` | `tm1-typescript/coverage/*.txt` | as Java's: 240, the same 2 excluded |
 
 Beyond counting endpoints, each client has a parity gate that reads the Java sources: every public service class and method, with the same endpoints and parameters (`tm1-python/tests/test_java_parity.py`, `tm1-dotnet/tests/.../JavaParityTests.cs`, `tm1-typescript/test/java-parity.test.ts`), and the runtime's public API (`test_java_parity_runtime.py`, `JavaParityRuntimeTests.cs`, `java-parity-runtime.test.ts`). Each also pins the exact headers Java's `Connection` sends.
+
+The gates compare names and signatures; behaviour is compared by [conformance](conformance/README.md). The Java unit tests record each service call they make, with every request and answer. Every other client replays the recording and must send the same requests and return the same result. Against a real TM1, every client runs the same scenarios, and their traffic is compared.
 
 Python also runs `test_contract.py`, which works out a route from the root to every endpoint from the spec alone, calls it through both generated APIs against a fake server, and checks the request each sends. And it reads the `$metadata` snapshot itself, as a server's capabilities, into exactly the spec's 242 IDs.
 

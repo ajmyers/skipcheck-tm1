@@ -44,3 +44,6 @@ logs/
 
 ### Kotlin (build-logic) ###
 .kotlin/
+
+### Python ###
+__pycache__/

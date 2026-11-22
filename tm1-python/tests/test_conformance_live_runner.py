@@ -1,0 +1,92 @@
+"""The live conformance runner, offline: the cubes scenario against a fake TM1 that answers as TM1
+would, in both flavors, writing traffic that scripts/compare-live-traffic.py finds equal."""
+
+from __future__ import annotations
+
+import asyncio
+import importlib.util
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+import httpx
+import pytest
+
+from tm1_client import Tm1Client, Tm1Session, auth
+from tm1_client.aio import AsyncTm1Client, AsyncTm1Session
+
+from . import conformance_live as live
+from .conftest import BASE, FakeTm1
+
+
+def _tm1(names: dict[str, str]) -> FakeTm1:
+    fake = FakeTm1()
+
+    def respond(request: httpx.Request) -> Any:
+        target = request.url.raw_path.decode().removeprefix("/api/v1/")
+        body = json.loads(request.content) if request.content else {}
+        if request.method == "POST" and target in ("Dimensions", "Cubes"):
+            return httpx.Response(201, json={"Name": body["Name"]})
+        if request.method == "GET" and (m := re.fullmatch(r"Cubes\('([^']*)'\)(\?.*)?", target)):
+            return httpx.Response(404, json={"error": {"code": "278", "message": "no"}}) if m[1] == names["missing"] else {"Name": m[1]}
+        if request.method == "GET" and target.endswith("/Dimensions?$select=Name"):
+            return {"value": [{"Name": names["region"]}, {"Name": names["month"]}]}
+        if target.endswith("tm1.CheckRules"):
+            return {"value": []}
+        return None
+
+    fake.respond = respond
+    return fake
+
+
+@pytest.fixture
+def traffic_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setattr(live, "TRAFFIC", tmp_path)
+    return tmp_path
+
+
+def test_runs_the_cubes_scenario_in_both_flavors_and_the_traffic_compares_equal(traffic_dir: Path) -> None:
+    scenario = json.loads((live.SCENARIOS / "cubes.json").read_text(encoding="utf-8"))
+
+    names = live.names_for(scenario)
+    fake = _tm1(names)
+    traffic = live.Traffic(BASE)
+    http = httpx.Client(transport=httpx.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
+    assert live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names) == []
+    traffic.write("cubes", "python-sync", names)
+
+    names2 = live.names_for(scenario)
+    fake2 = _tm1(names2)
+    traffic2 = live.Traffic(BASE)
+
+    async def go() -> list[str]:
+        http = httpx.AsyncClient(transport=httpx.MockTransport(fake2.handler), event_hooks={"response": [traffic2.arecord]})
+        return await live.arun(AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic2, scenario, names2)
+
+    assert asyncio.run(go()) == []
+    traffic2.write("cubes", "python-async", names2)
+
+    lines = (traffic_dir / "python-sync" / "cubes.jsonl").read_text().splitlines()
+    assert json.loads(lines[0])["names"] == names
+    steps = [json.loads(line)["step"] for line in lines[1:]]
+    assert steps[0] == "steps[0]" and steps[-1] == "finally[2]"
+    assert len(steps) == len(scenario["steps"]) + len(scenario["finally"]), "the session's own requests are left out"
+
+    spec = importlib.util.spec_from_file_location("compare", live.REPO / "scripts" / "compare-live-traffic.py")
+    assert spec and spec.loader
+    compare = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(compare)
+    assert compare.main(["x", str(traffic_dir)]) == 0
+
+
+def test_a_step_that_misses_its_expectation_fails_and_still_cleans_up(traffic_dir: Path) -> None:
+    scenario = json.loads((live.SCENARIOS / "cubes.json").read_text(encoding="utf-8"))
+    names = live.names_for(scenario)
+    fake = _tm1(names)
+    fake.respond = lambda request: httpx.Response(500, json={"error": {"code": "1", "message": "down"}})
+    traffic = live.Traffic(BASE)
+    http = httpx.Client(transport=httpx.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
+    failures = live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names)
+    assert len(failures) == 1 and failures[0].startswith("step 0 dimensions.create")
+    assert [e["step"] for e in traffic.exchanges][-3:] == ["finally[0]", "finally[1]", "finally[2]"]

@@ -11,6 +11,10 @@
 # Each suite starts its own tm1-server container from it (they share the bundle cache volume),
 # or, with TM1_URL set, the Python, .NET and TypeScript suites use that server instead.
 #
+# Each suite also runs the live conformance scenarios (spec/conformance/live) and writes what it
+# sent to build/conformance-live/<language>; afterwards scripts/compare-live-traffic.py requires
+# every language to have sent the same requests.
+#
 #   scripts/live-tests.sh                  # all four
 #   scripts/live-tests.sh python dotnet    # some
 set -euo pipefail
@@ -24,6 +28,7 @@ fi
 suites=("$@")
 [[ ${#suites[@]} -eq 0 ]] && suites=(java python dotnet typescript)
 failed=()
+rm -rf build/conformance-live
 for suite in "${suites[@]}"; do
   echo "== $suite"
   case "$suite" in
@@ -34,6 +39,8 @@ for suite in "${suites[@]}"; do
     *) echo "Unknown suite: $suite (java, python, dotnet, typescript)" >&2; exit 2 ;;
   esac
 done
+echo "== conformance traffic"
+python3 scripts/compare-live-traffic.py build/conformance-live || failed+=(conformance)
 if [[ ${#failed[@]} -gt 0 ]]; then
   echo "Failed: ${failed[*]}" >&2
   exit 1

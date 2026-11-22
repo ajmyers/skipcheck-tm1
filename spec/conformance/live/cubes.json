@@ -1,0 +1,76 @@
+{
+	"specVersion" : 1,
+	"name" : "cubes",
+	"description" : "A cube over two fresh dimensions: create, read, its dimensions, rules, a missing cube, delete.",
+	"names" : [ "region", "month", "cube", "missing" ],
+	"steps" : [
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${region}", "Hierarchies" : [ { "Name" : "${region}", "Elements" : [ { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${region}" } }
+		},
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${month}", "Hierarchies" : [ { "Name" : "${month}", "Elements" : [ { "Name" : "Jan", "Type" : "Numeric" }, { "Name" : "Feb", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${month}" } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "create",
+			"params" : [ "cube" ],
+			"args" : [ { "$patch" : "CubePatch", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${region}')", "Dimensions('${month}')" ] } } ],
+			"expect" : { "fields" : { "Name" : "${cube}" } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${cube}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "${cube}" } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "dimensions",
+			"params" : [ "name", "query" ],
+			"args" : [ "${cube}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "${region}", "${month}" ] } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${cube}", { "$patch" : "CubePatch", "json" : { "Rules" : "SKIPCHECK;" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "cubes",
+			"method" : "checkRules",
+			"params" : [ "name" ],
+			"args" : [ "${cube}" ],
+			"expect" : { "count" : 0 }
+		},
+		{
+			"service" : "cubes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${cube}" ],
+			"expect" : { "none" : true }
+		}
+	],
+	"finally" : [
+		{ "service" : "cubes", "method" : "delete", "params" : [ "name" ], "args" : [ "${cube}" ] },
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${region}" ] },
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${month}" ] }
+	]
+}
