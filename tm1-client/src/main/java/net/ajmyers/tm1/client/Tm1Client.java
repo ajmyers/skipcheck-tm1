@@ -25,6 +25,7 @@ import net.ajmyers.tm1.client.service.dimension.HierarchyService;
 import net.ajmyers.tm1.client.service.dimension.LevelService;
 import net.ajmyers.tm1.client.service.dimension.MemberService;
 import net.ajmyers.tm1.client.service.dimension.SubsetService;
+import net.ajmyers.tm1.client.service.process.ChoreService;
 import net.ajmyers.tm1.client.service.process.ProcessDebugService;
 import net.ajmyers.tm1.client.service.process.ProcessService;
 import net.ajmyers.tm1.client.session.Tm1Session;
@@ -92,6 +93,8 @@ public final class Tm1Client {
 
 	private final ProcessDebugService processDebugging;
 
+	private final ChoreService chores;
+
 	private Tm1Client(Tm1Session session) {
 		this.session = Objects.requireNonNull(session, "session");
 		this.dimensions = new DimensionService(session);
@@ -113,6 +116,7 @@ public final class Tm1Client {
 		this.drillthrough = new DrillthroughService(session);
 		this.processes = new ProcessService(session);
 		this.processDebugging = new ProcessDebugService(session);
+		this.chores = new ChoreService(session);
 	}
 
 	/**
@@ -291,6 +295,14 @@ public final class Tm1Client {
 	 */
 	public ProcessDebugService processDebugging() {
 		return processDebugging;
+	}
+
+	/**
+	 * Chores.
+	 * @return the chore service, on this client's session
+	 */
+	public ChoreService chores() {
+		return chores;
 	}
 
 	/**

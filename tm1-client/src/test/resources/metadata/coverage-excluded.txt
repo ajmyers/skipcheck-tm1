@@ -2,3 +2,4 @@
 # Deprecated endpoints are still implemented, since servers still serve them.
 # See CoverageGateTest.
 ActionImport Update | The same tm1.Update as Action Cube/Update, with the cube as a parameter; CellService.update calls the bound one
+ActionImport ExecuteChore | The same tm1.ExecuteChore as Action Chore/Execute, with the chore as a parameter; ChoreService.execute calls the bound one
