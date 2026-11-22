@@ -8,6 +8,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpMethod;
 
 import net.ajmyers.tm1.client.odata.ODataPath;
@@ -43,6 +45,11 @@ public final class Tm1Request<T> {
 		COLLECTION,
 		/** Plain text, such as {@code $value} or {@code $count}. */
 		TEXT,
+		/**
+		 * Raw bytes, such as a document's content, streamed as {@code DataBuffer}s as
+		 * they arrive.
+		 */
+		BYTES,
 		/** No content (or content that's ignored). */
 		NONE
 
@@ -102,6 +109,43 @@ public final class Tm1Request<T> {
 	 */
 	public static <T> Tm1Request<T> list(ODataPath path, ODataQuery query, Class<T> itemType) {
 		return new Tm1Request<>(HttpMethod.GET, path, query, Map.of(), null, Response.COLLECTION, itemType, null, null);
+	}
+
+	/**
+	 * {@code GET} of raw bytes, such as a document's {@code Content}, streamed with
+	 * {@code Tm1Session.stream}. Each buffer is the subscriber's to release
+	 * ({@code DataBufferUtils.release}), or to hand on to something that does, such as
+	 * {@code DataBufferUtils.write}.
+	 * @param path the resource path
+	 * @return the request
+	 */
+	public static Tm1Request<DataBuffer> bytes(ODataPath path) {
+		return new Tm1Request<>(HttpMethod.GET, path, ODataQuery.none(), Map.of(), null, Response.BYTES,
+				DataBuffer.class, null, null);
+	}
+
+	/**
+	 * {@code PUT} of raw bytes, as {@code application/octet-stream}, such as a document's
+	 * {@code Content}. TM1 (11.8) refuses a chunked body (400, with no message), so the
+	 * bytes are gathered and sent with their {@code Content-Length}: the whole content is
+	 * held in memory while it's sent. If the session has to log in again, the request is
+	 * sent once more and {@code content} subscribed again, so it should be one that can
+	 * be: {@code DataBufferUtils.read} of a file is.
+	 * @param path the resource path
+	 * @param content the bytes
+	 * @return the request
+	 */
+	public static Tm1Request<Void> put(ODataPath path, Publisher<DataBuffer> content) {
+		return new Tm1Request<>(HttpMethod.PUT, path, ODataQuery.none(), Map.of(),
+				new Bytes(Objects.requireNonNull(content, "content")), Response.NONE, Void.class, null, null);
+	}
+
+	/**
+	 * A body of raw bytes rather than JSON: see {@link #put(ODataPath, Publisher)}.
+	 *
+	 * @param content the bytes
+	 */
+	public record Bytes(Publisher<DataBuffer> content) {
 	}
 
 	/**

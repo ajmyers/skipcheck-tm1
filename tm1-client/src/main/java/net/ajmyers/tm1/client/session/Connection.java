@@ -239,6 +239,10 @@ final class Connection {
 	 * pool, so a collection of many pages doesn't hold a connection for its whole length.
 	 */
 	<T> Flux<T> stream(Tm1Request<T> request) {
+		if (request.response() == Tm1Request.Response.BYTES) {
+			return exchange(request, uri(request.relativeUri()),
+					response -> response.bodyToFlux(DataBuffer.class).map(request.type()::cast));
+		}
 		return page(request, uri(request.relativeUri()));
 	}
 
@@ -370,13 +374,25 @@ final class Connection {
 			long start = System.nanoTime();
 			log.debug("Sending {} {}", method, uri);
 			WebClient.RequestBodySpec spec = web.method(request.method()).uri(uri).headers(h -> {
-				odataHeaders(h, request.response() == Tm1Request.Response.TEXT);
+				odataHeaders(h, request.response());
 				request.headers().forEach(h::set);
 			})
 				.cookie(COOKIE, session.cookie())
 				.httpRequest(r -> responseTimeout(r.getNativeRequest(), request.timeout().orElse(timeouts.request())));
-			WebClient.RequestHeadersSpec<?> ready = request.body() == null ? spec
-					: spec.contentType(MediaType.APPLICATION_JSON).bodyValue(json(request.body()));
+			Object body = request.body();
+			WebClient.RequestHeadersSpec<?> ready;
+			if (body == null) {
+				ready = spec;
+			}
+			else if (body instanceof Tm1Request.Bytes bytes) {
+				// TM1 (11.8) refuses a chunked body with 400, so the bytes are gathered
+				// and sent with their length
+				ready = spec.contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.body(DataBufferUtils.join(bytes.content()), DataBuffer.class);
+			}
+			else {
+				ready = spec.contentType(MediaType.APPLICATION_JSON).bodyValue(json(body));
+			}
 			return ready.<R>exchangeToFlux(response -> {
 				int status = response.statusCode().value();
 				log.debug("Received {} for {} {} after {} ms", status, method, uri,
@@ -473,7 +489,7 @@ final class Connection {
 	private Mono<LoggedIn> sendLogin(URI uri, String authorization, @Nullable String seedCookie) {
 		return Mono.defer(() -> {
 			WebClient.RequestHeadersSpec<?> spec = web.get().uri(uri).headers(h -> {
-				odataHeaders(h, false);
+				odataHeaders(h, Tm1Request.Response.SINGLE);
 				h.set(HttpHeaders.AUTHORIZATION, authorization);
 				if (impersonate != null) {
 					// At login only: TM1 decides the identity then and ignores the header
@@ -552,7 +568,7 @@ final class Connection {
 	private Mono<Void> sendClose(LoggedIn session) {
 		URI uri = uri(CLOSE_PATH);
 		Mono<Void> close = web.post().uri(uri).headers(h -> {
-			odataHeaders(h, false);
+			odataHeaders(h, Tm1Request.Response.SINGLE);
 			// TM1 sometimes drops the connection that carried a close, so the next
 			// request to
 			// reuse it gets no response at all. Don't put it back in the pool.
@@ -588,10 +604,14 @@ final class Connection {
 		return URI.create(root + relative);
 	}
 
-	private static void odataHeaders(HttpHeaders headers, boolean text) {
+	private static void odataHeaders(HttpHeaders headers, Tm1Request.Response response) {
 		headers.set("OData-Version", "4.0");
 		headers.set("OData-MaxVersion", "4.0");
-		headers.set(HttpHeaders.ACCEPT, text ? "text/plain, application/json" : MediaType.APPLICATION_JSON_VALUE);
+		headers.set(HttpHeaders.ACCEPT, switch (response) {
+			case TEXT -> "text/plain, application/json";
+			case BYTES -> "*/*";
+			default -> MediaType.APPLICATION_JSON_VALUE;
+		});
 	}
 
 	private static void responseTimeout(Object nativeRequest, Duration timeout) {

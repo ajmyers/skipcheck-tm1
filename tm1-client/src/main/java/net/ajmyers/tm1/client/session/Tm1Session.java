@@ -97,9 +97,9 @@ public final class Tm1Session {
 	 */
 	public <T> Mono<T> execute(Tm1Request<T> request) {
 		Objects.requireNonNull(request, "request");
-		if (request.response() == Tm1Request.Response.COLLECTION) {
-			return Mono
-				.error(new IllegalArgumentException("Collection requests are streamed: use stream() for " + request));
+		if (request.response() == Tm1Request.Response.COLLECTION || request.response() == Tm1Request.Response.BYTES) {
+			return Mono.error(new IllegalArgumentException(
+					"Collection and byte requests are streamed: use stream() for " + request));
 		}
 		Mono<T> send = connection.execute(inSandbox(request));
 		return request.requirement().map(needed -> connection.require(needed).then(send)).orElse(send);
@@ -108,7 +108,8 @@ public final class Tm1Session {
 	/**
 	 * Sends a {@link Tm1Request.Response#COLLECTION} request and streams its items as
 	 * they're decoded, never holding the whole response. Follows {@code @odata.nextLink}
-	 * if TM1 pages.
+	 * if TM1 pages. A {@link Tm1Request.Response#BYTES} request streams the body's
+	 * buffers as they arrive.
 	 * @param <T> the type of each item
 	 * @param request the collection request to send
 	 * @return the items, or an {@link IllegalArgumentException} for a request that isn't
@@ -116,7 +117,7 @@ public final class Tm1Session {
 	 */
 	public <T> Flux<T> stream(Tm1Request<T> request) {
 		Objects.requireNonNull(request, "request");
-		if (request.response() != Tm1Request.Response.COLLECTION) {
+		if (request.response() != Tm1Request.Response.COLLECTION && request.response() != Tm1Request.Response.BYTES) {
 			return Flux.error(new IllegalArgumentException(
 					"Only collection requests are streamed: use execute() for " + request));
 		}
