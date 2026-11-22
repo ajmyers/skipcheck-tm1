@@ -39,6 +39,11 @@ for want in "  keycloak:" "  cognos:" "  tm1-admin:" "  planning:" "  reporting:
 done
 pass "examples/everything.yaml generates a valid, fully wired compose project"
 
+# 2b. With PAW, Cognos hands browser logons back to PAW and TM1 Web
+out=$(tool "$(sed 's/^# paw:/paw:/' "$here/examples/everything.yaml")" generate) || fail "everything with PAW: $out"
+grep -qF "COGNOS_PMHUB_URLS: http://localhost:8800 http://localhost:9510" <<<"$out" || fail "no COGNOS_PMHUB_URLS: $out"
+pass "with PAW and TM1 Web, Cognos hands logons back to them"
+
 # 3. One server: its own Admin Server, no CAM
 out=$(tool $'version: 1\nibm: ./ibm\ntm1: {servers: {tm1: {}}}' generate) || fail "one server: $out"
 ! grep -q "COMPOSE INVALID" <<<"$out" || fail "one server: invalid compose: $out"

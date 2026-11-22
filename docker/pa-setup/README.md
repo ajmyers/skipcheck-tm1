@@ -128,10 +128,17 @@ PAW. `up` warns when Docker has less than the parts need; raise it in Docker Des
 3. **`docker compose up --wait`.** Paths in the file are your machine's (Windows paths
    work); the Docker daemon resolves them.
 4. **PAW** runs IBM's own compose files through [`paw-local.sh`](../paw/README.md), in a
-   container like the one `tm1-testcontainers` uses, joined to the project's network.
-   With Cognos, PAW uses CAM (`PAW_AUTH_MODE=cam`). **PAW through pa-setup hasn't been
-   tested yet.**
+   container like the one `tm1-testcontainers` uses, joined to the project's network, and
+   `up` waits until its logon page answers there. With Cognos, PAW uses CAM security:
+   browsers log on at Cognos (and through the OIDC namespace, at Keycloak), and come back
+   to PAW through IBM's `pmhub.html`, which Cognos installs from your TM1 bundle.
 
-Tested on Apple Silicon with TM1 2.1.19, TM1 Web 2.1.19, Cognos 12.1.1 and Keycloak 26.4:
-`examples/everything.yaml` (on other ports) came up healthy in about 4 minutes, with CAM
-logons on both servers and an OIDC token logon through Cognos.
+**Browser cookies:** everything is on `localhost`, and browsers share cookies across ports.
+After Cognos is reinstalled, an old cookie can make Cognos answer `DPR-ERR-2107 The User
+Capabilities Cache cookie cannot be decoded`: clear `localhost`'s cookies, or use a private
+window.
+
+Tested on Apple Silicon with TM1 2.1.19, TM1 Web 2.1.19, Cognos 12.1.1, Keycloak 26.4 and
+PAW Local 2.1.19: everything, PAW included, came up in about 4 minutes. That covered CAM
+logons on both servers, an OIDC token logon, and PAW's browser logon through Cognos and
+Keycloak.

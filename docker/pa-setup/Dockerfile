@@ -15,7 +15,8 @@ LABEL org.opencontainers.image.authors="Andrew Myers (https://ajmyers.net)" \
       org.opencontainers.image.description="Sets up a local IBM Planning Analytics environment (TM1, TM1 Web, PAW, Cognos) in Docker from one file. Contains no IBM software. Not affiliated with IBM." \
       org.opencontainers.image.documentation="https://github.com/ajmyers/tm1-pa-developer-tools/blob/master/docker/pa-setup/README.md"
 
-RUN apk add --no-cache python3 py3-yaml bash coreutils unzip
+# paw-local.sh (PAW) needs bash, curl, coreutils and unzip
+RUN apk add --no-cache python3 py3-yaml bash coreutils unzip curl
 
 COPY pa-setup/pa_setup.py /usr/local/lib/pa-setup/pa_setup.py
 COPY pa-setup/pa-environment.schema.json /usr/local/lib/pa-setup/
