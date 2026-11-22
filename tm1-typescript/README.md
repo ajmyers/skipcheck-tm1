@@ -20,7 +20,7 @@ if ((await tm1.cubes.checkRules("Plan", rules).toArray()).length === 0) {
 }
 ```
 
-**Status:** the foundation. The model, the runtime (session, views, batches, async operations, capabilities, errors, auth) and `CubeService` are done; the other services are stubs, listed in [`coverage/pending-classes.txt`](coverage/pending-classes.txt), as are their endpoints in [`coverage/pending.txt`](coverage/pending.txt).
+**Status:** at parity with the Java client: every service class and method (240 endpoints, the same 2 excluded), the runtime (session, views, batches, async operations, capabilities, errors, auth, pool, identities, Cognos passports) and tm1-testcontainers. The live tests haven't yet run against a real TM1, nor have the containers been started here. Cognos passports work in Node only: a browser never lets a page read the `Set-Cookie` header they come back in.
 
 ## From the Java client
 

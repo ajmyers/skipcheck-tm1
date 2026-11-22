@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs every client's tests against a real TM1: the Java *Tm1Test classes, the Python
-# tests/live and the .NET Live tests. Give TM1 the way the Java tests take it, one of:
+# tests/live, the .NET Live tests and the TypeScript test/live. Give TM1 the way the Java tests take it, one of:
 #
 #   TM1_PRIVATE_IMAGE   an image with TM1 built in
 #   TM1_HOME_DIR        an installed tm1_64 folder
@@ -9,9 +9,9 @@
 #   TM1_BUNDLE_URL      a download link for the bundle (TM1_BUNDLE_SHA256 checks it)
 #
 # Each suite starts its own tm1-server container from it (they share the bundle cache volume),
-# or, with TM1_URL set, the Python and .NET suites use that server instead.
+# or, with TM1_URL set, the Python, .NET and TypeScript suites use that server instead.
 #
-#   scripts/live-tests.sh                  # all three
+#   scripts/live-tests.sh                  # all four
 #   scripts/live-tests.sh python dotnet    # some
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -22,7 +22,7 @@ if [[ -z "${TM1_PRIVATE_IMAGE:-}${TM1_HOME_DIR:-}${TM1_INSTALL_VOLUME:-}${TM1_BU
 fi
 
 suites=("$@")
-[[ ${#suites[@]} -eq 0 ]] && suites=(java python dotnet)
+[[ ${#suites[@]} -eq 0 ]] && suites=(java python dotnet typescript)
 failed=()
 for suite in "${suites[@]}"; do
   echo "== $suite"
@@ -30,7 +30,8 @@ for suite in "${suites[@]}"; do
     java) ./gradlew test --tests '*Tm1Test' || failed+=(java) ;;
     python) (cd tm1-python && python -m pytest tests/live -rs) || failed+=(python) ;;
     dotnet) dotnet test tm1-dotnet/Tm1.slnx --filter 'FullyQualifiedName~.Live.' || failed+=(dotnet) ;;
-    *) echo "Unknown suite: $suite (java, python, dotnet)" >&2; exit 2 ;;
+    typescript) (cd tm1-typescript && npx vitest run test/live && npm test -w testcontainers) || failed+=(typescript) ;;
+    *) echo "Unknown suite: $suite (java, python, dotnet, typescript)" >&2; exit 2 ;;
   esac
 done
 if [[ ${#failed[@]} -gt 0 ]]; then
