@@ -1,22 +1,38 @@
-# Release to Maven Central.
+# Release: the Java libraries to Maven Central and the Python packages to PyPI.
 #
-#   Real release: push a tag like v0.1.0. Publishes that version, permanently.
+#   Real release: push a tag like v0.1.0. Publishes that version everywhere, permanently.
 #   Dry run:      run this workflow manually (Actions tab, or `gh workflow run release.yml`).
-#                 Uploads 0.0.0-dryrun.<run number> to the Central Portal for validation but
+#                 Maven: uploads 0.0.0-dryrun.<run number> to the Central Portal for validation but
 #                 does NOT release it. Check it under Deployments, then Drop it.
+#                 Python: builds and checks the packages, and uploads nothing.
+#   Python pre-release: a manual run with python_version set (0.1.0.dev1, 0.1.0rc1) publishes that
+#                 version to PyPI. A version can never be reused there, even after deleting it.
 #
 # Repo secrets needed:
 #   MAVEN_CENTRAL_USERNAME / MAVEN_CENTRAL_PASSWORD  - Central Portal user token
 #   SIGNING_KEY / SIGNING_KEY_PASSWORD               - ASCII-armored GPG private key
+# PyPI needs none: each project there trusts this workflow by name (its Publishing settings:
+# owner, repository, release.yml, no environment), so renaming this file breaks publishing.
 name: Release
 
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      only:
+        description: Which registries to run
+        type: choice
+        options: [all, maven, python]
+        default: all
+      python_version:
+        description: Publish this pre-release to PyPI (e.g. 0.1.0.dev1). Empty builds without publishing.
+        type: string
+        default: ''
 
 jobs:
   publish:
+    if: github.event_name == 'push' || inputs.only == 'all' || inputs.only == 'maven'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -44,3 +60,61 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+
+  # One job per package, so one can be run again without the other
+  python:
+    if: github.event_name == 'push' || inputs.only == 'all' || inputs.only == 'python'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [tm1-client, tm1-testcontainers]
+    permissions:
+      contents: read
+      # PyPI takes this job's identity token instead of a password (trusted publishing)
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Choose version
+        id: plan
+        # Passed via env, never interpolated into the script, so the input can't inject shell
+        env:
+          PYTHON_VERSION: ${{ inputs.python_version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$PYTHON_VERSION" ]; then
+            # Only a pre-release by hand: a final version comes from a tag, with the other languages
+            if ! printf '%s' "$PYTHON_VERSION" | grep -Eq '^[0-9]+(\.[0-9]+)*(\.dev|a|b|rc)[0-9]+$'; then
+              echo "python_version must be a pre-release such as 0.1.0.dev1 or 0.1.0rc1, not '$PYTHON_VERSION'" >&2
+              exit 1
+            fi
+            echo "version=$PYTHON_VERSION" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0.dev$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build ${{ steps.plan.outputs.version }}
+        working-directory: python/${{ matrix.package }}
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          sed -i -E "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+          grep -q "^version = \"$VERSION\"" pyproject.toml
+          python -m pip install --quiet build twine
+          python -m build --outdir "$GITHUB_WORKSPACE/dist"
+          python -m twine check --strict "$GITHUB_WORKSPACE"/dist/*
+
+      - name: Publish ${{ steps.plan.outputs.version }} to PyPI
+        if: steps.plan.outputs.publish == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
