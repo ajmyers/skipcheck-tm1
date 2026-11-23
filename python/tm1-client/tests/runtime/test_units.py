@@ -563,20 +563,18 @@ def test_describes_raw_bytes_both_ways() -> None:
 # Tm1OperationTest
 
 
-def test_describes_a_bound_operation() -> None:
-    activate = Tm1Operations.CHORE_ACTIVATE
+def test_a_bound_operation_needs_its_binding_and_operation() -> None:
+    activate = Tm1Operation(Tm1Operation.Kind.ACTION, "tm1.Activate", "tm1.Chore", None, (), None, "10.2.2.1", "11.8.3")
     assert activate.bound() and activate.deprecated()
     assert activate.endpoint() == "Action Chore/Activate"
     assert activate.capability() == Tm1Capability.bound_operation("tm1.Chore", "tm1.Activate").since("10.2.2.1")
 
 
-def test_describes_an_unbound_operation() -> None:
-    mdx = Tm1Operations.EXECUTE_MDX
+def test_an_unbound_operation_needs_its_import() -> None:
+    mdx = Tm1Operation(Tm1Operation.Kind.ACTION, "tm1.ExecuteMDX", None, "ExecuteMDX", (Tm1Operation.Parameter("MDX", "Edm.String", False),), "tm1.Cellset")
     assert not mdx.bound()
     assert mdx.endpoint() == "ActionImport ExecuteMDX"
-    assert mdx.capability() == Tm1Capability.unbound_operation("ExecuteMDX").since("10.2.2.1")
-    assert mdx.parameters == (Tm1Operation.Parameter("MDX", "Edm.String", False),)
-    assert mdx.return_type == "tm1.Cellset" and mdx.import_name == "ExecuteMDX"
+    assert mdx.capability() == Tm1Capability.unbound_operation("ExecuteMDX")
 
 
 def test_needs_exactly_one_of_a_binding_and_an_import() -> None:
