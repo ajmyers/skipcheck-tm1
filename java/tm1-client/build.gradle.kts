@@ -67,6 +67,12 @@ val generateModel = tasks.register<JavaExec>("generateModel") {
 	outputs.dir(modelSources)
 	outputs.cacheIf { true }
 	args(snapshot.asFile.path, modelSources.get().asFile.path)
+	// Start from an empty folder: a type or package that's gone from the model mustn't stay
+	// behind from an earlier run, to be compiled and cached as if it were still generated
+	val output = modelSources.get().asFile
+	doFirst {
+		output.deleteRecursively()
+	}
 }
 sourceSets.main {
 	java.srcDir(generateModel)
