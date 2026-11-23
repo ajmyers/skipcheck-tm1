@@ -3,12 +3,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  allOperations,
   ODataPath,
   ODataQuery,
   Tm1Capabilities,
   Tm1Capability,
   Tm1Dialect,
   Tm1Operation,
+  Tm1Operations,
   Tm1ProtocolException,
   Tm1Request,
   Tm1Session,
@@ -272,6 +274,36 @@ describe("Tm1Capabilities", () => {
     // And so it parses: a bound operation without one is refused (see "reports an operation it
     // can't model as a parse error")
     expect(() => Tm1Capabilities.parse(v10)).not.toThrow();
+  });
+});
+
+/** The Java client's `OperationCatalogTest`: the generated operation catalog matches the inventory
+ * the coverage gate counts, and the snapshot. */
+describe("Tm1Operations", () => {
+  const spec = JSON.parse(readFileSync(Repo.spec, "utf8")) as { endpoints: { id: string }[] };
+
+  it("has one descriptor per operation endpoint of the coverage gate", () => {
+    const operations = spec.endpoints.map((e) => e.id).filter((e) => /^(Action|Function|ActionImport|FunctionImport) /.test(e));
+    const catalog = allOperations.map((op) => op.endpoint());
+    expect(new Set(catalog).size, "no duplicates").toBe(catalog.length);
+    expect([...catalog].sort()).toEqual([...operations].sort());
+    expect(catalog).toHaveLength(105);
+  });
+
+  it("every capability is one the snapshot has", () => {
+    const snapshot = Tm1Capabilities.parse(SNAPSHOT);
+    for (const op of allOperations) expect(snapshot.supports(op.capability()), op.endpoint()).toBe(true);
+  });
+
+  it("carries revisions, parameters and return types", () => {
+    expect(Tm1Operations.ChoreActivate.deprecatedIn).toBe("11.8.3");
+    const mdx = Tm1Operations.ExecuteMdx;
+    expect(mdx.kind).toBe("Action");
+    expect(mdx.importName).toBe("ExecuteMDX");
+    expect(mdx.parameters).toEqual([{ name: "MDX", type: "Edm.String", nullable: false }]);
+    expect(mdx.returnType).toBe("tm1.Cellset");
+    expect(mdx.addedIn).toBe("10.2.2.1");
+    expect(allOperations.filter((op) => op.deprecated())).not.toHaveLength(0);
   });
 });
 
