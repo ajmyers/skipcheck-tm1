@@ -34,6 +34,7 @@ from skipcheck_tm1 import (
     Tm1Version,
     auth,
 )
+from skipcheck_tm1._protocol import Call
 
 from ..conftest import BASE, target
 from .conftest import SERVER, Clock, Runtime, each, json_response, text_response
@@ -501,6 +502,53 @@ def test_refuses_calls_after_it_ran(rt: Runtime) -> None:
     rt.run(batch.run())
     rt.raises(RuntimeError, lambda: batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("x"))))
     rt.raises(RuntimeError, lambda: batch.run())
+
+
+def test_refuses_a_call_whose_body_cant_be_written_and_still_runs_the_rest(rt: Runtime) -> None:
+    rt.fake.respond = lambda r: {"responses": [{"id": "1", "status": 204}]}
+    batch = rt.session().batch()
+    deleted = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("Old"))))
+    unwritable = Tm1Request.post(ODataPath.of("Cubes"), {"name": object()}, dict)
+    error = rt.raises((TypeError, ValueError), lambda: batch.session.execute(unwritable))
+    assert not isinstance(error, Tm1TransportError)
+    # A call made without a Tm1Request, as the generated API's are, is written when it's queued
+    rt.raises(ValueError, lambda: batch.session.execute(Call("POST", "Cubes", json_body={"name": object()})))
+    assert batch.size() == 1, "never queued"
+    rt.run(batch.run())
+    assert deleted.result() is None
+
+
+def test_sends_a_body_as_it_was_when_the_call_was_queued(rt: Runtime) -> None:
+    rt.fake.respond = lambda r: {"responses": [{"id": "1", "status": 201, "body": {}}]}
+    batch = rt.session().batch()
+    body = {"Name": "before"}
+    rt.run(batch.session.execute(Tm1Request.post(ODataPath.of("Cubes"), body, dict)))
+    body["Name"] = "after"
+    rt.run(batch.run())
+    assert json.loads(rt.fake.last.content)["requests"][0]["body"] == {"Name": "before"}
+
+
+def test_fails_every_call_when_tm1_answers_the_batch_with_no_body(rt: Runtime) -> None:
+    rt.fake.respond = lambda r: httpx.Response(200)
+    batch = rt.session().batch()
+    first = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("a"))))
+    second = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("b"))))
+    rt.run(batch.run())
+    for deferred in (first, second):
+        with pytest.raises(Tm1ProtocolError, match="no body"):
+            deferred.result()
+
+
+def test_fails_every_call_when_the_batchs_answer_cant_be_read(rt: Runtime) -> None:
+    # Not in the Java tests: there, a response that isn't JSON fails the $batch request, and so every call
+    rt.fake.respond = lambda r: text_response(200, "not a batch response")
+    batch = rt.session().batch()
+    first = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("a"))))
+    second = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("b"))))
+    rt.run(batch.run())
+    for deferred in (first, second):
+        with pytest.raises(Tm1ProtocolError):
+            deferred.result()
 
 
 def test_splits_a_big_queue(rt: Runtime) -> None:

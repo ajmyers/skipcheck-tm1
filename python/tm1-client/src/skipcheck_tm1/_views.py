@@ -6,6 +6,7 @@ capability refusal, a batch's queue and how its answers are handed out."""
 from __future__ import annotations
 
 import functools
+import json
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import timedelta
@@ -73,6 +74,13 @@ class Queue:
             )
         if call.raw:
             raise ValueError(f"Bytes can't go in a JSON batch: {call.method} {call.path}")
+        if call.json_body is not None:
+            # Written now, so a body that can't be written fails its own call, where it was made, rather
+            # than the run and every other call with it. What's sent is the body as it is now.
+            try:
+                call = replace(call, json_body=json.loads(json.dumps(call.json_body, ensure_ascii=False)))
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"The request body isn't JSON, so it can't go in a batch: {call.method} {call.path}") from e
         deferred: p.Deferred[Any] = p.Deferred(call)
         self.entries.append((call, context, deferred))
         return deferred
@@ -86,6 +94,11 @@ class Queue:
 
 
 def settle(chunk: list[tuple[p.Call, p.Context, p.Deferred[Any]]], reply: p.Reply, url: Any, classifier: Any = None) -> None:
-    replies = p.batch_replies(reply.json(), len(chunk))
+    """Hands each call of a ``$batch`` request its answer. Raises, with no call answered, if the
+    response has no body or isn't a batch response: the caller fails every call with that."""
+    doc = reply.json()
+    if doc is None:
+        raise Tm1ProtocolError("TM1 answered the batch with no body", None, "POST", url("$batch"))
+    replies = p.batch_replies(doc, len(chunk))
     for (call, context, deferred), item in zip(chunk, replies):
         deferred._settle(url(p.target(call, context)), item, classifier)

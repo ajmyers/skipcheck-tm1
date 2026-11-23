@@ -230,8 +230,10 @@ def batch_body(calls: list[tuple[Call, Context]]) -> dict[str, Any]:
 
 def batch_replies(doc: Any, count: int) -> list[Reply | None]:
     """The answers of a ``$batch`` response, in the order of its requests."""
+    if not isinstance(doc, dict):
+        raise Tm1ProtocolError(f"TM1's batch response isn't a JSON object: {str(doc)[:100]}")
     by_id: dict[str, Any] = {}
-    for item in (doc or {}).get("responses", []):
+    for item in doc.get("responses") or []:
         by_id[str(item.get("id"))] = item
     out: list[Reply | None] = []
     for i in range(1, count + 1):

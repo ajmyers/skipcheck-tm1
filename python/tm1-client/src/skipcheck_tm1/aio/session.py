@@ -690,6 +690,12 @@ class AsyncTm1SessionBatch:
     carries on past failed ones: each result holds its own value or error. Multipart batches,
     ``atomicityGroup`` and ``dependsOn`` are refused, so none are used; 1000 requests in one
     batch work, and :meth:`run` splits a bigger queue.
+
+    A body that can't be written as JSON fails its call with a ``ValueError`` when the call is
+    made, and the call never joins the batch; the others still run. The body is written then, so a
+    change made to the object afterwards isn't sent. If TM1 answers a ``$batch`` with no body, or
+    with something that isn't a batch response, every call of that request fails with
+    :class:`~skipcheck_tm1.errors.Tm1ProtocolError`.
     """
 
     DEFAULT_PER_REQUEST = 500
@@ -734,11 +740,12 @@ class AsyncTm1SessionBatch:
             body = p.batch_body([(call, context) for call, context, _ in chunk])
             try:
                 reply = await self._sender.execute(p.Call("POST", "$batch", json_body=body, read=lambda r: r, contextual=False))
+                settle(chunk, reply, self._sender._connection.url, self._sender._connection.classifier)
             except Exception as e:  # noqa: BLE001
+                # Every call is told, whatever went wrong: none is left without a result. That includes
+                # a response with no body, or one that isn't a batch response.
                 for _, _, deferred in chunk:
                     deferred._fail(e)
-                continue
-            settle(chunk, reply, self._sender._connection.url, self._sender._connection.classifier)
 
 
 class AsyncTm1SessionBuilder:
