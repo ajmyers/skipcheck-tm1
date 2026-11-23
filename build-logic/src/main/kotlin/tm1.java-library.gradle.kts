@@ -78,7 +78,7 @@ tasks.withType<Javadoc>().configureEach {
 	}
 }
 
-// The same Javadoc, themed for ajmyers.net/projects/<module>/api/ (api-site/README.md). A separate
+// The same Javadoc, themed for skipcheck.io/projects/<module>/api/ (api-site/README.md). A separate
 // task, so the javadoc jar on Maven Central stays plain: the theme imports the site's styles from
 // the same origin, which only works there.
 val apiSiteBaseUrl = providers.gradleProperty("apiSiteBaseUrl")
