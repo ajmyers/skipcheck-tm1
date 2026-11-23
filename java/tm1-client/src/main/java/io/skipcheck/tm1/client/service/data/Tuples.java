@@ -11,12 +11,7 @@ import io.skipcheck.tm1.client.odata.ODataPath;
  * Cell coordinates, as TM1 binds them: one element path per dimension of the cube, in the
  * cube's order.
  *
- * <pre class="code">
- * Map&lt;String, String&gt; cell = new LinkedHashMap&lt;&gt;();
- * cell.put("Region", "North");
- * cell.put("Measure", "Amount");
- * CubeUpdatePatch.builder().bindTuple(Tuples.of(cell)).value(42).build();
- * </pre>
+ * {@snippet class = examples.CellServiceExamples region = update-cells}
  */
 public final class Tuples {
 

@@ -20,10 +20,7 @@ import io.skipcheck.tm1.csdl.CsdlStructuredType;
  * OData intends clients to detect features, with no version tables. It works for any TM1,
  * including versions the client has never seen.
  *
- * <pre class="code">
- * session.capabilities()
- *     .map(c -&gt; c.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.Reserve")));
- * </pre>
+ * {@snippet class = examples.Tm1CapabilitiesExamples region = supports}
  */
 public final class Tm1Capabilities {
 

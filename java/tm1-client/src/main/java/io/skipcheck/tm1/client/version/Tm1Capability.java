@@ -12,9 +12,7 @@ import org.jspecify.annotations.Nullable;
  * a singleton, an operation or a property. A request can declare one, and the session
  * checks it against the connected server before sending anything.
  *
- * <pre class="code">
- * Tm1Capability reserve = Tm1Capability.boundOperation("tm1.Cube", "tm1.Reserve").since("11.8.34");
- * </pre>
+ * {@snippet class = examples.Tm1CapabilitiesExamples region = supports}
  *
  * <p>
  * Names are qualified by namespace or alias ({@code tm1.Cube} or
