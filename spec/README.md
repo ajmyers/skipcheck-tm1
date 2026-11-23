@@ -19,7 +19,7 @@ spec/conformance/*.json                            cases every client's tests mu
 
 | File | What it is | Edited by |
 |---|---|---|
-| `tm1-overlay.json` | TM1's departures from `$metadata` (plan §16.5): properties sent in another type (`departures`), dates TM1 sometimes garbles (`lenientDates`), and notes about endpoints, with generic requests a client mustn't offer (`forbid`). Notes are Markdown. | Hand |
+| `tm1-overlay.json` | TM1's departures from `$metadata`: properties sent in another type (`departures`), dates TM1 sometimes garbles (`lenientDates`), and notes about endpoints, with generic requests a client mustn't offer (`forbid`). Notes are Markdown. | Hand |
 | `tm1-api.json` | The snapshot as plain JSON, with the overlay merged in: `enums`, `types`, `operations`, `container`, and `endpoints`, the coverage inventory. Sorted and versioned (`specVersion`), so a TM1 upgrade shows up as a readable diff. | `./gradlew :tm1-codegen:exportSpec` |
 | `conformance/odata-encoding.json` | Paths and literals every client must build identically. | Hand |
 | `conformance/calls/*.json` | Service calls the Java unit tests record, with every request and answer, which every other client replays exactly ([format](conformance/README.md)). | `./gradlew :tm1-client:test -PrecordConformance` |

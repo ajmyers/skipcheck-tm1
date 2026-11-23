@@ -347,7 +347,7 @@ public final class CellsetService {
 
 	/**
 	 * Runs an MDX query and streams its cells to {@code handler}, then deletes the
-	 * cellset: when the result completes, fails, or is cancelled (plan §7).
+	 * cellset: when the result completes, fails, or is cancelled.
 	 *
 	 * <p>
 	 * One round trip brings the axes (hierarchies by name, tuples with their members'

@@ -66,7 +66,7 @@ class MetadataSnapshotTest {
 
 	@Test
 	void keepsTheDescriptions() {
-		// IBM's descriptions are kept: generated model docs (phase 1) come from them
+		// IBM's descriptions are kept: the generated model's docs come from them
 		var name = doc.entityType("tm1.Cube")
 			.orElseThrow()
 			.properties()

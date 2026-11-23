@@ -24,9 +24,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Phase 1's exit criterion (plan §15): JSON captured from a real TM1
- * ({@link PayloadCaptureTest}) decodes into the generated model and encodes back to the
- * same JSON, with the session's default mapper.
+ * JSON captured from a real TM1 ({@link PayloadCaptureTest}) decodes into the generated
+ * model and encodes back to the same JSON, with the session's default mapper.
  *
  * <p>
  * "The same" allows for what the model deliberately doesn't keep: control information

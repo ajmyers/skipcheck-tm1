@@ -17,8 +17,8 @@ import io.skipcheck.tm1.csdl.CsdlStructuredType;
 
 /**
  * What a connected TM1 server supports, read from its own {@code $metadata}: the way
- * OData intends clients to detect features, with no version tables (plan §9, mechanism
- * 1). It works for any TM1, including versions the client has never seen.
+ * OData intends clients to detect features, with no version tables. It works for any TM1,
+ * including versions the client has never seen.
  *
  * <pre class="code">
  * session.capabilities()

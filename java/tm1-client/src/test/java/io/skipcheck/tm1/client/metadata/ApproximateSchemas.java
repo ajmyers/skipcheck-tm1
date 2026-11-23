@@ -21,7 +21,7 @@ import io.skipcheck.tm1.csdl.CsdlValue;
 
 /**
  * Approximate {@code $metadata} for older TM1 schema versions, made from a newer
- * document's {@code Core.Revisions} (plan §12.4).
+ * document's {@code Core.Revisions}.
  *
  * <p>
  * {@link #asOf} removes every element whose revisions say it was added after the given

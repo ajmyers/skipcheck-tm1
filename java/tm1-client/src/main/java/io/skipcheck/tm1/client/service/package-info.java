@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * The services: one per REST resource family, in a subpackage per area (plan §6).
+ * The services: one per REST resource family, in a subpackage per area.
  *
  * <p>
  * Every service follows the same conventions, which {@code ArchitectureTest} checks:
@@ -19,8 +19,7 @@
  * one fails before anything is sent.</li>
  * <li>where TM1 behaves differently from {@code $metadata}, or from what a reader would
  * expect (a property a PATCH ignores, an append where a replace is natural, an operation
- * it refuses), the method's Javadoc says so, as "TM1 (11.8) …", and a test pins it. The
- * plan's §16.5 keeps the list.</li>
+ * it refuses), the method's Javadoc says so, as "TM1 (11.8) …", and a test pins it.</li>
  * </ul>
  */
 @NullMarked

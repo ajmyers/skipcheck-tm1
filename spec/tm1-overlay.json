@@ -1,5 +1,5 @@
 {
-	"$comment": "What TM1 does differently from its own $metadata, shared by every client's code generator (plan §16.5). Notes are Markdown; each generator renders them in its own doc format. Keys are Type/Property for properties and coverage-gate endpoint IDs for endpoints.",
+	"$comment": "What TM1 does differently from its own $metadata, shared by every client's code generator. Notes are Markdown; each generator renders them in its own doc format. Keys are Type/Property for properties and coverage-gate endpoint IDs for endpoints.",
 	"departures": {
 		"CAMSettings/ClientPingCAMPassport": {
 			"read": "json",

@@ -21,7 +21,7 @@ tasks.withType<Jar>().configureEach {
 	}
 }
 
-// The public API's Javadoc is part of the deliverable (plan §13 item 14): every public class,
+// The public API's Javadoc is part of the deliverable: every public class,
 // method and record component must be documented, any doclint warning fails, and check runs it,
 // so ./gradlew build catches a gap rather than the release.
 tasks.withType<Javadoc>().configureEach {

@@ -15,7 +15,7 @@ import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Phase 0's exit criterion, in the plan's own words: connect, read {@code Server}, close.
+ * The smallest whole use of the client: connect, read {@code Server}, close.
  */
 @RequiresTm1
 class Tm1ClientTm1Test {

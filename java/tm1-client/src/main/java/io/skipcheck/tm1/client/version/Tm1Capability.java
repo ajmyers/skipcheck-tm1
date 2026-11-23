@@ -9,8 +9,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Something a request needs the server to define in its {@code $metadata}: an entity set,
- * a singleton, an operation or a property (plan §9, mechanism 1). A request can declare
- * one, and the session checks it against the connected server before sending anything.
+ * a singleton, an operation or a property. A request can declare one, and the session
+ * checks it against the connected server before sending anything.
  *
  * <pre class="code">
  * Tm1Capability reserve = Tm1Capability.boundOperation("tm1.Cube", "tm1.Reserve").since("11.8.34");
@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
  * Names are qualified by namespace or alias ({@code tm1.Cube} or
  * {@code ibm.tm1.api.v1.Cube}), as in {@code $metadata}. {@link #since} records the
  * schema version that added it, from {@code Core.Revisions}, so a server that lacks it
- * can be told why; the generated model (phase 1) fills it in.
+ * can be told why; the generated model fills it in.
  *
  * @param kind what kind of element this is
  * @param type the qualified type it belongs to (a bound operation's binding type, a

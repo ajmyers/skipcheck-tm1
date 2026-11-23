@@ -18,9 +18,9 @@ import io.skipcheck.tm1.testcontainers.RequiresTm1;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /**
- * Pins how TM1 handles {@code TM1-Impersonate}, which the session pool relies on (plan
- * §16.1). Over bare HTTP, like {@link Tm1SessionBehaviorTest}. Observed on 11.8.03500.6
- * with TM1's own security; CAM may behave differently.
+ * Pins how TM1 handles {@code TM1-Impersonate}, which the session pool relies on. Over
+ * bare HTTP, like {@link Tm1SessionBehaviorTest}. Observed on 11.8.03500.6 with TM1's own
+ * security; CAM may behave differently.
  */
 @RequiresTm1
 class Tm1ImpersonationBehaviorTest {
@@ -212,8 +212,8 @@ class Tm1ImpersonationBehaviorTest {
 	}
 
 	/**
-	 * User names match ignoring case and spaces, as TM1 object names do (plan §16.4), so
-	 * the pool must compare identities the same way, or one user would get two sessions.
+	 * User names match ignoring case and spaces, as TM1 object names do, so the pool must
+	 * compare identities the same way, or one user would get two sessions.
 	 */
 	@Test
 	void matchesUserNamesIgnoringCaseAndSpaces() {

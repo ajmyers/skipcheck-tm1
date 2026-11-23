@@ -17,7 +17,7 @@ import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import tools.jackson.databind.json.JsonMapper;
 
-/** The generated model reads TM1's JSON (plan §8.1); full round trips come with #67. */
+/** The generated model reads TM1's JSON; full round trips come with #67. */
 class GeneratedModelTest {
 
 	private static final JsonMapper JSON = JsonMapper.builder().build();

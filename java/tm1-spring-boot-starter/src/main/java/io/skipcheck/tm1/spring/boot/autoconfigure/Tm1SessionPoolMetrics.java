@@ -14,9 +14,9 @@ import io.micrometer.core.instrument.binder.MeterBinder;
 import io.skipcheck.tm1.client.session.Tm1SessionPool;
 
 /**
- * Metrics for a {@link Tm1SessionPool}, from its {@code stats()}: plan §16.1 asks for
- * sessions held, evicted and closed, since unbounded sessions caused a production
- * incident. Auto-configured when Micrometer is present; bind it yourself otherwise.
+ * Metrics for a {@link Tm1SessionPool}, from its {@code stats()}: sessions held, evicted
+ * and closed, since every session counts against the TM1 server. Auto-configured when
+ * Micrometer is present; bind it yourself otherwise.
  *
  * <ul>
  * <li>{@code tm1.session.pool.held} (gauge): sessions in the pool</li>

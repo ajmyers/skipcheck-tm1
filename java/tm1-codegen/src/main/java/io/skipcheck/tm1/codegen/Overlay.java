@@ -19,7 +19,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * What TM1 does differently from its own {@code $metadata} (plan §16.5), read from
+ * What TM1 does differently from its own {@code $metadata}, read from
  * {@code spec/tm1-overlay.json}: the one file every client's generator reads, so the Java
  * and the other clients encode the same departures.
  *

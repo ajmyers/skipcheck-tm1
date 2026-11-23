@@ -30,7 +30,7 @@ import io.skipcheck.tm1.client.session.Tm1SessionPool;
 import io.skipcheck.tm1.client.session.Tm1Timeouts;
 
 /**
- * Auto-configures the TM1 client (plan §11): given {@link Tm1ConnectionDetails} (see
+ * Auto-configures the TM1 client: given {@link Tm1ConnectionDetails} (see
  * {@link Tm1ConnectionDetailsAutoConfiguration}), a {@link Tm1Session}, a
  * {@link Tm1Client} and, with {@code tm1.pool.enabled=true}, a {@link Tm1SessionPool}.
  * Each bean backs off if you define your own. Sessions are closed on shutdown.
@@ -154,9 +154,9 @@ public final class Tm1AutoConfiguration {
 	}
 
 	/**
-	 * Reactor Netty, as the client requires (plan Q4), through Boot's builder for the SSL
-	 * bundle and connect timeout, with the client's own defaults on top: gzip, and the
-	 * request idle timeout.
+	 * Reactor Netty, as the client requires, through Boot's builder for the SSL bundle
+	 * and connect timeout, with the client's own defaults on top: gzip, and the request
+	 * idle timeout.
 	 */
 	private static ClientHttpConnector connector(Tm1Timeouts timeouts, @Nullable SslBundle ssl) {
 		HttpClientSettings settings = HttpClientSettings.defaults().withConnectTimeout(timeouts.connect());

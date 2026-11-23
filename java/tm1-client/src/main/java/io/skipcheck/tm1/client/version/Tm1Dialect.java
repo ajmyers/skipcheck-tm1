@@ -6,11 +6,10 @@ import java.net.URI;
 import java.util.Objects;
 
 /**
- * How to reach a kind of TM1 deployment (plan §9, mechanism 3): structural differences
- * such as the REST API's root path. Only TM1 11 on-premises ({@link #V11}) is
- * implemented. The interface exists so TM1 12 (Planning Analytics Engine) and Planning
- * Analytics Cloud, which have different roots and authentication, can be added without a
- * redesign.
+ * How to reach a kind of TM1 deployment: structural differences such as the REST API's
+ * root path. Only TM1 11 on-premises ({@link #V11}) is implemented. The interface exists
+ * so TM1 12 (Planning Analytics Engine) and Planning Analytics Cloud, which have
+ * different roots and authentication, can be added without a redesign.
  */
 public interface Tm1Dialect {
 

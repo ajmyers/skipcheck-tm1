@@ -50,8 +50,8 @@ import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The client for one TM1 server: one {@link Tm1Session}, and every service built on it
- * (plan §6), such as {@link #dimensions()}. Services arrive with the endpoint phases;
+ * The client for one TM1 server: one {@link Tm1Session}, and every service built on it,
+ * such as {@link #dimensions()}. Services arrive with the endpoint phases;
  * {@link #session()} sends any request, for what has no service yet.
  *
  * {@snippet class = examples.ClientExamples region = connect}

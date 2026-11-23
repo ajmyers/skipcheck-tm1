@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/** Services for the server, its configuration and its logs (plan phase 7). */
+/** Services for the server, its configuration and its logs. */
 @NullMarked
 package io.skipcheck.tm1.client.service.server;
 

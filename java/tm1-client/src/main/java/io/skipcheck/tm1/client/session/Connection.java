@@ -324,8 +324,8 @@ final class Connection {
 	 * unknown or disabled user, impersonation not allowed) is kept for
 	 * {@link Tm1Timeouts#refusedLogin()}, so requests meanwhile fail at once with the
 	 * same error: each login attempt leaves a session behind on TM1, and retrying a
-	 * refusal at once would pile them up (plan §16.8). Any other failure, such as TM1
-	 * being unreachable, is forgotten, so the next request tries again.
+	 * refusal at once would pile them up. Any other failure, such as TM1 being
+	 * unreachable, is forgotten, so the next request tries again.
 	 */
 	private synchronized void failed(Attempt failed, Throwable error) {
 		if (attempt != failed) {
@@ -753,7 +753,7 @@ final class Connection {
 	URI uri(String relative) {
 		// Already encoded by ODataPath and ODataQuery: never through a URI template,
 		// which would
-		// read the braces in TM1 control object names as variables (plan §16.2)
+		// read the braces in TM1 control object names as variables
 		return URI.create(root + relative);
 	}
 
