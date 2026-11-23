@@ -22,7 +22,13 @@ export async function walkthroughsOf(project) {
 	const list = [];
 	for (const name of (await readdir(dir).catch(() => [])).filter((n) => n.endsWith('.md')).sort()) {
 		const file = path.join(dir, name);
-		const { meta, sections } = parse(await readFile(file, 'utf8'));
+		let parsed;
+		try {
+			parsed = parse(await readFile(file, 'utf8'));
+		} catch (e) {
+			throw new Error(path.relative(repoDir, file) + ', ' + e.message, { cause: e });
+		}
+		const { meta, sections } = parsed;
 		for (const key of ['title', 'summary', 'description', 'order']) {
 			if (!meta[key]) throw new Error(path.relative(repoDir, file) + ' has no ' + key + ' in its front matter');
 		}
