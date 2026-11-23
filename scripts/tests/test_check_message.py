@@ -21,8 +21,8 @@ def commit_errors(*lines: str) -> list[str]:
     return check.check_commit(list(lines))
 
 
-def pr_errors(*lines: str, require_issue: bool = True) -> list[str]:
-    return check.check_pr(list(lines), require_issue)
+def pr_errors(*lines: str) -> list[str]:
+    return check.check_pr(list(lines))
 
 
 def test_accepts_a_title_a_description_and_the_issue_trailer() -> None:
@@ -103,11 +103,6 @@ def test_refuses_a_pull_request_without_an_issue_or_a_description() -> None:
     assert any("capital letter" in e for e in pr_errors("add cube listing", "", "Closes #12", "", "Why."))
 
 
-def test_a_generated_pull_request_needs_only_a_good_title() -> None:
-    assert pr_errors("Bump the gradle group with 3 updates", "", "Bumps a, b and c.", require_issue=False) == []
-    assert pr_errors("bump the gradle group", require_issue=False) != []
-
-
 def run(*arguments: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run([sys.executable, str(REPO / ".githooks" / "check_message.py"), *arguments], capture_output=True, text=True, check=False)
 
@@ -120,6 +115,5 @@ def test_exits_0_1_or_2(tmp_path: Path) -> None:
     refused = run("commit", str(bad))
     assert refused.returncode == 1 and "capital letter" in refused.stderr and "Refs: #12" in refused.stderr
     assert run("pr", str(good)).returncode == 1  # Refs isn't how a pull request links its issue
-    assert run("pr", "--no-issue", str(good)).returncode == 0
-    for usage in ([], ["commit"], ["push", str(good)], ["commit", "--no-issue", str(good)]):
+    for usage in ([], ["commit"], ["push", str(good)], ["pr", "--no-issue", str(good)]):
         assert run(*usage).returncode == 2, usage
