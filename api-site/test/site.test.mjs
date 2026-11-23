@@ -12,7 +12,7 @@ import { inline, parse, slug } from '../scripts/markdown.mjs';
 import { docsVersion, installCommands, packageOf } from '../scripts/packages.mjs';
 import { judge, sourceHash } from '../scripts/output.mjs';
 import { addressOf, sitemapXml } from '../scripts/sitemap.mjs';
-import { head, languagesOf, PROJECTS, regions, SECTIONS } from '../scripts/site.mjs';
+import { head, languagesOf, PA_DOCKER, PROJECTS, regions, SECTIONS } from '../scripts/site.mjs';
 import { examplesOf, typesUsed, walkthroughsOf } from '../scripts/walkthroughs.mjs';
 
 test('inline Markdown is escaped, then marked up', () => {
@@ -100,6 +100,14 @@ test('every project, the Docker pages and the docs landing page have a route on 
 	}
 	assert.ok(['tm1-client', 'pa-docker', 'docs'].every((id) => SECTIONS.some((section) => section.id === id)), SECTIONS.map((section) => section.id).join(', '));
 	assert.equal(patterns.length, 2 * (SECTIONS.length + 1), 'a route that SECTIONS in scripts/site.mjs does not account for');
+});
+
+test("no Docker page is built at the site's setup page, which the Worker passes through to the site", () => {
+	const docker = SECTIONS.find((section) => section.id === PA_DOCKER.id);
+	assert.deepEqual(docker.site, ['setup']);
+	for (const page of PA_DOCKER.pages) {
+		for (const own of docker.site) assert.ok(page.path !== own && !page.path.startsWith(own + '/'), page.path + ' is under the site\'s /' + PA_DOCKER.id + '/' + own + '/');
+	}
 });
 
 test('a page with a description has the link preview image, and one without has none', () => {

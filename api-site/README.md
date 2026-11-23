@@ -9,7 +9,7 @@ Builds and serves each project's pages on skipcheck.io (and on skipcheck.dev, wh
 | `/<project>/docs/model/` | TM1's own types (Cube, Dimension...), the same in every language. | `scripts/reference.mjs`, from `spec/tm1-api.json` |
 | `/<project>/walkthroughs/<slug>/` | A task done step by step, such as connecting and listing cubes, with each step's code in every language and what it printed. Listed on the landing page and the docs home. | `scripts/pages.mjs`, from `content/walkthroughs/<project>/<slug>.md` |
 | `/docs/` | The docs landing page: every project, its languages, and links to its docs in each. The masthead's Docs link opens it. | `scripts/pages.mjs`, from the same content files as the landing pages |
-| `/pa-docker/` | Planning Analytics in Docker: a landing page, and a page per image and for `pa-setup` (`/pa-docker/tm1-server/`...). | `scripts/docker.mjs`, from `content/pa-docker.md` and the READMEs under `docker/` |
+| `/pa-docker/` | Planning Analytics in Docker: a landing page, and a page per image and for `pa-setup` (`/pa-docker/tm1-server/`...). The setup page, `/pa-docker/setup/`, is the site's: the Worker passes it through. | `scripts/docker.mjs`, from `content/pa-docker.md` and the READMEs under `docker/` |
 | `/llms.txt`, `/llms-full.txt` | The docs for coding agents, as the [llms.txt convention](https://llmstxt.org) has them: a list of the pages, each with a line saying what's there, and the full text of the landing pages, the walkthroughs and every type's overview in Markdown. | `scripts/llms.mjs`, from the same sources as the pages |
 | `/<project>/release.json` | The version the pages describe, and whether it's a release: the site's home page reads it for each project's badge. | `scripts/pages.mjs` |
 | `/<project>/api/java/` | The Javadoc, themed, linked from each Java page. | `./gradlew apiSiteJavadoc`, collected by `scripts/assemble.mjs` |
@@ -93,7 +93,7 @@ has one, and isn't required.
 | `scripts/llms.mjs` | `llms.txt` and `llms-full.txt`, from the content files, the examples and the overviews `reference.mjs` writes to `.generated/reference.json`. |
 | `scripts/check-links.mjs` | Checks every link on the landing and docs pages, every entry of the search indexes, every address in `llms.txt`, `llms-full.txt` and the prompts, and that a prompt's install commands are `packages.mjs`'s. |
 | `assets/` | The generated pages' own styles and script, copied to `/<project>/assets/`: `docs.css` (the reference's layout), `docs.js` (the reference's language memory), `search.js` and `search-rank.js` (the reference's search box, and how it matches and ranks), `tabs.css` and `tabs.js` (the landing pages' language tabs), `readme.css` (what the Docker pages add to `docs.css`). A language chosen anywhere is remembered and followed everywhere. |
-| `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, serves the site's 404 page for missing paths, and sends the addresses these pages had under `/projects/` to the new ones. |
+| `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, serves the site's 404 page for missing paths, and sends the addresses these pages had under `/projects/` to the new ones. The site's own pages under these paths (`site` in `SECTIONS`: the setup page, `/pa-docker/setup/`) it passes through to the site. |
 | `wrangler.jsonc` | The Worker's config: a route per project, for `/docs/` and for `/pa-docker/` on each zone, and one per zone for the old addresses. |
 | `test/` | `npm test` here, or `./gradlew checkApiSite`: the Worker, the Markdown, the install steps against the real build files, that every project has its routes, the extractors and the member gate. |
 | `.github/workflows/api-docs.yml` | Tests the Worker and the page builders, builds the site and bundles the Worker on every change, as part of CI. Deploys when the release workflow calls it for a tag, or when run by hand. |
@@ -167,7 +167,11 @@ The workflow deploys with `wrangler deploy`. It needs two repository secrets:
 - **The Docker pages are the READMEs, rendered.** The READMEs stay written for GitHub, where
   people read them next to the code, and the pages follow them without a copy. That's why the
   Docker pages use a full Markdown parser (`marked`), not the small one the content files are
-  written in. `/projects/pa-docker/setup/`, the setup page, stays the site's; the site sends
-  `/projects/pa-docker/` to `/pa-docker/`.
+  written in.
+- **The setup page is the site's, at `/pa-docker/setup/`.** It writes `pa-environment.yaml` in the
+  browser, and is hand-written in ajmyers/skipcheck.io. The `/pa-docker*` routes bring it here, so
+  the Worker passes it, and everything under it, through to the site (`site` in `SECTIONS`, in
+  `scripts/site.mjs`), and no Docker page may be built there. The site sends the old addresses,
+  `/projects/pa-docker/` and `/projects/pa-docker/setup/`, to the new ones.
 - **The masthead is a `<div>` in the docs.** Javadoc's script measures the first `<header>` on the
   page to place its sticky navigation bar, so the Worker renames the site's masthead element.

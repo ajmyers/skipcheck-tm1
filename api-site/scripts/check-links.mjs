@@ -25,8 +25,9 @@ import { CANONICAL_ORIGIN, distDir, PROJECTS, repoDir, SECTIONS } from './site.m
 const repository = /^githubRepo=(.+)$/m.exec(await readFile(path.join(repoDir, 'gradle.properties'), 'utf8'))[1].trim();
 
 // What these pages may link to on the site itself. Add an address here when a page starts to use
-// it, after checking that the site serves it.
-const SITE_PATHS = new Set(['/', '/styles.css', '/tokens.css', '/chrome.css', '/code.css', '/highlight.js', '/favicon.svg', '/projects/pa-docker/setup/']);
+// it, after checking that the site serves it. One under a section's path must be among the
+// section's site paths (site in site.mjs), or the Worker wouldn't pass it through to the site.
+const SITE_PATHS = new Set(['/', '/styles.css', '/tokens.css', '/chrome.css', '/code.css', '/highlight.js', '/favicon.svg', '/projects/pa-docker/setup/', '/pa-docker/setup/']);
 
 const exists = (file) =>
 	stat(file).then(
@@ -66,7 +67,8 @@ for await (const file of htmlFiles(distDir)) {
 /** What's wrong with a link to an address on the site (a URL), or null. */
 async function onSite(target) {
 	const section = SECTIONS.find((s) => target.pathname === '/' + s.id || target.pathname.startsWith('/' + s.id + '/'));
-	if (!section) return SITE_PATHS.has(target.pathname) ? null : " isn't one of the site's addresses in check-links.mjs";
+	const sitePage = section?.site?.some((page) => target.pathname === '/' + section.id + '/' + page || target.pathname.startsWith('/' + section.id + '/' + page + '/'));
+	if (!section || sitePage) return SITE_PATHS.has(target.pathname) ? null : " isn't one of the site's addresses in check-links.mjs";
 	const asset = path.join(distDir, target.pathname.endsWith('/') ? target.pathname + 'index.html' : target.pathname);
 	if (!(await exists(asset))) return ' (no ' + path.relative(distDir, asset) + ' in dist)';
 	if (target.hash && asset.endsWith('.html')) {
