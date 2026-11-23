@@ -37,6 +37,14 @@ updates:
     groups:
       npm:
         patterns: ["*"]
+    ignore:
+      # typescript-eslint names the TypeScript versions it supports as a peer, and npm ci
+      # fails on any other. Take a new major once typescript-eslint accepts it.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # The types are for the oldest Node in engines: newer ones let code use APIs it lacks.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   # Ruff and Pyright are pinned in tm1-client's test extra: a newer one may lay code out
   # differently or report more, so each bump comes with whatever it reformats or finds.
