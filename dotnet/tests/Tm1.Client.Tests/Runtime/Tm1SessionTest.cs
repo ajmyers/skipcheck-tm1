@@ -691,6 +691,40 @@ public class Tm1SessionBatchTest
     }
 
     [Fact]
+    public async Task RefusesACallWhoseBodyCantBeWrittenAndStillRunsTheRest()
+    {
+        var tm1 = new ScriptedTm1().On(BatchKey, _ => ScriptedTm1.Json(200, "{\"responses\":[{\"id\":\"1\",\"status\":204}]}"));
+        var batch = tm1.Session().Batch();
+        var deleted = batch.Session.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Cubes").Key("Old")));
+        var unwritable = batch.Session.ExecuteAsync(Tm1Request.Post<JsonElement>(ODataPath.Of("Cubes"), new Unwritable()));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => unwritable.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(1, batch.Size()); // never queued
+        await batch.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await deleted.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, Assert.Single(tm1.Requests(BatchKey)).Json.GetProperty("requests").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task FailsEveryCallWhenTm1AnswersTheBatchWithNoBody()
+    {
+        var tm1 = new ScriptedTm1().On(BatchKey, _ => ScriptedTm1.Status(200));
+        var batch = tm1.Session().Batch();
+        var first = batch.Session.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Cubes").Key("a")));
+        var second = batch.Session.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Cubes").Key("b")));
+
+        await batch.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAsync<Tm1ProtocolException>(() => first.WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAsync<Tm1ProtocolException>(() => second.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    /// <summary>A body that can't be written as JSON: reading its property fails.</summary>
+    private sealed class Unwritable
+    {
+        public string Name => throw new NotSupportedException("not readable");
+    }
+
+    [Fact]
     public async Task SplitsABigQueue()
     {
         var tm1 = new ScriptedTm1().On(BatchKey, _ => ScriptedTm1.Json(200, "{\"responses\":[]}"));

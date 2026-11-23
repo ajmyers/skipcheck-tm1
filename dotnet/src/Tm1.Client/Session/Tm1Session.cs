@@ -410,7 +410,10 @@ public sealed class Tm1Session : IAsyncDisposable
 /// <summary>A JSON <c>$batch</c>, as the Java client's <c>Tm1SessionBatch</c>: requests through
 /// <see cref="Session"/> are queued, and <c>RunAsync</c> sends them together. TM1 (11.8)
 /// runs them in order (a later one sees an earlier one's writes) and carries on past failed ones:
-/// each request's task gets its own result or error.</summary>
+/// each request's task gets its own result or error. A request's body is written as JSON when the
+/// call is made, not at the run: one that can't be written fails its own call at once and never
+/// joins the batch, and a change to the body object afterwards isn't sent. If TM1 answers a
+/// <c>$batch</c> with no body, every call in it fails with <see cref="Tm1ProtocolException"/>.</summary>
 public sealed class Tm1SessionBatch
 {
     /// <summary>The most requests <see cref="RunAsync(CancellationToken)"/> sends in one
@@ -464,7 +467,15 @@ internal sealed class BatchQueue
         {
             throw new ArgumentException("Raw bytes can't go in a JSON batch: " + request);
         }
-        var entry = new Entry(request.Method, view.Contextual(request.RelativeUri()), request.Headers, request.Body, request.Accept, read);
+        // Written now, so a body that can't be written fails its own call, where it was made, rather
+        // than the run and every other call with it (Encode throws an ArgumentException)
+        JsonElement? body = null;
+        if (request.Encode().Content is { } written)
+        {
+            using var doc = JsonDocument.Parse(written);
+            body = doc.RootElement.Clone();
+        }
+        var entry = new Entry(request.Method, view.Contextual(request.RelativeUri()), request.Headers, body, request.Accept, read);
         lock (_entries)
         {
             if (_ran)
@@ -512,10 +523,10 @@ internal sealed class BatchQueue
                         {
                             headers[header.Key] = header.Value;
                         }
-                        if (e.Body is not null)
+                        if (e.Body is { } body)
                         {
                             headers["content-type"] = "application/json";
-                            item["body"] = e.Body;
+                            item["body"] = body;
                         }
                         item["headers"] = headers;
                         return item;
@@ -527,6 +538,19 @@ internal sealed class BatchQueue
                 var reply = await _sender
                     .ExecuteAsync(Tm1Request.Post<JsonElement>(ODataPath.Batch(), new Dictionary<string, object?> { ["requests"] = requests }), ct)
                     .ConfigureAwait(false);
+                if (reply.ValueKind != JsonValueKind.Object)
+                {
+                    // No body is no answers: every call of this request fails, below, rather than wait for ever
+                    throw new Tm1ProtocolException(
+                        reply.ValueKind == JsonValueKind.Undefined
+                            ? "TM1 answered the batch with no body"
+                            : "TM1 answered the batch with something that isn't an object",
+                        null,
+                        "POST",
+                        connection.Url(ODataPath.Batch().ToString()),
+                        null
+                    );
+                }
                 var byId = reply.TryGetProperty("responses", out var responses)
                     ? responses.EnumerateArray().ToDictionary(r => r.GetProperty("id").ToString())
                     : new Dictionary<string, JsonElement>();
@@ -568,7 +592,15 @@ internal sealed class BatchQueue
         }
     }
 
-    private sealed record Entry(string Method, string Url, IReadOnlyDictionary<string, string> Headers, object? Body, string Accept, Func<Reply, object?> Read)
+    /// <summary>A queued call. Its body is the JSON it was when queued: a change to the caller's object afterwards isn't sent.</summary>
+    private sealed record Entry(
+        string Method,
+        string Url,
+        IReadOnlyDictionary<string, string> Headers,
+        JsonElement? Body,
+        string Accept,
+        Func<Reply, object?> Read
+    )
     {
         public TaskCompletionSource<object?> Result { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
