@@ -40,7 +40,7 @@ Refs: #12
 - Description: required.
 - `Refs: #N` trailer: required; it links the issue.
 
-PRs are squash-merged, so the PR title and description become the commit on `master`. CI checks that the title follows the same rules and that the description links the issue with `Closes #N` or `Part of #N`.
+PRs are squash-merged, so the PR title and description become the commit on `master`. CI checks that the title follows the same rules and that the description links the issue with `Closes #N` or `Part of #N`. A PR a bot opened (Dependabot) isn't checked: it writes its own title and carries its own context.
 
 ## Code style
 
