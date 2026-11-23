@@ -32,7 +32,8 @@ rm -rf build/conformance-live
 for suite in "${suites[@]}"; do
   echo "== $suite"
   case "$suite" in
-    java) ./gradlew :tm1-client:test --tests '*Tm1Test' || failed+=(java) ;;
+    # --rerun: Gradle doesn't know a TM1 is an input, and would call the tests up to date
+    java) ./gradlew :tm1-client:test --rerun --tests '*Tm1Test' || failed+=(java) ;;
     python) (cd python/tm1-client && python -m pytest tests/live -rs) || failed+=(python) ;;
     dotnet) dotnet test dotnet/Tm1.slnx --filter 'FullyQualifiedName~.Live.' || failed+=(dotnet) ;;
     typescript) (cd typescript && npm run test:live -w tm1-client && npm test -w tm1-testcontainers) || failed+=(typescript) ;;
