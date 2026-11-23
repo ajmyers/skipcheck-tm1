@@ -15,7 +15,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+# Ruff is pinned: a newer one may lay code out differently, and tests/test_format.py checks the layout
+test = ["pytest>=8", "ruff==0.17.6"]
 
 [tool.hatch.build.hooks.custom]
 # hatch_build.py generates src/tm1_client/_generated from ../spec/tm1-api.json, and
