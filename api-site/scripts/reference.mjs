@@ -11,7 +11,8 @@
 //                                                    Java by java/tools/docs-doclet, Python by
 //                                                    extract/python_api.py
 //   a type's overview                                the Java type's Javadoc, with its {@snippet}s
-//                                                    replaced by that region in the page's language,
+//                                                    replaced by that region in the page's language
+//                                                    (or by the file of the Java examples it names),
 //                                                    and the Java names in it named the page's way
 //   which member is which across languages           the parity rule each language's tests enforce:
 //                                                    modelCubes is model_cubes in Python, and each
@@ -111,6 +112,12 @@ function javadocParts(doc) {
 	return { description, tags };
 }
 
+/** The file a {@snippet file = ...} quotes, under the project's Java examples (src/examples/java), or null. */
+const snippetFile = (body) => /\bfile\s*=\s*"?([\w./-]+)"?/.exec(body)?.[1] ?? null;
+
+// A quoted file's language in the site's highlighter, by its extension
+const FILE_HIGHLIGHT = { yml: 'yaml', yaml: 'yaml', json: 'json', xml: 'xml', properties: 'properties' };
+
 /** Javadoc as HTML, for a page in one language: inline tags rendered, links to members named the
  * language's way and linked where there is a page, snippets as that language's example. */
 function javadocHtml(doc, page) {
@@ -128,9 +135,11 @@ function javadocHtml(doc, page) {
 		if (tag === 'snippet') {
 			const cls = /class\s*=\s*"?examples\.(\w+)"?/.exec(body);
 			const region = /region\s*=\s*"?([\w-]+)"?/.exec(body);
+			const quoted = snippetFile(body);
 			// An inline snippet ({@snippet : code}) is Java written into the comment
 			const inline = /^[^:]*:\s*\n?([\s\S]*)$/.exec(rest);
 			if (cls && region) html += '</p>' + page.example(cls[1], region[1]) + '<p>';
+			else if (quoted) html += '</p>' + (page.file?.(quoted) ?? '') + '<p>';
 			else if (inline) html += '</p>' + page.javaCode(inline[1]) + '<p>';
 		} else if (block) {
 			// <pre>{@code ...}</pre>: a block of Java written into the comment
@@ -446,12 +455,22 @@ for (const project of PROJECTS) {
 					if (text === undefined) missing.add(language + ': ' + where + ' region ' + region);
 					exampleBlocks.set(cls + '#' + region, text === undefined ? '' : code(text, highlight, 'x-' + cls + '-' + region));
 				}
+				// A whole file of the Java examples, such as a Spring Boot application.yml, the same in every language
+				for (const [snippet] of doc.matchAll(/\{@snippet[^}]*\}/g)) {
+					const quoted = snippetFile(snippet);
+					if (!quoted) continue;
+					const where = path.join('java', project.id, 'src', 'examples', 'java', quoted);
+					const text = await readFile(path.join(repoDir, where), 'utf8').catch(() => undefined);
+					if (text === undefined) missing.add(language + ': ' + where);
+					exampleBlocks.set('file:' + quoted, text === undefined ? '' : code(text.trim(), FILE_HIGHLIGHT[quoted.split('.').at(-1)] ?? 'plaintext', 'x-' + quoted));
+				}
 			}
 			// Java written into a comment (not an example region) is shown on Java's page only; on another
 			// language's page it would be Java in the wrong place, so the build counts it as a fault
 			let fallback = false;
 			const render = {
 				example: (cls, region) => exampleBlocks.get(cls + '#' + region) ?? '',
+				file: (quoted) => exampleBlocks.get('file:' + quoted) ?? '',
 				javaCode(text) {
 					if (language === 'java') return code(dedent(text.split('\n')).replace(/\}\s*$/, '').trimEnd(), 'java');
 					if (fallback) return '';

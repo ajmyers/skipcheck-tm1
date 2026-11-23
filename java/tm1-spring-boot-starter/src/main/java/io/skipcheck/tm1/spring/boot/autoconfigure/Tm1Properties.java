@@ -14,14 +14,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * properties ({@link Tm1ServersProperties}). The starter binds these itself when it
  * creates the server's beans; there's no bean of this type.
  *
- * <pre class="code">
- * tm1:
- *   address: http://tm1:8010        # or base-url: http://tm1:8010/api/v1/
- *   user: admin
- *   password: ${TM1_PASSWORD}
- *   pool:
- *     enabled: true
- * </pre>
+ * {@snippet file = examples/application.yml}
  *
  * @param address the server's address, such as {@code http://tm1:8010}; the service root
  * is derived with the TM1 11 dialect. Set this or {@code base-url}.
