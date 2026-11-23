@@ -15,6 +15,7 @@ import pytest
 from skipcheck_tm1 import Tm1Client, Tm1NotFoundError, Tm1Session, Tm1UnsupportedOperationError, auth
 from skipcheck_tm1 import _protocol as p
 from skipcheck_tm1._generated import model as m
+from skipcheck_tm1.version import Tm1Capabilities, Tm1Capability, Tm1Version
 
 from .conftest import BASE, SNAPSHOT, Api, FakeTm1, target
 
@@ -181,8 +182,6 @@ def test_async_monitor_messages() -> None:
 def test_spec_lists_the_endpoints_the_coverage_gate_counts(spec: dict[str, Any]) -> None:
     """Python reads $metadata into the same 242 endpoint IDs as the Java client's Endpoints, and
     the spec is of the snapshot's schema (Java's ApiSpecInventoryTest)."""
-    from skipcheck_tm1.version import Tm1Capabilities
-
     caps = Tm1Capabilities.parse(SNAPSHOT.read_bytes())
     assert caps.schema_version == "11.8.35"
     assert caps.endpoints == {e["id"] for e in spec["endpoints"]}
@@ -199,6 +198,61 @@ OLD_SERVER = b"""<?xml version="1.0" encoding="utf-8"?>
     </Schema>
   </edmx:DataServices>
 </edmx:Edmx>"""
+
+
+# Tm1CapabilitiesTest: Java makes its older server from the snapshot with its ApproximateSchemas
+# tooling; here it's OLD_SERVER, an 11.8.20 schema that has Cubes and no Cube.Reserve
+
+RESERVE = Tm1Capability.bound_operation("tm1.Cube", "tm1.Reserve").since("11.8.34")
+
+
+def _current() -> Tm1Capabilities:
+    return Tm1Capabilities.parse(SNAPSHOT.read_bytes(), Tm1Version.parse("11.8.03500.6"))
+
+
+def test_finds_each_kind_of_element() -> None:
+    current = _current()
+    assert current.supports(Tm1Capability.entity_set("Cubes"))
+    assert not current.supports(Tm1Capability.entity_set("Bananas"))
+    assert current.supports(Tm1Capability.singleton("ActiveSession"))
+    assert not current.supports(Tm1Capability.singleton("Cubes")), "an entity set isn't a singleton"
+    assert current.supports(Tm1Capability.unbound_operation("ExecuteMDX"))
+    assert current.supports(Tm1Capability.unbound_operation("ControlCubes")), "a function import"
+    assert current.supports(RESERVE)
+    assert current.supports(Tm1Capability.bound_operation("ibm.tm1.api.v1.Cube", "ibm.tm1.api.v1.Reserve")), "by namespace rather than alias"
+    assert not current.supports(Tm1Capability.bound_operation("tm1.Dimension", "tm1.CheckRules")), "bound elsewhere"
+    assert current.supports(Tm1Capability.property("tm1.Cube", "Rules"))
+    assert current.supports(Tm1Capability.property("tm1.Cube", "Views")), "a navigation property"
+    assert not current.supports(Tm1Capability.property("tm1.Cube", "Colour"))
+
+
+def test_finds_operations_and_properties_of_base_types() -> None:
+    current = _current()
+    assert current.supports(Tm1Capability.bound_operation("tm1.Folder", "tm1.Copy")), "Entry.Copy on a Folder"
+    assert current.supports(Tm1Capability.property("tm1.NativeView", "Name")), "View.Name on a NativeView"
+
+
+def test_reports_what_an_older_server_lacks_comparing_schema_versions() -> None:
+    older = Tm1Capabilities.parse(OLD_SERVER)
+    assert older.schema_version == "11.8.20"
+    assert not older.supports(RESERVE)
+    assert older.supports(Tm1Capability.entity_set("Cubes"))
+    error = older.check(RESERVE, "http://tm1:8010/api/v1/")
+    assert error is not None
+    assert error.missing == "Cube.Reserve"
+    assert str(error) == (
+        "Cube.Reserve isn't defined by the TM1 server at http://tm1:8010/api/v1/: it was added in schema 11.8.34, and the server reports schema 11.8.20"
+    )
+    assert not error.may_have_applied()
+    assert _current().check(RESERVE, "x") is None
+
+
+def test_says_what_it_knows_when_the_added_version_isnt_recorded() -> None:
+    error = _current().check(Tm1Capability.entity_set("Bananas"), "http://tm1:8010/api/v1/")
+    assert error is not None
+    assert str(error) == (
+        "entity set Bananas isn't defined by the TM1 server at http://tm1:8010/api/v1/ (the server reports schema 11.8.35, product version 11.8.03500.6)"
+    )
 
 
 def _old(check: bool) -> tuple[Tm1Client, FakeTm1]:
