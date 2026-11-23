@@ -21,7 +21,7 @@ namespace Skipcheck.Tm1.Client.Tests.Runtime;
 public class Tm1ErrorsTest
 {
     [Fact]
-    public void ReadsTheODataErrorBody()
+    public void ReadsTheOdataErrorBody()
     {
         var e = Error("{\"error\":{\"code\":\"278\",\"message\":\"Boom\",\"target\":\"Name\",\"details\":[{\"code\":\"1\",\"message\":\"inner\"}]}}")!;
         Assert.Equal("278", e.Code);
