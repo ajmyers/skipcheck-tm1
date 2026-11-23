@@ -55,6 +55,7 @@ namespace Skipcheck.Tm1.Client.Services;
 /// </summary>
 public sealed class ContentService : Tm1Service
 {
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public ContentService(Tm1Session session)
         : base(session) { }
 

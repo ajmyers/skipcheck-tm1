@@ -28,6 +28,7 @@ namespace Skipcheck.Tm1.Client.Services;
 /// </summary>
 public sealed class CellService : Tm1Service
 {
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public CellService(Tm1Session session)
         : base(session) { }
 

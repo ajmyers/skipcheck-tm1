@@ -30,6 +30,7 @@ public sealed class ThreadService : Tm1Service
 {
     private static readonly ODataPath Threads = ODataPath.Of("Threads");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public ThreadService(Tm1Session session)
         : base(session) { }
 

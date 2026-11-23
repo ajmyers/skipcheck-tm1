@@ -337,6 +337,7 @@ public class PawContainer : IStartable
     {
         var info = await container.InspectAsync(cancellationToken).ConfigureAwait(false);
         var address = Tm1WebContainer.AddressOn(info, container.Network?.Name, "PAW");
+        // AddressOn found the network, so there are settings
         return (info.NetworkSettings!.Networks[container.Network?.Name ?? "bridge"].NetworkID, address);
     }
 

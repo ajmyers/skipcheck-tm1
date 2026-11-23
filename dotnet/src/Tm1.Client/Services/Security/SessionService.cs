@@ -34,6 +34,7 @@ public sealed class SessionService : Tm1Service
 {
     private static readonly ODataPath Sessions = ODataPath.Of("Sessions");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public SessionService(Tm1Session session)
         : base(session) { }
 

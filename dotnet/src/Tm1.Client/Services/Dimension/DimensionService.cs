@@ -39,6 +39,7 @@ public sealed class DimensionService : Tm1Service
 {
     private static readonly ODataPath Dimensions = ODataPath.Of("Dimensions");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public DimensionService(Tm1Session session)
         : base(session) { }
 

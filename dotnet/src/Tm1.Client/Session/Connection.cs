@@ -164,7 +164,7 @@ internal sealed class Connection
             return this;
         }
 
-        public Task<(string Cookie, long Id)> Login { get; private set; } = null!;
+        public Task<(string Cookie, long Id)> Login { get; private set; } = null!; // set by Start, which every attempt is made with
 
         public DateTimeOffset? RefusedAt { get; set; }
     }

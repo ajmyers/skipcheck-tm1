@@ -11,5 +11,6 @@ public sealed class Tm1SessionClosedException : InvalidOperationException
         ServiceRoot = serviceRoot;
     }
 
+    /// <summary>The service root of the session that was closed.</summary>
     public string ServiceRoot { get; }
 }

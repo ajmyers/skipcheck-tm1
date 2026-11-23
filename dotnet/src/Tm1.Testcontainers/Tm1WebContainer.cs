@@ -146,7 +146,7 @@ public class Tm1WebContainer : GenericContainer<Tm1WebContainer>
         {
             return;
         }
-        if (!tm1.IsRunning || tm1Address is null)
+        if (!tm1.IsRunning || tm1Address is null || tm1Hostname is null)
         {
             throw new InvalidOperationException("The TM1 server isn't running; it should have started first");
         }
@@ -156,7 +156,7 @@ public class Tm1WebContainer : GenericContainer<Tm1WebContainer>
         }
         else
         {
-            WithExtraHost(tm1Hostname!, tm1Address);
+            WithExtraHost(tm1Hostname, tm1Address);
         }
         WithEnv("TM1_ADMIN_HOST", tm1Address);
     }

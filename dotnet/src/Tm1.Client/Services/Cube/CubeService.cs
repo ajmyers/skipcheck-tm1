@@ -37,6 +37,7 @@ public sealed class CubeService : Tm1Service
 {
     private static readonly ODataPath Cubes = ODataPath.Of("Cubes");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public CubeService(Tm1Session session)
         : base(session) { }
 

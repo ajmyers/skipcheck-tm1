@@ -16,6 +16,8 @@ namespace Skipcheck.Tm1.Client.Json;
 [AttributeUsage(AttributeTargets.Enum)]
 public sealed class Tm1EnumAttribute(string qualifiedName) : Attribute
 {
+    /// <summary>The enum's qualified name in <c>$metadata</c>, such as
+    /// <c>ibm.tm1.api.v1.ElementType</c>.</summary>
     public string QualifiedName { get; } = qualifiedName;
 }
 
@@ -23,6 +25,7 @@ public sealed class Tm1EnumAttribute(string qualifiedName) : Attribute
 [AttributeUsage(AttributeTargets.Field)]
 public sealed class Tm1EnumMemberAttribute(string name) : Attribute
 {
+    /// <summary>The member's name in TM1's JSON.</summary>
     public string Name { get; } = name;
 }
 
@@ -35,6 +38,7 @@ public sealed class Tm1EnumFallbackAttribute : Attribute { }
 /// read by <c>@odata.type</c>, patches written as set, nulls not written for models.</summary>
 public static class Tm1Json
 {
+    /// <summary>The options every model is read and written with.</summary>
     public static JsonSerializerOptions Options { get; } = Create();
 
     private static JsonSerializerOptions Create()
@@ -55,10 +59,13 @@ public static class Tm1Json
         return options;
     }
 
+    /// <summary>Reads a model from JSON.</summary>
     public static T? Read<T>(JsonElement element) => element.Deserialize<T>(Options);
 
+    /// <summary>Reads a model of <paramref name="type"/> from JSON.</summary>
     public static object? Read(JsonElement element, Type type) => element.Deserialize(type, Options);
 
+    /// <summary>Writes a model, a patch or a plain value as JSON.</summary>
     public static JsonElement Write(object? value) => JsonSerializer.SerializeToElement(value, Options);
 }
 
@@ -79,7 +86,7 @@ public static class Tm1EnumConverter
             object? fallback = null;
             foreach (var field in t.GetFields(BindingFlags.Public | BindingFlags.Static))
             {
-                var value = field.GetValue(null)!;
+                var value = field.GetValue(null)!; // a static field of an enum: its member, never null
                 if (field.GetCustomAttribute<Tm1EnumMemberAttribute>() is { } m)
                 {
                     byName[m.Name] = value;
@@ -90,9 +97,23 @@ public static class Tm1EnumConverter
                     fallback = value;
                 }
             }
-            return new Description(e.QualifiedName, byName, byValue, fallback!);
+            return new Description(
+                e.QualifiedName,
+                byName,
+                byValue,
+                fallback ?? throw new InvalidOperationException($"{t.Name} has no member marked [Tm1EnumFallback], which every generated enum has")
+            );
         });
 
+    /// <summary>What a generated enum is called in TM1.</summary>
+    /// <exception cref="InvalidOperationException"><paramref name="type"/> isn't a generated enum.</exception>
+    internal static Description Of(Type type) => Describe(type) ?? throw new InvalidOperationException(type.Name + " isn't a generated TM1 enum");
+
+    /// <summary>What <see cref="Describe"/> knows of a generated enum.</summary>
+    /// <param name="QualifiedName">Its qualified name in <c>$metadata</c>.</param>
+    /// <param name="ByName">Its members, by the names TM1 writes.</param>
+    /// <param name="ByValue">The names TM1 writes, by member.</param>
+    /// <param name="Fallback">The member a value this client doesn't know reads as.</param>
     public sealed record Description(
         string QualifiedName,
         IReadOnlyDictionary<string, object> ByName,
@@ -100,11 +121,16 @@ public static class Tm1EnumConverter
         object Fallback
     )
     {
+        /// <summary>The name TM1 writes for <paramref name="value"/>.</summary>
+        /// <exception cref="InvalidOperationException">It is the fallback member, which stands for
+        /// a value this client doesn't know and is never sent.</exception>
         public string Name(Enum value) =>
             ByValue.TryGetValue(value, out var n)
                 ? n
                 : throw new InvalidOperationException($"{value.GetType().Name}.{value} stands for a value this client doesn't know, and isn't sent");
 
+        /// <summary><paramref name="value"/> as an OData literal, such as
+        /// <c>ibm.tm1.api.v1.ElementType'Numeric'</c>.</summary>
         public string Literal(Enum value) => ODataLiterals.EnumMember(QualifiedName, Name(value));
     }
 }
@@ -114,12 +140,12 @@ internal sealed class Tm1EnumConverterFactory : JsonConverterFactory
     public override bool CanConvert(Type typeToConvert) => Tm1EnumConverter.Describe(typeToConvert) is not null;
 
     public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options) =>
-        (JsonConverter)Activator.CreateInstance(typeof(Converter<>).MakeGenericType(typeToConvert))!;
+        (JsonConverter)Activator.CreateInstance(typeof(Converter<>).MakeGenericType(typeToConvert))!; // null only for Nullable<T>, which a class isn't
 
     private sealed class Converter<T> : JsonConverter<T>
         where T : struct, Enum
     {
-        private readonly Tm1EnumConverter.Description _d = Tm1EnumConverter.Describe(typeof(T))!;
+        private readonly Tm1EnumConverter.Description _d = Tm1EnumConverter.Of(typeof(T));
 
         public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
@@ -135,6 +161,7 @@ internal sealed class Tm1EnumConverterFactory : JsonConverterFactory
 /// accepts the standard form.</summary>
 public sealed class Iso8601TimeSpanConverter : JsonConverter<TimeSpan>
 {
+    /// <inheritdoc/>
     public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
         reader.TokenType switch
         {
@@ -142,6 +169,7 @@ public sealed class Iso8601TimeSpanConverter : JsonConverter<TimeSpan>
             _ => XmlConvert.ToTimeSpan(reader.GetString()!),
         };
 
+    /// <inheritdoc/>
     public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options) => writer.WriteStringValue(Format(value));
 
     /// <summary>As the Java client writes a duration (<c>Duration.toString</c>): hours, minutes and
@@ -193,9 +221,11 @@ public sealed class Iso8601TimeSpanConverter : JsonConverter<TimeSpan>
 /// (<c>2026-01-02T03:04:00.12Z</c>).</summary>
 public sealed class Iso8601DateTimeOffsetConverter : JsonConverter<DateTimeOffset>
 {
+    /// <inheritdoc/>
     public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
         reader.GetDateTimeOffset().ToUniversalTime();
 
+    /// <inheritdoc/>
     public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) => writer.WriteStringValue(Format(value));
 
     internal static string Format(DateTimeOffset value) =>
@@ -205,12 +235,14 @@ public sealed class Iso8601DateTimeOffsetConverter : JsonConverter<DateTimeOffse
 /// <summary>A date-time TM1 sometimes sends something else in (<c>0000-00-00T00:00Z</c>): read as null.</summary>
 public sealed class LenientDateTimeOffsetConverter : JsonConverter<DateTimeOffset?>
 {
+    /// <inheritdoc/>
     public override DateTimeOffset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
         reader.TokenType == JsonTokenType.String
         && DateTimeOffset.TryParse(reader.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d)
             ? d.ToUniversalTime()
             : null;
 
+    /// <inheritdoc/>
     public override void Write(Utf8JsonWriter writer, DateTimeOffset? value, JsonSerializerOptions options)
     {
         if (value is { } v)
@@ -251,7 +283,7 @@ internal sealed class Tm1PolymorphicConverterFactory : JsonConverterFactory
     public override bool CanConvert(Type typeToConvert) => Tm1ModelRegistry.Hierarchies.ContainsKey(typeToConvert);
 
     public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options) =>
-        (JsonConverter)Activator.CreateInstance(typeof(Converter<>).MakeGenericType(typeToConvert))!;
+        (JsonConverter)Activator.CreateInstance(typeof(Converter<>).MakeGenericType(typeToConvert))!; // null only for Nullable<T>, which a class isn't
 
     private static readonly ConcurrentDictionary<JsonSerializerOptions, JsonSerializerOptions> Plain = new();
 
@@ -288,6 +320,6 @@ internal sealed class Tm1PolymorphicConverterFactory : JsonConverterFactory
         }
 
         public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options) =>
-            JsonSerializer.Serialize(writer, value, value!.GetType(), Without(options));
+            JsonSerializer.Serialize(writer, value, value!.GetType(), Without(options)); // System.Text.Json writes a null itself, without the converter
     }
 }

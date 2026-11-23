@@ -22,6 +22,7 @@ public sealed class MemberSetService : Tm1Service
 {
     private static readonly ODataPath MemberSets = ODataPath.Of("MemberSets");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public MemberSetService(Tm1Session session)
         : base(session) { }
 
@@ -34,7 +35,7 @@ public sealed class MemberSetService : Tm1Service
     {
         var operation = Tm1Operations.ExecuteMdxSetExpression;
         var request = Tm1Request
-            .Post<CellsetAxis>(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
+            .Post<CellsetAxis>(ODataPath.Of(operation.Import), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
             .WithQuery(query)
             .Requires(operation.Capability());
         return Session.ExecuteAsync(request, cancellationToken);

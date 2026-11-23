@@ -51,6 +51,7 @@ public sealed class CellsetService : Tm1Service
     /// <summary>How many pages <see cref="StreamAsync{R}"/> fetches at once, beyond the first.</summary>
     private const int PagesInFlight = 2;
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public CellsetService(Tm1Session session)
         : base(session) { }
 
@@ -62,7 +63,7 @@ public sealed class CellsetService : Tm1Service
     {
         var operation = Tm1Operations.ExecuteMdx;
         var request = Tm1Request
-            .Post<Cellset>(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
+            .Post<Cellset>(ODataPath.Of(operation.Import), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
             .WithQuery(query)
             .Requires(operation.Capability());
         return Session.ExecuteAsync(request, cancellationToken);
@@ -76,7 +77,7 @@ public sealed class CellsetService : Tm1Service
     {
         var operation = Tm1Operations.ExecuteMdxStatement;
         var request = Tm1Request
-            .Post(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
+            .Post(ODataPath.Of(operation.Import), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
             .Requires(operation.Capability());
         return Session.ExecuteAsync(request, cancellationToken);
     }

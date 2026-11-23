@@ -55,6 +55,7 @@ public sealed class Tm1Identity : IEquatable<Tm1Identity>
         return new(IdentityKind.OwnCredentials, name, authenticator ?? throw new ArgumentNullException(nameof(authenticator)));
     }
 
+    /// <summary>What kind of identity this is.</summary>
     public IdentityKind Kind { get; }
 
     /// <summary>The user's name, as given (empty for the service account).</summary>
@@ -69,16 +70,20 @@ public sealed class Tm1Identity : IEquatable<Tm1Identity>
         {
             IdentityKind.ServiceAccount => settings,
             IdentityKind.Impersonating => settings.Impersonate(Name),
-            _ => settings.WithoutImpersonation().Authenticator(Authenticator!),
+            _ => settings.WithoutImpersonation().Authenticator(Authenticator!), // own credentials: WithCredentials checks it has them
         };
 
+    /// <inheritdoc/>
     public bool Equals(Tm1Identity? other) =>
         ReferenceEquals(this, other) || (other is not null && Kind == other.Kind && _comparableName == other._comparableName);
 
+    /// <inheritdoc/>
     public override bool Equals(object? obj) => Equals(obj as Tm1Identity);
 
+    /// <inheritdoc/>
     public override int GetHashCode() => HashCode.Combine(Kind, _comparableName);
 
+    /// <inheritdoc/>
     public override string ToString() =>
         Kind switch
         {

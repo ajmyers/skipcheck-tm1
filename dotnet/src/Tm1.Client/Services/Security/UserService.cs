@@ -36,6 +36,7 @@ public sealed class UserService : Tm1Service
 {
     private static readonly ODataPath Users = ODataPath.Of("Users");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public UserService(Tm1Session session)
         : base(session) { }
 

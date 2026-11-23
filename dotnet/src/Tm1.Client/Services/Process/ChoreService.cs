@@ -39,6 +39,7 @@ public sealed class ChoreService : Tm1Service
 {
     private static readonly ODataPath Chores = ODataPath.Of("Chores");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public ChoreService(Tm1Session session)
         : base(session) { }
 

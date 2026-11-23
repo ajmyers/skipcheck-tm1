@@ -53,6 +53,7 @@ public sealed class EncryptionService : Tm1Service
 {
     private static readonly ODataPath.Alias Settings = new("@settings");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public EncryptionService(Tm1Session session)
         : base(session) { }
 
@@ -130,7 +131,7 @@ public sealed class EncryptionService : Tm1Service
             ["SourcePath"] = Require(source, nameof(source)),
             ["DestinationPath"] = Require(destination, nameof(destination)),
         };
-        var names = Tm1EnumConverter.Describe(typeof(EncryptionFileType))!;
+        var names = Tm1EnumConverter.Of(typeof(EncryptionFileType));
         // The member for a value this client doesn't know has no name to send: no type, as Java has it
         file["FileType"] = names.ByValue.TryGetValue(type, out var name)
             ? name

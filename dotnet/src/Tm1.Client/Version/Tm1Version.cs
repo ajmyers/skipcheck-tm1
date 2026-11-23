@@ -17,6 +17,9 @@ public sealed partial class Tm1Version : IComparable<Tm1Version>, IEquatable<Tm1
         _parts = parts;
     }
 
+    /// <summary>Parses a version such as <c>11.8.03500.6</c>. Surrounding whitespace is
+    /// ignored.</summary>
+    /// <exception cref="ArgumentException">The text isn't dot-separated numbers.</exception>
     public static Tm1Version Parse(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -32,10 +35,14 @@ public sealed partial class Tm1Version : IComparable<Tm1Version>, IEquatable<Tm1
         return new Tm1Version(trimmed, parts);
     }
 
+    /// <summary>True if this version is the same as or newer than
+    /// <paramref name="other"/>.</summary>
     public bool IsAtLeast(Tm1Version other) => CompareTo(other) >= 0;
 
+    /// <summary>True if this version is older than <paramref name="other"/>.</summary>
     public bool IsBefore(Tm1Version other) => CompareTo(other) < 0;
 
+    /// <inheritdoc/>
     public int CompareTo(Tm1Version? other)
     {
         if (other is null)
@@ -55,10 +62,13 @@ public sealed partial class Tm1Version : IComparable<Tm1Version>, IEquatable<Tm1
         return 0;
     }
 
+    /// <inheritdoc/>
     public bool Equals(Tm1Version? other) => other is not null && CompareTo(other) == 0;
 
+    /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is Tm1Version v && Equals(v);
 
+    /// <inheritdoc/>
     public override int GetHashCode()
     {
         var end = _parts.Length;
@@ -74,15 +84,28 @@ public sealed partial class Tm1Version : IComparable<Tm1Version>, IEquatable<Tm1
         return hash.ToHashCode();
     }
 
+    /// <summary>The version exactly as parsed, such as <c>11.8.03500.6</c>.</summary>
     public override string ToString() => _text;
 
+    /// <summary>True if <paramref name="a"/> is older than <paramref name="b"/>.</summary>
     public static bool operator <(Tm1Version a, Tm1Version b) => a.CompareTo(b) < 0;
 
+    /// <summary>True if <paramref name="a"/> is newer than <paramref name="b"/>.</summary>
     public static bool operator >(Tm1Version a, Tm1Version b) => a.CompareTo(b) > 0;
 
+    /// <summary>True if <paramref name="a"/> is the same as or older than
+    /// <paramref name="b"/>.</summary>
     public static bool operator <=(Tm1Version a, Tm1Version b) => a.CompareTo(b) <= 0;
 
+    /// <summary>True if <paramref name="a"/> is the same as or newer than
+    /// <paramref name="b"/>.</summary>
     public static bool operator >=(Tm1Version a, Tm1Version b) => a.CompareTo(b) >= 0;
+
+    /// <summary>True if both are the same version, part by part: <c>11.8</c> equals <c>11.8.0.0</c>.</summary>
+    public static bool operator ==(Tm1Version? a, Tm1Version? b) => a is null ? b is null : a.Equals(b);
+
+    /// <summary>True if they are different versions.</summary>
+    public static bool operator !=(Tm1Version? a, Tm1Version? b) => !(a == b);
 
     [GeneratedRegex(@"^\d+(\.\d+)*$")]
     private static partial Regex Format();

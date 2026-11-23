@@ -45,6 +45,7 @@ public sealed class AttributeOwner
     /// <summary>A chore.</summary>
     public static AttributeOwner Chore(string chore) => new(ODataPath.Of("Chores").Key(Required(chore, nameof(chore))));
 
+    /// <inheritdoc/>
     public override string ToString() => Path.ToString();
 
     private static string Required(string? value, string name) => value ?? throw new ArgumentNullException(name);

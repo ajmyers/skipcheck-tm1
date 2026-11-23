@@ -177,8 +177,10 @@ public sealed class Tm1SessionPool : IAsyncDisposable
         }
     }
 
+    /// <summary>Closes the pool: <see cref="CloseAsync"/>.</summary>
     public async ValueTask DisposeAsync() => await CloseAsync().ConfigureAwait(false);
 
+    /// <inheritdoc/>
     public override string ToString() => $"Tm1SessionPool[{ServiceRoot}]";
 
     private string ServiceRoot => _sessions.BaseUrlOrUnset();
@@ -212,7 +214,7 @@ public sealed class Tm1SessionPool : IAsyncDisposable
     {
         while (_entries.Count > _maxSize)
         {
-            var eldest = _order.First!;
+            var eldest = _order.First!; // there's an entry, so there's a first: every entry is in the order
             if (eldest.Value.Identity.Equals(keep))
             {
                 return;
@@ -355,6 +357,8 @@ public sealed class Tm1SessionPoolBuilder
         return this;
     }
 
+    /// <summary>The pool. It starts its sweep at once, and opens sessions only when
+    /// asked.</summary>
     public Tm1SessionPool Build() => new(this);
 
     private static TimeSpan Positive(TimeSpan value, string name) =>

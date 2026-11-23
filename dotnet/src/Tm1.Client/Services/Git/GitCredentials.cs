@@ -56,6 +56,10 @@ public sealed record GitCredentials(string? Username, string? PasswordOrToken, s
 /// <summary>What a push's commit says, and who it's by: its message, and the author's name and email address.</summary>
 public sealed record GitCommitDetails
 {
+    /// <summary>What a push's commit says, and who it's by.</summary>
+    /// <param name="message">The commit message.</param>
+    /// <param name="author">The author's name.</param>
+    /// <param name="email">The author's email address.</param>
     public GitCommitDetails(string message, string author, string email)
     {
         Message = message ?? throw new ArgumentNullException(nameof(message));

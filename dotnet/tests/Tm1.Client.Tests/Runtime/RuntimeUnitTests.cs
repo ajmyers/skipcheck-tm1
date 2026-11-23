@@ -635,6 +635,29 @@ public class Tm1VersionTest
         Assert.True(Tm1Version.Parse("11.8.1") > Tm1Version.Parse("11.8"));
     }
 
+    /// <summary>.NET only: == agrees with Equals and the other operators, rather than comparing references.</summary>
+    [Fact]
+    public void ComparesWithTheEqualityOperatorsAsEqualsDoes()
+    {
+        Assert.True(Tm1Version.Parse("11.8.0.0") == Tm1Version.Parse("11.8"));
+        Assert.False(Tm1Version.Parse("11.8.0.0") != Tm1Version.Parse("11.8"));
+        Assert.True(Tm1Version.Parse("11.8.1") != Tm1Version.Parse("11.8"));
+        Tm1Version? none = null;
+        Assert.True(none == null);
+        Assert.True(Tm1Version.Parse("11.8") != none);
+    }
+
+    /// <summary>.NET only: a $metadata that leaves out an attribute CSDL requires is refused as one the client can't read.</summary>
+    [Fact]
+    public void RefusesMetadataWithoutARequiredAttribute()
+    {
+        const string csdl =
+            "<edmx:Edmx xmlns:edmx=\"http://docs.oasis-open.org/odata/ns/edmx\" Version=\"4.0\"><edmx:DataServices>"
+            + "<Schema xmlns=\"http://docs.oasis-open.org/odata/ns/edm\" Namespace=\"ibm.tm1.api.v1\"><EntityType/></Schema>"
+            + "</edmx:DataServices></edmx:Edmx>";
+        Assert.Contains("EntityType has no Name", Assert.Throws<Tm1ProtocolException>(() => Tm1Capabilities.Parse(csdl)).Message);
+    }
+
     [Fact]
     public void AnswersRangeQuestions()
     {

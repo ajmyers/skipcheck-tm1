@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Skipcheck.Tm1.Client.Errors;
 using Skipcheck.Tm1.Client.Model;
 using Skipcheck.Tm1.Client.OData;
 using Skipcheck.Tm1.Client.Session;
@@ -39,6 +40,7 @@ public sealed class LogService : Tm1Service
     private const string ByteOrderMark = "﻿";
     private static readonly ODataPath ErrorLogFiles = ODataPath.Of("ErrorLogFiles");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public LogService(Tm1Session session)
         : base(session) { }
 
@@ -52,7 +54,7 @@ public sealed class LogService : Tm1Service
     public IAsyncEnumerable<MessageLogEntry> MessageLogAsync(bool reverse, ODataQuery? query = null, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.MessageLog;
-        var path = ODataPath.FunctionImport(operation.ImportName!, new Dictionary<string, object?> { ["Reverse"] = reverse });
+        var path = ODataPath.FunctionImport(operation.Import, new Dictionary<string, object?> { ["Reverse"] = reverse });
         return Session.StreamAsync(Tm1Request.List<MessageLogEntry>(path, query).Requires(operation.Capability()), cancellationToken);
     }
 
@@ -73,7 +75,7 @@ public sealed class LogService : Tm1Service
     {
         var operation = Tm1Operations.TransactionLog;
         var parameters = new Dictionary<string, object?> { ["Reverse"] = reverse, ["IgnoreStatusMessages"] = ignoreStatusMessages };
-        var path = ODataPath.FunctionImport(operation.ImportName!, parameters);
+        var path = ODataPath.FunctionImport(operation.Import, parameters);
         return Session.StreamAsync(Tm1Request.List<TransactionLogEntry>(path, query).Requires(operation.Capability()), cancellationToken);
     }
 
@@ -129,9 +131,13 @@ public sealed class LogService : Tm1Service
 
     private async IAsyncEnumerable<T> Tail<T>(Tm1Operation operation, TimeSpan every, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var request = Tm1Request.Get<JsonElement>(ODataPath.FunctionImport(operation.ImportName!), null).Requires(operation.Capability());
+        var request = Tm1Request.Get<JsonElement>(ODataPath.FunctionImport(operation.Import), null).Requires(operation.Capability());
         var answer = await Session.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
-        var link = ODataPath.Link(answer.GetProperty("value").GetString()!);
+        var link = ODataPath.Link(
+            answer.TryGetProperty("value", out var value) && value.GetString() is { } delta
+                ? delta
+                : throw new Tm1ProtocolException($"{operation.Import} answered with no delta link to follow")
+        );
         long seen = 0;
         while (true)
         {

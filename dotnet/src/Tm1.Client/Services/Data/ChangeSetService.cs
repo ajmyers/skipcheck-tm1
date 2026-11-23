@@ -29,6 +29,7 @@ namespace Skipcheck.Tm1.Client.Services;
 /// </summary>
 public sealed class ChangeSetService : Tm1Service
 {
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public ChangeSetService(Tm1Session session)
         : base(session) { }
 
@@ -65,7 +66,7 @@ public sealed class ChangeSetService : Tm1Service
         var operation = Tm1Operations.UndoChangeSet;
         return Session.ExecuteAsync(
             Tm1Request
-                .Post(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["ChangeSetID"] = Require(id, nameof(id)) })
+                .Post(ODataPath.Of(operation.Import), new Dictionary<string, object?> { ["ChangeSetID"] = Require(id, nameof(id)) })
                 .Requires(operation.Capability()),
             cancellationToken
         );
@@ -133,5 +134,5 @@ public sealed class ChangeSetService : Tm1Service
     private static JsonElement Value(JsonElement result) => result.ValueKind == JsonValueKind.Object && result.TryGetProperty("value", out var v) ? v : result;
 
     private static Tm1Request<JsonElement> Request(Tm1Operation operation, Dictionary<string, object?> body) =>
-        Tm1Request.Post<JsonElement>(ODataPath.Of(operation.ImportName!), body).Requires(operation.Capability());
+        Tm1Request.Post<JsonElement>(ODataPath.Of(operation.Import), body).Requires(operation.Capability());
 }

@@ -6,12 +6,21 @@ namespace Skipcheck.Tm1.Client.Version;
 /// <c>Tm1Dialect</c>: <see cref="V11"/> turns <c>http://tm1:8010</c> into <c>http://tm1:8010/api/v1/</c>.</summary>
 public abstract class Tm1Dialect
 {
+    /// <summary>TM1 11 on-premises: the REST API is at
+    /// <c>http(s)://host:port/api/v1/</c>.</summary>
     public static readonly Tm1Dialect V11 = new Tm111();
 
+    /// <summary>The deployment kind, for logs and messages, such as <c>TM1 11</c>.</summary>
     public abstract string Name();
 
+    /// <summary>The REST API's service root, ending in <c>/</c>, for a server's address.</summary>
+    /// <param name="address">Where the server is, such as <c>http://tm1:8010</c>; a full service
+    /// root is accepted too.</param>
+    /// <exception cref="ArgumentException"><paramref name="address"/> isn't an address of this
+    /// kind.</exception>
     public abstract string ServiceRoot(string address);
 
+    /// <inheritdoc/>
     public override string ToString() => $"Tm1Dialect[{Name()}]";
 
     private sealed class Tm111 : Tm1Dialect

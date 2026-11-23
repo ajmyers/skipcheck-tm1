@@ -59,19 +59,29 @@ public sealed class Tm1Session : IAsyncDisposable
     /// <summary>The REST API's root, such as <c>http://tm1:8010/api/v1/</c>.</summary>
     public string ServiceRoot() => _connection.Root;
 
+    /// <summary>The sandbox this view's requests run in, or null for base data.</summary>
     public string? Sandbox() => _sandbox;
 
+    /// <summary>The ID of the change set this view's writes are recorded in, or null.</summary>
     public string? ChangeSet() => _changeSet;
 
     /// <summary>How often this view polls an async request's monitor, or null.</summary>
     public TimeSpan? Async() => _async;
 
+    /// <summary>Whether <see cref="CloseAsync"/> has been called.</summary>
     public bool IsClosed() => _connection.IsClosed;
 
     internal Connection Connection => _connection;
 
     // Views
 
+    /// <summary>A view of this session whose requests run in sandbox <paramref name="name"/>: each
+    /// gets TM1's <c>!sandbox</c> query option, unless the request sets its own. The view shares
+    /// this session's login, cookie and connections, so it costs nothing; closing either closes
+    /// both. TM1 evaluates <c>NON EMPTY</c> and filters in the request's sandbox, so every request
+    /// of an operation needs it, cellset reads and deletes included; a service given this view gets
+    /// that for free.</summary>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is blank.</exception>
     public Tm1Session WithSandbox(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -81,8 +91,16 @@ public sealed class Tm1Session : IAsyncDisposable
         return new(_connection, name, _changeSet, _async, _batch);
     }
 
+    /// <summary>A view of this session whose requests run outside any sandbox, in base data; this
+    /// session if it has no sandbox.</summary>
     public Tm1Session WithoutSandbox() => _sandbox is null ? this : new(_connection, null, _changeSet, _async, _batch);
 
+    /// <summary>A view of this session whose writes are recorded in change set
+    /// <paramref name="id"/> (from <c>BeginChangeSet</c>): each request gets TM1's
+    /// <c>!ChangeSet</c> query option, unless it sets its own, so <c>UndoChangeSet</c> can revert
+    /// them together. Like <see cref="WithSandbox"/>, the view shares this session's login and
+    /// connections; it keeps the sandbox, if any.</summary>
+    /// <exception cref="ArgumentException"><paramref name="id"/> is blank.</exception>
     public Tm1Session WithChangeSet(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -92,8 +110,18 @@ public sealed class Tm1Session : IAsyncDisposable
         return new(_connection, _sandbox, id, _async, _batch);
     }
 
+    /// <summary>A view of this session whose writes go into no change set; this session if it has
+    /// none.</summary>
     public Tm1Session WithoutChangeSet() => _changeSet is null ? this : new(_connection, _sandbox, null, _async, _batch);
 
+    /// <summary>A view of this session whose requests TM1 runs asynchronously (OData's <c>Prefer:
+    /// respond-async</c>): each returns at once with a monitor, which the client polls every
+    /// <paramref name="every"/> until the result is there, so a long process or chore never holds a
+    /// request open for its whole run. Methods return what they always do. Cancelling before the
+    /// result deletes the monitor, which stops the work on TM1: a process run ends as
+    /// <c>TM1UserException: Cancel</c>. Raw byte requests (document content) aren't sent async. TM1
+    /// (11.8) sends no <c>Retry-After</c>, so <paramref name="every"/> is the only pace.</summary>
+    /// <exception cref="ArgumentException"><paramref name="every"/> isn't positive.</exception>
     public Tm1Session WithAsync(TimeSpan every)
     {
         if (every <= TimeSpan.Zero)
@@ -103,6 +131,8 @@ public sealed class Tm1Session : IAsyncDisposable
         return new(_connection, _sandbox, _changeSet, every, _batch);
     }
 
+    /// <summary>A view of this session whose requests run synchronously, as usual; this session if
+    /// it isn't async.</summary>
     public Tm1Session WithoutAsync() => _async is null ? this : new(_connection, _sandbox, _changeSet, null, _batch);
 
     /// <summary>Starts a JSON <c>$batch</c>: its <see cref="Tm1SessionBatch.Session"/> is a view of
@@ -129,10 +159,17 @@ public sealed class Tm1Session : IAsyncDisposable
     /// <summary>Ends the session on the server, for every view.</summary>
     public Task CloseAsync(CancellationToken cancellationToken = default) => _connection.CloseAsync().WaitAsync(cancellationToken);
 
+    /// <summary>Closes the session: <see cref="CloseAsync"/>.</summary>
     public ValueTask DisposeAsync() => new(CloseAsync());
 
+    /// <summary>The server's product version, such as <c>11.8.03500.6</c>, read from
+    /// <c>Server.ProductVersion</c> once per login. Logs in first if needed.</summary>
     public Task<Tm1Version> VersionAsync(CancellationToken cancellationToken = default) => _connection.VersionAsync(cancellationToken);
 
+    /// <summary>What the server supports, from its own <c>$metadata</c>. Fetched once per server
+    /// version and shared by every session built from the same settings, a pool's included. A
+    /// request that declares <see cref="Tm1Request{T}.Requires"/> is checked against it before it's
+    /// sent.</summary>
     public Task<Tm1Capabilities> CapabilitiesAsync(CancellationToken cancellationToken = default) => _connection.CapabilitiesAsync(cancellationToken);
 
     // Sending
@@ -149,6 +186,7 @@ public sealed class Tm1Session : IAsyncDisposable
         await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
         if (_batch is not null)
         {
+            // Null only when TM1 answers a JSON null, which is then what T has to allow
             return (T)(await _batch.Add(this, request, r => Read(request, r)).ConfigureAwait(false))!;
         }
         var reply = await SendAsync(request, Target(request.RelativeUri()), cancellationToken).ConfigureAwait(false);
@@ -167,7 +205,7 @@ public sealed class Tm1Session : IAsyncDisposable
         await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
         if (_batch is not null)
         {
-            var page = (Page<T>)(await _batch.Add(this, request, r => ReadPage(request, r)).ConfigureAwait(false))!;
+            var page = (Page<T>)(await _batch.Add(this, request, r => ReadPage(request, r)).ConfigureAwait(false))!; // ReadPage never returns null
             if (page.NextLink is not null)
             {
                 throw new Tm1ProtocolException($"{request}: TM1 sent more than one page, which a batch can't follow; ask for fewer with Top()");
@@ -317,7 +355,7 @@ public sealed class Tm1Session : IAsyncDisposable
             Tm1Response.Text => reply.Text,
             _ => ReadJson<T>(reply),
         };
-        return (T)value!;
+        return (T)value!; // null only when TM1 answers a JSON null, which is then what T has to allow
     }
 
     private static T? ReadJson<T>(Reply reply)
@@ -350,7 +388,7 @@ public sealed class Tm1Session : IAsyncDisposable
             {
                 throw new Tm1ProtocolException($"{request}: expected a collection");
             }
-            var list = items.EnumerateArray().Select(i => typeof(T) == typeof(JsonElement) ? (T)(object)i.Clone() : Tm1Json.Read<T>(i)!).ToList();
+            var list = items.EnumerateArray().Select(i => typeof(T) == typeof(JsonElement) ? (T)(object)i.Clone() : Tm1Json.Read<T>(i)!).ToList(); // a null item only where T allows one
             var next = doc.RootElement.TryGetProperty(ODataJson.NextLink, out var n) ? n.GetString() : null;
             return new Page<T>(list, next);
         }
@@ -360,6 +398,7 @@ public sealed class Tm1Session : IAsyncDisposable
         }
     }
 
+    /// <inheritdoc/>
     public override string ToString() =>
         $"Tm1Session[{_connection.Root}{(_sandbox is null ? "" : ", sandbox=" + _sandbox)}{(_changeSet is null ? "" : ", changeSet=" + _changeSet)}]";
 
@@ -372,6 +411,8 @@ public sealed class Tm1Session : IAsyncDisposable
 /// each request's task gets its own result or error.</summary>
 public sealed class Tm1SessionBatch
 {
+    /// <summary>The most requests <see cref="RunAsync(CancellationToken)"/> sends in one
+    /// <c>$batch</c>.</summary>
     public const int DefaultPerRequest = 500;
 
     private readonly BatchQueue _queue;
@@ -385,8 +426,11 @@ public sealed class Tm1SessionBatch
     /// <summary>The view whose requests join this batch.</summary>
     public Tm1Session Session { get; }
 
+    /// <summary>How many requests have joined.</summary>
     public int Size() => _queue.Count;
 
+    /// <summary>Sends the queued requests, at most <see cref="DefaultPerRequest"/> to each
+    /// <c>$batch</c>; completes when every call has its result.</summary>
     public Task RunAsync(CancellationToken cancellationToken = default) => RunAsync(DefaultPerRequest, cancellationToken);
 
     /// <summary>Sends the queued requests, at most <paramref name="perRequest"/> to each <c>$batch</c>.</summary>
@@ -560,14 +604,21 @@ public class Tm1SessionBuilder
         return this;
     }
 
+    /// <summary>The kind of deployment, for <see cref="Address"/>. <see cref="Tm1Dialect.V11"/>
+    /// unless set.</summary>
     public Tm1SessionBuilder Dialect(Tm1Dialect dialect)
     {
         _dialect = dialect ?? throw new ArgumentNullException(nameof(dialect));
         return this;
     }
 
+    /// <summary>Basic authentication, for TM1 security modes 1 and 2: shorthand for
+    /// <c>Authenticator(Tm1Authenticator.Basic(user, password))</c>. A null password counts as
+    /// empty.</summary>
     public Tm1SessionBuilder BasicAuth(string user, string? password) => Authenticator(Tm1Authenticator.Basic(user, password));
 
+    /// <summary>How to log in: TM1's own security, CAM, or credentials of your own. Asked for
+    /// credentials on every login.</summary>
     public Tm1SessionBuilder Authenticator(Tm1Authenticator authenticator)
     {
         _authenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
@@ -588,6 +639,7 @@ public class Tm1SessionBuilder
         return this;
     }
 
+    /// <summary>Logs in as the credentials' own user: no impersonation.</summary>
     public Tm1SessionBuilder WithoutImpersonation()
     {
         _impersonate = null;
@@ -609,12 +661,15 @@ public class Tm1SessionBuilder
         return this;
     }
 
+    /// <summary>Timeouts by kind of work; <see cref="Tm1Timeouts.Defaults"/> unless set.</summary>
     public Tm1SessionBuilder Timeouts(Tm1Timeouts timeouts)
     {
         _timeouts = timeouts ?? throw new ArgumentNullException(nameof(timeouts));
         return this;
     }
 
+    /// <summary>How error responses are classified; <see cref="Tm1ErrorClassifier.Defaults"/>
+    /// unless set.</summary>
     public Tm1SessionBuilder ErrorClassifier(Tm1ErrorClassifier classifier)
     {
         _classifier = classifier ?? throw new ArgumentNullException(nameof(classifier));
@@ -654,6 +709,9 @@ public class Tm1SessionBuilder
     /// <summary>The service root, or a placeholder if it isn't set yet, for the pool's messages.</summary>
     internal string BaseUrlOrUnset() => _root ?? (_address is not null ? _dialect.ServiceRoot(_address) : "(no base URL)");
 
+    /// <summary>The session. Nothing is sent to TM1 until the first request.</summary>
+    /// <exception cref="InvalidOperationException">The base URL or credentials aren't
+    /// set.</exception>
     public Tm1Session Build()
     {
         var root = _root

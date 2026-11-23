@@ -63,6 +63,7 @@ dotnet test Tm1.slnx
 ```
 
 - `JavaParityTests` and `Runtime/JavaParityRuntimeTests` read the Java sources. They require every public class and method, with the same `@Tm1Endpoint` IDs and parameters.
+- `ArchitectureTests` holds the compiled libraries to the Java client's architecture rules (`ArchitectureTest`), each with its reason: asynchronous only, URLs from `ODataPath` only, no console, an OData layer that knows nothing of TM1, stateless services whose methods declare their endpoints.
 - `CoverageGateTests` holds the client to the spec's 242 endpoints, by the Java gate's rules. It implements 240 and excludes the same 2 as Java ([`coverage/`](coverage)).
 - `ConformanceTests` shares OData encoding cases with Java and Python. `PayloadTests` round-trips the payloads the Java client captured from a real TM1.
 - `Services/` and `Runtime/` port the Java client's unit tests, against a fake TM1 (`FakeTm1`).

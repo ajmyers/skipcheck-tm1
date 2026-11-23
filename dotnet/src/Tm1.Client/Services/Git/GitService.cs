@@ -69,6 +69,7 @@ public sealed class GitService : Tm1Service
 {
     private static readonly ODataPath Plans = ODataPath.Of("GitPlans");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public GitService(Tm1Session session)
         : base(session) { }
 
@@ -157,7 +158,7 @@ public sealed class GitService : Tm1Service
         var parameters = new Dictionary<string, object?>();
         Require(credentials, nameof(credentials)).AddTo(parameters);
         parameters["Branch"] = Require(branch, nameof(branch));
-        GitCredentials.Put(parameters, "ExecutionMode", mode is { } m ? Tm1EnumConverter.Describe(typeof(GitPlanExecutionMode))!.Name(m) : null);
+        GitCredentials.Put(parameters, "ExecutionMode", mode is { } m ? Tm1EnumConverter.Of(typeof(GitPlanExecutionMode)).Name(m) : null);
         parameters["Force"] = force;
         return Call<GitPullPlan>(Tm1Operations.GitPull, parameters, cancellationToken);
     }

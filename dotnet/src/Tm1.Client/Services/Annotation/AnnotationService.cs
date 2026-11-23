@@ -49,6 +49,7 @@ public sealed class AnnotationService : Tm1Service
     private static readonly ODataPath Annotations = ODataPath.Of("Annotations");
     private static readonly ODataPath Facets = ODataPath.Of("ApplicationContextFacets");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public AnnotationService(Tm1Session session)
         : base(session) { }
 
@@ -174,7 +175,7 @@ public sealed class AnnotationService : Tm1Service
     public Task DeleteAnnotationArtifactsAsync(CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.DeleteAnnotationArtifacts;
-        return Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of(operation.ImportName!), null).Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of(operation.Import), null).Requires(operation.Capability()), cancellationToken);
     }
 
     private static ODataPath AnnotationPath(string id) => Annotations.Key(Require(id, nameof(id)));

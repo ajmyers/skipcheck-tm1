@@ -88,9 +88,12 @@ public sealed class ContentPath : IEquatable<ContentPath>
         return text.ToString();
     }
 
+    /// <inheritdoc/>
     public bool Equals(ContentPath? other) => other is not null && _steps.SequenceEqual(other._steps);
 
+    /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is ContentPath other && Equals(other);
 
+    /// <inheritdoc/>
     public override int GetHashCode() => _steps.Aggregate(17, (h, s) => HashCode.Combine(h, s.Id, s.Scope));
 }

@@ -6,9 +6,6 @@
     <Version>0.1.0-dev</Version>
     <Description>.NET client for the IBM Planning Analytics (TM1) REST API, generated from its $metadata</Description>
     <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <!-- Generated members carry IBM's descriptions, not every one has a doc comment -->
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <GeneratedDir>$(BaseIntermediateOutputPath)generated/</GeneratedDir>
     <SpecFile>$(RepositoryRoot)/spec/tm1-api.json</SpecFile>
   </PropertyGroup>

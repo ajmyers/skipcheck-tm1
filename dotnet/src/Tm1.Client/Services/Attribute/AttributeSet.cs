@@ -42,5 +42,6 @@ public sealed class AttributeSet
     /// <summary>Chores' attributes: <c>/ChoreAttributes</c>.</summary>
     public static AttributeSet Chores() => new(ODataPath.Of("ChoreAttributes"));
 
+    /// <inheritdoc/>
     public override string ToString() => Path.ToString();
 }

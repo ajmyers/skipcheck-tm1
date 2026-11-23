@@ -16,6 +16,7 @@ public abstract class Tm1Authenticator
     /// <summary>Who logs in, without secrets, for logs and errors.</summary>
     public abstract string Describe();
 
+    /// <inheritdoc/>
     public override string ToString() => $"Tm1Authenticator[{Describe()}]";
 
     /// <summary>TM1's own security (modes 1 and 2).</summary>

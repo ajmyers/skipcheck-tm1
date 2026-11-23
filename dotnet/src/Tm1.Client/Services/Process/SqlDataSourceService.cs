@@ -13,6 +13,7 @@ public sealed class SqlDataSourceService : Tm1Service
 {
     private static readonly ODataPath Sources = ODataPath.Of("SQLDataSources");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public SqlDataSourceService(Tm1Session session)
         : base(session) { }
 

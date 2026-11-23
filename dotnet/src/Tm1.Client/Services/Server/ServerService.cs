@@ -26,6 +26,7 @@ public sealed class ServerService : Tm1Service
 {
     private static readonly ODataPath Loggers = ODataPath.Of("Loggers");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public ServerService(Tm1Session session)
         : base(session) { }
 
@@ -75,7 +76,7 @@ public sealed class ServerService : Tm1Service
     public Task SetLoggerLevelAsync(string name, LogLevel level, CancellationToken cancellationToken = default)
     {
         // As the Java client's: a level this client doesn't know is a bad argument, and isn't sent
-        var json = Tm1EnumConverter.Describe(typeof(LogLevel))!.ByValue.TryGetValue(level, out var known)
+        var json = Tm1EnumConverter.Of(typeof(LogLevel)).ByValue.TryGetValue(level, out var known)
             ? known
             : throw new System.ArgumentException($"LogLevel.{level} stands for a level this client doesn't know, and isn't sent", nameof(level));
         var body = new Dictionary<string, object?> { ["Level"] = json };

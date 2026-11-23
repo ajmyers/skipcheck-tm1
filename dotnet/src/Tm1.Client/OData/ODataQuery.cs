@@ -31,11 +31,16 @@ public sealed partial class ODataQuery : IEquatable<ODataQuery>
     /// <summary>No options: the server's default response.</summary>
     public static ODataQuery None() => Empty;
 
+    /// <summary>Adds property paths to <c>$select</c>, after any already selected. Like every
+    /// option here it works the same at the top level and inside
+    /// <see cref="Expand(string, Func{ODataQuery, ODataQuery})"/>.</summary>
     public ODataQuery Select(params string[] properties) =>
         With(q => q._select = [.. _select, .. properties.Select(p => p ?? throw new ArgumentNullException(nameof(properties)))]);
 
+    /// <summary>Adds properties to <c>$select</c>, after any already selected.</summary>
     public ODataQuery Select(params ODataProperty[] properties) => Select(properties.Select(p => p.Path).ToArray());
 
+    /// <summary>Expands a navigation property with no nested options.</summary>
     public ODataQuery Expand(string navigation) => Expand(navigation, q => q);
 
     /// <summary>Expands a navigation property, with nested options applied to what's there for it already.</summary>
@@ -57,24 +62,40 @@ public sealed partial class ODataQuery : IEquatable<ODataQuery>
         return With(q => q._expand = next);
     }
 
+    /// <summary>Expands a navigation property with no nested options:
+    /// <c>Expand(Cube.Fields.Dimensions)</c>.</summary>
     public ODataQuery Expand(ODataProperty navigation) => Expand(navigation.Path);
 
+    /// <summary>Expands a navigation property, with nested options:
+    /// <c>Expand(Dimension.Fields.Hierarchies, h =&gt;
+    /// h.Select(Hierarchy.Fields.Name))</c>.</summary>
     public ODataQuery Expand(ODataProperty navigation, Func<ODataQuery, ODataQuery> options) => Expand(navigation.Path, options);
 
+    /// <summary>Sets <c>$filter</c>, replacing any set before.</summary>
     public ODataQuery Filter(Filter filter) => With(q => q._filter = (filter ?? throw new ArgumentNullException(nameof(filter))).ToString());
 
+    /// <summary>Adds an ascending <c>$orderby</c> key, after any keys already added.</summary>
     public ODataQuery OrderBy(string property) => With(q => q._orderBy = [.. _orderBy, property]);
 
+    /// <summary>Adds a descending <c>$orderby</c> key, after any keys already added.</summary>
     public ODataQuery OrderByDescending(string property) => With(q => q._orderBy = [.. _orderBy, property + " desc"]);
 
+    /// <summary>Adds an ascending <c>$orderby</c> key:
+    /// <c>OrderBy(Element.Fields.Name)</c>.</summary>
     public ODataQuery OrderBy(ODataProperty property) => OrderBy(property.Path);
 
+    /// <summary>Adds a descending <c>$orderby</c> key, after any keys already added.</summary>
     public ODataQuery OrderByDescending(ODataProperty property) => OrderByDescending(property.Path);
 
+    /// <summary>Sets <c>$top</c>: at most this many items.</summary>
+    /// <exception cref="ArgumentException"><paramref name="n"/> is negative.</exception>
     public ODataQuery Top(int n) => n < 0 ? throw new ArgumentException("$top can't be negative: " + n) : With(q => q._top = n);
 
+    /// <summary>Sets <c>$skip</c>: skip this many items first.</summary>
+    /// <exception cref="ArgumentException"><paramref name="n"/> is negative.</exception>
     public ODataQuery Skip(int n) => n < 0 ? throw new ArgumentException("$skip can't be negative: " + n) : With(q => q._skip = n);
 
+    /// <summary>Sets <c>$count=true</c>: include the total number of matching items.</summary>
     public ODataQuery WithCount() => With(q => q._count = true);
 
     /// <summary>A custom option, such as TM1's <c>!sandbox</c>.</summary>
@@ -97,6 +118,7 @@ public sealed partial class ODataQuery : IEquatable<ODataQuery>
             q._aliases = [.. _aliases.Where(a => a.Key != alias.Name), new(alias.Name, literalOrJson ?? throw new ArgumentNullException(nameof(literalOrJson)))]
         );
 
+    /// <summary>True if this query has no options.</summary>
     public bool IsEmpty() => SystemOptions().Count == 0 && _custom.Count == 0 && _aliases.Count == 0;
 
     internal IReadOnlyList<KeyValuePair<string, string>> CustomOptions => _custom;
@@ -107,12 +129,16 @@ public sealed partial class ODataQuery : IEquatable<ODataQuery>
     /// <summary>The encoded query string, without <c>?</c>.</summary>
     public string ToQueryString() => string.Join("&", Parameters().Select(p => p.Key + "=" + ODataEncoding.QueryValue(p.Value)));
 
+    /// <summary>The query string, before percent-encoding, for logs.</summary>
     public override string ToString() => string.Join("&", Parameters().Select(p => p.Key + "=" + p.Value));
 
+    /// <inheritdoc/>
     public bool Equals(ODataQuery? other) => other is not null && other.ToQueryString() == ToQueryString();
 
+    /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is ODataQuery q && Equals(q);
 
+    /// <inheritdoc/>
     public override int GetHashCode() => ToQueryString().GetHashCode(StringComparison.Ordinal);
 
     private ODataQuery With(Action<ODataQuery> change)

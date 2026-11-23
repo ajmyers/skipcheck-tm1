@@ -70,6 +70,12 @@ public sealed record ODataError
 {
     private const int MaxText = 1000;
 
+    /// <summary>An error body. A null code or message reads as an empty string.</summary>
+    /// <param name="code">The error code, as text.</param>
+    /// <param name="message">The message.</param>
+    /// <param name="target">What the error applies to, or null.</param>
+    /// <param name="details">Further errors, or null for none.</param>
+    /// <param name="innerError">The server's own extra information, or null.</param>
     public ODataError(string? code, string? message, string? target = null, IReadOnlyList<ODataError>? details = null, JsonElement? innerError = null)
     {
         Code = code ?? "";
@@ -85,10 +91,13 @@ public sealed record ODataError
     /// <summary>TM1's message, or empty.</summary>
     public string Message { get; }
 
+    /// <summary>What the error applies to, or null.</summary>
     public string? Target { get; }
 
+    /// <summary>Further errors; empty if there are none.</summary>
     public IReadOnlyList<ODataError> Details { get; }
 
+    /// <summary>The server's own extra information (<c>innererror</c>), or null.</summary>
     public JsonElement? InnerError { get; }
 
     /// <summary>The error in a JSON body, wrapped in <c>error</c> or not; null if it isn't one.</summary>
@@ -167,6 +176,7 @@ public sealed record ODataError
         : v.ValueKind == JsonValueKind.String ? v.GetString()
         : v.ToString();
 
+    /// <inheritdoc/>
     public bool Equals(ODataError? other) =>
         other is not null
         && Code == other.Code
@@ -175,6 +185,7 @@ public sealed record ODataError
         && Details.SequenceEqual(other.Details)
         && InnerError?.GetRawText() == other.InnerError?.GetRawText();
 
+    /// <inheritdoc/>
     public override int GetHashCode() => HashCode.Combine(Code, Message, Target, Details.Count);
 }
 
@@ -185,6 +196,11 @@ public sealed record ODataError
 /// whether the request may have taken effect.</summary>
 public abstract class Tm1Exception : Exception
 {
+    /// <summary>An exception for a failed request.</summary>
+    /// <param name="message">The detail message.</param>
+    /// <param name="method">The request's HTTP method, or null if not known.</param>
+    /// <param name="url">The request's URL, without credentials, or null if not known.</param>
+    /// <param name="cause">The underlying failure, or null.</param>
     protected Tm1Exception(string message, string? method, string? url, Exception? cause)
         : base(message, cause)
     {
@@ -212,6 +228,12 @@ public abstract class Tm1Exception : Exception
 /// used), then the status.</summary>
 public class Tm1ApiException : Tm1Exception
 {
+    /// <summary>An exception for an error response.</summary>
+    /// <param name="status">The HTTP status.</param>
+    /// <param name="kind">What the error means.</param>
+    /// <param name="error">The parsed error body, or null.</param>
+    /// <param name="method">The request's HTTP method.</param>
+    /// <param name="url">The request's URL, without credentials.</param>
     protected internal Tm1ApiException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url)
         : base(Describe(status, error, method, url), method, url, null)
     {
@@ -220,8 +242,10 @@ public class Tm1ApiException : Tm1Exception
         Error = error;
     }
 
+    /// <summary>The HTTP status, such as 404.</summary>
     public int Status { get; }
 
+    /// <summary>What the error means.</summary>
     public Tm1ErrorKind Kind { get; }
 
     /// <summary>TM1's error, when the response had one.</summary>
@@ -338,6 +362,7 @@ public sealed class Tm1ServerException : Tm1ApiException
 /// have.</summary>
 public sealed class Tm1TransportException : Tm1Exception
 {
+    /// <summary>How far a request got.</summary>
     public enum Phase
     {
         /// <summary>The request never reached TM1.</summary>
@@ -349,6 +374,13 @@ public sealed class Tm1TransportException : Tm1Exception
 
     private readonly bool _idempotent;
 
+    /// <summary>An exception for a request that got no complete response.</summary>
+    /// <param name="phase">How far the request got.</param>
+    /// <param name="idempotent">Whether the request is safe to repeat (GET, PUT, DELETE), which
+    /// makes a response-phase failure retryable.</param>
+    /// <param name="method">The request's HTTP method.</param>
+    /// <param name="url">The request's URL, without credentials.</param>
+    /// <param name="cause">The underlying failure, or null.</param>
     public Tm1TransportException(Phase phase, bool idempotent, string method, string url, Exception? cause)
         : base(
             (phase == Phase.Connect ? "Couldn't send the request to TM1" : "No complete response from TM1")
@@ -369,6 +401,7 @@ public sealed class Tm1TransportException : Tm1Exception
     /// <summary>Unsent requests, and idempotent ones (GET, PUT, DELETE, HEAD), may be sent again.</summary>
     public override bool IsRetryable() => TransportPhase == Phase.Connect || _idempotent;
 
+    /// <summary>False only if the request was never sent.</summary>
     public override bool MayHaveApplied() => TransportPhase == Phase.Response;
 }
 
@@ -376,6 +409,13 @@ public sealed class Tm1TransportException : Tm1Exception
 /// cookie, an async result that isn't an HTTP message. The request may have applied.</summary>
 public sealed class Tm1ProtocolException : Tm1Exception
 {
+    /// <summary>An exception for a response that couldn't be read.</summary>
+    /// <param name="message">What was wrong with the response; the method and URL are
+    /// appended.</param>
+    /// <param name="error">The error TM1 reported in the response, or null.</param>
+    /// <param name="method">The request's HTTP method, or null if not known.</param>
+    /// <param name="url">The request's URL, without credentials, or null if not known.</param>
+    /// <param name="cause">The underlying failure, such as a parse error, or null.</param>
     public Tm1ProtocolException(string message, ODataError? error, string? method, string? url, Exception? cause)
         : base(message + Describe(method, url), method, url, cause)
     {
@@ -386,10 +426,13 @@ public sealed class Tm1ProtocolException : Tm1Exception
     public Tm1ProtocolException(string message, Exception? cause = null)
         : this(message, null, null, null, cause) { }
 
+    /// <summary>The error TM1 reported in the response, or null if it reported none.</summary>
     public ODataError? Error { get; }
 
+    /// <summary>Never: the same response would come back.</summary>
     public override bool IsRetryable() => false;
 
+    /// <summary>Always: TM1 had started to answer, so the request may have taken effect.</summary>
     public override bool MayHaveApplied() => true;
 }
 
@@ -397,6 +440,9 @@ public sealed class Tm1ProtocolException : Tm1Exception
 /// it needs (a function, an entity set, a property) or its version is too old; nothing was sent.</summary>
 public sealed class Tm1UnsupportedOperationException : Tm1Exception
 {
+    /// <summary>An exception for a request the server can't take.</summary>
+    /// <param name="message">The full message.</param>
+    /// <param name="missing">What's missing, such as <c>Cube.Reserve</c>.</param>
     public Tm1UnsupportedOperationException(string message, string missing)
         : base(message, null, null, null)
     {
@@ -406,7 +452,9 @@ public sealed class Tm1UnsupportedOperationException : Tm1Exception
     /// <summary>What's missing, such as <c>Cube.Reserve</c>.</summary>
     public string Missing { get; }
 
+    /// <summary>Never: the server won't define it on a second try.</summary>
     public override bool IsRetryable() => false;
 
+    /// <summary>Never: the request was not sent.</summary>
     public override bool MayHaveApplied() => false;
 }

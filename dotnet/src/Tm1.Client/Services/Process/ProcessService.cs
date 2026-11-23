@@ -50,6 +50,7 @@ public sealed class ProcessService : Tm1Service
 {
     private static readonly ODataPath Processes = ODataPath.Of("Processes");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public ProcessService(Tm1Session session)
         : base(session) { }
 
@@ -186,7 +187,7 @@ public sealed class ProcessService : Tm1Service
         return Session.ExecuteAsync(Tm1Request.Text(ProcessPath(name).Nav("ErrorLogs").Key(key).Nav("Content")), cancellationToken);
     }
 
-    private static ODataPath Root(Tm1Operation operation) => ODataPath.Of(operation.ImportName!);
+    private static ODataPath Root(Tm1Operation operation) => ODataPath.Of(operation.Import);
 
     private static ODataPath ProcessPath(string name) => Processes.Key(Require(name, nameof(name)));
 }

@@ -23,6 +23,7 @@ public sealed class SandboxService : Tm1Service
 {
     private static readonly ODataPath Sandboxes = ODataPath.Of("Sandboxes");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public SandboxService(Tm1Session session)
         : base(session) { }
 

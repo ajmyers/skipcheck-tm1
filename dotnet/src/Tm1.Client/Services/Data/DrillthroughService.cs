@@ -43,6 +43,7 @@ public sealed class DrillthroughService : Tm1Service
 {
     private static readonly ODataPath Rowsets = ODataPath.Of("Rowsets");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public DrillthroughService(Tm1Session session)
         : base(session) { }
 
@@ -192,7 +193,7 @@ public sealed class DrillthroughService : Tm1Service
         return body;
     }
 
-    private static ODataPath Root(Tm1Operation operation) => ODataPath.Of(operation.ImportName!);
+    private static ODataPath Root(Tm1Operation operation) => ODataPath.Of(operation.Import);
 
     private static ODataPath ScriptsPath(string cellset, long ordinal) =>
         ODataPath.Of("Cellsets").Key(Require(cellset, nameof(cellset))).Nav("Cells").Key(ordinal).Nav("DrillthroughScripts");

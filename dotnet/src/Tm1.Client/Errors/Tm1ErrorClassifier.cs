@@ -28,11 +28,17 @@ public sealed class Tm1ErrorClassifier
 
     private Tm1ErrorClassifier(IReadOnlyList<Rule> rules) => _rules = rules;
 
+    /// <summary>The rules this client knows about.</summary>
     public static Tm1ErrorClassifier Defaults() => DefaultRules;
 
     /// <summary>This classifier with <paramref name="rule"/> tried first.</summary>
     public Tm1ErrorClassifier WithRule(Rule rule) => new([rule ?? throw new ArgumentNullException(nameof(rule)), .. _rules]);
 
+    /// <summary>Classifies an error response: the first matching rule's kind, or else the kind for
+    /// the status (<see cref="Tm1ErrorKind.Other"/> if it has none).</summary>
+    /// <param name="status">The HTTP status.</param>
+    /// <param name="error">The parsed error body, or null if the body wasn't an OData
+    /// error.</param>
     public Tm1ErrorKind Classify(int status, ODataError? error)
     {
         foreach (var rule in _rules)
@@ -58,6 +64,13 @@ public sealed class Tm1ErrorClassifier
     /// one is needed), and the kind it means.</summary>
     public sealed record Rule
     {
+        /// <summary>A rule. Each condition that's set must match: the status, the code exactly, and
+        /// the message pattern anywhere in the message.</summary>
+        /// <param name="status">The HTTP status to match, or null for any.</param>
+        /// <param name="code">The error code to match, or null for any.</param>
+        /// <param name="message">A pattern to find in the message, or null for any.</param>
+        /// <param name="kind">The kind to report on a match.</param>
+        /// <exception cref="ArgumentException">No condition is set.</exception>
         public Rule(int? status, string? code, Regex? message, Tm1ErrorKind kind)
         {
             if (status is null && code is null && message is null)
@@ -70,12 +83,16 @@ public sealed class Tm1ErrorClassifier
             Kind = kind;
         }
 
+        /// <summary>The HTTP status to match, or null for any.</summary>
         public int? Status { get; }
 
+        /// <summary>The error code to match exactly, or null for any.</summary>
         public string? CodeValue { get; }
 
+        /// <summary>The pattern to find in the message, or null for any.</summary>
         public Regex? MessagePattern { get; }
 
+        /// <summary>The kind to report on a match.</summary>
         public Tm1ErrorKind Kind { get; }
 
         /// <summary>Matches TM1's message, case-insensitively.</summary>

@@ -48,6 +48,7 @@ public sealed class ProcessDebugService : Tm1Service
     /// <summary>How many times <see cref="FinishAsync"/> resumes a run that keeps pausing before giving up.</summary>
     private const int MaxResumes = 100;
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public ProcessDebugService(Tm1Session session)
         : base(session) { }
 

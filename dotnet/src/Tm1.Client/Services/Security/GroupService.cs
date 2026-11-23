@@ -22,6 +22,7 @@ public sealed class GroupService : Tm1Service
 {
     private static readonly ODataPath Groups = ODataPath.Of("Groups");
 
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public GroupService(Tm1Session session)
         : base(session) { }
 

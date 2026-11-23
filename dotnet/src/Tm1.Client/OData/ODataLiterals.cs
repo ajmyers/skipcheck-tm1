@@ -9,6 +9,7 @@ namespace Skipcheck.Tm1.Client.OData;
 /// <summary>Something that writes itself as an OData literal.</summary>
 public interface IODataLiteral
 {
+    /// <summary>The literal, exactly as it should appear before percent-encoding.</summary>
     string ODataLiteral();
 }
 
@@ -43,7 +44,7 @@ public static class ODataLiterals
             bool b => b ? "true" : "false",
             Enum e when Tm1EnumConverter.Describe(e.GetType()) is { } d => d.Literal(e),
             decimal m => m.ToString(CultureInfo.InvariantCulture),
-            int or long or short or byte or sbyte or uint or ulong or ushort or BigInteger => Convert.ToString(value, CultureInfo.InvariantCulture)!,
+            int or long or short or byte or sbyte or uint or ulong or ushort or BigInteger => Convert.ToString(value, CultureInfo.InvariantCulture)!, // null only for a null value, and this is a number
             double d => Double(d),
             float f => Double(f),
             DateTimeOffset dto => dto.ToString(
@@ -76,6 +77,7 @@ public static class ODataLiterals
     /// <summary>A preformed literal, sent as is.</summary>
     public sealed record Raw(string Literal) : IODataLiteral
     {
+        /// <inheritdoc/>
         public string ODataLiteral() => Literal;
     }
 }

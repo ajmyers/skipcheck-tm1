@@ -11,6 +11,7 @@ namespace Skipcheck.Tm1.Client.Services;
 /// leaves), and the members at each.</summary>
 public sealed class LevelService : Tm1Service
 {
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public LevelService(Tm1Session session)
         : base(session) { }
 

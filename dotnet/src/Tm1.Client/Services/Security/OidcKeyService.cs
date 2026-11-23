@@ -16,6 +16,7 @@ namespace Skipcheck.Tm1.Client.Services;
 /// </summary>
 public sealed class OidcKeyService : Tm1Service
 {
+    /// <summary>A service that sends its requests through <paramref name="session"/>.</summary>
     public OidcKeyService(Tm1Session session)
         : base(session) { }
 
@@ -25,7 +26,7 @@ public sealed class OidcKeyService : Tm1Service
     {
         var operation = Tm1Operations.GetOidcKeys;
         return Session.StreamAsync(
-            Tm1Request.List<string>(ODataPath.FunctionImport(operation.ImportName!), null).Requires(operation.Capability()),
+            Tm1Request.List<string>(ODataPath.FunctionImport(operation.Import), null).Requires(operation.Capability()),
             cancellationToken
         );
     }
@@ -38,6 +39,6 @@ public sealed class OidcKeyService : Tm1Service
     {
         var operation = Tm1Operations.RemoveOidcKeyFromCache;
         var body = new Dictionary<string, object?> { ["KeyId"] = Require(keyIds, nameof(keyIds)).Select(key => Require(key, nameof(keyIds))).ToList() };
-        return Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of(operation.ImportName!), body).Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of(operation.Import), body).Requires(operation.Capability()), cancellationToken);
     }
 }

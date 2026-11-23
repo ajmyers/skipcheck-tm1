@@ -43,8 +43,13 @@ public sealed class Tm1Capabilities
         _aliases = aliases;
     }
 
+    /// <summary>The REST API schema version the server reports in <c>Core.SchemaVersion</c>, such
+    /// as <c>11.8.35</c>, or null if it reports none. Not the product version: a different
+    /// number.</summary>
     public string? SchemaVersion { get; }
 
+    /// <summary>The server's product version, such as <c>11.8.03500.6</c>, or null if not
+    /// known.</summary>
     public Tm1Version? ProductVersion { get; }
 
     /// <summary>The endpoints, as coverage-gate IDs.</summary>
@@ -67,9 +72,7 @@ public sealed class Tm1Capabilities
             throw new Tm1ProtocolException("TM1's $metadata isn't CSDL: its root is " + doc.Root?.Name.LocalName);
         }
         var schemas = doc.Descendants(Edm + "Schema").ToList();
-        var aliases = schemas
-            .Where(s => s.Attribute("Alias") is not null)
-            .ToDictionary(s => (string)s.Attribute("Alias")!, s => (string)s.Attribute("Namespace")!);
+        var aliases = schemas.Where(s => s.Attribute("Alias") is not null).ToDictionary(s => Required(s, "Alias"), s => Required(s, "Namespace"));
         string Qualify(string name)
         {
             var dot = name.LastIndexOf('.');
@@ -89,7 +92,7 @@ public sealed class Tm1Capabilities
         string? version = null;
         foreach (var schema in schemas)
         {
-            var ns = (string)schema.Attribute("Namespace")!;
+            var ns = Required(schema, "Namespace");
             foreach (
                 var a in schema
                     .Elements(Edm + "Annotation")
@@ -107,31 +110,31 @@ public sealed class Tm1Capabilities
                     {
                         continue;
                     }
-                    var binding = (string)first.Attribute("Type")!;
+                    var binding = Required(first, "Type");
                     var collection = binding.StartsWith("Collection(", StringComparison.Ordinal);
                     var inner = collection ? binding["Collection(".Length..^1] : binding;
                     var simple = inner[(inner.LastIndexOf('.') + 1)..];
-                    endpoints.Add($"{kind} {(collection ? $"Collection({simple})" : simple)}/{op.Attribute("Name")!.Value}");
+                    endpoints.Add($"{kind} {(collection ? $"Collection({simple})" : simple)}/{Required(op, "Name")}");
                     var key = Qualify(inner);
                     if (!bound.TryGetValue(key, out var names))
                     {
                         bound[key] = names = new HashSet<string>();
                     }
-                    names.Add(op.Attribute("Name")!.Value);
+                    names.Add(Required(op, "Name"));
                 }
             }
             foreach (var t in schema.Elements(Edm + "EntityType").Concat(schema.Elements(Edm + "ComplexType")))
             {
-                var name = t.Attribute("Name")!.Value;
+                var name = Required(t, "Name");
                 var members = new HashSet<string>();
                 foreach (var p in t.Elements(Edm + "Property"))
                 {
-                    members.Add(p.Attribute("Name")!.Value);
+                    members.Add(Required(p, "Name"));
                 }
                 foreach (var n in t.Elements(Edm + "NavigationProperty"))
                 {
-                    members.Add(n.Attribute("Name")!.Value);
-                    endpoints.Add($"Navigation {name}/{n.Attribute("Name")!.Value}");
+                    members.Add(Required(n, "Name"));
+                    endpoints.Add($"Navigation {name}/{Required(n, "Name")}");
                 }
                 var baseType = (string?)t.Attribute("BaseType");
                 types[$"{ns}.{name}"] = (baseType is null ? null : Qualify(baseType), members);
@@ -142,8 +145,8 @@ public sealed class Tm1Capabilities
                 {
                     foreach (var item in c.Elements(Edm + tag))
                     {
-                        endpoints.Add($"{tag} {item.Attribute("Name")!.Value}");
-                        set.Add(item.Attribute("Name")!.Value);
+                        endpoints.Add($"{tag} {Required(item, "Name")}");
+                        set.Add(Required(item, "Name"));
                     }
                 }
             }
@@ -151,9 +154,12 @@ public sealed class Tm1Capabilities
         return new Tm1Capabilities(version, productVersion, endpoints, types, bound, sets, singletons, imports, aliases);
     }
 
+    /// <summary>A copy that knows the server's product version.</summary>
     public Tm1Capabilities WithProductVersion(Tm1Version? productVersion) =>
         new(SchemaVersion, productVersion, Endpoints, _types, _bound, _entitySets, _singletons, _imports, _aliases);
 
+    /// <summary>Whether the server's <c>$metadata</c> defines
+    /// <paramref name="capability"/>.</summary>
     public bool Supports(Tm1Capability capability)
     {
         ArgumentNullException.ThrowIfNull(capability);
@@ -162,7 +168,7 @@ public sealed class Tm1Capabilities
             Tm1Capability.CapabilityKind.EntitySet => _entitySets.Contains(capability.Name),
             Tm1Capability.CapabilityKind.Singleton => _singletons.Contains(capability.Name),
             Tm1Capability.CapabilityKind.UnboundOperation => _imports.Contains(capability.Name),
-            Tm1Capability.CapabilityKind.BoundOperation => Hierarchy(capability.Type!)
+            Tm1Capability.CapabilityKind.BoundOperation => Hierarchy(capability.Type!) // not null for a bound operation or a property: Tm1Capability's constructor checks
                 .Any(t => _bound.TryGetValue(t, out var ops) && ops.Contains(Simple(capability.Name))),
             _ => Hierarchy(capability.Type!).Any(t => _types[t].Members.Contains(capability.Name)),
         };
@@ -187,6 +193,7 @@ public sealed class Tm1Capabilities
         return new Tm1UnsupportedOperationException(message, missing);
     }
 
+    /// <inheritdoc/>
     public override string ToString() => $"Tm1Capabilities[schema {SchemaVersion ?? "unknown"}, product {ProductVersion?.ToString() ?? "unknown"}]";
 
     private List<string> Hierarchy(string type)
@@ -211,6 +218,10 @@ public sealed class Tm1Capabilities
         var prefix = name[..dot];
         return (_aliases.TryGetValue(prefix, out var ns) ? ns : prefix) + name[dot..];
     }
+
+    /// <summary>An attribute CSDL requires: without it, the document isn't one the client can read.</summary>
+    private static string Required(XElement element, string attribute) =>
+        (string?)element.Attribute(attribute) ?? throw new Tm1ProtocolException($"TM1's $metadata isn't CSDL: a {element.Name.LocalName} has no {attribute}");
 
     private static string Simple(string qualified) => qualified[(qualified.LastIndexOf('.') + 1)..];
 }
