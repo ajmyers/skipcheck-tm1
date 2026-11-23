@@ -25,6 +25,30 @@ public class Tm1SessionTest
     private readonly ScriptedTm1 _tm1 = new ScriptedTm1().On("GET Server?$select=Name", _ => ScriptedTm1.Json(200, "{\"Name\":\"tm1\"}"));
 
     [Fact]
+    public async Task GivesUpOnAnAuthenticatorThatNeverAnswers()
+    {
+        var session = _tm1.SessionWithOwnCredentials(b =>
+            b.Authenticator(new Never()).Timeouts(Tm1Timeouts.Builder().Login(TimeSpan.FromMilliseconds(100)).Build())
+        );
+
+        var e = await Assert.ThrowsAsync<Tm1TransportException>(() => session.ExecuteAsync(Server).WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(Tm1TransportException.Phase.Connect, e.TransportPhase);
+        Assert.True(e.IsRetryable()); // nothing was sent to TM1
+        Assert.False(e.MayHaveApplied());
+        await session.CloseAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Empty(_tm1.Requests(ScriptedTm1.Login));
+    }
+
+    /// <summary>An authenticator that never supplies credentials, and doesn't stop when told to.</summary>
+    private sealed class Never : Tm1Authenticator
+    {
+        public override async ValueTask<string> AuthorizationAsync(CancellationToken cancellationToken = default) =>
+            await new TaskCompletionSource<string>().Task;
+
+        public override string Describe() => "Never";
+    }
+
+    [Fact]
     public async Task LogsInOnceForConcurrentFirstRequestsAndSendsOnlyTheCookieAfterwards()
     {
         var login = new ScriptedTm1.Pending();

@@ -44,7 +44,9 @@ public sealed record Tm1Timeouts
     public TimeSpan Connect { get; }
 
     /// <summary>How long to wait for a login response. Short, because a TM1 that is still loading
-    /// accepts connections and never answers. Default 30 s.</summary>
+    /// accepts connections and never answers. The authenticator gets as long again to supply the
+    /// credentials first, since it may ask another server, such as Cognos for a passport. Default
+    /// 30 s.</summary>
     public TimeSpan Login { get; }
 
     /// <summary>How long a request may go without receiving any data, unless the request sets its
