@@ -1,6 +1,6 @@
 ---
 name: tm1-setup
-description: Set up and start a local IBM Planning Analytics (TM1) server in Docker with tm1-server, check that it's healthy, and troubleshoot it. Use when the user wants TM1 running on their own machine (Mac, Windows or Linux), asks to install or start tm1-server, or has trouble with a local tm1-server.
+description: Set up and start one local IBM Planning Analytics (TM1) server in Docker with tm1-server's setup script, check that it's healthy, and troubleshoot it. Use when the user wants a TM1 server running on their own machine (Mac, Windows or Linux), asks to install or start tm1-server, or has trouble with a local tm1-server. For several TM1 servers, TM1 Web, PAW or Cognos, use the pa-setup skill instead.
 argument-hint: "[path to bundle, URL, or what you have]"
 ---
 
@@ -12,6 +12,12 @@ IBM software: the user brings their own licensed TM1 Server for Linux. Your job 
 get it running for them with the setup script, check it, and explain how to use it.
 
 If the user gave arguments, treat them as what they have, e.g. a bundle path: $ARGUMENTS
+
+**This skill sets up one TM1 server** (and optionally IBM's SData sample beside it). If the
+user wants more (several servers on a shared Admin Server, TM1 Web, Planning Analytics
+Workspace, or Cognos security with LDAP or OIDC test users), use the `pa-setup` skill
+instead. It runs any combination from one file, `pa-environment.yaml`. Don't run both
+setups at once: they use the same ports.
 
 ## Rules
 
@@ -114,7 +120,8 @@ Read the script's error first: each one says what to do. Then `docker compose lo
 | Container name already exists | Another tm1-server setup exists; only one runs at a time. Use that folder, or (after asking) `docker compose --profile samples down` there. |
 | Slow or crashing on Apple Silicon | Rosetta is off: Docker Desktop → Settings → General → *Use Rosetta for x86_64/amd64 emulation*. |
 | Windows containers mode | Docker Desktop → *Switch to Linux containers*. |
-| Logins fail, `IntegratedSecurityMode` warning | Their `tm1s.cfg` uses CAM security; set `IntegratedSecurityMode=1`. |
+| Logins fail, `IntegratedSecurityMode` warning | Their `tm1s.cfg` uses CAM security, and there's no Cognos here. Set `IntegratedSecurityMode=1` for TM1's own users, or run TM1 with Cognos through the `pa-setup` skill. |
 
 Full guide: https://github.com/ajmyers/skipcheck-tm1/blob/master/docker/tm1-server/GETTING-STARTED.md
+For more than one TM1 server, or TM1 Web, PAW or Cognos: https://github.com/ajmyers/skipcheck-tm1/blob/master/docker/pa-setup/README.md
 If it's a bug in tm1-server, suggest opening an issue: https://github.com/ajmyers/skipcheck-tm1/issues
