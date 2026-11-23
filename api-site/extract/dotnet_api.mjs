@@ -76,7 +76,7 @@ function parseFile(text) {
 		if (typeDecl && line.startsWith('public') && (!current || atBody)) {
 			const name = (current ? current.type.name + '.' : '') + typeDecl[3];
 			const kind = typeDecl[2].startsWith('record') ? 'record' : typeDecl[2];
-			const type = { name, package: namespace, kind, signature: line.replace(/\s*[{;]?\s*$/, '').replace(/\s*:\s*.*$/, (m) => m), doc: doc.join('\n'), deprecated: false, members: [] };
+			const type = { name, package: namespace, kind, signature: line.replace(/\s*[{;]?\s*$/, '').replace(/\s*:\s*.*$/, (m) => m), doc: doc.join('\n'), deprecated: false, members: [], bases: bases(line.slice(typeDecl[0].length)) };
 			types.push(type);
 			// A positional record's parameters are its properties
 			const positional = /^[^(]*\(([^)]*)\)/.exec(line);
@@ -102,7 +102,11 @@ function parseFile(text) {
 			const deprecated = attributes.some((a) => /Obsolete/.test(a));
 			const isStatic = /\bstatic\b/.test(head);
 			const bare = head.replace(MODIFIERS, '').trim();
-			const call = /^(.*?)\b(\w+)\s*(<[^()]*>)?\s*\((.*)\)\s*(?:where .*)?$/.exec(bare);
+			// A field's initializer isn't part of it: public static readonly Tm1Timeouts Defaults = new(...)
+			const field = /^([^(=]*\S)\s+(\w+)\s*=(?!>)/.exec(bare);
+			// The name is the word before the parameters, with its type parameters: in
+			// IAsyncEnumerable<R> StreamAsync<R>(...), StreamAsync
+			const call = field ? null : /^(.*?)\b(\w+)\s*(<(?:[^<>()]|<(?:[^<>()]|<[^<>()]*>)*>)*>)?\s*\((.*)\)\s*(?:where .*)?$/.exec(bare);
 			let member = null;
 			if (call && !/\boperator\b/.test(bare)) {
 				const [, ret, name, , params] = call;
@@ -111,6 +115,8 @@ function parseFile(text) {
 					kind: constructor ? 'constructor' : 'method',
 					name,
 					static: isStatic,
+					// An extension method (Id(this CognosContainer.Namespace @namespace)) is a member of the type it extends
+					...(isStatic && /^\s*this\s/.test(params) ? { extends: /^\s*this\s+(.*\S)\s+@?\w+/.exec(splitTop(params)[0])?.[1] } : {}),
 					signature: bare,
 					returns: ret.trim(),
 					params: splitTop(params).map((p) => {
@@ -118,6 +124,8 @@ function parseFile(text) {
 						return m ? { name: m[2], type: m[1], ...(m[3] ? { default: m[3] } : {}) } : { name: p, type: '' };
 					}),
 				};
+			} else if (field && !/\bconst\b/.test(field[1])) {
+				member = { kind: 'field', name: field[2], static: isStatic, signature: field[1] + ' ' + field[2], returns: field[1].replace(/^(?:\w+\s+)*?(?=\S+$)/, ''), params: [] };
 			} else {
 				const prop = /^(.*\S)\s+(\w+)$/.exec(bare);
 				if (prop && !/\b(?:class|record|struct|interface|enum|delegate|event|const)\b/.test(prop[1])) {
@@ -149,8 +157,72 @@ function parseFile(text) {
 	return types;
 }
 
+/** The names of the types a declaration's base list names: class X : Base, IFace<T> → Base, IFace. */
+function bases(rest) {
+	let at = 0;
+	// A positional record's parameters come first
+	if (rest.trimStart().startsWith('(')) {
+		let depth = 0;
+		for (at = rest.indexOf('('); at < rest.length; at++) {
+			if (rest[at] === '(') depth++;
+			else if (rest[at] === ')' && --depth === 0) break;
+		}
+		at++;
+	}
+	const list = /^\s*:\s*([^{;]*?)\s*(?:\bwhere\b.*)?[{;]?\s*$/.exec(rest.slice(at));
+	return list ? splitTop(list[1]).map((b) => b.replace(/\(.*$/, '').replace(/<.*$/, '').split('.').at(-1).trim()) : [];
+}
+
+/** Merges the types that share a name (Tm1Request and Tm1Request<T>, one type in Java), gives each
+ * type the members of its bases in the project and the extension methods written for it, each
+ * marked with where it comes from (inherited), and drops what only this script needs. */
+function complete(types) {
+	const byName = new Map();
+	const out = [];
+	for (const type of types) {
+		const key = type.package + ' ' + type.name;
+		const first = byName.get(key);
+		if (!first) {
+			byName.set(key, type);
+			out.push(type);
+			continue;
+		}
+		first.members.push(...type.members);
+		first.bases.push(...type.bases);
+		first.doc ||= type.doc;
+	}
+	const find = (name) => out.find((t) => t.name === name) ?? out.find((t) => t.name.split('.').at(-1) === name);
+	for (const type of out) {
+		for (const member of type.members.filter((m) => m.extends)) {
+			const target = find(member.extends.replace(/<.*$/, ''));
+			if (target) target.members.push({ ...member, static: false, params: member.params.slice(1), inherited: type.name });
+		}
+	}
+	const done = new Set();
+	const inherit = (type, seen) => {
+		if (done.has(type) || seen.has(type)) return;
+		const names = new Set(type.members.map((m) => m.name));
+		for (const name of type.bases) {
+			const base = find(name);
+			if (!base || base === type) continue;
+			inherit(base, new Set([...seen, type]));
+			for (const member of base.members) {
+				if (member.kind === 'constructor' || names.has(member.name)) continue;
+				type.members.push({ ...member, inherited: member.inherited ?? base.name });
+			}
+			for (const member of base.members) names.add(member.name);
+		}
+		done.add(type);
+	};
+	for (const type of out) inherit(type, new Set());
+	for (const type of out) {
+		delete type.bases;
+		for (const member of type.members) delete member.extends;
+	}
+	return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 const [source, out] = process.argv.slice(2);
 const types = [];
 for await (const file of files(source)) types.push(...parseFile(await readFile(file, 'utf8')));
-types.sort((a, b) => a.name.localeCompare(b.name));
-await writeFile(out, JSON.stringify(types));
+await writeFile(out, JSON.stringify(complete(types)));

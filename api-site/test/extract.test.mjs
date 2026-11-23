@@ -24,6 +24,49 @@ function extract(files, run) {
 }
 const names = (t) => t.members.map((m) => m.name + (m.inherited ? '<' + m.inherited : ''));
 
+test('the .NET extractor follows base classes and extension methods, and joins a generic and a static class', () => {
+	const types = extract(
+		{
+			'Errors.cs': [
+				'namespace N;',
+				'public class Tm1Exception : Exception',
+				'{',
+				'    public string Method { get; }',
+				'    public virtual bool IsRetryable() => false;',
+				'}',
+				'public sealed class Tm1ApiException : Tm1Exception',
+				'{',
+				'    public override bool IsRetryable() => true;',
+				'    public static readonly Tm1ApiException Empty = new();',
+				'    public IAsyncEnumerable<R> StreamAsync<R>(string mdx, Func<Cell, R> map) => throw null;',
+				'}',
+				'public enum Scope',
+				'{',
+				'    Public,',
+				'}',
+				'public static class Scopes',
+				'{',
+				'    public static string Navigation(this Scope scope) => "x";',
+				'}',
+				'public static class Tm1Request',
+				'{',
+				'    public static Tm1Request<T> Get<T>(string path) => null;',
+				'}',
+				'public sealed record Tm1Request<T>',
+				'{',
+				'    public string Path { get; }',
+				'}',
+			].join('\n'),
+		},
+		(dir, out) => execFileSync(process.execPath, [path.join(siteDir, 'extract', 'dotnet_api.mjs'), dir, out]),
+	);
+	assert.deepEqual(names(types.Tm1ApiException), ['IsRetryable', 'Empty', 'StreamAsync', 'Method<Tm1Exception']);
+	assert.equal(types.Tm1ApiException.members[1].kind, 'field');
+	assert.deepEqual(names(types.Scope), ['Public', 'Navigation<Scopes']);
+	assert.deepEqual(types.Scope.members[1].params, []);
+	assert.deepEqual(names(types.Tm1Request), ['Get', 'Path']);
+});
+
 /** A Python of 3.11 or later, as scripts/extract.mjs finds one, or null. */
 function python() {
 	for (const candidate of [process.env.PYTHON, 'python3', 'python3.14', 'python3.13', 'python3.12', 'python3.11'].filter(Boolean)) {
