@@ -155,7 +155,7 @@ for (const { project, content } of landings) {
 	}
 	const related = landings.filter((other) => other.project !== project).map((other) => card(other.project, other.content.meta.card));
 	body +=
-		'<section id="related" class="section wrap" aria-labelledby="related-heading"><h2 id="related-heading" class="section-label">Related</h2><ul class="cards compact">' +
+		'<section id="related" class="section wrap" aria-labelledby="related-heading"><h2 id="related-heading" class="section-label">Related</h2><ul class="cards">' +
 		related.join('') +
 		'</ul></section>';
 

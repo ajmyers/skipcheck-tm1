@@ -612,6 +612,9 @@ function switchHtml(project, language, javaName, languages, counterparts) {
 	);
 }
 async function writePage(project, language, file, title, body, nav, javaName, languages, counterparts) {
+	// The breadcrumbs share the language bar, on its left
+	const crumbs = /^<p class="crumbs">[\s\S]*?<\/p>/.exec(body)?.[0] ?? null;
+	const rest = crumbs ? body.slice(crumbs.length) : body;
 	const dir = path.join(distDir, project.id, 'docs', language);
 	await mkdir(dir, { recursive: true });
 	const html =
@@ -621,7 +624,7 @@ async function writePage(project, language, file, title, body, nav, javaName, la
 			styles: ['../../assets/docs.css'],
 			scripts: ['../../assets/docs.js', '/highlight.js'],
 		}) +
-		'<body data-lang="' + language + '"><div class="docs">' + nav + '<main class="guide"><div class="toolbar">' + switchHtml(project, language, javaName, languages, counterparts) + '</div>' + body + '</main></div></body></html>\n';
+		'<body data-lang="' + language + '"><div class="docs">' + nav + '<main class="guide"><div class="toolbar">' + (crumbs ?? '<span></span>') + switchHtml(project, language, javaName, languages, counterparts) + '</div>' + rest + '</main></div></body></html>\n';
 	await writeFile(path.join(dir, file), html);
 }
 

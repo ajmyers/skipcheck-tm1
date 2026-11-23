@@ -44,14 +44,15 @@ body {
 .guide .types li { break-inside: avoid; }
 
 /* ---- the reference: a sidebar of every type, the page beside it ---- */
-.docs { display: grid; grid-template-columns: 15rem minmax(0, 1fr); max-width: 80rem; margin: 0 auto; }
+/* The docs line up with the site's masthead and footer: the same width (--wrap) and gutters */
+.docs { display: grid; grid-template-columns: 14rem minmax(0, 1fr); width: min(100% - 2 * var(--gutter, 1.25rem), var(--wrap, 68rem)); margin: 0 auto; }
 /* The sidebar stays in view below the site's sticky masthead (--bar high), and scrolls on its own
    within the space left. Scrolling past its end doesn't carry on into the page. */
 .sidebar {
     position: sticky; top: var(--bar, 3.75rem); align-self: start;
     height: calc(100vh - var(--bar, 3.75rem)); height: calc(100dvh - var(--bar, 3.75rem));
     box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
-    padding: 1.25rem 1rem 2rem 1.25rem; border-right: 1px solid var(--rule, #d8d8d8); font-size: 0.86rem;
+    padding: 1.25rem 1rem 2rem 0; border-right: 1px solid var(--rule, #d8d8d8); font-size: 0.86rem;
 }
 .sidebar p { margin: 0 0 0.3rem; }
 .sidebar > p:first-child a { font-weight: 600; color: var(--ink, #1a1a1a); text-decoration: none; }
@@ -63,10 +64,10 @@ body {
 .sidebar li.nested a { padding-left: 0.9rem; color: var(--muted, #677285); font-size: 0.8rem; }
 /* Beside the sidebar, the page fills its column up to a reading width, rather than sizing to its
    longest line of code (which margin: auto would let it do) */
-.docs > .guide { margin: 0; box-sizing: border-box; width: 100%; max-width: 60rem; padding-left: 2rem; }
+.docs > .guide { margin: 0; box-sizing: border-box; width: 100%; max-width: none; padding: 0 0 4rem 2.25rem; }
 @media (max-width: 52rem) {
     .docs { display: block; }
-    .docs > .guide { padding-left: 1.25rem; }
+    .docs > .guide { padding-left: 0; }
     .sidebar { display: none; }
 }
 
@@ -75,8 +76,8 @@ body {
    change anywhere on it; docs.js keeps the reader's place across the change */
 .toolbar {
     position: sticky; top: var(--bar, 3.75rem); z-index: 4;
-    display: flex; justify-content: flex-end;
-    margin: -1.5rem -0.5rem 0.25rem; padding: 0.6rem 0.5rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    margin: 0 -0.5rem 0.5rem; padding: 0.75rem 0.5rem;
     background: color-mix(in srgb, var(--paper, #fff) 88%, transparent);
     backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
@@ -137,3 +138,11 @@ body {
 
 /* Anchors land below the sticky masthead and the language bar, not under them */
 .guide h2[id], .guide section[id] { scroll-margin-top: calc(var(--bar, 3.75rem) + 3.5rem); }
+
+.toolbar .crumbs { margin: 0; }
+/* Names in lists are links in the code font, without a chip */
+.guide ul.areas a, .guide table.members a { text-decoration: none; }
+.guide ul.areas a code, .guide table.members a code { background: none; padding: 0; color: var(--accent, #0b5fff); font-size: 0.9em; }
+.guide ul.areas a:hover code, .guide table.members a:hover code { text-decoration: underline; }
+/* TM1's own types: no sidebar, but the same edges as the rest of the docs */
+.guide.model { width: min(100% - 2 * var(--gutter, 1.25rem), var(--wrap, 68rem)); max-width: none; margin: 0 auto; padding-inline: 0; box-sizing: border-box; }
