@@ -36,9 +36,11 @@ Run the Gradle task for what you changed before you push. They're what CI runs.
 
 ## Merging
 
-- `master` requires `ci-ok`, `docker-ok` and `conventions`, on a branch that is up to date with
-  `master`. Rebase onto `master` (`git push --force-with-lease` afterwards) rather than merging
-  it in; if `master` moves before you merge, rebase again.
+- `master` requires `ci-ok`, `docker-ok` and `conventions`. A branch needn't be up to date with
+  `master`; when it conflicts, rebase it (`git push --force-with-lease` afterwards) rather than
+  merging `master` in.
+- After you merge, look at CI on `master`. Two PRs that each passed can break it together; if
+  it's red, mending it comes before anything else.
 - Squash-merge, with the PR's title and description as the commit: write the description as the
   permanent record.
 - Don't merge past a red check (`--admin`), and don't change the ruleset, the required checks or a
