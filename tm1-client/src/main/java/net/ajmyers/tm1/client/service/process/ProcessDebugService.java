@@ -35,10 +35,10 @@ import reactor.core.publisher.Mono;
  * <p>
  * {@link #debug} starts one, paused before the first line; {@link #resume} runs to the
  * next breakpoint (or the end), and the {@code step…} methods move a line at a time. Each
- * returns the context as it then is. TM1 (11.8) answers a step without waiting for it to
- * land, so the status is {@code RUNNING} or {@code PAUSED} depending on which came first;
- * {@link #get} reads it again. A step past a procedure's last line pauses with an empty
- * call stack before the run completes.
+ * returns the context as it then is. TM1 (11.8) answers a start, a resume or a step
+ * without waiting for the run to stop again, so the status is {@code RUNNING} or
+ * {@code PAUSED} depending on which came first; {@link #get} reads it again. A step past
+ * a procedure's last line either pauses with an empty call stack or completes the run.
  *
  * <p>
  * TM1 (11.8) refuses to delete a debug context: a run ends by running to completion,

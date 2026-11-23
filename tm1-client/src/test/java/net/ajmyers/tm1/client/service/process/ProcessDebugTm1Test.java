@@ -68,9 +68,29 @@ class ProcessDebugTm1Test {
 
 	@Test
 	void stopsAtABreakpointReadsTheStateAndRunsToTheEnd() {
-		ProcessDebugContext started = debug.debug(process, Map.of(), ODataQuery.none()).block(WAIT);
-		String id = started.id();
-		assertThat(started.status()).as("paused before the first line").isEqualTo(ProcessDebugContextStatus.PAUSED);
+		String id = debug.debug(process, Map.of(), ODataQuery.none()).block(WAIT).id();
+		try {
+			stopsAndRunsToTheEnd(id);
+		}
+		finally {
+			// A run left paused holds the process, and its delete would wait for it
+			debug.finish(id).onErrorComplete().block(WAIT);
+		}
+	}
+
+	/**
+	 * The context once the run has stopped moving. TM1 answers a start, a resume or a
+	 * step with the status of that moment, RUNNING or already PAUSED.
+	 */
+	private static ProcessDebugContext settled(String id) {
+		return debug.get(id, ODataQuery.none())
+			.repeatWhen(polls -> polls.delayElements(Duration.ofMillis(100)))
+			.filter(context -> context.status() != ProcessDebugContextStatus.RUNNING)
+			.blockFirst(WAIT);
+	}
+
+	private static void stopsAndRunsToTheEnd(String id) {
+		assertThat(settled(id).status()).as("paused before the first line").isEqualTo(ProcessDebugContextStatus.PAUSED);
 		debug
 			.addBreakpoint(id,
 					ProcessDebugContextLineBreakpointPatch.builder()
@@ -85,8 +105,9 @@ class ProcessDebugTm1Test {
 			.isInstanceOfSatisfying(ProcessDebugContextLineBreakpoint.class,
 					b -> assertThat(b.lineNumber()).isEqualTo(3));
 
-		assertThat(debug.resume(id, ODataQuery.none()).block(WAIT).status())
-			.isEqualTo(ProcessDebugContextStatus.PAUSED);
+		assertThat(debug.resume(id, ODataQuery.none()).block(WAIT).status()).isIn(ProcessDebugContextStatus.RUNNING,
+				ProcessDebugContextStatus.PAUSED);
+		assertThat(settled(id).status()).as("at the breakpoint").isEqualTo(ProcessDebugContextStatus.PAUSED);
 		assertThat(debug.currentBreakpoint(id, ODataQuery.none()).block(WAIT)).isInstanceOfSatisfying(
 				ProcessDebugContextLineBreakpoint.class, b -> assertThat(b.lineNumber()).isEqualTo(3));
 		List<ProcessDebugContextStackFrame> stack = debug.callStack(id, ODataQuery.none()).collectList().block(WAIT);
@@ -107,8 +128,9 @@ class ProcessDebugTm1Test {
 		assertThat(debug.list(ODataQuery.none()).collectList().block(WAIT)).as("lists none").isEmpty();
 
 		assertThat(debug.stepOver(id, ODataQuery.none()).block(WAIT).status())
-			.as("TM1 answers before or after the step lands, whichever comes first")
-			.isIn(ProcessDebugContextStatus.RUNNING, ProcessDebugContextStatus.PAUSED);
+			.as("past the last line: still running, paused with no line to be on, or already complete")
+			.isIn(ProcessDebugContextStatus.RUNNING, ProcessDebugContextStatus.PAUSED,
+					ProcessDebugContextStatus.COMPLETE);
 		ProcessDebugContext done = debug.finish(id).block(WAIT);
 		assertThat(done.status()).isEqualTo(ProcessDebugContextStatus.COMPLETE);
 		assertThat(done.result().processExecuteStatusCode()).isEqualTo(ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY);

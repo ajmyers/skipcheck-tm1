@@ -15,10 +15,10 @@ namespace AjMyers.Tm1.Client.Services;
 /// held on the server as a <c>ProcessDebugContext</c> until deleted.
 /// <para><see cref="DebugAsync"/> starts one, paused before the first line; <see cref="ResumeAsync"/>
 /// runs to the next breakpoint (or the end), and the <c>Step…</c> methods move a line at a time. Each
-/// returns the context as it then is. TM1 (11.8) answers a step without waiting for it to land, so
-/// the status is <c>Running</c> or <c>Paused</c> depending on which came first;
-/// <see cref="GetAsync"/> reads it again. A step past a procedure's last line pauses with an empty
-/// call stack before the run completes.</para>
+/// returns the context as it then is. TM1 (11.8) answers a start, a resume or a step without
+/// waiting for the run to stop again, so the status is <c>Running</c> or <c>Paused</c> depending on which came first;
+/// <see cref="GetAsync"/> reads it again. A step past a procedure's last line either pauses with
+/// an empty call stack or completes the run.</para>
 /// <para>TM1 (11.8) refuses to delete a debug context: a run ends by running to completion, which
 /// <see cref="FinishAsync"/> does, and <c>DebuggingAsync</c> does when its work is done. A finished
 /// context stays readable until the session ends. <c>ProcessDebugContexts</c> lists none, though each

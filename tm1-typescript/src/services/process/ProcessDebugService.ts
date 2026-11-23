@@ -30,9 +30,10 @@ export type ProcessDebugWork<R> = AsyncIterable<R> | PromiseLike<R | void> | R |
  *
  * {@link debug} starts one, paused before the first line; {@link resume} runs to the next
  * breakpoint (or the end), and the `step…` methods move a line at a time. Each returns the context
- * as it then is. TM1 (11.8) answers a step without waiting for it to land, so the status is
+ * as it then is. TM1 (11.8) answers a start, a resume or a step without waiting for the run to
+ * stop again, so the status is
  * `Running` or `Paused` depending on which came first; {@link get} reads it again. A step past a
- * procedure's last line pauses with an empty call stack before the run completes.
+ * procedure's last line either pauses with an empty call stack or completes the run.
  *
  * TM1 (11.8) refuses to delete a debug context: a run ends by running to completion, which
  * {@link finish} does, and {@link debugging} does when its work is done. A finished context stays

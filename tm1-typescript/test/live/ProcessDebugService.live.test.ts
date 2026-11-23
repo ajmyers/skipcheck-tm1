@@ -8,6 +8,7 @@ import {
   Tm1BadRequestException,
   Tm1Request,
   typeOf,
+  type ProcessDebugContext,
   type ProcessDebugContextLineBreakpoint,
   type Tm1Client,
 } from "../../src/index.js";
@@ -36,16 +37,38 @@ describe("ProcessDebugService on TM1" + liveReason, () => {
 
   tm1Test("stops at a breakpoint, reads the state and runs to the end", async () => {
     const debug = tm1.processDebugging;
-    const started = await debug.debug(process, {}, ODataQuery.none());
-    const id = started.ID!;
-    expect(started.Status, "paused before the first line").toBe("Paused");
+    const id = (await debug.debug(process, {}, ODataQuery.none())).ID!;
+    try {
+      await stopsAndRunsToTheEnd(id);
+    } finally {
+      // A run left paused holds the process, and its delete would wait for it
+      await debug.finish(id).catch(() => undefined);
+    }
+  });
+
+  /** The context once the run has stopped moving. TM1 answers a start, a resume or a step with the
+   * status of that moment, Running or already Paused. */
+  async function settled(id: string): Promise<ProcessDebugContext> {
+    const deadline = Date.now() + 30_000;
+    let context = await tm1.processDebugging.get(id, ODataQuery.none());
+    while (context.Status === "Running" && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      context = await tm1.processDebugging.get(id, ODataQuery.none());
+    }
+    return context;
+  }
+
+  async function stopsAndRunsToTheEnd(id: string): Promise<void> {
+    const debug = tm1.processDebugging;
+    expect((await settled(id)).Status, "paused before the first line").toBe("Paused");
     await debug.addBreakpoint(id, line(1, 3));
     const breakpoints = await debug.breakpoints(id, ODataQuery.none()).toArray();
     expect(breakpoints).toHaveLength(1);
     expect(typeOf(ProcessDebugContextBreakpoint, breakpoints[0]!)).toBe("ProcessDebugContextLineBreakpoint");
     expect((breakpoints[0] as ProcessDebugContextLineBreakpoint).LineNumber).toBe(3);
 
-    expect((await debug.resume(id, ODataQuery.none())).Status).toBe("Paused");
+    expect(["Running", "Paused"]).toContain((await debug.resume(id, ODataQuery.none())).Status);
+    expect((await settled(id)).Status, "at the breakpoint").toBe("Paused");
     const current = await debug.currentBreakpoint(id, ODataQuery.none());
     expect(typeOf(ProcessDebugContextBreakpoint, current!)).toBe("ProcessDebugContextLineBreakpoint");
     expect((current as ProcessDebugContextLineBreakpoint).LineNumber).toBe(3);
@@ -61,14 +84,14 @@ describe("ProcessDebugService on TM1" + liveReason, () => {
     expect((await debug.thread(id, ODataQuery.none())).ObjectName).toBe(process);
     expect(await debug.list(ODataQuery.none()).toArray(), "lists none").toEqual([]);
 
-    // TM1 answers before or after the step lands, whichever comes first
-    expect(["Running", "Paused"]).toContain((await debug.stepOver(id, ODataQuery.none())).Status);
+    // Past the last line: still running, paused with no line to be on, or already complete
+    expect(["Running", "Paused", "Complete"]).toContain((await debug.stepOver(id, ODataQuery.none())).Status);
     const done = await debug.finish(id);
     expect(done.Status).toBe("Complete");
     expect(done.Result?.ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
     expect((await debug.get(id, ODataQuery.none())).Status, "still readable, complete").toBe("Complete");
     await expect(tm1.session.execute(Tm1Request.delete(ODataPath.of("ProcessDebugContexts").key(id))), "TM1 refuses to delete one").rejects.toBeInstanceOf(Tm1BadRequestException);
-  });
+  }
 
   tm1Test("needs a chosen breakpoint ID, and updates and removes by it", async () => {
     const debug = tm1.processDebugging;

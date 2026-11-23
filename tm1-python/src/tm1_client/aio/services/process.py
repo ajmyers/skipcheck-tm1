@@ -275,10 +275,10 @@ class ProcessDebugService(Service):
 
     :meth:`debug` starts one, paused before the first line; :meth:`resume` runs to the next
     breakpoint (or the end), and the ``step_…`` methods move a line at a time. Each returns
-    the context as it then is. TM1 (11.8) answers a step without waiting for it to land, so the
-    status is ``RUNNING`` or ``PAUSED`` depending on which came first; :meth:`get` reads it
-    again. A step past a procedure's last line pauses with an empty call stack before the run
-    completes.
+    the context as it then is. TM1 (11.8) answers a start, a resume or a step without waiting
+    for the run to stop again, so the status is ``RUNNING`` or ``PAUSED`` depending on which came first; :meth:`get` reads it
+    again. A step past a procedure's last line either pauses with an empty call stack or
+    completes the run.
 
     TM1 (11.8) refuses to delete a debug context: a run ends by running to completion, which
     :meth:`finish` does, and :meth:`debugging` does when its work is done. A finished context

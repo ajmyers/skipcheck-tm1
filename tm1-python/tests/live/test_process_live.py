@@ -4,6 +4,8 @@ for how to point them at a server)."""
 
 from __future__ import annotations
 
+import contextlib
+import time as clock
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Iterator
 
@@ -162,16 +164,35 @@ def line(process: str, id: int, number: int) -> Any:
     )
 
 
+def settled(debug: Any, id: str) -> Any:
+    """The context once the run has stopped moving. TM1 answers a start, a resume or a step with
+    the status of that moment, RUNNING or already PAUSED."""
+    deadline = clock.monotonic() + 30
+    while (context := debug.get(id)).status is ProcessDebugContextStatus.RUNNING and clock.monotonic() < deadline:
+        clock.sleep(0.1)
+    return context
+
+
 def test_stops_at_a_breakpoint_reads_the_state_and_runs_to_the_end(tm1: Tm1Client, three_lines: str) -> None:
     debug = tm1.process_debugging
-    started = debug.debug(three_lines)
-    id = started.id
-    assert started.status is ProcessDebugContextStatus.PAUSED, "paused before the first line"
+    id = debug.debug(three_lines).id
+    try:
+        _stops_and_runs_to_the_end(tm1, three_lines, id)
+    finally:
+        # A run left paused holds the process, and its delete would wait for it
+        with contextlib.suppress(Exception):
+            debug.finish(id)
+
+
+def _stops_and_runs_to_the_end(tm1: Tm1Client, three_lines: str, id: str) -> None:
+    debug = tm1.process_debugging
+    assert settled(debug, id).status is ProcessDebugContextStatus.PAUSED, "paused before the first line"
     debug.add_breakpoint(id, line(three_lines, 1, 3))
     (breakpoint,) = debug.breakpoints(id)
     assert isinstance(breakpoint, ProcessDebugContextLineBreakpoint) and breakpoint.line_number == 3
 
-    assert debug.resume(id).status is ProcessDebugContextStatus.PAUSED
+    assert debug.resume(id).status in (ProcessDebugContextStatus.RUNNING, ProcessDebugContextStatus.PAUSED)
+    assert settled(debug, id).status is ProcessDebugContextStatus.PAUSED, "at the breakpoint"
     current = debug.current_breakpoint(id)
     assert isinstance(current, ProcessDebugContextLineBreakpoint) and current.line_number == 3
     (frame,) = debug.call_stack(id)
@@ -184,8 +205,8 @@ def test_stops_at_a_breakpoint_reads_the_state_and_runs_to_the_end(tm1: Tm1Clien
     assert debug.thread(id).object_name == three_lines
     assert debug.list() == [], "lists none"
 
-    # TM1 answers before or after the step lands, whichever comes first
-    assert debug.step_over(id).status in (ProcessDebugContextStatus.RUNNING, ProcessDebugContextStatus.PAUSED)
+    # Past the last line: still running, paused with no line to be on, or already complete
+    assert debug.step_over(id).status in (ProcessDebugContextStatus.RUNNING, ProcessDebugContextStatus.PAUSED, ProcessDebugContextStatus.COMPLETE)
     done = debug.finish(id)
     assert done.status is ProcessDebugContextStatus.COMPLETE
     assert done.result.process_execute_status_code is ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY

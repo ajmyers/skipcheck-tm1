@@ -160,14 +160,49 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task StopsAtABreakpointReadsTheStateAndRunsToTheEnd()
     {
-        var started = await Debug.DebugAsync(_process);
-        var id = started.Id!;
-        Assert.Equal(ProcessDebugContextStatus.Paused, started.Status); // paused before the first line
+        var id = (await Debug.DebugAsync(_process)).Id!;
+        try
+        {
+            await StopsAndRunsToTheEnd(id);
+        }
+        finally
+        {
+            // A run left paused holds the process, and its delete would wait for it
+            try
+            {
+                await Debug.FinishAsync(id);
+            }
+            catch (Tm1Exception)
+            {
+                // already finished
+            }
+        }
+    }
+
+    /// <summary>The context once the run has stopped moving. TM1 answers a start, a resume or a step
+    /// with the status of that moment, Running or already Paused.</summary>
+    private async Task<ProcessDebugContext> Settled(string id)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        var context = await Debug.GetAsync(id);
+        while (context.Status == ProcessDebugContextStatus.Running && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(100);
+            context = await Debug.GetAsync(id);
+        }
+        return context;
+    }
+
+    private async Task StopsAndRunsToTheEnd(string id)
+    {
+        Assert.Equal(ProcessDebugContextStatus.Paused, (await Settled(id)).Status); // paused before the first line
         await Debug.AddBreakpointAsync(id, Line(1, 3));
         var breakpoint = Assert.IsType<ProcessDebugContextLineBreakpoint>(Assert.Single(await Debug.BreakpointsAsync(id).ToListAsync()));
         Assert.Equal(3, breakpoint.LineNumber);
 
-        Assert.Equal(ProcessDebugContextStatus.Paused, (await Debug.ResumeAsync(id)).Status);
+        var moving = new ProcessDebugContextStatus?[] { ProcessDebugContextStatus.Running, ProcessDebugContextStatus.Paused };
+        Assert.Contains((await Debug.ResumeAsync(id)).Status, moving);
+        Assert.Equal(ProcessDebugContextStatus.Paused, (await Settled(id)).Status); // at the breakpoint
         Assert.Equal(3, Assert.IsType<ProcessDebugContextLineBreakpoint>(await Debug.CurrentBreakpointAsync(id)).LineNumber);
         var frame = Assert.Single(await Debug.CallStackAsync(id).ToListAsync());
         Assert.Equal((ProcessProcedure.Prolog, 3), (frame.Procedure, frame.LineNumber));
@@ -182,8 +217,8 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
         Assert.Equal(_process, (await Debug.ThreadAsync(id)).ObjectName);
         Assert.Empty(await Debug.ListAsync().ToListAsync()); // lists none
 
-        // TM1 answers before or after the step lands, whichever comes first
-        Assert.Contains((await Debug.StepOverAsync(id)).Status, new ProcessDebugContextStatus?[] { ProcessDebugContextStatus.Running, ProcessDebugContextStatus.Paused });
+        // Past the last line: still running, paused with no line to be on, or already complete
+        Assert.Contains((await Debug.StepOverAsync(id)).Status, new ProcessDebugContextStatus?[] { ProcessDebugContextStatus.Running, ProcessDebugContextStatus.Paused, ProcessDebugContextStatus.Complete });
         var done = await Debug.FinishAsync(id);
         Assert.Equal(ProcessDebugContextStatus.Complete, done.Status);
         Assert.Equal(ProcessExecuteStatusCode.CompletedSuccessfully, done.Result!.ProcessExecuteStatusCode);
