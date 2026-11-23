@@ -433,6 +433,17 @@ public class FilterTest
     }
 
     [Fact]
+    public void KeepsARawExpressionsMeaningWhenCombined()
+    {
+        var either = Filter.Raw("A eq 1 or B eq 2");
+        Assert.Equal("A eq 1 or B eq 2", either.ToString());
+        Assert.Equal("((A eq 1 or B eq 2) and (Name eq 'x'))", Filter.And(either, Name.Eq("x")).ToString());
+        Assert.Equal("((Name eq 'x') or (A eq 1 and B eq 2))", (Name.Eq("x") | Filter.Raw("A eq 1 and B eq 2")).ToString());
+        Assert.Equal("A eq 1 or B eq 2", Filter.And(either).ToString());
+        Assert.Equal("not(A eq 1 or B eq 2)", Filter.Not(either).ToString());
+    }
+
+    [Fact]
     public void UsesCanonicalFunctions()
     {
         Assert.Equal("contains(Name,'Q1')", Filter.Contains(Name, "Q1").ToString());

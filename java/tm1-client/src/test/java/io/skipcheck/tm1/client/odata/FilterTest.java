@@ -36,6 +36,17 @@ class FilterTest {
 	}
 
 	@Test
+	void keepsARawExpressionsMeaningWhenCombined() {
+		Filter either = Filter.raw("A eq 1 or B eq 2");
+		assertThat(either).as("as is on its own").hasToString("A eq 1 or B eq 2");
+		assertThat(Filter.and(either, NAME.eq("x"))).hasToString("((A eq 1 or B eq 2) and (Name eq 'x'))");
+		assertThat(Filter.or(NAME.eq("x"), Filter.raw("A eq 1 and B eq 2")))
+			.hasToString("((Name eq 'x') or (A eq 1 and B eq 2))");
+		assertThat(Filter.and(either)).as("alone, still as is").hasToString("A eq 1 or B eq 2");
+		assertThat(Filter.not(either)).hasToString("not(A eq 1 or B eq 2)");
+	}
+
+	@Test
 	void usesCanonicalFunctions() {
 		assertThat(Filter.contains(NAME, "Q1")).hasToString("contains(Name,'Q1')");
 		assertThat(Filter.endsWith(NAME, "'s")).hasToString("endswith(Name,'''s')");

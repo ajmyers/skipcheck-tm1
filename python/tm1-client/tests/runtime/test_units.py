@@ -281,6 +281,15 @@ def test_parenthesizes_every_combination() -> None:
     assert (NAME.eq("a") & LEVEL.eq(0)) | ~NAME.eq("b") == Filter.or_(Filter.and_(NAME.eq("a"), LEVEL.eq(0)), Filter.not_(NAME.eq("b")))
 
 
+def test_keeps_a_raw_expressions_meaning_when_combined() -> None:
+    either = Filter.raw("A eq 1 or B eq 2")
+    assert str(either) == "A eq 1 or B eq 2"
+    assert str(Filter.and_(either, NAME.eq("x"))) == "((A eq 1 or B eq 2) and (Name eq 'x'))"
+    assert str(NAME.eq("x") | Filter.raw("A eq 1 and B eq 2")) == "((Name eq 'x') or (A eq 1 and B eq 2))"
+    assert str(Filter.and_(either)) == "A eq 1 or B eq 2"
+    assert str(~either) == "not(A eq 1 or B eq 2)"
+
+
 def test_uses_canonical_functions() -> None:
     assert str(Filter.contains(NAME, "Q1")) == "contains(Name,'Q1')"
     assert str(Filter.ends_with(NAME, "'s")) == "endswith(Name,'''s')"

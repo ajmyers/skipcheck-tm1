@@ -412,17 +412,19 @@ class Filter:
     space-sensitively, while keyed access ignores both: to find one object by name, use its key.
     """
 
-    __slots__ = ("_expression",)
+    __slots__ = ("_expression", "_raw")
 
-    def __init__(self, expression: str):
+    def __init__(self, expression: str, _raw: bool = False):
         self._expression = expression
+        self._raw = _raw
 
     @staticmethod
     def raw(expression: str) -> Filter:
-        """An expression written by hand, used as is."""
+        """An expression written by hand, used as is. Combined with others by :meth:`and_` or
+        :meth:`or_`, it's put in parentheses, so it keeps its meaning whatever operators it uses."""
         if not isinstance(expression, str):
             raise TypeError("expression")
-        return Filter(expression)
+        return Filter(expression, _raw=True)
 
     @staticmethod
     def and_(*filters: Filter) -> Filter:
@@ -525,7 +527,12 @@ class Filter:
             raise ValueError(f"{operator}_() needs at least one filter")
         if len(filters) == 1:
             return filters[0]
-        return Filter("(" + f" {operator} ".join(f._expression for f in filters) + ")")
+        return Filter("(" + f" {operator} ".join(f._operand() for f in filters) + ")")
+
+    def _operand(self) -> str:
+        """The expression as an operand of ``and`` or ``or``: a raw one might not stand on its
+        own, so it gets parentheses."""
+        return f"({self._expression})" if self._raw else self._expression
 
     @staticmethod
     def _function(name: str, prop: str | ODataProperty, argument: str) -> Filter:
