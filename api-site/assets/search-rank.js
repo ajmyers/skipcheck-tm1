@@ -27,6 +27,8 @@ const PART = 2; // words, the last in part: modelc for ModelCubes, cubes for Cub
 //                 or the starts of some of its words, in order: get cubes for getModelCubes
 const INSIDE = 1; // anywhere in it: data for metadata
 const TYPE_BONUS = 1;
+// On a tie: the library's types, then TM1's, then the rest
+const KIND_ORDER = (kind) => (kind === 'type' ? 0 : kind === 'model' ? 1 : 2);
 
 /** How well a name (as its words) matches a query (as its words). */
 export function matchName(nameWords, queryWords) {
@@ -69,6 +71,7 @@ export function prepare(index) {
 		href: page,
 	}));
 	const types = index.types.map(([name, page, summary]) => ({ kind: 'type', name, words: words(name), summary, href: page }));
+	const model = (index.model ?? []).map(([name, page, summary]) => ({ kind: 'model', name, words: words(name), summary, href: page }));
 	const members = index.members.map(([name, type, summary, anchor = name]) => ({
 		kind: 'member',
 		name,
@@ -77,14 +80,16 @@ export function prepare(index) {
 		summary,
 		href: types[type].href + '#' + anchor,
 	}));
-	return { types, members, walkthroughs };
+	return { types, model, members, walkthroughs };
 }
 
 /**
  * The entries of a prepared index that match a query, best first, at most limit of them. A better
  * match comes first, a type counting one better than a member, so a type comes before a member
  * matched as well or one step better (CubeService before AttributeOwner.cube for "cube", but
- * after Tm1Client.cubes for "cubes"). Then the shorter name, then the order of the docs.
+ * after Tm1Client.cubes for "cubes"). TM1's own types count as types, after the library's when
+ * matched as well: "cube" finds the TM1 type Cube first, as the whole name, then CubeService. Then the
+ * shorter name, then the order of the docs.
  */
 export function search(prepared, query, limit = 12) {
 	const text = query.trim();
@@ -94,7 +99,7 @@ export function search(prepared, query, limit = 12) {
 	const consider = (entry, score) => {
 		if (score > 0) found.push({ entry, score, order: found.length });
 	};
-	for (const type of prepared.types) {
+	for (const type of [...prepared.types, ...(prepared.model ?? [])]) {
 		const score = matchName(type.words, queryWords);
 		consider(type, score && score + TYPE_BONUS);
 	}
@@ -117,7 +122,7 @@ export function search(prepared, query, limit = 12) {
 	found.sort(
 		(a, b) =>
 			b.score - a.score ||
-			(a.entry.kind === 'type' ? 0 : 1) - (b.entry.kind === 'type' ? 0 : 1) ||
+			KIND_ORDER(a.entry.kind) - KIND_ORDER(b.entry.kind) ||
 			a.entry.name.length - b.entry.name.length ||
 			a.order - b.order,
 	);

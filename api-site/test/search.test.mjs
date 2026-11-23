@@ -131,6 +131,28 @@ test("a project's walkthroughs are in its index, after the types, and only when 
 	assert.equal('walkthroughs' in searchIndex([]), false);
 });
 
+test("TM1's own types are in every language's index, after the walkthroughs, and only when the pages link some", () => {
+	const model = [{ name: 'Cube', page: '../model/Cube.html', summary: 'A cube.' }];
+	assert.deepEqual(searchIndex([], [], model).model, [['Cube', '../model/Cube.html', 'A cube.']]);
+	assert.equal('model' in searchIndex([]), false);
+});
+
+test("a TM1 type is found as a type is, after the library's when they match as well", () => {
+	const index = prepare(
+		searchIndex(
+			[page('CubeService', ['model_cubes']), page('Tm1Client', ['cubes'])],
+			[],
+			['Cube', 'CubeRule', 'Dimension'].map((name) => ({ name, page: '../model/' + name + '.html', summary: name + '.' })),
+		),
+	);
+	const [cube] = search(index, 'Cube');
+	assert.equal(cube.kind, 'model');
+	assert.equal(cube.href, '../model/Cube.html');
+	assert.deepEqual(names(search(index, 'cube')).slice(0, 3), ['Cube', 'CubeService', 'CubeRule'], 'the whole name, then the library type over the TM1 type');
+	assert.deepEqual(names(search(index, 'dim')), ['Dimension']);
+	assert.deepEqual(search(index, 'Tm1Client.cube').filter((r) => r.kind === 'model'), [], 'not for a member of a type');
+});
+
 test('a walkthrough is found by the words of its title, or less well by those of its summary', () => {
 	const index = prepare(
 		searchIndex(

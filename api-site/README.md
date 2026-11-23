@@ -5,7 +5,7 @@ Builds and serves each project's pages on skipcheck.io (and on skipcheck.dev, wh
 | Address | What | Built by |
 |---|---|---|
 | `/<project>/` | The landing page: what it is, a quick start in every language it has, what's in it. | `scripts/pages.mjs`, from `content/<project>.md` |
-| `/<project>/docs/<language>/` | The reference: a page per type in each language, where the signatures, the descriptions and the examples are all that language's, with a switch to the same page in another. `/<project>/docs/` opens the language last chosen. A search box finds a type or member by name in the page's language. | `scripts/reference.mjs`, from each language's API (below) |
+| `/<project>/docs/<language>/` | The reference: a page per type in each language, where the signatures, the descriptions and the examples are all that language's, with a switch to the same page in another. `/<project>/docs/` opens the language last chosen. A search box finds a type or member by name in the page's language, and TM1's own types. | `scripts/reference.mjs`, from each language's API (below) |
 | `/<project>/docs/model/` | TM1's own types (Cube, Dimension...), the same in every language. | `scripts/reference.mjs`, from `spec/tm1-api.json` |
 | `/<project>/walkthroughs/<slug>/` | A task done step by step, such as connecting and listing cubes, with each step's code in every language and what it printed. Listed on the landing page and the docs home. | `scripts/pages.mjs`, from `content/walkthroughs/<project>/<slug>.md` |
 | `/docs/` | The docs landing page: every project, its languages, and links to its docs in each. The masthead's Docs link opens it. | `scripts/pages.mjs`, from the same content files as the landing pages |
@@ -84,7 +84,7 @@ has one, and isn't required.
 | `scripts/type-page.mjs` | The top of a type's page: its name, its import line, and the walkthroughs that use it, before the overview. |
 | `scripts/members.mjs` | Which member is which across languages, and the gate that each language has every Java member or lists it with the reason. |
 | `scripts/doc-code.mjs` | The gate that no doc comment the reference reads has code typed into it: a Javadoc `<pre>` or inline `{@snippet}`, a .NET `<code>`, a TypeScript fence or `@example`, a Python `::` block or doctest. |
-| `scripts/search.mjs` | The search index of each docs language, `search.json` beside its pages: every type and member, a short summary, and where it is. `reference.mjs` writes it from the data it renders the pages with. |
+| `scripts/search.mjs` | The search index of each docs language, `search.json` beside its pages: every type and member, the walkthroughs and the TM1 types the pages link to, a short summary, and where it is. `reference.mjs` writes it from the data it renders the pages with. |
 | `scripts/pages.mjs` | The landing pages and the walkthroughs. |
 | `scripts/sitemap.mjs` | `/docs/sitemap.xml`: every generated page but the Javadoc, for search engines. skipcheck.io's `robots.txt` names it. |
 | `scripts/walkthroughs.mjs` | Each project's walkthroughs, from `content/walkthroughs/`. |
@@ -158,8 +158,10 @@ The workflow deploys with `wrangler deploy`. It needs two repository secrets:
   and `onclick` handlers into its tables. The CSP allows exactly those, by hash, with
   `'unsafe-hashes'` for the handlers.
 - **Search is in the page, not a service.** Each docs language has its own index, loaded when the
-  reader first uses the box: the largest, the TM1 client's in .NET, is about 58 KB (16 KB
-  gzipped). It finds names only, not the text of the pages. A name matches by its words, whatever
+  reader first uses the box: the largest, the TM1 client's in .NET, is about 69 KB (18 KB
+  gzipped), 11 KB of it TM1's 136 types. It finds names only, not the text of the pages. TM1's
+  types are there by name, without their properties, which have no anchors and would make the
+  index several times larger. A name matches by its words, whatever
   the language's casing, so `cubes` finds `model_cubes` and `ModelCubesAsync`.
 - **The theme follows the OS.** The site has no light/dark switch, so the theme hides Javadoc's.
 - **Pages are never revalidated against the Javadoc file.** A page is the file plus the site's

@@ -387,6 +387,7 @@ for (const project of PROJECTS) {
 	}
 	const documented = (language) => types.filter((t) => counterparts.get(t.name)[language]);
 	const usesModel = new Set();
+	const searchIndexes = [];
 
 	for (const language of languages) {
 		const label = LANGUAGES.find((l) => l.id === language).label;
@@ -628,14 +629,12 @@ for (const project of PROJECTS) {
 		// that open in the language last chosen, this one when it's read here
 		const walkthroughs = await walkthroughsOf(project);
 		const walkthroughPage = (w) => '../../walkthroughs/' + w.slug + '/';
-		const index = JSON.stringify(
-			searchIndex(
-				here.map((t) => ({ name: nameOf(t), page: pageOf(t), summary: summaries.get(t.name), members: searchable.get(t.name) })),
-				walkthroughs.map((w) => ({ title: w.meta.title, page: walkthroughPage(w), summary: w.meta.summary })),
-			),
-		);
-		await writeFile(path.join(distDir, project.id, 'docs', language, 'search.json'), index + '\n');
-		indexSizes.push({ at: project.id + ' ' + language, bytes: Buffer.byteLength(index), gzip: gzipSync(index).length });
+		// Written once the TM1 types are known, below
+		searchIndexes.push({
+			language,
+			types: here.map((t) => ({ name: nameOf(t), page: pageOf(t), summary: summaries.get(t.name), members: searchable.get(t.name) })),
+			walkthroughs: walkthroughs.map((w) => ({ title: w.meta.title, page: walkthroughPage(w), summary: w.meta.summary })),
+		});
 		let home =
 			(project.landing ? '<p class="crumbs"><a href="../../">' + escape(project.title) + '</a> · Docs</p>' : '') +
 			'<h1>' + escape(project.title) + ' docs <span class="lang">' + escape(label) + '</span></h1>' +
@@ -666,6 +665,20 @@ for (const project of PROJECTS) {
 
 	// TM1's own types used by these pages
 	for (const name of usesModel) await writeModel(project, name, usesModel);
+
+	// Each language's search index: its types, members and walkthroughs, and the TM1 types the pages
+	// link to, the same in every language (writeModel adds those they link to in turn)
+	const model = [...usesModel].sort().map((name) => ({ name, page: '../model/' + name + '.html', summary: modelLead(specTypes.get(name)) }));
+	for (const { language, types: listed, walkthroughs } of searchIndexes) {
+		const index = JSON.stringify(searchIndex(listed, walkthroughs, model));
+		await writeFile(path.join(distDir, project.id, 'docs', language, 'search.json'), index + '\n');
+		indexSizes.push({ at: project.id + ' ' + language, bytes: Buffer.byteLength(index), gzip: gzipSync(index).length });
+	}
+}
+
+/** What a TM1 type is: its description in the metadata, else its kind. */
+function modelLead(type) {
+	return type.description ?? (type.members ? 'A TM1 enumeration.' : 'A TM1 ' + (type.kind ?? 'type') + '.');
 }
 
 function groupByArea(list) {
@@ -755,7 +768,7 @@ async function writeModel(project, name, uses) {
 		return escape(simple);
 	};
 	let body = (project.landing ? '<p class="crumbs"><a href="../../">' + escape(project.title) + '</a> · <a href="../">Docs</a> · TM1 types</p>' : '<p class="crumbs"><a href="../">' + escape(project.title) + ' docs</a> · TM1 types</p>') + '<h1>' + escape(name) + '</h1>';
-	body += '<p class="lead">' + escape(type.description ?? (type.members ? 'A TM1 enumeration.' : 'A TM1 ' + (type.kind ?? 'type') + '.')) + '</p>';
+	body += '<p class="lead">' + escape(modelLead(type)) + '</p>';
 	body += '<p class="note">A type of TM1 itself, from its REST API metadata, the same in every language. A property is a method in Java (<code>cube.name()</code>), and a property in Python (<code>cube.name</code>), .NET and TypeScript (<code>cube.Name</code>).</p>';
 	if (type.members) {
 		body += '<table class="members">' + type.members.map((m) => '<tr><td><code>' + escape(m.name) + '</code></td><td>' + escape(String(m.value)) + '</td></tr>').join('') + '</table>';

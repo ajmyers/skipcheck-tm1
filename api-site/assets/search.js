@@ -50,7 +50,7 @@ function start() {
 		name.textContent = entry.name;
 		const where = document.createElement('span');
 		where.className = 'where';
-		where.textContent = entry.kind === 'type' ? 'type' : entry.kind === 'walkthrough' ? 'walkthrough' : entry.type.name;
+		where.textContent = { type: 'type', model: 'TM1 type', walkthrough: 'walkthrough' }[entry.kind] ?? entry.type.name;
 		link.append(name, where);
 		if (entry.summary) {
 			const summary = document.createElement('span');

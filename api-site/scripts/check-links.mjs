@@ -11,7 +11,7 @@
 // one to a file of this repository on GitHub must be a file here, and any other is left alone.
 //
 // Each docs language's search index (search.json, search.mjs) is checked the same way: every type
-// and member it lists must be on a page there.
+// and member it lists must be on a page there, and every TM1 type a page of its own.
 //
 // The Javadoc is left out: its links are javadoc's own, and there are thousands of them.
 //
@@ -134,6 +134,10 @@ for (const project of PROJECTS) {
 		for (const [name, page] of index.types) {
 			checked++;
 			if (!(await idsOf(page))) broken.push(where + ': ' + name + ' is on ' + page + ', which is not there');
+		}
+		for (const [name, page] of index.model ?? []) {
+			checked++;
+			if (!(await idsOf(page))) broken.push(where + ': the TM1 type ' + name + ' is on ' + page + ', which is not there');
 		}
 		for (const [name, type, , anchor = name] of index.members) {
 			checked++;
