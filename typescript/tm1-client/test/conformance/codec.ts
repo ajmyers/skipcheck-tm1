@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /** The language-neutral encoding of the conformance fixtures (spec/conformance/README.md): arguments
  * decoded into this client's values, results and errors encoded to compare with what the Java
  * client recorded, and the request comparison every runner makes. */

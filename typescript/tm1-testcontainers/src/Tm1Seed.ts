@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /** Objects the image puts into an empty database on first start (its `TM1_SEED` setting), and the
  * login that goes with them, as the Java enum `Tm1Seed`. The samples come from the TM1 install
  * itself, so they're only available where the install includes them. */

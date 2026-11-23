@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /** What went wrong, independent of the status TM1 chose to report it with. A
  * {@link Tm1ErrorClassifier} picks the kind from the status, TM1's error code and its message,
  * since TM1 reports the same failure with different statuses across versions. */

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { Tm1Authenticator } from "./auth/index.js";
 import type { Tm1ErrorClassifier } from "./errors/index.js";
 import { AnnotationService } from "./services/annotation/AnnotationService.js";

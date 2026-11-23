@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /** Why tests are skipped, word for word as the Java annotations' constants (`RequiresTm1`,
  * `RequiresCognos`, `RequiresTm1Web`, `RequiresPaw`). Here rather than in `./vitest.js`, so the
  * containers can use them without loading vitest. */

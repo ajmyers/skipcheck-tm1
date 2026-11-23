@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { connect as netConnect } from "node:net";
 import { connect as tlsConnect } from "node:tls";
 import { randomUUID } from "node:crypto";

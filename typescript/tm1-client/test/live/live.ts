@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { randomUUID } from "node:crypto";
 import { inject, it } from "vitest";
 import { CognosSource } from "@skipcheck/tm1-testcontainers";

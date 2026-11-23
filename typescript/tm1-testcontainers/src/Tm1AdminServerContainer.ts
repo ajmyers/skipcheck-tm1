@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { GenericContainer } from "./GenericContainer.js";
 import { Tm1ServerContainer } from "./Tm1ServerContainer.js";
 import { Tm1Source } from "./Tm1Source.js";

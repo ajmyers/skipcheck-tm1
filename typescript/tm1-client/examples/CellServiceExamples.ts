@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { CubeUpdatePatch, Tuples, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for CellService, quoted in its documentation.

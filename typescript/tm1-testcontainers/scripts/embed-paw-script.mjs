@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Copies docker/paw/paw-local.sh into the package, as the Java build puts it in its jar and the
 // .NET build embeds it in its assembly. PawContainer reads the copy (or, in this repository, the
 // original), and builds its runner image from it.

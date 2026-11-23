@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { test, type TestAPI } from "vitest";
 import { CognosSource } from "./CognosSource.js";
 import { DockerHost } from "./docker.js";

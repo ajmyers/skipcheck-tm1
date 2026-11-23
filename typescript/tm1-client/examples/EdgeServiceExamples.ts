@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { EdgePatch, type Edge, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for EdgeService, quoted in its documentation.

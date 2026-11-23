@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { LogLevel, ODataQuery, Server, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for ServerService, quoted in its documentation.

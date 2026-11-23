@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect } from "vitest";
 import { fetchTransport } from "../../src/index.js";
 import * as live from "../conformance/live.js";

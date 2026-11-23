@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { AttributeDefinition, AttributeDefinitionPatch, AttributeSet, AttributeType, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for AttributeService, quoted in its documentation.

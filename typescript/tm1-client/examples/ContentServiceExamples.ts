@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createWriteStream } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";

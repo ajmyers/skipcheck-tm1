@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { existsSync, statSync } from "node:fs";
 import { GenericContainer as TcGenericContainer, log, Wait, type StartedTestContainer } from "testcontainers";
 import { DockerHost } from "./docker.js";

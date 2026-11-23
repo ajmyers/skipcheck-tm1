@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Member, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for MemberService, quoted in its documentation.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { entriesOf, type Tm1Map } from "../util.js";
 import { ODataEncoding } from "./encoding.js";
 import { ODataLiterals } from "./literals.js";

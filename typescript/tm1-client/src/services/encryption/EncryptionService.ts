@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { EncryptionAtRestValidationReport, Tm1Operations, type EncryptionAtRestProviderSettingsPatch, type EncryptionFileType } from "../../generated/index.js";
 import { Tm1Duration, writeJson } from "../../json.js";
 import { ODataPath, ODataQuery } from "../../odata/index.js";

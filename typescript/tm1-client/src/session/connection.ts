@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { Tm1Authenticator } from "../auth/index.js";
 import { headerText } from "./header-text.js";
 import {

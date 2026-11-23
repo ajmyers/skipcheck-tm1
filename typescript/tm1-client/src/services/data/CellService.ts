@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Tm1Operations, type CubeUpdatePatch, type UpdateOrder } from "../../generated/index.js";
 import { ODataPath } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { join } from "node:path";
 import { inspect } from "node:util";
 import { IllegalArgumentException, parseUrl, Settings, type Lookup } from "./settings.js";

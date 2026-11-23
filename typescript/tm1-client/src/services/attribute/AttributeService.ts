@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { AttributeDefinition, type AttributeDefinitionPatch } from "../../generated/index.js";
 import type { ODataQuery } from "../../odata/index.js";
 import { Tm1Request } from "../../request.js";

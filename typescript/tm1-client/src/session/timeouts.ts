@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 function positive(value: number, name: string): void {
   if (!(value > 0) || !Number.isFinite(value)) throw new RangeError(`${name} timeout must be positive: ${value}`);
 }

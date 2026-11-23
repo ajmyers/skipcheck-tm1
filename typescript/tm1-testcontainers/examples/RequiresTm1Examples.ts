@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Examples for requiresTm1 (Java's @RequiresTm1), quoted in its documentation: vitest tests,
 // type-checked but never run.
 import { randomUUID } from "node:crypto";

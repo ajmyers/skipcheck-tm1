@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Group, ODataPath, ODataQuery, UserPatch, type Tm1Client, type User } from "@skipcheck/tm1-client";
 
 // Examples for UserService, quoted in its documentation.

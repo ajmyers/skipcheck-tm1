@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { randomUUID } from "node:crypto";
 import { DimensionPatch, ElementPatch, ElementType, HierarchyPatch, ODataPath, SubsetScope, type SubsetPatch, type Tm1Client } from "../../src/index.js";
 

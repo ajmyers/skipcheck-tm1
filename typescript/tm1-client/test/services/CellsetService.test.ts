@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect, it } from "vitest";
 import { CellsetUpdatePatch, ODataQuery, ViewScope, type Cellset, type CellsetCell, type Tm1Stream } from "../../src/index.js";
 import { FakeTm1, type Recorded } from "../support/fake-tm1.js";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Element, Hierarchy, Subset, Tm1Operations, type SubsetPatch } from "../../generated/index.js";
 import type { Tm1Model } from "../../model.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";

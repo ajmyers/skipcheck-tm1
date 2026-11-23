@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Reading TM1's JSON into the model: TM1's own property names stay, so a value read is the JSON it
 // was, except where reading means something: an enum value this client doesn't know becomes the
 // enum's fallback, durations and date-times are read as the Java client reads them (a duration in

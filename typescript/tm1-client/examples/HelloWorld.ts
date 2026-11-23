@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Cube, ODataQuery, Tm1Client } from "@skipcheck/tm1-client";
 
 /** The Getting started example on tm1-client's overview page. */

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { ODataPath, ODataQuery, Tm1Request, type Tm1Client } from "../../src/index.js";
 
 /** Fixtures for the data and view live tests, through the session until the dimension, subset and

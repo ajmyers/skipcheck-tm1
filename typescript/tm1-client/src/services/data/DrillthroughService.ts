@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Cellset, Drillthrough, Rowset, RowsetRow, Tm1Operations, type ProcessParameterPatch } from "../../generated/index.js";
 import { Json } from "../../model.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /** A request as the session sends it. */
 export interface Tm1HttpRequest {
   /** The HTTP method. */

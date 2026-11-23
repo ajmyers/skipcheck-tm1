@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 export { CognosContainer } from "./CognosContainer.js";
 export { CognosSource } from "./CognosSource.js";
 export { DockerHost } from "./docker.js";
