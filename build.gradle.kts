@@ -202,8 +202,30 @@ val packageTestPython = tasks.register<PythonTask>("packageTestPython") {
 	}
 }
 
+val packageDotnet = tasks.register<ToolTask>("packageDotnet") {
+	description = "Packs the .NET packages into build/packages/dotnet."
+	directory = root
+	fresh = listOf(packages.dir("dotnet").asFile.path)
+	commands = listOf(listOf("dotnet", "pack", "dotnet/Tm1.slnx", "-c", "Release", "-o", packages.dir("dotnet").asFile.path))
+	defaultEnvironment = dotnetEnvironment
+	unlessPrebuilt()
+}
+
+val packageTestDotnet = tasks.register<ToolTask>("packageTestDotnet") {
+	group = "verification"
+	description = "Builds an application against the packed .NET packages and runs it."
+	dependsOn(packageDotnet)
+	directory = root
+	val work = packageTests.dir("dotnet")
+	fresh = listOf(work.asFile.path)
+	commands = listOf(listOf("dotnet", "run", "--project", "package-tests/dotnet/Smoke.csproj", "--artifacts-path", work.dir("artifacts").asFile.path, "--", rootPath))
+	defaultEnvironment = dotnetEnvironment
+	// A package cache of its own: the machine's would keep an earlier build of the same version
+	environment = mapOf("NUGET_PACKAGES" to work.dir("packages").asFile.path)
+}
+
 tasks.register("packageTest") {
 	group = "verification"
 	description = "Builds every package as a release does, installs each somewhere clean, and runs it."
-	dependsOn(packageTestPython)
+	dependsOn(packageTestPython, packageTestDotnet)
 }
