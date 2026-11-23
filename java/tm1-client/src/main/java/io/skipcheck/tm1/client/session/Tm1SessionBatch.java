@@ -19,9 +19,12 @@ import reactor.core.publisher.Mono;
  * <p>
  * What TM1 (11.8) does here that you might not expect:
  * <ul>
- * <li>A batch is a list of independent requests: TM1 carries on past a failed one, and
- * refuses {@code atomicityGroup} and {@code dependsOn}, so one request can't use
- * another's result. A call that sends a second request after the first answers (such as
+ * <li>TM1 runs the requests one after another, in the order they joined: a later request
+ * sees what an earlier one wrote, and one that runs before a write doesn't see it. So a
+ * batch can create something and then read it back.</li>
+ * <li>TM1 carries on past a failed request, and keeps what the others did. It refuses
+ * {@code atomicityGroup} and {@code dependsOn}, so one request can't refer to another's
+ * result. A call that sends a second request after the first answers (such as
  * {@code CellsetService.stream}) can't join a batch: its second request comes after the
  * run, and fails.</li>
  * <li>TM1 answers 200 for the batch even when every request in it failed: each failure is

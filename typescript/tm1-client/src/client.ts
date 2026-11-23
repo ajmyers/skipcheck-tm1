@@ -216,7 +216,8 @@ export class Tm1Client implements AsyncDisposable {
 }
 
 /** A JSON `$batch` of client calls, as the Java client's `Tm1Batch`: each call's promise settles
- * with its own result or error once the batch has run. */
+ * with its own result or error once the batch has run. TM1 (11.8) runs the calls in the order they
+ * were made, so a later call sees an earlier one's writes ({@link Tm1SessionBatch}). */
 export class Tm1Batch {
   /** The client whose calls join this batch. */
   readonly client: Tm1Client;

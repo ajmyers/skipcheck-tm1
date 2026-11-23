@@ -354,7 +354,9 @@ class AsyncTm1Batch:
         print(a.result().name, b.result().name)
 
     Each call returns a :class:`~skipcheck_tm1._protocol.Deferred`, its result there once the
-    batch has run: its own value, or the error TM1 answered it with.
+    batch has run: its own value, or the error TM1 answered it with. TM1 (11.8) runs the calls in
+    the order they were made, so a later call sees an earlier one's writes
+    (:class:`AsyncTm1SessionBatch`).
     """
 
     def __init__(self, batch: AsyncTm1SessionBatch):
