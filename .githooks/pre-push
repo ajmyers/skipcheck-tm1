@@ -32,7 +32,7 @@ remote="$1"
 zero="0000000000000000000000000000000000000000"
 
 commits=()
-while read -r local_ref local_sha remote_ref remote_sha; do
+while read -r _local_ref local_sha _remote_ref remote_sha; do
 	[[ "$local_sha" == "$zero" ]] && continue
 	# Only what the remote lacks: not on the remote's tip of this branch, nor on any of its other
 	# branches (a commit merged in from master was built when it got there)
