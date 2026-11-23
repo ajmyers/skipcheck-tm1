@@ -1,6 +1,6 @@
 """Tests against a real TM1, as the Java client's ``*Tm1Test`` classes. The server is either:
 
-* started in Docker for the run by tm1-testcontainers (``tm1-python/testcontainers``), as Java's
+* started in Docker for the run by tm1-testcontainers (``python/tm1-testcontainers``), as Java's
   ``@RequiresTm1`` tests start theirs: :meth:`Tm1ServerContainer.shared`, from the same TM1
   sources (``TM1_PRIVATE_IMAGE``, ``TM1_HOME_DIR``, ``TM1_INSTALL_VOLUME``, ``TM1_BUNDLE_DIR``,
   ``TM1_BUNDLE_URL``), one container for the whole run, logging in as ``admin`` with no password;
@@ -33,7 +33,7 @@ try:
 except ImportError:  # tm1-testcontainers isn't installed: only TM1_URL
     _SOURCE = None
     CONFIGURED = bool(_RUNNING)
-    REASON = "Install tm1-testcontainers (pip install -e tm1-python/testcontainers) to start TM1 in Docker." + _ALREADY_RUNNING
+    REASON = "Install tm1-testcontainers (pip install -e python/tm1-testcontainers) to start TM1 in Docker." + _ALREADY_RUNNING
 else:
     _SOURCE = Tm1Source.discover()  # raises if a source is set but wrong, as Java's does
     CONFIGURED = bool(_RUNNING) or (_SOURCE is not None and docker_available())

@@ -15,7 +15,7 @@ ROOT = Path(__file__).parent
 
 
 def spec_path() -> Path:
-    for candidate in (ROOT.parent / "spec" / "tm1-api.json", ROOT / "spec" / "tm1-api.json"):
+    for candidate in (ROOT.parent.parent / "spec" / "tm1-api.json", ROOT / "spec" / "tm1-api.json"):
         if candidate.is_file():
             return candidate
     raise FileNotFoundError("spec/tm1-api.json: not in the repository root or the sdist")

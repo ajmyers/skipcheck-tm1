@@ -6,10 +6,10 @@ Libraries and tools for the **IBM Planning Analytics (TM1) REST API**: a Java cl
 |---|---|
 | [`tm1-client`](java/tm1-client) | Plain Java client. No Spring container required. |
 | [`tm1-spring-boot-starter`](java/tm1-spring-boot-starter) | Spring Boot auto-configuration for the client. |
-| [`tm1-testcontainers`](java/tm1-testcontainers) | Real TM1 servers in Docker for your tests, with [Testcontainers](https://testcontainers.com). Bring your own licensed TM1. Ported to Python ([`tm1-python/testcontainers`](tm1-python/testcontainers)), .NET ([`tm1-dotnet/src/Tm1.Testcontainers`](tm1-dotnet/src/Tm1.Testcontainers)) and TypeScript ([`tm1-typescript/testcontainers`](tm1-typescript/testcontainers)). |
+| [`tm1-testcontainers`](java/tm1-testcontainers) | Real TM1 servers in Docker for your tests, with [Testcontainers](https://testcontainers.com). Bring your own licensed TM1. Ported to Python ([`python/tm1-testcontainers`](python/tm1-testcontainers)), .NET ([`tm1-dotnet/src/Tm1.Testcontainers`](tm1-dotnet/src/Tm1.Testcontainers)) and TypeScript ([`tm1-typescript/testcontainers`](tm1-typescript/testcontainers)). |
 | [`tm1-bom`](java/tm1-bom) | Keeps the module versions aligned. |
 | [`spec`](spec) | The language-neutral API spec every client is generated from and counts its coverage against, exported from TM1's `$metadata` by `tm1-codegen`. |
-| [`tm1-python`](tm1-python) | Python client (sync and asyncio), with the Java client's API. |
+| [`python`](python) | Python client (sync and asyncio), with the Java client's API. |
 | [`tm1-dotnet`](tm1-dotnet) | .NET client, with the Java client's API. See its [README](tm1-dotnet/README.md). |
 | [`tm1-typescript`](tm1-typescript) | TypeScript client for Node and browsers, with the Java client's API. See its [README](tm1-typescript/README.md). |
 | [`tools/`](java/tools) | Applications built on the libraries (not published). |
@@ -26,7 +26,7 @@ The Java libraries require Java 17+, the Python client Python 3.10+, the .NET cl
 ./gradlew :tools:example:bootRun
 ./gradlew publishToMavenLocal            # try the libraries from another project
 ./gradlew :tm1-codegen:exportSpec        # refresh spec/tm1-api.json after changing the snapshot or overlay
-pip install -e './tm1-python[test]' && pytest tm1-python
+pip install -e './python/tm1-client[test]' && pytest python
 dotnet test tm1-dotnet/Tm1.slnx
 (cd tm1-typescript && npm ci && npm test)
 scripts/live-tests.sh                    # every client's tests against a real TM1 (bring your own: see the script)

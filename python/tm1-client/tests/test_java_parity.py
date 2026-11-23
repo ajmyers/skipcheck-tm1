@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 JAVA = ROOT / "java" / "tm1-client" / "src" / "main" / "java" / "io" / "skipcheck" / "tm1" / "client"
 SERVICES = JAVA / "service"
 

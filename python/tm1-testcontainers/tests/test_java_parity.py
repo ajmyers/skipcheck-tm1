@@ -1,5 +1,5 @@
 """This package offers what the Java module does, read from the Java sources themselves
-(java/tm1-testcontainers/src/main/java/io/skipcheck/tm1/testcontainers), as tm1-python's own
+(java/tm1-testcontainers/src/main/java/io/skipcheck/tm1/testcontainers), as the client's own
 test_java_parity.py does for the client:
 
 * each public Java type, nested ones too (``Tm1Source.PrivateImage``,

@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "compare-live-traffic.py"
+SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "compare-live-traffic.py"
 
 
 @pytest.fixture(scope="module")

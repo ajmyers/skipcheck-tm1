@@ -30,10 +30,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       # tm1-testcontainers too: the live tests start TM1 with it (skipped here, with no TM1 source)
-      - run: pip install -e './tm1-python[test]' -e './tm1-python/testcontainers[test]'
-      # Also checks layout and lint (tests/test_format.py, tm1-python/ruff.toml), as the Java
+      - run: pip install -e './python/tm1-client[test]' -e './python/tm1-testcontainers[test]'
+      # Also checks layout and lint (tests/test_format.py, python/ruff.toml), as the Java
       # build's checkFormat and Error Prone
-      - run: pytest tm1-python
+      - run: pytest python
 
   # The .NET client, generated from spec/tm1-api.json at build time
   dotnet:

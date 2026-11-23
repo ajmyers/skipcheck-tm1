@@ -9,7 +9,7 @@ spec/tm1-overlay.json                              what TM1 does differently fro
         ▼
 spec/tm1-api.json                                  the language-neutral spec (generated, committed)
         ├── Java:   tm1-codegen's ModelGenerator  → tm1-client's model (at build time)
-        ├── Python: tm1-python/codegen (tm1_pygen) → skipcheck_tm1._generated (at build time)
+        ├── Python: python/tm1-client/codegen (tm1_pygen) → skipcheck_tm1._generated (at build time)
         ├── .NET:   tm1-dotnet/src/Tm1.Codegen    → Skipcheck.Tm1.Client.Model (at build time)
         └── TypeScript: tm1-typescript/codegen    → src/generated (before build and test)
 spec/conformance/*.json                            cases every client's tests must pass
@@ -36,11 +36,11 @@ Every client has a coverage gate over this list. An endpoint is implemented, exc
 | Client | Gate | Lists | Implemented |
 |---|---|---|---|
 | Java | `tm1-client` `CoverageGateTest` | `java/tm1-client/src/test/resources/metadata/coverage-*.txt` | 240 (2 excluded as duplicates) |
-| Python (sync and asyncio, counted separately) | `tm1-python/tests/test_coverage_gate.py` | `tm1-python/coverage/*.txt` | 242 each (the generated `tm1.api`; the services match Java's 240) |
+| Python (sync and asyncio, counted separately) | `python/tm1-client/tests/test_coverage_gate.py` | `python/tm1-client/coverage/*.txt` | 242 each (the generated `tm1.api`; the services match Java's 240) |
 | .NET | `tm1-dotnet/tests/.../CoverageGateTests.cs` | `tm1-dotnet/coverage/*.txt` | as Java's: 240, the same 2 excluded |
 | TypeScript | `tm1-typescript/test/coverage-gate.test.ts` | `tm1-typescript/coverage/*.txt` | as Java's: 240, the same 2 excluded |
 
-Beyond counting endpoints, each client has a parity gate that reads the Java sources: every public service class and method, with the same endpoints and parameters (`tm1-python/tests/test_java_parity.py`, `tm1-dotnet/tests/.../JavaParityTests.cs`, `tm1-typescript/test/java-parity.test.ts`), and the runtime's public API (`test_java_parity_runtime.py`, `JavaParityRuntimeTests.cs`, `java-parity-runtime.test.ts`). Each also pins the exact headers Java's `Connection` sends.
+Beyond counting endpoints, each client has a parity gate that reads the Java sources: every public service class and method, with the same endpoints and parameters (`python/tm1-client/tests/test_java_parity.py`, `tm1-dotnet/tests/.../JavaParityTests.cs`, `tm1-typescript/test/java-parity.test.ts`), and the runtime's public API (`test_java_parity_runtime.py`, `JavaParityRuntimeTests.cs`, `java-parity-runtime.test.ts`). Each also pins the exact headers Java's `Connection` sends.
 
 The gates compare names and signatures; behaviour is compared by [conformance](conformance/README.md). The Java unit tests record each service call they make, with every request and answer. Every other client replays the recording and must send the same requests and return the same result. Against a real TM1, every client runs the same scenarios, and their traffic is compared.
 
@@ -48,7 +48,7 @@ Python also runs `test_contract.py`, which works out a route from the root to ev
 
 ## Adding a language
 
-1. Write a generator that reads `tm1-api.json`. `tm1-python/codegen/tm1_pygen/spec.py` has the lookups any generator needs and no Python-specific code, so it ports easily. Refuse a `specVersion` you don't know.
+1. Write a generator that reads `tm1-api.json`. `python/tm1-client/codegen/tm1_pygen/spec.py` has the lookups any generator needs and no Python-specific code, so it ports easily. Refuse a `specVersion` you don't know.
 2. Generate the model: an enum per `enums` entry (with a fallback member for values a newer server adds), and a type per `types` entry. Every property is optional, a hierarchy reads by `@odata.type`, open types keep undeclared properties, writes send only what was set, and properties with a `departure` or `lenientDate` read leniently.
 3. Generate a member per endpoint, and honour `forbid`. Through a navigation that doesn't contain its targets (`containsTarget: false`), offer reads only: on TM1, deleting through one deletes the target itself.
 4. Hand-write the runtime: session (login, `TM1SessionId` cookie, re-login on 401, `ActiveSession/tm1.Close`), errors (the Java `Tm1ErrorClassifier` rules), and OData encoding.

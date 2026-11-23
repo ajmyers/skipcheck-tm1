@@ -3,7 +3,7 @@
 # Formats the files a commit stages, each with its language's formatter, and stages them again:
 #
 #   *.java                     ./gradlew format (Spring Java Format: layout, imports)
-#   tm1-python/**/*.py         ruff format, and ruff's import order
+#   python/**/*.py         ruff format, and ruff's import order
 #   tm1-typescript/**          prettier (*.ts, *.mts, *.mjs, *.json)
 #   tm1-dotnet/**/*.cs         dotnet csharpier
 #
@@ -36,7 +36,7 @@ java=() python=() typescript=() dotnet=()
 while IFS= read -r -d '' file; do
 	case "$file" in
 		*.java) kind=java ;;
-		tm1-python/*.py) kind=python ;;
+		python/*.py) kind=python ;;
 		tm1-typescript/package-lock.json) continue ;;
 		tm1-typescript/*.ts | tm1-typescript/*.mts | tm1-typescript/*.mjs | tm1-typescript/*.json) kind=typescript ;;
 		tm1-dotnet/*.cs) kind=dotnet ;;
@@ -95,7 +95,7 @@ if [[ ${#python[@]} -gt 0 ]]; then
 		ruff=()
 	fi
 	if [[ ${#ruff[@]} -eq 0 ]]; then
-		refuse Python "ruff isn't installed: pip install -e './tm1-python[test]'"
+		refuse Python "ruff isn't installed: pip install -e './python/tm1-client[test]'"
 	else
 		# Import order is lint to ruff, layout to us: fix it here, then lay out
 		"${ruff[@]}" check -q --select I --fix "${python[@]}" > /dev/null 2>&1

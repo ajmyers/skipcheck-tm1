@@ -11,7 +11,7 @@ settings, images, mounts and messages, named the Python way. Built on the
 > are skipped.
 
 ```sh
-pip install -e ./tm1-python -e ./tm1-python/testcontainers
+pip install -e ./python/tm1-client -e ./python/tm1-testcontainers
 ```
 
 Requires Python 3.10+, testcontainers 4.15+ and [`skipcheck-tm1`](..).
@@ -99,7 +99,7 @@ variables only.
 ## Tests
 
 ```sh
-pytest tm1-python/testcontainers
+pytest python/tm1-testcontainers
 ```
 
 - `test_java_parity.py` reads the Java sources and requires every public class, constant and

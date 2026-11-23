@@ -16,7 +16,7 @@ import pytest
 from skipcheck_tm1 import Tm1Client, Tm1Session, auth
 from skipcheck_tm1.aio import AsyncTm1Client, AsyncTm1Session
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 SPEC = REPO / "spec" / "tm1-api.json"
 CONFORMANCE = REPO / "spec" / "conformance"
 PAYLOADS = REPO / "java" / "tm1-client" / "src" / "test" / "resources" / "payloads"

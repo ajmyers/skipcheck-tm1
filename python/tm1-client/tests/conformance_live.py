@@ -16,7 +16,7 @@ import httpx
 from . import conformance_codec as codec
 from .conformance_codec import snake
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 SCENARIOS = REPO / "spec" / "conformance" / "live"
 TRAFFIC = REPO / "build" / "conformance-live"
 

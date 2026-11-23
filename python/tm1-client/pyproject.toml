@@ -19,7 +19,7 @@ dependencies = [
 test = ["pytest>=8", "ruff==0.17.6"]
 
 [tool.hatch.build.hooks.custom]
-# hatch_build.py generates src/skipcheck_tm1/_generated from ../spec/tm1-api.json, and
+# hatch_build.py generates src/skipcheck_tm1/_generated from ../../spec/tm1-api.json, and
 # src/skipcheck_tm1/_sync (the sync flavor) from src/skipcheck_tm1/aio
 
 [tool.hatch.build.targets.wheel]
@@ -32,7 +32,7 @@ exclude = ["src/skipcheck_tm1/_generated", "src/skipcheck_tm1/_sync"]
 
 [tool.hatch.build.targets.sdist.force-include]
 # The sdist builds without the repository, so it takes the spec along
-"../spec/tm1-api.json" = "spec/tm1-api.json"
+"../../spec/tm1-api.json" = "spec/tm1-api.json"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

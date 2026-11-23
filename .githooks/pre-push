@@ -63,11 +63,11 @@ top="$(pwd)"
 ports() {
 	local changed
 	changed="$(git diff-tree --no-commit-id --name-only -r --root "$1")"
-	if grep -q '^tm1-python/' <<< "$changed"; then
+	if grep -q '^python/' <<< "$changed"; then
 		local ruff=(ruff)
 		command -v ruff > /dev/null || ruff=(python3 -m ruff)
-		"${ruff[@]}" --version > /dev/null 2>&1 || { echo "ruff isn't installed: pip install -e './tm1-python[test]'"; return 1; }
-		(cd "$worktree" && "${ruff[@]}" format --check tm1-python && "${ruff[@]}" check tm1-python) || return 1
+		"${ruff[@]}" --version > /dev/null 2>&1 || { echo "ruff isn't installed: pip install -e './python/tm1-client[test]'"; return 1; }
+		(cd "$worktree" && "${ruff[@]}" format --check python && "${ruff[@]}" check python) || return 1
 	fi
 	if grep -q '^tm1-typescript/' <<< "$changed"; then
 		[[ -d "$top/tm1-typescript/node_modules" ]] || { echo "prettier and eslint aren't installed: (cd tm1-typescript && npm ci)"; return 1; }
