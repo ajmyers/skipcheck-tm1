@@ -2,7 +2,7 @@
 
 A Python client for the **IBM Planning Analytics (TM1) REST API**, with the same API as the Java client (`tm1-client`): the same services, methods, parameters, queries, patches, session views and errors, named the Python way. Its model is generated from the same language-neutral spec ([`spec/tm1-api.json`](../spec)).
 
-It comes in two flavors with one API: sync (`skipcheck_tm1`) and asyncio (`skipcheck_tm1.aio`). Requires Python 3.10+, [httpx](https://www.python-httpx.org/) and [pydantic](https://docs.pydantic.dev/) 2.
+It comes in two flavors with one API: sync (`skipcheck_tm1`) and asyncio (`skipcheck_tm1.aio`). Requires Python 3.11+, [httpx2](https://github.com/pydantic/httpx2) and [pydantic](https://docs.pydantic.dev/) 2.
 
 ```python
 from skipcheck_tm1 import Filter, ODataPath, ODataQuery, Tm1Client

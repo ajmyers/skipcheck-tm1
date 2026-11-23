@@ -5,8 +5,8 @@
 // java/tools/docs-doclet), Python's by extract/python_api.py, .NET's and TypeScript's by
 // extract/dotnet_api.mjs and extract/typescript_api.mjs.
 //
-// Python is found as the build finds it: $PYTHON, or the first of python3, python3.14 ... python3.10
-// that is 3.10 or later (macOS's python3 is 3.9).
+// Python is found as the build finds it: $PYTHON, or the first of python3, python3.14 ... python3.11
+// that is 3.11 or later (macOS's python3 is 3.9).
 //
 //   node scripts/extract.mjs
 
@@ -19,16 +19,16 @@ const out = path.join(generatedDir, 'api');
 await mkdir(out, { recursive: true });
 
 function python() {
-	const candidates = [process.env.PYTHON, 'python3', ...[14, 13, 12, 11, 10].map((minor) => 'python3.' + minor), '/opt/homebrew/bin/python3.14'].filter(Boolean);
+	const candidates = [process.env.PYTHON, 'python3', ...[14, 13, 12, 11].map((minor) => 'python3.' + minor), '/opt/homebrew/bin/python3.14'].filter(Boolean);
 	for (const candidate of candidates) {
 		try {
-			const version = execFileSync(candidate, ['-c', 'import sys; print(sys.version_info >= (3, 10))'], { encoding: 'utf8' }).trim();
+			const version = execFileSync(candidate, ['-c', 'import sys; print(sys.version_info >= (3, 11))'], { encoding: 'utf8' }).trim();
 			if (version === 'True') return candidate;
 		} catch {
 			// not there: try the next
 		}
 	}
-	throw new Error('No Python 3.10 or later found: set PYTHON');
+	throw new Error('No Python 3.11 or later found: set PYTHON');
 }
 
 let interpreter = null;

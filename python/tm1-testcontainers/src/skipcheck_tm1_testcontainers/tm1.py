@@ -11,10 +11,9 @@ import enum
 import threading
 from importlib import metadata
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
-import httpx
-from typing_extensions import Self
+import httpx2
 
 from skipcheck_tm1 import Tm1Version
 
@@ -318,7 +317,7 @@ class Tm1ServerContainer(GenericContainer):
     def _read_version(self) -> Tm1Version:
         url = self.rest_url
         try:
-            with httpx.Client(timeout=_REQUEST_TIMEOUT) as http:
+            with httpx2.Client(timeout=_REQUEST_TIMEOUT) as http:
                 response = http.get(url + "Configuration/ProductVersion/$value", headers={"Authorization": self.authorization})
                 if response.status_code != 200:
                     raise RuntimeError(
@@ -328,10 +327,10 @@ class Tm1ServerContainer(GenericContainer):
                 if session is not None:
                     self._close_session(http, session)
                 return Tm1Version.parse(response.text)
-        except httpx.HTTPError as e:
+        except httpx2.HTTPError as e:
             raise RuntimeError(f"Couldn't read the TM1 version from {url}") from e
 
-    def _close_session(self, http: httpx.Client, session: str) -> None:
+    def _close_session(self, http: httpx2.Client, session: str) -> None:
         try:
             # TM1 rejects actions without a JSON content type, even with no parameters
             http.post(
@@ -339,7 +338,7 @@ class Tm1ServerContainer(GenericContainer):
                 headers={"Cookie": f"TM1SessionId={session}", "Content-Type": "application/json"},
                 content="{}",
             )
-        except httpx.HTTPError:
+        except httpx2.HTTPError:
             self.logger.debug("Couldn't close the version-check session; TM1 will time it out", exc_info=True)
 
 

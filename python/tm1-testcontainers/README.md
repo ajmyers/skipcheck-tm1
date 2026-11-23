@@ -14,7 +14,7 @@ settings, images, mounts and messages, named the Python way. Built on the
 pip install -e ./python/tm1-client -e ./python/tm1-testcontainers
 ```
 
-Requires Python 3.10+, testcontainers 4.15+ and [`skipcheck-tm1`](..).
+Requires Python 3.11+, testcontainers 4.15+ and [`skipcheck-tm1`](..).
 
 To run the same parts by hand, outside tests (to develop against, or to look at in a browser), use
 [`pa-setup`](../../docker/pa-setup/README.md). It starts the same images from one file, `pa-environment.yaml`.

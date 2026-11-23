@@ -11,7 +11,7 @@ import json
 import re
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import Tm1Client, Tm1Session, auth
@@ -28,17 +28,17 @@ def _tm1(names: dict[str, str]) -> FakeTm1:
     fake = FakeTm1()
     tasks = [0]
 
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         target = request.url.raw_path.decode().removeprefix("/api/v1/")
         method = request.method
         if method == "POST" and target in ("Processes", "Chores"):
             body = json.loads(request.content)
             if target == "Chores":
                 tasks[0] = len(body.get("Tasks", []))
-            return httpx.Response(201, json={"Name": body["Name"]})
+            return httpx2.Response(201, json={"Name": body["Name"]})
         if method == "GET" and (m := _ENTITY.fullmatch(target)):
             if m[2] in (names["missing"], names["missing"] + ".log"):
-                return httpx.Response(404, json={"error": {"code": "278", "message": "no"}})
+                return httpx2.Response(404, json={"error": {"code": "278", "message": "no"}})
             return {"Name": m[2], "Active": False, "ExecutionMode": "SingleCommit"} if m[1] == "Chores" else {"Name": m[2]}
         if method == "GET" and target.startswith("Processes?"):
             return {"value": [{"Name": names["process"]}]}
@@ -54,7 +54,7 @@ def _tm1(names: dict[str, str]) -> FakeTm1:
             return {"value": []}
         if re.fullmatch(r"Chores\('[^']*'\)/Tasks", target):
             tasks[0] += 1
-            return httpx.Response(201, json={"Step": tasks[0] - 1})
+            return httpx2.Response(201, json={"Step": tasks[0] - 1})
         if method == "GET" and re.fullmatch(r"Chores\('[^']*'\)/Tasks\?.*", target):
             return {"value": [{"Step": i} for i in range(tasks[0])]}
         if method == "DELETE" and re.fullmatch(r"Chores\('[^']*'\)/Tasks\(\d+\)", target):
@@ -94,7 +94,7 @@ def test_runs_the_scenario_and_records_its_traffic(name: str, traffic_dir: Any) 
 
     names = live.names_for(scenario)
     traffic = live.Traffic(BASE)
-    http = httpx.Client(transport=httpx.MockTransport(_tm1(names).handler), event_hooks={"response": [traffic.record]})
+    http = httpx2.Client(transport=httpx2.MockTransport(_tm1(names).handler), event_hooks={"response": [traffic.record]})
     assert live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names) == []
     assert len(traffic.exchanges) == expected, "one request a step, the session's own left out"
 
@@ -103,7 +103,7 @@ def test_runs_the_scenario_and_records_its_traffic(name: str, traffic_dir: Any) 
     fake2 = _tm1(names2)
 
     async def go() -> list[str]:
-        http = httpx.AsyncClient(transport=httpx.MockTransport(fake2.handler), event_hooks={"response": [traffic2.arecord]})
+        http = httpx2.AsyncClient(transport=httpx2.MockTransport(fake2.handler), event_hooks={"response": [traffic2.arecord]})
         return await live.arun(AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic2, scenario, names2)
 
     assert asyncio.run(go()) == []

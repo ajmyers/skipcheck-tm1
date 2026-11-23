@@ -6,9 +6,7 @@ from __future__ import annotations
 
 import atexit
 import threading
-from typing import Any, ClassVar
-
-from typing_extensions import Self
+from typing import Any, ClassVar, Self
 
 from ._container import GenericContainer, Network, reuse_enabled, share_network, wait_for_http
 from .sources import Tm1WebSource

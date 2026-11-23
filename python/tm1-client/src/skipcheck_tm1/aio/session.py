@@ -26,13 +26,15 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
+import ssl
 import threading
 import time
 from collections.abc import AsyncIterator, Callable, Iterator
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
-import httpx
+import httpx2
 
 from .. import _protocol as p
 from .._compat import AsyncIO as runtime
@@ -56,8 +58,8 @@ from ..timeouts import Tm1Timeouts
 from ..version import Tm1Capabilities, Tm1Dialect, Tm1Version
 
 if TYPE_CHECKING:
-    # For the checker only (pydantic brings it): a builder's methods return the builder they're called on
-    from typing_extensions import Self
+    # For the checker only: a builder's methods return the builder they're called on
+    from typing import Self
 
 __all__ = ["AsyncTm1Session", "AsyncTm1SessionBatch", "AsyncTm1SessionBuilder"]
 
@@ -73,6 +75,15 @@ def _check_session_context(session_context: str | None) -> str | None:
     return session_context
 
 
+def _ssl_context(verify: bool | str | ssl.SSLContext) -> bool | ssl.SSLContext:
+    """What httpx2 is given for ``verify``: a CA bundle's path (a file, or a directory as
+    OpenSSL's ``capath``) as a context that trusts only it, which httpx2 deprecates taking as a
+    string; anything else as it is."""
+    if not isinstance(verify, str):
+        return verify
+    return ssl.create_default_context(capath=verify) if os.path.isdir(verify) else ssl.create_default_context(cafile=verify)
+
+
 def _refusal(error: BaseException) -> bool:
     """A login TM1 refused (wrong credentials, an unknown or disabled user, impersonation not
     allowed), as opposed to one that failed for another reason, such as TM1 being unreachable."""
@@ -84,7 +95,7 @@ def _transport(error: BaseException, method: str, url: str) -> Tm1TransportError
     TLS, no connection free) or after (a timeout, a dropped connection)."""
     phase = (
         Tm1TransportError.Phase.CONNECT
-        if isinstance(error, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, httpx.UnsupportedProtocol))
+        if isinstance(error, (httpx2.ConnectError, httpx2.ConnectTimeout, httpx2.PoolTimeout, httpx2.UnsupportedProtocol))
         else Tm1TransportError.Phase.RESPONSE
     )
     return Tm1TransportError(phase, method.upper() in _IDEMPOTENT, method, url, error)
@@ -115,7 +126,7 @@ class _AsyncConnection:
         impersonate: str | None,
         timeouts: Tm1Timeouts,
         classifier: Tm1ErrorClassifier,
-        http: httpx.AsyncClient,
+        http: httpx2.AsyncClient,
         owns_http: bool,
         check_capabilities: bool,
         clock: Callable[[], float],
@@ -156,7 +167,7 @@ class _AsyncConnection:
                 self.running -= 1
 
     def url(self, relative: str) -> str:
-        return str(httpx.URL(self.base_url).join(relative))
+        return str(httpx2.URL(self.base_url).join(relative))
 
     def check(self, method: str, url: str, reply: p.Reply) -> p.Reply:
         """The reply, or the error for a refusal, classified by this session's classifier."""
@@ -164,8 +175,8 @@ class _AsyncConnection:
             raise api_error(method, url, reply.status, reply.content, self.classifier)
         return reply
 
-    def _timeout(self, seconds: float | None) -> httpx.Timeout:
-        return httpx.Timeout(self.timeouts.request if seconds is None else seconds, connect=self.timeouts.connect)
+    def _timeout(self, seconds: float | None) -> httpx2.Timeout:
+        return httpx2.Timeout(self.timeouts.request if seconds is None else seconds, connect=self.timeouts.connect)
 
     def _require_open(self) -> None:
         if self.closed:
@@ -238,9 +249,9 @@ class _AsyncConnection:
             extra["Cookie"] = f"{p.COOKIE}={seed}"
         try:
             # As UTF-8, which is how TM1 reads the user to impersonate and the session's label
-            headers = httpx.Headers(p.headers(self.session_context, p.JSON, extra), encoding=p.HEADER_ENCODING)
+            headers = httpx2.Headers(p.headers(self.session_context, p.JSON, extra), encoding=p.HEADER_ENCODING)
             response = await self.http.get(url, headers=headers, timeout=self._timeout(self.timeouts.login))
-        except httpx.HTTPError as e:
+        except httpx2.HTTPError as e:
             raise _transport(e, "GET", url) from e
         self.http.cookies.clear()
         status = response.status_code
@@ -288,7 +299,7 @@ class _AsyncConnection:
         accept: str,
         timeout: float | None,
         cookie: str,
-    ) -> httpx.Response:
+    ) -> httpx2.Response:
         try:
             response = await self.http.request(
                 method,
@@ -297,7 +308,7 @@ class _AsyncConnection:
                 headers=p.headers(None, accept, {**headers, "Cookie": f"{p.COOKIE}={cookie}"}),
                 timeout=self._timeout(timeout),
             )
-        except httpx.HTTPError as e:
+        except httpx2.HTTPError as e:
             raise _transport(e, method, url) from e
         # The session cookie is this session's to send, not the HTTP client's jar
         self.http.cookies.clear()
@@ -380,7 +391,7 @@ class _AsyncConnection:
             )
             try:
                 response = await self.http.post(url, content=b"{}", headers=headers, timeout=self._timeout(self.timeouts.close))
-            except httpx.HTTPError as e:
+            except httpx2.HTTPError as e:
                 log.warning("Couldn't close TM1 session %s at %s: %s", self.session_id, self.base_url, e)
                 raise _transport(e, "POST", url) from e
             if response.status_code >= 400 and response.status_code != 401:
@@ -413,8 +424,8 @@ class AsyncTm1Session:
         timeouts: Tm1Timeouts | None = None,
         error_classifier: Tm1ErrorClassifier | None = None,
         check_capabilities: bool = True,
-        verify: bool | str = True,
-        client: httpx.AsyncClient | None = None,
+        verify: bool | str | ssl.SSLContext = True,
+        client: httpx2.AsyncClient | None = None,
         clock: Callable[[], float] | None = None,
     ):
         """The server is ``base_url`` (the service root), or ``address`` read by ``dialect``
@@ -432,7 +443,7 @@ class AsyncTm1Session:
             authenticator = basic(user, password)
         _check_session_context(session_context)
         timeouts = timeouts or Tm1Timeouts.DEFAULTS
-        http = client or runtime.HttpClient(verify=verify, timeout=httpx.Timeout(timeouts.request, connect=timeouts.connect))
+        http = client or runtime.HttpClient(verify=_ssl_context(verify), timeout=httpx2.Timeout(timeouts.request, connect=timeouts.connect))
         self._connection = _AsyncConnection(
             base_url,
             authenticator,
@@ -688,7 +699,7 @@ class AsyncTm1Session:
         location = reply.headers.get("location")
         if not location:
             raise Tm1ProtocolError(f"TM1 accepted {method} {url} async without a Location")
-        monitor = str(httpx.URL(url).join(location))
+        monitor = str(httpx2.URL(url).join(location))
         finished = False
         try:
             while True:
@@ -913,12 +924,18 @@ class AsyncTm1SessionBuilder:
         """How error responses are classified; :meth:`Tm1ErrorClassifier.defaults` unless set."""
         return self._set(error_classifier=classifier)
 
-    def http_client(self, client: httpx.AsyncClient) -> Self:
+    def http_client(self, client: httpx2.AsyncClient) -> Self:
         """The HTTP client to send through (Java's ``webClient`` and ``connector``)."""
         return self._set(client=client)
 
-    def verify(self, verify: bool | str) -> Self:
-        """Whether to check the server's certificate, or a CA bundle to check it with."""
+    def verify(self, verify: bool | str | ssl.SSLContext) -> Self:
+        """How the server's certificate is checked. ``True`` (the default) checks it against the
+        operating system's trust store, as the .NET client does, so a company CA installed on
+        the machine is trusted; the Java client uses the JVM's trust store instead. That's
+        httpx2's default: ``truststore`` on Windows and macOS, OpenSSL's system CA files on
+        Linux, and ``SSL_CERT_FILE`` or ``SSL_CERT_DIR`` instead when either is set. A path
+        is a CA bundle (a PEM file, or a directory of them) to check it against instead, an
+        ``ssl.SSLContext`` is used as it is, and ``False`` doesn't check it."""
         return self._set(verify=verify)
 
     def check_capabilities(self, check: bool) -> Self:

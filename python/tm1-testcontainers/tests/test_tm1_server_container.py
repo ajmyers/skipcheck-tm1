@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import Tm1Version
@@ -13,8 +13,8 @@ from skipcheck_tm1_testcontainers import Tm1ServerContainer
 pytestmark = pytest.mark.requires_tm1
 
 
-def get(tm1: Tm1ServerContainer, path: str) -> httpx.Response:
-    return httpx.get(tm1.rest_url + path, auth=(tm1.username, tm1.password), timeout=30)
+def get(tm1: Tm1ServerContainer, path: str) -> httpx2.Response:
+    return httpx2.get(tm1.rest_url + path, auth=(tm1.username, tm1.password), timeout=30)
 
 
 def test_starts_a_tm1_server_and_reports_its_version(tm1_server: Tm1ServerContainer) -> None:

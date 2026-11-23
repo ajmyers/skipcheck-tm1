@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import Tm1Client, Tm1Session, auth
@@ -26,13 +26,13 @@ from . import scenarios as live
 def _tm1(names: dict[str, str]) -> FakeTm1:
     fake = FakeTm1()
 
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         target = request.url.raw_path.decode().removeprefix("/api/v1/")
         body = json.loads(request.content) if request.content else {}
         if request.method == "POST" and target in ("Dimensions", "Cubes"):
-            return httpx.Response(201, json={"Name": body["Name"]})
+            return httpx2.Response(201, json={"Name": body["Name"]})
         if request.method == "GET" and (m := re.fullmatch(r"Cubes\('([^']*)'\)(\?.*)?", target)):
-            return httpx.Response(404, json={"error": {"code": "278", "message": "no"}}) if m[1] == names["missing"] else {"Name": m[1]}
+            return httpx2.Response(404, json={"error": {"code": "278", "message": "no"}}) if m[1] == names["missing"] else {"Name": m[1]}
         if request.method == "GET" and target.endswith("/Dimensions?$select=Name"):
             return {"value": [{"Name": "Sandboxes"}, {"Name": names["region"]}, {"Name": names["month"]}]}
         if target.endswith("tm1.CheckRules"):
@@ -56,7 +56,7 @@ def test_runs_the_cubes_scenario_and_records_its_traffic(traffic_dir: Path) -> N
     names = live.names_for(scenario)
     fake = _tm1(names)
     traffic = live.Traffic(BASE)
-    http = httpx.Client(transport=httpx.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
+    http = httpx2.Client(transport=httpx2.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
     assert live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names) == []
     traffic.write("cubes", "python-sync", names)
 
@@ -65,7 +65,7 @@ def test_runs_the_cubes_scenario_and_records_its_traffic(traffic_dir: Path) -> N
     traffic2 = live.Traffic(BASE)
 
     async def go() -> list[str]:
-        http = httpx.AsyncClient(transport=httpx.MockTransport(fake2.handler), event_hooks={"response": [traffic2.arecord]})
+        http = httpx2.AsyncClient(transport=httpx2.MockTransport(fake2.handler), event_hooks={"response": [traffic2.arecord]})
         return await live.arun(AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic2, scenario, names2)
 
     assert asyncio.run(go()) == []
@@ -88,27 +88,27 @@ def test_stops_at_a_step_that_misses_its_expectation_and_still_cleans_up(traffic
     scenario = json.loads((live.SCENARIOS / "cubes.json").read_text(encoding="utf-8"))
     names = live.names_for(scenario)
     fake = _tm1(names)
-    fake.respond = lambda request: httpx.Response(500, json={"error": {"code": "1", "message": "down"}})
+    fake.respond = lambda request: httpx2.Response(500, json={"error": {"code": "1", "message": "down"}})
     traffic = live.Traffic(BASE)
-    http = httpx.Client(transport=httpx.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
+    http = httpx2.Client(transport=httpx2.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
     failures = live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names)
     assert len(failures) == 1 and failures[0].startswith("step 0 dimensions.create")
     assert [e["step"] for e in traffic.exchanges][-3:] == ["finally[0]", "finally[1]", "finally[2]"]
 
 
-def _expected(expect: dict[str, Any]) -> httpx.Response:
+def _expected(expect: dict[str, Any]) -> httpx2.Response:
     """What a step expects, as TM1's answer to its one request."""
     if "error" in expect:
         error = expect["error"]
         status = error.get("status") or {"NOT_FOUND": 404, "CONFLICT": 409, "PRECONDITION_FAILED": 412}.get(error.get("kind"), 400)
         message = "can not be found" if error.get("kind") == "NOT_FOUND" else "refused"
         code = "248" if error.get("kind") == "INVALID_UNIQUE_NAME" else "278"
-        return httpx.Response(status, json={"error": {"code": code, "message": message}})
+        return httpx2.Response(status, json={"error": {"code": code, "message": message}})
     if "$bytes" in expect.get("fields", {}):
         content = base64.b64decode(expect["fields"]["$bytes"])
-        return httpx.Response(200, content=content, headers={"Content-Type": "application/octet-stream"})
+        return httpx2.Response(200, content=content, headers={"Content-Type": "application/octet-stream"})
     if "fields" in expect:
-        return httpx.Response(200, json=expect["fields"])
+        return httpx2.Response(200, json=expect["fields"])
     if "count" in expect or "items" in expect:
         value: list[dict[str, Any]] = [{} for _ in range(expect.get("count", 0))]
         for field, values in expect.get("items", {}).items():
@@ -116,8 +116,8 @@ def _expected(expect: dict[str, Any]) -> httpx.Response:
                 if i == len(value):
                     value.append({})
                 value[i][field] = v
-        return httpx.Response(200, json={"value": value})
-    return httpx.Response(204)
+        return httpx2.Response(200, json={"value": value})
+    return httpx2.Response(204)
 
 
 def _sends(step: dict[str, Any]) -> bool:
@@ -129,9 +129,9 @@ def _sends(step: dict[str, Any]) -> bool:
 def _answering_as_expected(scenario: dict[str, Any], names: dict[str, str]) -> FakeTm1:
     """Answers each step's one request with what the step expects, and a finally step's with 204."""
     answers = [_expected(live.substitute(step["expect"], names)) for step in scenario["steps"] if _sends(step)]
-    answers += [httpx.Response(204) for _ in scenario.get("finally", [])]
+    answers += [httpx2.Response(204) for _ in scenario.get("finally", [])]
     fake = FakeTm1()
-    fake.respond = lambda request: answers.pop(0) if answers else httpx.Response(599, text="unscripted")
+    fake.respond = lambda request: answers.pop(0) if answers else httpx2.Response(599, text="unscripted")
     return fake
 
 
@@ -147,7 +147,7 @@ def test_runs_a_scenario_sending_one_request_per_step(traffic_dir: Path, name: s
     names = live.names_for(scenario)
     traffic = live.Traffic(BASE)
     fake = _answering_as_expected(scenario, names)
-    http = httpx.Client(transport=httpx.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
+    http = httpx2.Client(transport=httpx2.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
     assert live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names) == []
     assert len(traffic.exchanges) == expected
     traffic.write(name, "python-sync", names)
@@ -157,7 +157,7 @@ def test_runs_a_scenario_sending_one_request_per_step(traffic_dir: Path, name: s
     fake2 = _answering_as_expected(scenario, names2)
 
     async def go() -> list[str]:
-        http = httpx.AsyncClient(transport=httpx.MockTransport(fake2.handler), event_hooks={"response": [traffic2.arecord]})
+        http = httpx2.AsyncClient(transport=httpx2.MockTransport(fake2.handler), event_hooks={"response": [traffic2.arecord]})
         return await live.arun(AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic2, scenario, names2)
 
     assert asyncio.run(go()) == []
@@ -180,17 +180,17 @@ def _data_tm1(names: dict[str, str]) -> FakeTm1:
     def cells(begin: int, end: int) -> list[dict[str, Any]]:
         return [{"Ordinal": n, "Value": n} for n in range(begin, end + 1)]
 
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         target = request.url.raw_path.decode().removeprefix("/api/v1/")
         method = request.method
         body = json.loads(request.content) if request.content else {}
         if f"('{missing}')" in target or (method == "POST" and target.startswith("ExecuteRelationalDrillthrough")):
-            return httpx.Response(404, json={"error": {"code": "278", "message": "no"}})
+            return httpx2.Response(404, json={"error": {"code": "278", "message": "no"}})
         if method == "POST" and re.fullmatch(r"Dimensions|Cubes|Sandboxes|Cubes\('[^']*'\)/(Private)?Views", target):
-            return httpx.Response(201, json={"Name": body["Name"]})
+            return httpx2.Response(201, json={"Name": body["Name"]})
         if method == "POST" and target.split("?")[0] == "ExecuteMDX":
             if "SELEKT" in body["MDX"]:
-                return httpx.Response(400, json={"error": {"code": "501", "message": "syntax"}})
+                return httpx2.Response(400, json={"error": {"code": "501", "message": "syntax"}})
             top = int(re.search(r"\$top%3D(\d+)", target)[1])
             axes = [{"Ordinal": 0, "Cardinality": 3}, {"Ordinal": 1, "Cardinality": 2}, {"Ordinal": 2, "Cardinality": 1}]
             return {"ID": "cs1", "Axes": axes, "Cells": cells(0, top - 1)}
@@ -220,7 +220,7 @@ def test_runs_the_data_scenarios(traffic_dir: Path, name: str) -> None:
 
     names = live.names_for(scenario)
     traffic = live.Traffic(BASE)
-    http = httpx.Client(transport=httpx.MockTransport(_data_tm1(names).handler), event_hooks={"response": [traffic.record]})
+    http = httpx2.Client(transport=httpx2.MockTransport(_data_tm1(names).handler), event_hooks={"response": [traffic.record]})
     assert live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names) == []
     traffic.write(name, "python-sync", names)
 
@@ -228,7 +228,7 @@ def test_runs_the_data_scenarios(traffic_dir: Path, name: str) -> None:
     traffic2 = live.Traffic(BASE)
 
     async def go() -> list[str]:
-        http = httpx.AsyncClient(transport=httpx.MockTransport(_data_tm1(names2).handler), event_hooks={"response": [traffic2.arecord]})
+        http = httpx2.AsyncClient(transport=httpx2.MockTransport(_data_tm1(names2).handler), event_hooks={"response": [traffic2.arecord]})
         return await live.arun(AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic2, scenario, names2)
 
     assert asyncio.run(go()) == []

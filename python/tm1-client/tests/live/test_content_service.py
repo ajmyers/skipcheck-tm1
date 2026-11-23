@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import ODataPath, Tm1BadRequestError, Tm1Client, Tm1NotFoundError, Tm1Request
@@ -101,7 +101,7 @@ def test_refuses_a_chunked_upload(tm1: Tm1Client, name: str) -> None:
             yield b"hello"
 
         # A body of unknown length is sent chunked
-        chunked = httpx.put(
+        chunked = httpx2.put(
             content,
             content=pieces(),
             auth=(user, password),

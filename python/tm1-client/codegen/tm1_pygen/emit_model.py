@@ -252,7 +252,7 @@ def emit_patches(spec: Spec) -> str:
         "",
         "if TYPE_CHECKING:",
         "    # A setter returns the builder it's called on, so a subtype's builder keeps its own setters",
-        "    from typing_extensions import Self",
+        "    from typing import Self",
         "",
     ]
     names_all = []

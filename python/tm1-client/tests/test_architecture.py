@@ -99,7 +99,7 @@ def test_never_blocks_the_event_loop() -> None:
     found = []
     for name, tree in modules(AIO):
         for call, target in calls(tree):
-            if target in ("time.sleep", "asyncio.run", "httpx.Client") or target.endswith((".run_until_complete", ".run_in_executor")):
+            if target in ("time.sleep", "asyncio.run", "httpx2.Client") or target.endswith((".run_until_complete", ".run_in_executor")):
                 found.append(f"{name}:{call.lineno} calls {target}")
     assert not found, "\n".join([*found, because])
 
@@ -166,7 +166,7 @@ def test_keeps_the_odata_layer_free_of_tm1() -> None:
         "versions (Java's keepsTheODataLayerFreeOfTm1)"
     )
     tree = ast.parse((LIBRARY / "odata.py").read_text(encoding="utf-8"))
-    found = sorted(imported for imported in imports(tree, "skipcheck_tm1.odata") if imported.split(".")[0] in ("skipcheck_tm1", "httpx", "pydantic"))
+    found = sorted(imported for imported in imports(tree, "skipcheck_tm1.odata") if imported.split(".")[0] in ("skipcheck_tm1", "httpx2", "pydantic"))
     assert not found, "\n".join([f"odata.py imports {imported}" for imported in found] + [because])
 
 

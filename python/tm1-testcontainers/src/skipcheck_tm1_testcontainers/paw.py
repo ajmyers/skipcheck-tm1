@@ -20,13 +20,12 @@ import time
 from http.cookies import SimpleCookie
 from importlib import resources
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Self
 from urllib.parse import quote, quote_plus
 
-import httpx
+import httpx2
 from testcontainers.core.config import testcontainers_config as tc_config
 from testcontainers.core.docker_client import DockerClient
-from typing_extensions import Self
 
 from .sources import PawSource, setting
 from .tm1 import Tm1AdminServerContainer, Tm1ServerContainer
@@ -297,7 +296,7 @@ class PawContainer:
                     last = f"a TM1 call through PAW answered {version.status_code}: {version.text}"
                 else:
                     last = "PAW lists no TM1 servers yet"
-            except (OSError, httpx.HTTPError) as e:
+            except (OSError, httpx2.HTTPError) as e:
                 last = str(e)
             time.sleep(5)
         raise RuntimeError(f"PAW wasn't ready within {_READY_TIMEOUT / 60:.0f} minutes: {last}")
@@ -358,7 +357,7 @@ class PawSession:
         self._url = url
         self._cookies: dict[str, str] = {}
         # PAW's gateway is Apache over plain http: no h2c upgrade
-        self._http = httpx.Client(timeout=30.0, follow_redirects=False)
+        self._http = httpx2.Client(timeout=30.0, follow_redirects=False)
 
     def login(self, username: str, password: str) -> Self:
         """Logs on with TM1's own security; raises :class:`OSError` when PAW refuses."""
@@ -384,15 +383,15 @@ class PawSession:
             raise OSError(f"PAW couldn't list TM1 servers ({response.status_code}): {response.text}")
         return re.findall(self._NAME, response.text)
 
-    def tm1_get(self, server: str, path: str) -> httpx.Response:
+    def tm1_get(self, server: str, path: str) -> httpx2.Response:
         """A TM1 REST call through PAW's gateway."""
         return self.get(f"tm1/{quote(server, safe='')}/api/v1/{path}")
 
-    def get(self, path: str) -> httpx.Response:
+    def get(self, path: str) -> httpx2.Response:
         """A GET request on PAW, relative to its address: ``path`` has no leading ``/``."""
         return self._send("GET", path)
 
-    def _send(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+    def _send(self, method: str, path: str, **kwargs: Any) -> httpx2.Response:
         headers = dict(kwargs.pop("headers", {}))
         if self._cookies:
             headers["Cookie"] = "; ".join(f"{k}={v}" for k, v in self._cookies.items())

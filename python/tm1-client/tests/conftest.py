@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-"""Shared fixtures: the spec, and a fake TM1 on httpx's MockTransport."""
+"""Shared fixtures: the spec, and a fake TM1 on httpx2's MockTransport."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import Tm1Client, Tm1Session, auth
@@ -34,20 +34,20 @@ def spec() -> dict[str, Any]:
 class FakeTm1:
     """Answers logins with a session cookie and ``$metadata`` with the snapshot (or what it's
     given), records every other request, and answers it with ``respond(request)`` (a JSON
-    body, text, ``None`` for 204, or an httpx.Response)."""
+    body, text, ``None`` for 204, or an httpx2.Response)."""
 
     def __init__(self, metadata: bytes | None = None) -> None:
-        self.requests: list[httpx.Request] = []
+        self.requests: list[httpx2.Request] = []
         self.logins = 0
         self.metadata_reads = 0
         self.metadata = SNAPSHOT.read_bytes() if metadata is None else metadata
         self.product_version = "11.8.03500.6"
-        self.respond: Callable[[httpx.Request], Any] = lambda request: {}
-        self.login_requests: list[httpx.Request] = []
-        self.on_login: Callable[[httpx.Request], Any] | None = None
+        self.respond: Callable[[httpx2.Request], Any] = lambda request: {}
+        self.login_requests: list[httpx2.Request] = []
+        self.on_login: Callable[[httpx2.Request], Any] | None = None
         """Answers logins instead of the default (``ID`` n, cookie ``s<n>``), when set."""
 
-    def handler(self, request: httpx.Request) -> httpx.Response:
+    def handler(self, request: httpx2.Request) -> httpx2.Response:
         path = request.url.raw_path.decode()
         if path.startswith("/api/v1/ActiveSession?$select=ID") and "authorization" in request.headers:
             self.logins += 1
@@ -56,28 +56,28 @@ class FakeTm1:
                 answer = self.on_login(request)
                 if answer is not None:
                     return answer
-            return httpx.Response(200, json={"ID": self.logins}, headers={"Set-Cookie": f"TM1SessionId=s{self.logins}; Path=/api/; HttpOnly"})
+            return httpx2.Response(200, json={"ID": self.logins}, headers={"Set-Cookie": f"TM1SessionId=s{self.logins}; Path=/api/; HttpOnly"})
         if path == "/api/v1/Server?$select=ProductVersion":
-            return httpx.Response(200, json={"ProductVersion": self.product_version})
+            return httpx2.Response(200, json={"ProductVersion": self.product_version})
         if path == "/api/v1/$metadata":
             self.metadata_reads += 1
-            return httpx.Response(200, content=self.metadata, headers={"Content-Type": "application/xml"})
+            return httpx2.Response(200, content=self.metadata, headers={"Content-Type": "application/xml"})
         self.requests.append(request)
         answer = self.respond(request)
-        if isinstance(answer, httpx.Response):
+        if isinstance(answer, httpx2.Response):
             return answer
         if answer is None:
-            return httpx.Response(204)
+            return httpx2.Response(204)
         if isinstance(answer, str):
-            return httpx.Response(200, text=answer)
-        return httpx.Response(200, json=answer)
+            return httpx2.Response(200, text=answer)
+        return httpx2.Response(200, json=answer)
 
     @property
-    def last(self) -> httpx.Request:
+    def last(self) -> httpx2.Request:
         return self.requests[-1]
 
 
-def target(request: httpx.Request) -> str:
+def target(request: httpx2.Request) -> str:
     """``METHOD path?query`` of a request, relative to the service root, as sent (encoded)."""
     raw = request.url.raw_path.decode()
     return f"{request.method} {raw.removeprefix('/api/v1/')}"
@@ -100,7 +100,7 @@ def fake() -> FakeTm1:
 
 @pytest.fixture
 def session(fake: FakeTm1) -> Tm1Session:
-    http = httpx.Client(transport=httpx.MockTransport(fake.handler))
+    http = httpx2.Client(transport=httpx2.MockTransport(fake.handler))
     return Tm1Session(BASE, auth.basic("admin", "apple"), client=http)
 
 
@@ -135,10 +135,10 @@ class Api:
 def api(request: pytest.FixtureRequest, fake: FakeTm1) -> Any:
     """The generated API in each flavor, over the same fake TM1."""
     if request.param == "sync":
-        yield Api("sync", Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=httpx.Client(transport=httpx.MockTransport(fake.handler)))), None)
+        yield Api("sync", Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=httpx2.Client(transport=httpx2.MockTransport(fake.handler)))), None)
         return
     loop = asyncio.new_event_loop()
-    http = httpx.AsyncClient(transport=httpx.MockTransport(fake.handler))
+    http = httpx2.AsyncClient(transport=httpx2.MockTransport(fake.handler))
     yield Api("async", AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http)), loop)
     loop.run_until_complete(http.aclose())
     loop.close()

@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_the_code_type_checks() -> None:
     generated = ROOT / "tm1-client" / "src" / "skipcheck_tm1" / "_sync" / "session.py"
     assert generated.exists(), "the sync flavor isn't generated: pip install -e python/tm1-client"
-    # --pythonpath: this interpreter's packages (httpx, pydantic, testcontainers), whichever is active
+    # --pythonpath: this interpreter's packages (httpx2, pydantic, testcontainers), whichever is active
     command = [sys.executable, "-m", "pyright", "--project", str(ROOT), "--pythonpath", sys.executable]
     done = subprocess.run(command, capture_output=True, text=True)
     assert done.returncode == 0, done.stdout + done.stderr

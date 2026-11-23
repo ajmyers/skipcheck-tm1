@@ -10,10 +10,9 @@ import enum
 import json
 import re
 from dataclasses import dataclass, field
-from typing import ClassVar
+from typing import ClassVar, Self
 
-import httpx
-from typing_extensions import Self
+import httpx2
 
 from ._container import GenericContainer, share_network, wait_for_http
 from .sources import CognosSource, setting
@@ -177,7 +176,7 @@ class CognosContainer(GenericContainer):
         """A CAM passport for an OIDC ID token (from :meth:`KeycloakContainer.id_token`)."""
         body = json.dumps({"parameters": [{"name": "CAMNamespace", "value": Namespace.OIDC.id}, {"name": "CAMOIDCIdToken", "value": id_token}]})
         url = f"http://{self.host}:{self.get_mapped_port(self.DISPATCHER_PORT)}/api/v1/session"
-        response = httpx.put(url, content=body, headers={"Content-Type": "application/json"}, timeout=60)
+        response = httpx2.put(url, content=body, headers={"Content-Type": "application/json"}, timeout=60)
         passport = response.cookies.get("cam_passport")
         if passport is None:
             raise RuntimeError(f"Cognos refused the ID token (HTTP {response.status_code}): {response.text}")
@@ -241,7 +240,7 @@ class KeycloakContainer(GenericContainer):
 
     def id_token(self, user: str, password: str) -> str:
         """An ID token for a user of the realm, by password."""
-        response = httpx.post(
+        response = httpx2.post(
             f"{self.url}/realms/{self.REALM}/protocol/openid-connect/token",
             data={"grant_type": "password", "client_id": self.APP_CLIENT, "scope": "openid", "username": user, "password": password},
             timeout=30,

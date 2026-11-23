@@ -38,7 +38,7 @@ RENAMED = {
     "Tm1ErrorClassifier.Rule.message": "of_message",  # the record's field of that name holds the pattern
     "Tm1ErrorClassifier.Rule.code": "of_code",
     "Tm1SessionPool.Builder.scheduler": "clock",  # a clock to move in tests, rather than a Reactor scheduler
-    "Tm1Session.Builder.webClient": "http_client",  # an httpx client, rather than Spring's
+    "Tm1Session.Builder.webClient": "http_client",  # an httpx2 client, rather than Spring's
     "Tm1Session.Builder.connector": "http_client",
     "Tm1Client.Builder.webClient": "http_client",
     "Tm1Client.Builder.connector": "http_client",

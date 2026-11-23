@@ -19,7 +19,7 @@ import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-import httpx
+import httpx2
 
 from .._compat import AsyncIO as runtime
 from ..auth import Authenticator, _Passport
@@ -51,7 +51,7 @@ class _Logon:
         async with self._http() as http:
             try:
                 response = await http.put(self._url, json=body)
-            except httpx.HTTPError as e:
+            except httpx2.HTTPError as e:
                 raise Tm1ProtocolError(f"Logging on to Cognos failed: {e}", None, "PUT", self._url) from e
         if response.status_code in (401, 403):
             raise Tm1ApiError.of_kind(response.status_code, Tm1ErrorKind.CREDENTIAL_REJECTED, ODataError(message="Cognos refused the logon"), "PUT", self._url)

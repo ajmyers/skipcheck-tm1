@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import ODataQuery
@@ -21,7 +21,7 @@ from ..conftest import Api, FakeTm1, target
 H = "Dimensions('Region')/Hierarchies('Region')"
 
 
-def body(request: httpx.Request) -> Any:
+def body(request: httpx2.Request) -> Any:
     return json.loads(request.content) if request.content else None
 
 

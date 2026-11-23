@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from typing import Any
 from urllib.parse import quote
 
-import httpx
+import httpx2
 import pytest
 
 from .conftest import CONFIGURED, REASON
@@ -32,7 +32,7 @@ class Users:
         self.alice = "zz_alice_" + run
         self.bob = "zz_bob_" + run
 
-    def impersonate(self, user: str, password: str, target: Any) -> httpx.Response:
+    def impersonate(self, user: str, password: str, target: Any) -> httpx2.Response:
         return self.raw.send("GET", ACTIVE_USER, headers={"Authorization": RawTm1.basic(user, password), "TM1-Impersonate": target})
 
     def create_user(self, name: str, group: str) -> None:
@@ -41,7 +41,7 @@ class Users:
     def name(self, **request: Any) -> str:
         return self.raw.send("GET", ACTIVE_USER, **request).json()["Name"]
 
-    def close(self, response: httpx.Response) -> None:
+    def close(self, response: httpx2.Response) -> None:
         cookie = RawTm1.cookie(response)
         if cookie is not None:
             self.raw.close(cookie)
@@ -185,7 +185,7 @@ def test_matches_user_names_ignoring_case_and_spaces(users: Users) -> None:
 def test_impersonates_users_with_non_ascii_names_only_as_utf8(raw: RawTm1, admin: str, users: Users) -> None:
     """A user whose name has characters outside ASCII is impersonated when the header carries the
     name as UTF-8, and only then: as ISO 8859-1 bytes or percent-encoded, TM1 reports the user
-    unknown. The header values are bytes, which httpx sends as they are. The client sends UTF-8
+    unknown. The header values are bytes, which httpx2 sends as they are. The client sends UTF-8
     (``HEADER_ENCODING``)."""
     accented = users.alice + "_ë"
     raw.create_user(admin, accented, "p")

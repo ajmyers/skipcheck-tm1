@@ -6,14 +6,14 @@ from __future__ import annotations
 
 import json
 
-import httpx
+import httpx2
 
 from skipcheck_tm1.model import AnnotationPatch
 
 from ..conftest import Api, FakeTm1, target
 
 
-def body(request: httpx.Request) -> object:
+def body(request: httpx2.Request) -> object:
     return json.loads(request.content) if request.content else None
 
 

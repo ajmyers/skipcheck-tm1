@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import Tm1Client
@@ -24,14 +24,14 @@ from .conftest import _builder, target
 
 
 def _sync(traffic: live.Traffic, scenario: dict[str, Any], names: dict[str, str], verify: bool) -> list[str]:
-    http = httpx.Client(verify=verify, event_hooks={"response": [traffic.record]})
+    http = httpx2.Client(verify=verify, event_hooks={"response": [traffic.record]})
     with _builder(Tm1Client.builder()).http_client(http).build() as tm1:
         return live.run(tm1, traffic, scenario, names)
 
 
 def _async(traffic: live.Traffic, scenario: dict[str, Any], names: dict[str, str], verify: bool) -> list[str]:
     async def go() -> list[str]:
-        http = httpx.AsyncClient(verify=verify, event_hooks={"response": [traffic.arecord]})
+        http = httpx2.AsyncClient(verify=verify, event_hooks={"response": [traffic.arecord]})
         async with _builder(AsyncTm1Client.builder()).http_client(http).build() as tm1:
             return await live.arun(tm1, traffic, scenario, names)
 

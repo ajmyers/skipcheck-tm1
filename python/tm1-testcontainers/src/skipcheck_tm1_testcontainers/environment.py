@@ -9,9 +9,7 @@ import json
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypeVar
-
-from typing_extensions import Self
+from typing import Any, Self, TypeVar
 
 from . import _pa_environment
 from ._container import GenericContainer, Network, reuse_enabled

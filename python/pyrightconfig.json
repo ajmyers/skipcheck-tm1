@@ -6,7 +6,7 @@
   // run: this is what keeps them from rotting. Tests and the code generator aren't.
   "include": ["tm1-client/src", "tm1-testcontainers/src", "tm1-client/examples", "tm1-testcontainers/examples"],
   // The oldest Python the packages support (requires-python)
-  "pythonVersion": "3.10",
+  "pythonVersion": "3.11",
   "typeCheckingMode": "standard",
   "reportMissingModuleSource": "error",
   "reportUnsupportedDunderAll": "error"

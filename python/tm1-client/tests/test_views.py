@@ -9,7 +9,7 @@ import gzip
 import json
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import Tm1Client, Tm1NotFoundError, Tm1Session, Tm1UnsupportedOperationError, auth
@@ -48,7 +48,7 @@ def test_a_view_shares_the_login(api: Api, fake: FakeTm1) -> None:
 
 
 def test_a_batch_sends_its_calls_together_each_with_its_own_result(api: Api, fake: FakeTm1) -> None:
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         assert target(request) == "POST $batch"
         body = json.loads(request.content)
         assert [r["url"] for r in body["requests"]] == ["Cubes('a')?!sandbox=s", "Cubes('b')?!sandbox=s", "Cubes?!sandbox=s"]
@@ -81,7 +81,7 @@ def test_a_batch_sends_its_calls_together_each_with_its_own_result(api: Api, fak
 
 
 def test_a_batch_splits_a_big_queue(client: Tm1Client, fake: FakeTm1) -> None:
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         ids = [r["id"] for r in json.loads(request.content)["requests"]]
         return {"responses": [{"id": i, "status": 204} for i in ids]}
 
@@ -111,13 +111,13 @@ def _message(status: int, body: bytes, gzipped: bool = False) -> bytes:
 
 
 def test_an_async_view_polls_the_monitor_and_reads_the_result(api: Api, fake: FakeTm1) -> None:
-    polls = iter([httpx.Response(202), httpx.Response(200, content=_message(200, b'{"ProcessExecuteStatusCode":"CompletedSuccessfully"}', gzipped=True))])
+    polls = iter([httpx2.Response(202), httpx2.Response(200, content=_message(200, b'{"ProcessExecuteStatusCode":"CompletedSuccessfully"}', gzipped=True))])
 
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         if request.method == "POST":
             assert request.headers["prefer"] == "respond-async"
             # Relative to the request's URL
-            return httpx.Response(202, headers={"Location": "../_async('7')"})
+            return httpx2.Response(202, headers={"Location": "../_async('7')"})
         assert target(request) == "GET _async('7')"
         return next(polls)
 
@@ -132,10 +132,10 @@ def test_an_async_view_polls_the_monitor_and_reads_the_result(api: Api, fake: Fa
 
 
 def test_an_async_result_carries_tms_refusal(api: Api, fake: FakeTm1) -> None:
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         if request.method == "POST":
-            return httpx.Response(202, headers={"Location": "../_async('8')"})
-        return httpx.Response(200, content=_message(500, b'{"error":{"code":"174","message":"TM1UserException: Cancel"}}'))
+            return httpx2.Response(202, headers={"Location": "../_async('8')"})
+        return httpx2.Response(200, content=_message(500, b'{"error":{"code":"174","message":"TM1UserException: Cancel"}}'))
 
     fake.respond = respond
     from skipcheck_tm1 import Tm1ErrorKind, Tm1ServerError
@@ -146,9 +146,9 @@ def test_an_async_result_carries_tms_refusal(api: Api, fake: FakeTm1) -> None:
 
 
 def test_giving_up_on_an_async_operation_deletes_its_monitor(client: Tm1Client, fake: FakeTm1) -> None:
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         if request.method == "POST":
-            return httpx.Response(202, headers={"Location": "../_async('9')"})
+            return httpx2.Response(202, headers={"Location": "../_async('9')"})
         if request.method == "GET":
             raise KeyboardInterrupt  # someone pressed Ctrl-C while waiting
         return None
@@ -257,7 +257,7 @@ def test_says_what_it_knows_when_the_added_version_isnt_recorded() -> None:
 
 def _old(check: bool) -> tuple[Tm1Client, FakeTm1]:
     fake = FakeTm1(metadata=OLD_SERVER)
-    http = httpx.Client(transport=httpx.MockTransport(fake.handler))
+    http = httpx2.Client(transport=httpx2.MockTransport(fake.handler))
     return Tm1Client(Tm1Session(BASE, auth.basic("a"), client=http, check_capabilities=check)), fake
 
 

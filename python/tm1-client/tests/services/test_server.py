@@ -10,7 +10,7 @@ import itertools
 import json
 from typing import Any
 
-import httpx
+import httpx2
 
 from skipcheck_tm1 import ODataQuery
 from skipcheck_tm1.model import LogLevel, Server, ServerSettingsPatch
@@ -18,7 +18,7 @@ from skipcheck_tm1.model import LogLevel, Server, ServerSettingsPatch
 from ..conftest import Api, FakeTm1, target
 
 
-def body(request: httpx.Request) -> object:
+def body(request: httpx2.Request) -> object:
     return json.loads(request.content) if request.content else None
 
 
@@ -100,7 +100,7 @@ def test_error_logs(api: Api, fake: FakeTm1) -> None:
     api.run(api.client.logs.error_log_file("a.log"))
     assert target(fake.last) == "GET ErrorLogFiles('a.log')"
     # TM1 (11.8) starts the content with a byte order mark, which is dropped
-    fake.respond = lambda r: httpx.Response(200, content="﻿Line 1".encode())
+    fake.respond = lambda r: httpx2.Response(200, content="﻿Line 1".encode())
     assert api.run(api.client.logs.error_log_content("a.log")) == "Line 1"
     assert target(fake.last) == "GET ErrorLogFiles('a.log')/Content"
 
@@ -114,7 +114,7 @@ def test_tails_a_log_skipping_what_it_has_yielded(api: Api, fake: FakeTm1) -> No
         ]
     )
 
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         if target(request) == "GET TailMessageLog()":
             return {"value": "MessageLogEntries/!delta('0[4096]38@11!19')"}
         assert target(request) == "GET MessageLogEntries/!delta('0%5B4096%5D38%4011!19')"
@@ -127,7 +127,7 @@ def test_tails_a_log_skipping_what_it_has_yielded(api: Api, fake: FakeTm1) -> No
 
 
 def test_tails_the_transaction_and_audit_logs(api: Api, fake: FakeTm1) -> None:
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         if "Tail" in target(request):
             return {"value": "TransactionLogEntries/!delta('1')"}
         return {"value": [{"Cube": "Sales"}]}

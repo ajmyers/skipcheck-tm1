@@ -129,9 +129,9 @@ private fun venvPython(venv: File): File = venv.resolve(if (windows) "Scripts/py
  * One task, which every Python task depends on: Gradle runs tasks side by side, and two of them
  * making the same environment at once would break it.
  *
- * The interpreter the environment is made from is the first of these that is Python 3.10 or later:
+ * The interpreter the environment is made from is the first of these that is Python 3.11 or later:
  * -Ppython=... or the PYTHON environment variable, then python3, python, python3.14 down to
- * python3.10, and on Windows the py launcher. So CI's setup-python decides there, and a machine
+ * python3.11, and on Windows the py launcher. So CI's setup-python decides there, and a machine
  * whose python3 is too old (macOS's is 3.9) still finds a newer one beside it.
  */
 @DisableCachingByDefault(because = "Runs another build tool, which tracks its own inputs")
@@ -162,12 +162,12 @@ abstract class PythonVenv : ToolTask() {
 	private fun find(): List<String> {
 		val named = interpreter.orNull
 		val candidates = if (named != null) listOf(listOf(named))
-		else listOf(listOf("python3"), listOf("python")) + (14 downTo 10).map { listOf("python3.$it") } + (if (windows) listOf(listOf("py", "-3")) else listOf())
-		val recentEnough = listOf("-c", "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)")
+		else listOf(listOf("python3"), listOf("python")) + (14 downTo 11).map { listOf("python3.$it") } + (if (windows) listOf(listOf("py", "-3")) else listOf())
+		val recentEnough = listOf("-c", "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)")
 		return candidates.firstOrNull { output(it + recentEnough) != null }
 			?: throw GradleException(
-				if (named != null) "$named isn't Python 3.10 or later"
-				else "No Python 3.10 or later found (tried python3, python, python3.14 to python3.10). Install one, or name it: -Ppython=/path/to/python",
+				if (named != null) "$named isn't Python 3.11 or later"
+				else "No Python 3.11 or later found (tried python3, python, python3.14 to python3.11). Install one, or name it: -Ppython=/path/to/python",
 			)
 	}
 }
