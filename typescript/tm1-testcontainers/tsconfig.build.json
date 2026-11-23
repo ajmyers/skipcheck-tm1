@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    // The built client (the root's npm run build builds it first), as a user of the package has it
+    "paths": {}
+  },
+  "include": ["src"]
+}

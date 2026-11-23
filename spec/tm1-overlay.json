@@ -1,0 +1,45 @@
+{
+	"$comment": "What TM1 does differently from its own $metadata, shared by every client's code generator (plan §16.5). Notes are Markdown; each generator renders them in its own doc format. Keys are Type/Property for properties and coverage-gate endpoint IDs for endpoints.",
+	"departures": {
+		"CAMSettings/ClientPingCAMPassport": {
+			"read": "json",
+			"note": "TM1 (11.8) sends it as a number in `StaticConfiguration` and as an ISO 8601 duration in `ActiveConfiguration`, though `$metadata` declares `Edm.Int32`, so it's JSON"
+		}
+	},
+	"lenientDates": {
+		"MessageLogEntry/TimeStamp": {
+			"note": "TM1 (11.8) sends `0000-00-00T00:00Z` for an entry without a time, such as the first; it's read as null"
+		}
+	},
+	"endpoints": {
+		"Navigation User/Groups": {
+			"forbid": ["create", "delete"],
+			"note": "TM1 (11.8): `DELETE Users('u')/Groups('g')` (and its `$ref`) deletes the group itself, for everyone, not the link. Binding `Groups` in a user PATCH replaces them; a POST through it tries to create a group."
+		},
+		"Navigation Group/Users": {
+			"forbid": ["create", "delete"],
+			"note": "Deleting through this navigation deletes the user itself, not the membership."
+		},
+		"EntitySet Contents": {
+			"note": "TM1 (11.8): entries are keyed by `ID` (name plus a kind suffix: `.blob`, `.extr`, `.cube`), not by `Name` as `$metadata` says. Entries refuse PATCH."
+		},
+		"Navigation Hierarchy/Elements": {
+			"note": "TM1 (11.8): a hierarchy PATCH binding `Elements` or `Edges` replaces the collection, deleting elements not listed."
+		},
+		"Navigation Subset/Elements": {
+			"note": "TM1 (11.8): a subset PATCH binding `Elements` appends."
+		},
+		"EntitySet Annotations": {
+			"note": "TM1 (11.8): `GET Annotations` lists none, though `Cubes('c')/Annotations` shows them. Missing annotations return 400, not 404."
+		},
+		"EntitySet Cellsets": {
+			"note": "TM1 (11.8): `Cellsets` lists none, though each reads by ID."
+		},
+		"Action Cube/Update": {
+			"note": "TM1 (11.8): with several `Cells`, only the first is written; use `UpdateCells` for many."
+		},
+		"Action Cellset/Update": {
+			"note": "TM1 (11.8): writes only `BeginOrdinal`'s cell."
+		}
+	}
+}

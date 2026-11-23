@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "skipcheck-tm1"
+version = "0.1.0.dev0"
+description = "Python client for the IBM Planning Analytics (TM1) REST API, generated from its $metadata"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27,<1",
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+# Ruff is pinned: a newer one may lay code out differently, and tests/test_format.py checks the layout.
+# Pyright is pinned too: a newer one may report more, and tests/test_types.py fails on a finding
+test = ["pytest>=8", "ruff==0.17.6", "pyright==1.1.414"]
+
+[tool.hatch.build.hooks.custom]
+# hatch_build.py generates src/skipcheck_tm1/_generated from ../../spec/tm1-api.json, and
+# src/skipcheck_tm1/_sync (the sync flavor) from src/skipcheck_tm1/aio
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/skipcheck_tm1"]
+artifacts = ["src/skipcheck_tm1/_generated/*.py", "src/skipcheck_tm1/_sync/**/*.py"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "codegen", "tests", "coverage", "hatch_build.py"]
+exclude = ["src/skipcheck_tm1/_generated", "src/skipcheck_tm1/_sync"]
+
+[tool.hatch.build.targets.sdist.force-include]
+# The sdist builds without the repository, so it takes the spec along
+"../../spec/tm1-api.json" = "spec/tm1-api.json"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

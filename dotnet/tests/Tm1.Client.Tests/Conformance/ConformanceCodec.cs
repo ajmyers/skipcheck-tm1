@@ -1,0 +1,621 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Xml;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.Json;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
+
+namespace Skipcheck.Tm1.Client.Tests.Conformance;
+
+/// <summary>A tag or type this runner can't decode: a failure, never a skip.</summary>
+public sealed class UnknownConformanceValueException(string message) : Exception(message);
+
+/// <summary>The language-neutral encoding of the conformance fixtures (spec/conformance/README.md):
+/// arguments decoded into this client's values for the parameter they go to, results and errors
+/// encoded to compare with what the Java client recorded, and the request comparison every runner
+/// makes.</summary>
+public static class ConformanceCodec
+{
+    public const int SpecVersion = 1;
+
+    private static readonly HashSet<string> Headers = ["accept", "content-type", "if-match", "if-none-match", "odata-version", "odata-maxversion", "prefer"];
+
+    private static readonly Assembly Client = typeof(Tm1Client).Assembly;
+
+    /// <summary><c>modelCubes</c> → <c>ModelCubes</c>; <c>PRIVATE_VIEWS</c> → <c>PrivateViews</c>.</summary>
+    public static string Pascal(string name) =>
+        name.Contains('_', StringComparison.Ordinal) || name.All(c => !char.IsLower(c))
+            ? string.Concat(name.ToLowerInvariant().Split('_').Select(w => w.Length == 0 ? w : char.ToUpperInvariant(w[0]) + w[1..]))
+            : char.ToUpperInvariant(name[0]) + name[1..];
+
+    /// <summary>An argument, as the parameter of type <paramref name="type"/> takes it.</summary>
+    public static object? Decode(JsonNode? node, Type type)
+    {
+        var target = Nullable.GetUnderlyingType(type) ?? type;
+        switch (node)
+        {
+            case null:
+                return null;
+            case JsonArray array:
+            {
+                var element = ElementType(target) ?? throw new UnknownConformanceValueException($"a list for a {type}");
+                var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(element))!;
+                foreach (var item in array)
+                {
+                    list.Add(Decode(item, element));
+                }
+                if (target.IsArray)
+                {
+                    var copy = Array.CreateInstance(element, list.Count);
+                    list.CopyTo(copy, 0);
+                    return copy;
+                }
+                return list;
+            }
+            case JsonValue value:
+                return Primitive(value, target);
+            case JsonObject tagged:
+                return Tagged(tagged, target);
+        }
+        throw new UnknownConformanceValueException("not an encoded value: " + node.ToJsonString());
+    }
+
+    private static object? Primitive(JsonValue value, Type target)
+    {
+        var element = Element(value);
+        return element.ValueKind switch
+        {
+            JsonValueKind.String when target == typeof(string) || target == typeof(object) => element.GetString(),
+            JsonValueKind.True or JsonValueKind.False => element.GetBoolean(),
+            JsonValueKind.Number when target == typeof(object) => element.TryGetInt64(out var l) ? (object)l : element.GetDouble(),
+            JsonValueKind.Number => Convert.ChangeType(element.GetDouble(), target, CultureInfo.InvariantCulture),
+            _ => throw new UnknownConformanceValueException($"{element} for a {target}"),
+        };
+    }
+
+    private static object? Tagged(JsonObject node, Type target)
+    {
+        var tag = node.First().Key;
+        var body = node[tag];
+        switch (tag)
+        {
+            case "$double":
+                return Convert.ChangeType(body!.GetValue<double>(), target == typeof(object) ? typeof(double) : target, CultureInfo.InvariantCulture);
+            case "$query":
+                return Query(body!.AsObject());
+            case "$path":
+                return ODataPath.Link(body!.GetValue<string>());
+            case "$map":
+            {
+                var args = target.IsGenericType ? target.GetGenericArguments() : [typeof(string), typeof(object)];
+                var map = (IDictionary)Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(args[0], args[1]))!;
+                foreach (var (key, value) in body!.AsObject())
+                {
+                    map[key] = Decode(value, args[1]);
+                }
+                return map;
+            }
+            case "$patch":
+            {
+                var type = Client.GetType("Skipcheck.Tm1.Client.Model." + body!.GetValue<string>())
+                    ?? throw new UnknownConformanceValueException("no patch " + body);
+                var values = new Dictionary<string, object?>();
+                foreach (var (key, value) in node["json"]!.AsObject())
+                {
+                    values[key] = Plain(value);
+                }
+                var ctor = type.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                    .Single(c => c.GetParameters() is [var p] && p.ParameterType.IsAssignableFrom(typeof(Dictionary<string, object?>)));
+                return ctor.Invoke([values]);
+            }
+            case "$model":
+            {
+                var type = Client.GetType("Skipcheck.Tm1.Client.Model." + body!.GetValue<string>())
+                    ?? throw new UnknownConformanceValueException("no model " + body);
+                // An argument Java built: its date-times as given, as a caller's are
+                return JsonSerializer.Deserialize(JsonSerializer.SerializeToElement(node["json"]), type, AsGiven.Value);
+            }
+            case "$enum":
+            {
+                if (!target.IsEnum || target.Name != body!.GetValue<string>())
+                {
+                    throw new UnknownConformanceValueException($"enum {body} for a {target}");
+                }
+                return Enum.Parse(target, Pascal(node["name"]!.GetValue<string>()), ignoreCase: true);
+            }
+            case "$duration":
+                return XmlConvert.ToTimeSpan(body!.GetValue<string>());
+            case "$dateTime":
+                return DateTimeOffset.Parse(body!.GetValue<string>(), CultureInfo.InvariantCulture);
+            case "$date":
+                return DateOnly.Parse(body!.GetValue<string>(), CultureInfo.InvariantCulture);
+            case "$time":
+                return TimeOnly.Parse(body!.GetValue<string>(), CultureInfo.InvariantCulture);
+            case "$bytes":
+                return Convert.FromBase64String(body!.GetValue<string>());
+            case "$handler":
+            {
+                var handler = Handler(body!.GetValue<string>());
+                return target.IsInstanceOfType(handler.Value) ? handler.Value : throw new UnknownConformanceValueException($"handler {body} for a {target}");
+            }
+            case "$type":
+            {
+                var name = body!.GetValue<string>();
+                var type = Client.GetTypes().SingleOrDefault(t => t.IsPublic && t.Name == name && t.Namespace == "Skipcheck.Tm1.Client.Services")
+                    ?? throw new UnknownConformanceValueException("no type " + name);
+                var args = node["args"]!.AsArray();
+                var factoryName = node["factory"]!.GetValue<string>();
+                if (factoryName == "new")
+                {
+                    var ctor = type.GetConstructors().SingleOrDefault(c => c.GetParameters().Length == args.Count)
+                        ?? throw new UnknownConformanceValueException($"no constructor {name}({args.Count})");
+                    var ps = ctor.GetParameters();
+                    return ctor.Invoke(args.Select((a, i) => Decode(a, ps[i].ParameterType)).ToArray());
+                }
+                var factory = type.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .SingleOrDefault(m => m.Name == Pascal(factoryName) && m.GetParameters().Length == args.Count);
+                if (factory is null && args.Count > 0)
+                {
+                    // An instance method, such as ContentPath.Child, on the first argument: the
+                    // overload the rest of the arguments decode for
+                    var receiver = Decode(args[0], type);
+                    foreach (
+                        var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                            .Where(m => m.Name == Pascal(factoryName) && m.GetParameters().Length == args.Count - 1)
+                    )
+                    {
+                        var ps = method.GetParameters();
+                        object?[] values;
+                        try
+                        {
+                            values = ps.Select((p, i) => Decode(args[i + 1], p.ParameterType)).ToArray();
+                        }
+                        catch (UnknownConformanceValueException)
+                        {
+                            continue;
+                        }
+                        if (values.Select((v, i) => v is null || ps[i].ParameterType.IsInstanceOfType(v)).All(fits => fits))
+                        {
+                            return method.Invoke(receiver, values);
+                        }
+                    }
+                }
+                if (factory is null)
+                {
+                    throw new UnknownConformanceValueException($"no factory {name}.{factoryName}");
+                }
+                var parameters = factory.GetParameters();
+                return factory.Invoke(null, args.Select((a, i) => Decode(a, parameters[i].ParameterType)).ToArray());
+            }
+        }
+        throw new UnknownConformanceValueException("unknown tag " + tag);
+    }
+
+    /// <summary>The handlers every runner knows by name (Java's <c>ConformanceHandler</c>): the
+    /// delegate, and the type it gives, for a generic method's type argument.</summary>
+    private static (object Value, Type Result) Handler(string name) =>
+        name switch
+        {
+            // (cellset, cells) => cells: a cellset stream's cells
+            "cells" => (new Func<Cellset, IAsyncEnumerable<CellsetCell>, IAsyncEnumerable<CellsetCell>>((_, cells) => cells), typeof(CellsetCell)),
+            _ => throw new UnknownConformanceValueException("no handler " + name),
+        };
+
+    /// <summary>JSON as plain values, as a patch holds them.</summary>
+    private static object? Plain(JsonNode? node) =>
+        node switch
+        {
+            null => null,
+            JsonArray a => a.Select(Plain).ToList(),
+            JsonObject o => o.ToDictionary(p => p.Key, p => Plain(p.Value)),
+            JsonValue v => Element(v) switch
+            {
+                { ValueKind: JsonValueKind.String } e => e.GetString(),
+                { ValueKind: JsonValueKind.True } => true,
+                { ValueKind: JsonValueKind.False } => false,
+                { ValueKind: JsonValueKind.Number } e => e.TryGetInt64(out var l) ? (object)l : e.GetDouble(),
+                var e => throw new UnknownConformanceValueException(e.ToString()),
+            },
+            _ => throw new UnknownConformanceValueException(node.ToJsonString()),
+        };
+
+    private static JsonElement Element(JsonNode node) => JsonSerializer.SerializeToElement(node);
+
+    private static Type? ElementType(Type type) =>
+        type.IsArray ? type.GetElementType()
+        : type.IsGenericType && type.GetGenericArguments().Length == 1 ? type.GetGenericArguments()[0]
+        : type == typeof(object) ? typeof(object)
+        : null;
+
+    /// <summary>The overload that takes Java's parameters by name, with the rest left to their
+    /// defaults (the <c>CancellationToken</c> among them).</summary>
+    public static (MethodInfo, object?[]) Bind(Type type, string name, List<string> names, JsonArray args)
+    {
+        var fits = new List<(MethodInfo, object?[])>();
+        foreach (var declared in type.GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(m => m.Name == name))
+        {
+            var m = declared;
+            if (m.IsGenericMethodDefinition)
+            {
+                // A generic method's type argument is what the handler it's given gives
+                var handlers = args.OfType<JsonObject>().Where(a => a.ContainsKey("$handler")).ToList();
+                if (handlers.Count != 1 || m.GetGenericArguments().Length != 1)
+                {
+                    continue;
+                }
+                m = m.MakeGenericMethod(Handler(handlers[0]["$handler"]!.GetValue<string>()).Result);
+            }
+            var parameters = m.GetParameters();
+            if (names.Any(n => parameters.All(p => p.Name != n)))
+            {
+                continue;
+            }
+            if (parameters.Any(p => !names.Contains(p.Name!) && !p.HasDefaultValue && p.ParameterType != typeof(CancellationToken)))
+            {
+                continue;
+            }
+            var values = parameters
+                .Select(
+                    object? (p) =>
+                    {
+                        var i = names.IndexOf(p.Name!);
+                        return i >= 0 ? ConformanceCodec.Decode(args[i], p.ParameterType)
+                            : p.HasDefaultValue ? p.DefaultValue
+                            : p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType)
+                            : null;
+                    }
+                )
+                .ToArray();
+            fits.Add((m, values));
+        }
+        return fits.Count == 1
+            ? fits[0]
+            : throw new UnknownConformanceValueException($"{fits.Count} methods {type.Name}.{name} take ({string.Join(", ", names)})");
+    }
+
+    /// <summary>Calls the method and encodes what it gave; its exceptions propagate unwrapped.</summary>
+    public static async Task<JsonNode?> Call(object service, MethodInfo method, object?[] values, int? take = null)
+    {
+        object? returned;
+        try
+        {
+            returned = method.Invoke(service, values);
+        }
+        catch (TargetInvocationException e)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(e.InnerException!).Throw();
+            throw;
+        }
+        return Result(await Await(returned, method.ReturnType, take));
+    }
+
+    /// <summary>A query rebuilt from its parts, with this client's own query builder.</summary>
+    public static ODataQuery Query(JsonObject parts)
+    {
+        string[] known = ["select", "expand", "filter", "orderBy", "top", "skip", "count", "options", "aliases"];
+        var unknown = parts.Select(p => p.Key).Except(known).ToList();
+        if (unknown.Count > 0)
+        {
+            throw new UnknownConformanceValueException("unknown query parts " + string.Join(", ", unknown));
+        }
+        var q = ODataQuery.None();
+        if (parts["select"] is JsonArray select)
+        {
+            q = q.Select(select.Select(s => s!.GetValue<string>()).ToArray());
+        }
+        if (parts["expand"] is JsonObject expand)
+        {
+            foreach (var (name, nested) in expand)
+            {
+                var inner = nested!.AsObject();
+                q = inner.Count > 0 ? q.Expand(name, _ => Query(inner)) : q.Expand(name);
+            }
+        }
+        if (parts["filter"] is JsonValue filter)
+        {
+            q = q.Filter(Filter.Raw(filter.GetValue<string>()));
+        }
+        if (parts["orderBy"] is JsonArray orderBy)
+        {
+            foreach (var key in orderBy.Select(k => k!.GetValue<string>()))
+            {
+                q = key.EndsWith(" desc", StringComparison.Ordinal) ? q.OrderByDescending(key[..^" desc".Length]) : q.OrderBy(key);
+            }
+        }
+        if (parts["top"] is JsonValue top)
+        {
+            q = q.Top(top.GetValue<int>());
+        }
+        if (parts["skip"] is JsonValue skip)
+        {
+            q = q.Skip(skip.GetValue<int>());
+        }
+        if (parts["count"] is JsonValue count && count.GetValue<bool>())
+        {
+            q = q.WithCount();
+        }
+        foreach (var (name, value) in parts["options"]?.AsObject() ?? [])
+        {
+            q = q.Option(name, value!.GetValue<string>());
+        }
+        foreach (var (name, value) in parts["aliases"]?.AsObject() ?? [])
+        {
+            q = q.Alias(new ODataPath.Alias(name), value!.GetValue<string>());
+        }
+        return q;
+    }
+
+    /// <summary>What a call gave: a <c>Task</c>'s value, or an <c>IAsyncEnumerable</c>'s items (with
+    /// <paramref name="take"/>, the first so many, for a stream that doesn't end by itself).</summary>
+    public static async Task<object?> Await(object? returned, Type declared, int? take = null)
+    {
+        switch (returned)
+        {
+            case Task task:
+                await task;
+                // By the declared type: a method that returns Task may hand back a Task<T> underneath
+                return declared.IsGenericType && declared.GetGenericTypeDefinition() == typeof(Task<>) ? declared.GetProperty("Result")!.GetValue(task) : null;
+            case null:
+                return null;
+        }
+        var enumerable = returned.GetType().GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IAsyncEnumerable<>));
+        if (enumerable is null)
+        {
+            return returned;
+        }
+        var collect = typeof(ConformanceCodec)
+            .GetMethod(nameof(Collect), BindingFlags.NonPublic | BindingFlags.Static)!
+            .MakeGenericMethod(enumerable.GetGenericArguments()[0]);
+        return await (Task<List<object?>>)collect.Invoke(null, [returned, take])!;
+    }
+
+    private static async Task<List<object?>> Collect<T>(IAsyncEnumerable<T> items, int? take)
+    {
+        var list = new List<object?>();
+        if (take <= 0)
+        {
+            return list;
+        }
+        await foreach (var item in items)
+        {
+            list.Add(item);
+            if (list.Count >= take)
+            {
+                break;
+            }
+        }
+        return list;
+    }
+
+    /// <summary>A result, encoded as the Java recorder encodes its own.</summary>
+    public static JsonNode? Result(object? value) =>
+        value switch
+        {
+            null => null,
+            string or bool => JsonValue.Create(value),
+            byte[] bytes => new JsonObject { ["$bytes"] = Convert.ToBase64String(bytes) },
+            int or long or short => JsonValue.Create(Convert.ToInt64(value, CultureInfo.InvariantCulture)),
+            double or float or decimal => JsonValue.Create(Convert.ToDouble(value, CultureInfo.InvariantCulture)),
+            IList list => new JsonArray(list.Cast<object?>().Select(Result).ToArray()),
+            _ when value.GetType().Namespace == "Skipcheck.Tm1.Client.Model" && !value.GetType().IsEnum => new JsonObject
+            {
+                ["$model"] = value.GetType().Name,
+                ["json"] = WithoutTypes(JsonSerializer.SerializeToNode(value, value.GetType(), ResultOptions)),
+            },
+            _ => JsonSerializer.SerializeToNode(value, value.GetType(), ResultOptions),
+        };
+
+    /// <summary>The client's JSON options, but reading date-times as given (the client reads TM1's
+    /// in UTC, as Java's Jackson does), for arguments Java built.</summary>
+    private static readonly Lazy<JsonSerializerOptions> AsGiven = new(() =>
+    {
+        var options = new JsonSerializerOptions(Tm1Json.Options);
+        options.Converters.Insert(0, new AsGivenDateTime());
+        options.Converters.Insert(0, new AsGivenLenientDateTime());
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    });
+
+    private sealed class AsGivenDateTime : System.Text.Json.Serialization.JsonConverter<DateTimeOffset>
+    {
+        public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.GetDateTimeOffset();
+
+        public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) =>
+            throw new NotSupportedException("Arguments are read, not written");
+    }
+
+    private sealed class AsGivenLenientDateTime : System.Text.Json.Serialization.JsonConverter<DateTimeOffset?>
+    {
+        public override DateTimeOffset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            reader.TokenType == JsonTokenType.String
+            && DateTimeOffset.TryParse(reader.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d)
+                ? d
+                : null;
+
+        public override void Write(Utf8JsonWriter writer, DateTimeOffset? value, JsonSerializerOptions options) =>
+            throw new NotSupportedException("Arguments are read, not written");
+    }
+
+    /// <summary>The client's JSON options, but writing an enum's fallback (a value this client
+    /// doesn't know, which it never sends) as null, as Java writes its fallback constant.</summary>
+    private static readonly JsonSerializerOptions ResultOptions = CreateResultOptions();
+
+    private static JsonSerializerOptions CreateResultOptions()
+    {
+        var options = new JsonSerializerOptions(Tm1Json.Options);
+        options.Converters.Insert(0, new FallbackAsNullFactory());
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    }
+
+    private sealed class FallbackAsNullFactory : System.Text.Json.Serialization.JsonConverterFactory
+    {
+        public override bool CanConvert(Type typeToConvert) => Tm1EnumConverter.Describe(typeToConvert) is not null;
+
+        public override System.Text.Json.Serialization.JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options) =>
+            (System.Text.Json.Serialization.JsonConverter)Activator.CreateInstance(typeof(FallbackAsNull<>).MakeGenericType(typeToConvert))!;
+    }
+
+    private sealed class FallbackAsNull<T> : System.Text.Json.Serialization.JsonConverter<T>
+        where T : struct, Enum
+    {
+        private readonly Tm1EnumConverter.Description _d = Tm1EnumConverter.Describe(typeof(T))!;
+
+        public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            throw new NotSupportedException("Results are written, not read");
+
+        public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
+        {
+            if (_d.ByValue.TryGetValue(value, out var name))
+            {
+                writer.WriteStringValue(name);
+            }
+            else
+            {
+                writer.WriteNullValue();
+            }
+        }
+    }
+
+    /// <summary>A model's JSON without <c>@odata.type</c>, throughout: the type is <c>$model</c>'s, as
+    /// the Java recorder writes it.</summary>
+    private static JsonNode? WithoutTypes(JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonObject o:
+                o.Remove("@odata.type");
+                foreach (var (_, v) in o.ToList())
+                {
+                    WithoutTypes(v);
+                }
+                break;
+            case JsonArray a:
+                foreach (var v in a)
+                {
+                    WithoutTypes(v);
+                }
+                break;
+        }
+        return node;
+    }
+
+    /// <summary>How a call failed, as the Java recorder writes it (kinds in Java's constant case).</summary>
+    public static JsonObject Error(Exception e)
+    {
+        var o = new JsonObject { ["exception"] = e.GetType().Name };
+        switch (e)
+        {
+            case Tm1ApiException api:
+                o["category"] = "api";
+                o["kind"] = ConstantCase(api.Kind.ToString());
+                o["status"] = api.Status;
+                if (!string.IsNullOrEmpty(api.Error?.Code))
+                {
+                    o["code"] = api.Error.Code;
+                }
+                break;
+            case Tm1UnsupportedOperationException:
+                o["category"] = "unsupported";
+                break;
+            case Tm1ProtocolException:
+                o["category"] = "protocol";
+                break;
+            case Tm1TransportException:
+                o["category"] = "transport";
+                break;
+            case ArgumentException:
+                o["category"] = "argument";
+                break;
+            case InvalidOperationException:
+                o["category"] = "state";
+                break;
+            default:
+                throw new InvalidOperationException("No conformance category for " + e, e);
+        }
+        return o;
+    }
+
+    private static string ConstantCase(string pascal) =>
+        string.Concat(pascal.Select((c, i) => i > 0 && char.IsUpper(c) ? "_" + c : c.ToString())).ToUpperInvariant();
+
+    /// <summary>Equal but for the exception's name, which is each language's own.</summary>
+    public static bool SameError(JsonObject expected, JsonObject got)
+    {
+        string Pick(JsonObject o) => string.Join("|", new[] { "category", "kind", "status", "code" }.Select(k => o[k]?.ToJsonString() ?? "-"));
+        return Pick(expected) == Pick(got);
+    }
+
+    /// <summary>For comparing: numbers as doubles, the order of members kept; with
+    /// <paramref name="dropNulls"/>, null members left out and a model by its JSON alone.</summary>
+    public static string Comparable(JsonNode? node, bool dropNulls = false) => Normal(node, dropNulls)?.ToJsonString() ?? "null";
+
+    private static JsonNode? Normal(JsonNode? node, bool dropNulls) =>
+        node switch
+        {
+            null => null,
+            JsonArray a => new JsonArray(a.Select(x => Normal(x, dropNulls)).ToArray()),
+            JsonObject o when dropNulls && o.ContainsKey("$model") => Normal(o["json"], dropNulls),
+            JsonObject o => Members(o, dropNulls),
+            JsonValue v when Element(v).ValueKind == JsonValueKind.Number => JsonValue.Create(Element(v).GetDouble()),
+            JsonValue v => JsonNode.Parse(v.ToJsonString()),
+            _ => throw new InvalidOperationException(),
+        };
+
+    private static JsonObject Members(JsonObject o, bool dropNulls)
+    {
+        var copy = new JsonObject();
+        IEnumerable<KeyValuePair<string, JsonNode?>> members = dropNulls ? o.Where(p => p.Value is not null).OrderBy(p => p.Key, StringComparer.Ordinal) : o;
+        foreach (var (key, value) in members)
+        {
+            copy[key] = Normal(value, dropNulls);
+        }
+        return copy;
+    }
+
+    /// <summary>A request as a fixture records it.</summary>
+    public static JsonObject Request(string method, string target, IReadOnlyDictionary<string, string> headers, byte[] body)
+    {
+        var kept = new JsonObject();
+        foreach (var (key, value) in headers.OrderBy(h => h.Key, StringComparer.Ordinal))
+        {
+            if (Headers.Contains(key) || (key.StartsWith("tm1-", StringComparison.Ordinal) && key != "tm1-sessioncontext"))
+            {
+                kept[key] = value;
+            }
+        }
+        var o = new JsonObject
+        {
+            ["method"] = method,
+            ["target"] = target,
+            ["headers"] = kept,
+        };
+        if (body.Length > 0)
+        {
+            var type = headers.TryGetValue("content-type", out var t) ? t.ToLowerInvariant() : "";
+            if (type.StartsWith("application/json", StringComparison.Ordinal))
+            {
+                o["json"] = JsonNode.Parse(body);
+            }
+            else if (type.StartsWith("text/", StringComparison.Ordinal))
+            {
+                o["text"] = Encoding.UTF8.GetString(body);
+            }
+            else
+            {
+                o["bytes"] = Convert.ToBase64String(body);
+            }
+        }
+        return o;
+    }
+}

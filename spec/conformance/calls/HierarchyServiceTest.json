@@ -1,0 +1,1502 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.dimension.HierarchyServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "HierarchyServiceTest#aMissingHierarchyIsNotFound#1",
+			"service" : "hierarchies",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Hierarchy'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#aStaleEtagIsRefused#1",
+			"service" : "hierarchies",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "HierarchyPatch",
+					"json" : { }
+				},
+				"W/\"0\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"0\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 412,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "stale"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1PreconditionFailedException",
+				"category" : "api",
+				"kind" : "PRECONDITION_FAILED",
+				"status" : 412,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#anUpdateWithStructureIsRefused#1",
+			"service" : "hierarchies",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "HierarchyPatch",
+					"json" : {
+						"Elements" : [
+							{
+								"Name" : "a"
+							}
+						]
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#anUpdateWithStructureIsRefused#2",
+			"service" : "hierarchies",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "HierarchyPatch",
+					"json" : {
+						"Edges" : [ ]
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#anUpdateWithStructureIsRefused#3",
+			"service" : "hierarchies",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "HierarchyPatch",
+					"json" : {
+						"Elements@odata.bind" : [
+							"Dimensions('Region')/Hierarchies('Region')/Elements('a')"
+						]
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#anUpdateWithStructureIsRefused#4",
+			"service" : "hierarchies",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "HierarchyPatch",
+					"json" : {
+						"Edges@odata.bind" : [ ]
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#anUpdateWithStructureIsRefused#5",
+			"service" : "hierarchies",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "HierarchyPatch",
+					"json" : {
+						"Edges" : [ ]
+					}
+				},
+				"W/\"1\""
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#createsAHierarchyWithItsStructure#1",
+			"service" : "hierarchies",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy"
+			],
+			"args" : [
+				"Region",
+				{
+					"$patch" : "HierarchyPatch",
+					"json" : {
+						"Name" : "Alt",
+						"Elements" : [
+							{
+								"Name" : "Total",
+								"Type" : "Consolidated"
+							},
+							{
+								"Name" : "North",
+								"Type" : "Numeric"
+							}
+						],
+						"Edges" : [
+							{
+								"ParentName" : "Total",
+								"ComponentName" : "North",
+								"Weight" : 1.0
+							}
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Alt",
+							"Elements" : [
+								{
+									"Name" : "Total",
+									"Type" : "Consolidated"
+								},
+								{
+									"Name" : "North",
+									"Type" : "Numeric"
+								}
+							],
+							"Edges" : [
+								{
+									"ParentName" : "Total",
+									"ComponentName" : "North",
+									"Weight" : 1.0
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Alt"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "Alt"
+				}
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#creatingAHierarchyThatExistsConflicts#1",
+			"service" : "hierarchies",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy"
+			],
+			"args" : [
+				"Region",
+				{
+					"$patch" : "HierarchyPatch",
+					"json" : {
+						"Name" : "Region"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Region"
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Hierarchy 'Region' already exists."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#deletesAHierarchy#1",
+			"service" : "hierarchies",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy"
+			],
+			"args" : [
+				"Region",
+				"Leaves"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Leaves')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "HierarchyServiceTest#deletesAHierarchy#2",
+			"service" : "hierarchies",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy"
+			],
+			"args" : [
+				"Region",
+				"Nope"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Hierarchy'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#escapesSpecialCharactersInNames#1",
+			"service" : "hierarchies",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"O'Brien & Co",
+				"50% / #1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('O''Brien%20%26%20Co')/Hierarchies('50%25%20%2F%20%231')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#followsNextLinksAcrossPages#1",
+			"service" : "hierarchies",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"query"
+			],
+			"args" : [
+				"Region",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "a"
+								}
+							],
+							"@odata.nextLink" : "Dimensions('Region')/Hierarchies?$skiptoken=1"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies?$skiptoken=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "b"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Hierarchy",
+					"json" : {
+						"Name" : "a"
+					}
+				},
+				{
+					"$model" : "Hierarchy",
+					"json" : {
+						"Name" : "b"
+					}
+				}
+			]
+		},
+		{
+			"id" : "HierarchyServiceTest#listsAndGetsHierarchies#1",
+			"service" : "hierarchies",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"query"
+			],
+			"args" : [
+				"Region",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Region"
+								},
+								{
+									"Name" : "Leaves"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Hierarchy",
+					"json" : {
+						"Name" : "Region"
+					}
+				},
+				{
+					"$model" : "Hierarchy",
+					"json" : {
+						"Name" : "Leaves"
+					}
+				}
+			]
+		},
+		{
+			"id" : "HierarchyServiceTest#listsAndGetsHierarchies#2",
+			"service" : "hierarchies",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"By Manager",
+				{
+					"$query" : {
+						"expand" : {
+							"Elements" : {
+								"select" : [
+									"Name"
+								],
+								"top" : 10
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('By%20Manager')?$expand=Elements($select%3DName;$top%3D10)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.etag" : "W/\"2\"",
+							"Name" : "By Manager",
+							"Visible" : true
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"@odata.etag" : "W/\"2\"",
+					"Name" : "By Manager",
+					"Visible" : true
+				}
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#listsTheRootMembers#1",
+			"service" : "hierarchies",
+			"method" : "rootMembers",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/tm1.RootMembers()?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Total"
+								},
+								{
+									"Name" : "East"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "Total"
+					}
+				},
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "East"
+					}
+				}
+			]
+		},
+		{
+			"id" : "HierarchyServiceTest#navigatesToTheDefaultHierarchyAndTheDimension#1",
+			"service" : "hierarchies",
+			"method" : "defaultHierarchy",
+			"params" : [
+				"dimension",
+				"query"
+			],
+			"args" : [
+				"Region",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/DefaultHierarchy?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Region"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "Region"
+				}
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#navigatesToTheDefaultHierarchyAndTheDimension#2",
+			"service" : "hierarchies",
+			"method" : "dimension",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Leaves",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Leaves')/Dimension",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Region"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Dimension",
+				"json" : {
+					"Name" : "Region"
+				}
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#readsTheAllAndDefaultMembers#1",
+			"service" : "hierarchies",
+			"method" : "allMember",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"UniqueName"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/AllMember?$select=Name,UniqueName",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Total",
+							"UniqueName" : "[Region].[Region].[Total]"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Member",
+				"json" : {
+					"Name" : "Total",
+					"UniqueName" : "[Region].[Region].[Total]"
+				}
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#readsTheAllAndDefaultMembers#2",
+			"service" : "hierarchies",
+			"method" : "defaultMember",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/DefaultMember",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "North"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Member",
+				"json" : {
+					"Name" : "North"
+				}
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#refusesMissingNames#1",
+			"service" : "hierarchies",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#refusesMissingNames#2",
+			"service" : "hierarchies",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#refusesMissingNames#3",
+			"service" : "hierarchies",
+			"method" : "setElement",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#replacesTheStructure#1",
+			"service" : "hierarchies",
+			"method" : "replaceStructure",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"elements",
+				"edges"
+			],
+			"args" : [
+				"Version",
+				"Version",
+				[
+					{
+						"$patch" : "ElementPatch",
+						"json" : {
+							"Name" : "All Versions",
+							"Type" : "Consolidated"
+						}
+					},
+					{
+						"$patch" : "ElementPatch",
+						"json" : {
+							"Name" : "Actual",
+							"Type" : "Numeric"
+						}
+					}
+				],
+				[
+					{
+						"$patch" : "EdgePatch",
+						"json" : {
+							"ParentName" : "All Versions",
+							"ComponentName" : "Actual",
+							"Weight" : 1.0
+						}
+					}
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Version')/Hierarchies('Version')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Elements" : [
+								{
+									"Name" : "All Versions",
+									"Type" : "Consolidated"
+								},
+								{
+									"Name" : "Actual",
+									"Type" : "Numeric"
+								}
+							],
+							"Edges" : [
+								{
+									"ParentName" : "All Versions",
+									"ComponentName" : "Actual",
+									"Weight" : 1.0
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "HierarchyServiceTest#replacesTheStructure#2",
+			"service" : "hierarchies",
+			"method" : "replaceStructure",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"elements",
+				"edges"
+			],
+			"args" : [
+				"Version",
+				"Version",
+				[
+					{
+						"$patch" : "ElementPatch",
+						"json" : {
+							"Name" : "Actual",
+							"Type" : "Numeric"
+						}
+					}
+				],
+				[ ]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Version')/Hierarchies('Version')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Elements" : [
+								{
+									"Name" : "Actual",
+									"Type" : "Numeric"
+								}
+							],
+							"Edges" : [ ]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "HierarchyServiceTest#savesACopy#1",
+			"service" : "hierarchies",
+			"method" : "saveAs",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"newName"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Copy"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/tm1.SaveAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Copy"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Copy"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "Copy"
+				}
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#savesACopy#2",
+			"service" : "hierarchies",
+			"method" : "saveAs",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"newName",
+				"overwrite",
+				"keepExistingAttributes"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Copy",
+				true,
+				false
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/tm1.SaveAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Copy",
+							"Overwrite" : true,
+							"KeepExistingAttributes" : false
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Copy"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "Copy"
+				}
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#savesACopy#3",
+			"service" : "hierarchies",
+			"method" : "saveAs",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"newName"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Copy"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/tm1.SaveAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Copy"
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Hierarchy 'Copy' already exists."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "HierarchyServiceTest#setsAnElementLastOrBeforeAnother#1",
+			"service" : "hierarchies",
+			"method" : "setElement",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/tm1.SetElement",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "HierarchyServiceTest#setsAnElementLastOrBeforeAnother#2",
+			"service" : "hierarchies",
+			"method" : "setElement",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"before"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"O'Neil",
+				"Total"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/tm1.SetElement",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('O''Neil')",
+							"Before@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "HierarchyServiceTest#thereIsNoAllMemberWithSeveralRoots#1",
+			"service" : "hierarchies",
+			"method" : "allMember",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/AllMember",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "HierarchyServiceTest#updatesWithAndWithoutAnEtag#1",
+			"service" : "hierarchies",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "HierarchyPatch",
+					"json" : {
+						"Visible" : false
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Visible" : false
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "HierarchyServiceTest#updatesWithAndWithoutAnEtag#2",
+			"service" : "hierarchies",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "HierarchyPatch",
+					"json" : {
+						"UniqueName" : "x"
+					}
+				},
+				"W/\"2\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"2\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"UniqueName" : "x"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

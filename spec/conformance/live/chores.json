@@ -1,0 +1,124 @@
+{
+	"specVersion" : 1,
+	"name" : "chores",
+	"description" : "A chore over a fresh process: create with a task, read, add, change and remove tasks by step, read a task's process and chore, activate and deactivate by patch, run it now, a missing chore, delete.",
+	"names" : [ "process", "chore", "missing" ],
+	"steps" : [
+		{
+			"service" : "processes",
+			"method" : "create",
+			"params" : [ "process" ],
+			"args" : [ { "$patch" : "ProcessPatch", "json" : { "Name" : "${process}", "Parameters" : [ { "Name" : "pName", "Prompt" : "", "Value" : "", "Type" : "String" } ], "PrologProcedure" : "sName = pName;\n" } } ],
+			"expect" : { "fields" : { "Name" : "${process}" } }
+		},
+		{
+			"service" : "chores",
+			"method" : "create",
+			"params" : [ "chore" ],
+			"args" : [ { "$patch" : "ChorePatch", "json" : { "Name" : "${chore}", "StartTime" : "2026-01-01T02:00:00Z", "DSTSensitive" : false, "Frequency" : "PT24H", "ExecutionMode" : "SingleCommit", "Active" : false, "Tasks" : [ { "Process@odata.bind" : "Processes('${process}')", "Parameters" : [ { "Name" : "pName", "Value" : "first" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${chore}" } }
+		},
+		{
+			"service" : "chores",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${chore}", { "$query" : { "select" : [ "Name", "Active", "ExecutionMode" ] } } ],
+			"expect" : { "fields" : { "Name" : "${chore}", "Active" : false, "ExecutionMode" : "SingleCommit" } }
+		},
+		{
+			"service" : "chores",
+			"method" : "list",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { "select" : [ "Name" ], "filter" : "Name eq '${chore}'" } } ],
+			"expect" : { "items" : { "Name" : [ "${chore}" ] } }
+		},
+		{
+			"service" : "chores",
+			"method" : "addTask",
+			"params" : [ "name", "task" ],
+			"args" : [ "${chore}", { "$patch" : "ChoreTaskPatch", "json" : { "Process@odata.bind" : "Processes('${process}')", "Parameters" : [ { "Name" : "pName", "Value" : "second" } ] } } ],
+			"expect" : { "fields" : { "Step" : 1 } }
+		},
+		{
+			"service" : "chores",
+			"method" : "tasks",
+			"params" : [ "name", "query" ],
+			"args" : [ "${chore}", { "$query" : { "select" : [ "Step" ] } } ],
+			"expect" : { "items" : { "Step" : [ 0, 1 ] } }
+		},
+		{
+			"service" : "chores",
+			"method" : "updateTask",
+			"params" : [ "name", "step", "patch" ],
+			"args" : [ "${chore}", 1, { "$patch" : "ChoreTaskPatch", "json" : { "Parameters" : [ { "Name" : "pName", "Value" : "third" } ] } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "chores",
+			"method" : "taskProcess",
+			"params" : [ "name", "step", "query" ],
+			"args" : [ "${chore}", 0, { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "${process}" } }
+		},
+		{
+			"service" : "chores",
+			"method" : "taskChore",
+			"params" : [ "name", "step", "query" ],
+			"args" : [ "${chore}", 0, { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "${chore}" } }
+		},
+		{
+			"service" : "chores",
+			"method" : "deleteTask",
+			"params" : [ "name", "step" ],
+			"args" : [ "${chore}", 0 ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "chores",
+			"method" : "tasks",
+			"params" : [ "name", "query" ],
+			"args" : [ "${chore}", { "$query" : { "select" : [ "Step" ] } } ],
+			"expect" : { "items" : { "Step" : [ 0 ] } }
+		},
+		{
+			"service" : "chores",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${chore}", { "$patch" : "ChorePatch", "json" : { "Active" : true } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "chores",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${chore}", { "$patch" : "ChorePatch", "json" : { "Active" : false } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "chores",
+			"method" : "execute",
+			"params" : [ "name" ],
+			"args" : [ "${chore}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "chores",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "chores",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${chore}" ],
+			"expect" : { "none" : true }
+		}
+	],
+	"finally" : [
+		{ "service" : "chores", "method" : "delete", "params" : [ "name" ], "args" : [ "${chore}" ] },
+		{ "service" : "processes", "method" : "delete", "params" : [ "name" ], "args" : [ "${process}" ] }
+	]
+}

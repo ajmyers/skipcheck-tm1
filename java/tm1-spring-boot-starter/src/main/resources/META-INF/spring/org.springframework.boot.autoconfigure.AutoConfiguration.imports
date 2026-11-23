@@ -1,0 +1,3 @@
+io.skipcheck.tm1.spring.boot.autoconfigure.Tm1ConnectionDetailsAutoConfiguration
+io.skipcheck.tm1.spring.boot.autoconfigure.Tm1AutoConfiguration
+io.skipcheck.tm1.spring.boot.autoconfigure.Tm1MetricsAutoConfiguration

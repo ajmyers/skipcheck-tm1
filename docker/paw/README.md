@@ -11,7 +11,7 @@ end-to-end tests.
 > redistributes them. You bring your own licensed zip, and you are responsible
 > for complying with your IBM license terms.
 
-For tests, [`tm1-testcontainers`](../../tm1-testcontainers/README.md#planning-analytics-workspace)'s
+For tests, [`tm1-testcontainers`](../../java/tm1-testcontainers/README.md#planning-analytics-workspace)'s
 `PawContainer` runs this script inside a Linux container, so it works on Windows too.
 
 ## Quick start

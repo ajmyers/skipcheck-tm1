@@ -1,0 +1,62 @@
+{
+	"specVersion" : 1,
+	"name" : "annotations",
+	"description" : "A comment on a cell of a fresh cube, as Workspace makes it: create, find it by cube, the cube's facet value, an ID that isn't one of TM1's.",
+	"names" : [ "region", "month", "cube", "missing" ],
+	"steps" : [
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${region}", "Hierarchies" : [ { "Name" : "${region}", "Elements" : [ { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${region}" } }
+		},
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${month}", "Hierarchies" : [ { "Name" : "${month}", "Elements" : [ { "Name" : "Jan", "Type" : "Numeric" }, { "Name" : "Feb", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${month}" } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "create",
+			"params" : [ "cube" ],
+			"args" : [ { "$patch" : "CubePatch", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${region}')", "Dimensions('${month}')" ] } } ],
+			"expect" : { "fields" : { "Name" : "${cube}" } }
+		},
+		{
+			"service" : "annotations",
+			"method" : "create",
+			"params" : [ "cube", "elements", "text" ],
+			"args" : [ "${cube}", { "$map" : { "${region}" : "North", "${month}" : "Jan" } }, "first note" ],
+			"expect" : { "fields" : { "Text" : "first note", "objectName" : "${cube}", "commentLocation" : "North,Jan" } }
+		},
+		{
+			"service" : "annotations",
+			"method" : "cubeAnnotations",
+			"params" : [ "cube", "query" ],
+			"args" : [ "${cube}", { "$query" : { "select" : [ "Text" ] } } ],
+			"expect" : { "items" : { "Text" : [ "first note" ] } }
+		},
+		{
+			"service" : "annotations",
+			"method" : "facet",
+			"params" : [ "facet", "value", "query" ],
+			"args" : [ "}Cubes", "${cube}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "}Cubes" } }
+		},
+		{
+			"service" : "annotations",
+			"method" : "get",
+			"params" : [ "id", "query" ],
+			"args" : [ "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "INVALID_UNIQUE_NAME", "status" : 400 } }
+		}
+	],
+	"finally" : [
+		{ "service" : "cubes", "method" : "delete", "params" : [ "name" ], "args" : [ "${cube}" ] },
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${region}" ] },
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${month}" ] }
+	]
+}

@@ -1,0 +1,95 @@
+{
+	"specVersion" : 1,
+	"name" : "edges",
+	"description" : "A fresh dimension Total = North + South, with East alone: list, read and reweight an edge, its parent, component and hierarchy, add East, remove North, a missing edge.",
+	"names" : [ "dim" ],
+	"steps" : [
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${dim}", "Hierarchies" : [ { "Name" : "${dim}", "Elements" : [ { "Name" : "Total", "Type" : "Consolidated" }, { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" }, { "Name" : "East", "Type" : "Numeric" } ], "Edges" : [ { "ParentName" : "Total", "ComponentName" : "North", "Weight" : 1.0 }, { "ParentName" : "Total", "ComponentName" : "South", "Weight" : 1.0 } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${dim}" } }
+		},
+		{
+			"service" : "edges",
+			"method" : "list",
+			"params" : [ "dimension", "hierarchy", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$query" : { } } ],
+			"expect" : { "count" : 2 }
+		},
+		{
+			"service" : "edges",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "parent", "component", "query" ],
+			"args" : [ "${dim}", "${dim}", "Total", "North", { "$query" : { "select" : [ "ParentName", "ComponentName", "Weight" ] } } ],
+			"expect" : { "fields" : { "ParentName" : "Total", "ComponentName" : "North", "Weight" : 1.0 } }
+		},
+		{
+			"service" : "edges",
+			"method" : "update",
+			"params" : [ "dimension", "hierarchy", "parent", "component", "patch" ],
+			"args" : [ "${dim}", "${dim}", "Total", "North", { "$patch" : "EdgePatch", "json" : { "Weight" : 3.0 } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "edges",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "parent", "component", "query" ],
+			"args" : [ "${dim}", "${dim}", "Total", "North", { "$query" : { "select" : [ "Weight" ] } } ],
+			"expect" : { "fields" : { "Weight" : 3.0 } }
+		},
+		{
+			"service" : "edges",
+			"method" : "parent",
+			"params" : [ "dimension", "hierarchy", "parent", "component", "query" ],
+			"args" : [ "${dim}", "${dim}", "Total", "North", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "Total" } }
+		},
+		{
+			"service" : "edges",
+			"method" : "component",
+			"params" : [ "dimension", "hierarchy", "parent", "component", "query" ],
+			"args" : [ "${dim}", "${dim}", "Total", "North", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "North" } }
+		},
+		{
+			"service" : "edges",
+			"method" : "hierarchy",
+			"params" : [ "dimension", "hierarchy", "parent", "component", "query" ],
+			"args" : [ "${dim}", "${dim}", "Total", "North", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "${dim}" } }
+		},
+		{
+			"service" : "edges",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy", "edge" ],
+			"args" : [ "${dim}", "${dim}", { "$patch" : "EdgePatch", "json" : { "ParentName" : "Total", "ComponentName" : "East", "Weight" : 1.0 } } ],
+			"expect" : { "fields" : { "ParentName" : "Total", "ComponentName" : "East" } }
+		},
+		{
+			"service" : "edges",
+			"method" : "delete",
+			"params" : [ "dimension", "hierarchy", "parent", "component" ],
+			"args" : [ "${dim}", "${dim}", "Total", "North" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "elements",
+			"method" : "components",
+			"params" : [ "dimension", "hierarchy", "element", "query" ],
+			"args" : [ "${dim}", "${dim}", "Total", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "South", "East" ] } }
+		},
+		{
+			"service" : "edges",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "parent", "component", "query" ],
+			"args" : [ "${dim}", "${dim}", "Total", "North", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND" } }
+		}
+	],
+	"finally" : [
+		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${dim}" ] }
+	]
+}

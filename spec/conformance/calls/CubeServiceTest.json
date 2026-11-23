@@ -1,0 +1,1284 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.cube.CubeServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "CubeServiceTest#aMissingCubeIsNotFound#1",
+			"service" : "cubes",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Cube'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "CubeServiceTest#aStaleEtagIsRefused#1",
+			"service" : "cubes",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$patch" : "CubePatch",
+					"json" : {
+						"Rules" : "x"
+					}
+				},
+				"W/\"0\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Cubes('Sales')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"0\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Rules" : "x"
+						}
+					},
+					"response" : {
+						"status" : 412,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "stale"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1PreconditionFailedException",
+				"category" : "api",
+				"kind" : "PRECONDITION_FAILED",
+				"status" : 412,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "CubeServiceTest#checksRulesAsSavedOrAsGiven#1",
+			"service" : "cubes",
+			"method" : "checkRules",
+			"params" : [
+				"name",
+				"rules"
+			],
+			"args" : [
+				"Sales",
+				"SKIPCHECK"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.CheckRules",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Rules" : "SKIPCHECK"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LineNumber" : 2,
+									"Message" : "Syntax error"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "RuleSyntaxError",
+					"json" : {
+						"LineNumber" : 2,
+						"Message" : "Syntax error"
+					}
+				}
+			]
+		},
+		{
+			"id" : "CubeServiceTest#checksRulesAsSavedOrAsGiven#2",
+			"service" : "cubes",
+			"method" : "checkRules",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Sales"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.CheckRules",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "CubeServiceTest#createsACubeOverDimensions#1",
+			"service" : "cubes",
+			"method" : "create",
+			"params" : [
+				"cube"
+			],
+			"args" : [
+				{
+					"$patch" : "CubePatch",
+					"json" : {
+						"Name" : "Sales",
+						"Dimensions@odata.bind" : [
+							"Dimensions('Region')",
+							"Dimensions('Month')"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Sales",
+							"Dimensions@odata.bind" : [
+								"Dimensions('Region')",
+								"Dimensions('Month')"
+							]
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Sales"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cube",
+				"json" : {
+					"Name" : "Sales"
+				}
+			}
+		},
+		{
+			"id" : "CubeServiceTest#deletesACube#1",
+			"service" : "cubes",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Sales"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cubes('Sales')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CubeServiceTest#followsNextLinksAcrossPages#1",
+			"service" : "cubes",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "a"
+								}
+							],
+							"@odata.nextLink" : "Cubes?$skiptoken=2"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes?$skiptoken=2",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "b"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Cube",
+					"json" : {
+						"Name" : "a"
+					}
+				},
+				{
+					"$model" : "Cube",
+					"json" : {
+						"Name" : "b"
+					}
+				}
+			]
+		},
+		{
+			"id" : "CubeServiceTest#getsACubeWithItsEtag#1",
+			"service" : "cubes",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"Rules"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')?$select=Name,Rules",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.etag" : "W/\"1\"",
+							"Name" : "Sales",
+							"Rules" : "SKIPCHECK;"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cube",
+				"json" : {
+					"@odata.etag" : "W/\"1\"",
+					"Name" : "Sales",
+					"Rules" : "SKIPCHECK;"
+				}
+			}
+		},
+		{
+			"id" : "CubeServiceTest#listsAllCubesModelCubesAndControlCubes#1",
+			"service" : "cubes",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"top" : 2
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes?$top=2",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Sales"
+								},
+								{
+									"Name" : "}Stats"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Cube",
+					"json" : {
+						"Name" : "Sales"
+					}
+				},
+				{
+					"$model" : "Cube",
+					"json" : {
+						"Name" : "}Stats"
+					}
+				}
+			]
+		},
+		{
+			"id" : "CubeServiceTest#listsAllCubesModelCubesAndControlCubes#2",
+			"service" : "cubes",
+			"method" : "modelCubes",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"filter" : "startswith(Name,'Sales')",
+						"orderBy" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ModelCubes()?$select=Name&$filter=startswith(Name,'Sales')&$orderby=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Sales"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Cube",
+					"json" : {
+						"Name" : "Sales"
+					}
+				}
+			]
+		},
+		{
+			"id" : "CubeServiceTest#listsAllCubesModelCubesAndControlCubes#3",
+			"service" : "cubes",
+			"method" : "controlCubes",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ControlCubes()",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "}Stats"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Cube",
+					"json" : {
+						"Name" : "}Stats"
+					}
+				}
+			]
+		},
+		{
+			"id" : "CubeServiceTest#quotesANameWithAnApostrophe#1",
+			"service" : "cubes",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Joe's",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Joe''s')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Joe's"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cube",
+				"json" : {
+					"Name" : "Joe's"
+				}
+			}
+		},
+		{
+			"id" : "CubeServiceTest#readsDimensionsInBothOrders#1",
+			"service" : "cubes",
+			"method" : "dimensions",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/Dimensions",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Month"
+								},
+								{
+									"Name" : "Region"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Dimension",
+					"json" : {
+						"Name" : "Month"
+					}
+				},
+				{
+					"$model" : "Dimension",
+					"json" : {
+						"Name" : "Region"
+					}
+				}
+			]
+		},
+		{
+			"id" : "CubeServiceTest#readsDimensionsInBothOrders#2",
+			"service" : "cubes",
+			"method" : "dimensionsStorageOrder",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/tm1.DimensionsStorageOrder()?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Region"
+								},
+								{
+									"Name" : "Month"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Dimension",
+					"json" : {
+						"Name" : "Region"
+					}
+				},
+				{
+					"$model" : "Dimension",
+					"json" : {
+						"Name" : "Month"
+					}
+				}
+			]
+		},
+		{
+			"id" : "CubeServiceTest#refusesAMissingName#1",
+			"service" : "cubes",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "CubeServiceTest#reordersDimensions#1",
+			"service" : "cubes",
+			"method" : "reorderDimensions",
+			"params" : [
+				"name",
+				"dimensions"
+			],
+			"args" : [
+				"Sales",
+				[
+					"Month",
+					"Region"
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.ReorderDimensions",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Dimensions@odata.bind" : [
+								"Dimensions('Month')",
+								"Dimensions('Region')"
+							]
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.context" : "$metadata#Edm.Double",
+							"value" : 12.5
+						}
+					}
+				}
+			],
+			"result" : 12.5
+		},
+		{
+			"id" : "CubeServiceTest#runsEachCubeOperation#1",
+			"service" : "cubes",
+			"method" : "load",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Sales"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.Load",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CubeServiceTest#runsEachCubeOperation#2",
+			"service" : "cubes",
+			"method" : "unload",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Sales"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.Unload",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CubeServiceTest#runsEachCubeOperation#3",
+			"service" : "cubes",
+			"method" : "lock",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Sales"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.Lock",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CubeServiceTest#runsEachCubeOperation#4",
+			"service" : "cubes",
+			"method" : "unlock",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Sales"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.Unlock",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CubeServiceTest#runsEachCubeOperation#5",
+			"service" : "cubes",
+			"method" : "reserve",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Sales"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.Reserve",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CubeServiceTest#runsEachCubeOperation#6",
+			"service" : "cubes",
+			"method" : "release",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Sales"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.Release",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CubeServiceTest#tracesACellsCalculationAndFeeders#1",
+			"service" : "cubes",
+			"method" : "traceCellCalculation",
+			"params" : [
+				"name",
+				"tuple",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$map" : {
+						"Region" : "North",
+						"Month" : "Jan"
+					}
+				},
+				{
+					"$query" : {
+						"expand" : {
+							"Components" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.TraceCellCalculation?$expand=Components",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Tuple@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+								"Dimensions('Month')/Hierarchies('Month')/Elements('Jan')"
+							]
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Type" : "Rule",
+							"Statements" : [
+								"['Margin'] = N: 1;"
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "CalculationComponent",
+				"json" : {
+					"Type" : "Rule",
+					"Statements" : [
+						"['Margin'] = N: 1;"
+					]
+				}
+			}
+		},
+		{
+			"id" : "CubeServiceTest#tracesACellsCalculationAndFeeders#2",
+			"service" : "cubes",
+			"method" : "traceFeeders",
+			"params" : [
+				"name",
+				"tuple",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$map" : {
+						"Region" : "North",
+						"Month" : "Jan"
+					}
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.TraceFeeders",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Tuple@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+								"Dimensions('Month')/Hierarchies('Month')/Elements('Jan')"
+							]
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"FedCells" : [
+								{
+									"Fed" : true
+								}
+							],
+							"Statements" : [ ]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "FeederTrace",
+				"json" : {
+					"FedCells" : [
+						{
+							"Fed" : true
+						}
+					],
+					"Statements" : [ ]
+				}
+			}
+		},
+		{
+			"id" : "CubeServiceTest#tracesACellsCalculationAndFeeders#3",
+			"service" : "cubes",
+			"method" : "checkFeeders",
+			"params" : [
+				"name",
+				"tuple",
+				"selection",
+				"query"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$map" : {
+						"Region" : "North",
+						"Month" : "Jan"
+					}
+				},
+				{
+					"$enum" : "CheckFeedersSelection",
+					"name" : "UNFED",
+					"json" : "Unfed"
+				},
+				{
+					"$query" : {
+						"expand" : {
+							"Tuple" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/tm1.CheckFeeders?$expand=Tuple",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Tuple@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+								"Dimensions('Month')/Hierarchies('Month')/Elements('Jan')"
+							],
+							"Selection" : "Unfed"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Fed" : false
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "FedCellDescriptor",
+					"json" : {
+						"Fed" : false
+					}
+				}
+			]
+		},
+		{
+			"id" : "CubeServiceTest#updatesWithAndWithoutAnEtag#1",
+			"service" : "cubes",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$patch" : "CubePatch",
+					"json" : {
+						"Rules" : null
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Cubes('Sales')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Rules" : null
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "CubeServiceTest#updatesWithAndWithoutAnEtag#2",
+			"service" : "cubes",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Sales",
+				{
+					"$patch" : "CubePatch",
+					"json" : {
+						"Rules" : "SKIPCHECK;"
+					}
+				},
+				"W/\"1\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Cubes('Sales')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"1\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Rules" : "SKIPCHECK;"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

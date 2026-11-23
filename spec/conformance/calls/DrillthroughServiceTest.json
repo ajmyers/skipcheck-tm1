@@ -1,0 +1,865 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.data.DrillthroughServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "DrillthroughServiceTest#aMissingDrillthroughIsNotFound#1",
+			"service" : "drillthrough",
+			"method" : "execute",
+			"params" : [
+				"cellset",
+				"ordinal",
+				"drillthrough",
+				"query"
+			],
+			"args" : [
+				"c1",
+				3,
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/Cells(3)/DrillthroughScripts('Nope')/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Drillthrough'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "DrillthroughServiceTest#listsACellsDrillthroughs#1",
+			"service" : "drillthrough",
+			"method" : "scripts",
+			"params" : [
+				"cellset",
+				"ordinal",
+				"query"
+			],
+			"args" : [
+				"c1",
+				3,
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')/Cells(3)/DrillthroughScripts?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Detail"
+								},
+								{
+									"Name" : "Joe's"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Drillthrough",
+					"json" : {
+						"Name" : "Detail"
+					}
+				},
+				{
+					"$model" : "Drillthrough",
+					"json" : {
+						"Name" : "Joe's"
+					}
+				}
+			]
+		},
+		{
+			"id" : "DrillthroughServiceTest#listsACellsDrillthroughs#2",
+			"service" : "drillthrough",
+			"method" : "scripts",
+			"params" : [
+				"cellset",
+				"ordinal",
+				"query"
+			],
+			"args" : [
+				"c1",
+				0,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cellsets('c1')/Cells(0)/DrillthroughScripts",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "DrillthroughServiceTest#readsPagesAndDeletesARowset#1",
+			"service" : "drillthrough",
+			"method" : "rowset",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"r1",
+				{
+					"$query" : {
+						"expand" : {
+							"Rows" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Rowsets('r1')?$expand=Rows",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "r1",
+							"Rows" : [
+								{
+									"Region" : "North",
+									"Amount" : 1
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Rowset",
+				"json" : {
+					"ID" : "r1",
+					"Rows" : [
+						{
+							"Amount" : 1,
+							"Region" : "North"
+						}
+					]
+				}
+			}
+		},
+		{
+			"id" : "DrillthroughServiceTest#readsPagesAndDeletesARowset#2",
+			"service" : "drillthrough",
+			"method" : "rows",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"r1",
+				{
+					"$query" : {
+						"top" : 1
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Rowsets('r1')/Rows?$top=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Region" : "North"
+								}
+							],
+							"@odata.nextLink" : "Rowsets('r1')/Rows?$skiptoken=1"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Rowsets('r1')/Rows?$skiptoken=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Region" : "South"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "RowsetRow",
+					"json" : {
+						"Region" : "North"
+					}
+				},
+				{
+					"$model" : "RowsetRow",
+					"json" : {
+						"Region" : "South"
+					}
+				}
+			]
+		},
+		{
+			"id" : "DrillthroughServiceTest#readsPagesAndDeletesARowset#3",
+			"service" : "drillthrough",
+			"method" : "deleteRowset",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"r1"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Rowsets('r1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "DrillthroughServiceTest#readsPagesAndDeletesARowset#4",
+			"service" : "drillthrough",
+			"method" : "rowset",
+			"params" : [
+				"id",
+				"query"
+			],
+			"args" : [
+				"r1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Rowsets('r1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'r1' can not be found in collection of type 'Rowset'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "DrillthroughServiceTest#refusesAMissingProcess#1",
+			"service" : "drillthrough",
+			"method" : "executeRelationalProcess",
+			"params" : [
+				"process",
+				"parameters"
+			],
+			"args" : [
+				null,
+				[ ]
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "DrillthroughServiceTest#runsACellsDrillthroughToACellset#1",
+			"service" : "drillthrough",
+			"method" : "execute",
+			"params" : [
+				"cellset",
+				"ordinal",
+				"drillthrough",
+				"query"
+			],
+			"args" : [
+				"c1",
+				3,
+				"Detail",
+				{
+					"$query" : {
+						"expand" : {
+							"Cells" : {
+								"select" : [
+									"Value"
+								]
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/Cells(3)/DrillthroughScripts('Detail')/tm1.Execute?$expand=Cells($select%3DValue)",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"Cells" : [
+								{
+									"Value" : 4
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cellset",
+				"json" : {
+					"ID" : "d1",
+					"Cells" : [
+						{
+							"Value" : 4
+						}
+					]
+				}
+			}
+		},
+		{
+			"id" : "DrillthroughServiceTest#runsACellsDrillthroughToACellset#2",
+			"service" : "drillthrough",
+			"method" : "execute",
+			"params" : [
+				"cellset",
+				"ordinal",
+				"drillthrough",
+				"query"
+			],
+			"args" : [
+				"c'1",
+				0,
+				"Joe's",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c''1')/Cells(0)/DrillthroughScripts('Joe''s')/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d2"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cellset",
+				"json" : {
+					"ID" : "d2"
+				}
+			}
+		},
+		{
+			"id" : "DrillthroughServiceTest#runsADrillthroughProcessDirectly#1",
+			"service" : "drillthrough",
+			"method" : "executeProcess",
+			"params" : [
+				"process",
+				"parameters",
+				"query"
+			],
+			"args" : [
+				"Joe's Detail",
+				[
+					{
+						"$patch" : "ProcessParameterPatch",
+						"json" : {
+							"Name" : "pRegion",
+							"Value" : "North"
+						}
+					},
+					{
+						"$patch" : "ProcessParameterPatch",
+						"json" : {
+							"Name" : "pAmount",
+							"Value" : 2
+						}
+					}
+				],
+				{
+					"$query" : {
+						"expand" : {
+							"Axes" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteCubeDrillthrough?$expand=Axes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"DrillthroughProcess@odata.bind" : "Processes('Joe''s%20Detail')",
+							"Parameters" : [
+								{
+									"Name" : "pRegion",
+									"Value" : "North"
+								},
+								{
+									"Name" : "pAmount",
+									"Value" : 2
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cellset",
+				"json" : {
+					"ID" : "d1"
+				}
+			}
+		},
+		{
+			"id" : "DrillthroughServiceTest#runsADrillthroughProcessDirectly#2",
+			"service" : "drillthrough",
+			"method" : "executeProcess",
+			"params" : [
+				"process",
+				"parameters",
+				"query"
+			],
+			"args" : [
+				"Detail",
+				[ ],
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteCubeDrillthrough",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"DrillthroughProcess@odata.bind" : "Processes('Detail')"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d2"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Cellset",
+				"json" : {
+					"ID" : "d2"
+				}
+			}
+		},
+		{
+			"id" : "DrillthroughServiceTest#runsADrillthroughProcessDirectly#3",
+			"service" : "drillthrough",
+			"method" : "executeRelationalProcess",
+			"params" : [
+				"process",
+				"parameters"
+			],
+			"args" : [
+				"Detail",
+				[
+					{
+						"$patch" : "ProcessParameterPatch",
+						"json" : {
+							"Name" : "pRegion",
+							"Value" : "North"
+						}
+					},
+					{
+						"$patch" : "ProcessParameterPatch",
+						"json" : {
+							"Name" : "pAmount",
+							"Value" : 2
+						}
+					}
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteRelationalDrillthrough",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"DrillthroughProcess@odata.bind" : "Processes('Detail')",
+							"Parameters" : [
+								{
+									"Name" : "pRegion",
+									"Value" : "North"
+								},
+								{
+									"Name" : "pAmount",
+									"Value" : 2
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Region" : "North"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"Region" : "North"
+				}
+			]
+		},
+		{
+			"id" : "DrillthroughServiceTest#runsADrillthroughProcessDirectly#4",
+			"service" : "drillthrough",
+			"method" : "executeRelationalProcessWithRowset",
+			"params" : [
+				"process",
+				"parameters"
+			],
+			"args" : [
+				"Detail",
+				[ ]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteRelationalDrillthroughWithRowset",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"DrillthroughProcess@odata.bind" : "Processes('Detail')"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "r1"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Rowset",
+				"json" : {
+					"ID" : "r1"
+				}
+			}
+		},
+		{
+			"id" : "DrillthroughServiceTest#runsARelationalDrillthroughToRowsOrARowset#1",
+			"service" : "drillthrough",
+			"method" : "executeRelational",
+			"params" : [
+				"cellset",
+				"ordinal",
+				"drillthrough"
+			],
+			"args" : [
+				"c1",
+				3,
+				"Detail"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/Cells(3)/DrillthroughScripts('Detail')/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Region" : "North",
+									"Amount" : 1
+								},
+								{
+									"Region" : "South",
+									"Amount" : 2.5
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"Region" : "North",
+					"Amount" : 1
+				},
+				{
+					"Region" : "South",
+					"Amount" : 2.5
+				}
+			]
+		},
+		{
+			"id" : "DrillthroughServiceTest#runsARelationalDrillthroughToRowsOrARowset#2",
+			"service" : "drillthrough",
+			"method" : "executeRelationalWithRowset",
+			"params" : [
+				"cellset",
+				"ordinal",
+				"drillthrough"
+			],
+			"args" : [
+				"c1",
+				3,
+				"Detail"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cellsets('c1')/Cells(3)/DrillthroughScripts('Detail')/tm1.ExecuteWithRowset",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "r1"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Rowset",
+				"json" : {
+					"ID" : "r1"
+				}
+			}
+		}
+	]
+}

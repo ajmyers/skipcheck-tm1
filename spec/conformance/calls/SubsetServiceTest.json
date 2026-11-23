@@ -1,0 +1,2353 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.dimension.SubsetServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "SubsetServiceTest#aMissingElementIsNotFound#1",
+			"service" : "subsets",
+			"method" : "setElement",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				"Nope"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('s')/tm1.SetElement",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('Nope')"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Element'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#aMissingSubsetIsNotFound#1",
+			"service" : "subsets",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Subset'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#aMissingSubsetIsNotFound#2",
+			"service" : "subsets",
+			"method" : "elements",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('Nope')/Elements",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Subset'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#aStaleEtagIsRefused#1",
+			"service" : "subsets",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Leaves",
+				{
+					"$patch" : "SubsetPatch",
+					"json" : {
+						"Expression" : "{}"
+					}
+				},
+				"W/\"0\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('Leaves')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"0\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Expression" : "{}"
+						}
+					},
+					"response" : {
+						"status" : 412,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "stale"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1PreconditionFailedException",
+				"category" : "api",
+				"kind" : "PRECONDITION_FAILED",
+				"status" : 412,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#aSubsetThatExistsIsRefused#1",
+			"service" : "subsets",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$patch" : "SubsetPatch",
+					"json" : {
+						"Name" : "Leaves",
+						"Expression" : "{}"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Leaves",
+							"Expression" : "{}"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Subset 'Leaves' already exists."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#addsClearsAndListsElements#1",
+			"service" : "subsets",
+			"method" : "addElements",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"elements"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				[
+					"West",
+					"East"
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('s')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Elements@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Elements('West')",
+								"Dimensions('Region')/Hierarchies('Region')/Elements('East')"
+							]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#addsClearsAndListsElements#2",
+			"service" : "subsets",
+			"method" : "addElements",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"elements"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"s",
+				[ ]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/PrivateSubsets('s')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Elements@odata.bind" : [ ]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#addsClearsAndListsElements#3",
+			"service" : "subsets",
+			"method" : "clearElements",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"s"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/PrivateSubsets('s')/Elements/$ref",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#addsClearsAndListsElements#4",
+			"service" : "subsets",
+			"method" : "elements",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"Type"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('s')/Elements?$select=Name,Type",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "West",
+									"Type" : "Numeric"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Element",
+					"json" : {
+						"Name" : "West",
+						"Type" : "Numeric"
+					}
+				}
+			]
+		},
+		{
+			"id" : "SubsetServiceTest#createsSessionSubsetsFromADefinitionOrAnotherSubset#1",
+			"service" : "subsets",
+			"method" : "createSessionSubset",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"definition"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "SubsetPatch",
+					"json" : {
+						"Name" : "Wanted",
+						"Expression" : "{[Region].[West]}"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/tm1.CreateSessionSubset",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Subset" : {
+								"Name" : "Wanted",
+								"Expression" : "{[Region].[West]}"
+							}
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "yExesF4AAIABAAAQ",
+							"Expression" : "{[Region].[West]}"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"Name" : "yExesF4AAIABAAAQ",
+					"Expression" : "{[Region].[West]}"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#createsSessionSubsetsFromADefinitionOrAnotherSubset#2",
+			"service" : "subsets",
+			"method" : "createSessionSubset",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"definition"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "SubsetPatch",
+					"json" : {
+						"Elements@odata.bind" : [
+							"Dimensions('Region')/Hierarchies('Region')/Elements('West')"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/tm1.CreateSessionSubset",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Subset" : {
+								"Elements@odata.bind" : [
+									"Dimensions('Region')/Hierarchies('Region')/Elements('West')"
+								]
+							}
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "yExesF4AAIABAAAR"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"Name" : "yExesF4AAIABAAAR"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#createsSessionSubsetsFromADefinitionOrAnotherSubset#3",
+			"service" : "subsets",
+			"method" : "createSessionSubsetFrom",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"Mine"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/tm1.CreateSessionSubset",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Subset@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/PrivateSubsets('Mine')"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "yExesF4AAIABAAAS"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"Name" : "yExesF4AAIABAAAS"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#createsStaticAndDynamicSubsets#1",
+			"service" : "subsets",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$patch" : "SubsetPatch",
+					"json" : {
+						"Name" : "Key Regions",
+						"Elements@odata.bind" : [
+							"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+							"Dimensions('Region')/Hierarchies('Region')/Elements('South')"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Key Regions",
+							"Elements@odata.bind" : [
+								"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+								"Dimensions('Region')/Hierarchies('Region')/Elements('South')"
+							]
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Key Regions"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"Name" : "Key Regions"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#createsStaticAndDynamicSubsets#2",
+			"service" : "subsets",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				{
+					"$patch" : "SubsetPatch",
+					"json" : {
+						"Name" : "Leaves",
+						"Expression" : "{TM1SUBSETALL([Region])}"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/PrivateSubsets",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Leaves",
+							"Expression" : "{TM1SUBSETALL([Region])}"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Leaves",
+							"Expression" : "{TM1SUBSETALL([Region])}"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"Name" : "Leaves",
+					"Expression" : "{TM1SUBSETALL([Region])}"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#deletesASubsetOfEachScope#1",
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Leaves"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('Leaves')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#deletesASubsetOfEachScope#2",
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"Leaves"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/PrivateSubsets('Leaves')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#deletesASubsetOfEachScope#3",
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "SESSION",
+					"json" : "SESSION"
+				},
+				"Leaves"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/SessionSubsets('Leaves')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#encodesReservedAndNonAsciiCharacters#1",
+			"service" : "subsets",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"query"
+			],
+			"args" : [
+				"Région",
+				"東京",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"a/b?c+d=e",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('R%C3%A9gion')/Hierarchies('%E6%9D%B1%E4%BA%AC')/PrivateSubsets('a%2Fb%3Fc%2Bd%3De')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "a/b?c+d=e"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"Name" : "a/b?c+d=e"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#encodesReservedAndNonAsciiCharacters#2",
+			"service" : "subsets",
+			"method" : "setElementAfter",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"element",
+				"after"
+			],
+			"args" : [
+				"Région",
+				"Région",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"a/b",
+				"Zürich",
+				"#1 & ~2"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('R%C3%A9gion')/Hierarchies('R%C3%A9gion')/Subsets('a%2Fb')/tm1.SetElement",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('R%C3%A9gion')/Hierarchies('R%C3%A9gion')/Elements('Z%C3%BCrich')",
+							"After@odata.bind" : "Dimensions('R%C3%A9gion')/Hierarchies('R%C3%A9gion')/Elements('%231%20%26%20~2')"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#followsNextLinksAcrossPages#1",
+			"service" : "subsets",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "a"
+								}
+							],
+							"@odata.nextLink" : "Dimensions('Region')/Hierarchies('Region')/Subsets?$skiptoken=2"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets?$skiptoken=2",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "b"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Subset",
+					"json" : {
+						"Name" : "a"
+					}
+				},
+				{
+					"$model" : "Subset",
+					"json" : {
+						"Name" : "b"
+					}
+				}
+			]
+		},
+		{
+			"id" : "SubsetServiceTest#getsASubsetWithItsEtagAndElements#1",
+			"service" : "subsets",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Key Regions",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"Expression"
+						],
+						"expand" : {
+							"Elements" : {
+								"select" : [
+									"Name"
+								]
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('Key%20Regions')?$select=Name,Expression&$expand=Elements($select%3DName)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.etag" : "W/\"7\"",
+							"Name" : "Key Regions",
+							"Expression" : null,
+							"Elements" : [
+								{
+									"Name" : "North"
+								},
+								{
+									"Name" : "South"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"@odata.etag" : "W/\"7\"",
+					"Name" : "Key Regions",
+					"Elements" : [
+						{
+							"Name" : "North"
+						},
+						{
+							"Name" : "South"
+						}
+					]
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#getsASubsetWithItsEtagAndElements#2",
+			"service" : "subsets",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"Mine",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/PrivateSubsets('Mine')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Mine"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"Name" : "Mine"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#listsTheSubsetsOfEachScope#1",
+			"service" : "subsets",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"filter" : "startswith(Name,'West')",
+						"orderBy" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets?$select=Name&$filter=startswith(Name,'West')&$orderby=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "West Coast"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Subset",
+					"json" : {
+						"Name" : "West Coast"
+					}
+				}
+			]
+		},
+		{
+			"id" : "SubsetServiceTest#listsTheSubsetsOfEachScope#2",
+			"service" : "subsets",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/PrivateSubsets",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Mine"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Subset",
+					"json" : {
+						"Name" : "Mine"
+					}
+				}
+			]
+		},
+		{
+			"id" : "SubsetServiceTest#listsTheSubsetsOfEachScope#3",
+			"service" : "subsets",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "SESSION",
+					"json" : "SESSION"
+				},
+				{
+					"$query" : {
+						"top" : 5
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/SessionSubsets?$top=5",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "SubsetServiceTest#quotesNamesWithApostrophesAndOtherCharacters#1",
+			"service" : "subsets",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"query"
+			],
+			"args" : [
+				"Bob's Region",
+				"Alt & Co",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Joe's #1",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Bob''s%20Region')/Hierarchies('Alt%20%26%20Co')/Subsets('Joe''s%20%231')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Joe's #1"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"Name" : "Joe's #1"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#quotesNamesWithApostrophesAndOtherCharacters#2",
+			"service" : "subsets",
+			"method" : "addElements",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"elements"
+			],
+			"args" : [
+				"Bob's Region",
+				"Bob's Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				[
+					"O'Neil",
+					"50%"
+				]
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Bob''s%20Region')/Hierarchies('Bob''s%20Region')/Subsets('s')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Elements@odata.bind" : [
+								"Dimensions('Bob''s%20Region')/Hierarchies('Bob''s%20Region')/Elements('O''Neil')",
+								"Dimensions('Bob''s%20Region')/Hierarchies('Bob''s%20Region')/Elements('50%25')"
+							]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#readsASubsetsHierarchy#1",
+			"service" : "subsets",
+			"method" : "hierarchy",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "SESSION",
+					"json" : "SESSION"
+				},
+				"s",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/SessionSubsets('s')/Hierarchy?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Region"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "Region"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesAMissingScopeSendingNothing#1",
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				null,
+				"s"
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesAnUpdateWithElementsSendingNothing#1",
+			"service" : "subsets",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				{
+					"$patch" : "SubsetPatch",
+					"json" : {
+						"Elements" : [
+							{
+								"Name" : "West"
+							}
+						]
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesAnUpdateWithElementsSendingNothing#2",
+			"service" : "subsets",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				{
+					"$patch" : "SubsetPatch",
+					"json" : {
+						"Elements@odata.bind" : [
+							"Dimensions('Region')/Hierarchies('Region')/Elements('West')"
+						]
+					}
+				},
+				"W/\"1\""
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesMissingBodiesSendingNothing#1",
+			"service" : "subsets",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesMissingBodiesSendingNothing#2",
+			"service" : "subsets",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesMissingBodiesSendingNothing#3",
+			"service" : "subsets",
+			"method" : "addElements",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"elements"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesMissingBodiesSendingNothing#4",
+			"service" : "subsets",
+			"method" : "addElements",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"elements"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				[
+					"West",
+					null
+				]
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesMissingBodiesSendingNothing#5",
+			"service" : "subsets",
+			"method" : "createSessionSubset",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"definition"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesMissingNamesSendingNothing#1",
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesMissingNamesSendingNothing#2",
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset"
+			],
+			"args" : [
+				null,
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s"
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesMissingNamesSendingNothing#3",
+			"service" : "subsets",
+			"method" : "setElementBefore",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"element",
+				"before"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				"West",
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#refusesMissingNamesSendingNothing#4",
+			"service" : "subsets",
+			"method" : "setElementAfter",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"element",
+				"after"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				null,
+				"East"
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#savesACopy#1",
+			"service" : "subsets",
+			"method" : "saveAs",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"newName"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				"Copy"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('s')/tm1.SaveAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Copy"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Copy",
+							"Expression" : "{TM1SUBSETALL([Region])}"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"Name" : "Copy",
+					"Expression" : "{TM1SUBSETALL([Region])}"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#savesACopy#2",
+			"service" : "subsets",
+			"method" : "saveAs",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"newName",
+				"makePrivate",
+				"makeStatic"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"s",
+				"Frozen",
+				true,
+				false
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/PrivateSubsets('s')/tm1.SaveAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Frozen",
+							"MakePrivate" : true,
+							"MakeStatic" : false
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Frozen"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"Name" : "Frozen"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#savesACopy#3",
+			"service" : "subsets",
+			"method" : "saveAs",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"newName",
+				"makePrivate",
+				"makeStatic"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				"Frozen",
+				false,
+				true
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('s')/tm1.SaveAs",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Frozen",
+							"MakePrivate" : false,
+							"MakeStatic" : true
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Frozen"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Subset",
+				"json" : {
+					"Name" : "Frozen"
+				}
+			}
+		},
+		{
+			"id" : "SubsetServiceTest#setsElementsLastBeforeOrAfterOthers#1",
+			"service" : "subsets",
+			"method" : "setElement",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				"West"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('s')/tm1.SetElement",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#setsElementsLastBeforeOrAfterOthers#2",
+			"service" : "subsets",
+			"method" : "setElementBefore",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"element",
+				"before"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"s",
+				"West",
+				"East's"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('s')/tm1.SetElement",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')",
+							"Before@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('East''s')"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#setsElementsLastBeforeOrAfterOthers#3",
+			"service" : "subsets",
+			"method" : "setElementAfter",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"element",
+				"after"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PRIVATE",
+					"json" : "PRIVATE"
+				},
+				"s",
+				"West",
+				"East"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/PrivateSubsets('s')/tm1.SetElement",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')",
+							"After@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('East')"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#updatesWithAndWithoutAnEtag#1",
+			"service" : "subsets",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "PUBLIC",
+					"json" : "PUBLIC"
+				},
+				"Leaves",
+				{
+					"$patch" : "SubsetPatch",
+					"json" : {
+						"Expression" : "{[Region].[North]}"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Subsets('Leaves')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Expression" : "{[Region].[North]}"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SubsetServiceTest#updatesWithAndWithoutAnEtag#2",
+			"service" : "subsets",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"scope",
+				"subset",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$enum" : "SubsetScope",
+					"name" : "SESSION",
+					"json" : "SESSION"
+				},
+				"Leaves",
+				{
+					"$patch" : "SubsetPatch",
+					"json" : {
+						"Expression" : null
+					}
+				},
+				"W/\"4\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/SessionSubsets('Leaves')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"4\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Expression" : null
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

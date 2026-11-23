@@ -1,5 +1,6 @@
-# Editor settings that match the build's checks (Spring Java Format: tabs), so code is laid out
-# right while typing, not only when ./gradlew format or the pre-commit hook runs.
+# Editor settings that match the builds' checks (Spring Java Format: tabs; Ruff, CSharpier and
+# Prettier: spaces), so code is laid out right while typing, not only when a formatter or the
+# pre-commit hook runs.
 root = true
 
 [*]
@@ -11,6 +12,17 @@ trim_trailing_whitespace = true
 [*.{java,kt,kts,gradle}]
 indent_style = tab
 indent_size = 4
+
+# The other clients, as their formatters lay them out (Ruff, CSharpier, Prettier), each 160 wide
+[*.{py,cs}]
+indent_style = space
+indent_size = 4
+max_line_length = 160
+
+[*.{ts,mts,mjs}]
+indent_style = space
+indent_size = 2
+max_line_length = 160
 
 [*.{yml,yaml,json,toml,xml,properties}]
 indent_style = space
@@ -24,7 +36,7 @@ trim_trailing_whitespace = false
 end_of_line = crlf
 
 # TM1's $metadata is committed exactly as the server sends it (plan Q2): never reformat it
-[tm1-client/src/model/metadata/**]
+[java/tm1-client/src/model/metadata/**]
 charset = unset
 end_of_line = unset
 insert_final_newline = unset

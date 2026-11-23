@@ -29,7 +29,9 @@
     { "pattern": "ajmyers.net/projects/tm1-csdl/api*", "zone_name": "ajmyers.net" },
     { "pattern": "ajmyers.net/projects/tm1-testcontainers/api*", "zone_name": "ajmyers.net" },
     { "pattern": "ajmyers.net/projects/tm1-spring-boot-starter/api*", "zone_name": "ajmyers.net" },
-    { "pattern": "ajmyers.net/projects/tm1-spring-boot-testcontainers/api*", "zone_name": "ajmyers.net" }
+    { "pattern": "ajmyers.net/projects/tm1-spring-boot-testcontainers/api*", "zone_name": "ajmyers.net" },
+    // The guide (scripts/guide.mjs), which covers the client and testcontainers in every language
+    { "pattern": "ajmyers.net/projects/tm1/guide*", "zone_name": "ajmyers.net" }
   ],
   "workers_dev": false,
   "preview_urls": false

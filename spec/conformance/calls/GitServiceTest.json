@@ -1,0 +1,1527 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.git.GitServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "GitServiceTest#aPlanWithoutAnIdCantBeExecuted#1",
+			"service" : "git",
+			"method" : "execute",
+			"params" : [
+				"plan"
+			],
+			"args" : [
+				{
+					"$model" : "GitPushPlan",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.GitPushPlan",
+						"Branch" : "main"
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "GitServiceTest#anExecutedPlanIsGone#1",
+			"service" : "git",
+			"method" : "execute",
+			"params" : [
+				"plan"
+			],
+			"args" : [
+				{
+					"$model" : "GitPushPlan",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.GitPushPlan",
+						"ID" : "p1"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitPlans('p1')/tm1.GitPushPlan/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'p1' can not be found in collection of type 'GitPlan'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "GitServiceTest#anUnreachableRemoteIsABadRequest#1",
+			"service" : "git",
+			"method" : "init",
+			"params" : [
+				"url",
+				"deployment",
+				"credentials",
+				"force",
+				"config"
+			],
+			"args" : [
+				"https://nowhere.example.com/x.git",
+				null,
+				{
+					"$type" : "GitCredentials",
+					"factory" : "none",
+					"args" : [ ]
+				},
+				false,
+				null
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitInit",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"URL" : "https://nowhere.example.com/x.git",
+							"Force" : false
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "Failed to connect to the remote repository"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "GitServiceTest#deploys#1",
+			"service" : "git",
+			"method" : "deploy",
+			"params" : [
+				"url",
+				"branch",
+				"deployment",
+				"credentials",
+				"force",
+				"config"
+			],
+			"args" : [
+				"git://git.example.com/model.git",
+				"main",
+				"prod",
+				{
+					"$type" : "GitCredentials",
+					"factory" : "password",
+					"args" : [
+						"me",
+						"s3cret"
+					]
+				},
+				true,
+				{
+					"$patch" : "GitConfigurationPatch",
+					"json" : {
+						"core.autocrlf" : "false"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitDeploy",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"URL" : "git://git.example.com/model.git",
+							"Username" : "me",
+							"Password" : "s3cret",
+							"Branch" : "main",
+							"Deployment" : "prod",
+							"Force" : true,
+							"Config" : {
+								"core.autocrlf" : "false"
+							}
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "GitServiceTest#deploys#2",
+			"service" : "git",
+			"method" : "deploy",
+			"params" : [
+				"url",
+				"branch",
+				"deployment",
+				"credentials",
+				"force",
+				"config"
+			],
+			"args" : [
+				"git://git.example.com/model.git",
+				"main",
+				null,
+				{
+					"$type" : "GitCredentials",
+					"factory" : "none",
+					"args" : [ ]
+				},
+				false,
+				null
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitDeploy",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"URL" : "git://git.example.com/model.git",
+							"Branch" : "main",
+							"Force" : false
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "GitServiceTest#executesAPushOrAPull#1",
+			"service" : "git",
+			"method" : "execute",
+			"params" : [
+				"plan"
+			],
+			"args" : [
+				{
+					"$model" : "GitPushPlan",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.GitPushPlan",
+						"ID" : "p1",
+						"Branch" : "main",
+						"Force" : false,
+						"SourceFiles" : [
+							"/dimensions/Region.json"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitPlans('p1')/tm1.GitPushPlan/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "GitServiceTest#executesAPushOrAPull#2",
+			"service" : "git",
+			"method" : "execute",
+			"params" : [
+				"plan"
+			],
+			"args" : [
+				{
+					"$model" : "GitPullPlan",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.GitPullPlan",
+						"ID" : "it's"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitPlans('it''s')/tm1.GitPullPlan/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "GitServiceTest#findsAPlanInTheList#1",
+			"service" : "git",
+			"method" : "plan",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"p2"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "GitPlans",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.GitPushPlan",
+									"ID" : "p1"
+								},
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.GitPullPlan",
+									"ID" : "p2"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "GitPullPlan",
+				"json" : {
+					"ID" : "p2"
+				}
+			}
+		},
+		{
+			"id" : "GitServiceTest#findsAPlanInTheList#2",
+			"service" : "git",
+			"method" : "plan",
+			"params" : [
+				"id"
+			],
+			"args" : [
+				"gone"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "GitPlans",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.GitPushPlan",
+									"ID" : "p1"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "GitServiceTest#initsWithEachKindOfCredentials#1",
+			"service" : "git",
+			"method" : "init",
+			"params" : [
+				"url",
+				"deployment",
+				"credentials",
+				"force",
+				"config"
+			],
+			"args" : [
+				"git://git.example.com/model.git",
+				"dev",
+				{
+					"$type" : "GitCredentials",
+					"factory" : "password",
+					"args" : [
+						"me",
+						"s3cret"
+					]
+				},
+				true,
+				null
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitInit",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"URL" : "git://git.example.com/model.git",
+							"Username" : "me",
+							"Password" : "s3cret",
+							"Deployment" : "dev",
+							"Force" : true
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"URL" : "git://git.example.com/model.git",
+							"Deployment" : "dev",
+							"DeployedCommit" : {
+								"ID" : "c1",
+								"Summary" : "First",
+								"Author" : "Ada"
+							},
+							"Remote" : {
+								"Connected" : true,
+								"Branches" : [
+									"main"
+								],
+								"Tags" : [ ]
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Git",
+				"json" : {
+					"URL" : "git://git.example.com/model.git",
+					"Deployment" : "dev",
+					"DeployedCommit" : {
+						"ID" : "c1",
+						"Summary" : "First",
+						"Author" : "Ada"
+					},
+					"Remote" : {
+						"Connected" : true,
+						"Branches" : [
+							"main"
+						],
+						"Tags" : [ ]
+					}
+				}
+			}
+		},
+		{
+			"id" : "GitServiceTest#initsWithEachKindOfCredentials#2",
+			"service" : "git",
+			"method" : "init",
+			"params" : [
+				"url",
+				"deployment",
+				"credentials",
+				"force",
+				"config"
+			],
+			"args" : [
+				"git://git.example.com/model.git",
+				null,
+				{
+					"$type" : "GitCredentials",
+					"factory" : "none",
+					"args" : [ ]
+				},
+				false,
+				{
+					"$patch" : "GitConfigurationPatch",
+					"json" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitInit",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"URL" : "git://git.example.com/model.git",
+							"Force" : false,
+							"Config" : { }
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"URL" : "git://git.example.com/model.git",
+							"Deployment" : "dev",
+							"DeployedCommit" : {
+								"ID" : "c1",
+								"Summary" : "First",
+								"Author" : "Ada"
+							},
+							"Remote" : {
+								"Connected" : true,
+								"Branches" : [
+									"main"
+								],
+								"Tags" : [ ]
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Git",
+				"json" : {
+					"URL" : "git://git.example.com/model.git",
+					"Deployment" : "dev",
+					"DeployedCommit" : {
+						"ID" : "c1",
+						"Summary" : "First",
+						"Author" : "Ada"
+					},
+					"Remote" : {
+						"Connected" : true,
+						"Branches" : [
+							"main"
+						],
+						"Tags" : [ ]
+					}
+				}
+			}
+		},
+		{
+			"id" : "GitServiceTest#initsWithEachKindOfCredentials#3",
+			"service" : "git",
+			"method" : "init",
+			"params" : [
+				"url",
+				"deployment",
+				"credentials",
+				"force",
+				"config"
+			],
+			"args" : [
+				"git://git.example.com/model.git",
+				"prod",
+				{
+					"$type" : "GitCredentials",
+					"factory" : "sshKey",
+					"args" : [
+						"pub",
+						"priv",
+						"phrase"
+					]
+				},
+				false,
+				{
+					"$patch" : "GitConfigurationPatch",
+					"json" : {
+						"core.autocrlf" : "false"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitInit",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"URL" : "git://git.example.com/model.git",
+							"PublicKey" : "pub",
+							"PrivateKey" : "priv",
+							"Passphrase" : "phrase",
+							"Deployment" : "prod",
+							"Force" : false,
+							"Config" : {
+								"core.autocrlf" : "false"
+							}
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"URL" : "git://git.example.com/model.git",
+							"Deployment" : "dev",
+							"DeployedCommit" : {
+								"ID" : "c1",
+								"Summary" : "First",
+								"Author" : "Ada"
+							},
+							"Remote" : {
+								"Connected" : true,
+								"Branches" : [
+									"main"
+								],
+								"Tags" : [ ]
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Git",
+				"json" : {
+					"URL" : "git://git.example.com/model.git",
+					"Deployment" : "dev",
+					"DeployedCommit" : {
+						"ID" : "c1",
+						"Summary" : "First",
+						"Author" : "Ada"
+					},
+					"Remote" : {
+						"Connected" : true,
+						"Branches" : [
+							"main"
+						],
+						"Tags" : [ ]
+					}
+				}
+			}
+		},
+		{
+			"id" : "GitServiceTest#listsThePlansOfEachKind#1",
+			"service" : "git",
+			"method" : "plans",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"ID"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "GitPlans?$select=ID",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.GitPushPlan",
+									"ID" : "p1"
+								},
+								{
+									"@odata.type" : "#ibm.tm1.api.v1.GitPullPlan",
+									"ID" : "p2"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "GitPushPlan",
+					"json" : {
+						"ID" : "p1"
+					}
+				},
+				{
+					"$model" : "GitPullPlan",
+					"json" : {
+						"ID" : "p2"
+					}
+				}
+			]
+		},
+		{
+			"id" : "GitServiceTest#listsThePlansOfEachKind#2",
+			"service" : "git",
+			"method" : "plans",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "GitPlans",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "GitServiceTest#plansAPull#1",
+			"service" : "git",
+			"method" : "pull",
+			"params" : [
+				"branch",
+				"credentials",
+				"mode",
+				"force"
+			],
+			"args" : [
+				"main",
+				{
+					"$type" : "GitCredentials",
+					"factory" : "none",
+					"args" : [ ]
+				},
+				{
+					"$enum" : "GitPlanExecutionMode",
+					"name" : "MULTIPLE_COMMIT",
+					"json" : "MultipleCommit"
+				},
+				true
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitPull",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Branch" : "main",
+							"ExecutionMode" : "MultipleCommit",
+							"Force" : true
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "p3",
+							"Branch" : "main",
+							"Commit" : {
+								"ID" : "c2"
+							},
+							"Operations" : [
+								"Skip Dimensions('Region')"
+							],
+							"ExecutionMode" : "MultipleCommit"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "GitPullPlan",
+				"json" : {
+					"ID" : "p3",
+					"Branch" : "main",
+					"Commit" : {
+						"ID" : "c2"
+					},
+					"Operations" : [
+						"Skip Dimensions('Region')"
+					],
+					"ExecutionMode" : "MultipleCommit"
+				}
+			}
+		},
+		{
+			"id" : "GitServiceTest#plansAPull#2",
+			"service" : "git",
+			"method" : "pull",
+			"params" : [
+				"branch",
+				"credentials",
+				"mode",
+				"force"
+			],
+			"args" : [
+				"release/1.0",
+				{
+					"$type" : "GitCredentials",
+					"factory" : "password",
+					"args" : [
+						"me",
+						"t0ken"
+					]
+				},
+				null,
+				false
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitPull",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Username" : "me",
+							"Password" : "t0ken",
+							"Branch" : "release/1.0",
+							"Force" : false
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "p4"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "GitPullPlan",
+				"json" : {
+					"ID" : "p4"
+				}
+			}
+		},
+		{
+			"id" : "GitServiceTest#plansAPush#1",
+			"service" : "git",
+			"method" : "push",
+			"params" : [
+				"branch",
+				"newBranch",
+				"commit",
+				"credentials",
+				"force"
+			],
+			"args" : [
+				"main",
+				"feature",
+				{
+					"$type" : "GitCommitDetails",
+					"factory" : "new",
+					"args" : [
+						"Add the Region dimension",
+						"Ada Analyst",
+						"ada@example.com"
+					]
+				},
+				{
+					"$type" : "GitCredentials",
+					"factory" : "password",
+					"args" : [
+						"me",
+						"s3cret"
+					]
+				},
+				false
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitPush",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Username" : "me",
+							"Password" : "s3cret",
+							"Branch" : "main",
+							"NewBranch" : "feature",
+							"Message" : "Add the Region dimension",
+							"Author" : "Ada Analyst",
+							"Email" : "ada@example.com",
+							"Force" : false
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "p1",
+							"Branch" : "main",
+							"NewBranch" : "feature",
+							"Force" : false,
+							"SourceFiles" : [
+								"/dimensions/Region.json"
+							],
+							"ParentCommit" : {
+								"ID" : "c1"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "GitPushPlan",
+				"json" : {
+					"ID" : "p1",
+					"Branch" : "main",
+					"Force" : false,
+					"NewBranch" : "feature",
+					"ParentCommit" : {
+						"ID" : "c1"
+					},
+					"SourceFiles" : [
+						"/dimensions/Region.json"
+					]
+				}
+			}
+		},
+		{
+			"id" : "GitServiceTest#plansAPush#2",
+			"service" : "git",
+			"method" : "push",
+			"params" : [
+				"branch",
+				"newBranch",
+				"commit",
+				"credentials",
+				"force"
+			],
+			"args" : [
+				"main",
+				null,
+				{
+					"$type" : "GitCommitDetails",
+					"factory" : "new",
+					"args" : [
+						"Add the Region dimension",
+						"Ada Analyst",
+						"ada@example.com"
+					]
+				},
+				{
+					"$type" : "GitCredentials",
+					"factory" : "none",
+					"args" : [ ]
+				},
+				true
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitPush",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Branch" : "main",
+							"Message" : "Add the Region dimension",
+							"Author" : "Ada Analyst",
+							"Email" : "ada@example.com",
+							"Force" : true
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "p2",
+							"Branch" : "main"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "GitPushPlan",
+				"json" : {
+					"ID" : "p2",
+					"Branch" : "main"
+				}
+			}
+		},
+		{
+			"id" : "GitServiceTest#pushingNothingNewIsABadRequest#1",
+			"service" : "git",
+			"method" : "push",
+			"params" : [
+				"branch",
+				"newBranch",
+				"commit",
+				"credentials",
+				"force"
+			],
+			"args" : [
+				"main",
+				null,
+				{
+					"$type" : "GitCommitDetails",
+					"factory" : "new",
+					"args" : [
+						"Add the Region dimension",
+						"Ada Analyst",
+						"ada@example.com"
+					]
+				},
+				{
+					"$type" : "GitCredentials",
+					"factory" : "none",
+					"args" : [ ]
+				},
+				false
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitPush",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Branch" : "main",
+							"Message" : "Add the Region dimension",
+							"Author" : "Ada Analyst",
+							"Email" : "ada@example.com",
+							"Force" : false
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "Cannot create bare commit"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "GitServiceTest#readsTheStatus#1",
+			"service" : "git",
+			"method" : "status",
+			"params" : [
+				"credentials"
+			],
+			"args" : [
+				{
+					"$type" : "GitCredentials",
+					"factory" : "none",
+					"args" : [ ]
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitStatus",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"URL" : "git://git.example.com/model.git",
+							"Deployment" : "dev",
+							"DeployedCommit" : {
+								"ID" : "c1",
+								"Summary" : "First",
+								"Author" : "Ada"
+							},
+							"Remote" : {
+								"Connected" : true,
+								"Branches" : [
+									"main"
+								],
+								"Tags" : [ ]
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Git",
+				"json" : {
+					"URL" : "git://git.example.com/model.git",
+					"Deployment" : "dev",
+					"DeployedCommit" : {
+						"ID" : "c1",
+						"Summary" : "First",
+						"Author" : "Ada"
+					},
+					"Remote" : {
+						"Connected" : true,
+						"Branches" : [
+							"main"
+						],
+						"Tags" : [ ]
+					}
+				}
+			}
+		},
+		{
+			"id" : "GitServiceTest#readsTheStatus#2",
+			"service" : "git",
+			"method" : "status",
+			"params" : [
+				"credentials"
+			],
+			"args" : [
+				{
+					"$type" : "GitCredentials",
+					"factory" : "sshKey",
+					"args" : [
+						"pub",
+						"priv",
+						null
+					]
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitStatus",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"PublicKey" : "pub",
+							"PrivateKey" : "priv"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"URL" : "git://git.example.com/model.git",
+							"Deployment" : "dev",
+							"DeployedCommit" : {
+								"ID" : "c1",
+								"Summary" : "First",
+								"Author" : "Ada"
+							},
+							"Remote" : {
+								"Connected" : true,
+								"Branches" : [
+									"main"
+								],
+								"Tags" : [ ]
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Git",
+				"json" : {
+					"URL" : "git://git.example.com/model.git",
+					"Deployment" : "dev",
+					"DeployedCommit" : {
+						"ID" : "c1",
+						"Summary" : "First",
+						"Author" : "Ada"
+					},
+					"Remote" : {
+						"Connected" : true,
+						"Branches" : [
+							"main"
+						],
+						"Tags" : [ ]
+					}
+				}
+			}
+		},
+		{
+			"id" : "GitServiceTest#redeployingIsABadRequest#1",
+			"service" : "git",
+			"method" : "deploy",
+			"params" : [
+				"url",
+				"branch",
+				"deployment",
+				"credentials",
+				"force",
+				"config"
+			],
+			"args" : [
+				"git://git.example.com/model.git",
+				"main",
+				null,
+				{
+					"$type" : "GitCredentials",
+					"factory" : "none",
+					"args" : [ ]
+				},
+				false,
+				null
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitDeploy",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"URL" : "git://git.example.com/model.git",
+							"Branch" : "main",
+							"Force" : false
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "Cannot re-deploy"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "GitServiceTest#thePlansOfAServerNotTiedAreABadRequest#1",
+			"service" : "git",
+			"method" : "plans",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "GitPlans",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "Git is not initialized"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "GitServiceTest#theStatusOfAServerNotTiedIsABadRequest#1",
+			"service" : "git",
+			"method" : "status",
+			"params" : [
+				"credentials"
+			],
+			"args" : [
+				{
+					"$type" : "GitCredentials",
+					"factory" : "none",
+					"args" : [ ]
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitStatus",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "Git is not initialized"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "GitServiceTest#uninits#1",
+			"service" : "git",
+			"method" : "uninit",
+			"params" : [
+				"force"
+			],
+			"args" : [
+				true
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitUninit",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Force" : true
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "GitServiceTest#uninits#2",
+			"service" : "git",
+			"method" : "uninit",
+			"params" : [
+				"force"
+			],
+			"args" : [
+				false
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "GitUninit",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Force" : false
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

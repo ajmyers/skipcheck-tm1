@@ -1,0 +1,1090 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.dimension.EdgeServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "EdgeServiceTest#aMissingEdgeIsNotFound#1",
+			"service" : "edges",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges(ParentName='Total',ComponentName='Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Edge can not be found."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#anEdgeThatWouldMakeACycleIsRefused#1",
+			"service" : "edges",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"edge"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "EdgePatch",
+					"json" : {
+						"ParentName" : "West",
+						"ComponentName" : "Total"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"ParentName" : "West",
+							"ComponentName" : "Total"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Circular reference: 'Total' is a descendant of 'West'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#createsAnEdge#1",
+			"service" : "edges",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"edge"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "EdgePatch",
+					"json" : {
+						"ParentName" : "Total",
+						"ComponentName" : "West",
+						"Weight" : 1.0
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"ParentName" : "Total",
+							"ComponentName" : "West",
+							"Weight" : 1.0
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ParentName" : "Total",
+							"ComponentName" : "West",
+							"Weight" : 1.0
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Edge",
+				"json" : {
+					"ParentName" : "Total",
+					"ComponentName" : "West",
+					"Weight" : 1.0
+				}
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#createsAnEdge#2",
+			"service" : "edges",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"edge"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "EdgePatch",
+					"json" : {
+						"Parent@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')",
+						"Component@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('East')",
+						"Weight" : -0.5
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Parent@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')",
+							"Component@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('East')",
+							"Weight" : -0.5
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ParentName" : "Total",
+							"ComponentName" : "East",
+							"Weight" : -0.5
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Edge",
+				"json" : {
+					"ParentName" : "Total",
+					"ComponentName" : "East",
+					"Weight" : -0.5
+				}
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#deletesAnEdge#1",
+			"service" : "edges",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"West"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges(ParentName='Total',ComponentName='West')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EdgeServiceTest#deletesAnEdge#2",
+			"service" : "edges",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"Nope"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges(ParentName='Total',ComponentName='Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Edge can not be found."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#encodesReservedAndNonAsciiCharactersInTheKey#1",
+			"service" : "edges",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"query"
+			],
+			"args" : [
+				"Région",
+				"Région",
+				"Zürich/Nord",
+				"a+b=c?",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('R%C3%A9gion')/Hierarchies('R%C3%A9gion')/Edges(ParentName='Z%C3%BCrich%2FNord',ComponentName='a%2Bb%3Dc%3F')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ParentName" : "Zürich/Nord",
+							"ComponentName" : "a+b=c?"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Edge",
+				"json" : {
+					"ParentName" : "Zürich/Nord",
+					"ComponentName" : "a+b=c?"
+				}
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#followsNextLinksAcrossPages#1",
+			"service" : "edges",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : {
+						"select" : [
+							"ComponentName"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges?$select=ComponentName",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ParentName" : "Total",
+									"ComponentName" : "a"
+								}
+							],
+							"@odata.nextLink" : "Dimensions('Region')/Hierarchies('Region')/Edges?$skiptoken=2"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges?$skiptoken=2",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ParentName" : "Total",
+									"ComponentName" : "b"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Edge",
+					"json" : {
+						"ParentName" : "Total",
+						"ComponentName" : "a"
+					}
+				},
+				{
+					"$model" : "Edge",
+					"json" : {
+						"ParentName" : "Total",
+						"ComponentName" : "b"
+					}
+				}
+			]
+		},
+		{
+			"id" : "EdgeServiceTest#getsAnEdgeByItsTwoPartKey#1",
+			"service" : "edges",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"West",
+				{
+					"$query" : {
+						"select" : [
+							"Weight"
+						],
+						"expand" : {
+							"Parent" : {
+								"select" : [
+									"Name"
+								]
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges(ParentName='Total',ComponentName='West')?$select=Weight&$expand=Parent($select%3DName)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.etag" : "W/\"3\"",
+							"ParentName" : "Total",
+							"ComponentName" : "West",
+							"Weight" : 2.5
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Edge",
+				"json" : {
+					"@odata.etag" : "W/\"3\"",
+					"ParentName" : "Total",
+					"ComponentName" : "West",
+					"Weight" : 2.5
+				}
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#listsEdges#1",
+			"service" : "edges",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : {
+						"filter" : "ParentName eq 'Total'",
+						"orderBy" : [
+							"ComponentName"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges?$filter=ParentName%20eq%20'Total'&$orderby=ComponentName",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ParentName" : "Total",
+									"ComponentName" : "West",
+									"Weight" : 1.0
+								},
+								{
+									"ParentName" : "Total",
+									"ComponentName" : "East",
+									"Weight" : -1.0
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Edge",
+					"json" : {
+						"ParentName" : "Total",
+						"ComponentName" : "West",
+						"Weight" : 1.0
+					}
+				},
+				{
+					"$model" : "Edge",
+					"json" : {
+						"ParentName" : "Total",
+						"ComponentName" : "East",
+						"Weight" : -1.0
+					}
+				}
+			]
+		},
+		{
+			"id" : "EdgeServiceTest#listsEdges#2",
+			"service" : "edges",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "EdgeServiceTest#quotesKeysWithApostrophesAndOtherCharacters#1",
+			"service" : "edges",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"query"
+			],
+			"args" : [
+				"Bob's",
+				"Bob's",
+				"Bob's Total",
+				"A&B",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Bob''s')/Hierarchies('Bob''s')/Edges(ParentName='Bob''s%20Total',ComponentName='A%26B')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ParentName" : "Bob's Total",
+							"ComponentName" : "A&B"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Edge",
+				"json" : {
+					"ParentName" : "Bob's Total",
+					"ComponentName" : "A&B"
+				}
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#readsAnEdgesParentComponentAndHierarchy#1",
+			"service" : "edges",
+			"method" : "parent",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"West",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"Type"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges(ParentName='Total',ComponentName='West')/Parent?$select=Name,Type",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Total",
+							"Type" : "Consolidated"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"Name" : "Total",
+					"Type" : "Consolidated"
+				}
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#readsAnEdgesParentComponentAndHierarchy#2",
+			"service" : "edges",
+			"method" : "component",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"West",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges(ParentName='Total',ComponentName='West')/Component",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "West",
+							"Type" : "Numeric"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"Name" : "West",
+					"Type" : "Numeric"
+				}
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#readsAnEdgesParentComponentAndHierarchy#3",
+			"service" : "edges",
+			"method" : "hierarchy",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"West",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges(ParentName='Total',ComponentName='West')/Hierarchy?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Region"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "Region"
+				}
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#refusesAMissingEdgeOrPatchSendingNothing#1",
+			"service" : "edges",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"edge"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#refusesAMissingEdgeOrPatchSendingNothing#2",
+			"service" : "edges",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"West",
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#refusesMissingNamesSendingNothing#1",
+			"service" : "edges",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				null,
+				"West"
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#refusesMissingNamesSendingNothing#2",
+			"service" : "edges",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#refusesMissingNamesSendingNothing#3",
+			"service" : "edges",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"query"
+			],
+			"args" : [
+				null,
+				"Region",
+				"Total",
+				"West",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#refusesMissingNamesSendingNothing#4",
+			"service" : "edges",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				null,
+				"Total",
+				"West",
+				{
+					"$patch" : "EdgePatch",
+					"json" : {
+						"Weight" : 1.0
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "EdgeServiceTest#updatesAnEdgesWeight#1",
+			"service" : "edges",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"West",
+				{
+					"$patch" : "EdgePatch",
+					"json" : {
+						"Weight" : -1.0
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges(ParentName='Total',ComponentName='West')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Weight" : -1.0
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EdgeServiceTest#updatesAnEdgesWeight#2",
+			"service" : "edges",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"component",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"West",
+				{
+					"$patch" : "EdgePatch",
+					"json" : {
+						"Weight" : null
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges(ParentName='Total',ComponentName='West')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Weight" : null
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

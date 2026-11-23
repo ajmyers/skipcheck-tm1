@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // The workspace's packages from their sources (test/live uses the testcontainers package,
+    // which uses this one), so typecheck and tests need no build first
+    "paths": {
+      "@skipcheck/tm1-client": ["./src/index.ts"],
+      "@skipcheck/tm1-testcontainers": ["../tm1-testcontainers/src/index.ts"],
+      "@skipcheck/tm1-testcontainers/vitest": ["../tm1-testcontainers/src/vitest.ts"]
+    }
+  },
+  "include": ["src", "test", "examples", "codegen", "vitest.config.ts"]
+}

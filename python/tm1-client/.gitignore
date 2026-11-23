@@ -1,0 +1,9 @@
+# Generated from ../spec/tm1-api.json at build time (hatch_build.py), never committed
+src/skipcheck_tm1/_generated/
+.venv/
+__pycache__/
+*.egg-info/
+dist/
+.pytest_cache/
+build/
+src/skipcheck_tm1/_sync/

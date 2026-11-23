@@ -16,3 +16,53 @@ jobs:
           java-version: '27'
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew build
+
+  # The Python client, generated from spec/tm1-api.json; the build job above fails when that
+  # spec is out of date with the $metadata snapshot (ApiSpecTest)
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      # tm1-testcontainers too: the live tests start TM1 with it (skipped here, with no TM1 source)
+      - run: pip install -e './python/tm1-client[test]' -e './python/tm1-testcontainers[test]'
+      # Also checks layout and lint (tests/test_format.py, python/ruff.toml), as the Java
+      # build's checkFormat and Error Prone
+      - run: pytest python
+
+  # The .NET client, generated from spec/tm1-api.json at build time
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test dotnet/Tm1.slnx
+
+  typescript:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['20', '22']
+    defaults:
+      run:
+        working-directory: typescript
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+      # The client and, as an npm workspace, tm1-testcontainers: each script
+      # runs both. The live and container tests are skipped here, with no TM1 source
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build

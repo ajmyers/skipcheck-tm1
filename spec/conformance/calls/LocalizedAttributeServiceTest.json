@@ -1,0 +1,2804 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.attribute.LocalizedAttributeServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "LocalizedAttributeServiceTest#aLocaleIsCreatedOnceAndNeverThroughAMember#1",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "element",
+					"args" : [
+						"Region",
+						"Region",
+						"North"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('North')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Localized attributes for locale 'fr' exist."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#aLocaleIsCreatedOnceAndNeverThroughAMember#2",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "member",
+					"args" : [
+						"Region",
+						"Region",
+						"North"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members('North')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "POST not supported."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#aMissingLocaleIsNotFound#1",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "dimension",
+					"args" : [
+						"Region"
+					]
+				},
+				"xx",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/LocalizedAttributes('xx')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'xx' can not be found in collection of type 'LocalizedAttributes'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#1",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "dimension",
+					"args" : [
+						"Region"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#2",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "hierarchy",
+					"args" : [
+						"Region",
+						"Alt"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#3",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "element",
+					"args" : [
+						"Region",
+						"Alt",
+						"North"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/Elements('North')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#4",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "member",
+					"args" : [
+						"Region",
+						"Alt",
+						"North"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/Members('North')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#5",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "subset",
+					"args" : [
+						"Region",
+						"Alt",
+						{
+							"$enum" : "SubsetScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						},
+						"S"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/Subsets('S')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#6",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "subset",
+					"args" : [
+						"Region",
+						"Alt",
+						{
+							"$enum" : "SubsetScope",
+							"name" : "PRIVATE",
+							"json" : "PRIVATE"
+						},
+						"S"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/PrivateSubsets('S')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#7",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "cube",
+					"args" : [
+						"Sales"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#8",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "view",
+					"args" : [
+						"Sales",
+						{
+							"$enum" : "ViewScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						},
+						"V"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/Views('V')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#9",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "view",
+					"args" : [
+						"Sales",
+						{
+							"$enum" : "ViewScope",
+							"name" : "PRIVATE",
+							"json" : "PRIVATE"
+						},
+						"V"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/PrivateViews('V')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#10",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "process",
+					"args" : [
+						"Load"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Load')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#11",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "chore",
+					"args" : [
+						"Nightly"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Chores('Nightly')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#createsALocalesTranslations#12",
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [
+				"owner",
+				"translations"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "process",
+					"args" : [
+						"Load"
+					]
+				},
+				{
+					"$patch" : "LocalizedAttributesPatch",
+					"json" : {
+						"LocaleID" : "de",
+						"Attributes" : {
+							"Weight" : 2.5,
+							"Note" : null
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Load')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"LocaleID" : "de",
+							"Attributes" : {
+								"Weight" : 2.5,
+								"Note" : null
+							}
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de",
+							"Attributes" : {
+								"Weight" : 2.5
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de",
+					"Attributes" : {
+						"Weight" : 2.5
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#1",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "dimension",
+					"args" : [
+						"Region"
+					]
+				},
+				"de-CH",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/LocalizedAttributes('de-CH')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de-CH",
+							"Attributes" : {
+								"Caption" : "Norden",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de-CH",
+					"Attributes" : {
+						"Caption" : "Norden",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#2",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "hierarchy",
+					"args" : [
+						"Region",
+						"Alt"
+					]
+				},
+				"de-CH",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/LocalizedAttributes('de-CH')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de-CH",
+							"Attributes" : {
+								"Caption" : "Norden",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de-CH",
+					"Attributes" : {
+						"Caption" : "Norden",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#3",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "element",
+					"args" : [
+						"Region",
+						"Alt",
+						"North"
+					]
+				},
+				"de-CH",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/Elements('North')/LocalizedAttributes('de-CH')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de-CH",
+							"Attributes" : {
+								"Caption" : "Norden",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de-CH",
+					"Attributes" : {
+						"Caption" : "Norden",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#4",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "member",
+					"args" : [
+						"Region",
+						"Alt",
+						"North"
+					]
+				},
+				"de-CH",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/Members('North')/LocalizedAttributes('de-CH')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de-CH",
+							"Attributes" : {
+								"Caption" : "Norden",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de-CH",
+					"Attributes" : {
+						"Caption" : "Norden",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#5",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "subset",
+					"args" : [
+						"Region",
+						"Alt",
+						{
+							"$enum" : "SubsetScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						},
+						"S"
+					]
+				},
+				"de-CH",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/Subsets('S')/LocalizedAttributes('de-CH')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de-CH",
+							"Attributes" : {
+								"Caption" : "Norden",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de-CH",
+					"Attributes" : {
+						"Caption" : "Norden",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#6",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "subset",
+					"args" : [
+						"Region",
+						"Alt",
+						{
+							"$enum" : "SubsetScope",
+							"name" : "PRIVATE",
+							"json" : "PRIVATE"
+						},
+						"S"
+					]
+				},
+				"de-CH",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/PrivateSubsets('S')/LocalizedAttributes('de-CH')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de-CH",
+							"Attributes" : {
+								"Caption" : "Norden",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de-CH",
+					"Attributes" : {
+						"Caption" : "Norden",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#7",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "cube",
+					"args" : [
+						"Sales"
+					]
+				},
+				"de-CH",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/LocalizedAttributes('de-CH')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de-CH",
+							"Attributes" : {
+								"Caption" : "Norden",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de-CH",
+					"Attributes" : {
+						"Caption" : "Norden",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#8",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "view",
+					"args" : [
+						"Sales",
+						{
+							"$enum" : "ViewScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						},
+						"V"
+					]
+				},
+				"de-CH",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/Views('V')/LocalizedAttributes('de-CH')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de-CH",
+							"Attributes" : {
+								"Caption" : "Norden",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de-CH",
+					"Attributes" : {
+						"Caption" : "Norden",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#9",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "view",
+					"args" : [
+						"Sales",
+						{
+							"$enum" : "ViewScope",
+							"name" : "PRIVATE",
+							"json" : "PRIVATE"
+						},
+						"V"
+					]
+				},
+				"de-CH",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/PrivateViews('V')/LocalizedAttributes('de-CH')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de-CH",
+							"Attributes" : {
+								"Caption" : "Norden",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de-CH",
+					"Attributes" : {
+						"Caption" : "Norden",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#10",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "process",
+					"args" : [
+						"Load"
+					]
+				},
+				"de-CH",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes('Load')/LocalizedAttributes('de-CH')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de-CH",
+							"Attributes" : {
+								"Caption" : "Norden",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de-CH",
+					"Attributes" : {
+						"Caption" : "Norden",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#11",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "chore",
+					"args" : [
+						"Nightly"
+					]
+				},
+				"de-CH",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Chores('Nightly')/LocalizedAttributes('de-CH')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "de-CH",
+							"Attributes" : {
+								"Caption" : "Norden",
+								"Code" : "N"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "de-CH",
+					"Attributes" : {
+						"Caption" : "Norden",
+						"Code" : "N"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#getsALocalesTranslations#12",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "element",
+					"args" : [
+						"}Clients",
+						"}Clients",
+						"O'Neil / Ünï"
+					]
+				},
+				"fr",
+				{
+					"$query" : {
+						"select" : [
+							"Attributes"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('%7DClients')/Hierarchies('%7DClients')/Elements('O''Neil%20%2F%20%C3%9Cn%C3%AF')/LocalizedAttributes('fr')?$select=Attributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "LocalizedAttributes",
+				"json" : {
+					"LocaleID" : "fr",
+					"Attributes" : {
+						"Caption" : "Nord"
+					}
+				}
+			}
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#1",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "dimension",
+					"args" : [
+						"Region"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Nord",
+										"Code" : "N"
+									}
+								},
+								{
+									"LocaleID" : "de-CH",
+									"Attributes" : {
+										"Caption" : "Norden"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				},
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "de-CH",
+						"Attributes" : {
+							"Caption" : "Norden"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#2",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "hierarchy",
+					"args" : [
+						"Region",
+						"Alt"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Nord",
+										"Code" : "N"
+									}
+								},
+								{
+									"LocaleID" : "de-CH",
+									"Attributes" : {
+										"Caption" : "Norden"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				},
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "de-CH",
+						"Attributes" : {
+							"Caption" : "Norden"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#3",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "element",
+					"args" : [
+						"Region",
+						"Alt",
+						"North"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/Elements('North')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Nord",
+										"Code" : "N"
+									}
+								},
+								{
+									"LocaleID" : "de-CH",
+									"Attributes" : {
+										"Caption" : "Norden"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				},
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "de-CH",
+						"Attributes" : {
+							"Caption" : "Norden"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#4",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "member",
+					"args" : [
+						"Region",
+						"Alt",
+						"North"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/Members('North')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Nord",
+										"Code" : "N"
+									}
+								},
+								{
+									"LocaleID" : "de-CH",
+									"Attributes" : {
+										"Caption" : "Norden"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				},
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "de-CH",
+						"Attributes" : {
+							"Caption" : "Norden"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#5",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "subset",
+					"args" : [
+						"Region",
+						"Alt",
+						{
+							"$enum" : "SubsetScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						},
+						"S"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/Subsets('S')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Nord",
+										"Code" : "N"
+									}
+								},
+								{
+									"LocaleID" : "de-CH",
+									"Attributes" : {
+										"Caption" : "Norden"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				},
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "de-CH",
+						"Attributes" : {
+							"Caption" : "Norden"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#6",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "subset",
+					"args" : [
+						"Region",
+						"Alt",
+						{
+							"$enum" : "SubsetScope",
+							"name" : "PRIVATE",
+							"json" : "PRIVATE"
+						},
+						"S"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/PrivateSubsets('S')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Nord",
+										"Code" : "N"
+									}
+								},
+								{
+									"LocaleID" : "de-CH",
+									"Attributes" : {
+										"Caption" : "Norden"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				},
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "de-CH",
+						"Attributes" : {
+							"Caption" : "Norden"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#7",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "cube",
+					"args" : [
+						"Sales"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Nord",
+										"Code" : "N"
+									}
+								},
+								{
+									"LocaleID" : "de-CH",
+									"Attributes" : {
+										"Caption" : "Norden"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				},
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "de-CH",
+						"Attributes" : {
+							"Caption" : "Norden"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#8",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "view",
+					"args" : [
+						"Sales",
+						{
+							"$enum" : "ViewScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						},
+						"V"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/Views('V')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Nord",
+										"Code" : "N"
+									}
+								},
+								{
+									"LocaleID" : "de-CH",
+									"Attributes" : {
+										"Caption" : "Norden"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				},
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "de-CH",
+						"Attributes" : {
+							"Caption" : "Norden"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#9",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "view",
+					"args" : [
+						"Sales",
+						{
+							"$enum" : "ViewScope",
+							"name" : "PRIVATE",
+							"json" : "PRIVATE"
+						},
+						"V"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/PrivateViews('V')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Nord",
+										"Code" : "N"
+									}
+								},
+								{
+									"LocaleID" : "de-CH",
+									"Attributes" : {
+										"Caption" : "Norden"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				},
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "de-CH",
+						"Attributes" : {
+							"Caption" : "Norden"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#10",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "process",
+					"args" : [
+						"Load"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes('Load')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Nord",
+										"Code" : "N"
+									}
+								},
+								{
+									"LocaleID" : "de-CH",
+									"Attributes" : {
+										"Caption" : "Norden"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				},
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "de-CH",
+						"Attributes" : {
+							"Caption" : "Norden"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#11",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "chore",
+					"args" : [
+						"Nightly"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Chores('Nightly')/LocalizedAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr",
+									"Attributes" : {
+										"Caption" : "Nord",
+										"Code" : "N"
+									}
+								},
+								{
+									"LocaleID" : "de-CH",
+									"Attributes" : {
+										"Caption" : "Norden"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord",
+							"Code" : "N"
+						}
+					}
+				},
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "de-CH",
+						"Attributes" : {
+							"Caption" : "Norden"
+						}
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#listsEachOwnersTranslations#12",
+			"service" : "localizedAttributes",
+			"method" : "list",
+			"params" : [
+				"owner",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "cube",
+					"args" : [
+						"Sales"
+					]
+				},
+				{
+					"$query" : {
+						"select" : [
+							"LocaleID"
+						],
+						"orderBy" : [
+							"LocaleID"
+						],
+						"top" : 1
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/LocalizedAttributes?$select=LocaleID&$orderby=LocaleID&$top=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"LocaleID" : "fr"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "LocalizedAttributes",
+					"json" : {
+						"LocaleID" : "fr"
+					}
+				}
+			]
+		},
+		{
+			"id" : "LocalizedAttributeServiceTest#refusesAMissingLocale#1",
+			"service" : "localizedAttributes",
+			"method" : "get",
+			"params" : [
+				"owner",
+				"locale",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeOwner",
+					"factory" : "cube",
+					"args" : [
+						"Sales"
+					]
+				},
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		}
+	]
+}

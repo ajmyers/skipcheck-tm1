@@ -1,0 +1,32 @@
+# Layout and lint for the Python client and tm1-testcontainers (testcontainers/ is inside this
+# folder, so it follows these too). The counterpart of the Java build's Spring Java Format and
+# Error Prone checks: CI fails on a file `ruff format` would change or `ruff check` reports.
+#
+#   ruff format python      # fix the layout
+#   ruff check --fix python # fix what can be fixed, such as import order
+line-length = 160
+target-version = "py310"
+# Generated at build time, never committed: the model and API from the spec, and the sync flavor
+extend-exclude = ["tm1-client/src/skipcheck_tm1/_generated", "tm1-client/src/skipcheck_tm1/_sync", "build"]
+
+# Where the packages are, and that they're ours whether or not the generated modules exist yet:
+# import order mustn't depend on having built
+src = ["tm1-client/src", "tm1-testcontainers/src"]
+
+[lint]
+# D100 to D104 and D106: the public API is documented, as the Java build requires Javadoc on its
+# public classes and methods. Presence only, no docstring style: magic methods (D105) are left
+# out, and constructors (D107), whose parameters the class's docstring describes.
+select = ["E", "F", "W", "I", "B", "UP", "D100", "D101", "D102", "D103", "D104", "D106"]
+isort.known-first-party = ["skipcheck_tm1", "skipcheck_tm1_testcontainers"]
+ignore = [
+    # The formatter lays code out; what it leaves long is a string or a comment it won't break
+    "E501",
+    # zip() without strict=: where lengths could differ, the code checks them and says which
+    "B905",
+]
+
+[lint.per-file-ignores]
+# Docstrings are required of the two packages' sources only: not of tests, the code generator or
+# the build hook
+"!tm1-*/src/**" = ["D"]

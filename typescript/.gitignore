@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# Generated from ../spec/tm1-api.json by npm run generate, never committed
+tm1-client/src/generated/

@@ -1,0 +1,1829 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.dimension.ElementServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "ElementServiceTest#aMissingElementIsNotFound#1",
+			"service" : "elements",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Element'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#aRootHasNoParents#1",
+			"service" : "elements",
+			"method" : "parents",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')/Parents",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "ElementServiceTest#anUpdateWithANameOrAttributesIsRefused#1",
+			"service" : "elements",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$patch" : "ElementPatch",
+					"json" : {
+						"Name" : "East"
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#anUpdateWithANameOrAttributesIsRefused#2",
+			"service" : "elements",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$patch" : "ElementPatch",
+					"json" : {
+						"Name" : "East"
+					}
+				},
+				"W/\"1\""
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#anUpdateWithANameOrAttributesIsRefused#3",
+			"service" : "elements",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$patch" : "ElementPatch",
+					"json" : {
+						"Attributes" : { }
+					}
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "IllegalArgumentException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#changingTheTypeOfAConsolidationWithChildrenIsABadRequest#1",
+			"service" : "elements",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				{
+					"$patch" : "ElementPatch",
+					"json" : {
+						"Type" : "Numeric"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Type" : "Numeric"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Cannot change the type of a consolidated element with children."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#createsAnElement#1",
+			"service" : "elements",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "ElementPatch",
+					"json" : {
+						"Name" : "West",
+						"Type" : "Numeric"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "West",
+							"Type" : "Numeric"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "West",
+							"Type" : "Numeric"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"Name" : "West",
+					"Type" : "Numeric"
+				}
+			}
+		},
+		{
+			"id" : "ElementServiceTest#createsAnElement#2",
+			"service" : "elements",
+			"method" : "create",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$patch" : "ElementPatch",
+					"json" : {
+						"Name" : "West",
+						"Type" : "Numeric"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "West",
+							"Type" : "Numeric"
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Element 'West' already exists."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#deletesAnElement#1",
+			"service" : "elements",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ElementServiceTest#deletesAnElement#2",
+			"service" : "elements",
+			"method" : "delete",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Nope"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Element'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#escapesSpecialCharactersInNames#1",
+			"service" : "elements",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"O'Brien",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('O''Brien')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "ElementServiceTest#escapesSpecialCharactersInNames#2",
+			"service" : "elements",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"North & South",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('North%20%26%20South')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "ElementServiceTest#escapesSpecialCharactersInNames#3",
+			"service" : "elements",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"1/2",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('1%2F2')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "ElementServiceTest#escapesSpecialCharactersInNames#4",
+			"service" : "elements",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"100%",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('100%25')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "ElementServiceTest#escapesSpecialCharactersInNames#5",
+			"service" : "elements",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"a+b",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('a%2Bb')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "ElementServiceTest#escapesSpecialCharactersInNames#6",
+			"service" : "elements",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Zürich",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('Z%C3%BCrich')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "ElementServiceTest#escapesSpecialCharactersInNames#7",
+			"service" : "elements",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"#?",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('%23%3F')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "x"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"Name" : "x"
+				}
+			}
+		},
+		{
+			"id" : "ElementServiceTest#followsNextLinksAcrossPages#1",
+			"service" : "elements",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : {
+						"top" : 100
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements?$top=100",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "a"
+								}
+							],
+							"@odata.nextLink" : "Dimensions('Region')/Hierarchies('Region')/Elements?$skiptoken=1"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements?$skiptoken=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "b"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Element",
+					"json" : {
+						"Name" : "a"
+					}
+				},
+				{
+					"$model" : "Element",
+					"json" : {
+						"Name" : "b"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ElementServiceTest#getsAnElementWithItsEtagAndAttributes#1",
+			"service" : "elements",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"Type",
+							"Attributes"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')?$select=Name,Type,Attributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.etag" : "W/\"3\"",
+							"Name" : "West",
+							"Type" : "Numeric",
+							"Attributes" : {
+								"Caption" : "The West"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"@odata.etag" : "W/\"3\"",
+					"Name" : "West",
+					"Type" : "Numeric",
+					"Attributes" : {
+						"Caption" : "The West"
+					}
+				}
+			}
+		},
+		{
+			"id" : "ElementServiceTest#listsElementsWithAFilter#1",
+			"service" : "elements",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"Type",
+							"Level"
+						],
+						"filter" : "(Type eq ibm.tm1.api.v1.ElementType'Consolidated')",
+						"orderBy" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements?$select=Name,Type,Level&$filter=(Type%20eq%20ibm.tm1.api.v1.ElementType'Consolidated')&$orderby=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Total",
+									"Type" : "Consolidated",
+									"Level" : 1
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Element",
+					"json" : {
+						"Name" : "Total",
+						"Type" : "Consolidated",
+						"Level" : 1
+					}
+				}
+			]
+		},
+		{
+			"id" : "ElementServiceTest#locksUnlocksReservesAndReleases#1",
+			"service" : "elements",
+			"method" : "lock",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')/tm1.Lock",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ElementServiceTest#locksUnlocksReservesAndReleases#2",
+			"service" : "elements",
+			"method" : "unlock",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')/tm1.Unlock",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ElementServiceTest#locksUnlocksReservesAndReleases#3",
+			"service" : "elements",
+			"method" : "reserve",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')/tm1.Reserve",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ElementServiceTest#locksUnlocksReservesAndReleases#4",
+			"service" : "elements",
+			"method" : "release",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')/tm1.Release",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ElementServiceTest#navigatesParentsComponentsEdgesAndTheHierarchy#1",
+			"service" : "elements",
+			"method" : "parents",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"North",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('North')/Parents?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Total"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Element",
+					"json" : {
+						"Name" : "Total"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ElementServiceTest#navigatesParentsComponentsEdgesAndTheHierarchy#2",
+			"service" : "elements",
+			"method" : "components",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')/Components",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "North"
+								},
+								{
+									"Name" : "South"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Element",
+					"json" : {
+						"Name" : "North"
+					}
+				},
+				{
+					"$model" : "Element",
+					"json" : {
+						"Name" : "South"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ElementServiceTest#navigatesParentsComponentsEdgesAndTheHierarchy#3",
+			"service" : "elements",
+			"method" : "edges",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				{
+					"$query" : {
+						"orderBy" : [
+							"ComponentName"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')/Edges?$orderby=ComponentName",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ParentName" : "Total",
+									"ComponentName" : "North",
+									"Weight" : 1
+								},
+								{
+									"ParentName" : "Total",
+									"ComponentName" : "South",
+									"Weight" : -1.5
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Edge",
+					"json" : {
+						"ParentName" : "Total",
+						"ComponentName" : "North",
+						"Weight" : 1.0
+					}
+				},
+				{
+					"$model" : "Edge",
+					"json" : {
+						"ParentName" : "Total",
+						"ComponentName" : "South",
+						"Weight" : -1.5
+					}
+				}
+			]
+		},
+		{
+			"id" : "ElementServiceTest#navigatesParentsComponentsEdgesAndTheHierarchy#4",
+			"service" : "elements",
+			"method" : "hierarchy",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"North",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('North')/Hierarchy?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Region"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "Region"
+				}
+			}
+		},
+		{
+			"id" : "ElementServiceTest#refusesMissingNames#1",
+			"service" : "elements",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#refusesMissingNames#2",
+			"service" : "elements",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#refusesMissingNames#3",
+			"service" : "elements",
+			"method" : "setComponent",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"child"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#refusesMissingNames#4",
+			"service" : "elements",
+			"method" : "lock",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#setsAComponentLastOrBeforeAnotherWithAWeight#1",
+			"service" : "elements",
+			"method" : "setComponent",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"child"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"West"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')/tm1.SetComponent",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ElementServiceTest#setsAComponentLastOrBeforeAnotherWithAWeight#2",
+			"service" : "elements",
+			"method" : "setComponent",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"child",
+				"weight"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"West",
+				{
+					"$double" : -1.0
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')/tm1.SetComponent",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')",
+							"Weight" : -1.0
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ElementServiceTest#setsAComponentLastOrBeforeAnotherWithAWeight#3",
+			"service" : "elements",
+			"method" : "setComponent",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"child",
+				"before",
+				"weight"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"West",
+				"North",
+				{
+					"$double" : 2.0
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')/tm1.SetComponent",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')",
+							"Before@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+							"Weight" : 2.0
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ElementServiceTest#setsAComponentLastOrBeforeAnotherWithAWeight#4",
+			"service" : "elements",
+			"method" : "setComponent",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"child",
+				"weight"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				"O'Neil",
+				{
+					"$double" : 0.5
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')/tm1.SetComponent",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('O''Neil')",
+							"Weight" : 0.5
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ElementServiceTest#settingAComponentThatWouldCycleIsABadRequest#1",
+			"service" : "elements",
+			"method" : "setComponent",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"parent",
+				"child"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"North",
+				"Total"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('North')/tm1.SetComponent",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Element@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Circular reference."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ElementServiceTest#updatesWithAndWithoutAnEtag#1",
+			"service" : "elements",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"patch"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$patch" : "ElementPatch",
+					"json" : {
+						"Type" : "String"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Type" : "String"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ElementServiceTest#updatesWithAndWithoutAnEtag#2",
+			"service" : "elements",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$patch" : "ElementPatch",
+					"json" : {
+						"Type" : "Numeric"
+					}
+				},
+				"W/\"3\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"3\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Type" : "Numeric"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ElementServiceTest#updatesWithAndWithoutAnEtag#3",
+			"service" : "elements",
+			"method" : "update",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"element",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$patch" : "ElementPatch",
+					"json" : {
+						"Type" : "Numeric"
+					}
+				},
+				"W/\"0\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Elements('West')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"0\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Type" : "Numeric"
+						}
+					},
+					"response" : {
+						"status" : 412,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "stale"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1PreconditionFailedException",
+				"category" : "api",
+				"kind" : "PRECONDITION_FAILED",
+				"status" : 412,
+				"code" : "278"
+			}
+		}
+	]
+}

@@ -1,0 +1,270 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.process.SqlDataSourceServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "SqlDataSourceServiceTest#aMissingDataSourceIsNotFound#1",
+			"service" : "sqlDataSources",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "SQLDataSources('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'SQLDataSource'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "SqlDataSourceServiceTest#getsADataSource#1",
+			"service" : "sqlDataSources",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Sales DW",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "SQLDataSources('Sales%20DW')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Sales DW",
+							"Description" : "SQL Server"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "SQLDataSource",
+				"json" : {
+					"Name" : "Sales DW",
+					"Description" : "SQL Server"
+				}
+			}
+		},
+		{
+			"id" : "SqlDataSourceServiceTest#getsADataSource#2",
+			"service" : "sqlDataSources",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"O'Brien's",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "SQLDataSources('O''Brien''s')?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "O'Brien's"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "SQLDataSource",
+				"json" : {
+					"Name" : "O'Brien's"
+				}
+			}
+		},
+		{
+			"id" : "SqlDataSourceServiceTest#listsTheDataSources#1",
+			"service" : "sqlDataSources",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "SQLDataSources",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Sales DW",
+									"Description" : "SQL Server"
+								},
+								{
+									"Name" : "Excel Files"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "SQLDataSource",
+					"json" : {
+						"Name" : "Sales DW",
+						"Description" : "SQL Server"
+					}
+				},
+				{
+					"$model" : "SQLDataSource",
+					"json" : {
+						"Name" : "Excel Files"
+					}
+				}
+			]
+		},
+		{
+			"id" : "SqlDataSourceServiceTest#listsTheDataSources#2",
+			"service" : "sqlDataSources",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"filter" : "startswith(Name,'Sales')",
+						"orderBy" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "SQLDataSources?$select=Name&$filter=startswith(Name,'Sales')&$orderby=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "SqlDataSourceServiceTest#refusesAMissingName#1",
+			"service" : "sqlDataSources",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		}
+	]
+}

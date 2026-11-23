@@ -1,0 +1,3 @@
+# Endpoints the Python client doesn't implement yet. This list only shrinks: implementing an
+# endpoint means taking it off. A new spec's new endpoints go here or in excluded.txt.
+# See tests/test_coverage_gate.py.

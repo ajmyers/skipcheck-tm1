@@ -1,0 +1,478 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.dimension.LevelServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "LevelServiceTest#aMissingLevelIsNotFound#1",
+			"service" : "levels",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"number",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				9,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Levels(9)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'9' can not be found in collection of type 'Level'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "LevelServiceTest#followsNextLinksAcrossPages#1",
+			"service" : "levels",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Levels",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Number" : 0
+								}
+							],
+							"@odata.nextLink" : "Dimensions('Region')/Hierarchies('Region')/Levels?$skiptoken=1"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Levels?$skiptoken=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Number" : 1
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Level",
+					"json" : {
+						"Number" : 0
+					}
+				},
+				{
+					"$model" : "Level",
+					"json" : {
+						"Number" : 1
+					}
+				}
+			]
+		},
+		{
+			"id" : "LevelServiceTest#getsALevelByNumber#1",
+			"service" : "levels",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"number",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				2,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Levels(2)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Number" : 2,
+							"Name" : "level002",
+							"Cardinality" : 3
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Level",
+				"json" : {
+					"Number" : 2,
+					"Name" : "level002",
+					"Cardinality" : 3
+				}
+			}
+		},
+		{
+			"id" : "LevelServiceTest#getsALevelByNumber#2",
+			"service" : "levels",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"number",
+				"query"
+			],
+			"args" : [
+				"O'Brien",
+				"By Manager",
+				0,
+				{
+					"$query" : {
+						"select" : [
+							"Number"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('O''Brien')/Hierarchies('By%20Manager')/Levels(0)?$select=Number",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Number" : 0
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Level",
+				"json" : {
+					"Number" : 0
+				}
+			}
+		},
+		{
+			"id" : "LevelServiceTest#listsALevelsMembers#1",
+			"service" : "levels",
+			"method" : "members",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"number",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				1,
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"top" : 2
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Levels(1)/Members?$select=Name&$top=2",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "North"
+								},
+								{
+									"Name" : "South"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "North"
+					}
+				},
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "South"
+					}
+				}
+			]
+		},
+		{
+			"id" : "LevelServiceTest#listsLevels#1",
+			"service" : "levels",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : {
+						"select" : [
+							"Number",
+							"Name",
+							"Cardinality"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Levels?$select=Number,Name,Cardinality",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Number" : 0,
+									"Name" : "level000",
+									"Cardinality" : 1
+								},
+								{
+									"Number" : 1,
+									"Name" : "level001",
+									"Cardinality" : 2
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Level",
+					"json" : {
+						"Number" : 0,
+						"Name" : "level000",
+						"Cardinality" : 1
+					}
+				},
+				{
+					"$model" : "Level",
+					"json" : {
+						"Number" : 1,
+						"Name" : "level001",
+						"Cardinality" : 2
+					}
+				}
+			]
+		},
+		{
+			"id" : "LevelServiceTest#navigatesToTheHierarchy#1",
+			"service" : "levels",
+			"method" : "hierarchy",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"number",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				0,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Levels(0)/Hierarchy",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Region"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "Region"
+				}
+			}
+		},
+		{
+			"id" : "LevelServiceTest#refusesMissingNames#1",
+			"service" : "levels",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				null,
+				"Region",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "LevelServiceTest#refusesMissingNames#2",
+			"service" : "levels",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"number",
+				"query"
+			],
+			"args" : [
+				"Region",
+				null,
+				0,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		}
+	]
+}

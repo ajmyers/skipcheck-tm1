@@ -1,0 +1,58 @@
+{
+	"specVersion" : 1,
+	"name" : "sessions",
+	"description" : "Sessions, threads and the OIDC key cache: this session and its thread are listed, a gone session and thread are not found, the empty key cache, removing no keys and a key that isn't cached.",
+	"names" : [ "key" ],
+	"steps" : [
+		{
+			"service" : "sessions",
+			"method" : "list",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { "select" : [ "ID", "Context" ], "top" : 1 } } ],
+			"expect" : { "count" : 1 }
+		},
+		{
+			"service" : "sessions",
+			"method" : "get",
+			"params" : [ "id", "query" ],
+			"args" : [ 2147483646, { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "threads",
+			"method" : "list",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { "select" : [ "ID", "Function" ], "top" : 1 } } ],
+			"expect" : { "count" : 1 }
+		},
+		{
+			"service" : "threads",
+			"method" : "get",
+			"params" : [ "id", "query" ],
+			"args" : [ 2147483646, { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "oidcKeys",
+			"method" : "keys",
+			"params" : [ ],
+			"args" : [ ],
+			"expect" : { "count" : 0 }
+		},
+		{
+			"service" : "oidcKeys",
+			"method" : "remove",
+			"params" : [ "keyIds" ],
+			"args" : [ [ ] ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "oidcKeys",
+			"method" : "remove",
+			"params" : [ "keyIds" ],
+			"args" : [ [ "${key}" ] ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 400 } }
+		}
+	],
+	"finally" : [ ]
+}

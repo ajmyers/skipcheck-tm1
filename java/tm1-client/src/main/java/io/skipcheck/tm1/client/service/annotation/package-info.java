@@ -1,0 +1,5 @@
+/** Services for annotations on cube cells (plan phase 8). */
+@NullMarked
+package io.skipcheck.tm1.client.service.annotation;
+
+import org.jspecify.annotations.NullMarked;

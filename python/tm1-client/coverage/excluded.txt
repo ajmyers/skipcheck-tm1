@@ -1,0 +1,2 @@
+# Endpoints the Python client deliberately doesn't implement, as: <endpoint> | <reason>
+# The same rules as the Java client's coverage-excluded.txt; see tests/test_coverage_gate.py.

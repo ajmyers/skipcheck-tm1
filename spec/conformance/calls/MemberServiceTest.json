@@ -1,0 +1,790 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.dimension.MemberServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "MemberServiceTest#aMissingMemberIsNotFound#1",
+			"service" : "members",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Member'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "MemberServiceTest#aMissingMemberIsNotFound#2",
+			"service" : "members",
+			"method" : "children",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members('Nope')/Children",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Member'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "MemberServiceTest#aRootHasNoParent#1",
+			"service" : "members",
+			"method" : "parent",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members('Total')/Parent",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "MemberServiceTest#followsNextLinksAcrossPages#1",
+			"service" : "members",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "a"
+								}
+							],
+							"@odata.nextLink" : "Dimensions('Region')/Hierarchies('Region')/Members?$skiptoken=2"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members?$skiptoken=2",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "b"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "a"
+					}
+				},
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "b"
+					}
+				}
+			]
+		},
+		{
+			"id" : "MemberServiceTest#getsAMember#1",
+			"service" : "members",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West Coast",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"UniqueName"
+						],
+						"expand" : {
+							"Element" : {
+								"select" : [
+									"Type"
+								]
+							}
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members('West%20Coast')?$select=Name,UniqueName&$expand=Element($select%3DType)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.etag" : "W/\"2\"",
+							"Name" : "West Coast",
+							"UniqueName" : "[Region].[Region].[West Coast]"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Member",
+				"json" : {
+					"@odata.etag" : "W/\"2\"",
+					"Name" : "West Coast",
+					"UniqueName" : "[Region].[Region].[West Coast]"
+				}
+			}
+		},
+		{
+			"id" : "MemberServiceTest#listsMembers#1",
+			"service" : "members",
+			"method" : "list",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"UniqueName"
+						],
+						"filter" : "Type eq 1",
+						"orderBy" : [
+							"Name"
+						],
+						"top" : 1
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members?$select=Name,UniqueName&$filter=Type%20eq%201&$orderby=Name&$top=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "West",
+									"UniqueName" : "[Region].[Region].[West]"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "West",
+						"UniqueName" : "[Region].[Region].[West]"
+					}
+				}
+			]
+		},
+		{
+			"id" : "MemberServiceTest#quotesNamesWithApostrophesAndOtherCharacters#1",
+			"service" : "members",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Bob's",
+				"Bob's",
+				"O'Neil & Co",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Bob''s')/Hierarchies('Bob''s')/Members('O''Neil%20%26%20Co')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "O'Neil & Co"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Member",
+				"json" : {
+					"Name" : "O'Neil & Co"
+				}
+			}
+		},
+		{
+			"id" : "MemberServiceTest#readsAMembersChildren#1",
+			"service" : "members",
+			"method" : "children",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"Total",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members('Total')/Children?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "West"
+								},
+								{
+									"Name" : "East"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "West"
+					}
+				},
+				{
+					"$model" : "Member",
+					"json" : {
+						"Name" : "East"
+					}
+				}
+			]
+		},
+		{
+			"id" : "MemberServiceTest#readsAMembersChildren#2",
+			"service" : "members",
+			"method" : "children",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members('West')/Children",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "MemberServiceTest#readsAMembersElementLevelAndHierarchy#1",
+			"service" : "members",
+			"method" : "element",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"Type"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members('West')/Element?$select=Name,Type",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "West",
+							"Type" : "Numeric"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Element",
+				"json" : {
+					"Name" : "West",
+					"Type" : "Numeric"
+				}
+			}
+		},
+		{
+			"id" : "MemberServiceTest#readsAMembersElementLevelAndHierarchy#2",
+			"service" : "members",
+			"method" : "level",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members('West')/Level",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Number" : 2,
+							"Name" : "Level002",
+							"Cardinality" : 3
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Level",
+				"json" : {
+					"Number" : 2,
+					"Name" : "Level002",
+					"Cardinality" : 3
+				}
+			}
+		},
+		{
+			"id" : "MemberServiceTest#readsAMembersElementLevelAndHierarchy#3",
+			"service" : "members",
+			"method" : "hierarchy",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members('West')/Hierarchy?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Region"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Hierarchy",
+				"json" : {
+					"Name" : "Region"
+				}
+			}
+		},
+		{
+			"id" : "MemberServiceTest#readsAMembersParent#1",
+			"service" : "members",
+			"method" : "parent",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				"West",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/Members('West')/Parent?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Total"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Member",
+				"json" : {
+					"Name" : "Total"
+				}
+			}
+		},
+		{
+			"id" : "MemberServiceTest#refusesMissingNamesSendingNothing#1",
+			"service" : "members",
+			"method" : "get",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				"Region",
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "MemberServiceTest#refusesMissingNamesSendingNothing#2",
+			"service" : "members",
+			"method" : "parent",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				null,
+				"Region",
+				"West",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "MemberServiceTest#refusesMissingNamesSendingNothing#3",
+			"service" : "members",
+			"method" : "children",
+			"params" : [
+				"dimension",
+				"hierarchy",
+				"member",
+				"query"
+			],
+			"args" : [
+				"Region",
+				null,
+				"West",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		}
+	]
+}

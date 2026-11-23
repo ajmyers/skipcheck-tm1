@@ -1,0 +1,17 @@
+{
+	"specVersion" : 1,
+	"name" : "levels",
+	"description" : "A fresh dimension (World = Europe (France, Spain) + Asia (Japan)): its levels, one by number, a level's members and its hierarchy.",
+	"names" : ["dimension"],
+	"steps" : [
+		{"service": "dimensions", "method": "create", "params": ["dimension"], "args": [{"$patch": "DimensionPatch", "json": {"Name": "${dimension}", "Hierarchies": [{"Name": "${dimension}", "Elements": [{"Name": "World", "Type": "Consolidated"}, {"Name": "Europe", "Type": "Consolidated"}, {"Name": "Asia", "Type": "Consolidated"}, {"Name": "France", "Type": "Numeric"}, {"Name": "Spain", "Type": "Numeric"}, {"Name": "Japan", "Type": "Numeric"}], "Edges": [{"ParentName": "World", "ComponentName": "Europe", "Weight": 1.0}, {"ParentName": "World", "ComponentName": "Asia", "Weight": 1.0}, {"ParentName": "Europe", "ComponentName": "France", "Weight": 1.0}, {"ParentName": "Europe", "ComponentName": "Spain", "Weight": 1.0}, {"ParentName": "Asia", "ComponentName": "Japan", "Weight": 1.0}]}]}}], "expect": {"fields": {"Name": "${dimension}"}}},
+		{"service": "levels", "method": "list", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "${dimension}", {"$query": {}}], "expect": {"items": {"Number": [0, 1, 2], "Cardinality": [1, 2, 3]}}},
+		{"service": "levels", "method": "get", "params": ["dimension", "hierarchy", "number", "query"], "args": ["${dimension}", "${dimension}", 2, {"$query": {}}], "expect": {"fields": {"Number": 2, "Cardinality": 3}}},
+		{"service": "levels", "method": "members", "params": ["dimension", "hierarchy", "number", "query"], "args": ["${dimension}", "${dimension}", 2, {"$query": {"select": ["Name"]}}], "expect": {"count": 3}},
+		{"service": "levels", "method": "members", "params": ["dimension", "hierarchy", "number", "query"], "args": ["${dimension}", "${dimension}", 0, {"$query": {"select": ["Name"]}}], "expect": {"items": {"Name": ["World"]}}},
+		{"service": "levels", "method": "hierarchy", "params": ["dimension", "hierarchy", "number", "query"], "args": ["${dimension}", "${dimension}", 0, {"$query": {"select": ["Name"]}}], "expect": {"fields": {"Name": "${dimension}"}}}
+	],
+	"finally" : [
+		{"service": "dimensions", "method": "delete", "params": ["name"], "args": ["${dimension}"]}
+	]
+}

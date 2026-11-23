@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# Copied from docker/paw by npm run embed (prebuild)
+paw-local.sh
+# Copied from the repository root as the package is packed (prepack)
+LICENSE

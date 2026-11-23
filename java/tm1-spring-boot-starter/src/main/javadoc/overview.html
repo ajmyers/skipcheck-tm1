@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><title>tm1-spring-boot-starter</title></head>
+<body>
+The <a href="https://ajmyers.net/projects/tm1-client/api/">TM1 client</a> as Spring Boot beans,
+configured from <code>tm1.*</code> properties.
+
+<h1>Getting started</h1>
+
+<ol>
+<li><p><b>Have a TM1 server to talk to.</b> To run one on your own computer in Docker, follow
+<a href="https://ajmyers.net/tm1/">Run TM1 on your own computer</a>. You need your own licensed
+copy of TM1 Server.</p></li>
+
+<li><p><b>Add the starter to a Spring Boot 4 application.</b> Gradle:</p>
+<pre><code class="language-kotlin">implementation("io.skipcheck:tm1-spring-boot-starter:{{version}}")</code></pre>
+<p>Maven:</p>
+<pre><code class="language-xml">&lt;dependency&gt;
+  &lt;groupId&gt;io.skipcheck&lt;/groupId&gt;
+  &lt;artifactId&gt;tm1-spring-boot-starter&lt;/artifactId&gt;
+  &lt;version&gt;{{version}}&lt;/version&gt;
+&lt;/dependency&gt;</code></pre></li>
+
+<li><p><b>Tell it where TM1 is.</b> The starter connects with the <code>tm1</code> settings in <code>application.yml</code>;
+these are the defaults of a server set up with the link above:</p>
+{@snippet file = examples/application.yml lang = yaml}
+<p>For a server elsewhere, change the address. Keep a real password out of the file, for example
+with <code>password: ${TM1_PASSWORD}</code> and an environment variable.
+{@link io.skipcheck.tm1.spring.boot.autoconfigure.Tm1Properties} lists every property.</p></li>
+
+<li><p><b>Say hello.</b> The starter builds a <code>Tm1Client</code> from those settings; ask
+for it, and use it. This prints the server's version and lists its cubes when the application
+starts:</p>
+{@snippet class = examples.HelloTm1Application region = hello-app}
+<p>Run it with <code>./gradlew bootRun</code> (or <code>mvn spring-boot:run</code>):</p>
+<pre><code class="language-plaintext">Hello from TM1 11.8.03500.6
+  Plan_BudgetPlan
+  SalesCube
+  ...</code></pre></li>
+</ol>
+
+<h1>Where next</h1>
+
+<ul>
+<li>{@link io.skipcheck.tm1.spring.boot.autoconfigure.Tm1AutoConfiguration}: the beans it creates,
+and a session per user from the pool.</li>
+<li>{@link io.skipcheck.tm1.spring.boot.autoconfigure.Tm1ConnectionDetails}: logging in your own
+way, such as with CAM.</li>
+<li><a href="https://ajmyers.net/projects/tm1-spring-boot-testcontainers/api/">tm1-spring-boot-testcontainers</a>:
+a real TM1 in your Spring Boot tests.</li>
+</ul>
+</body>
+</html>

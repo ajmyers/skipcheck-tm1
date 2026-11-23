@@ -1,0 +1,103 @@
+{
+	"specVersion" : 1,
+	"name" : "sandboxes",
+	"description" : "Two fresh sandboxes: create, read, load and unload, discard, merge one into the other, publish, delete, and a missing sandbox, rowset and drillthrough process.",
+	"names" : [ "sandbox", "target", "missing" ],
+	"steps" : [
+		{
+			"service" : "sandboxes",
+			"method" : "create",
+			"params" : [ "sandbox" ],
+			"args" : [ { "$patch" : "SandboxPatch", "json" : { "Name" : "${sandbox}" } } ],
+			"expect" : { "fields" : { "Name" : "${sandbox}" } }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "create",
+			"params" : [ "sandbox" ],
+			"args" : [ { "$patch" : "SandboxPatch", "json" : { "Name" : "${target}" } } ],
+			"expect" : { "fields" : { "Name" : "${target}" } }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${sandbox}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "${sandbox}" } }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "unload",
+			"params" : [ "name" ],
+			"args" : [ "${target}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "load",
+			"params" : [ "name" ],
+			"args" : [ "${target}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${target}", { "$query" : { "select" : [ "Name", "IsLoaded" ] } } ],
+			"expect" : { "fields" : { "Name" : "${target}", "IsLoaded" : true } }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "discardChanges",
+			"params" : [ "name" ],
+			"args" : [ "${sandbox}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "merge",
+			"params" : [ "name", "target" ],
+			"args" : [ "${sandbox}", "${target}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "publish",
+			"params" : [ "name" ],
+			"args" : [ "${target}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${target}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "drillthrough",
+			"method" : "rowset",
+			"params" : [ "id", "query" ],
+			"args" : [ "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "drillthrough",
+			"method" : "executeRelationalProcess",
+			"params" : [ "process", "parameters" ],
+			"args" : [ "${missing}", [ ] ],
+			"expect" : { "error" : { "category" : "api" } }
+		}
+	],
+	"finally" : [
+		{ "service" : "sandboxes", "method" : "delete", "params" : [ "name" ], "args" : [ "${target}" ] },
+		{ "service" : "sandboxes", "method" : "delete", "params" : [ "name" ], "args" : [ "${sandbox}" ] }
+	]
+}

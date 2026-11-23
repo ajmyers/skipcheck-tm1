@@ -1,0 +1,139 @@
+{
+	"specVersion" : 1,
+	"name" : "users",
+	"description" : "A user in two fresh groups: create, read, update, set the groups whole, list members from both sides, a refused groups update, a missing user, delete.",
+	"names" : [ "user", "g1", "g2", "missing" ],
+	"steps" : [
+		{
+			"service" : "groups",
+			"method" : "create",
+			"params" : [ "name" ],
+			"args" : [ "${g1}" ],
+			"expect" : { "fields" : { "Name" : "${g1}" } }
+		},
+		{
+			"service" : "groups",
+			"method" : "create",
+			"params" : [ "name" ],
+			"args" : [ "${g2}" ],
+			"expect" : { "fields" : { "Name" : "${g2}" } }
+		},
+		{
+			"service" : "users",
+			"method" : "create",
+			"params" : [ "user" ],
+			"args" : [ { "$patch" : "UserPatch", "json" : { "Name" : "${user}", "Password" : "pw", "Groups@odata.bind" : [ "Groups('${g1}')" ] } } ],
+			"expect" : { "fields" : { "Name" : "${user}" } }
+		},
+		{
+			"service" : "users",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${user}", { "$query" : { "select" : [ "Name", "Type" ] } } ],
+			"expect" : { "fields" : { "Name" : "${user}", "Type" : "User" } }
+		},
+		{
+			"service" : "users",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${user}", { "$patch" : "UserPatch", "json" : { "FriendlyName" : "Friend" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "users",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${user}", { "$query" : { "select" : [ "FriendlyName" ] } } ],
+			"expect" : { "fields" : { "FriendlyName" : "Friend" } }
+		},
+		{
+			"service" : "users",
+			"method" : "groups",
+			"params" : [ "name", "query" ],
+			"args" : [ "${user}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "${g1}" ] } }
+		},
+		{
+			"service" : "users",
+			"method" : "setGroups",
+			"params" : [ "name", "groups" ],
+			"args" : [ "${user}", [ "${g1}", "${g2}" ] ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "users",
+			"method" : "groups",
+			"params" : [ "name", "query" ],
+			"args" : [ "${user}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "count" : 2 }
+		},
+		{
+			"service" : "users",
+			"method" : "setGroups",
+			"params" : [ "name", "groups" ],
+			"args" : [ "${user}", [ "${g2}" ] ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "groups",
+			"method" : "users",
+			"params" : [ "name", "query" ],
+			"args" : [ "${g2}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "${user}" ] } }
+		},
+		{
+			"service" : "groups",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${g1}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "fields" : { "Name" : "${g1}" } }
+		},
+		{
+			"service" : "users",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${user}", { "$patch" : "UserPatch", "json" : { "Groups@odata.bind" : [ "Groups('${g1}')" ] } } ],
+			"expect" : { "error" : { "category" : "argument" } }
+		},
+		{
+			"service" : "users",
+			"method" : "sessions",
+			"params" : [ "name", "query" ],
+			"args" : [ "${user}", { "$query" : { } } ],
+			"expect" : { "count" : 0 }
+		},
+		{
+			"service" : "users",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "users",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${user}" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "users",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${user}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "groups",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${g1}" ],
+			"expect" : { "none" : true }
+		}
+	],
+	"finally" : [
+		{ "service" : "users", "method" : "delete", "params" : [ "name" ], "args" : [ "${user}" ] },
+		{ "service" : "groups", "method" : "delete", "params" : [ "name" ], "args" : [ "${g1}" ] },
+		{ "service" : "groups", "method" : "delete", "params" : [ "name" ], "args" : [ "${g2}" ] }
+	]
+}

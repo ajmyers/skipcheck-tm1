@@ -1,0 +1,720 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.data.SandboxServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "SandboxServiceTest#aMissingSandboxIsNotFound#1",
+			"service" : "sandboxes",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Joe's",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Sandboxes('Joe''s')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Joe's' can not be found in collection of type 'Sandbox'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "SandboxServiceTest#aPublishThatConflictsFails#1",
+			"service" : "sandboxes",
+			"method" : "publish",
+			"params" : [
+				"name",
+				"conflicts",
+				"allowQueueing",
+				"cleanAfter"
+			],
+			"args" : [
+				"S",
+				{
+					"$enum" : "ConflictResolution",
+					"name" : "USING_TARGET",
+					"json" : "UsingTarget"
+				},
+				false,
+				false
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sandboxes('S')/tm1.Publish",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"ConflictResolution" : "UsingTarget",
+							"AllowQueueing" : false,
+							"CleanAfter" : false
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "conflicts"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "CONFLICT",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "SandboxServiceTest#aSandboxThatExistsIsAConflict#1",
+			"service" : "sandboxes",
+			"method" : "create",
+			"params" : [
+				"sandbox"
+			],
+			"args" : [
+				{
+					"$patch" : "SandboxPatch",
+					"json" : {
+						"Name" : "S"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sandboxes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "S"
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'S' already exists"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "SandboxServiceTest#createsUpdatesAndDeletes#1",
+			"service" : "sandboxes",
+			"method" : "create",
+			"params" : [
+				"sandbox"
+			],
+			"args" : [
+				{
+					"$patch" : "SandboxPatch",
+					"json" : {
+						"Name" : "S",
+						"IncludeInSandboxDimension" : true
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sandboxes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "S",
+							"IncludeInSandboxDimension" : true
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "S",
+							"IsLoaded" : true
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Sandbox",
+				"json" : {
+					"Name" : "S",
+					"IsLoaded" : true
+				}
+			}
+		},
+		{
+			"id" : "SandboxServiceTest#createsUpdatesAndDeletes#2",
+			"service" : "sandboxes",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch"
+			],
+			"args" : [
+				"S",
+				{
+					"$patch" : "SandboxPatch",
+					"json" : {
+						"Name" : "T",
+						"IsActive" : null
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Sandboxes('S')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "T",
+							"IsActive" : null
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SandboxServiceTest#createsUpdatesAndDeletes#3",
+			"service" : "sandboxes",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"T"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Sandboxes('T')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SandboxServiceTest#listsAndGetsSandboxes#1",
+			"service" : "sandboxes",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Sandboxes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Best case",
+									"IsLoaded" : true
+								},
+								{
+									"Name" : "Worst"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Sandbox",
+					"json" : {
+						"Name" : "Best case",
+						"IsLoaded" : true
+					}
+				},
+				{
+					"$model" : "Sandbox",
+					"json" : {
+						"Name" : "Worst"
+					}
+				}
+			]
+		},
+		{
+			"id" : "SandboxServiceTest#listsAndGetsSandboxes#2",
+			"service" : "sandboxes",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"IsLoaded"
+						],
+						"filter" : "IsLoaded eq true"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Sandboxes?$select=Name,IsLoaded&$filter=IsLoaded%20eq%20true",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Best case"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Sandbox",
+					"json" : {
+						"Name" : "Best case"
+					}
+				}
+			]
+		},
+		{
+			"id" : "SandboxServiceTest#listsAndGetsSandboxes#3",
+			"service" : "sandboxes",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Best case",
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Sandboxes('Best%20case')?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Best case",
+							"IsLoaded" : false,
+							"IsActive" : false
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Sandbox",
+				"json" : {
+					"Name" : "Best case",
+					"IsLoaded" : false,
+					"IsActive" : false
+				}
+			}
+		},
+		{
+			"id" : "SandboxServiceTest#publishesAndMergesWithOptions#1",
+			"service" : "sandboxes",
+			"method" : "publish",
+			"params" : [
+				"name",
+				"conflicts",
+				"allowQueueing",
+				"cleanAfter"
+			],
+			"args" : [
+				"S",
+				{
+					"$enum" : "ConflictResolution",
+					"name" : "USING_SOURCE",
+					"json" : "UsingSource"
+				},
+				true,
+				false
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sandboxes('S')/tm1.Publish",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"ConflictResolution" : "UsingSource",
+							"AllowQueueing" : true,
+							"CleanAfter" : false
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SandboxServiceTest#publishesAndMergesWithOptions#2",
+			"service" : "sandboxes",
+			"method" : "merge",
+			"params" : [
+				"name",
+				"target"
+			],
+			"args" : [
+				"S",
+				"Joe's"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sandboxes('S')/tm1.Merge",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Target@odata.bind" : "Sandboxes('Joe''s')"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SandboxServiceTest#publishesAndMergesWithOptions#3",
+			"service" : "sandboxes",
+			"method" : "merge",
+			"params" : [
+				"name",
+				"target",
+				"conflicts",
+				"allowQueueing",
+				"cleanAfter"
+			],
+			"args" : [
+				"S",
+				"T",
+				{
+					"$enum" : "ConflictResolution",
+					"name" : "INDIVIDUALLY",
+					"json" : "Individually"
+				},
+				false,
+				true
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sandboxes('S')/tm1.Merge",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Target@odata.bind" : "Sandboxes('T')",
+							"ConflictResolution" : "Individually",
+							"AllowQueueing" : false,
+							"CleanAfter" : true
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SandboxServiceTest#refusesAMissingName#1",
+			"service" : "sandboxes",
+			"method" : "load",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "SandboxServiceTest#runsEachSandboxAction#1",
+			"service" : "sandboxes",
+			"method" : "load",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Best case"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sandboxes('Best%20case')/tm1.Load",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SandboxServiceTest#runsEachSandboxAction#2",
+			"service" : "sandboxes",
+			"method" : "unload",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Best case"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sandboxes('Best%20case')/tm1.Unload",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SandboxServiceTest#runsEachSandboxAction#3",
+			"service" : "sandboxes",
+			"method" : "discardChanges",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Best case"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sandboxes('Best%20case')/tm1.DiscardChanges",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "SandboxServiceTest#runsEachSandboxAction#4",
+			"service" : "sandboxes",
+			"method" : "publish",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Best case"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Sandboxes('Best%20case')/tm1.Publish",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

@@ -1,0 +1,67 @@
+{
+  "name": "@skipcheck/tm1-testcontainers",
+  "version": "0.1.0-dev",
+  "description": "Testcontainers for IBM Planning Analytics: TM1, its Admin Server, TM1 Web, Planning Analytics Workspace, Cognos and Keycloak in Docker for Node tests, as the Java tm1-testcontainers",
+  "license": "AGPL-3.0-only",
+  "author": "Andrew Myers (https://ajmyers.net)",
+  "homepage": "https://skipcheck.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ajmyers/skipcheck-tm1.git",
+    "directory": "typescript/tm1-testcontainers"
+  },
+  "bugs": "https://github.com/ajmyers/skipcheck-tm1/issues",
+  "keywords": [
+    "tm1",
+    "planning-analytics",
+    "ibm",
+    "testcontainers",
+    "vitest"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20.18.1"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./vitest": {
+      "types": "./dist/vitest.d.ts",
+      "default": "./dist/vitest.js"
+    }
+  },
+  "files": [
+    "dist",
+    "paw-local.sh"
+  ],
+  "scripts": {
+    "embed": "node scripts/embed-paw-script.mjs",
+    "prebuild": "npm run embed",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepack": "npm run build && node --input-type=module -e \"import { copyFileSync } from 'node:fs'; copyFileSync('../../LICENSE', 'LICENSE');\""
+  },
+  "dependencies": {
+    "testcontainers": "11.14.0"
+  },
+  "peerDependencies": {
+    "@skipcheck/tm1-client": "*",
+    "vitest": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@skipcheck/tm1-client": "*"
+  }
+}

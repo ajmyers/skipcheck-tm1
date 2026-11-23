@@ -1,2 +1,0 @@
-org.springframework.boot.autoconfigure.service.connection.ConnectionDetailsFactory=\
-net.ajmyers.tm1.spring.boot.testcontainers.Tm1ContainerConnectionDetailsFactory

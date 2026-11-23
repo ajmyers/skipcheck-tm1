@@ -8,6 +8,8 @@
 #   touched, and uncommitted changes can't make a commit look like it builds.
 # - It runs ./gradlew build, the same as CI: compile, checks, tests, Javadoc. TM1 tests are skipped
 #   (TM1_* settings are cleared), as in CI, since they take minutes per commit; run them by hand.
+# - For a commit that touches the Python, TypeScript or .NET client, it also runs that client's
+#   layout and lint checks (ruff, prettier and eslint, CSharpier), but not its tests.
 # - Branch deletions push nothing and are let through. CI skips the hook.
 #
 # Enabled with the other hooks: git config core.hooksPath .githooks
@@ -54,6 +56,34 @@ git worktree add -q --detach "$worktree" "${unique[0]}" || { warn "couldn't crea
 
 unset TM1_PRIVATE_IMAGE TM1_HOME_DIR TM1_INSTALL_VOLUME TM1_BUNDLE_DIR TM1_BUNDLE TM1_BUNDLE_URL TM1_BUNDLE_SHA256 TM1_SERVER_IMAGE
 
+# The layout and lint checks of the other clients, for a commit that touches them: what pytest,
+# npm test and dotnet build check first, without their tests, which take longer than a build per
+# commit is worth. A check whose tool is missing fails, with what to install.
+top="$(pwd)"
+ports() {
+	local changed
+	changed="$(git diff-tree --no-commit-id --name-only -r --root "$1")"
+	if grep -q '^python/' <<< "$changed"; then
+		local ruff=(ruff)
+		command -v ruff > /dev/null || ruff=(python3 -m ruff)
+		"${ruff[@]}" --version > /dev/null 2>&1 || { echo "ruff isn't installed: pip install -e './python/tm1-client[test]'"; return 1; }
+		(cd "$worktree" && "${ruff[@]}" format --check python && "${ruff[@]}" check python) || return 1
+	fi
+	if grep -q '^typescript/' <<< "$changed"; then
+		[[ -d "$top/typescript/node_modules" ]] || { echo "prettier and eslint aren't installed: (cd typescript && npm ci)"; return 1; }
+		# The tools and what the lint config imports, from this checkout's install
+		ln -sfn "$top/typescript/node_modules" "$worktree/typescript/node_modules"
+		(cd "$worktree/typescript" && node_modules/.bin/prettier --log-level warn --check . && node_modules/.bin/eslint .)
+		local status=$?
+		rm -f "$worktree/typescript/node_modules"
+		[[ $status -eq 0 ]] || return 1
+	fi
+	if grep -q '^dotnet/' <<< "$changed"; then
+		(cd "$worktree/dotnet" && dotnet tool restore > /dev/null && dotnet csharpier check .) || return 1
+	fi
+	return 0
+}
+
 warn "building ${#unique[@]} commit(s) before pushing to $remote"
 n=0
 for commit in "${unique[@]}"; do
@@ -64,6 +94,12 @@ for commit in "${unique[@]}"; do
 	if ! (cd "$worktree" && ./gradlew build -q --console=plain > build.log 2>&1); then
 		warn "commit $n of ${#unique[@]} doesn't build: $subject"
 		grep -v -i -E 'deprecat|incubating|warning-mode|docs.gradle.org' "$worktree/build.log" | tail -30 >&2
+		warn "push refused. Fix that commit (an interactive rebase, or a fixup commit), then push again."
+		exit 1
+	fi
+	if ! ports "$commit" > "$worktree/ports.log" 2>&1; then
+		warn "commit $n of ${#unique[@]} fails a layout or lint check: $subject"
+		tail -30 "$worktree/ports.log" >&2
 		warn "push refused. Fix that commit (an interactive rebase, or a fixup commit), then push again."
 		exit 1
 	fi

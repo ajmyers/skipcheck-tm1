@@ -1,0 +1,950 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.encryption.EncryptionServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "EncryptionServiceTest#aFileTypeIsRequired#1",
+			"service" : "encryption",
+			"method" : "encryptFile",
+			"params" : [
+				"source",
+				"destination",
+				"type"
+			],
+			"args" : [
+				"a",
+				"b",
+				{
+					"$enum" : "EncryptionFileType",
+					"name" : "UNKNOWN",
+					"json" : null
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "EncryptionServiceTest#changingAServerNotEncryptedIsABadRequest#1",
+			"service" : "encryption",
+			"method" : "configure",
+			"params" : [
+				"settings"
+			],
+			"args" : [
+				{
+					"$patch" : "LocalKeyFileProviderSettingsPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.LocalKeyFileProviderSettings",
+						"KeyRef" : "/tmp/a.key"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ConfigureEncryptionAtRest",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Settings" : {
+								"@odata.type" : "#ibm.tm1.api.v1.LocalKeyFileProviderSettings",
+								"KeyRef" : "/tmp/a.key"
+							}
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "DataModelConversion"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "EncryptionServiceTest#changingAServerNotEncryptedIsABadRequest#2",
+			"service" : "encryption",
+			"method" : "disable",
+			"params" : [ ],
+			"args" : [ ],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "DisableEncryptionAtRest",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "DataModelConversion"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "EncryptionServiceTest#changingAServerNotEncryptedIsABadRequest#3",
+			"service" : "encryption",
+			"method" : "rotateDataEncryptionKey",
+			"params" : [ ],
+			"args" : [ ],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "RotateDataEncryptionKey",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "DataEncryptionKeyRotationFailed"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "EncryptionServiceTest#changingAServerNotEncryptedIsABadRequest#4",
+			"service" : "encryption",
+			"method" : "rotateDataModelKey",
+			"params" : [ ],
+			"args" : [ ],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "RotateDataModelKey",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "RotateDataModelKey"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "EncryptionServiceTest#changingAServerNotEncryptedIsABadRequest#5",
+			"service" : "encryption",
+			"method" : "encryptFile",
+			"params" : [
+				"source",
+				"destination",
+				"type"
+			],
+			"args" : [
+				"a.cub",
+				"a.cub.enc",
+				{
+					"$enum" : "EncryptionFileType",
+					"name" : "OBJECT",
+					"json" : "Object"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "EncryptDataFile",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"SourcePath" : "a.cub",
+							"DestinationPath" : "a.cub.enc",
+							"FileType" : "Object"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "DataFileConversion"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "EncryptionServiceTest#changingAServerNotEncryptedIsABadRequest#6",
+			"service" : "encryption",
+			"method" : "decryptFile",
+			"params" : [
+				"source",
+				"destination",
+				"type"
+			],
+			"args" : [
+				"a.cub.enc",
+				"a.cub",
+				{
+					"$enum" : "EncryptionFileType",
+					"name" : "OBJECT",
+					"json" : "Object"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "DecryptDataFile",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"SourcePath" : "a.cub.enc",
+							"DestinationPath" : "a.cub",
+							"FileType" : "Object"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "DataFileConversion"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "EncryptionServiceTest#configures#1",
+			"service" : "encryption",
+			"method" : "configure",
+			"params" : [
+				"settings"
+			],
+			"args" : [
+				{
+					"$patch" : "LocalKeyFileProviderSettingsPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.LocalKeyFileProviderSettings",
+						"KeyRef" : "/tmp/a.key"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ConfigureEncryptionAtRest",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Settings" : {
+								"@odata.type" : "#ibm.tm1.api.v1.LocalKeyFileProviderSettings",
+								"KeyRef" : "/tmp/a.key"
+							}
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#configures#2",
+			"service" : "encryption",
+			"method" : "configure",
+			"params" : [
+				"settings"
+			],
+			"args" : [
+				{
+					"$patch" : "VaultSettingsPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.VaultSettings",
+						"KeyRef" : "transit/keys/tm1",
+						"ServiceEndpoint" : "https://vault.example.com:8200",
+						"AuthRef" : "s.token"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ConfigureEncryptionAtRest",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Settings" : {
+								"@odata.type" : "#ibm.tm1.api.v1.VaultSettings",
+								"KeyRef" : "transit/keys/tm1",
+								"ServiceEndpoint" : "https://vault.example.com:8200",
+								"AuthRef" : "s.token"
+							}
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#disablesAndRotatesKeys#1",
+			"service" : "encryption",
+			"method" : "disable",
+			"params" : [ ],
+			"args" : [ ],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "DisableEncryptionAtRest",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#disablesAndRotatesKeys#2",
+			"service" : "encryption",
+			"method" : "rotateDataEncryptionKey",
+			"params" : [ ],
+			"args" : [ ],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "RotateDataEncryptionKey",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#disablesAndRotatesKeys#3",
+			"service" : "encryption",
+			"method" : "rotateDataModelKey",
+			"params" : [ ],
+			"args" : [ ],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "RotateDataModelKey",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#encodesTheSettingsInTheQuery#1",
+			"service" : "encryption",
+			"method" : "validate",
+			"params" : [
+				"settings"
+			],
+			"args" : [
+				{
+					"$patch" : "KeyProtectSettingsPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.KeyProtectSettings",
+						"KeyRef" : "key/1?x=a&b=c#d",
+						"ServiceEndpoint" : "https://us-south.kms.cloud.ibm.com",
+						"InstanceID" : "a1b2 c3",
+						"AuthRef" : "apikey's \"value\" 100%",
+						"AuthEndpoint" : "https://iam.cloud.ibm.com/identity/token"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ValidateEncryptionAtRestSettings(Settings=@settings)?@settings=%7B%22@odata.type%22:%22%23ibm.tm1.api.v1.KeyProtectSettings%22,%22KeyRef%22:%22key/1%3Fx%3Da%26b%3Dc%23d%22,%22ServiceEndpoint%22:%22https://us-south.kms.cloud.ibm.com%22,%22InstanceID%22:%22a1b2%20c3%22,%22AuthRef%22:%22apikey's%20%5C%22value%5C%22%20100%25%22,%22AuthEndpoint%22:%22https://iam.cloud.ibm.com/identity/token%22%7D",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"IsValid" : true,
+							"Issues" : [ ]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "EncryptionAtRestValidationReport",
+				"json" : {
+					"IsValid" : true,
+					"Issues" : [ ]
+				}
+			}
+		},
+		{
+			"id" : "EncryptionServiceTest#encodesTheSettingsInTheQuery#2",
+			"service" : "encryption",
+			"method" : "validate",
+			"params" : [
+				"settings"
+			],
+			"args" : [
+				{
+					"$patch" : "VaultSettingsPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.VaultSettings",
+						"KeyRef" : "transit/keys/tm1",
+						"ServiceEndpoint" : "https://vault.example.com:8200",
+						"AuthRef" : "s.token+/="
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ValidateEncryptionAtRestSettings(Settings=@settings)?@settings=%7B%22@odata.type%22:%22%23ibm.tm1.api.v1.VaultSettings%22,%22KeyRef%22:%22transit/keys/tm1%22,%22ServiceEndpoint%22:%22https://vault.example.com:8200%22,%22AuthRef%22:%22s.token%2B/%3D%22%7D",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"IsValid" : true
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "EncryptionAtRestValidationReport",
+				"json" : {
+					"IsValid" : true
+				}
+			}
+		},
+		{
+			"id" : "EncryptionServiceTest#encryptsAndDecryptsFilesOfEachType#1",
+			"service" : "encryption",
+			"method" : "encryptFile",
+			"params" : [
+				"source",
+				"destination",
+				"type"
+			],
+			"args" : [
+				"Sales.cub",
+				"/tmp/Sales.cub.enc",
+				{
+					"$enum" : "EncryptionFileType",
+					"name" : "OBJECT",
+					"json" : "Object"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "EncryptDataFile",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"SourcePath" : "Sales.cub",
+							"DestinationPath" : "/tmp/Sales.cub.enc",
+							"FileType" : "Object"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#encryptsAndDecryptsFilesOfEachType#2",
+			"service" : "encryption",
+			"method" : "decryptFile",
+			"params" : [
+				"source",
+				"destination",
+				"type"
+			],
+			"args" : [
+				"tm1s20261122.log",
+				"C:\\logs\\tm1s.log",
+				{
+					"$enum" : "EncryptionFileType",
+					"name" : "TRANSACTION_LOG",
+					"json" : "TransactionLog"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "DecryptDataFile",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"SourcePath" : "tm1s20261122.log",
+							"DestinationPath" : "C:\\logs\\tm1s.log",
+							"FileType" : "TransactionLog"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#encryptsAndDecryptsFilesOfEachType#3",
+			"service" : "encryption",
+			"method" : "encryptFile",
+			"params" : [
+				"source",
+				"destination",
+				"type"
+			],
+			"args" : [
+				"tm1auditstore/audit.log",
+				"audit.log.enc",
+				{
+					"$enum" : "EncryptionFileType",
+					"name" : "AUDIT_LOG",
+					"json" : "AuditLog"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "EncryptDataFile",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"SourcePath" : "tm1auditstore/audit.log",
+							"DestinationPath" : "audit.log.enc",
+							"FileType" : "AuditLog"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#encryptsAndDecryptsTheModel#1",
+			"service" : "encryption",
+			"method" : "encryptModel",
+			"params" : [
+				"timeUntilShutdown"
+			],
+			"args" : [
+				{
+					"$duration" : "PT30S"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "EncryptDataModel",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"TimeUntilShutdown" : "PT30S"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#encryptsAndDecryptsTheModel#2",
+			"service" : "encryption",
+			"method" : "encryptModel",
+			"params" : [
+				"timeUntilShutdown"
+			],
+			"args" : [
+				{
+					"$duration" : "PT36H1.5S"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "EncryptDataModel",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"TimeUntilShutdown" : "PT36H1.5S"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#encryptsAndDecryptsTheModel#3",
+			"service" : "encryption",
+			"method" : "decryptModel",
+			"params" : [
+				"timeUntilShutdown"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "DecryptDataModel",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#encryptsAndDecryptsTheModel#4",
+			"service" : "encryption",
+			"method" : "decryptModel",
+			"params" : [
+				"timeUntilShutdown"
+			],
+			"args" : [
+				{
+					"$duration" : "PT1M30S"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "DecryptDataModel",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"TimeUntilShutdown" : "PT1M30S"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "EncryptionServiceTest#onlyAFullAdministratorMayChangeIt#1",
+			"service" : "encryption",
+			"method" : "disable",
+			"params" : [ ],
+			"args" : [ ],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "DisableEncryptionAtRest",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 403,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "1",
+								"message" : "Insufficient privileges"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ForbiddenException",
+				"category" : "api",
+				"kind" : "FORBIDDEN",
+				"status" : 403,
+				"code" : "1"
+			}
+		},
+		{
+			"id" : "EncryptionServiceTest#validatesSettingsGivenAsAParameterAlias#1",
+			"service" : "encryption",
+			"method" : "validate",
+			"params" : [
+				"settings"
+			],
+			"args" : [
+				{
+					"$patch" : "LocalKeyFileProviderSettingsPatch",
+					"json" : {
+						"@odata.type" : "#ibm.tm1.api.v1.LocalKeyFileProviderSettings",
+						"KeyRef" : "/tmp/a.key"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ValidateEncryptionAtRestSettings(Settings=@settings)?@settings=%7B%22@odata.type%22:%22%23ibm.tm1.api.v1.LocalKeyFileProviderSettings%22,%22KeyRef%22:%22/tmp/a.key%22%7D",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"IsValid" : false,
+							"Issues" : [
+								"Could not generate a new key using the local GSKit installation"
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "EncryptionAtRestValidationReport",
+				"json" : {
+					"IsValid" : false,
+					"Issues" : [
+						"Could not generate a new key using the local GSKit installation"
+					]
+				}
+			}
+		}
+	]
+}

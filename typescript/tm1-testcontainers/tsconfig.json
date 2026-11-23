@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // The client from its sources, so the tests and typecheck need no build of it first
+    "paths": {
+      "@skipcheck/tm1-client": ["../tm1-client/src/index.ts"],
+      // The examples import this package by name, as a user's code does
+      "@skipcheck/tm1-testcontainers": ["./src/index.ts"],
+      "@skipcheck/tm1-testcontainers/vitest": ["./src/vitest.ts"]
+    }
+  },
+  "include": ["src", "test", "examples", "vitest.config.ts"]
+}

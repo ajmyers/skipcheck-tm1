@@ -1,0 +1,1501 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.process.ProcessServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "ProcessServiceTest#aCancelledRunFails#1",
+			"service" : "processes",
+			"method" : "executeWithReturn",
+			"params" : [
+				"name",
+				"parameters",
+				"query"
+			],
+			"args" : [
+				"Load",
+				{
+					"$map" : { }
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Load')/tm1.ExecuteWithReturn",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 500,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "174",
+								"message" : "TM1UserException: Cancel"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ServerException",
+				"category" : "api",
+				"kind" : "CANCELLED",
+				"status" : 500,
+				"code" : "174"
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#aMissingProcessIsNotFound#1",
+			"service" : "processes",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'Process'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#aStaleEtagIsRefused#1",
+			"service" : "processes",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Load",
+				{
+					"$patch" : "ProcessPatch",
+					"json" : {
+						"EpilogProcedure" : ""
+					}
+				},
+				"W/\"0\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Processes('Load')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"0\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"EpilogProcedure" : ""
+						}
+					},
+					"response" : {
+						"status" : 412,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "stale"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1PreconditionFailedException",
+				"category" : "api",
+				"kind" : "PRECONDITION_FAILED",
+				"status" : 412,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#anExistingProcessConflicts#1",
+			"service" : "processes",
+			"method" : "create",
+			"params" : [
+				"process"
+			],
+			"args" : [
+				{
+					"$patch" : "ProcessPatch",
+					"json" : {
+						"Name" : "adhoc"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "adhoc"
+						}
+					},
+					"response" : {
+						"status" : 409,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "A process with the name 'adhoc' already exists."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ConflictException",
+				"category" : "api",
+				"kind" : "ALREADY_EXISTS",
+				"status" : 409,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#compilesADefinition#1",
+			"service" : "processes",
+			"method" : "compile",
+			"params" : [
+				"definition"
+			],
+			"args" : [
+				{
+					"$patch" : "ProcessPatch",
+					"json" : {
+						"Name" : "adhoc",
+						"Parameters" : [
+							{
+								"Name" : "p",
+								"Value" : "v",
+								"Type" : "String"
+							}
+						],
+						"PrologProcedure" : "LogOutput('INFO', p);\n"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "CompileProcess",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Process" : {
+								"Name" : "adhoc",
+								"Parameters" : [
+									{
+										"Name" : "p",
+										"Value" : "v",
+										"Type" : "String"
+									}
+								],
+								"PrologProcedure" : "LogOutput('INFO', p);\n"
+							}
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "ProcessServiceTest#compilesASavedProcess#1",
+			"service" : "processes",
+			"method" : "compile",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Load"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Load')/tm1.Compile",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Procedure" : "Prolog",
+									"LineNumber" : 3,
+									"Message" : "Syntax error"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "ProcessSyntaxError",
+					"json" : {
+						"Procedure" : "Prolog",
+						"LineNumber" : 3,
+						"Message" : "Syntax error"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ProcessServiceTest#createsAProcess#1",
+			"service" : "processes",
+			"method" : "create",
+			"params" : [
+				"process"
+			],
+			"args" : [
+				{
+					"$patch" : "ProcessPatch",
+					"json" : {
+						"Name" : "adhoc",
+						"Parameters" : [
+							{
+								"Name" : "p",
+								"Value" : "v",
+								"Type" : "String"
+							}
+						],
+						"PrologProcedure" : "LogOutput('INFO', p);\n"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "adhoc",
+							"Parameters" : [
+								{
+									"Name" : "p",
+									"Value" : "v",
+									"Type" : "String"
+								}
+							],
+							"PrologProcedure" : "LogOutput('INFO', p);\n"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "adhoc"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Process",
+				"json" : {
+					"Name" : "adhoc"
+				}
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#deletesAProcess#1",
+			"service" : "processes",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Load"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Processes('Load')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ProcessServiceTest#deletesAProcess#2",
+			"service" : "processes",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				"Nope"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Processes('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#executesADefinitionWithReturn#1",
+			"service" : "processes",
+			"method" : "executeWithReturn",
+			"params" : [
+				"definition",
+				"parameters",
+				"query"
+			],
+			"args" : [
+				{
+					"$patch" : "ProcessPatch",
+					"json" : {
+						"Name" : "adhoc",
+						"Parameters" : [
+							{
+								"Name" : "p",
+								"Value" : "v",
+								"Type" : "String"
+							}
+						],
+						"PrologProcedure" : "LogOutput('INFO', p);\n"
+					}
+				},
+				{
+					"$map" : {
+						"p" : "x"
+					}
+				},
+				{
+					"$query" : {
+						"expand" : {
+							"ErrorLogFile" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteProcessWithReturn?$expand=ErrorLogFile",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Process" : {
+								"Name" : "adhoc",
+								"Parameters" : [
+									{
+										"Name" : "p",
+										"Value" : "v",
+										"Type" : "String"
+									}
+								],
+								"PrologProcedure" : "LogOutput('INFO', p);\n"
+							},
+							"Parameters" : [
+								{
+									"Name" : "p",
+									"Value" : "x"
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ProcessExecuteStatusCode" : "Aborted",
+							"ErrorLogFile" : {
+								"Filename" : "tm1processerror_20260102030405_adhoc.log"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessExecuteResult",
+				"json" : {
+					"ProcessExecuteStatusCode" : "Aborted",
+					"ErrorLogFile" : {
+						"Filename" : "tm1processerror_20260102030405_adhoc.log"
+					}
+				}
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#executesWithReturnAndParametersInOrder#1",
+			"service" : "processes",
+			"method" : "executeWithReturn",
+			"params" : [
+				"name",
+				"parameters",
+				"query"
+			],
+			"args" : [
+				"Load",
+				{
+					"$map" : {
+						"pYear" : 2026,
+						"pVersion" : "Actual"
+					}
+				},
+				{
+					"$query" : {
+						"expand" : {
+							"ErrorLogFile" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Load')/tm1.ExecuteWithReturn?$expand=ErrorLogFile",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Parameters" : [
+								{
+									"Name" : "pYear",
+									"Value" : 2026
+								},
+								{
+									"Name" : "pVersion",
+									"Value" : "Actual"
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ProcessExecuteStatusCode" : "CompletedSuccessfully",
+							"ErrorLogFile" : null
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessExecuteResult",
+				"json" : {
+					"ProcessExecuteStatusCode" : "CompletedSuccessfully"
+				}
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#executesWithReturnAndParametersInOrder#2",
+			"service" : "processes",
+			"method" : "executeWithReturn",
+			"params" : [
+				"name",
+				"parameters",
+				"query"
+			],
+			"args" : [
+				"Load",
+				{
+					"$map" : { }
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Load')/tm1.ExecuteWithReturn",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ProcessExecuteStatusCode" : "CompletedSuccessfully"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessExecuteResult",
+				"json" : {
+					"ProcessExecuteStatusCode" : "CompletedSuccessfully"
+				}
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#followsNextLinks#1",
+			"service" : "processes",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes?$select=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "a"
+								}
+							],
+							"@odata.nextLink" : "Processes?$skiptoken=1"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes?$skiptoken=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "b"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Process",
+					"json" : {
+						"Name" : "a"
+					}
+				},
+				{
+					"$model" : "Process",
+					"json" : {
+						"Name" : "b"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ProcessServiceTest#getsAProcessWithItsEtag#1",
+			"service" : "processes",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Load",
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"PrologProcedure",
+							"Parameters"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes('Load')?$select=Name,PrologProcedure,Parameters",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.etag" : "W/\"1\"",
+							"Name" : "Load",
+							"PrologProcedure" : "x=1;",
+							"Parameters" : [
+								{
+									"Name" : "pYear",
+									"Value" : 2026,
+									"Type" : "Numeric"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Process",
+				"json" : {
+					"@odata.etag" : "W/\"1\"",
+					"Name" : "Load",
+					"PrologProcedure" : "x=1;",
+					"Parameters" : [
+						{
+							"Name" : "pYear",
+							"Value" : 2026,
+							"Type" : "Numeric"
+						}
+					]
+				}
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#keysAnErrorLogByItsTimestampAsJavaWritesIt#1",
+			"service" : "processes",
+			"method" : "errorLogContent",
+			"params" : [
+				"name",
+				"log"
+			],
+			"args" : [
+				"Load",
+				{
+					"$model" : "ProcessErrorLog",
+					"json" : {
+						"Timestamp" : "2026-01-02T03:04:00Z"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes('Load')/ErrorLogs('2026-01-02T03%3A04Z')/Content",
+						"headers" : {
+							"accept" : "text/plain, application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "text/plain"
+						},
+						"text" : "x"
+					}
+				}
+			],
+			"result" : "x"
+		},
+		{
+			"id" : "ProcessServiceTest#keysAnErrorLogByItsTimestampAsJavaWritesIt#2",
+			"service" : "processes",
+			"method" : "errorLogContent",
+			"params" : [
+				"name",
+				"log"
+			],
+			"args" : [
+				"Load",
+				{
+					"$model" : "ProcessErrorLog",
+					"json" : {
+						"Timestamp" : "2026-01-02T03:04:05.12+01:00"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes('Load')/ErrorLogs('2026-01-02T03%3A04%3A05.120%2B01%3A00')/Content",
+						"headers" : {
+							"accept" : "text/plain, application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "text/plain"
+						},
+						"text" : "y"
+					}
+				}
+			],
+			"result" : "y"
+		},
+		{
+			"id" : "ProcessServiceTest#listsProcesses#1",
+			"service" : "processes",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Load"
+								},
+								{
+									"Name" : "}bedrock.cube.clone"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Process",
+					"json" : {
+						"Name" : "Load"
+					}
+				},
+				{
+					"$model" : "Process",
+					"json" : {
+						"Name" : "}bedrock.cube.clone"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ProcessServiceTest#listsProcesses#2",
+			"service" : "processes",
+			"method" : "list",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"filter" : "not startswith(Name,'}')",
+						"orderBy" : [
+							"Name"
+						],
+						"top" : 10
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes?$select=Name&$filter=not%20startswith(Name,'%7D')&$orderby=Name&$top=10",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Load"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Process",
+					"json" : {
+						"Name" : "Load"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ProcessServiceTest#quotesAndEncodesAName#1",
+			"service" : "processes",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Joe's load/#1 & 50%",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes('Joe''s%20load%2F%231%20%26%2050%25')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Joe's load/#1 & 50%"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Process",
+				"json" : {
+					"Name" : "Joe's load/#1 & 50%"
+				}
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#quotesAndEncodesAName#2",
+			"service" : "processes",
+			"method" : "get",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"}bedrock.server.wait",
+				{
+					"$query" : {
+						"expand" : {
+							"DataSource" : { }
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes('%7Dbedrock.server.wait')?$expand=DataSource",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "}bedrock.server.wait"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Process",
+				"json" : {
+					"Name" : "}bedrock.server.wait"
+				}
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#readsAStatusItDoesntKnow#1",
+			"service" : "processes",
+			"method" : "executeWithReturn",
+			"params" : [
+				"name",
+				"parameters",
+				"query"
+			],
+			"args" : [
+				"Load",
+				{
+					"$map" : { }
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Load')/tm1.ExecuteWithReturn",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ProcessExecuteStatusCode" : "SomethingNew"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ProcessExecuteResult",
+				"json" : {
+					"ProcessExecuteStatusCode" : null
+				}
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#readsTheDeprecatedErrorLogs#1",
+			"service" : "processes",
+			"method" : "errorLogs",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"Load",
+				{
+					"$query" : {
+						"top" : 1
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes('Load')/ErrorLogs?$top=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Timestamp" : "2026-01-02T03:04:05Z"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "ProcessErrorLog",
+					"json" : {
+						"Timestamp" : "2026-01-02T03:04:05Z"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ProcessServiceTest#readsTheDeprecatedErrorLogs#2",
+			"service" : "processes",
+			"method" : "errorLogContent",
+			"params" : [
+				"name",
+				"log"
+			],
+			"args" : [
+				"Load",
+				{
+					"$model" : "ProcessErrorLog",
+					"json" : {
+						"Timestamp" : "2026-01-02T03:04:05Z"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Processes('Load')/ErrorLogs('2026-01-02T03%3A04%3A05Z')/Content",
+						"headers" : {
+							"accept" : "text/plain, application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "text/plain"
+						},
+						"text" : "line 1\nline 2"
+					}
+				}
+			],
+			"result" : "line 1\nline 2"
+		},
+		{
+			"id" : "ProcessServiceTest#refusesALogWithoutATimestamp#1",
+			"service" : "processes",
+			"method" : "errorLogContent",
+			"params" : [
+				"name",
+				"log"
+			],
+			"args" : [
+				"Load",
+				{
+					"$model" : "ProcessErrorLog",
+					"json" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#refusesAMissingName#1",
+			"service" : "processes",
+			"method" : "delete",
+			"params" : [
+				"name"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ProcessServiceTest#runsTheDeprecatedExecute#1",
+			"service" : "processes",
+			"method" : "execute",
+			"params" : [
+				"name",
+				"parameters"
+			],
+			"args" : [
+				"Load",
+				{
+					"$map" : {
+						"p" : 1
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Load')/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Parameters" : [
+								{
+									"Name" : "p",
+									"Value" : 1
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ProcessServiceTest#runsTheDeprecatedExecute#2",
+			"service" : "processes",
+			"method" : "execute",
+			"params" : [
+				"name",
+				"parameters"
+			],
+			"args" : [
+				"Load",
+				{
+					"$map" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Processes('Load')/tm1.Execute",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : { }
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ProcessServiceTest#runsTheDeprecatedExecute#3",
+			"service" : "processes",
+			"method" : "execute",
+			"params" : [
+				"definition",
+				"parameters"
+			],
+			"args" : [
+				{
+					"$patch" : "ProcessPatch",
+					"json" : {
+						"Name" : "adhoc"
+					}
+				},
+				{
+					"$map" : {
+						"p" : null,
+						"q" : {
+							"$double" : 2.5
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ExecuteProcess",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Process" : {
+								"Name" : "adhoc"
+							},
+							"Parameters" : [
+								{
+									"Name" : "p",
+									"Value" : null
+								},
+								{
+									"Name" : "q",
+									"Value" : 2.5
+								}
+							]
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ProcessServiceTest#updatesWithAndWithoutAnEtag#1",
+			"service" : "processes",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch"
+			],
+			"args" : [
+				"Load",
+				{
+					"$patch" : "ProcessPatch",
+					"json" : {
+						"PrologProcedure" : "x=2;"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Processes('Load')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"PrologProcedure" : "x=2;"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ProcessServiceTest#updatesWithAndWithoutAnEtag#2",
+			"service" : "processes",
+			"method" : "update",
+			"params" : [
+				"name",
+				"patch",
+				"etag"
+			],
+			"args" : [
+				"Load",
+				{
+					"$patch" : "ProcessPatch",
+					"json" : {
+						"EpilogProcedure" : null
+					}
+				},
+				"W/\"1\""
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Processes('Load')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"if-match" : "W/\"1\"",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"EpilogProcedure" : null
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

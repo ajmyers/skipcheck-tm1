@@ -1,0 +1,8 @@
+# Generated or copied, never committed
+dist/
+node_modules/
+tm1-client/src/generated/
+tm1-testcontainers/paw-local.sh
+package-lock.json
+# Prose keeps its own line breaks
+*.md

@@ -1,0 +1,2 @@
+# Endpoints the .NET client doesn't implement yet. This list only shrinks: implementing an
+# endpoint means taking it off (CoverageGateTests).

@@ -18,14 +18,33 @@ for older ones.
 Changes to the site's palette, fonts, masthead or footer reach the docs without a rebuild. The site
 side is in ajmyers/ajmyers.net: `public/tokens.css`, `public/chrome.css` and `public/partials/`.
 
+## The guide
+
+`scripts/guide.mjs` builds a second set of pages, at `/projects/tm1/guide/`: one for each type of the
+client and of tm1-testcontainers that has examples, with every example in Java, Python, .NET and
+TypeScript behind tabs. Choosing a language on one example chooses it everywhere, and the choice is
+remembered (`guide/guide.js`).
+
+| Piece | Where it comes from |
+|---|---|
+| The text | The Java type's Javadoc, where it quotes its examples with `{@snippet}`. There is one text, so names in it are Java's. |
+| An example | A region of an examples file, with the same name in each language: `java/<module>/src/examples`, `python/<module>/examples`, `dotnet/examples/<Module>.Examples`, `typescript/<module>/examples`. |
+
+Each language compiles or type-checks its examples with its own tests, and each has a gate that its
+examples files and regions match Java's. `guide.mjs` fails if a language lacks an example the Java
+documentation quotes, so a new Java example needs its three counterparts before the docs build
+passes. Java's Spring Boot modules exist only in Java; their Javadoc is their documentation.
+
+The pages have no inline script or style, so they need no entry in the CSP hashes.
+
 ## Preview locally
 
 ```sh
 ./gradlew apiSiteJavadoc
 cd api-site
 npm ci
-npm run assemble
-npm run dev        # http://localhost:8787/projects/tm1-client/api/
+npm run assemble   # the Javadoc, then the guide
+npm run dev        # http://localhost:8787/projects/tm1-client/api/ and /projects/tm1/guide/
 ```
 
 The local Worker passes any path outside `/projects/` through to ajmyers.net, so the site's styles,

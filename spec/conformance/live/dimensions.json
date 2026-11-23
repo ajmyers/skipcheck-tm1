@@ -1,0 +1,30 @@
+{
+	"specVersion" : 1,
+	"name" : "dimensions",
+	"description" : "A fresh dimension: create it with its structure, read, list and filter, update, copy it, add an all-leaves hierarchy, lock and reserve it, delete it, and a missing dimension.",
+	"names" : ["dimension", "copy", "missing"],
+	"steps" : [
+		{"service": "dimensions", "method": "create", "params": ["dimension"], "args": [{"$patch": "DimensionPatch", "json": {"Name": "${dimension}", "Hierarchies": [{"Name": "${dimension}", "Elements": [{"Name": "North", "Type": "Numeric"}, {"Name": "South", "Type": "Numeric"}]}]}}], "expect": {"fields": {"Name": "${dimension}"}}},
+		{"service": "dimensions", "method": "get", "params": ["name", "query"], "args": ["${dimension}", {"$query": {"select": ["Name"], "expand": {"Hierarchies": {"select": ["Name"], "expand": {"Elements": {"select": ["Name"]}}}}}}], "expect": {"fields": {"Name": "${dimension}"}}},
+		{"service": "dimensions", "method": "list", "params": ["query"], "args": [{"$query": {"select": ["Name"], "filter": "Name eq '${dimension}'"}}], "expect": {"items": {"Name": ["${dimension}"]}}},
+		{"service": "dimensions", "method": "modelDimensions", "params": ["query"], "args": [{"$query": {"select": ["Name"], "filter": "startswith(Name,'${dimension}')"}}], "expect": {"items": {"Name": ["${dimension}"]}}},
+		{"service": "dimensions", "method": "controlDimensions", "params": ["query"], "args": [{"$query": {"select": ["Name"], "filter": "Name eq '${dimension}'"}}], "expect": {"count": 0}},
+		{"service": "dimensions", "method": "update", "params": ["name", "patch"], "args": ["${dimension}", {"$patch": "DimensionPatch", "json": {"Name": "${dimension}"}}], "expect": {"none": true}},
+		{"service": "dimensions", "method": "saveAs", "params": ["name", "newName"], "args": ["${dimension}", "${copy}"], "expect": {"fields": {"Name": "${copy}"}}},
+		{"service": "dimensions", "method": "saveAs", "params": ["name", "newName", "overwrite", "keepExistingAttributes"], "args": ["${dimension}", "${copy}", true, false], "expect": {"fields": {"Name": "${copy}"}}},
+		{"service": "dimensions", "method": "delete", "params": ["name"], "args": ["${copy}"], "expect": {"none": true}},
+		{"service": "dimensions", "method": "addAllLeavesHierarchy", "params": ["name"], "args": ["${dimension}"], "expect": {"fields": {"Name": "Leaves"}}},
+		{"service": "hierarchies", "method": "list", "params": ["dimension", "query"], "args": ["${dimension}", {"$query": {"select": ["Name"], "orderBy": ["Name"]}}], "expect": {"count": 2}},
+		{"service": "dimensions", "method": "lock", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
+		{"service": "dimensions", "method": "unlock", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
+		{"service": "dimensions", "method": "reserve", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
+		{"service": "dimensions", "method": "release", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
+		{"service": "dimensions", "method": "delete", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
+		{"service": "dimensions", "method": "get", "params": ["name", "query"], "args": ["${dimension}", {"$query": {}}], "expect": {"error": {"category": "api", "kind": "NOT_FOUND", "status": 404}}},
+		{"service": "dimensions", "method": "get", "params": ["name", "query"], "args": ["${missing}", {"$query": {}}], "expect": {"error": {"category": "api", "kind": "NOT_FOUND", "status": 404}}}
+	],
+	"finally" : [
+		{"service": "dimensions", "method": "delete", "params": ["name"], "args": ["${copy}"]},
+		{"service": "dimensions", "method": "delete", "params": ["name"], "args": ["${dimension}"]}
+	]
+}

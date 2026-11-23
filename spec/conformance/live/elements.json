@@ -1,0 +1,36 @@
+{
+	"specVersion" : 1,
+	"name" : "elements",
+	"description" : "A fresh dimension (Total = North + South, East and Label): elements created, read, updated and deleted; parents, components, edges and the hierarchy; components set last or before another with a weight; locks and reservations; a name that needs quoting.",
+	"names" : ["dimension"],
+	"steps" : [
+		{"service": "dimensions", "method": "create", "params": ["dimension"], "args": [{"$patch": "DimensionPatch", "json": {"Name": "${dimension}", "Hierarchies": [{"Name": "${dimension}", "Elements": [{"Name": "Total", "Type": "Consolidated"}, {"Name": "North", "Type": "Numeric"}, {"Name": "South", "Type": "Numeric"}, {"Name": "East", "Type": "Numeric"}, {"Name": "Label", "Type": "String"}], "Edges": [{"ParentName": "Total", "ComponentName": "North", "Weight": 1.0}, {"ParentName": "Total", "ComponentName": "South", "Weight": 1.0}]}]}}], "expect": {"fields": {"Name": "${dimension}"}}},
+		{"service": "elements", "method": "create", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", {"$patch": "ElementPatch", "json": {"Name": "West", "Type": "Numeric"}}], "expect": {"fields": {"Name": "West", "Type": "Numeric"}}},
+		{"service": "elements", "method": "list", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "${dimension}", {"$query": {"select": ["Name"]}}], "expect": {"count": 6}},
+		{"service": "elements", "method": "list", "params": ["dimension", "hierarchy", "query"], "args": ["${dimension}", "${dimension}", {"$query": {"select": ["Name", "Type"], "filter": "Type eq ibm.tm1.api.v1.ElementType'String'"}}], "expect": {"items": {"Name": ["Label"]}}},
+		{"service": "elements", "method": "get", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "West", {"$query": {"select": ["Name", "Type"]}}], "expect": {"fields": {"Name": "West", "Type": "Numeric"}}},
+		{"service": "elements", "method": "parents", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "North", {"$query": {"select": ["Name"]}}], "expect": {"items": {"Name": ["Total"]}}},
+		{"service": "elements", "method": "parents", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "Total", {"$query": {}}], "expect": {"count": 0}},
+		{"service": "elements", "method": "components", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "Total", {"$query": {"select": ["Name"]}}], "expect": {"items": {"Name": ["North", "South"]}}},
+		{"service": "elements", "method": "edges", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "Total", {"$query": {}}], "expect": {"items": {"ComponentName": ["North", "South"]}}},
+		{"service": "elements", "method": "hierarchy", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "North", {"$query": {"select": ["Name"]}}], "expect": {"fields": {"Name": "${dimension}"}}},
+		{"service": "elements", "method": "setComponent", "params": ["dimension", "hierarchy", "parent", "child"], "args": ["${dimension}", "${dimension}", "Total", "East"], "expect": {"none": true}},
+		{"service": "elements", "method": "setComponent", "params": ["dimension", "hierarchy", "parent", "child", "before", "weight"], "args": ["${dimension}", "${dimension}", "Total", "West", "North", {"$double": 2.0}], "expect": {"none": true}},
+		{"service": "elements", "method": "components", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "Total", {"$query": {"select": ["Name"]}}], "expect": {"items": {"Name": ["West", "North", "South", "East"]}}},
+		{"service": "elements", "method": "create", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", {"$patch": "ElementPatch", "json": {"Name": "O'Brien & Co", "Type": "Numeric"}}], "expect": {"fields": {"Name": "O'Brien & Co"}}},
+		{"service": "elements", "method": "setComponent", "params": ["dimension", "hierarchy", "parent", "child", "weight"], "args": ["${dimension}", "${dimension}", "Total", "O'Brien & Co", {"$double": -1.0}], "expect": {"none": true}},
+		{"service": "elements", "method": "parents", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "O'Brien & Co", {"$query": {"select": ["Name"]}}], "expect": {"items": {"Name": ["Total"]}}},
+		{"service": "elements", "method": "create", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", {"$patch": "ElementPatch", "json": {"Name": "Note", "Type": "Numeric"}}], "expect": {"fields": {"Name": "Note"}}},
+		{"service": "elements", "method": "update", "params": ["dimension", "hierarchy", "element", "patch"], "args": ["${dimension}", "${dimension}", "Note", {"$patch": "ElementPatch", "json": {"Type": "String"}}], "expect": {"none": true}},
+		{"service": "elements", "method": "get", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "Note", {"$query": {"select": ["Type"]}}], "expect": {"fields": {"Type": "String"}}},
+		{"service": "elements", "method": "lock", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "North"], "expect": {"none": true}},
+		{"service": "elements", "method": "unlock", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "North"], "expect": {"none": true}},
+		{"service": "elements", "method": "reserve", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "North"], "expect": {"none": true}},
+		{"service": "elements", "method": "release", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "North"], "expect": {"none": true}},
+		{"service": "elements", "method": "delete", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "West"], "expect": {"none": true}},
+		{"service": "elements", "method": "get", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "West", {"$query": {}}], "expect": {"error": {"category": "api", "kind": "NOT_FOUND", "status": 404}}}
+	],
+	"finally" : [
+		{"service": "dimensions", "method": "delete", "params": ["name"], "args": ["${dimension}"]}
+	]
+}

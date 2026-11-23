@@ -19,7 +19,7 @@ if (modules.length === 0) throw new Error('No /projects/<module>/api* routes in 
 
 await rm(dist, { recursive: true, force: true });
 for (const module of modules) {
-	const built = path.join(repoDir, module, 'build', 'docs', 'api-site');
+	const built = path.join(repoDir, 'java', module, 'build', 'docs', 'api-site');
 	if (!(await exists(path.join(built, 'index.html')))) {
 		throw new Error(`No Javadoc for ${module} at ${built}: run ./gradlew apiSiteJavadoc first`);
 	}

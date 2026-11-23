@@ -1,0 +1,1106 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.server.LogServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "LogServiceTest#aTailThatFailsFails#1",
+			"service" : "logs",
+			"method" : "tailMessageLog",
+			"params" : [
+				"every"
+			],
+			"args" : [
+				{
+					"$duration" : "PT0S"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "TailMessageLog()",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 500,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Internal error"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1ServerException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 500,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "LogServiceTest#readsAnErrorLogsTextWithoutItsByteOrderMark#1",
+			"service" : "logs",
+			"method" : "errorLogContent",
+			"params" : [
+				"filename"
+			],
+			"args" : [
+				"tm1processerror_x_Load.log"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ErrorLogFiles('tm1processerror_x_Load.log')/Content",
+						"headers" : {
+							"accept" : "text/plain, application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "text/plain"
+						},
+						"text" : "﻿Error: Prolog procedure line (3): x\n"
+					}
+				}
+			],
+			"result" : "Error: Prolog procedure line (3): x\n"
+		},
+		{
+			"id" : "LogServiceTest#readsAnErrorLogsTextWithoutItsByteOrderMark#2",
+			"service" : "logs",
+			"method" : "errorLogContent",
+			"params" : [
+				"filename"
+			],
+			"args" : [
+				"Joe's.log"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ErrorLogFiles('Joe''s.log')/Content",
+						"headers" : {
+							"accept" : "text/plain, application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "text/plain"
+						},
+						"text" : "no mark"
+					}
+				}
+			],
+			"result" : "no mark"
+		},
+		{
+			"id" : "LogServiceTest#readsErrorLogFiles#1",
+			"service" : "logs",
+			"method" : "errorLogFiles",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"filter" : "endswith(Filename,'_Load Sales.log')"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ErrorLogFiles?$filter=endswith(Filename,'_Load%20Sales.log')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Filename" : "tm1processerror_20260102030405_Load Sales.log"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "ErrorLogFile",
+					"json" : {
+						"Filename" : "tm1processerror_20260102030405_Load Sales.log"
+					}
+				}
+			]
+		},
+		{
+			"id" : "LogServiceTest#readsErrorLogFiles#2",
+			"service" : "logs",
+			"method" : "errorLogFile",
+			"params" : [
+				"filename",
+				"query"
+			],
+			"args" : [
+				"tm1processerror_20260102030405_Load Sales.log",
+				{
+					"$query" : {
+						"select" : [
+							"Filename"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ErrorLogFiles('tm1processerror_20260102030405_Load%20Sales.log')?$select=Filename",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Filename" : "tm1processerror_20260102030405_Load Sales.log"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ErrorLogFile",
+				"json" : {
+					"Filename" : "tm1processerror_20260102030405_Load Sales.log"
+				}
+			}
+		},
+		{
+			"id" : "LogServiceTest#readsErrorLogFiles#3",
+			"service" : "logs",
+			"method" : "errorLogFile",
+			"params" : [
+				"filename",
+				"query"
+			],
+			"args" : [
+				"x.log",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ErrorLogFiles('x.log')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'x.log' can not be found"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "LogServiceTest#readsTheAuditLog#1",
+			"service" : "logs",
+			"method" : "auditLogEntries",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"expand" : {
+							"AuditDetails" : { }
+						},
+						"orderBy" : [
+							"TimeStamp desc"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "AuditLogEntries?$expand=AuditDetails&$orderby=TimeStamp%20desc",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 0,
+									"UserName" : "Admin",
+									"Description" : "Created",
+									"ObjectType" : "Cube",
+									"ObjectName" : "Sales",
+									"AuditDetails" : [ ]
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "AuditLogEntry",
+					"json" : {
+						"ID" : 0,
+						"UserName" : "Admin",
+						"Description" : "Created",
+						"ObjectType" : "Cube",
+						"ObjectName" : "Sales",
+						"AuditDetails" : [ ]
+					}
+				}
+			]
+		},
+		{
+			"id" : "LogServiceTest#readsTheMessageLogEitherWay#1",
+			"service" : "logs",
+			"method" : "messageLog",
+			"params" : [
+				"reverse",
+				"query"
+			],
+			"args" : [
+				true,
+				{
+					"$query" : {
+						"top" : 1
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MessageLog(Reverse=true)?$top=1",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 0,
+									"Message" : "newest"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "MessageLogEntry",
+					"json" : {
+						"ID" : 0,
+						"Message" : "newest"
+					}
+				}
+			]
+		},
+		{
+			"id" : "LogServiceTest#readsTheMessageLogEitherWay#2",
+			"service" : "logs",
+			"method" : "messageLog",
+			"params" : [
+				"reverse",
+				"query"
+			],
+			"args" : [
+				false,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MessageLog(Reverse=false)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "LogServiceTest#readsTheMessageLogEntries#1",
+			"service" : "logs",
+			"method" : "messageLogEntries",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"filter" : "Level eq 'Error' or Level eq 'Info'",
+						"orderBy" : [
+							"TimeStamp"
+						],
+						"top" : 2
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MessageLogEntries?$filter=Level%20eq%20'Error'%20or%20Level%20eq%20'Info'&$orderby=TimeStamp&$top=2",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 0,
+									"TimeStamp" : "0000-00-00T00:00Z",
+									"Level" : "Info",
+									"Message" : "first"
+								},
+								{
+									"ID" : 1,
+									"ThreadID" : 7,
+									"TimeStamp" : "2026-01-02T03:04:05.123Z",
+									"Level" : "Error",
+									"Logger" : "TM1.Server",
+									"Message" : "x"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "MessageLogEntry",
+					"json" : {
+						"ID" : 0,
+						"Level" : "Info",
+						"Message" : "first"
+					}
+				},
+				{
+					"$model" : "MessageLogEntry",
+					"json" : {
+						"ID" : 1,
+						"ThreadID" : 7,
+						"Level" : "Error",
+						"TimeStamp" : "2026-01-02T03:04:05.123Z",
+						"Logger" : "TM1.Server",
+						"Message" : "x"
+					}
+				}
+			]
+		},
+		{
+			"id" : "LogServiceTest#readsTheTransactionLog#1",
+			"service" : "logs",
+			"method" : "transactionLogEntries",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"filter" : "Cube eq 'Sales'"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "TransactionLogEntries?$filter=Cube%20eq%20'Sales'",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 0,
+									"Cube" : "Sales",
+									"User" : "Admin",
+									"OldValue" : 1,
+									"NewValue" : 2.5,
+									"Tuple" : [
+										"North",
+										"Jan"
+									]
+								},
+								{
+									"ID" : 1,
+									"StatusMessage" : "CubeSerialized: Sales"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "TransactionLogEntry",
+					"json" : {
+						"ID" : 0,
+						"User" : "Admin",
+						"Cube" : "Sales",
+						"Tuple" : [
+							"North",
+							"Jan"
+						],
+						"OldValue" : 1,
+						"NewValue" : 2.5
+					}
+				},
+				{
+					"$model" : "TransactionLogEntry",
+					"json" : {
+						"ID" : 1,
+						"StatusMessage" : "CubeSerialized: Sales"
+					}
+				}
+			]
+		},
+		{
+			"id" : "LogServiceTest#readsTheTransactionLog#2",
+			"service" : "logs",
+			"method" : "transactionLog",
+			"params" : [
+				"reverse",
+				"ignoreStatusMessages",
+				"query"
+			],
+			"args" : [
+				true,
+				false,
+				{
+					"$query" : {
+						"top" : 5
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "TransactionLog(Reverse=true,IgnoreStatusMessages=false)?$top=5",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "LogServiceTest#readsTheTransactionLog#3",
+			"service" : "logs",
+			"method" : "transactionLog",
+			"params" : [
+				"reverse",
+				"ignoreStatusMessages",
+				"query"
+			],
+			"args" : [
+				false,
+				true,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "TransactionLog(Reverse=false,IgnoreStatusMessages=true)",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				}
+			],
+			"result" : [ ]
+		},
+		{
+			"id" : "LogServiceTest#refusesAMissingFilename#1",
+			"service" : "logs",
+			"method" : "errorLogContent",
+			"params" : [
+				"filename"
+			],
+			"args" : [
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "LogServiceTest#stopsTailingMidPoll#1",
+			"service" : "logs",
+			"method" : "tailMessageLog",
+			"params" : [
+				"every"
+			],
+			"args" : [
+				{
+					"$duration" : "PT30S"
+				}
+			],
+			"take" : 1,
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "TailMessageLog()",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : "MessageLogEntries/!delta('4')"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MessageLogEntries/!delta('4')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 0,
+									"Message" : "a"
+								},
+								{
+									"ID" : 1,
+									"Message" : "b"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "MessageLogEntry",
+					"json" : {
+						"ID" : 0,
+						"Message" : "a"
+					}
+				}
+			]
+		},
+		{
+			"id" : "LogServiceTest#tailsTheMessageLogSkippingWhatItHasEmitted#1",
+			"service" : "logs",
+			"method" : "tailMessageLog",
+			"params" : [
+				"every"
+			],
+			"args" : [
+				{
+					"$duration" : "PT0S"
+				}
+			],
+			"take" : 3,
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "TailMessageLog()",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"@odata.context" : "$metadata#Edm.String",
+							"value" : "MessageLogEntries/!delta('0[4096]38@11!19')"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MessageLogEntries/!delta('0%5B4096%5D38%4011!19')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 0,
+									"Message" : "a"
+								},
+								{
+									"ID" : 1,
+									"Message" : "b"
+								}
+							]
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MessageLogEntries/!delta('0%5B4096%5D38%4011!19')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 0,
+									"Message" : "a"
+								},
+								{
+									"ID" : 1,
+									"Message" : "b"
+								},
+								{
+									"ID" : 2,
+									"Message" : "c"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "MessageLogEntry",
+					"json" : {
+						"ID" : 0,
+						"Message" : "a"
+					}
+				},
+				{
+					"$model" : "MessageLogEntry",
+					"json" : {
+						"ID" : 1,
+						"Message" : "b"
+					}
+				},
+				{
+					"$model" : "MessageLogEntry",
+					"json" : {
+						"ID" : 2,
+						"Message" : "c"
+					}
+				}
+			]
+		},
+		{
+			"id" : "LogServiceTest#tailsTheTransactionAndAuditLogs#1",
+			"service" : "logs",
+			"method" : "tailTransactionLog",
+			"params" : [
+				"every"
+			],
+			"args" : [
+				{
+					"$duration" : "PT0S"
+				}
+			],
+			"take" : 1,
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "TailTransactionLog()",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : "TransactionLogEntries/!delta('1')"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "TransactionLogEntries/!delta('1')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 0,
+									"Cube" : "Sales",
+									"NewValue" : 1
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "TransactionLogEntry",
+					"json" : {
+						"ID" : 0,
+						"Cube" : "Sales",
+						"NewValue" : 1
+					}
+				}
+			]
+		},
+		{
+			"id" : "LogServiceTest#tailsTheTransactionAndAuditLogs#2",
+			"service" : "logs",
+			"method" : "tailAuditLog",
+			"params" : [
+				"every"
+			],
+			"args" : [
+				{
+					"$duration" : "PT0S"
+				}
+			],
+			"take" : 2,
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "TailAuditLog()",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : "AuditLogEntries/!delta('3')"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "AuditLogEntries/!delta('3')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 0,
+									"ObjectName" : "Sales"
+								},
+								{
+									"ID" : 1,
+									"ObjectName" : "Region"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "AuditLogEntry",
+					"json" : {
+						"ID" : 0,
+						"ObjectName" : "Sales"
+					}
+				},
+				{
+					"$model" : "AuditLogEntry",
+					"json" : {
+						"ID" : 1,
+						"ObjectName" : "Region"
+					}
+				}
+			]
+		},
+		{
+			"id" : "LogServiceTest#tailsThroughAnEmptyPoll#1",
+			"service" : "logs",
+			"method" : "tailMessageLog",
+			"params" : [
+				"every"
+			],
+			"args" : [
+				{
+					"$duration" : "PT0.001S"
+				}
+			],
+			"take" : 1,
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "TailMessageLog()",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : "MessageLogEntries/!delta('2')"
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MessageLogEntries/!delta('2')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [ ]
+						}
+					}
+				},
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "MessageLogEntries/!delta('2')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"ID" : 0,
+									"Message" : "a"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "MessageLogEntry",
+					"json" : {
+						"ID" : 0,
+						"Message" : "a"
+					}
+				}
+			]
+		}
+	]
+}

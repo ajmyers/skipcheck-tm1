@@ -1,0 +1,55 @@
+<Project>
+  <!-- Shared by every project: the current LTS, nullable reference types, warnings as errors -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Not followed, each for a reason:
+         CA1715, CA1716, CA1720: names kept as the Java client has them (R, Alias, Namespace, String, Single)
+         CA1859: a private member has the type its callers see (a Task, a read-only list), not the one it happens to hold
+         CA1001: Connection disposes its HttpClient when its session closes (CloseAsync)
+         CA1848, CA1873: a container logs a line or two as it starts, where speed doesn't matter -->
+    <NoWarn>$(NoWarn);CA1715;CA1716;CA1720;CA1859;CA1001;CA1848;CA1873</NoWarn>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- The repository root, where spec/ lives -->
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</RepositoryRoot>
+    <!-- A build fails on a file CSharpier would reformat (.csharpierrc.json), as the Java build's
+         checkFormat: fix with "dotnet csharpier format dotnet". It never formats during a build. -->
+    <CSharpier_Check>true</CSharpier_Check>
+  </PropertyGroup>
+  <!-- .NET's own analyzers, as the Java build's Error Prone: their findings are errors. For the
+       libraries only, as Error Prone's stricter checks are: tests take certificates as they come
+       and parse JSON without ceremony. -->
+  <PropertyGroup Condition="!$(MSBuildProjectName.EndsWith('.Tests'))">
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+  <!-- Public API needs documentation, as the Java build's Javadoc check (CONTRIBUTING.md): the two
+       published libraries write their XML documentation, so a public type or member without a
+       comment is an error (CS1591). Not the tests, nor Tm1.Codegen, which is a build tool. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Tm1.Client' Or '$(MSBuildProjectName)' == 'Tm1.Testcontainers'">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <!-- What nuget.org shows for the two published libraries. The version is each project's own until
+       a release, when the release workflow sets one for both (-p:Version). -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Tm1.Client' Or '$(MSBuildProjectName)' == 'Tm1.Testcontainers'">
+    <Authors>Andrew Myers</Authors>
+    <Copyright>© Andrew Myers</Copyright>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <PackageProjectUrl>https://skipcheck.io</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ajmyers/skipcheck-tm1</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>tm1;planning-analytics;ibm;odata;testcontainers</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Tm1.Client' Or '$(MSBuildProjectName)' == 'Tm1.Testcontainers'">
+    <!-- One README for both: it covers the client and its testcontainers -->
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The same version as the tool in dotnet-tools.json: they have to lay code out alike -->
+    <PackageReference Include="CSharpier.MsBuild" Version="1.4.1" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

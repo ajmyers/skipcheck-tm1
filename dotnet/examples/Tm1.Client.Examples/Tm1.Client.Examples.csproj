@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The examples the guide shows (api-site/scripts/guide.mjs), the same ones as the Java client's
+       src/examples. Built with the solution so they can't rot; never run, packed or published. -->
+  <PropertyGroup>
+    <RootNamespace>Examples</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- CA2007: an application awaits without ConfigureAwait(false), which is a library's concern -->
+    <NoWarn>$(NoWarn);CA2007</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Tm1.Client/Tm1.Client.csproj" />
+  </ItemGroup>
+</Project>

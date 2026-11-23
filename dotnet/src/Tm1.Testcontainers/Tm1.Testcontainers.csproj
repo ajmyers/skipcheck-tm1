@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Skipcheck.Tm1.Testcontainers</AssemblyName>
+    <RootNamespace>Skipcheck.Tm1.Testcontainers</RootNamespace>
+    <PackageId>Skipcheck.Tm1.Testcontainers</PackageId>
+    <Version>0.1.0-dev</Version>
+    <Description>Testcontainers for IBM Planning Analytics: TM1, its admin server, TM1 Web, Planning Analytics Workspace, Cognos and Keycloak in Docker for .NET tests</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Skipcheck.Tm1.Testcontainers.Tests" />
+    <ProjectReference Include="../Tm1.Client/Tm1.Client.csproj" />
+    <PackageReference Include="Testcontainers" Version="4.*" />
+    <PackageReference Include="xunit.extensibility.core" Version="2.9.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- PAW's runner script, embedded as the Java build copies it onto the classpath -->
+    <EmbeddedResource Include="$(RepositoryRoot)/docker/paw/paw-local.sh" LogicalName="paw-local.sh" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,615 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.server.ServerServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "ServerServiceTest#aMissingLoggerIsNotFound#1",
+			"service" : "server",
+			"method" : "logger",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"TM1.Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Loggers('TM1.Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'TM1.Nope' can not be found in collection of type 'Logger'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ServerServiceTest#aSettingTm1RefusesFails#1",
+			"service" : "server",
+			"method" : "updateStaticConfiguration",
+			"params" : [
+				"patch"
+			],
+			"args" : [
+				{
+					"$patch" : "ServerSettingsPatch",
+					"json" : {
+						"ServerName" : "renamed"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "StaticConfiguration",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"ServerName" : "renamed"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Invalid value for ServerName"
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "ServerServiceTest#readsAndSetsLoggers#1",
+			"service" : "server",
+			"method" : "loggers",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"filter" : "startswith(Name,'TM1.')"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Loggers?$filter=startswith(Name,'TM1.')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "TM1.Server",
+									"Level" : "Info"
+								},
+								{
+									"Name" : "TM1.Process",
+									"Level" : "Off"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "Logger",
+					"json" : {
+						"Name" : "TM1.Server",
+						"Level" : "Info"
+					}
+				},
+				{
+					"$model" : "Logger",
+					"json" : {
+						"Name" : "TM1.Process",
+						"Level" : "Off"
+					}
+				}
+			]
+		},
+		{
+			"id" : "ServerServiceTest#readsAndSetsLoggers#2",
+			"service" : "server",
+			"method" : "logger",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"TM1.Server",
+				{
+					"$query" : {
+						"select" : [
+							"Level"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Loggers('TM1.Server')?$select=Level",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "TM1.Server",
+							"Level" : "Unknown"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Logger",
+				"json" : {
+					"Name" : "TM1.Server",
+					"Level" : "Unknown"
+				}
+			}
+		},
+		{
+			"id" : "ServerServiceTest#readsAndSetsLoggers#3",
+			"service" : "server",
+			"method" : "logger",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				"TM1.Server",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Loggers('TM1.Server')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "TM1.Server",
+							"Level" : "Trace"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Logger",
+				"json" : {
+					"Name" : "TM1.Server",
+					"Level" : null
+				}
+			}
+		},
+		{
+			"id" : "ServerServiceTest#readsAndSetsLoggers#4",
+			"service" : "server",
+			"method" : "setLoggerLevel",
+			"params" : [
+				"name",
+				"level"
+			],
+			"args" : [
+				"TM1.Process",
+				{
+					"$enum" : "LogLevel",
+					"name" : "DEBUG",
+					"json" : "Debug"
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Loggers('TM1.Process')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Level" : "Debug"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ServerServiceTest#readsTheConfigurations#1",
+			"service" : "server",
+			"method" : "activeConfiguration",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ActiveConfiguration",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ServerName" : "Planning Sample",
+							"Administration" : {
+								"DataBaseDirectory" : "/data"
+							}
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ServerSettings",
+				"json" : {
+					"ServerName" : "Planning Sample",
+					"Administration" : {
+						"DataBaseDirectory" : "/data"
+					}
+				}
+			}
+		},
+		{
+			"id" : "ServerServiceTest#readsTheConfigurations#2",
+			"service" : "server",
+			"method" : "staticConfiguration",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"ServerName"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "StaticConfiguration?$select=ServerName",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ServerName" : "Planning Sample"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "ServerSettings",
+				"json" : {
+					"ServerName" : "Planning Sample"
+				}
+			}
+		},
+		{
+			"id" : "ServerServiceTest#readsTheConfigurations#3",
+			"service" : "server",
+			"method" : "configuration",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Configuration",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ServerName" : "Planning Sample",
+							"DataBaseDirectory" : "/data",
+							"PortNumber" : 12354
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Configuration",
+				"json" : {
+					"ServerName" : "Planning Sample",
+					"PortNumber" : 12354,
+					"DataBaseDirectory" : "/data"
+				}
+			}
+		},
+		{
+			"id" : "ServerServiceTest#readsTheServer#1",
+			"service" : "server",
+			"method" : "server",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"ProductVersion"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Server?$select=Name,ProductVersion",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Planning Sample",
+							"ProductVersion" : "11.8.03500.6",
+							"HTTPPortNumber" : 12354
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Server",
+				"json" : {
+					"Name" : "Planning Sample",
+					"ProductVersion" : "11.8.03500.6",
+					"HTTPPortNumber" : 12354
+				}
+			}
+		},
+		{
+			"id" : "ServerServiceTest#readsTheServer#2",
+			"service" : "server",
+			"method" : "server",
+			"params" : [
+				"query"
+			],
+			"args" : [
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Server",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Planning Sample"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Server",
+				"json" : {
+					"Name" : "Planning Sample"
+				}
+			}
+		},
+		{
+			"id" : "ServerServiceTest#refusesALevelItDoesntKnow#1",
+			"service" : "server",
+			"method" : "setLoggerLevel",
+			"params" : [
+				"name",
+				"level"
+			],
+			"args" : [
+				"TM1.Process",
+				{
+					"$enum" : "LogLevel",
+					"name" : "UNRECOGNIZED",
+					"json" : null
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ServerServiceTest#refusesAMissingName#1",
+			"service" : "server",
+			"method" : "logger",
+			"params" : [
+				"name",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ServerServiceTest#updatesTheStaticConfiguration#1",
+			"service" : "server",
+			"method" : "updateStaticConfiguration",
+			"params" : [
+				"patch"
+			],
+			"args" : [
+				{
+					"$patch" : "ServerSettingsPatch",
+					"json" : {
+						"Administration" : {
+							"DisableSandboxing" : true
+						}
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "StaticConfiguration",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Administration" : {
+								"DisableSandboxing" : true
+							}
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		}
+	]
+}

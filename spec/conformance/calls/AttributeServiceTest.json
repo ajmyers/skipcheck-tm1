@@ -1,0 +1,2109 @@
+{
+	"specVersion" : 1,
+	"source" : "io.skipcheck.tm1.client.service.attribute.AttributeServiceTest",
+	"session" : {
+		"productVersion" : "11.8.03500.6"
+	},
+	"cases" : [
+		{
+			"id" : "AttributeServiceTest#aMissingAttributeIsNotFound#1",
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [
+				"set",
+				"name",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "cubes",
+					"args" : [ ]
+				},
+				"Nope",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "CubeAttributes('Nope')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 404,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "'Nope' can not be found in collection of type 'AttributeDefinition'."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1NotFoundException",
+				"category" : "api",
+				"kind" : "NOT_FOUND",
+				"status" : 404,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#aViewAttributeNeedsAPublicNativeView#1",
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [
+				"set",
+				"attribute"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "views",
+					"args" : [
+						"Sales"
+					]
+				},
+				{
+					"$patch" : "AttributeDefinitionPatch",
+					"json" : {
+						"Name" : "Owner",
+						"Type" : "String"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/ViewAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Owner",
+							"Type" : "String"
+						}
+					},
+					"response" : {
+						"status" : 400,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"error" : {
+								"code" : "278",
+								"message" : "Cube 'Sales' has no public views."
+							}
+						}
+					}
+				}
+			],
+			"error" : {
+				"exception" : "Tm1BadRequestException",
+				"category" : "api",
+				"kind" : "OTHER",
+				"status" : 400,
+				"code" : "278"
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#createsAnAttributeInEachSet#1",
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [
+				"set",
+				"attribute"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "dimensions",
+					"args" : [ ]
+				},
+				{
+					"$patch" : "AttributeDefinitionPatch",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "DimensionAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#createsAnAttributeInEachSet#2",
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [
+				"set",
+				"attribute"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "hierarchies",
+					"args" : [
+						"Region"
+					]
+				},
+				{
+					"$patch" : "AttributeDefinitionPatch",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/HierarchyAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#createsAnAttributeInEachSet#3",
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [
+				"set",
+				"attribute"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "elements",
+					"args" : [
+						"Region",
+						"Alt"
+					]
+				},
+				{
+					"$patch" : "AttributeDefinitionPatch",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/ElementAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#createsAnAttributeInEachSet#4",
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [
+				"set",
+				"attribute"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "subsets",
+					"args" : [
+						"Region",
+						"Region"
+					]
+				},
+				{
+					"$patch" : "AttributeDefinitionPatch",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/SubsetAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#createsAnAttributeInEachSet#5",
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [
+				"set",
+				"attribute"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "cubes",
+					"args" : [ ]
+				},
+				{
+					"$patch" : "AttributeDefinitionPatch",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "CubeAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#createsAnAttributeInEachSet#6",
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [
+				"set",
+				"attribute"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "views",
+					"args" : [
+						"Sales"
+					]
+				},
+				{
+					"$patch" : "AttributeDefinitionPatch",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Cubes('Sales')/ViewAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#createsAnAttributeInEachSet#7",
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [
+				"set",
+				"attribute"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "processes",
+					"args" : [ ]
+				},
+				{
+					"$patch" : "AttributeDefinitionPatch",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ProcessAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#createsAnAttributeInEachSet#8",
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [
+				"set",
+				"attribute"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "chores",
+					"args" : [ ]
+				},
+				{
+					"$patch" : "AttributeDefinitionPatch",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "ChoreAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#createsAnAttributeInEachSet#9",
+			"service" : "attributes",
+			"method" : "create",
+			"params" : [
+				"set",
+				"attribute"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "elements",
+					"args" : [
+						"Region",
+						"Region"
+					]
+				},
+				{
+					"$patch" : "AttributeDefinitionPatch",
+					"json" : {
+						"Name" : "Weight",
+						"Type" : "Numeric"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "POST",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/ElementAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Name" : "Weight",
+							"Type" : "Numeric"
+						}
+					},
+					"response" : {
+						"status" : 201,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Weight",
+							"Type" : "Numeric"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Weight",
+					"Type" : "Numeric"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#deletesAnAttributeFromEachSet#1",
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [
+				"set",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "dimensions",
+					"args" : [ ]
+				},
+				"Code"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "DimensionAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AttributeServiceTest#deletesAnAttributeFromEachSet#2",
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [
+				"set",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "hierarchies",
+					"args" : [
+						"Region"
+					]
+				},
+				"Code"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/HierarchyAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AttributeServiceTest#deletesAnAttributeFromEachSet#3",
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [
+				"set",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "elements",
+					"args" : [
+						"Region",
+						"Alt"
+					]
+				},
+				"Code"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/ElementAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AttributeServiceTest#deletesAnAttributeFromEachSet#4",
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [
+				"set",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "subsets",
+					"args" : [
+						"Region",
+						"Region"
+					]
+				},
+				"Code"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/SubsetAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AttributeServiceTest#deletesAnAttributeFromEachSet#5",
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [
+				"set",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "cubes",
+					"args" : [ ]
+				},
+				"Code"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "CubeAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AttributeServiceTest#deletesAnAttributeFromEachSet#6",
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [
+				"set",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "views",
+					"args" : [
+						"Sales"
+					]
+				},
+				"Code"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "Cubes('Sales')/ViewAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AttributeServiceTest#deletesAnAttributeFromEachSet#7",
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [
+				"set",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "processes",
+					"args" : [ ]
+				},
+				"Code"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "ProcessAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AttributeServiceTest#deletesAnAttributeFromEachSet#8",
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [
+				"set",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "chores",
+					"args" : [ ]
+				},
+				"Code"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "ChoreAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AttributeServiceTest#deletesAnAttributeFromEachSet#9",
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [
+				"set",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "processes",
+					"args" : [ ]
+				},
+				"O'Neil"
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "DELETE",
+						"target" : "ProcessAttributes('O''Neil')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "AttributeServiceTest#getsOneAttributeOfEachSet#1",
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [
+				"set",
+				"name",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "dimensions",
+					"args" : [ ]
+				},
+				"Code",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "DimensionAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#getsOneAttributeOfEachSet#2",
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [
+				"set",
+				"name",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "hierarchies",
+					"args" : [
+						"Region"
+					]
+				},
+				"Code",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/HierarchyAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#getsOneAttributeOfEachSet#3",
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [
+				"set",
+				"name",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "elements",
+					"args" : [
+						"Region",
+						"Alt"
+					]
+				},
+				"Code",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/ElementAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#getsOneAttributeOfEachSet#4",
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [
+				"set",
+				"name",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "subsets",
+					"args" : [
+						"Region",
+						"Region"
+					]
+				},
+				"Code",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/SubsetAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#getsOneAttributeOfEachSet#5",
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [
+				"set",
+				"name",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "cubes",
+					"args" : [ ]
+				},
+				"Code",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "CubeAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#getsOneAttributeOfEachSet#6",
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [
+				"set",
+				"name",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "views",
+					"args" : [
+						"Sales"
+					]
+				},
+				"Code",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/ViewAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#getsOneAttributeOfEachSet#7",
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [
+				"set",
+				"name",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "processes",
+					"args" : [ ]
+				},
+				"Code",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#getsOneAttributeOfEachSet#8",
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [
+				"set",
+				"name",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "chores",
+					"args" : [ ]
+				},
+				"Code",
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ChoreAttributes('Code')",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "Code",
+							"Type" : "String"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "Code",
+					"Type" : "String"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#getsOneAttributeOfEachSet#9",
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [
+				"set",
+				"name",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "hierarchies",
+					"args" : [
+						"}Clients & Co"
+					]
+				},
+				"O'Neil / Ünï",
+				{
+					"$query" : {
+						"select" : [
+							"Type"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('%7DClients%20%26%20Co')/HierarchyAttributes('O''Neil%20%2F%20%C3%9Cn%C3%AF')?$select=Type",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "O'Neil / Ünï",
+							"Type" : "Numeric"
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "AttributeDefinition",
+				"json" : {
+					"Name" : "O'Neil / Ünï",
+					"Type" : "Numeric"
+				}
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#listsEachSetsAttributes#1",
+			"service" : "attributes",
+			"method" : "list",
+			"params" : [
+				"set",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "dimensions",
+					"args" : [ ]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "DimensionAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Caption",
+									"Type" : "Alias"
+								},
+								{
+									"Name" : "Code",
+									"Type" : "String"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Caption",
+						"Type" : "Alias"
+					}
+				},
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AttributeServiceTest#listsEachSetsAttributes#2",
+			"service" : "attributes",
+			"method" : "list",
+			"params" : [
+				"set",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "hierarchies",
+					"args" : [
+						"Region"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/HierarchyAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Caption",
+									"Type" : "Alias"
+								},
+								{
+									"Name" : "Code",
+									"Type" : "String"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Caption",
+						"Type" : "Alias"
+					}
+				},
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AttributeServiceTest#listsEachSetsAttributes#3",
+			"service" : "attributes",
+			"method" : "list",
+			"params" : [
+				"set",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "elements",
+					"args" : [
+						"Region",
+						"Alt"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Alt')/ElementAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Caption",
+									"Type" : "Alias"
+								},
+								{
+									"Name" : "Code",
+									"Type" : "String"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Caption",
+						"Type" : "Alias"
+					}
+				},
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AttributeServiceTest#listsEachSetsAttributes#4",
+			"service" : "attributes",
+			"method" : "list",
+			"params" : [
+				"set",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "subsets",
+					"args" : [
+						"Region",
+						"Region"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/SubsetAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Caption",
+									"Type" : "Alias"
+								},
+								{
+									"Name" : "Code",
+									"Type" : "String"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Caption",
+						"Type" : "Alias"
+					}
+				},
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AttributeServiceTest#listsEachSetsAttributes#5",
+			"service" : "attributes",
+			"method" : "list",
+			"params" : [
+				"set",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "cubes",
+					"args" : [ ]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "CubeAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Caption",
+									"Type" : "Alias"
+								},
+								{
+									"Name" : "Code",
+									"Type" : "String"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Caption",
+						"Type" : "Alias"
+					}
+				},
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AttributeServiceTest#listsEachSetsAttributes#6",
+			"service" : "attributes",
+			"method" : "list",
+			"params" : [
+				"set",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "views",
+					"args" : [
+						"Sales"
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Cubes('Sales')/ViewAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Caption",
+									"Type" : "Alias"
+								},
+								{
+									"Name" : "Code",
+									"Type" : "String"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Caption",
+						"Type" : "Alias"
+					}
+				},
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AttributeServiceTest#listsEachSetsAttributes#7",
+			"service" : "attributes",
+			"method" : "list",
+			"params" : [
+				"set",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "processes",
+					"args" : [ ]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ProcessAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Caption",
+									"Type" : "Alias"
+								},
+								{
+									"Name" : "Code",
+									"Type" : "String"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Caption",
+						"Type" : "Alias"
+					}
+				},
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AttributeServiceTest#listsEachSetsAttributes#8",
+			"service" : "attributes",
+			"method" : "list",
+			"params" : [
+				"set",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "chores",
+					"args" : [ ]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "ChoreAttributes",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Caption",
+									"Type" : "Alias"
+								},
+								{
+									"Name" : "Code",
+									"Type" : "String"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Caption",
+						"Type" : "Alias"
+					}
+				},
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Code",
+						"Type" : "String"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AttributeServiceTest#listsEachSetsAttributes#9",
+			"service" : "attributes",
+			"method" : "list",
+			"params" : [
+				"set",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "elements",
+					"args" : [
+						"Region",
+						"Region"
+					]
+				},
+				{
+					"$query" : {
+						"select" : [
+							"Name"
+						],
+						"filter" : "Type eq 'String'",
+						"orderBy" : [
+							"Name"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Dimensions('Region')/Hierarchies('Region')/ElementAttributes?$select=Name&$filter=Type%20eq%20'String'&$orderby=Name",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"value" : [
+								{
+									"Name" : "Code"
+								}
+							]
+						}
+					}
+				}
+			],
+			"result" : [
+				{
+					"$model" : "AttributeDefinition",
+					"json" : {
+						"Name" : "Code"
+					}
+				}
+			]
+		},
+		{
+			"id" : "AttributeServiceTest#refusesAMissingName#1",
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [
+				"set",
+				"name"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "cubes",
+					"args" : [ ]
+				},
+				null
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "AttributeServiceTest#refusesAMissingName#2",
+			"service" : "attributes",
+			"method" : "get",
+			"params" : [
+				"set",
+				"name",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "AttributeSet",
+					"factory" : "cubes",
+					"args" : [ ]
+				},
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		}
+	]
+}

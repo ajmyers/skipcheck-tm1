@@ -1,0 +1,88 @@
+{
+	"specVersion" : 1,
+	"name" : "processes",
+	"description" : "A process with a parameter: create, list, read, change, compile saved and unsaved code, run it and unsaved code, the debug contexts TM1 lists, a missing process, delete.",
+	"names" : [ "process", "adhoc", "missing" ],
+	"steps" : [
+		{
+			"service" : "processes",
+			"method" : "create",
+			"params" : [ "process" ],
+			"args" : [ { "$patch" : "ProcessPatch", "json" : { "Name" : "${process}", "Parameters" : [ { "Name" : "pName", "Prompt" : "", "Value" : "first", "Type" : "String" } ], "PrologProcedure" : "sName = pName;\n" } } ],
+			"expect" : { "fields" : { "Name" : "${process}" } }
+		},
+		{
+			"service" : "processes",
+			"method" : "list",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { "select" : [ "Name" ], "filter" : "Name eq '${process}'" } } ],
+			"expect" : { "items" : { "Name" : [ "${process}" ] } }
+		},
+		{
+			"service" : "processes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${process}", { "$query" : { "select" : [ "Name", "PrologProcedure" ] } } ],
+			"expect" : { "fields" : { "Name" : "${process}" } }
+		},
+		{
+			"service" : "processes",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${process}", { "$patch" : "ProcessPatch", "json" : { "EpilogProcedure" : "sDone = 'yes';\n" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "processes",
+			"method" : "compile",
+			"params" : [ "name" ],
+			"args" : [ "${process}" ],
+			"expect" : { "count" : 0 }
+		},
+		{
+			"service" : "processes",
+			"method" : "compile",
+			"params" : [ "definition" ],
+			"args" : [ { "$patch" : "ProcessPatch", "json" : { "Name" : "${adhoc}", "PrologProcedure" : "nX = ;\n" } } ],
+			"expect" : { "count" : 1 }
+		},
+		{
+			"service" : "processes",
+			"method" : "executeWithReturn",
+			"params" : [ "name", "parameters", "query" ],
+			"args" : [ "${process}", { "$map" : { "pName" : "second" } }, { "$query" : { "expand" : { "ErrorLogFile" : { } } } } ],
+			"expect" : { "fields" : { "ProcessExecuteStatusCode" : "CompletedSuccessfully" } }
+		},
+		{
+			"service" : "processes",
+			"method" : "executeWithReturn",
+			"params" : [ "definition", "parameters", "query" ],
+			"args" : [ { "$patch" : "ProcessPatch", "json" : { "Name" : "${adhoc}", "PrologProcedure" : "nX = 1;\n" } }, { "$map" : { } }, { "$query" : { } } ],
+			"expect" : { "fields" : { "ProcessExecuteStatusCode" : "CompletedSuccessfully" } }
+		},
+		{
+			"service" : "processDebugging",
+			"method" : "list",
+			"params" : [ "query" ],
+			"args" : [ { "$query" : { } } ],
+			"expect" : { "count" : 0 }
+		},
+		{
+			"service" : "processes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${missing}", { "$query" : { } } ],
+			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
+		},
+		{
+			"service" : "processes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${process}" ],
+			"expect" : { "none" : true }
+		}
+	],
+	"finally" : [
+		{ "service" : "processes", "method" : "delete", "params" : [ "name" ], "args" : [ "${process}" ] }
+	]
+}
