@@ -48,6 +48,19 @@ final class BatchQueue {
 		if (request.response() == Tm1Request.Response.BYTES || request.body() instanceof Tm1Request.Bytes) {
 			return Flux.error(new IllegalArgumentException("Raw bytes can't go in a JSON batch: " + request));
 		}
+		// Written now, so a body that can't be written fails its own call, where it was
+		// made, rather than the run and every other call with it
+		JsonNode body;
+		try {
+			body = request.body() == null ? null : mapper.readTree(connection.json(request.body()));
+		}
+		catch (JacksonException e) {
+			return Flux.error(new IllegalArgumentException(
+					"The request body isn't JSON, so it can't go in a batch: " + request, e));
+		}
+		catch (IllegalArgumentException e) {
+			return Flux.error(e);
+		}
 		Sinks.One<Item> sink = Sinks.one();
 		synchronized (this) {
 			if (ran) {
@@ -55,7 +68,7 @@ final class BatchQueue {
 						"The batch has already run, so this call can't join it: a call whose request depends on "
 								+ "another's result can't be batched. " + request));
 			}
-			entries.add(new Entry(String.valueOf(entries.size() + 1), request, sink));
+			entries.add(new Entry(String.valueOf(entries.size() + 1), request, body, sink));
 		}
 		URI uri = connection.uri(request.relativeUri());
 		return sink.asMono().flatMapMany(item -> connection.decode(request, uri, item.status(), item.body()));
@@ -93,6 +106,9 @@ final class BatchQueue {
 		}
 		return connection.execute(Tm1Request.post(ODataPath.batch(), body, JsonNode.class))
 			.doOnNext(response -> deliver(chunk, response))
+			// No body is no answers: without this the calls would wait for ever
+			.switchIfEmpty(Mono.error(() -> new Tm1ProtocolException("TM1 answered the batch with no body", null,
+					"POST", connection.uri(ODataPath.batch().toString()).toString(), null)))
 			.doOnError(e -> chunk.forEach(entry -> entry.sink().tryEmitError(e)))
 			.onErrorResume(e -> Mono.empty())
 			.then();
@@ -110,10 +126,9 @@ final class BatchQueue {
 		// reads a header's name as written, and only knows this one in lower case.
 		headers.put("accept", Connection.accept(request.response()));
 		request.headers().forEach(headers::put);
-		Object payload = request.body();
-		if (payload != null) {
+		if (entry.body() != null) {
 			headers.put("content-type", "application/json");
-			json.set("body", mapper.readTree(connection.json(payload)));
+			json.set("body", entry.body());
 		}
 		return json;
 	}
@@ -151,7 +166,7 @@ final class BatchQueue {
 		}
 	}
 
-	private record Entry(String id, Tm1Request<?> request, Sinks.One<Item> sink) {
+	private record Entry(String id, Tm1Request<?> request, @Nullable JsonNode body, Sinks.One<Item> sink) {
 	}
 
 	/**
