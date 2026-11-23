@@ -42,11 +42,13 @@ const snake = (name) =>
 		.replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
 		.toLowerCase();
 
+// highlight is the language's name in the site's highlighter (/highlight.js on skipcheck.io), which
+// colours a block marked lang-<name>
 const LANGUAGES = [
-	{ id: 'java', label: 'Java', file: (m, cls) => path.join('java', m.id, 'src', 'examples', 'java', 'examples', cls + '.java') },
-	{ id: 'python', label: 'Python', file: (m, cls) => path.join('python', m.id, 'examples', snake(cls) + '.py') },
-	{ id: 'dotnet', label: '.NET', file: (m, cls) => path.join('dotnet', 'examples', m.dotnet, cls + '.cs') },
-	{ id: 'typescript', label: 'TypeScript', file: (m, cls) => path.join('typescript', m.id, 'examples', cls + '.ts') },
+	{ id: 'java', label: 'Java', highlight: 'java', file: (m, cls) => path.join('java', m.id, 'src', 'examples', 'java', 'examples', cls + '.java') },
+	{ id: 'python', label: 'Python', highlight: 'python', file: (m, cls) => path.join('python', m.id, 'examples', snake(cls) + '.py') },
+	{ id: 'dotnet', label: '.NET', highlight: 'csharp', file: (m, cls) => path.join('dotnet', 'examples', m.dotnet, cls + '.cs') },
+	{ id: 'typescript', label: 'TypeScript', highlight: 'typescript', file: (m, cls) => path.join('typescript', m.id, 'examples', cls + '.ts') },
 ];
 
 const escape = (text) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
@@ -174,7 +176,7 @@ async function* javaFiles(dir) {
 function tabGroup(tabs) {
 	const buttons = tabs.map((tab) => '<button type="button" role="tab" data-lang="' + tab.language.id + '">' + tab.language.label + '</button>').join('');
 	const panels = tabs
-		.map((tab) => '<div role="tabpanel" data-lang="' + tab.language.id + '"><pre><code class="language-' + tab.language.id + '">' + escape(tab.code) + '</code></pre></div>')
+		.map((tab) => '<div role="tabpanel" data-lang="' + tab.language.id + '"><pre><code class="lang-' + tab.language.highlight + '">' + escape(tab.code) + '</code></pre></div>')
 		.join('');
 	// Javadoc puts a snippet inside the paragraph that introduces it: end that paragraph first
 	return '</p><div class="tabs"><div class="tablist" role="tablist" aria-label="Language">' + buttons + '</div>' + panels + '</div><p>';
@@ -185,7 +187,7 @@ function page(title, body) {
 		'<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
 		'<title>' +
 		escape(title) +
-		' · TM1 client guide</title><link rel="stylesheet" href="guide.css"><script src="guide.js" defer></script></head>' +
+		' · TM1 client guide</title><link rel="stylesheet" href="guide.css"><script src="guide.js" defer></script><script src="/highlight.js" defer></script></head>' +
 		'<body><main class="guide">' +
 		body +
 		'</main></body></html>\n'
