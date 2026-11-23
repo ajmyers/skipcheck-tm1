@@ -43,6 +43,6 @@
     }
   },
   "devDependencies": {
-    "@skipcheck/tm1-client": "file:.."
+    "@skipcheck/tm1-client": "*"
   }
 }

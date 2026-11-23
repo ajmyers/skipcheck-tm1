@@ -59,7 +59,7 @@ export const Repo = {
     return join(this.root, "java", "tm1-testcontainers", "src", "main", "java", "io", "skipcheck", "tm1", "testcontainers");
   },
   get typescriptSources(): string {
-    return join(this.root, "tm1-typescript", "testcontainers", "src");
+    return join(this.root, "typescript", "tm1-testcontainers", "src");
   },
   get pawScript(): string {
     return join(this.root, "docker", "paw", "paw-local.sh");

@@ -4,7 +4,7 @@
 #
 #   *.java                     ./gradlew format (Spring Java Format: layout, imports)
 #   python/**/*.py         ruff format, and ruff's import order
-#   tm1-typescript/**          prettier (*.ts, *.mts, *.mjs, *.json)
+#   typescript/**          prettier (*.ts, *.mts, *.mjs, *.json)
 #   dotnet/**/*.cs         dotnet csharpier
 #
 # Then it checks them, and refuses the commit if a file still isn't formatted or a formatter
@@ -37,8 +37,8 @@ while IFS= read -r -d '' file; do
 	case "$file" in
 		*.java) kind=java ;;
 		python/*.py) kind=python ;;
-		tm1-typescript/package-lock.json) continue ;;
-		tm1-typescript/*.ts | tm1-typescript/*.mts | tm1-typescript/*.mjs | tm1-typescript/*.json) kind=typescript ;;
+		typescript/package-lock.json) continue ;;
+		typescript/*.ts | typescript/*.mts | typescript/*.mjs | typescript/*.json) kind=typescript ;;
 		dotnet/*.cs) kind=dotnet ;;
 		*) continue ;;
 	esac
@@ -106,10 +106,10 @@ if [[ ${#python[@]} -gt 0 ]]; then
 fi
 
 if [[ ${#typescript[@]} -gt 0 ]]; then
-	if [[ ! -x tm1-typescript/node_modules/.bin/prettier ]]; then
-		refuse TypeScript "prettier isn't installed: (cd tm1-typescript && npm ci)"
-	elif ! output="$(cd tm1-typescript && within tm1-typescript "${typescript[@]}" | xargs -0 node_modules/.bin/prettier --log-level warn --write 2>&1 \
-		&& within tm1-typescript "${typescript[@]}" | xargs -0 node_modules/.bin/prettier --log-level warn --check 2>&1)"; then
+	if [[ ! -x typescript/node_modules/.bin/prettier ]]; then
+		refuse TypeScript "prettier isn't installed: (cd typescript && npm ci)"
+	elif ! output="$(cd typescript && within typescript "${typescript[@]}" | xargs -0 node_modules/.bin/prettier --log-level warn --write 2>&1 \
+		&& within typescript "${typescript[@]}" | xargs -0 node_modules/.bin/prettier --log-level warn --check 2>&1)"; then
 		refuse TypeScript "prettier failed" "$output"
 	fi
 fi

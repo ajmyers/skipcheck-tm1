@@ -9,7 +9,7 @@ import { Repo } from "../support/repo.js";
 import * as codec from "./codec.js";
 
 const CALLS = join(Repo.root, "spec", "conformance", "calls");
-const UNSUPPORTED = join(Repo.root, "tm1-typescript", "conformance", "unsupported.txt");
+const UNSUPPORTED = join(Repo.typescript, "conformance", "unsupported.txt");
 
 interface Exchange {
   request: Record<string, unknown>;

@@ -6,12 +6,12 @@ Libraries and tools for the **IBM Planning Analytics (TM1) REST API**: a Java cl
 |---|---|
 | [`tm1-client`](java/tm1-client) | Plain Java client. No Spring container required. |
 | [`tm1-spring-boot-starter`](java/tm1-spring-boot-starter) | Spring Boot auto-configuration for the client. |
-| [`tm1-testcontainers`](java/tm1-testcontainers) | Real TM1 servers in Docker for your tests, with [Testcontainers](https://testcontainers.com). Bring your own licensed TM1. Ported to Python ([`python/tm1-testcontainers`](python/tm1-testcontainers)), .NET ([`dotnet/src/Tm1.Testcontainers`](dotnet/src/Tm1.Testcontainers)) and TypeScript ([`tm1-typescript/testcontainers`](tm1-typescript/testcontainers)). |
+| [`tm1-testcontainers`](java/tm1-testcontainers) | Real TM1 servers in Docker for your tests, with [Testcontainers](https://testcontainers.com). Bring your own licensed TM1. Ported to Python ([`python/tm1-testcontainers`](python/tm1-testcontainers)), .NET ([`dotnet/src/Tm1.Testcontainers`](dotnet/src/Tm1.Testcontainers)) and TypeScript ([`typescript/tm1-testcontainers`](typescript/tm1-testcontainers)). |
 | [`tm1-bom`](java/tm1-bom) | Keeps the module versions aligned. |
 | [`spec`](spec) | The language-neutral API spec every client is generated from and counts its coverage against, exported from TM1's `$metadata` by `tm1-codegen`. |
 | [`python`](python) | Python client (sync and asyncio), with the Java client's API. |
 | [`dotnet`](dotnet) | .NET client, with the Java client's API. See its [README](dotnet/README.md). |
-| [`tm1-typescript`](tm1-typescript) | TypeScript client for Node and browsers, with the Java client's API. See its [README](tm1-typescript/README.md). |
+| [`typescript`](typescript) | TypeScript client for Node and browsers, with the Java client's API. See its [README](typescript/tm1-client/README.md). |
 | [`tools/`](java/tools) | Applications built on the libraries (not published). |
 | [`docker/tm1-server`](docker/tm1-server) | Docker image for TM1 Server, for local development and tests. You supply your own licensed TM1; no IBM software is included. **[Getting started](docker/tm1-server/GETTING-STARTED.md)** |
 | [`docker/tm1-web`](docker/tm1-web) | Docker image for TM1 Web (Planning Analytics Spreadsheet Services), to run alongside `tm1-server`. You supply your own licensed TM1 Web; no IBM software is included. |
@@ -28,7 +28,7 @@ The Java libraries require Java 17+, the Python client Python 3.10+, the .NET cl
 ./gradlew :tm1-codegen:exportSpec        # refresh spec/tm1-api.json after changing the snapshot or overlay
 pip install -e './python/tm1-client[test]' && pytest python
 dotnet test dotnet/Tm1.slnx
-(cd tm1-typescript && npm ci && npm test)
+(cd typescript && npm ci && npm test)
 scripts/live-tests.sh                    # every client's tests against a real TM1 (bring your own: see the script)
 ```
 

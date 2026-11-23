@@ -52,15 +52,15 @@ jobs:
         node: ['20', '22']
     defaults:
       run:
-        working-directory: tm1-typescript
+        working-directory: typescript
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-          cache-dependency-path: tm1-typescript/package-lock.json
-      # The client and, as an npm workspace, tm1-testcontainers (testcontainers/): each script
+          cache-dependency-path: typescript/package-lock.json
+      # The client and, as an npm workspace, tm1-testcontainers: each script
       # runs both. The live and container tests are skipped here, with no TM1 source
       - run: npm ci
       - run: npm test

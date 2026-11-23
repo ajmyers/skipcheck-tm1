@@ -69,7 +69,7 @@ The image tag is the library's version. For a development build it's `edge`: Jav
 ## Tests
 
 ```sh
-npm test                 # from tm1-typescript: the client's tests, then these
+npm test                 # from typescript/: the client's tests, then these
 npm test -w testcontainers
 TM1_PRIVATE_IMAGE=tm1-server-private:2.1.19 npm test -w testcontainers
 ```

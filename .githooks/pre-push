@@ -69,13 +69,13 @@ ports() {
 		"${ruff[@]}" --version > /dev/null 2>&1 || { echo "ruff isn't installed: pip install -e './python/tm1-client[test]'"; return 1; }
 		(cd "$worktree" && "${ruff[@]}" format --check python && "${ruff[@]}" check python) || return 1
 	fi
-	if grep -q '^tm1-typescript/' <<< "$changed"; then
-		[[ -d "$top/tm1-typescript/node_modules" ]] || { echo "prettier and eslint aren't installed: (cd tm1-typescript && npm ci)"; return 1; }
+	if grep -q '^typescript/' <<< "$changed"; then
+		[[ -d "$top/typescript/node_modules" ]] || { echo "prettier and eslint aren't installed: (cd typescript && npm ci)"; return 1; }
 		# The tools and what the lint config imports, from this checkout's install
-		ln -sfn "$top/tm1-typescript/node_modules" "$worktree/tm1-typescript/node_modules"
-		(cd "$worktree/tm1-typescript" && node_modules/.bin/prettier --log-level warn --check . && node_modules/.bin/eslint .)
+		ln -sfn "$top/typescript/node_modules" "$worktree/typescript/node_modules"
+		(cd "$worktree/typescript" && node_modules/.bin/prettier --log-level warn --check . && node_modules/.bin/eslint .)
 		local status=$?
-		rm -f "$worktree/tm1-typescript/node_modules"
+		rm -f "$worktree/typescript/node_modules"
 		[[ $status -eq 0 ]] || return 1
 	fi
 	if grep -q '^dotnet/' <<< "$changed"; then

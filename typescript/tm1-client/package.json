@@ -1,0 +1,39 @@
+{
+  "name": "@skipcheck/tm1-client",
+  "version": "0.0.0",
+  "description": "A client for the IBM Planning Analytics (TM1) REST API, with the Java client's API",
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./model": {
+      "types": "./dist/generated/index.d.ts",
+      "default": "./dist/generated/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "tsx codegen/main.ts ../../spec/tm1-api.json src/generated",
+    "prebuild": "npm run generate",
+    "build": "tsc -p tsconfig.build.json",
+    "pretest": "npm run generate",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:live": "vitest run test/live"
+  },
+  "devDependencies": {
+    "@skipcheck/tm1-testcontainers": "*",
+    "testcontainers": "11.14.0"
+  }
+}

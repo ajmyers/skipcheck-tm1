@@ -1,0 +1,34 @@
+{
+  "name": "skipcheck-tm1-typescript",
+  "private": true,
+  "description": "The TypeScript client for the IBM Planning Analytics (TM1) REST API and its tm1-testcontainers, as one workspace",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "tm1-client",
+    "tm1-testcontainers"
+  ],
+  "scripts": {
+    "generate": "npm run generate -w tm1-client",
+    "build": "npm run build -w tm1-client && npm run build -w tm1-testcontainers",
+    "pretest": "npm run generate && npm run format:check && npm run lint",
+    "test": "npm test -w tm1-client && npm test -w tm1-testcontainers",
+    "typecheck": "npm run typecheck -w tm1-client && npm run typecheck -w tm1-testcontainers",
+    "test:live": "npm run test:live -w tm1-client",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "20.19.43",
+    "eslint": "10.15.0",
+    "prettier": "3.10.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.73.0",
+    "vitest": "3.2.7"
+  }
+}

@@ -5,7 +5,7 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["**/dist/", "src/generated/", "**/node_modules/"] },
+  { ignores: ["**/dist/", "tm1-client/src/generated/", "**/node_modules/"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -23,7 +23,7 @@ export default tseslint.config(
   },
   {
     // Tests read TM1's JSON and fakes' requests as they come
-    files: ["test/**", "testcontainers/test/**"],
+    files: ["tm1-client/test/**", "tm1-testcontainers/test/**"],
     rules: { "@typescript-eslint/no-explicit-any": "off" },
   },
 );

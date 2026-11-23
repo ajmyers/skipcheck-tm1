@@ -34,6 +34,6 @@ export const Repo = {
     return join(this.javaClient, "service");
   },
   get typescript(): string {
-    return resolve(this.root, "tm1-typescript");
+    return resolve(this.root, "typescript", "tm1-client");
   },
 };

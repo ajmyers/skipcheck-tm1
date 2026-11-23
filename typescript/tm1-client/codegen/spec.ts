@@ -170,7 +170,7 @@ export const Names = {
   },
 };
 
-export const HEADER = "// Generated from spec/tm1-api.json by tm1-typescript's codegen: don't edit, don't commit.\n/* eslint-disable */\n";
+export const HEADER = "// Generated from spec/tm1-api.json by the TypeScript client's codegen: don't edit, don't commit.\n/* eslint-disable */\n";
 
 /** A JSDoc comment from a description and the item's since/deprecated notes, or nothing. */
 export function jsdoc(indent: string, text: string | undefined, item: { since?: string; deprecated?: { version?: string; reason?: string } | null }): string {

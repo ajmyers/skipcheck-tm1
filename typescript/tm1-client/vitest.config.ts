@@ -9,8 +9,8 @@ export default defineConfig({
     // with @skipcheck/tm1-testcontainers, which uses this package
     alias: [
       { find: /^@skipcheck\/tm1-client$/, replacement: source("./src/index.ts") },
-      { find: /^@skipcheck\/tm1-testcontainers$/, replacement: source("./testcontainers/src/index.ts") },
-      { find: /^@skipcheck\/tm1-testcontainers\/vitest$/, replacement: source("./testcontainers/src/vitest.ts") },
+      { find: /^@skipcheck\/tm1-testcontainers$/, replacement: source("../tm1-testcontainers/src/index.ts") },
+      { find: /^@skipcheck\/tm1-testcontainers\/vitest$/, replacement: source("../tm1-testcontainers/src/vitest.ts") },
     ],
   },
   test: {
