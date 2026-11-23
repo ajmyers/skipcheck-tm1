@@ -12,6 +12,8 @@
     color: var(--muted, #677285);
     font-size: 0.9rem;
 }
+/* A version keeps its case: v1.2.0, not V1.2.0 */
+.release-note .badge.version { text-transform: none; letter-spacing: 0.02em; }
 .release-note code {
     padding: 0.05em 0.35em;
     border-radius: 4px;

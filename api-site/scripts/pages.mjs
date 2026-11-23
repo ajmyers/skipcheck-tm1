@@ -126,11 +126,13 @@ for (const { project, content } of landings) {
 			.map((link, index) => '<a class="button' + (index === 0 ? ' primary' : '') + '" href="' + link.href + '">' + link.label + '</a>'),
 		'<a class="button" href="' + github + '">Source on GitHub</a>',
 	].join('');
+	// Where the release stands, under the buttons: the version a release build was made for (its tag),
+	// or that there is no stable release yet. Every release rebuilds these pages, so it's current.
 	const callout = version.release
-		? ''
-		: '<p class="release-note" role="note"><span class="badge">Pre-release</span><span>No stable release yet, and the API can still change. These pages describe version <code>' +
+		? '<p class="release-note"><span class="badge version">v' +
 			escape(version.version) +
-			'</code>.</span></p>';
+			'</span><span>The latest release. The install steps below use it, in every language.</span></p>'
+		: '<p class="release-note" role="note"><span class="badge">Pre-release</span><span>No stable release yet, and the API can still change. The install steps below get the latest development build.</span></p>';
 
 	let body =
 		'<section class="hero wrap" aria-labelledby="title"><p class="kicker">' +
