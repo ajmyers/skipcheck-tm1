@@ -128,10 +128,9 @@ for (const { project, content } of landings) {
 	].join('');
 	const callout = version.release
 		? ''
-		: '<div class="callout" role="note"><p><strong>Pre-release.</strong> There is no stable release yet, and the API can still change. ' +
-			'These pages describe the latest code, version ' +
+		: '<p class="release-note" role="note"><span class="badge">Pre-release</span><span>No stable release yet, and the API can still change. These pages describe version <code>' +
 			escape(version.version) +
-			'.</p></div>';
+			'</code>.</span></p>';
 
 	let body =
 		'<section class="hero wrap" aria-labelledby="title"><p class="kicker">' +
@@ -169,7 +168,7 @@ for (const { project, content } of landings) {
 			title: project.title + ' · Skipcheck',
 			description: meta.description,
 			canonical: CANONICAL_ORIGIN + '/' + project.id + '/',
-			styles: ['/styles.css', 'assets/tabs.css'],
+			styles: ['/styles.css', 'assets/tabs.css', 'assets/landing.css'],
 			scripts: ['/highlight.js', ...(several ? ['assets/tabs.js'] : [])],
 		}) +
 		'<body><main id="main" class="project">' +

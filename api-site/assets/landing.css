@@ -1,0 +1,20 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* What the landing pages add to the site's styles (/styles.css, which they load and are written
+   in). The release note sits under the hero's buttons as a line, not a box: the site's badge,
+   then the words, in the hero's quieter colour. */
+.release-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.75rem;
+    margin: 1.75rem 0 0;
+    color: var(--muted, #677285);
+    font-size: 0.9rem;
+}
+.release-note code {
+    padding: 0.05em 0.35em;
+    border-radius: 4px;
+    background: var(--chip, #eef2f7);
+    font-size: 0.85em;
+}
