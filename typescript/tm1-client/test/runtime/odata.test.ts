@@ -257,7 +257,7 @@ describe("ODataPath", () => {
   });
 
   it.each(["}Clients", "Year 2026", "O'Neil", "a/b", "50%", "{x}", "a&b=c+d#e", "Région", "日本", "😀", "''", "%2F", "?", "\\", "a\tb"])(
-    "keeps the awkward name %j intact",
+    "keeps awkward names intact: %j",
     (name) => {
       expect(keyOf(ODataPath.of("Dimensions").key(name).nav("Hierarchies"))).toBe(name);
     },
@@ -280,7 +280,7 @@ describe("ODataPath", () => {
     }
   });
 
-  it.each(["", "Cubes('x')", "a/b", "1abc", "$metadata", "Cubes Sales"])("refuses the name %j, which isn't an identifier", (name) => {
+  it.each(["", "Cubes('x')", "a/b", "1abc", "$metadata", "Cubes Sales"])("refuses names that aren't identifiers: %j", (name) => {
     expect(() => ODataPath.of(name)).toThrow(RangeError);
     expect(() => ODataPath.of("Cubes").nav(name)).toThrow(RangeError);
   });
