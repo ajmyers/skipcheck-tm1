@@ -79,6 +79,77 @@ public sealed class Tm1SessionPoolTest : IAsyncLifetime
     }
 
     [Fact]
+    public async Task KeepsASessionWhileARequestIsRunningOnIt()
+    {
+        var answer = new ScriptedTm1.Pending();
+        _tm1.On("GET Server", _ => answer.Task);
+        var alice = _pool.Session(Tm1Identity.Impersonating("alice"));
+        var result = alice.ExecuteAsync(Server);
+        await ScriptedTm1.Eventually(() => _tm1.Requests("GET Server").Count == 1, "for the request");
+
+        _time.Advance(TimeSpan.FromMinutes(25));
+        Assert.Equal(0, _pool.Stats().EvictedIdle); // a running request is use
+        Assert.False(alice.IsClosed());
+
+        answer.Answer(ScriptedTm1.Json(200, "{}"));
+        await result.WaitAsync(TimeSpan.FromSeconds(5));
+        _time.Advance(TimeSpan.FromMinutes(12));
+        Assert.Equal(1, _pool.Stats().EvictedIdle); // idle once it has finished
+        await ScriptedTm1.Eventually(() => alice.IsClosed(), "for the close");
+    }
+
+    /// <summary>.NET only: a collection counts as running until its stream ends or is disposed, as
+    /// Java's does while its body is read, though this client reads a page whole.</summary>
+    [Fact]
+    public async Task KeepsASessionWhileACollectionIsBeingRead()
+    {
+        _tm1.On("GET Cubes", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"a\"},{\"Name\":\"b\"}]}"));
+        var alice = _pool.Session(Tm1Identity.Impersonating("alice"));
+        await using (var cubes = alice.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"))).GetAsyncEnumerator())
+        {
+            Assert.True(await cubes.MoveNextAsync());
+            _time.Advance(TimeSpan.FromMinutes(25));
+            Assert.Equal(0, _pool.Stats().EvictedIdle); // the caller is still reading
+        }
+        _time.Advance(TimeSpan.FromMinutes(12));
+        Assert.Equal(1, _pool.Stats().EvictedIdle); // idle once the stream is disposed
+    }
+
+    [Fact]
+    public async Task ClosesAnEvictedSessionOnlyOnceItsRequestsHaveFinished()
+    {
+        await _pool.CloseAsync();
+        _pool = Pool(b => b.MaxAge(TimeSpan.FromMinutes(30)));
+        var answer = new ScriptedTm1.Pending();
+        _tm1.On("GET Server", _ => answer.Task);
+        var alice = _pool.Session(Tm1Identity.Impersonating("alice"));
+        var result = alice.ExecuteAsync(Server);
+        await ScriptedTm1.Eventually(() => _tm1.Requests("GET Server").Count == 1, "for the request");
+
+        _time.Advance(TimeSpan.FromMinutes(40));
+        Assert.Equal(1, _pool.Stats().EvictedAge); // out of the pool at its age
+        for (int i = 0; i < 5; i++)
+        {
+            // The pool looks again every second; its timers are set as the ones before them fire
+            await Task.Delay(20);
+            _time.Advance(TimeSpan.FromSeconds(1));
+            Assert.False(alice.IsClosed()); // but open for the request still running
+        }
+
+        answer.Answer(ScriptedTm1.Json(200, "{}"));
+        await result.WaitAsync(TimeSpan.FromSeconds(5));
+        await ScriptedTm1.Eventually(
+            () =>
+            {
+                _time.Advance(TimeSpan.FromSeconds(1));
+                return alice.IsClosed();
+            },
+            "for the close"
+        );
+        await ScriptedTm1.Eventually(() => _tm1.Requests(ScriptedTm1.Close).Count == 1, "for TM1 to be told");
+    }
+
+    [Fact]
     public async Task EvictsASessionPastItsMaximumAgeEvenIfInUse()
     {
         await _pool.CloseAsync();

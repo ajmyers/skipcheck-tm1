@@ -75,6 +75,9 @@ public sealed class Tm1Session : IAsyncDisposable
 
     internal Connection Connection => _connection;
 
+    /// <summary>Whether a request is running on the session, through any view of it.</summary>
+    internal bool IsBusy => _connection.IsBusy;
+
     // Views
 
     /// <summary>A view of this session whose requests run in sandbox <paramref name="name"/>: each
@@ -207,32 +210,44 @@ public sealed class Tm1Session : IAsyncDisposable
         {
             throw new ArgumentException("Only collection requests are streamed: use ExecuteAsync() for " + request);
         }
-        Page<T> page;
-        if (_batch is not null)
+        // Running until the stream ends or is disposed, between its pages too. In a batch, only once
+        // the batch has run: a call that is still queued has sent nothing
+        IDisposable? running = null;
+        try
         {
-            // Checked by the queue when the batch runs, as in ExecuteAsync
-            page = (Page<T>)(await _batch.Add(this, request, r => ReadPage(request, r)).ConfigureAwait(false))!; // ReadPage never returns null
-        }
-        else
-        {
-            await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
-            page = ReadPage(request, await SendAsync(request, Target(request.RelativeUri()), _async, cancellationToken).ConfigureAwait(false));
-        }
-        while (true)
-        {
-            foreach (var item in page.Items)
+            Page<T> page;
+            if (_batch is not null)
             {
-                yield return item;
+                // Checked by the queue when the batch runs, as in ExecuteAsync
+                page = (Page<T>)(await _batch.Add(this, request, r => ReadPage(request, r)).ConfigureAwait(false))!; // ReadPage never returns null
+                running = _connection.Running();
             }
-            if (page.NextLink is null)
+            else
             {
-                yield break;
+                running = _connection.Running();
+                await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
+                page = ReadPage(request, await SendAsync(request, Target(request.RelativeUri()), _async, cancellationToken).ConfigureAwait(false));
             }
-            // The link carries the query and TM1's options already. It's followed with an ordinary
-            // request, whatever the view: the rest of the collection isn't part of the async result or
-            // the batch
-            request = request with { Query = ODataQuery.None() };
-            page = ReadPage(request, await SendAsync(request, _connection.Url(page.NextLink), null, cancellationToken).ConfigureAwait(false));
+            while (true)
+            {
+                foreach (var item in page.Items)
+                {
+                    yield return item;
+                }
+                if (page.NextLink is null)
+                {
+                    yield break;
+                }
+                // The link carries the query and TM1's options already. It's followed with an ordinary
+                // request, whatever the view: the rest of the collection isn't part of the async result or
+                // the batch
+                request = request with { Query = ODataQuery.None() };
+                page = ReadPage(request, await SendAsync(request, _connection.Url(page.NextLink), null, cancellationToken).ConfigureAwait(false));
+            }
+        }
+        finally
+        {
+            running?.Dispose();
         }
     }
 
@@ -302,6 +317,8 @@ public sealed class Tm1Session : IAsyncDisposable
         CancellationToken ct
     )
     {
+        // Running until the result is read, between the polls too
+        using var running = _connection.Running();
         var withPrefer = new Dictionary<string, string>(headers) { ["Prefer"] = "respond-async" };
         var reply = await _connection.SendAsync(method, url, content, contentType, withPrefer, accept, timeout, ct).ConfigureAwait(false);
         if (reply.Status != 202)

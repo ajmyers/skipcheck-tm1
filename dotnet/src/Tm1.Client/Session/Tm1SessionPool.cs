@@ -16,15 +16,19 @@ namespace Skipcheck.Tm1.Client.Session;
 /// (default 10 minutes) or open for <see cref="Tm1SessionPoolBuilder.MaxAge"/> (default 8 hours),
 /// checked when it's next asked for and by a sweep every
 /// <see cref="Tm1SessionPoolBuilder.SweepInterval"/> (default a minute); and the least recently
-/// used one when there are more than <see cref="Tm1SessionPoolBuilder.MaxSize"/> (default 100). An
-/// evicted session is closed on TM1 after <see cref="Tm1SessionPoolBuilder.CloseGrace"/> (default
-/// 30 seconds), so requests already using it can finish; the next ask for its identity opens a
-/// new one.</para>
+/// used one when there are more than <see cref="Tm1SessionPoolBuilder.MaxSize"/> (default 100). A
+/// session with a request running isn't idle, however long ago it was asked for. An evicted
+/// session is closed on TM1 after <see cref="Tm1SessionPoolBuilder.CloseGrace"/> (default 30
+/// seconds), or when the requests running on it have finished, if that's later: closing it would
+/// end them on TM1. The next ask for its identity opens a new one.</para>
 ///
 /// <para>Sessions are opened lazily: <see cref="Session(Tm1Identity)"/> doesn't log in, the first
 /// request does. Thread-safe.</para></summary>
 public sealed class Tm1SessionPool : IAsyncDisposable
 {
+    /// <summary>How often an evicted session with a request still running is looked at again.</summary>
+    private static readonly TimeSpan BusyRecheck = TimeSpan.FromSeconds(1);
+
     private readonly Tm1SessionBuilder _sessions;
     private readonly TimeSpan _idleTimeout;
     private readonly TimeSpan _maxAge;
@@ -205,6 +209,12 @@ public sealed class Tm1SessionPool : IAsyncDisposable
         {
             return "age";
         }
+        if (entry.Session.IsBusy)
+        {
+            // A request running on it is use, however long ago the session was asked for
+            entry.LastUsed = now;
+            return null;
+        }
         if (now - entry.LastUsed >= _idleTimeout)
         {
             return "idle";
@@ -254,6 +264,11 @@ public sealed class Tm1SessionPool : IAsyncDisposable
             if (_closeGrace > TimeSpan.Zero)
             {
                 await Task.Delay(_closeGrace, _time, grace).ConfigureAwait(false);
+            }
+            // Closing it sooner would end the requests still running on it, on TM1
+            while (session.IsBusy)
+            {
+                await Task.Delay(BusyRecheck, _time, grace).ConfigureAwait(false);
             }
             await session.CloseAsync(CancellationToken.None).ConfigureAwait(false);
             Interlocked.Increment(ref _closedSessions);
@@ -338,7 +353,9 @@ public sealed class Tm1SessionPoolBuilder
         return this;
     }
 
-    /// <summary>How long an evicted session stays open for requests already using it (default 30 seconds).</summary>
+    /// <summary>How long an evicted session stays open before it's closed, for a caller that got it
+    /// just before and hasn't sent its request yet. A session with a request running stays open
+    /// until that finishes, however long the grace period. Default 30 seconds; zero closes at once.</summary>
     public Tm1SessionPoolBuilder CloseGrace(TimeSpan closeGrace)
     {
         CloseGraceValue = closeGrace < TimeSpan.Zero ? throw new ArgumentException("closeGrace must not be negative: " + closeGrace) : closeGrace;

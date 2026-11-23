@@ -53,6 +53,9 @@ internal sealed class Connection
     private bool _closed;
     private Task? _closing;
 
+    /// <summary>Requests running now: see <see cref="IsBusy"/>.</summary>
+    private int _running;
+
     public Connection(
         string root,
         Tm1Authenticator authenticator,
@@ -114,6 +117,33 @@ internal sealed class Connection
             lock (_gate)
             {
                 return _closed;
+            }
+        }
+    }
+
+    /// <summary>Whether a request is running: sent, or waiting for the login, and not yet answered,
+    /// failed or cancelled. An async request counts until its result is read, and a collection
+    /// until its stream ends or is disposed.</summary>
+    public bool IsBusy => Volatile.Read(ref _running) > 0;
+
+    /// <summary>Counts a request as running until the result is disposed.</summary>
+    public IDisposable Running() => new RunningRequest(this);
+
+    private sealed class RunningRequest : IDisposable
+    {
+        private Connection? _connection;
+
+        public RunningRequest(Connection connection)
+        {
+            _connection = connection;
+            Interlocked.Increment(ref connection._running);
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _connection, null) is { } connection)
+            {
+                Interlocked.Decrement(ref connection._running);
             }
         }
     }
@@ -342,6 +372,7 @@ internal sealed class Connection
         CancellationToken ct
     )
     {
+        using var running = Running();
         var used = Current();
         var session = await used.Login.WaitAsync(ct).ConfigureAwait(false);
         for (int attempt = 1; ; attempt++)
