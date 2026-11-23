@@ -356,5 +356,4 @@ Objects tests leave behind then survive between runs too. Stop the container (`d
 ## Not yet
 
 - Running test classes once per TM1 version, and pinning tests to a version range.
-- Several TM1 servers with a shared Admin Server (`Tm1Stack`), and PAW (#16).
 - Spring Boot `@ServiceConnection` (#15).
