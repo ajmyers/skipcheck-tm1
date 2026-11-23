@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package examples;
 
 import org.springframework.context.annotation.Bean;

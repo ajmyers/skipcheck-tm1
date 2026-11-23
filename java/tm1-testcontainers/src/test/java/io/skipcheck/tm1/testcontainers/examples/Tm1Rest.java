@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package io.skipcheck.tm1.testcontainers.examples;
 
 import java.io.IOException;

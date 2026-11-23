@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * A Testcontainers module for TM1, and the JUnit extension that runs tests against it.
  *

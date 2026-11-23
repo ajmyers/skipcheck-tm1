@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package io.skipcheck.tm1.client.service.dimension;
 
 /** Who sees a subset, and so which of a hierarchy's collections holds it. */

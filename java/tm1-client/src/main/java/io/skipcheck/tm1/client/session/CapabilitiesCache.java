@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package io.skipcheck.tm1.client.session;
 
 import java.util.concurrent.ConcurrentHashMap;

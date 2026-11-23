@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package io.skipcheck.tm1.codegen;
 
 import java.io.IOException;
@@ -69,6 +71,12 @@ import io.skipcheck.tm1.csdl.CsdlTypeRef;
  * Properties of flags enum types stay {@code String} (TM1 sends them comma-separated).
  */
 public final class ModelGenerator {
+
+	/**
+	 * What every generated file starts with, as the hand-written sources do: the license
+	 * it's under.
+	 */
+	static final String LICENSE = "SPDX-License-Identifier: Apache-2.0";
 
 	/** The package the model is generated into. */
 	public static final String PACKAGE = "io.skipcheck.tm1.client.model";
@@ -1145,13 +1153,15 @@ public final class ModelGenerator {
 	 */
 	private static JavaFile file(TypeSpec.Builder type) {
 		return JavaFile.builder(PACKAGE, type.addAnnotation(SUPPRESS_DEPRECATION).build())
+			.addFileComment(LICENSE)
 			.skipJavaLangImports(true)
 			.indent("\t")
 			.build();
 	}
 
 	private static String packageInfo() {
-		return "/**\n * The TM1 REST API's model, generated from the {@code $metadata} snapshot by\n"
+		return "// " + LICENSE
+				+ "\n\n/**\n * The TM1 REST API's model, generated from the {@code $metadata} snapshot by\n"
 				+ " * {@code tm1-codegen}: don't edit these files.\n *\n * <p>\n"
 				+ " * Everything here is non-null unless marked {@link org.jspecify.annotations.Nullable}.\n */\n"
 				+ "@NullMarked\npackage " + PACKAGE + ";\n\nimport org.jspecify.annotations.NullMarked;\n";

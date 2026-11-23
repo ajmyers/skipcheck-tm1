@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Attribute definitions, and the attribute values translated per locale
  * ({@code LocalizedAttributes}), for every kind of TM1 object that has them. Attribute

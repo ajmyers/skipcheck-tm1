@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Spring Boot {@code @ServiceConnection} support for {@code Tm1ServerContainer}: a Spring
  * test or a development-time application gets its TM1 connection from the container, with
