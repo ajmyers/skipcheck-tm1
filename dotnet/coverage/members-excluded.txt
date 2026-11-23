@@ -1,0 +1,36 @@
+# Java members the .NET libraries don't have, or name another way, as:
+#   <Java type>.<member> | <reason>
+#   <Java type>.<member or type> -> <.NET name> | <reason>
+# Read by api-site/scripts/members.mjs, which fails the docs build on a Java member that is neither
+# found by the parity tests' naming rule nor listed here, and on a line here that is wrong or stale.
+# The renamed lines are also the Java names that tests/Tm1.Testcontainers.Tests/JavaParityTests.cs
+# lets .NET change: a constant can't share its name with a nested type, a method or a property.
+Tm1Session.Builder.jsonMapper | Jackson's ObjectMapper is Java's: .NET reads JSON with System.Text.Json
+Tm1Session.Builder.observationRegistry | Micrometer's ObservationRegistry is Java's: there is no Micrometer here
+Tm1Session.Builder.webClient | Spring's WebClient is Java's HTTP client: .NET takes an HttpMessageHandler instead (HttpHandler)
+Tm1Session.Builder.connector | Reactor Netty's ClientHttpConnector is Java's: .NET takes an HttpMessageHandler instead (HttpHandler)
+Tm1Client.Builder.jsonMapper | Jackson's ObjectMapper is Java's: .NET reads JSON with System.Text.Json
+Tm1Client.Builder.observationRegistry | Micrometer's ObservationRegistry is Java's: there is no Micrometer here
+Tm1Client.Builder.webClient | Spring's WebClient is Java's HTTP client: .NET takes an HttpMessageHandler instead (HttpHandler)
+Tm1Client.Builder.connector | Reactor Netty's ClientHttpConnector is Java's: .NET takes an HttpMessageHandler instead (HttpHandler)
+Tm1SessionPool.Builder.scheduler | Reactor's Scheduler is Java's: .NET's pool takes a TimeProvider (TimeProvider) for tests
+Tm1Capabilities.of | Takes tm1-csdl's CsdlDocument, a Java library: .NET reads $metadata itself (Parse) and keeps no document
+Tm1Capabilities.metadata | Returns tm1-csdl's CsdlDocument, a Java library: .NET reads $metadata itself (Parse) and keeps no document
+Tm1Request.type | The class a response is read as: .NET keeps the type parameter T at run time (typeof(T))
+Tm1TransportException.phase -> TransportPhase | the nested Phase enum has the name
+Tm1Source.PRIVATE_IMAGE -> PrivateImageSetting | the PrivateImage record has the name
+Tm1Source.INSTALL_VOLUME -> InstallVolumeSetting | the InstallVolume record has the name
+Tm1Source.BUNDLE -> BundleSetting | the Bundle record has the name
+Tm1Source.BUNDLE_URL -> BundleUrlSetting | the BundleUrl record has the name
+Tm1WebSource.PRIVATE_IMAGE -> PrivateImageSetting | the PrivateImage record has the name
+Tm1WebSource.INSTALL_VOLUME -> InstallVolumeSetting | the InstallVolume record has the name
+Tm1WebSource.BUNDLE -> BundleSetting | the Bundle record has the name
+Tm1WebSource.BUNDLE_URL -> BundleUrlSetting | the BundleUrl record has the name
+CognosSource.PRIVATE_IMAGE -> PrivateImageSetting | the PrivateImage record has the name
+CognosSource.INSTALL_VOLUME -> InstallVolumeSetting | the InstallVolume record has the name
+CognosSource.ZIP -> ZipSetting | the Zip record has the name
+CognosSource.ZIP_URL -> ZipUrlSetting | the ZipUrl record has the name
+PawSource.ZIP -> ZipSetting | the Zip property (Java's record component zip()) has the name
+PawContainer.ACCEPT_LICENSE -> AcceptLicenseSetting | the AcceptLicense() method has the name
+CognosContainer.NAMESPACE -> NamespaceId | the Namespace enum has the name
+PlanningAnalyticsEnvironment.Builder -> EnvironmentBuilder | the Builder() method has the name

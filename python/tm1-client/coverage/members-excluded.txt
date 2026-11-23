@@ -1,0 +1,20 @@
+# Java members the Python client doesn't have, or names another way, as:
+#   <Java type>.<member> | <reason>
+#   <Java type>.<member or type> -> <Python name> | <reason>
+# Read by api-site/scripts/members.mjs, which fails the docs build on a Java member that is neither
+# found by the parity tests' naming rule nor listed here, and on a line here that is wrong or stale.
+Tm1Session.Builder.jsonMapper | Jackson's ObjectMapper is Java's: Python reads JSON with the standard library
+Tm1Session.Builder.observationRegistry | Micrometer's ObservationRegistry is Java's: there is no Micrometer here
+Tm1Session.Builder.webClient | Spring's WebClient is Java's HTTP client: Python takes an httpx2 client instead (http_client)
+Tm1Session.Builder.connector | Reactor Netty's ClientHttpConnector is Java's: Python takes an httpx2 client instead (http_client)
+Tm1Client.Builder.jsonMapper | Jackson's ObjectMapper is Java's: Python reads JSON with the standard library
+Tm1Client.Builder.observationRegistry | Micrometer's ObservationRegistry is Java's: there is no Micrometer here
+Tm1Client.Builder.webClient | Spring's WebClient is Java's HTTP client: Python takes an httpx2 client instead (http_client)
+Tm1Client.Builder.connector | Reactor Netty's ClientHttpConnector is Java's: Python takes an httpx2 client instead (http_client)
+Tm1SessionPool.Builder.scheduler | Reactor's Scheduler is Java's: Python's pool runs on asyncio and takes a clock (clock) for tests
+Tm1Capabilities.of | Takes tm1-csdl's CsdlDocument, a Java library: Python reads $metadata itself (parse) and keeps no document
+Tm1Capabilities.metadata | Returns tm1-csdl's CsdlDocument, a Java library: Python reads $metadata itself (parse) and keeps no document
+ODataError.from -> from_json | from is a Python keyword; it takes the parsed JSON, as Java's takes a JsonNode
+ODataLiterals.Raw.odataLiteral | literal() writes a Raw by its literal field; Python's ODataLiteral is a duck-typed odata_literal(), which Raw doesn't need
+Tm1Session.async -> async_every | async is a Python keyword
+Tm1Version.compareTo | Python compares versions with <, <= and the rest (functools.total_ordering)

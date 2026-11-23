@@ -1,0 +1,16 @@
+# Java members the TypeScript client doesn't have, or names another way, as:
+#   <Java type>.<member> | <reason>
+#   <Java type>.<member or type> -> <TypeScript name> | <reason>
+# Read by api-site/scripts/members.mjs, which fails the docs build on a Java member that is neither
+# found by the parity tests' naming rule nor listed here, and on a line here that is wrong or stale.
+Tm1Session.Builder.jsonMapper | Jackson's ObjectMapper is Java's: TypeScript reads JSON with JSON.parse
+Tm1Session.Builder.observationRegistry | Micrometer's ObservationRegistry is Java's: there is no Micrometer here
+Tm1Session.Builder.webClient | Spring's WebClient is Java's HTTP client: TypeScript takes a transport instead (transport)
+Tm1Session.Builder.connector | Reactor Netty's ClientHttpConnector is Java's: TypeScript takes a transport instead (transport)
+Tm1Client.Builder.jsonMapper | Jackson's ObjectMapper is Java's: TypeScript reads JSON with JSON.parse
+Tm1Client.Builder.observationRegistry | Micrometer's ObservationRegistry is Java's: there is no Micrometer here
+Tm1Client.Builder.webClient | Spring's WebClient is Java's HTTP client: TypeScript takes a transport instead (transport)
+Tm1Client.Builder.connector | Reactor Netty's ClientHttpConnector is Java's: TypeScript takes a transport instead (transport)
+Tm1SessionPool.Builder.scheduler | Reactor's Scheduler is Java's: TypeScript's pool takes a clock (clock) for tests
+Tm1Capabilities.of | Takes tm1-csdl's CsdlDocument, a Java library: TypeScript reads $metadata itself (parse) and keeps no document
+Tm1Capabilities.metadata | Returns tm1-csdl's CsdlDocument, a Java library: TypeScript reads $metadata itself (parse) and keeps no document

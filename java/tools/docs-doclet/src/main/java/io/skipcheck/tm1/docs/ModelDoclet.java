@@ -195,7 +195,11 @@ public final class ModelDoclet implements Doclet {
 		json.field("deprecated", this.elements.isDeprecated(type));
 		json.key("members").open('[');
 		for (Element member : type.getEnclosedElements()) {
-			if (member.getModifiers().contains(Modifier.PUBLIC) || type.getKind() == ElementKind.INTERFACE
+			// An interface's members are public unless they say private (Java 9's private
+			// helper methods)
+			boolean inInterface = type.getKind() == ElementKind.INTERFACE
+					&& !member.getModifiers().contains(Modifier.PRIVATE);
+			if (member.getModifiers().contains(Modifier.PUBLIC) || inInterface
 					|| member.getKind() == ElementKind.ENUM_CONSTANT) {
 				member(json, type, member);
 			}
