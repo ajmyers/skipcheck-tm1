@@ -10,8 +10,8 @@ from typing import Any
 import httpx
 import pytest
 
-from tm1_client import ODataPath, ODataQuery
-from tm1_client.model import (
+from skipcheck_tm1 import ODataPath, ODataQuery
+from skipcheck_tm1.model import (
     ChoreExecutionMode,
     ChorePatch,
     ChoreTaskParameterPatch,

@@ -25,7 +25,7 @@ CAPABILITIES: dict[tuple[str, str], Any] = {}
 
 
 def as_call(request: Any) -> p.Call:
-    """A :class:`~tm1_client.request.Tm1Request` as a call; a call as is."""
+    """A :class:`~skipcheck_tm1.request.Tm1Request` as a call; a call as is."""
     return request if isinstance(request, p.Call) else request.to_call()
 
 

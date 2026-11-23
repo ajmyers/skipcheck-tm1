@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "tm1-client"
+name = "skipcheck-tm1"
 version = "0.1.0.dev0"
 description = "Python client for the IBM Planning Analytics (TM1) REST API, generated from its $metadata"
 readme = "README.md"
@@ -19,16 +19,16 @@ dependencies = [
 test = ["pytest>=8", "ruff==0.17.6"]
 
 [tool.hatch.build.hooks.custom]
-# hatch_build.py generates src/tm1_client/_generated from ../spec/tm1-api.json, and
-# src/tm1_client/_sync (the sync flavor) from src/tm1_client/aio
+# hatch_build.py generates src/skipcheck_tm1/_generated from ../spec/tm1-api.json, and
+# src/skipcheck_tm1/_sync (the sync flavor) from src/skipcheck_tm1/aio
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/tm1_client"]
-artifacts = ["src/tm1_client/_generated/*.py", "src/tm1_client/_sync/**/*.py"]
+packages = ["src/skipcheck_tm1"]
+artifacts = ["src/skipcheck_tm1/_generated/*.py", "src/skipcheck_tm1/_sync/**/*.py"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src", "codegen", "tests", "coverage", "hatch_build.py"]
-exclude = ["src/tm1_client/_generated", "src/tm1_client/_sync"]
+exclude = ["src/skipcheck_tm1/_generated", "src/skipcheck_tm1/_sync"]
 
 [tool.hatch.build.targets.sdist.force-include]
 # The sdist builds without the repository, so it takes the spec along

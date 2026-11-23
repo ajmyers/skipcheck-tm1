@@ -10,7 +10,7 @@ from contextlib import contextmanager
 
 import pytest
 
-from tm1_client import (
+from skipcheck_tm1 import (
     Filter,
     ODataPath,
     ODataQuery,
@@ -20,8 +20,8 @@ from tm1_client import (
     Tm1PreconditionFailedError,
     Tm1Request,
 )
-from tm1_client._sync.services.dimension import SubsetScope
-from tm1_client.model import (
+from skipcheck_tm1._sync.services.dimension import SubsetScope
+from skipcheck_tm1.model import (
     Dimension,
     DimensionPatch,
     EdgePatch,

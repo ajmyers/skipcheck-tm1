@@ -9,10 +9,10 @@ from typing import Any
 import httpx
 import pytest
 
-from tm1_client import ODataQuery, Tm1NotFoundError
-from tm1_client.aio.services.cube import ViewScope
-from tm1_client.aio.services.data import Tuples
-from tm1_client.model import (
+from skipcheck_tm1 import ODataQuery, Tm1NotFoundError
+from skipcheck_tm1.aio.services.cube import ViewScope
+from skipcheck_tm1.aio.services.data import Tuples
+from skipcheck_tm1.model import (
     CellsetCell,
     CellsetUpdatePatch,
     ConflictResolution,
@@ -332,8 +332,8 @@ def test_begins_ends_and_undoes(api: Api, fake: FakeTm1) -> None:
 
 
 def test_within_records_the_work_and_ends_however_it_finishes(api: Api, fake: FakeTm1) -> None:
-    from tm1_client import Tm1Client
-    from tm1_client.aio import AsyncTm1Client
+    from skipcheck_tm1 import Tm1Client
+    from skipcheck_tm1.aio import AsyncTm1Client
 
     _change_set_server(fake)
     if api.flavor == "async":
@@ -368,7 +368,7 @@ def test_within_records_the_work_and_ends_however_it_finishes(api: Api, fake: Fa
 
 def test_within_does_no_work_if_the_change_set_cant_begin(api: Api, fake: FakeTm1) -> None:
     # Java: doesNoWorkIfTheChangeSetCantBegin
-    from tm1_client import Tm1ServerError
+    from skipcheck_tm1 import Tm1ServerError
 
     fake.respond = lambda request: httpx.Response(500, json={"error": {"code": "1", "message": "down"}})
     ran = []
@@ -387,7 +387,7 @@ def test_within_does_no_work_if_the_change_set_cant_begin(api: Api, fake: FakeTm
 
 
 def test_recording_is_within_as_a_context_manager(client: Any, fake: FakeTm1) -> None:
-    from tm1_client import Tm1Client
+    from skipcheck_tm1 import Tm1Client
 
     _change_set_server(fake)
     with pytest.raises(RuntimeError):
@@ -457,7 +457,7 @@ def test_reads_rowsets(api: Api, fake: FakeTm1) -> None:
 
 def test_operations_are_checked_against_the_server(api: Api, fake: FakeTm1) -> None:
     """Every operation request requires its capability, so a server without it refuses first."""
-    from tm1_client import Tm1UnsupportedOperationError
+    from skipcheck_tm1 import Tm1UnsupportedOperationError
 
     fake.metadata = fake.metadata.replace(b'Name="ExecuteMDXStatement"', b'Name="SomethingElse"')
     with pytest.raises(Tm1UnsupportedOperationError, match="ExecuteMDXStatement"):

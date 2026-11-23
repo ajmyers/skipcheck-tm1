@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from tm1_client import Tm1BadRequestError, Tm1Client, Tm1Error
-from tm1_client.model import EncryptionFileType, LocalKeyFileProviderSettingsPatch
+from skipcheck_tm1 import Tm1BadRequestError, Tm1Client, Tm1Error
+from skipcheck_tm1.model import EncryptionFileType, LocalKeyFileProviderSettingsPatch
 
 from .conftest import CONFIGURED, REASON
 

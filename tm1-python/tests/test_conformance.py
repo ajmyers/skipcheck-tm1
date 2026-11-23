@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from tm1_client.odata import ODataPath, literal
+from skipcheck_tm1.odata import ODataPath, literal
 
 from .conftest import CONFORMANCE
 

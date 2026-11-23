@@ -10,8 +10,8 @@ from typing import Any
 
 import httpx
 
-from tm1_client import ODataQuery
-from tm1_client.model import LogLevel, Server, ServerSettingsPatch
+from skipcheck_tm1 import ODataQuery
+from skipcheck_tm1.model import LogLevel, Server, ServerSettingsPatch
 
 from ..conftest import Api, FakeTm1, target
 

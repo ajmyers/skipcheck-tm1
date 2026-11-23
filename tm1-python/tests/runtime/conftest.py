@@ -12,13 +12,13 @@ from typing import Any
 import httpx
 import pytest
 
-import tm1_client
-import tm1_client.aio
+import skipcheck_tm1
+import skipcheck_tm1.aio
 
 from ..conftest import BASE, FakeTm1
 
 # The Java tests' requests
-SERVER = tm1_client.Tm1Request.get(tm1_client.ODataPath.of("Server"), tm1_client.ODataQuery.none().select("Name"), dict)
+SERVER = skipcheck_tm1.Tm1Request.get(skipcheck_tm1.ODataPath.of("Server"), skipcheck_tm1.ODataQuery.none().select("Name"), dict)
 
 
 def json_response(status: int, body: Any = None, *cookies: str) -> httpx.Response:
@@ -68,20 +68,20 @@ class Runtime:
 
     @property
     def m(self) -> Any:
-        """The flavor's module: ``tm1_client`` or ``tm1_client.aio``."""
-        return tm1_client if self.flavor == "sync" else tm1_client.aio
+        """The flavor's module: ``skipcheck_tm1`` or ``skipcheck_tm1.aio``."""
+        return skipcheck_tm1 if self.flavor == "sync" else skipcheck_tm1.aio
 
     @property
     def Session(self) -> Any:  # noqa: N802
-        return tm1_client.Tm1Session if self.flavor == "sync" else tm1_client.aio.AsyncTm1Session
+        return skipcheck_tm1.Tm1Session if self.flavor == "sync" else skipcheck_tm1.aio.AsyncTm1Session
 
     @property
     def Pool(self) -> Any:  # noqa: N802
-        return tm1_client.Tm1SessionPool if self.flavor == "sync" else tm1_client.aio.AsyncTm1SessionPool
+        return skipcheck_tm1.Tm1SessionPool if self.flavor == "sync" else skipcheck_tm1.aio.AsyncTm1SessionPool
 
     @property
     def Client(self) -> Any:  # noqa: N802
-        return tm1_client.Tm1Client if self.flavor == "sync" else tm1_client.aio.AsyncTm1Client
+        return skipcheck_tm1.Tm1Client if self.flavor == "sync" else skipcheck_tm1.aio.AsyncTm1Client
 
     def http(self) -> Any:
         transport = httpx.MockTransport(self.fake.handler)

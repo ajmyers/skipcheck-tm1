@@ -1,4 +1,4 @@
-"""Emits ``tm1_client/_generated/model.py``: an enum per CSDL enum type and a pydantic model
+"""Emits ``skipcheck_tm1/_generated/model.py``: an enum per CSDL enum type and a pydantic model
 per entity and complex type, the Python counterpart of the Java client's generated model."""
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ def emit(spec: Spec) -> str:
         "",
         "Every field is optional: ``$select`` can leave any property out, and navigation properties",
         "are only there when expanded. Fields are named in snake_case; TM1's names are their aliases,",
-        "and either is accepted. Writes send only the fields set (see :mod:`tm1_client.base`).",
+        "and either is accepted. Writes send only the fields set (see :mod:`skipcheck_tm1.base`).",
         '"""',
         "",
         "from __future__ import annotations",
@@ -125,7 +125,7 @@ def emit(spec: Spec) -> str:
         if e["kind"] == "Navigation" and e["ownerKind"] == "complex":
             owner = spec.type_by_name[e["owner"]]
             fname = field_names(spec, owner)[("n", e["name"])]
-            out.append(f'register_endpoint("{e["id"]}", "tm1_client._generated.model.{owner["name"]}.{fname} ($expand)")')
+            out.append(f'register_endpoint("{e["id"]}", "skipcheck_tm1._generated.model.{owner["name"]}.{fname} ($expand)")')
     out.append("")
     return "\n".join(out)
 
@@ -218,7 +218,7 @@ def _model(spec: Spec, t: dict[str, Any]) -> list[str]:
         out.append(f'    {name}: {tp} | None = Field(None, alias="{n["name"]}")')
         doc = (n.get("description") or f"The ``{n['name']}`` navigation property.") + " (When expanded.)"
         if spec.is_entity(n["type"]):
-            doc += " To refer to existing entities in a write, set :class:`~tm1_client.odata.Bind` values."
+            doc += " To refer to existing entities in a write, set :class:`~skipcheck_tm1.odata.Bind` values."
         out.extend(docstring(doc + revisions(n), "    "))
         constants.append((names.constant(n["name"]), n["name"]))
     if constants:

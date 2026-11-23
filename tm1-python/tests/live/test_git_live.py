@@ -16,9 +16,9 @@ from typing import Any
 
 import pytest
 
-from tm1_client import Tm1BadRequestError, Tm1Client, Tm1Error, Tm1NotFoundError
-from tm1_client._sync.services.git import GitCommitDetails, GitCredentials
-from tm1_client.model import DimensionPatch, ElementPatch, GitPushPlan, HierarchyPatch
+from skipcheck_tm1 import Tm1BadRequestError, Tm1Client, Tm1Error, Tm1NotFoundError
+from skipcheck_tm1._sync.services.git import GitCommitDetails, GitCredentials
+from skipcheck_tm1.model import DimensionPatch, ElementPatch, GitPushPlan, HierarchyPatch
 
 from .conftest import _RUNNING, CONFIGURED, REASON
 
@@ -69,7 +69,7 @@ class GitDaemon:
         from testcontainers.core.container import DockerContainer
         from testcontainers.core.waiting_utils import wait_for_logs
 
-        from tm1_testcontainers import Tm1ServerContainer
+        from skipcheck_tm1_testcontainers import Tm1ServerContainer
 
         tm1 = Tm1ServerContainer.shared()
         container = DockerContainer("alpine:3.21").with_kwargs(network_mode=f"container:{tm1.container_id}")

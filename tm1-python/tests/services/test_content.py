@@ -7,10 +7,10 @@ import json
 import httpx
 import pytest
 
-from tm1_client import ODataPath, ODataQuery
-from tm1_client._sync.services.content import ContentPath, ContentScope
-from tm1_client.aio.services.content import ContentPath as AsyncContentPath
-from tm1_client.model import CubeReference, CubeReferencePatch, DocumentReference, Folder, FolderPatch, LinkPatch
+from skipcheck_tm1 import ODataPath, ODataQuery
+from skipcheck_tm1._sync.services.content import ContentPath, ContentScope
+from skipcheck_tm1.aio.services.content import ContentPath as AsyncContentPath
+from skipcheck_tm1.model import CubeReference, CubeReferencePatch, DocumentReference, Folder, FolderPatch, LinkPatch
 
 from ..conftest import Api, FakeTm1, target
 

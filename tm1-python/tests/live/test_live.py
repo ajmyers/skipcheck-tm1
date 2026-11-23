@@ -9,9 +9,9 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from tm1_client import ODataQuery, Tm1ApiError, Tm1Client, Tm1ProtocolError, odata
-from tm1_client._generated import index
-from tm1_client.model import Cube, CubeUpdate, Dimension, Edge, Element, ElementType, Hierarchy
+from skipcheck_tm1 import ODataQuery, Tm1ApiError, Tm1Client, Tm1ProtocolError, odata
+from skipcheck_tm1._generated import index
+from skipcheck_tm1.model import Cube, CubeUpdate, Dimension, Edge, Element, ElementType, Hierarchy
 
 from ..conftest import SPEC
 from .conftest import CONFIGURED, REASON
@@ -99,7 +99,7 @@ def test_a_dimension_a_cube_and_a_cell(tm1: Tm1Client, name: str) -> None:
 
 
 def test_a_sandbox_keeps_its_writes_to_itself(tm1: Tm1Client, name: str) -> None:
-    from tm1_client.model import Sandbox
+    from skipcheck_tm1.model import Sandbox
 
     tm1.api.sandboxes.create(Sandbox(name=name))
     try:

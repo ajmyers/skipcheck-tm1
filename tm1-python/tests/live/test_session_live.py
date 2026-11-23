@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from tm1_client import (
+from skipcheck_tm1 import (
     ODataPath,
     ODataQuery,
     Tm1ApiError,
@@ -83,7 +83,7 @@ def test_reads_the_server_and_closes_its_session_leaving_none_behind(admin: Tm1S
 
 def test_shares_one_login_between_concurrent_first_requests(admin: Tm1Session) -> None:
     async def run() -> set[int]:
-        from tm1_client.aio import AsyncTm1Session
+        from skipcheck_tm1.aio import AsyncTm1Session
 
         async with _builder(AsyncTm1Session.builder()).build() as s:
             await asyncio.gather(*(s.execute(SERVER) for _ in range(5)))
@@ -220,7 +220,7 @@ def test_reads_the_version_and_the_capabilities_the_snapshot_describes(admin: Tm
     caps = admin.capabilities()
     assert caps.product_version == version
     if caps.schema_version == "11.8.35":
-        from tm1_client.version import Tm1Capabilities
+        from skipcheck_tm1.version import Tm1Capabilities
 
         assert caps.endpoints == Tm1Capabilities.parse(SNAPSHOT.read_bytes()).endpoints
 

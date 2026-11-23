@@ -20,8 +20,8 @@ from typing import Any
 import httpx
 import pytest
 
-from tm1_client import Bind
-from tm1_client._generated import index, model
+from skipcheck_tm1 import Bind
+from skipcheck_tm1._generated import index, model
 
 from .conftest import SPEC, Api, FakeTm1, target
 

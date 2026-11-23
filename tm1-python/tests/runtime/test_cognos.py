@@ -10,8 +10,8 @@ from typing import Any
 import httpx
 import pytest
 
-from tm1_client import Tm1AuthenticationError, Tm1ErrorKind, auth
-from tm1_client.aio import cognos as aio_cognos
+from skipcheck_tm1 import Tm1AuthenticationError, Tm1ErrorKind, auth
+from skipcheck_tm1.aio import cognos as aio_cognos
 
 
 class Cognos:

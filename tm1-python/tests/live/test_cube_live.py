@@ -10,9 +10,9 @@ from typing import Any
 
 import pytest
 
-from tm1_client import ODataPath, ODataQuery, Tm1Client, Tm1NotFoundError, Tm1PreconditionFailedError, Tm1Request
-from tm1_client.aio.services.cube import ViewScope
-from tm1_client.model import (
+from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client, Tm1NotFoundError, Tm1PreconditionFailedError, Tm1Request
+from skipcheck_tm1.aio.services.cube import ViewScope
+from skipcheck_tm1.model import (
     CheckFeedersSelection,
     Cube,
     CubePatch,

@@ -14,7 +14,7 @@ What a resource offers follows OData's rules, made safe:
   group), so it's refused here.
 * The overlay (``spec/tm1-overlay.json``) can forbid more.
 
-The requests are built in :mod:`tm1_client._calls`; these classes only send them.
+The requests are built in :mod:`skipcheck_tm1._calls`; these classes only send them.
 """
 
 from __future__ import annotations

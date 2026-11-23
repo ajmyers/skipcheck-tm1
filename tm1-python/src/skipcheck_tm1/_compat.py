@@ -1,7 +1,7 @@
 """The few primitives the asyncio and sync flavors do differently.
 
-The asyncio code (:mod:`tm1_client.aio`) is the source of truth; the sync flavor
-(``tm1_client._sync``) is generated from it by ``tm1_pygen.unasync``, which turns
+The asyncio code (:mod:`skipcheck_tm1.aio`) is the source of truth; the sync flavor
+(``skipcheck_tm1._sync``) is generated from it by ``tm1_pygen.unasync``, which turns
 ``AsyncIO`` into ``SyncIO``, drops ``async`` and ``await``, and renames ``Async*`` types.
 """
 

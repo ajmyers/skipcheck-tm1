@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from tm1_testcontainers import CognosSource, PawContainer, PawSource, Tm1Source, Tm1WebSource
+from skipcheck_tm1_testcontainers import CognosSource, PawContainer, PawSource, Tm1Source, Tm1WebSource
 
 # --- CognosSourceTest --------------------------------------------------------------------------
 

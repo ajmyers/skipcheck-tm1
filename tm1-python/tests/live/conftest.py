@@ -22,14 +22,14 @@ from typing import Any
 
 import pytest
 
-from tm1_client import Tm1Client
+from skipcheck_tm1 import Tm1Client
 
 _RUNNING = os.environ.get("TM1_URL")
 _ALREADY_RUNNING = " Or set TM1_URL for a server that's already running."
 
 try:
-    from tm1_testcontainers import RequiresTm1, Tm1ServerContainer, Tm1Source, docker_available
-    from tm1_testcontainers.plugin import NO_DOCKER_MESSAGE
+    from skipcheck_tm1_testcontainers import RequiresTm1, Tm1ServerContainer, Tm1Source, docker_available
+    from skipcheck_tm1_testcontainers.plugin import NO_DOCKER_MESSAGE
 except ImportError:  # tm1-testcontainers isn't installed: only TM1_URL
     _SOURCE = None
     CONFIGURED = bool(_RUNNING)
@@ -55,7 +55,7 @@ def target() -> tuple[str, str, str]:
 
 
 def _builder(builder: Any) -> Any:
-    from tm1_client import auth
+    from skipcheck_tm1 import auth
 
     url, user, password = target()
     namespace = os.environ.get("TM1_NAMESPACE") if _RUNNING else None
@@ -70,7 +70,7 @@ def client() -> Tm1Client:
 
 def async_client() -> Any:
     """A new asyncio client of the configured TM1."""
-    from tm1_client.aio import AsyncTm1Client
+    from skipcheck_tm1.aio import AsyncTm1Client
 
     return _builder(AsyncTm1Client.builder()).build()
 

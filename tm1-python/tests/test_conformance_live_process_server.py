@@ -12,8 +12,8 @@ from typing import Any
 import httpx
 import pytest
 
-from tm1_client import Tm1Client, Tm1Session, auth
-from tm1_client.aio import AsyncTm1Client, AsyncTm1Session
+from skipcheck_tm1 import Tm1Client, Tm1Session, auth
+from skipcheck_tm1.aio import AsyncTm1Client, AsyncTm1Session
 
 from . import conformance_live as live
 from .conftest import BASE, FakeTm1

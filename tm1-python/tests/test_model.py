@@ -13,8 +13,8 @@ from typing import Any
 import pytest
 from pydantic import TypeAdapter
 
-from tm1_client import Bind
-from tm1_client._generated import model as m
+from skipcheck_tm1 import Bind
+from skipcheck_tm1._generated import model as m
 
 from .conftest import PAYLOADS
 
@@ -178,7 +178,7 @@ def test_durations_read_tm1s_way_and_write_iso() -> None:
 
 def test_field_constants_name_tm1s_properties() -> None:
     """As the Java model's ``Cube.NAME``: ODataProperty constants, for queries and filters."""
-    from tm1_client.odata import ODataProperty, ODataQuery
+    from skipcheck_tm1.odata import ODataProperty, ODataQuery
 
     assert m.Cube.NAME == ODataProperty("Name")
     assert m.Cube.DRILLTHROUGH_RULES.path() == "DrillthroughRules"

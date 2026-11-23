@@ -312,7 +312,7 @@ class AsyncTm1Batch:
             b = await batch.client.cubes.get("B")
         print(a.result().name, b.result().name)
 
-    Each call returns a :class:`~tm1_client._protocol.Deferred`, its result there once the
+    Each call returns a :class:`~skipcheck_tm1._protocol.Deferred`, its result there once the
     batch has run: its own value, or the error TM1 answered it with.
     """
 

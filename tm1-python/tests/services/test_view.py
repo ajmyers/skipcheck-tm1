@@ -7,9 +7,9 @@ import json
 import httpx
 import pytest
 
-from tm1_client import ODataPath, ODataQuery, Tm1PreconditionFailedError
-from tm1_client.aio.services.cube import ViewScope
-from tm1_client.model import MDXView, MDXViewPatch, NativeView, NativeViewPatch, ViewAxisSelectionPatch, ViewTitlePatch
+from skipcheck_tm1 import ODataPath, ODataQuery, Tm1PreconditionFailedError
+from skipcheck_tm1.aio.services.cube import ViewScope
+from skipcheck_tm1.model import MDXView, MDXViewPatch, NativeView, NativeViewPatch, ViewAxisSelectionPatch, ViewTitlePatch
 
 from ..conftest import Api, FakeTm1, target
 

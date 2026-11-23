@@ -8,7 +8,7 @@ import json
 import httpx
 import pytest
 
-from tm1_client import (
+from skipcheck_tm1 import (
     ODataQuery,
     Tm1Client,
     Tm1ErrorKind,
@@ -18,7 +18,7 @@ from tm1_client import (
     Tm1UnsupportedOperationError,
     auth,
 )
-from tm1_client._generated import model as m
+from skipcheck_tm1._generated import model as m
 
 from .conftest import BASE, FakeTm1, target
 
@@ -37,7 +37,7 @@ def test_logs_in_once_then_sends_only_the_cookie(client: Tm1Client, fake: FakeTm
 
 def test_sends_the_java_clients_headers(session: Tm1Session, fake: FakeTm1) -> None:
     """The headers the Java client's ``Connection.odataHeaders`` sends, exactly."""
-    from tm1_client import ODataPath, Tm1Request
+    from skipcheck_tm1 import ODataPath, Tm1Request
 
     cubes = ODataPath.of("Cubes")
     fake.respond = lambda r: {"Name": "c"}
@@ -120,7 +120,7 @@ def test_reads_a_400_that_means_not_found_as_not_found(client: Tm1Client, fake: 
 
 
 def test_creates_with_binds(client: Tm1Client, fake: FakeTm1) -> None:
-    from tm1_client import Bind
+    from skipcheck_tm1 import Bind
 
     fake.respond = lambda r: {"Name": "c"}
     created = client.api.cubes.create(m.Cube(name="c", dimensions=[Bind("Dimensions('a')"), Bind("Dimensions('b')")]))
@@ -161,7 +161,7 @@ def test_a_compound_key(client: Tm1Client, fake: FakeTm1) -> None:
 
 
 def test_the_generated_api_takes_patches_too(client: Tm1Client, fake: FakeTm1) -> None:
-    from tm1_client.model import CubePatch, ProcessPatch
+    from skipcheck_tm1.model import CubePatch, ProcessPatch
 
     fake.respond = lambda r: {"Name": "p"}
     client.api.processes.create(ProcessPatch.builder().name("p").build())

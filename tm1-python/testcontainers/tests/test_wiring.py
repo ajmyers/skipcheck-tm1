@@ -7,7 +7,7 @@ import base64
 
 import pytest
 
-from tm1_testcontainers import (
+from skipcheck_tm1_testcontainers import (
     CognosContainer,
     CognosSource,
     KeycloakContainer,

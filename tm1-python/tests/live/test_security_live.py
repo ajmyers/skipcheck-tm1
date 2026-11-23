@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from tm1_client import (
+from skipcheck_tm1 import (
     ODataPath,
     Tm1Client,
     Tm1Error,
@@ -21,7 +21,7 @@ from tm1_client import (
     Tm1ServerError,
     auth,
 )
-from tm1_client.model import ProcessPatch, UserPatch, UserType
+from skipcheck_tm1.model import ProcessPatch, UserPatch, UserType
 
 from .conftest import CONFIGURED, REASON, _builder
 

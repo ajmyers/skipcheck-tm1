@@ -7,7 +7,7 @@
 line-length = 160
 target-version = "py310"
 # Generated at build time, never committed: the model and API from the spec, and the sync flavor
-extend-exclude = ["src/tm1_client/_generated", "src/tm1_client/_sync", "build"]
+extend-exclude = ["src/skipcheck_tm1/_generated", "src/skipcheck_tm1/_sync", "build"]
 
 # Where the packages are, and that they're ours whether or not the generated modules exist yet:
 # import order mustn't depend on having built
@@ -15,7 +15,7 @@ src = ["src", "testcontainers/src"]
 
 [lint]
 select = ["E", "F", "W", "I", "B", "UP"]
-isort.known-first-party = ["tm1_client", "tm1_testcontainers"]
+isort.known-first-party = ["skipcheck_tm1", "skipcheck_tm1_testcontainers"]
 ignore = [
     # The formatter lays code out; what it leaves long is a string or a comment it won't break
     "E501",

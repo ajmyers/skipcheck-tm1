@@ -6,7 +6,7 @@ import json
 
 import httpx
 
-from tm1_client.model import AnnotationPatch
+from skipcheck_tm1.model import AnnotationPatch
 
 from ..conftest import Api, FakeTm1, target
 

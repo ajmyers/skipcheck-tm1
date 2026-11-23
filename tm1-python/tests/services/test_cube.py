@@ -8,8 +8,8 @@ import json
 import httpx
 import pytest
 
-from tm1_client import Filter, ODataPath, ODataQuery, Tm1PreconditionFailedError
-from tm1_client.model import CheckFeedersSelection, Cube, CubePatch
+from skipcheck_tm1 import Filter, ODataPath, ODataQuery, Tm1PreconditionFailedError
+from skipcheck_tm1.model import CheckFeedersSelection, Cube, CubePatch
 
 from ..conftest import Api, FakeTm1, target
 

@@ -24,8 +24,8 @@ from typing import Any
 
 import pytest
 
-import tm1_testcontainers
-from tm1_testcontainers import plugin
+import skipcheck_tm1_testcontainers
+from skipcheck_tm1_testcontainers import plugin
 
 ROOT = Path(__file__).resolve().parents[3]
 JAVA = ROOT / "tm1-testcontainers" / "src" / "main" / "java" / "io" / "skipcheck" / "tm1" / "testcontainers"
@@ -133,7 +133,7 @@ JAVA_TYPES = java_types()
 
 
 def python_type(path: str) -> Any:
-    obj: Any = tm1_testcontainers
+    obj: Any = skipcheck_tm1_testcontainers
     for part in path.split("."):
         obj = getattr(obj, part, None)
         if obj is None:
@@ -219,11 +219,11 @@ def _java_message(type_name: str, constant: str) -> str:
 @pytest.mark.parametrize(
     "java,python",
     [
-        (("RequiresTm1", "NO_SOURCE_MESSAGE"), tm1_testcontainers.RequiresTm1.NO_SOURCE_MESSAGE),
-        (("RequiresCognos", "NO_SOURCE_MESSAGE"), tm1_testcontainers.RequiresCognos.NO_SOURCE_MESSAGE),
-        (("RequiresTm1Web", "NO_SOURCE_MESSAGE"), tm1_testcontainers.RequiresTm1Web.NO_SOURCE_MESSAGE),
-        (("RequiresPaw", "NO_SOURCE_MESSAGE"), tm1_testcontainers.RequiresPaw.NO_SOURCE_MESSAGE),
-        (("RequiresPaw", "NO_LICENSE_MESSAGE"), tm1_testcontainers.RequiresPaw.NO_LICENSE_MESSAGE),
+        (("RequiresTm1", "NO_SOURCE_MESSAGE"), skipcheck_tm1_testcontainers.RequiresTm1.NO_SOURCE_MESSAGE),
+        (("RequiresCognos", "NO_SOURCE_MESSAGE"), skipcheck_tm1_testcontainers.RequiresCognos.NO_SOURCE_MESSAGE),
+        (("RequiresTm1Web", "NO_SOURCE_MESSAGE"), skipcheck_tm1_testcontainers.RequiresTm1Web.NO_SOURCE_MESSAGE),
+        (("RequiresPaw", "NO_SOURCE_MESSAGE"), skipcheck_tm1_testcontainers.RequiresPaw.NO_SOURCE_MESSAGE),
+        (("RequiresPaw", "NO_LICENSE_MESSAGE"), skipcheck_tm1_testcontainers.RequiresPaw.NO_LICENSE_MESSAGE),
     ],
 )
 def test_skip_messages_are_javas(java: tuple[str, str], python: str) -> None:
@@ -241,6 +241,6 @@ def test_the_junit_extensions_are_the_plugins_markers_and_fixtures() -> None:
 
 
 def test_paw_local_sh_is_the_repositorys() -> None:
-    from tm1_testcontainers import paw
+    from skipcheck_tm1_testcontainers import paw
 
     assert paw.script() == (ROOT / "docker" / "paw" / "paw-local.sh").read_bytes()

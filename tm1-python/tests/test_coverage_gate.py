@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from tm1_client.resources import implemented_endpoints
+from skipcheck_tm1.resources import implemented_endpoints
 
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED = ROOT / "coverage" / "excluded.txt"

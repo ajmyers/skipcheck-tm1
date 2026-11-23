@@ -2,7 +2,7 @@
 sources themselves (tm1-client/src/main/java/.../service):
 
 * each Java service class is a Python class of the same name, in the module named after its
-  package (``service/cube/CubeService.java`` → ``tm1_client.aio.services.cube.CubeService``);
+  package (``service/cube/CubeService.java`` → ``skipcheck_tm1.aio.services.cube.CubeService``);
 * each public method is a Python method named in snake case (``modelCubes`` → ``model_cubes``),
   implementing the same ``@Tm1Endpoint`` IDs;
 * its parameters, but for the ``ODataQuery`` (which becomes ``query`` and ``**options``), come
@@ -102,8 +102,8 @@ CLASSES = java_classes()
 
 
 def python_class(package: str, name: str) -> type:
-    module = import_module(f"tm1_client.aio.services.{package}")
-    assert hasattr(module, name), f"tm1_client.aio.services.{package} has no {name}"
+    module = import_module(f"skipcheck_tm1.aio.services.{package}")
+    assert hasattr(module, name), f"skipcheck_tm1.aio.services.{package} has no {name}"
     return getattr(module, name)
 
 
@@ -155,7 +155,7 @@ def _subsequence(expected: list[str], got: list[str]) -> bool:
 
 
 def test_the_client_has_every_service() -> None:
-    from tm1_client.aio import AsyncTm1Client
+    from skipcheck_tm1.aio import AsyncTm1Client
 
     methods = java_methods(JAVA / "Tm1Client.java")
     services = [

@@ -123,7 +123,7 @@ class GenericContainer(DockerContainer):
     """A container, as Testcontainers for Java's ``GenericContainer``: configured without Docker,
     started with its dependencies, and reusable."""
 
-    _log = logging.getLogger("tm1_testcontainers")
+    _log = logging.getLogger("skipcheck_tm1_testcontainers")
 
     def __init__(self, image: str, docker_client_kw: dict[str, Any] | None = None) -> None:
         # DockerContainer's attributes, without its connecting to Docker: Java's containers are

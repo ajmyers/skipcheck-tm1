@@ -87,7 +87,7 @@ def cam_passport(passport: Callable[[], Any]) -> Authenticator:
 def cognos_logon(dispatcher: str, namespace: str, user: str, password: str, **options: Any) -> Authenticator:
     """CAM security with a passport the client gets from Cognos, by user name and password: a
     fresh one for each login; TM1 never sees the password. For the asyncio flavor, see
-    :func:`tm1_client.aio.cognos.cognos_logon`."""
+    :func:`skipcheck_tm1.aio.cognos.cognos_logon`."""
     from ._sync.cognos import cognos_logon as logon
 
     return logon(dispatcher, namespace, user, password, **options)
@@ -101,7 +101,7 @@ def cognos_id_token(dispatcher: str, namespace: str, id_token: Callable[[], str]
 
 
 def __getattr__(name: str) -> Any:
-    # CognosPassports is the sync flavor's, generated from tm1_client.aio.cognos
+    # CognosPassports is the sync flavor's, generated from skipcheck_tm1.aio.cognos
     if name == "CognosPassports":
         from ._sync.cognos import CognosPassports
 

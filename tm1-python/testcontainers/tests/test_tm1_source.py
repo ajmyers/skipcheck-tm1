@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from tm1_testcontainers import Tm1ServerContainer, Tm1Source
+from skipcheck_tm1_testcontainers import Tm1ServerContainer, Tm1Source
 
 
 def discover(settings: dict[str, str]) -> Tm1Source | None:
@@ -115,7 +115,7 @@ def test_mounts_each_source_as_the_image_takes_it(tmp_path: Path, monkeypatch: p
 
 
 def test_logs_in_as_the_seeds_user() -> None:
-    from tm1_testcontainers import Tm1Seed
+    from skipcheck_tm1_testcontainers import Tm1Seed
 
     tm1 = Tm1ServerContainer(Tm1Source.PrivateImage("me/tm1")).with_seed(Tm1Seed.SDATA)
     assert tm1.env["TM1_SEED"] == "sdata"

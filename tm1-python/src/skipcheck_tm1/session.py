@@ -1,4 +1,4 @@
-"""The session (sync flavor), generated from :mod:`tm1_client.aio.session`; see there."""
+"""The session (sync flavor), generated from :mod:`skipcheck_tm1.aio.session`; see there."""
 
 from ._sync.pool import Tm1PoolStats, Tm1SessionPool, Tm1SessionPoolBuilder
 from ._sync.session import Tm1Session, Tm1SessionBatch, Tm1SessionBuilder

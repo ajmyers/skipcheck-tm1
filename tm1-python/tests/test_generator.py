@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-from tm1_client._generated import aio_api, api
+from skipcheck_tm1._generated import aio_api, api
 
 from .conftest import SPEC
 
@@ -25,7 +25,7 @@ def test_generates_the_same_code_every_time(tmp_path: Path) -> None:
         sys.path.pop(0)
     assert first == second
     # And it's what the package was built with
-    built = ROOT / "src" / "tm1_client" / "_generated"
+    built = ROOT / "src" / "skipcheck_tm1" / "_generated"
     for name, text in first.items():
         assert (built / name).read_text() == text, f"{name} is stale: reinstall or run tm1_pygen"
 
@@ -90,9 +90,9 @@ def test_unasync_makes_the_sync_flavor() -> None:
 
 
 def test_value_types_are_shared_by_both_flavors() -> None:
-    """Value types live once (tm1_client.values), so a sync ContentScope is an asyncio one too."""
-    from tm1_client import services
-    from tm1_client.aio import services as aio_services
+    """Value types live once (skipcheck_tm1.values), so a sync ContentScope is an asyncio one too."""
+    from skipcheck_tm1 import services
+    from skipcheck_tm1.aio import services as aio_services
 
     for name in ("ContentPath", "ContentScope", "ViewScope", "SubsetScope", "Tuples", "AttributeOwner", "AttributeSet", "GitCredentials", "GitCommitDetails"):
         assert getattr(services, name) is getattr(aio_services, name), name

@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from tm1_client import (
+from skipcheck_tm1 import (
     Filter,
     ODataPath,
     ODataQuery,
@@ -23,7 +23,7 @@ from tm1_client import (
     Tm1PreconditionFailedError,
     Tm1Request,
 )
-from tm1_client.model import (
+from skipcheck_tm1.model import (
     Chore,
     ChoreExecutionMode,
     ChorePatch,

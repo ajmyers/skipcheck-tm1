@@ -13,12 +13,12 @@ from typing import Any
 
 import pydantic
 
-import tm1_client
-from tm1_client import Filter, ODataPath, ODataQuery
-from tm1_client import errors as e
-from tm1_client._generated import model as m
-from tm1_client._generated import patches as p
-from tm1_client.base import Tm1Enum
+import skipcheck_tm1
+from skipcheck_tm1 import Filter, ODataPath, ODataQuery
+from skipcheck_tm1 import errors as e
+from skipcheck_tm1._generated import model as m
+from skipcheck_tm1._generated import patches as p
+from skipcheck_tm1.base import Tm1Enum
 
 SPEC_VERSION = 1
 
@@ -37,7 +37,7 @@ def snake(name: str) -> str:
 
 
 def _services() -> Any:
-    from tm1_client import services
+    from skipcheck_tm1 import services
 
     return services
 
@@ -87,7 +87,7 @@ def decode(value: Any) -> Any:
             raise Unknown(f"no handler {value['$handler']}")
         return _HANDLERS[value["$handler"]]
     if tag == "$type":
-        cls = getattr(_services(), value["$type"], None) or getattr(tm1_client, value["$type"], None)
+        cls = getattr(_services(), value["$type"], None) or getattr(skipcheck_tm1, value["$type"], None)
         if cls is None:
             raise Unknown(f"no type {value['$type']}")
         args = [decode(a) for a in value["args"]]

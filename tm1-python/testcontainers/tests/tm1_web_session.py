@@ -9,7 +9,7 @@ from urllib.parse import urljoin, urlsplit
 
 import httpx
 
-from tm1_testcontainers import Tm1WebContainer
+from skipcheck_tm1_testcontainers import Tm1WebContainer
 
 # One line per callback: "." stops at the line end, so the match ends at its ");"
 _CALLBACK = re.compile(r'handleCallback\("\d+","0",(.*)\);')

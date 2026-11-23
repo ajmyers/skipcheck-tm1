@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 import httpx
 from typing_extensions import Self
 
-from tm1_client import Tm1Version
+from skipcheck_tm1 import Tm1Version
 
 from ._container import GenericContainer, reuse_enabled, share_network, wait_for_http
 from .sources import Tm1Source, setting

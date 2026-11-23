@@ -53,7 +53,7 @@ from ..version import Tm1Capabilities, Tm1Dialect, Tm1Version
 
 __all__ = ["AsyncTm1Session", "AsyncTm1SessionBatch", "AsyncTm1SessionBuilder"]
 
-log = logging.getLogger("tm1_client")
+log = logging.getLogger("skipcheck_tm1")
 
 
 _IDEMPOTENT = ("GET", "PUT", "DELETE", "HEAD")
@@ -635,7 +635,7 @@ class AsyncTm1Session:
 
 class AsyncTm1SessionBatch:
     """A JSON ``$batch``: calls through :attr:`client` (or :attr:`session`) are queued, return
-    :class:`~tm1_client._protocol.Deferred` results, and :meth:`run` sends them together; as a
+    :class:`~skipcheck_tm1._protocol.Deferred` results, and :meth:`run` sends them together; as a
     context manager it runs on leaving the block::
 
         async with tm1.batch() as batch:

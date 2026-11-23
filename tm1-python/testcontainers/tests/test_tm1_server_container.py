@@ -5,8 +5,8 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from tm1_client import Tm1Version
-from tm1_testcontainers import Tm1ServerContainer
+from skipcheck_tm1 import Tm1Version
+from skipcheck_tm1_testcontainers import Tm1ServerContainer
 
 pytestmark = pytest.mark.requires_tm1
 

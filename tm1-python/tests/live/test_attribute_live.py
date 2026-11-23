@@ -13,11 +13,11 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from tm1_client import ODataPath, Tm1BadRequestError, Tm1Client, Tm1Request
-from tm1_client._sync.services.attribute import AttributeOwner, AttributeSet
-from tm1_client._sync.services.cube import ViewScope
-from tm1_client._sync.services.dimension import SubsetScope
-from tm1_client.model import (
+from skipcheck_tm1 import ODataPath, Tm1BadRequestError, Tm1Client, Tm1Request
+from skipcheck_tm1._sync.services.attribute import AttributeOwner, AttributeSet
+from skipcheck_tm1._sync.services.cube import ViewScope
+from skipcheck_tm1._sync.services.dimension import SubsetScope
+from skipcheck_tm1.model import (
     AttributeDefinitionPatch,
     AttributesPatch,
     AttributeType,

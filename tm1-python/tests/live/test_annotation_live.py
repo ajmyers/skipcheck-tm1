@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from tm1_client import ODataQuery, Tm1Client, Tm1NotFoundError
-from tm1_client.model import AnnotationPatch
+from skipcheck_tm1 import ODataQuery, Tm1Client, Tm1NotFoundError
+from skipcheck_tm1.model import AnnotationPatch
 
 from .conftest import CONFIGURED, REASON
 

@@ -10,9 +10,9 @@ from typing import Any
 import httpx
 import pytest
 
-from tm1_client import Tm1Client, Tm1NotFoundError, Tm1Session, Tm1UnsupportedOperationError, auth
-from tm1_client import _protocol as p
-from tm1_client._generated import model as m
+from skipcheck_tm1 import Tm1Client, Tm1NotFoundError, Tm1Session, Tm1UnsupportedOperationError, auth
+from skipcheck_tm1 import _protocol as p
+from skipcheck_tm1._generated import model as m
 
 from .conftest import BASE, SNAPSHOT, Api, FakeTm1, target
 
@@ -28,7 +28,7 @@ def test_sandbox_and_change_set_views_add_tms_options(api: Api, fake: FakeTm1) -
     api.run(api.client.api.cubes["c"].get())
     assert target(fake.last) == "GET Cubes('c')"
     # A request's own option wins
-    from tm1_client import ODataQuery
+    from skipcheck_tm1 import ODataQuery
 
     api.run(view.api.cubes["c"].get(ODataQuery(custom={"!sandbox": "Other"})))
     assert target(fake.last) == "GET Cubes('c')?!sandbox=Other&!ChangeSet=3"
@@ -135,7 +135,7 @@ def test_an_async_result_carries_tms_refusal(api: Api, fake: FakeTm1) -> None:
         return httpx.Response(200, content=_message(500, b'{"error":{"code":"174","message":"TM1UserException: Cancel"}}'))
 
     fake.respond = respond
-    from tm1_client import Tm1ErrorKind, Tm1ServerError
+    from skipcheck_tm1 import Tm1ErrorKind, Tm1ServerError
 
     with pytest.raises(Tm1ServerError) as refused:
         api.run(api.client.with_async(0.001).api.processes["p"].execute())
@@ -167,7 +167,7 @@ def test_async_monitor_messages() -> None:
     reply = p.async_result(_message(201, b'{"a":1}', gzipped=True))
     assert (reply.status, reply.json()) == (201, {"a": 1})
     assert p.async_result(b"HTTP/1.1 204 No Content\r\n\r\n").status == 204
-    from tm1_client import Tm1ProtocolError
+    from skipcheck_tm1 import Tm1ProtocolError
 
     with pytest.raises(Tm1ProtocolError):
         p.async_result(b"not http")
@@ -178,7 +178,7 @@ def test_async_monitor_messages() -> None:
 
 def test_the_metadata_reader_makes_the_specs_inventory(spec: dict[str, Any]) -> None:
     """Python reads $metadata into the same 242 endpoint IDs as the Java client's Endpoints."""
-    from tm1_client.version import Tm1Capabilities
+    from skipcheck_tm1.version import Tm1Capabilities
 
     caps = Tm1Capabilities.parse(SNAPSHOT.read_bytes())
     assert caps.schema_version == "11.8.35"

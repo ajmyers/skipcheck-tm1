@@ -22,7 +22,7 @@ _INIT = '''"""Generated from spec/tm1-api.json by tm1_pygen: don't edit, don't c
 
 
 def generate(spec_path: str | Path, package_dir: str | Path) -> list[Path]:
-    """Writes ``_generated/`` under ``package_dir`` (the ``tm1_client`` directory) from the
+    """Writes ``_generated/`` under ``package_dir`` (the ``skipcheck_tm1`` directory) from the
     spec, and ``_sync/`` from ``aio/`` (the sync flavor of the hand-written code), replacing both."""
     spec = Spec.load(spec_path)
     out = Path(package_dir) / "_generated"

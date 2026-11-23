@@ -42,7 +42,7 @@ def _read(tp: Any, value: Any) -> Any:
 
 def body_of(body: Any) -> Any:
     """A request body as TM1's JSON: a model by what was set, a mapping by its values (a
-    :class:`~tm1_client.odata.Bind` value becomes ``Name@odata.bind``)."""
+    :class:`~skipcheck_tm1.odata.Bind` value becomes ``Name@odata.bind``)."""
     if body is None:
         return None
     if isinstance(body, Tm1Model):
@@ -143,7 +143,7 @@ class Tm1Request(Generic[T]):
 
     def requires(self, capability: Tm1Capability) -> Tm1Request[T]:
         """The request, checked against the server's ``$metadata`` before it's sent: an
-        :class:`~tm1_client.errors.Tm1UnsupportedOperationError` instead if it lacks it."""
+        :class:`~skipcheck_tm1.errors.Tm1UnsupportedOperationError` instead if it lacks it."""
         return replace(self, capability=capability)
 
     def requirement(self) -> Tm1Capability | None:

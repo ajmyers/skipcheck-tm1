@@ -1,4 +1,4 @@
-"""Emits ``tm1_client/_generated/operations.py``: ``Tm1Operations``, a :class:`Tm1Operation`
+"""Emits ``skipcheck_tm1/_generated/operations.py``: ``Tm1Operations``, a :class:`Tm1Operation`
 per action and function, named as in the Java client (``CHORE_ACTIVATE``, ``EXECUTE_MDX``)."""
 
 from __future__ import annotations

@@ -1,12 +1,12 @@
-# tm1-client (Python)
+# skipcheck-tm1 (Python)
 
 A Python client for the **IBM Planning Analytics (TM1) REST API**, with the same API as the Java client (`tm1-client`): the same services, methods, parameters, queries, patches, session views and errors, named the Python way. Its model is generated from the same language-neutral spec ([`spec/tm1-api.json`](../spec)).
 
-It comes in two flavors with one API: sync (`tm1_client`) and asyncio (`tm1_client.aio`). Requires Python 3.10+, [httpx](https://www.python-httpx.org/) and [pydantic](https://docs.pydantic.dev/) 2.
+It comes in two flavors with one API: sync (`skipcheck_tm1`) and asyncio (`skipcheck_tm1.aio`). Requires Python 3.10+, [httpx](https://www.python-httpx.org/) and [pydantic](https://docs.pydantic.dev/) 2.
 
 ```python
-from tm1_client import Filter, ODataPath, ODataQuery, Tm1Client
-from tm1_client.model import Cube, CubePatch
+from skipcheck_tm1 import Filter, ODataPath, ODataQuery, Tm1Client
+from skipcheck_tm1.model import Cube, CubePatch
 
 with Tm1Client.builder().base_url("http://localhost:8010/api/v1/").basic_auth("admin", "apple").build() as tm1:
     for cube in tm1.cubes.model_cubes(ODataQuery.none().select(Cube.NAME).filter(Filter.starts_with(Cube.NAME, "Sales"))):
@@ -26,7 +26,7 @@ with Tm1Client.builder().base_url("http://localhost:8010/api/v1/").basic_auth("a
 The same with asyncio:
 
 ```python
-from tm1_client.aio import AsyncTm1Client
+from skipcheck_tm1.aio import AsyncTm1Client
 
 async with AsyncTm1Client.builder().base_url("http://localhost:8010/api/v1/").basic_auth("admin", "apple").build() as tm1:
     cubes = await tm1.cubes.model_cubes(ODataQuery.none().select(Cube.NAME))
@@ -46,7 +46,7 @@ async with AsyncTm1Client.builder().base_url("http://localhost:8010/api/v1/").ba
 | `Tm1Client.builder()…build()`, `withSandbox`, `withAsync`, `batch()` | `Tm1Client.builder()…build()`, `with_sandbox`, `with_async`, `batch()` |
 | `Tm1SessionPool`, `Tm1Identity`, `Tm1Timeouts`, `Tm1ErrorClassifier` | the same names |
 | `Tm1NotFoundException` | `Tm1NotFoundError` |
-| Micrometer observations | the `tm1_client` logger |
+| Micrometer observations | the `skipcheck_tm1` logger |
 
 `tm1.api` adds what Java doesn't have: a generated member for every endpoint (`tm1.api.cubes["Sales"].views.list()`). It honours `$metadata`'s containment: through a reference, such as `users["u"].groups["g"]`, it reads only, since on TM1 a delete through it deletes the group itself.
 
@@ -54,16 +54,16 @@ async with AsyncTm1Client.builder().base_url("http://localhost:8010/api/v1/").ba
 
 | Part | Where | How |
 |---|---|---|
-| Model: an enum or pydantic model per CSDL type, patch builders, `Tm1Operations` | `tm1_client.model` | Generated from the spec at build time |
-| Generated API (`tm1.api`) | `tm1_client._generated.api`, `aio_api` | Generated from the spec at build time |
-| Services, session, pool, client | `tm1_client/aio/` | Hand-written, asyncio: the source of truth |
-| The same, sync | `tm1_client/_sync/` | Generated from `aio/` by `tm1_pygen.unasync` at build time |
-| Queries, requests, errors, versions, value types | `tm1_client/*.py` | Hand-written, shared by both flavors |
+| Model: an enum or pydantic model per CSDL type, patch builders, `Tm1Operations` | `skipcheck_tm1.model` | Generated from the spec at build time |
+| Generated API (`tm1.api`) | `skipcheck_tm1._generated.api`, `aio_api` | Generated from the spec at build time |
+| Services, session, pool, client | `skipcheck_tm1/aio/` | Hand-written, asyncio: the source of truth |
+| The same, sync | `skipcheck_tm1/_sync/` | Generated from `aio/` by `tm1_pygen.unasync` at build time |
+| Queries, requests, errors, versions, value types | `skipcheck_tm1/*.py` | Hand-written, shared by both flavors |
 
 Nothing generated is committed: the build (`hatch_build.py`) runs [`codegen/tm1_pygen`](codegen/tm1_pygen), which needs only the standard library. To regenerate by hand:
 
 ```sh
-PYTHONPATH=codegen python -m tm1_pygen ../spec/tm1-api.json src/tm1_client
+PYTHONPATH=codegen python -m tm1_pygen ../spec/tm1-api.json src/skipcheck_tm1
 ```
 
 ## Tests

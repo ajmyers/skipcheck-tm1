@@ -2,7 +2,7 @@
 :class:`Reply` values, and the formats around them (URLs with TM1's query options, the session
 cookie, JSON ``$batch``, async results, ``$metadata`` capabilities).
 
-The sync session (:mod:`tm1_client.session`) and the asyncio one (:mod:`tm1_client.aio`) are
+The sync session (:mod:`skipcheck_tm1.session`) and the asyncio one (:mod:`skipcheck_tm1.aio`) are
 thin loops over this, so they behave the same.
 """
 
@@ -66,7 +66,7 @@ class Call:
 
     :param path: relative to the service root, encoded, maybe with a query string
     :param read: turns the answer into the call's result (an answer of 400 or more has
-        already been raised as a :class:`~tm1_client.errors.Tm1ApiError`)
+        already been raised as a :class:`~skipcheck_tm1.errors.Tm1ApiError`)
     :param operation: the endpoint ID of the operation it calls, for the capability check
     :param raw: whether the body or the answer is bytes rather than JSON, which can't go in a
         JSON ``$batch`` and isn't sent async
@@ -85,7 +85,7 @@ class Call:
     contextual: bool = True
     """Whether the view's ``!sandbox`` and ``!ChangeSet`` are added: not to a link TM1 sent."""
     requires: Any = None
-    """A :class:`~tm1_client.version.Tm1Capability` the server must have, checked first."""
+    """A :class:`~skipcheck_tm1.version.Tm1Capability` the server must have, checked first."""
     timeout: float | None = None
     """Seconds to wait for the answer, instead of the session's request timeout."""
 
@@ -154,7 +154,7 @@ def session_cookie(set_cookies: Iterable[str]) -> str | None:
 
 
 def check(method: str, url: str, reply: Reply, classifier: Any = None) -> Reply:
-    """The reply, or the :class:`~tm1_client.errors.Tm1ApiError` for a refusal."""
+    """The reply, or the :class:`~skipcheck_tm1.errors.Tm1ApiError` for a refusal."""
     if reply.status >= 400:
         raise api_error(method, url, reply.status, reply.content, classifier)
     return reply

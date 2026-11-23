@@ -9,8 +9,8 @@ from typing import Any
 
 import pytest
 
-from tm1_client import ODataPath, ODataQuery, Tm1BadRequestError, Tm1Client, Tm1Request
-from tm1_client.model import LogLevel, ProcessPatch, ServerSettingsPatch, UserPatch
+from skipcheck_tm1 import ODataPath, ODataQuery, Tm1BadRequestError, Tm1Client, Tm1Request
+from skipcheck_tm1.model import LogLevel, ProcessPatch, ServerSettingsPatch, UserPatch
 
 from .conftest import CONFIGURED, REASON, client
 

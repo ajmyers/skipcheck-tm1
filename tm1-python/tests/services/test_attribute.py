@@ -9,10 +9,10 @@ from typing import Any
 import httpx
 import pytest
 
-from tm1_client import ODataQuery
-from tm1_client.aio.services.attribute import AttributeOwner, AttributeSet
-from tm1_client.aio.services.dimension import SubsetScope
-from tm1_client.model import AttributeDefinition, AttributeDefinitionPatch, AttributesPatch, AttributeType, LocalizedAttributesPatch
+from skipcheck_tm1 import ODataQuery
+from skipcheck_tm1.aio.services.attribute import AttributeOwner, AttributeSet
+from skipcheck_tm1.aio.services.dimension import SubsetScope
+from skipcheck_tm1.model import AttributeDefinition, AttributeDefinitionPatch, AttributesPatch, AttributeType, LocalizedAttributesPatch
 
 from ..conftest import Api, FakeTm1, target
 

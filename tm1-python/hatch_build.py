@@ -1,4 +1,4 @@
-"""Generates the model and API (src/tm1_client/_generated) from the API spec at build time,
+"""Generates the model and API (src/skipcheck_tm1/_generated) from the API spec at build time,
 as Gradle does for the Java client: generated code is never committed.
 
 The spec is the repository's spec/tm1-api.json; an sdist carries a copy in spec/.
@@ -26,7 +26,7 @@ def generate() -> None:
     try:
         from tm1_pygen import generate as run
 
-        run(spec_path(), ROOT / "src" / "tm1_client")
+        run(spec_path(), ROOT / "src" / "skipcheck_tm1")
     finally:
         sys.path.pop(0)
 

@@ -1,5 +1,5 @@
 """Generates the sync flavor from the asyncio one, as httpx and httpcore do: the hand-written
-code lives once, in ``tm1_client/aio``, and ``tm1_client/_sync`` is made from it at build time.
+code lives once, in ``skipcheck_tm1/aio``, and ``skipcheck_tm1/_sync`` is made from it at build time.
 
 The transform works on tokens: code changes by its grammar, strings and comments by the
 same renames (so examples read right in each flavor):
@@ -7,7 +7,7 @@ same renames (so examples read right in each flavor):
 * ``async def``, ``async for``, ``async with`` lose ``async``; ``await`` goes;
 * names are mapped: ``AsyncTm1Session`` → ``Tm1Session`` (any ``AsyncTm1…``),
   ``AsyncIterator`` → ``Iterator``, ``__aenter__`` → ``__enter__``, ``AsyncIO`` → ``SyncIO``
-  (the primitives in ``tm1_client._compat``), ``aio_api`` → ``api``…;
+  (the primitives in ``skipcheck_tm1._compat``), ``aio_api`` → ``api``…;
 * docstrings and comments get the same treatment, so examples read right in each flavor.
 
 ``_compat.py`` and ``__init__.py`` files are hand-written per flavor and not transformed.
@@ -41,7 +41,7 @@ NAMES = {
 
 _ASYNC_TM1 = re.compile(r"\bAsync(Tm1\w*)")
 
-HEADER = "# Generated from tm1_client/aio/{source} by tm1_pygen.unasync: don't edit, don't commit.\n"
+HEADER = "# Generated from skipcheck_tm1/aio/{source} by tm1_pygen.unasync: don't edit, don't commit.\n"
 
 
 def _name(name: str) -> str:
@@ -55,7 +55,7 @@ _TEXT_RULES = [
     (re.compile(r"\basync (def|for|with)\b"), r"\1"),
     (re.compile(r"\bawait "), ""),
     (_ASYNC_TM1, r"\1"),
-    (re.compile(r"\btm1_client\.aio\b"), "tm1_client"),
+    (re.compile(r"\btm1_client\.aio\b"), "skipcheck_tm1"),
     (re.compile(r"\baio_api\b"), "api"),
     (re.compile(r"\bAsyncIterator\b"), "Iterator"),
     (re.compile(r"\b__aenter__\b"), "__enter__"),

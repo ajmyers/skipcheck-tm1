@@ -15,9 +15,9 @@ from typing import Any
 
 import pytest
 
-import tm1_client
-import tm1_client.aio as aio
-from tm1_client import auth, errors, odata, version
+import skipcheck_tm1
+import skipcheck_tm1.aio as aio
+from skipcheck_tm1 import auth, errors, odata, version
 
 ROOT = Path(__file__).resolve().parents[3]
 JAVA = ROOT / "tm1-client" / "src" / "main" / "java" / "io" / "skipcheck" / "tm1" / "client"
@@ -47,8 +47,8 @@ RENAMED = {
 NOT_IN_PYTHON = {
     "Tm1Session.Builder.jsonMapper": "the model is pydantic; there's no mapper to configure",
     "Tm1Client.Builder.jsonMapper": "the model is pydantic; there's no mapper to configure",
-    "Tm1Session.Builder.observationRegistry": "Micrometer observations; the Python client logs to `tm1_client` instead",
-    "Tm1Client.Builder.observationRegistry": "Micrometer observations; the Python client logs to `tm1_client` instead",
+    "Tm1Session.Builder.observationRegistry": "Micrometer observations; the Python client logs to `skipcheck_tm1` instead",
+    "Tm1Client.Builder.observationRegistry": "Micrometer observations; the Python client logs to `skipcheck_tm1` instead",
     "Tm1Capabilities.metadata": "the Python capabilities keep what checks need, not a CSDL document model",
     "Tm1Capabilities.of": "made by Tm1Capabilities.parse from $metadata, rather than from a parsed CSDL document",
     "Tm1Request.Bytes": "it wraps a reactive publisher of buffers; a body of bytes is `bytes` itself in Python",
@@ -61,11 +61,11 @@ CLASSES: list[tuple[str, str | None, Any]] = [
     ("session/Tm1SessionBatch.java", None, aio.AsyncTm1SessionBatch),
     ("session/Tm1SessionPool.java", None, aio.AsyncTm1SessionPool),
     ("session/Tm1SessionPool.java", "Builder", aio.AsyncTm1SessionPoolBuilder),
-    ("session/Tm1Timeouts.java", None, tm1_client.Tm1Timeouts),
-    ("session/Tm1Timeouts.java", "Builder", tm1_client.Tm1Timeouts.Builder),
-    ("session/Tm1Identity.java", None, tm1_client.Tm1Identity),
-    ("Tm1Request.java", None, tm1_client.Tm1Request),
-    ("Tm1Operation.java", None, tm1_client.Tm1Operation),
+    ("session/Tm1Timeouts.java", None, skipcheck_tm1.Tm1Timeouts),
+    ("session/Tm1Timeouts.java", "Builder", skipcheck_tm1.Tm1Timeouts.Builder),
+    ("session/Tm1Identity.java", None, skipcheck_tm1.Tm1Identity),
+    ("Tm1Request.java", None, skipcheck_tm1.Tm1Request),
+    ("Tm1Operation.java", None, skipcheck_tm1.Tm1Operation),
     ("Tm1Client.java", None, aio.AsyncTm1Client),
     ("Tm1Client.java", "Builder", aio.AsyncTm1ClientBuilder),
     ("Tm1Batch.java", None, aio.AsyncTm1Batch),
@@ -158,13 +158,13 @@ def test_the_authenticators_are_javas() -> None:
 
 def test_the_sync_flavor_has_the_same_runtime() -> None:
     pairs = [
-        (aio.AsyncTm1Session, tm1_client.Tm1Session),
-        (aio.AsyncTm1SessionBuilder, tm1_client.Tm1SessionBuilder),
-        (aio.AsyncTm1SessionBatch, tm1_client.Tm1SessionBatch),
-        (aio.AsyncTm1SessionPool, tm1_client.Tm1SessionPool),
-        (aio.AsyncTm1SessionPoolBuilder, tm1_client.Tm1SessionPoolBuilder),
-        (aio.AsyncTm1Client, tm1_client.Tm1Client),
-        (aio.AsyncTm1Batch, tm1_client.Tm1Batch),
+        (aio.AsyncTm1Session, skipcheck_tm1.Tm1Session),
+        (aio.AsyncTm1SessionBuilder, skipcheck_tm1.Tm1SessionBuilder),
+        (aio.AsyncTm1SessionBatch, skipcheck_tm1.Tm1SessionBatch),
+        (aio.AsyncTm1SessionPool, skipcheck_tm1.Tm1SessionPool),
+        (aio.AsyncTm1SessionPoolBuilder, skipcheck_tm1.Tm1SessionPoolBuilder),
+        (aio.AsyncTm1Client, skipcheck_tm1.Tm1Client),
+        (aio.AsyncTm1Batch, skipcheck_tm1.Tm1Batch),
     ]
     for a, s in pairs:
         public = lambda c: {n for n in dir(c) if not n.startswith("_")}  # noqa: E731

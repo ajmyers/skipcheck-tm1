@@ -10,9 +10,9 @@ from typing import Any
 import httpx
 import pytest
 
-from tm1_client import ODataPath, ODataQuery, Tm1UnsupportedOperationError
-from tm1_client.aio.services.dimension import SubsetScope
-from tm1_client.model import (
+from skipcheck_tm1 import ODataPath, ODataQuery, Tm1UnsupportedOperationError
+from skipcheck_tm1.aio.services.dimension import SubsetScope
+from skipcheck_tm1.model import (
     Dimension,
     DimensionPatch,
     EdgePatch,
@@ -381,7 +381,7 @@ def test_subset_operations(api: Api, fake: FakeTm1) -> None:
 
 
 def test_an_operation_the_server_lacks_is_refused(fake: FakeTm1) -> None:
-    from tm1_client import Tm1Client, Tm1Session, auth
+    from skipcheck_tm1 import Tm1Client, Tm1Session, auth
 
     fake.metadata = fake.metadata.replace(b'Name="Reserve"', b'Name="NoReserve"')
     client = Tm1Client(Tm1Session("http://tm1:8010/api/v1/", auth.basic("a"), client=httpx.Client(transport=httpx.MockTransport(fake.handler))))

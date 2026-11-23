@@ -48,12 +48,12 @@ _COMPOSE_PROJECT = "paw"
 _RUNNER_BASE = "docker:cli"
 _DEFAULT_STARTUP_TIMEOUT = 20 * 60.0
 _READY_TIMEOUT = 10 * 60.0
-_log = logging.getLogger("tm1_testcontainers.paw")
+_log = logging.getLogger("skipcheck_tm1_testcontainers.paw")
 
 
 def script() -> bytes:
     """``paw-local.sh``: in the package, or in the repository for an editable install."""
-    packaged = resources.files("tm1_testcontainers").joinpath("paw-local.sh")
+    packaged = resources.files("skipcheck_tm1_testcontainers").joinpath("paw-local.sh")
     if packaged.is_file():
         return packaged.read_bytes()
     for parent in Path(__file__).resolve().parents:

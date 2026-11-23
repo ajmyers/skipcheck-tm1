@@ -1,6 +1,6 @@
 """Java's ``@Requires…`` annotations: their messages here, and as pytest markers (the
 ``mark`` of each, or ``@pytest.mark.requires_tm1`` and the others; see
-:mod:`tm1_testcontainers.plugin`)."""
+:mod:`skipcheck_tm1_testcontainers.plugin`)."""
 
 from __future__ import annotations
 

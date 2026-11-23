@@ -1,4 +1,4 @@
-"""Emits ``tm1_client/_generated/api.py``: a resource class per entity type and the root of
+"""Emits ``skipcheck_tm1/_generated/api.py``: a resource class per entity type and the root of
 the API, with a member for every endpoint of the spec, and ``index.py``, which says which
 member implements which endpoint (the contract tests walk it)."""
 
@@ -171,7 +171,7 @@ def _entity_class(spec: Spec, t: dict[str, Any], index: _Index) -> list[str]:
     out = ["", "", f"class {cls}({base}):"]
     out.extend(
         docstring(
-            f"An entity of type :class:`~tm1_client._generated.model.{t['name']}`: ``get``, ``update``, ``delete``, its navigation properties and bound operations.",
+            f"An entity of type :class:`~skipcheck_tm1._generated.model.{t['name']}`: ``get``, ``update``, ``delete``, its navigation properties and bound operations.",
             "    ",
         )
     )
@@ -226,7 +226,7 @@ def _entity_class(spec: Spec, t: dict[str, Any], index: _Index) -> list[str]:
         out.append(f"    def {name}(self) -> {names.entity_class(d['name'])}:")
         out.extend(
             docstring(
-                f"``…/{alias}``: this entity as a :class:`~tm1_client._generated.model.{d['name']}`, for its own properties, navigation and operations.",
+                f"``…/{alias}``: this entity as a :class:`~skipcheck_tm1._generated.model.{d['name']}`, for its own properties, navigation and operations.",
                 "        ",
             )
         )
@@ -260,7 +260,7 @@ def _collection_class(spec: Spec, t: dict[str, Any], index: _Index) -> list[str]
     out = ["", "", f"class {cls}(_r.CollectionResource[m.{t['name']}, {names.entity_class(t['name'])}]):"]
     out.extend(
         docstring(
-            f"A collection of :class:`~tm1_client._generated.model.{t['name']}`: ``list``, ``iter``, ``count``, ``create``, and ``[key]`` for one.", "    "
+            f"A collection of :class:`~skipcheck_tm1._generated.model.{t['name']}`: ``list``, ``iter``, ``count``, ``create``, and ``[key]`` for one.", "    "
         )
     )
     out.append("")
@@ -279,7 +279,7 @@ def _root(spec: Spec, index: _Index) -> list[str]:
     out.extend(
         docstring(
             "The root of the TM1 REST API: every entity set, singleton and unbound operation."
-            "\n\nThe generated, complete layer: one member per endpoint of the spec. :class:`~tm1_client.Tm1Client` adds hand-written conveniences on top.",
+            "\n\nThe generated, complete layer: one member per endpoint of the spec. :class:`~skipcheck_tm1.Tm1Client` adds hand-written conveniences on top.",
             "    ",
         )
     )

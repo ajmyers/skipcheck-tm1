@@ -11,7 +11,7 @@ import time
 import httpx
 import pytest
 
-from tm1_client import (
+from skipcheck_tm1 import (
     ODataPath,
     ODataQuery,
     Tm1ApiError,
@@ -104,8 +104,8 @@ def test_maps_error_responses_through_the_classifier(rt: Runtime) -> None:
 
 
 def test_uses_the_sessions_own_classifier(rt: Runtime) -> None:
-    from tm1_client import Tm1ConflictError, Tm1ErrorClassifier
-    from tm1_client.errors import Rule
+    from skipcheck_tm1 import Tm1ConflictError, Tm1ErrorClassifier
+    from skipcheck_tm1.errors import Rule
 
     rt.fake.respond = lambda r: json_response(400, {"error": {"code": "1", "message": "Cube is frozen"}})
     classifier = Tm1ErrorClassifier.defaults().with_rule(Rule.of_message("frozen", Tm1ErrorKind.LOCKED))

@@ -7,8 +7,8 @@ import json
 import httpx
 import pytest
 
-from tm1_client._sync.services.git import GitCommitDetails, GitCredentials
-from tm1_client.model import GitPlanExecutionMode, GitPullPlan, GitPushPlan
+from skipcheck_tm1._sync.services.git import GitCommitDetails, GitCredentials
+from skipcheck_tm1.model import GitPlanExecutionMode, GitPullPlan, GitPushPlan
 
 from ..conftest import Api, FakeTm1, target
 

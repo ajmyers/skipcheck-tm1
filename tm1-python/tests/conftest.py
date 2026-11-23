@@ -13,8 +13,8 @@ from typing import Any
 import httpx
 import pytest
 
-from tm1_client import Tm1Client, Tm1Session, auth
-from tm1_client.aio import AsyncTm1Client, AsyncTm1Session
+from skipcheck_tm1 import Tm1Client, Tm1Session, auth
+from skipcheck_tm1.aio import AsyncTm1Client, AsyncTm1Session
 
 REPO = Path(__file__).resolve().parents[2]
 SPEC = REPO / "spec" / "tm1-api.json"
@@ -84,7 +84,7 @@ def target(request: httpx.Request) -> str:
 @pytest.fixture(autouse=True)
 def _fresh_capabilities() -> Any:
     """Capabilities are cached per server for the process: each test starts without them."""
-    from tm1_client._views import CAPABILITIES
+    from skipcheck_tm1._views import CAPABILITIES
 
     CAPABILITIES.clear()
     yield

@@ -1,4 +1,4 @@
-"""The requests resources make, as :class:`~tm1_client._protocol.Call` values: built once,
+"""The requests resources make, as :class:`~skipcheck_tm1._protocol.Call` values: built once,
 sent by the sync session, the asyncio one, a batch, or as a TM1 async operation."""
 
 from __future__ import annotations
@@ -52,8 +52,8 @@ def endpoint(*ids: str) -> Any:
 
 
 FLAVORS = {
-    "sync": ("tm1_client._generated.api.", "tm1_client._generated.model.", "tm1_client._sync."),
-    "async": ("tm1_client._generated.aio_api.", "tm1_client._generated.model.", "tm1_client.aio."),
+    "sync": ("skipcheck_tm1._generated.api.", "skipcheck_tm1._generated.model.", "skipcheck_tm1._sync."),
+    "async": ("skipcheck_tm1._generated.aio_api.", "skipcheck_tm1._generated.model.", "skipcheck_tm1.aio."),
 }
 """Where each flavor's implementations live: the model (complex types' navigation, read
 through ``$expand``) is shared."""

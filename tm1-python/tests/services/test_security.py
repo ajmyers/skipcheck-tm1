@@ -9,8 +9,8 @@ from typing import Any
 import httpx
 import pytest
 
-from tm1_client import Filter, ODataPath, ODataQuery, Tm1NotFoundError
-from tm1_client.model import Group, Session, Thread, User, UserPatch
+from skipcheck_tm1 import Filter, ODataPath, ODataQuery, Tm1NotFoundError
+from skipcheck_tm1.model import Group, Session, Thread, User, UserPatch
 
 from ..conftest import Api, FakeTm1, target
 

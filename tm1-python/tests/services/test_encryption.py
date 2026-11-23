@@ -8,8 +8,8 @@ from datetime import timedelta
 import httpx
 import pytest
 
-from tm1_client import Tm1BadRequestError
-from tm1_client.model import EncryptionFileType, KeyProtectSettingsPatch
+from skipcheck_tm1 import Tm1BadRequestError
+from skipcheck_tm1.model import EncryptionFileType, KeyProtectSettingsPatch
 
 from ..conftest import Api, FakeTm1, target
 

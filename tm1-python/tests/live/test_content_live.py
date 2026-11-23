@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from tm1_client import ODataPath, Tm1BadRequestError, Tm1Client, Tm1NotFoundError, Tm1Request
-from tm1_client._sync.services.content import ContentPath, ContentScope
-from tm1_client.model import CubeReference, CubeReferencePatch, DocumentPatch, DocumentReference, Folder, FolderPatch, Link, LinkPatch
+from skipcheck_tm1 import ODataPath, Tm1BadRequestError, Tm1Client, Tm1NotFoundError, Tm1Request
+from skipcheck_tm1._sync.services.content import ContentPath, ContentScope
+from skipcheck_tm1.model import CubeReference, CubeReferencePatch, DocumentPatch, DocumentReference, Folder, FolderPatch, Link, LinkPatch
 
 from .conftest import CONFIGURED, REASON
 

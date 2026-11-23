@@ -12,8 +12,8 @@ from pathlib import Path
 import httpx
 import pytest
 
-from tm1_client import Tm1Client
-from tm1_client.aio import AsyncTm1Client
+from skipcheck_tm1 import Tm1Client
+from skipcheck_tm1.aio import AsyncTm1Client
 
 from .. import conformance_live as live
 from .conftest import _builder, target

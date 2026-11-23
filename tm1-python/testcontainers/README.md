@@ -1,4 +1,4 @@
-# tm1-testcontainers (Python)
+# skipcheck-tm1-testcontainers (Python)
 
 Run tests against a real IBM Planning Analytics (TM1) server in Docker, with
 [testcontainers-python](https://testcontainers-python.readthedocs.io). The Python port of the
@@ -14,7 +14,7 @@ settings, images, mounts and messages, named the Python way. Built on the
 pip install -e ./tm1-python -e ./tm1-python/testcontainers
 ```
 
-Requires Python 3.10+, testcontainers 4.15+ and [`tm1-client`](..).
+Requires Python 3.10+, testcontainers 4.15+ and [`skipcheck-tm1`](..).
 
 ## Writing a test
 
@@ -43,8 +43,8 @@ def test_lists_cubes(tm1_server):
 For a container of your own:
 
 ```python
-from tm1_client import Tm1Version
-from tm1_testcontainers import Tm1Seed, Tm1ServerContainer, Tm1Source
+from skipcheck_tm1 import Tm1Version
+from skipcheck_tm1_testcontainers import Tm1Seed, Tm1ServerContainer, Tm1Source
 
 with Tm1ServerContainer(Tm1Source.InstallDir("/opt/ibm/tm1_64")).with_seed(Tm1Seed.SDATA).with_expected_version(Tm1Version.parse("11.8.03500.6")) as tm1:
     ...

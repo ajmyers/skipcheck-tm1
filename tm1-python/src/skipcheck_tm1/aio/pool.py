@@ -1,4 +1,4 @@
-"""Sessions on one TM1 server, one per :class:`~tm1_client.identity.Tm1Identity`, for
+"""Sessions on one TM1 server, one per :class:`~skipcheck_tm1.identity.Tm1Identity`, for
 applications that act on behalf of many users, as the Java client's ``Tm1SessionPool``. In
 TM1 identity is the session, so the number of sessions grows with the number of users; the
 pool keeps that bounded::
@@ -43,7 +43,7 @@ from .session import AsyncTm1Session, AsyncTm1SessionBuilder
 
 __all__ = ["AsyncTm1SessionPool", "AsyncTm1SessionPoolBuilder", "Tm1PoolStats"]
 
-log = logging.getLogger("tm1_client")
+log = logging.getLogger("skipcheck_tm1")
 
 
 def _seconds(value: float | timedelta) -> float:

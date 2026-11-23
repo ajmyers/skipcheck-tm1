@@ -3,7 +3,7 @@
 Generated from the same language-neutral API spec as the Java client (``spec/tm1-api.json``,
 from TM1's ``$metadata``), so it covers every endpoint the spec lists::
 
-    from tm1_client import Tm1Client
+    from skipcheck_tm1 import Tm1Client
 
     with Tm1Client.builder().base_url("https://tm1:8010/api/v1").basic_auth("admin", "apple").build() as tm1:
         print(tm1.server.product_version())

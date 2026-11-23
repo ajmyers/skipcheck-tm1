@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from tm1_client import Tm1Identity, Tm1SessionClosedError, auth
+from skipcheck_tm1 import Tm1Identity, Tm1SessionClosedError, auth
 
 from ..conftest import target
 from .conftest import SERVER, Clock, Runtime

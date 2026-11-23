@@ -12,7 +12,7 @@ from urllib.parse import unquote
 
 import pytest
 
-from tm1_client import (
+from skipcheck_tm1 import (
     Filter,
     ODataPath,
     ODataProperty,
@@ -25,7 +25,7 @@ from tm1_client import (
     Tm1Version,
     auth,
 )
-from tm1_client.errors import (
+from skipcheck_tm1.errors import (
     ODataError,
     Rule,
     Tm1ApiError,
@@ -42,8 +42,8 @@ from tm1_client.errors import (
     Tm1ServerError,
     Tm1TransportError,
 )
-from tm1_client.model import Tm1Operations
-from tm1_client.odata import Alias, ODataLiterals, Raw
+from skipcheck_tm1.model import Tm1Operations
+from skipcheck_tm1.odata import Alias, ODataLiterals, Raw
 
 # Tm1ErrorsTest
 
