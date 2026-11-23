@@ -1,8 +1,26 @@
 {
   "name": "@skipcheck/tm1-client",
-  "version": "0.0.0",
+  "version": "0.1.0-dev",
   "description": "A client for the IBM Planning Analytics (TM1) REST API, with the Java client's API",
-  "license": "SEE LICENSE IN ../../LICENSE",
+  "license": "AGPL-3.0-only",
+  "author": "Andrew Myers (https://ajmyers.net)",
+  "homepage": "https://skipcheck.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ajmyers/skipcheck-tm1.git",
+    "directory": "typescript/tm1-client"
+  },
+  "bugs": "https://github.com/ajmyers/skipcheck-tm1/issues",
+  "keywords": [
+    "tm1",
+    "planning-analytics",
+    "ibm",
+    "odata",
+    "rest-client"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -30,7 +48,8 @@
     "pretest": "npm run generate",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:live": "vitest run test/live"
+    "test:live": "vitest run test/live",
+    "prepack": "npm run build && node --input-type=module -e \"import { copyFileSync } from 'node:fs'; copyFileSync('../../LICENSE', 'LICENSE');\""
   },
   "devDependencies": {
     "@skipcheck/tm1-testcontainers": "*",
