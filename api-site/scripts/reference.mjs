@@ -619,7 +619,16 @@ for (const project of PROJECTS) {
 		const start = (project.start ?? []).map((n) => here.find((t) => t.name === n)).filter(Boolean);
 		const summaries = new Map(here.map((t) => [t.name, summary(javadocHtml(javadocParts(t.doc).description, { example: () => '', javaCode: () => '', link: (target, l) => escape(l || target.replace(/^.*[.#]/, '')) }))]));
 		for (const entry of overviews) if (entry.project === project.id && entry.language === language) entry.summary = summaries.get(entry.java);
-		const index = JSON.stringify(searchIndex(here.map((t) => ({ name: nameOf(t), page: pageOf(t), summary: summaries.get(t.name), members: searchable.get(t.name) }))));
+		// The walkthroughs, which pages.mjs builds: their examples are in every language, behind tabs
+		// that open in the language last chosen, this one when it's read here
+		const walkthroughs = await walkthroughsOf(project);
+		const walkthroughPage = (w) => '../../walkthroughs/' + w.slug + '/';
+		const index = JSON.stringify(
+			searchIndex(
+				here.map((t) => ({ name: nameOf(t), page: pageOf(t), summary: summaries.get(t.name), members: searchable.get(t.name) })),
+				walkthroughs.map((w) => ({ title: w.meta.title, page: walkthroughPage(w), summary: w.meta.summary })),
+			),
+		);
 		await writeFile(path.join(distDir, project.id, 'docs', language, 'search.json'), index + '\n');
 		indexSizes.push({ at: project.id + ' ' + language, bytes: Buffer.byteLength(index), gzip: gzipSync(index).length });
 		let home =
@@ -629,11 +638,8 @@ for (const project of PROJECTS) {
 		if (start.length > 0) {
 			home += '<h2>Start here</h2><ul class="start">' + start.map((t) => '<li><a href="' + pageOf(t) + '"><strong>' + escape(nameOf(t)) + '</strong><span>' + escape(summaries.get(t.name)) + '</span></a></li>').join('') + '</ul>';
 		}
-		// The walkthroughs, which pages.mjs builds: their examples are in every language, behind tabs
-		// that open in the language last chosen, this one when it's read here
-		const walkthroughs = await walkthroughsOf(project);
 		if (walkthroughs.length > 0) {
-			home += '<h2 id="walkthroughs">Walkthroughs</h2><ul class="start">' + walkthroughs.map((w) => '<li><a href="../../walkthroughs/' + w.slug + '/"><strong>' + escape(w.meta.title) + '</strong><span>' + escape(w.meta.summary) + '</span></a></li>').join('') + '</ul>';
+			home += '<h2 id="walkthroughs">Walkthroughs</h2><ul class="start">' + walkthroughs.map((w) => '<li><a href="' + walkthroughPage(w) + '"><strong>' + escape(w.meta.title) + '</strong><span>' + escape(w.meta.summary) + '</span></a></li>').join('') + '</ul>';
 		}
 		home += grouped
 			.map(({ area, list }) => '<h2 id="' + area.id + '">' + escape(area.title) + '</h2><ul class="areas">' + list.map((t) => '<li><a href="' + pageOf(t) + '"><code>' + escape(nameOf(t)) + '</code></a><span>' + escape(summaries.get(t.name)) + '</span></li>').join('') + '</ul>')
