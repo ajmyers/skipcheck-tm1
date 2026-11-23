@@ -14,12 +14,10 @@
 #            runner's Docker service hasn't started yet).
 name: Setup scripts
 
+# Runs as part of CI (ci.yml calls it), so its result counts towards the required ci-ok check.
 on:
-  push:
-    branches: [master]
-    paths: ['docker/tm1-server/**', '.github/workflows/setup-scripts.yml']
-  pull_request:
-    paths: ['docker/tm1-server/**', '.github/workflows/setup-scripts.yml']
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -34,7 +32,7 @@ jobs:
     env:
       CI: 'true'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Fake bundle
         run: |
@@ -132,7 +130,7 @@ jobs:
       matrix:
         shell: [powershell, pwsh]   # Windows PowerShell 5.1, PowerShell 7
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: setup.ps1 under ${{ matrix.shell }}
         shell: pwsh
         run: |
