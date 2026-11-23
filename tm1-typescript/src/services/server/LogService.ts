@@ -84,7 +84,10 @@ export class LogService extends Tm1Service {
       ["Reverse", required(reverse, "reverse")],
       ["IgnoreStatusMessages", required(ignoreStatusMessages, "ignoreStatusMessages")],
     ]);
-    return this.session.stream(Tm1Request.list(ODataPath.functionImport(importName(operation), parameters), query, TransactionLogEntry).requires(operation.capability()), options);
+    return this.session.stream(
+      Tm1Request.list(ODataPath.functionImport(importName(operation), parameters), query, TransactionLogEntry).requires(operation.capability()),
+      options,
+    );
   }
 
   /** `GET AuditLogEntries`, streamed; empty unless the audit log is on. `query` can expand

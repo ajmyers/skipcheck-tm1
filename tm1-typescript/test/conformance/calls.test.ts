@@ -81,7 +81,14 @@ describe("conformance with the Java client's recorded calls", () => {
           group.splice(group.indexOf(exchange), 1);
           answered.push([sent, exchange.request]);
           const r = exchange.response;
-          const body = r.json !== undefined ? utf8.encode(JSON.stringify(r.json)) : r.text !== undefined ? r.text : r.bytes !== undefined ? Uint8Array.from(Buffer.from(r.bytes, "base64")) : undefined;
+          const body =
+            r.json !== undefined
+              ? utf8.encode(JSON.stringify(r.json))
+              : r.text !== undefined
+                ? r.text
+                : r.bytes !== undefined
+                  ? Uint8Array.from(Buffer.from(r.bytes, "base64"))
+                  : undefined;
           return FakeTm1.reply(r.status, body, r.headers ?? {});
         };
         const client = tm1.client() as unknown as Record<string, Record<string, (...args: unknown[]) => unknown>>;
@@ -125,7 +132,9 @@ describe("conformance with the Java client's recorded calls", () => {
           );
         } else {
           expect("result" in outcome, "a result, not " + JSON.stringify(outcome)).toBe(true);
-          expect(codec.normal(codec.javaResult(codec.fallbacksAsNull((outcome as { result: any }).result, c.result), c.result), true)).toEqual(codec.normal(codec.expectedResult(c.result), true));
+          expect(codec.normal(codec.javaResult(codec.fallbacksAsNull((outcome as { result: any }).result, c.result), c.result), true)).toEqual(
+            codec.normal(codec.expectedResult(c.result), true),
+          );
         }
       });
     }

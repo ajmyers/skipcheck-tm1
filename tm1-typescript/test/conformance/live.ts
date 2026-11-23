@@ -61,7 +61,11 @@ export class Traffic implements Tm1Transport {
     if (!SESSION.some((s) => target.startsWith(s))) {
       const headers: Record<string, string> = {};
       for (const [k, v] of Object.entries(request.headers)) headers[k.toLowerCase()] = v;
-      this.exchanges.push({ step: this.step, request: codec.requestOf(request.method, target, headers, request.body ?? new Uint8Array()), status: response.status });
+      this.exchanges.push({
+        step: this.step,
+        request: codec.requestOf(request.method, target, headers, request.body ?? new Uint8Array()),
+        status: response.status,
+      });
     }
     return response;
   }
@@ -85,7 +89,8 @@ export function namesFor(scenario: Scenario): Record<string, string> {
 export function substitute(value: any, names: Record<string, string>): any {
   if (typeof value === "string") return Object.entries(names).reduce((s, [p, a]) => s.split("${" + p + "}").join(a), value);
   if (Array.isArray(value)) return value.map((v) => substitute(v, names));
-  if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [substitute(k, names), substitute(v, names)]));
+  if (value !== null && typeof value === "object")
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [substitute(k, names), substitute(v, names)]));
   return value;
 }
 
@@ -95,13 +100,15 @@ type Outcome = { result: any } | { error: codec.EncodedError };
 export function check(expect: Record<string, any>, outcome: Outcome): string | undefined {
   if (expect.error) {
     const got = "error" in outcome ? (outcome.error as unknown as Record<string, unknown>) : undefined;
-    if (!got || Object.entries(expect.error).some(([k, v]) => got[k] !== v)) return `expected the error ${JSON.stringify(expect.error)}, got ${JSON.stringify(outcome)}`;
+    if (!got || Object.entries(expect.error).some(([k, v]) => got[k] !== v))
+      return `expected the error ${JSON.stringify(expect.error)}, got ${JSON.stringify(outcome)}`;
     return undefined;
   }
   if ("error" in outcome) return "failed with " + JSON.stringify(outcome.error);
   const result = outcome.result;
   if (expect.none && result !== null) return "expected nothing, got " + JSON.stringify(result);
-  if (expect.count !== undefined && (!Array.isArray(result) || result.length !== expect.count)) return `expected ${expect.count} items, got ${JSON.stringify(result)}`;
+  if (expect.count !== undefined && (!Array.isArray(result) || result.length !== expect.count))
+    return `expected ${expect.count} items, got ${JSON.stringify(result)}`;
   if (expect.fields && (result === null || typeof result !== "object" || Object.entries(expect.fields).some(([k, v]) => result[k] !== v))) {
     return `expected the fields ${JSON.stringify(expect.fields)}, got ${JSON.stringify(result)}`;
   }

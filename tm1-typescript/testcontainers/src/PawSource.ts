@@ -20,7 +20,9 @@ export class PawSource {
   constructor(zip: string) {
     this.zip = Settings.absolute(zip);
     if (!Settings.isFile(this.zip)) {
-      throw new IllegalArgumentException(`Not a file: ${this.zip}. Point ${PawSource.ZIP} at IBM's ipa_workspace_local_<release>.<build>.zip, or ${PawSource.BUNDLE_DIR} at its folder.`);
+      throw new IllegalArgumentException(
+        `Not a file: ${this.zip}. Point ${PawSource.ZIP} at IBM's ipa_workspace_local_<release>.<build>.zip, or ${PawSource.BUNDLE_DIR} at its folder.`,
+      );
     }
   }
 

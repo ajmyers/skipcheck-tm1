@@ -5,7 +5,12 @@ import { Live } from "./live.js";
 
 /** The Java client's `SandboxAndChangeSetTm1Test` fixture: a cube of two dimensions with cells X and
  * Y, made for each test, with a client of its own. */
-export function twoByTwo(): { tm1: () => Tm1Client; cube: () => string; cell: (element: string) => Map<string, string>; value: (client: Tm1Client, element: string) => Promise<number> } {
+export function twoByTwo(): {
+  tm1: () => Tm1Client;
+  cube: () => string;
+  cell: (element: string) => Map<string, string>;
+  value: (client: Tm1Client, element: string) => Promise<number>;
+} {
   let tm1: Tm1Client | undefined;
   let cube = "";
   const a = (): string => cube + "_a";

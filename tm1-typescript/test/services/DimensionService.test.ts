@@ -43,7 +43,9 @@ describe("DimensionService", () => {
   it("refuses a stale ETag", async () => {
     const tm1 = new FakeTm1();
     tm1.respond = () => FakeTm1.reply(412, { error: { code: "278", message: "stale" } });
-    await expect(tm1.client().dimensions.update("Region", DimensionPatch.builder().name("Region").build(), 'W/"0"')).rejects.toBeInstanceOf(Tm1PreconditionFailedException);
+    await expect(tm1.client().dimensions.update("Region", DimensionPatch.builder().name("Region").build(), 'W/"0"')).rejects.toBeInstanceOf(
+      Tm1PreconditionFailedException,
+    );
   });
 
   it("runs the dimension's operations", async () => {

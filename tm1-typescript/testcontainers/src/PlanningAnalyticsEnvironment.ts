@@ -103,7 +103,11 @@ export class PlanningAnalyticsEnvironment implements Startable {
 
   /** Starts everything, what's depended on first and in parallel where it can, then PAW. */
   async start(): Promise<void> {
-    await Promise.all(this.containers().filter((c) => c !== this.#paw).map((c) => c.start()));
+    await Promise.all(
+      this.containers()
+        .filter((c) => c !== this.#paw)
+        .map((c) => c.start()),
+    );
     if (this.#paw) await this.#paw.start();
   }
 
@@ -213,7 +217,8 @@ export namespace PlanningAnalyticsEnvironment {
      * `customizer` once wired.
      * @throws IllegalArgumentException for a bad name, or one added twice */
     tm1(name: string, customizer: Customizer<Tm1ServerContainer> = none): this {
-      if (typeof name !== "string" || !SERVER_NAME.test(name)) throw new IllegalArgumentException(`Bad TM1 server name '${String(name)}': use letters, digits, _ and -`);
+      if (typeof name !== "string" || !SERVER_NAME.test(name))
+        throw new IllegalArgumentException(`Bad TM1 server name '${String(name)}': use letters, digits, _ and -`);
       if (this.#parts.tm1.has(name)) throw new IllegalArgumentException(`TM1 server ${name} was already added`);
       this.#parts.tm1.set(name, customizer);
       return this;
@@ -294,7 +299,8 @@ export namespace PlanningAnalyticsEnvironment {
       const p = this.#parts;
       if (p.tm1.size === 0) throw new IllegalStateException("Add at least one TM1 server with tm1(name)");
       if (p.keycloak !== undefined && p.cognos === undefined) throw new IllegalStateException("Keycloak gives Cognos its OIDC namespace: add cognos(...) too");
-      if (p.camNamespace === CognosContainer.Namespace.OIDC && p.keycloak === undefined) throw new IllegalStateException("CAM security through OIDC needs keycloak()");
+      if (p.camNamespace === CognosContainer.Namespace.OIDC && p.keycloak === undefined)
+        throw new IllegalStateException("CAM security through OIDC needs keycloak()");
       if (p.paw !== undefined && p.cognos !== undefined) {
         throw new IllegalStateException("PAW with Cognos (CAM) security isn't supported yet: PAW logs users on with TM1's own security");
       }

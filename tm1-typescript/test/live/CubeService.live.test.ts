@@ -17,10 +17,17 @@ describe("CubeService on TM1" + liveReason, () => {
       [dimensions[0]!, ["a", "b"]],
       [dimensions[1]!, ["x", "y"]],
     ] as const) {
-      await tm1.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), { Name: d, Hierarchies: [{ Name: d, Elements: elements.map((e) => ({ Name: e })) }] }));
+      await tm1.session.execute(
+        Tm1Request.post(ODataPath.of("Dimensions"), { Name: d, Hierarchies: [{ Name: d, Elements: elements.map((e) => ({ Name: e })) }] }),
+      );
     }
     const all = ODataPath.of("Dimensions");
-    await tm1.cubes.create(CubePatch.builder().name(cube).bindDimensions(...dimensions.map((d) => all.key(d))).build());
+    await tm1.cubes.create(
+      CubePatch.builder()
+        .name(cube)
+        .bindDimensions(...dimensions.map((d) => all.key(d)))
+        .build(),
+    );
   });
 
   afterAll(async () => {

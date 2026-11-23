@@ -92,7 +92,11 @@ describe("ContentService on TM1" + liveReason, () => {
     await inFolder([name, name + "-2"], async ([folder, other]) => {
       const link = await tm1.contents.create(folder!, ContentScope.Public, LinkPatch.builder().name("ibm").url("https://www.ibm.com").build());
       expect(link.ID).toBe("ibm.extr");
-      const reference = await tm1.contents.create(folder!, ContentScope.Public, CubeReferencePatch.builder().name("}ClientGroups").bindCube(ODataPath.of("Cubes").key("}ClientGroups")).build());
+      const reference = await tm1.contents.create(
+        folder!,
+        ContentScope.Public,
+        CubeReferencePatch.builder().name("}ClientGroups").bindCube(ODataPath.of("Cubes").key("}ClientGroups")).build(),
+      );
       expect(reference.ID).toBe("}ClientGroups.cube");
 
       const listed = await tm1.contents.contents(folder!, ContentScope.Public, ODataQuery.none().expand("tm1.CubeReference/Cube($select=Name)")).toArray();

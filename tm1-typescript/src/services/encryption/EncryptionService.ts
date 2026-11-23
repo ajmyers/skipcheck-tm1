@@ -52,7 +52,11 @@ export class EncryptionService extends Tm1Service {
   async validate(settings: EncryptionAtRestProviderSettingsPatch, options?: Tm1CallOptions): Promise<EncryptionAtRestValidationReport> {
     const operation = Tm1Operations.ValidateEncryptionAtRestSettings;
     const json = writeJson(required(settings, "settings"));
-    const request = Tm1Request.get(ODataPath.functionImport(importName(operation), { Settings: SETTINGS }), ODataQuery.none().alias(SETTINGS, json), EncryptionAtRestValidationReport).requires(operation.capability());
+    const request = Tm1Request.get(
+      ODataPath.functionImport(importName(operation), { Settings: SETTINGS }),
+      ODataQuery.none().alias(SETTINGS, json),
+      EncryptionAtRestValidationReport,
+    ).requires(operation.capability());
     return this.session.execute(request, options);
   }
 

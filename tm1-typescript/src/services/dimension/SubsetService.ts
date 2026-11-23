@@ -82,7 +82,15 @@ export class SubsetService extends Tm1Service {
    * subset hasn't changed since, else a `Tm1PreconditionFailedException`. Throws a `RangeError`, at
    * once and sending nothing, if the patch sets or binds `Elements`, which TM1 appends: use
    * {@link addElements} or {@link clearElements}. */
-  update(dimension: string, hierarchy: string, scope: SubsetScope, subset: string, patch: SubsetPatch, etag?: string | null, options?: Tm1CallOptions): Promise<void> {
+  update(
+    dimension: string,
+    hierarchy: string,
+    scope: SubsetScope,
+    subset: string,
+    patch: SubsetPatch,
+    etag?: string | null,
+    options?: Tm1CallOptions,
+  ): Promise<void> {
     const request = Tm1Request.patch(subsetPath(dimension, hierarchy, scope, subset), withoutElements(patch));
     return this.session.execute(etag == null ? request : request.ifMatch(etag), options);
   }
@@ -119,8 +127,26 @@ export class SubsetService extends Tm1Service {
    * is public and keeps whether it's static or dynamic; with them, it's private if `makePrivate`, and
    * static, holding the elements the subset has now, if `makeStatic`. Returns the copy. */
   saveAs(dimension: string, hierarchy: string, scope: SubsetScope, subset: string, newName: string, options?: Tm1CallOptions): Promise<Subset>;
-  saveAs(dimension: string, hierarchy: string, scope: SubsetScope, subset: string, newName: string, makePrivate: boolean, makeStatic: boolean, options?: Tm1CallOptions): Promise<Subset>;
-  saveAs(dimension: string, hierarchy: string, scope: SubsetScope, subset: string, newName: string, makePrivate?: boolean | Tm1CallOptions, makeStatic?: boolean, options?: Tm1CallOptions): Promise<Subset> {
+  saveAs(
+    dimension: string,
+    hierarchy: string,
+    scope: SubsetScope,
+    subset: string,
+    newName: string,
+    makePrivate: boolean,
+    makeStatic: boolean,
+    options?: Tm1CallOptions,
+  ): Promise<Subset>;
+  saveAs(
+    dimension: string,
+    hierarchy: string,
+    scope: SubsetScope,
+    subset: string,
+    newName: string,
+    makePrivate?: boolean | Tm1CallOptions,
+    makeStatic?: boolean,
+    options?: Tm1CallOptions,
+  ): Promise<Subset> {
     const path = subsetPath(dimension, hierarchy, scope, subset);
     if (typeof makePrivate !== "boolean") {
       return this.session.execute(action(Tm1Operations.SubsetSaveAs, path, { Name: newName }, Subset), makePrivate);
@@ -135,12 +161,28 @@ export class SubsetService extends Tm1Service {
   }
 
   /** `tm1.SetElement` with `Before`: places an element just before another in a static subset. */
-  setElementBefore(dimension: string, hierarchy: string, scope: SubsetScope, subset: string, element: string, before: string, options?: Tm1CallOptions): Promise<void> {
+  setElementBefore(
+    dimension: string,
+    hierarchy: string,
+    scope: SubsetScope,
+    subset: string,
+    element: string,
+    before: string,
+    options?: Tm1CallOptions,
+  ): Promise<void> {
     return this.sendSetElement(dimension, hierarchy, scope, subset, element, "Before@odata.bind", required(before, "before"), options);
   }
 
   /** `tm1.SetElement` with `After`: places an element just after another in a static subset. */
-  setElementAfter(dimension: string, hierarchy: string, scope: SubsetScope, subset: string, element: string, after: string, options?: Tm1CallOptions): Promise<void> {
+  setElementAfter(
+    dimension: string,
+    hierarchy: string,
+    scope: SubsetScope,
+    subset: string,
+    element: string,
+    after: string,
+    options?: Tm1CallOptions,
+  ): Promise<void> {
     return this.sendSetElement(dimension, hierarchy, scope, subset, element, "After@odata.bind", required(after, "after"), options);
   }
 
@@ -159,16 +201,32 @@ export class SubsetService extends Tm1Service {
     return this.session.execute(action(Tm1Operations.HierarchyCreateSessionSubset, hierarchyPath(dimension, hierarchy), body, Subset), options);
   }
 
-  private sendSetElement(dimension: string, hierarchy: string, scope: SubsetScope, subset: string, element: string, position: string | undefined, other: string | undefined, options: Tm1CallOptions | undefined): Promise<void> {
+  private sendSetElement(
+    dimension: string,
+    hierarchy: string,
+    scope: SubsetScope,
+    subset: string,
+    element: string,
+    position: string | undefined,
+    other: string | undefined,
+    options: Tm1CallOptions | undefined,
+  ): Promise<void> {
     const body: Record<string, unknown> = { "Element@odata.bind": elementPath(dimension, hierarchy, element).toString() };
     if (position !== undefined && other !== undefined) body[position] = elementPath(dimension, hierarchy, other).toString();
     const operation = Tm1Operations.SubsetSetElement;
-    return this.session.execute(Tm1Request.post(subsetPath(dimension, hierarchy, scope, subset).action(operation.name), body).requires(operation.capability()), options);
+    return this.session.execute(
+      Tm1Request.post(subsetPath(dimension, hierarchy, scope, subset).action(operation.name), body).requires(operation.capability()),
+      options,
+    );
   }
 }
 
 function withoutElements(patch: SubsetPatch): SubsetPatch {
-  if (required(patch, "patch").values().some(([key]) => key === "Elements" || key.startsWith("Elements@"))) {
+  if (
+    required(patch, "patch")
+      .values()
+      .some(([key]) => key === "Elements" || key.startsWith("Elements@"))
+  ) {
     throw new RangeError("A subset PATCH with Elements appends to them: use addElements, or clearElements first");
   }
   return patch;

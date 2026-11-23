@@ -26,7 +26,10 @@ export class OidcKeyService extends Tm1Service {
   /** `GetOIDCKeys()`, streamed: the IDs of the cached keys. */
   keys(options?: Tm1CallOptions): Tm1Stream<string> {
     const operation = Tm1Operations.GetOidcKeys;
-    return this.session.stream(Tm1Request.list(ODataPath.functionImport(importName(operation), {}), ODataQuery.none(), Primitive.string).requires(operation.capability()), options);
+    return this.session.stream(
+      Tm1Request.list(ODataPath.functionImport(importName(operation), {}), ODataQuery.none(), Primitive.string).requires(operation.capability()),
+      options,
+    );
   }
 
   /** `RemoveOIDCKeyFromCache`: drops keys from the cache. A key TM1 hasn't cached fails the call

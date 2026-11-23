@@ -5,7 +5,16 @@ import { afterEach, describe, expect, it } from "vitest";
 import { DockerHost, IllegalArgumentException, Tm1ServerContainer } from "../src/index.js";
 import { RequiresCognos, RequiresPaw, RequiresTm1, RequiresTm1Web } from "../src/vitest.js";
 
-const SOURCES = ["TM1_PRIVATE_IMAGE", "TM1_HOME_DIR", "TM1_INSTALL_VOLUME", "TM1_BUNDLE_DIR", "TM1_BUNDLE_URL", "PAW_ZIP", "PAW_BUNDLE_DIR", "PAW_ACCEPT_LICENSE"];
+const SOURCES = [
+  "TM1_PRIVATE_IMAGE",
+  "TM1_HOME_DIR",
+  "TM1_INSTALL_VOLUME",
+  "TM1_BUNDLE_DIR",
+  "TM1_BUNDLE_URL",
+  "PAW_ZIP",
+  "PAW_BUNDLE_DIR",
+  "PAW_ACCEPT_LICENSE",
+];
 
 /** The skip helpers, as Java's annotations: skipped without Docker or a source, and a source
  * that's set but wrong fails the test rather than skipping it. Each test sets the environment

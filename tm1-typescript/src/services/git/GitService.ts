@@ -63,7 +63,14 @@ export class GitService extends Tm1Service {
   /** `GitInit`: ties the model to the repository at `url`, under the deployment's name (such as
    * `dev`) if given, replacing an existing tie if `force`, with the Git configuration `config` or
    * TM1's. Returns the tie: URL, deployment, deployed commit, and the remote's branches and tags. */
-  init(url: string, deployment: string | null | undefined, credentials: GitCredentials, force: boolean, config?: GitConfigurationPatch | null, options?: Tm1CallOptions): Promise<Git> {
+  init(
+    url: string,
+    deployment: string | null | undefined,
+    credentials: GitCredentials,
+    force: boolean,
+    config?: GitConfigurationPatch | null,
+    options?: Tm1CallOptions,
+  ): Promise<Git> {
     const parameters: Record<string, unknown> = { URL: required(url, "url") };
     required(credentials, "credentials").addTo(parameters);
     putIfSet(parameters, "Deployment", deployment);
@@ -89,7 +96,14 @@ export class GitService extends Tm1Service {
   /** `GitPush`: plans a commit of the model's changes on top of `branch` (which must exist on the
    * remote), pushed to `newBranch` or, with none, `branch`; even if the remote moved on if `force`.
    * The plan lists the files; {@link execute} pushes them. */
-  async push(branch: string, newBranch: string | null | undefined, commit: GitCommitDetails, credentials: GitCredentials, force: boolean, options?: Tm1CallOptions): Promise<GitPushPlan> {
+  async push(
+    branch: string,
+    newBranch: string | null | undefined,
+    commit: GitCommitDetails,
+    credentials: GitCredentials,
+    force: boolean,
+    options?: Tm1CallOptions,
+  ): Promise<GitPushPlan> {
     const parameters: Record<string, unknown> = {};
     required(credentials, "credentials").addTo(parameters);
     parameters["Branch"] = required(branch, "branch");
@@ -106,7 +120,13 @@ export class GitService extends Tm1Service {
    * or TM1's, `SingleCommit`), over local changes if `force`. Pull again if the plan's `Commit` isn't
    * the branch's newest: TM1 (11.8) lags a pull behind the remote. The plan lists the operations;
    * {@link execute} carries them out. */
-  async pull(branch: string, credentials: GitCredentials, mode: GitPlanExecutionMode | null | undefined, force: boolean, options?: Tm1CallOptions): Promise<GitPullPlan> {
+  async pull(
+    branch: string,
+    credentials: GitCredentials,
+    mode: GitPlanExecutionMode | null | undefined,
+    force: boolean,
+    options?: Tm1CallOptions,
+  ): Promise<GitPullPlan> {
     const parameters: Record<string, unknown> = {};
     required(credentials, "credentials").addTo(parameters);
     parameters["Branch"] = required(branch, "branch");
@@ -118,7 +138,15 @@ export class GitService extends Tm1Service {
   /** `GitDeploy`: ties a server not yet tied to a repository, and pulls `branch` into it, in one
    * step; over local changes if `force`. Refused while Git is initialized. {@link status} then shows
    * the commit. */
-  deploy(url: string, branch: string, deployment: string | null | undefined, credentials: GitCredentials, force: boolean, config?: GitConfigurationPatch | null, options?: Tm1CallOptions): Promise<void> {
+  deploy(
+    url: string,
+    branch: string,
+    deployment: string | null | undefined,
+    credentials: GitCredentials,
+    force: boolean,
+    config?: GitConfigurationPatch | null,
+    options?: Tm1CallOptions,
+  ): Promise<void> {
     const parameters: Record<string, unknown> = { URL: required(url, "url") };
     required(credentials, "credentials").addTo(parameters);
     parameters["Branch"] = required(branch, "branch");
@@ -154,13 +182,22 @@ export class GitService extends Tm1Service {
     if (kind === "GitPushPlan") operation = Tm1Operations.GitPushPlanExecute;
     else if (kind === "GitPullPlan") operation = Tm1Operations.GitPullPlanExecute;
     else throw new RangeError("Not a push or pull plan: " + JSON.stringify(plan));
-    const path = PLANS.key(id).cast("tm1." + kind).action(operation.name);
+    const path = PLANS.key(id)
+      .cast("tm1." + kind)
+      .action(operation.name);
     await this.session.execute(Tm1Request.post(path, null).requires(operation.capability()), options);
   }
 
-  private call<T>(operation: Tm1Operation, parameters: Record<string, unknown>, type: Tm1Model<T> | undefined, options: Tm1CallOptions | undefined): Promise<T> {
+  private call<T>(
+    operation: Tm1Operation,
+    parameters: Record<string, unknown>,
+    type: Tm1Model<T> | undefined,
+    options: Tm1CallOptions | undefined,
+  ): Promise<T> {
     const path = ODataPath.of(required(operation.importName, operation.name));
-    const request = (type ? Tm1Request.post(path, parameters, type) : (Tm1Request.post(path, parameters) as unknown as Tm1Request<T>)).requires(operation.capability());
+    const request = (type ? Tm1Request.post(path, parameters, type) : (Tm1Request.post(path, parameters) as unknown as Tm1Request<T>)).requires(
+      operation.capability(),
+    );
     return this.session.execute(request, options);
   }
 }

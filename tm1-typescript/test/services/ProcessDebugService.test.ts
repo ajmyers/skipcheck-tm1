@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ODataQuery, ProcessDebugContextBreakpointPatch, ProcessDebugContextLineBreakpointPatch, typeOf, ProcessDebugContextBreakpoint } from "../../src/index.js";
+import {
+  ODataQuery,
+  ProcessDebugContextBreakpointPatch,
+  ProcessDebugContextLineBreakpointPatch,
+  typeOf,
+  ProcessDebugContextBreakpoint,
+} from "../../src/index.js";
 import { FakeTm1, type Recorded } from "../support/fake-tm1.js";
 
 const context = (status: string): Record<string, unknown> => ({ ID: "d1", Status: status });
@@ -112,7 +118,8 @@ describe("ProcessDebugService", () => {
     let resumes = 0;
     tm1.respond = (r) => {
       if (r.target === "ProcessDebugContexts('d1')/Breakpoints") return FakeTm1.collection({ ID: 1 }, { ID: -1 }, {}, { ID: 4 });
-      if (r.target === "ProcessDebugContexts('d1')/tm1.Continue") return { ...context(++resumes < 3 ? "Paused" : "Complete"), Result: { ProcessExecuteStatusCode: "CompletedSuccessfully" } };
+      if (r.target === "ProcessDebugContexts('d1')/tm1.Continue")
+        return { ...context(++resumes < 3 ? "Paused" : "Complete"), Result: { ProcessExecuteStatusCode: "CompletedSuccessfully" } };
       return null;
     };
     const done = await tm1.client().processDebugging.finish("d1");
@@ -148,7 +155,11 @@ describe("ProcessDebugService", () => {
     const debugging = client.processDebugging.debugging("Load", null, async (c) => c.ID);
     expect(tm1.requests).toEqual([]); // nothing until it's iterated, as a Flux
     expect(await debugging.toArray()).toEqual(["d1"]);
-    expect(tm1.requests.map(sent)).toEqual(["POST Processes('Load')/tm1.Debug", "GET ProcessDebugContexts('d1')/Breakpoints", "POST ProcessDebugContexts('d1')/tm1.Continue"]);
+    expect(tm1.requests.map(sent)).toEqual([
+      "POST Processes('Load')/tm1.Debug",
+      "GET ProcessDebugContexts('d1')/Breakpoints",
+      "POST ProcessDebugContexts('d1')/tm1.Continue",
+    ]);
 
     tm1.requests.length = 0;
     async function* twice(id: string): AsyncGenerator<string> {
@@ -191,7 +202,12 @@ describe("ProcessDebugService", () => {
     async function* forever(): AsyncGenerator<number> {
       for (let i = 0; ; i++) yield i;
     }
-    expect(await tm1.client().processDebugging.debugging("Load", null, () => forever()).first()).toBe(0);
+    expect(
+      await tm1
+        .client()
+        .processDebugging.debugging("Load", null, () => forever())
+        .first(),
+    ).toBe(0);
     expect(sent(tm1.last)).toBe("POST ProcessDebugContexts('d1')/tm1.Continue");
   });
 });

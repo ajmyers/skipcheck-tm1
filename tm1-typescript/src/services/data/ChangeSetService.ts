@@ -55,7 +55,10 @@ export class ChangeSetService extends Tm1Service {
   /** `UndoChangeSet`: reverts every write recorded in a change set. Needs schema 10.2.2.6. */
   undo(id: string, options?: Tm1CallOptions): Promise<void> {
     const operation = Tm1Operations.UndoChangeSet;
-    return this.session.execute(Tm1Request.post(ODataPath.of(operation.importName!), { ChangeSetID: required(id, "id") }).requires(operation.capability()), options);
+    return this.session.execute(
+      Tm1Request.post(ODataPath.of(operation.importName!), { ChangeSetID: required(id, "id") }).requires(operation.capability()),
+      options,
+    );
   }
 
   /** Runs `work` in a new change set: begins it, gives the work a view of the session that records

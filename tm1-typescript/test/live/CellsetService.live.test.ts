@@ -1,5 +1,16 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { CubePatch, MDXViewPatch, NativeViewPatch, ODataQuery, Tm1BadRequestException, Tm1NotFoundException, ViewAxisSelectionPatch, ViewScope, type CellsetCell, type Tm1Client } from "../../src/index.js";
+import {
+  CubePatch,
+  MDXViewPatch,
+  NativeViewPatch,
+  ODataQuery,
+  Tm1BadRequestException,
+  Tm1NotFoundException,
+  ViewAxisSelectionPatch,
+  ViewScope,
+  type CellsetCell,
+  type Tm1Client,
+} from "../../src/index.js";
 import { Fixtures } from "./data-fixtures.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
@@ -25,7 +36,16 @@ describe("CellsetService on TM1" + liveReason, () => {
     await tm1.cubes.create(CubePatch.builder().name(cube).bindDimensions(Fixtures.dimensionPath(region), Fixtures.dimensionPath(measure)).build());
     // Ordinals run across the columns (measures) first: cell (row r, column c) is r * 2 + c
     let value = 1;
-    for (const r of REGIONS) for (const m of MEASURES) await tm1.cells.update(cube, new Map([[region, r], [measure, m]]), String(value++));
+    for (const r of REGIONS)
+      for (const m of MEASURES)
+        await tm1.cells.update(
+          cube,
+          new Map([
+            [region, r],
+            [measure, m],
+          ]),
+          String(value++),
+        );
   });
 
   afterAll(async () => {
@@ -46,7 +66,12 @@ describe("CellsetService on TM1" + liveReason, () => {
     );
 
   tm1Test("runs MDX and reads the cellset piece by piece", async () => {
-    const cellset = await tm1.cellsets.execute(mdx, ODataQuery.none().expand("Axes").expand("Cells", (c) => c.select("Ordinal", "Value")));
+    const cellset = await tm1.cellsets.execute(
+      mdx,
+      ODataQuery.none()
+        .expand("Axes")
+        .expand("Cells", (c) => c.select("Ordinal", "Value")),
+    );
     const id = cellset.ID!;
     expect(id).toBeTruthy();
     expect(cellset.Axes, "columns, rows and the slicer TM1 adds").toHaveLength(3);
@@ -59,10 +84,19 @@ describe("CellsetService on TM1" + liveReason, () => {
       expect(await tm1.cellsets.tuples(id, 1).toArray()).toHaveLength(4);
       expect((await tm1.cellsets.tupleMembers(id, 1, 2).toArray()).map((m) => m.Name)).toEqual(["E"]);
       expect(values(await tm1.cellsets.cells(id, ODataQuery.none().select("Ordinal", "Value")).toArray())).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-      expect((await tm1.cellsets.cellMembers(id, 5).toArray()).map((m) => m.Name), "Sandboxes' Base first").toEqual(["Base", "E", "Count"]);
+      expect(
+        (await tm1.cellsets.cellMembers(id, 5).toArray()).map((m) => m.Name),
+        "Sandboxes' Base first",
+      ).toEqual(["Base", "E", "Count"]);
       expect((await tm1.cellsets.cube(id)).Name).toBe(cube);
-      expect((await tm1.cellsets.partition(id, 2, 4, ODataQuery.none().select("Ordinal")).toArray()).map((c) => c.Ordinal), "a rectangle: column 0 of rows 1 and 2").toEqual([2, 4]);
-      expect((await tm1.cellsets.partition(id, 2, 5, ODataQuery.none().select("Ordinal")).toArray()).map((c) => c.Ordinal), "whole rows").toEqual([2, 3, 4, 5]);
+      expect(
+        (await tm1.cellsets.partition(id, 2, 4, ODataQuery.none().select("Ordinal")).toArray()).map((c) => c.Ordinal),
+        "a rectangle: column 0 of rows 1 and 2",
+      ).toEqual([2, 4]);
+      expect(
+        (await tm1.cellsets.partition(id, 2, 5, ODataQuery.none().select("Ordinal")).toArray()).map((c) => c.Ordinal),
+        "whole rows",
+      ).toEqual([2, 3, 4, 5]);
     } finally {
       await tm1.cellsets.delete(id);
     }
@@ -82,7 +116,9 @@ describe("CellsetService on TM1" + liveReason, () => {
   });
 
   tm1Test("streams at least a row per page", async () => {
-    expect(await tm1.cellsets.stream(mdx, ODataQuery.none().select("Ordinal", "Value"), 1, (_, cells) => cells.map((c) => c.Ordinal)).toArray()).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(await tm1.cellsets.stream(mdx, ODataQuery.none().select("Ordinal", "Value"), 1, (_, cells) => cells.map((c) => c.Ordinal)).toArray()).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 7,
+    ]);
   });
 
   tm1Test("deletes the cellset when the stream is abandoned", async () => {
@@ -105,9 +141,22 @@ describe("CellsetService on TM1" + liveReason, () => {
     await tm1.views.create(cube, ViewScope.Public, MDXViewPatch.builder().name("Mdx").mdx(mdx).build());
     for (const d of [region, measure]) await Fixtures.subsetAll(tm1, d);
     const axis = (d: string): ViewAxisSelectionPatch => ViewAxisSelectionPatch.builder().bindSubset(Fixtures.subset(d)).build();
-    await tm1.views.create(cube, ViewScope.Public, NativeViewPatch.builder().name("Native").columns([axis(measure)]).rows([axis(region)]).build());
+    await tm1.views.create(
+      cube,
+      ViewScope.Public,
+      NativeViewPatch.builder()
+        .name("Native")
+        .columns([axis(measure)])
+        .rows([axis(region)])
+        .build(),
+    );
     for (const view of ["Mdx", "Native"]) {
-      const cellset = await tm1.cellsets.executeView(cube, ViewScope.Public, view, ODataQuery.none().expand("Cells", (c) => c.select("Value")));
+      const cellset = await tm1.cellsets.executeView(
+        cube,
+        ViewScope.Public,
+        view,
+        ODataQuery.none().expand("Cells", (c) => c.select("Value")),
+      );
       try {
         expect(values(cellset.Cells), view).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
       } finally {
@@ -118,6 +167,8 @@ describe("CellsetService on TM1" + liveReason, () => {
 
   tm1Test("runs an MDX statement, but not CREATE SET", async () => {
     await tm1.cellsets.executeStatement("SELECT {} ON 0 FROM [}ClientGroups]");
-    await expect(tm1.cellsets.executeStatement("CREATE SET [}Clients].[Probe] AS {TM1SUBSETALL([}Clients].[}Clients])}")).rejects.toBeInstanceOf(Tm1BadRequestException);
+    await expect(tm1.cellsets.executeStatement("CREATE SET [}Clients].[Probe] AS {TM1SUBSETALL([}Clients].[}Clients])}")).rejects.toBeInstanceOf(
+      Tm1BadRequestException,
+    );
   });
 });

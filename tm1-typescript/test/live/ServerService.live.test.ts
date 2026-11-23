@@ -27,9 +27,20 @@ describe("ServerService on TM1" + liveReason, () => {
     expect(active.ServerName).toBe(read.Name);
     expect((await tm1.server.configuration(ODataQuery.none())).ServerName).toBe(read.Name);
 
-    await tm1.server.updateStaticConfiguration(ServerSettingsPatch.builder().serverName(fixed.ServerName ?? null).build());
+    await tm1.server.updateStaticConfiguration(
+      ServerSettingsPatch.builder()
+        .serverName(fixed.ServerName ?? null)
+        .build(),
+    );
     await expect(
-      tm1.session.execute(Tm1Request.patch(ODataPath.of("ActiveConfiguration"), ServerSettingsPatch.builder().serverName(active.ServerName ?? null).build())),
+      tm1.session.execute(
+        Tm1Request.patch(
+          ODataPath.of("ActiveConfiguration"),
+          ServerSettingsPatch.builder()
+            .serverName(active.ServerName ?? null)
+            .build(),
+        ),
+      ),
       "the active configuration is read only",
     ).rejects.toBeInstanceOf(Tm1BadRequestException);
     expect(typeof active.Access?.CAM?.ClientPingCAMPassport, "a duration here, though declared Int32").toBe("string");

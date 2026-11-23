@@ -34,7 +34,11 @@ describe("LocalizedAttributeService", () => {
       owner,
       LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().caption("Ouest").property("Manager", "Jean").build()).build(),
     );
-    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", localized, '{"LocaleID":"fr","Attributes":{"Caption":"Ouest","Manager":"Jean"}}']);
+    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual([
+      "POST",
+      localized,
+      '{"LocaleID":"fr","Attributes":{"Caption":"Ouest","Manager":"Jean"}}',
+    ]);
   });
 
   it("finds a subset or a view in its scope's collection", () => {

@@ -40,7 +40,11 @@ describe("LevelService on TM1" + liveReason, () => {
     expect(levels.map((l) => l.Number)).toEqual([0, 1, 2]);
     expect(levels.map((l) => l.Cardinality)).toEqual([1, 2, 3]);
     expect((await tm1.levels.get(d, d, 2)).Cardinality).toBe(3);
-    expect((await tm1.levels.members(d, d, 2, ODataQuery.none().select(Member.Fields.Name)).toArray()).map((m) => m.Name).sort()).toEqual(["France", "Japan", "Spain"]);
+    expect((await tm1.levels.members(d, d, 2, ODataQuery.none().select(Member.Fields.Name)).toArray()).map((m) => m.Name).sort()).toEqual([
+      "France",
+      "Japan",
+      "Spain",
+    ]);
     expect((await tm1.levels.hierarchy(d, d, 0)).Name).toBe(d);
   });
 });

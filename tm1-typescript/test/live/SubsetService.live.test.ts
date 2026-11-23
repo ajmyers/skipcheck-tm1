@@ -36,7 +36,12 @@ describe("SubsetService on TM1" + liveReason, () => {
     await tm1.dimensions.create(
       DimensionPatch.builder()
         .name(d)
-        .hierarchies([HierarchyPatch.builder().name(d).elements([numeric("A"), numeric("B"), numeric("C"), numeric("D")]).build()])
+        .hierarchies([
+          HierarchyPatch.builder()
+            .name(d)
+            .elements([numeric("A"), numeric("B"), numeric("C"), numeric("D")])
+            .build(),
+        ])
         .build(),
     );
   });
@@ -63,7 +68,9 @@ describe("SubsetService on TM1" + liveReason, () => {
     const etag = (await tm1.subsets.get(d, d, SubsetScope.Public, "Dynamic"))["@odata.etag"]!;
     await tm1.subsets.update(d, d, SubsetScope.Public, "Dynamic", SubsetPatch.builder().expression(`{[${d}].[${d}].[C]}`).build(), etag);
     expect(await elements(SubsetScope.Public, "Dynamic")).toEqual(["C"]);
-    await expect(tm1.subsets.update(d, d, SubsetScope.Public, "Dynamic", SubsetPatch.builder().expression("{}").build(), etag)).rejects.toBeInstanceOf(Tm1PreconditionFailedException);
+    await expect(tm1.subsets.update(d, d, SubsetScope.Public, "Dynamic", SubsetPatch.builder().expression("{}").build(), etag)).rejects.toBeInstanceOf(
+      Tm1PreconditionFailedException,
+    );
     expect((await tm1.subsets.hierarchy(d, d, SubsetScope.Public, "Static")).Name).toBe(d);
 
     await tm1.subsets.delete(d, d, SubsetScope.Public, "Static");

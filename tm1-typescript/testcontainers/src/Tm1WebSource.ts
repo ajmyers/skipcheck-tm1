@@ -59,7 +59,11 @@ export abstract class Tm1WebSource {
     if (url !== undefined) return new Tm1WebSource.BundleUrl(url, get(Tm1WebSource.BUNDLE_SHA256));
     // The TM1 downloads folder, when it holds TM1 Web too. Skipped quietly when it doesn't
     const tm1Dir = get(Tm1Source.BUNDLE_DIR);
-    if (tm1Dir !== undefined && (get(Tm1WebSource.BUNDLE) !== undefined || Settings.hasFile(tm1Dir, (n) => n.startsWith("tm1web-") && (n.endsWith("_bundle.tar.gz") || n.endsWith("-linuxi38664h.zip"))))) {
+    if (
+      tm1Dir !== undefined &&
+      (get(Tm1WebSource.BUNDLE) !== undefined ||
+        Settings.hasFile(tm1Dir, (n) => n.startsWith("tm1web-") && (n.endsWith("_bundle.tar.gz") || n.endsWith("-linuxi38664h.zip"))))
+    ) {
       return new Tm1WebSource.Bundle(tm1Dir, get(Tm1WebSource.BUNDLE));
     }
     return undefined;
@@ -91,7 +95,9 @@ export namespace Tm1WebSource {
       super();
       this.dir = Settings.absolute(dir);
       if (!Settings.isFile(join(this.dir, "wlp", "bin", "server"))) {
-        throw new IllegalArgumentException(`Not a TM1 Web install: ${this.dir} has no wlp/bin/server. Point ${Tm1WebSource.HOME_DIR} at the tm1web folder of a Linux TM1 Web install.`);
+        throw new IllegalArgumentException(
+          `Not a TM1 Web install: ${this.dir} has no wlp/bin/server. Point ${Tm1WebSource.HOME_DIR} at the tm1web folder of a Linux TM1 Web install.`,
+        );
       }
     }
 
@@ -127,7 +133,9 @@ export namespace Tm1WebSource {
       super();
       this.dir = Settings.absolute(dir);
       if (!Settings.isDirectory(this.dir)) {
-        throw new IllegalArgumentException(`${Tm1WebSource.BUNDLE_DIR} is not a folder: ${this.dir}. Point it at the folder holding the bundle; name the file itself with ${Tm1WebSource.BUNDLE}.`);
+        throw new IllegalArgumentException(
+          `${Tm1WebSource.BUNDLE_DIR} is not a folder: ${this.dir}. Point it at the folder holding the bundle; name the file itself with ${Tm1WebSource.BUNDLE}.`,
+        );
       }
       this.file = file === undefined || file === null || file.trim() === "" ? undefined : file;
       if (this.file !== undefined && !Settings.isFile(join(this.dir, this.file))) {

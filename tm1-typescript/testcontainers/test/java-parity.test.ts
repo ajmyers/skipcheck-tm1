@@ -58,7 +58,8 @@ function split(parameters: string): string[] {
 /** The public constructors and methods declared at `depth` tabs. */
 function javaMembers(source: string, depth: number, isInterface: boolean): JavaMember[] {
   const cls = /(?:class|record|interface|enum)\s+(\w+)/.exec(source)![1];
-  const pattern = /^(?<indent>\t+)(?<mods>(?:(?:public|static|synchronized|final|default)\s+)*)(?:<[^>]+>\s+)?(?<ret>[\w.<>[\]?, @]+?)\s+(?<name>\w+)\s*\((?<params>[^)]*)\)\s*(?:throws\s+[\w., ]+)?[{;]/gm;
+  const pattern =
+    /^(?<indent>\t+)(?<mods>(?:(?:public|static|synchronized|final|default)\s+)*)(?:<[^>]+>\s+)?(?<ret>[\w.<>[\]?, @]+?)\s+(?<name>\w+)\s*\((?<params>[^)]*)\)\s*(?:throws\s+[\w., ]+)?[{;]/gm;
   const out: JavaMember[] = [];
   for (const m of source.matchAll(pattern)) {
     const g = m.groups!;
@@ -90,7 +91,8 @@ function subsequence(expected: string[], got: string[]): boolean {
 function checkMembers(where: string, members: JavaMember[], d: TsDeclaration, problems: string[]): void {
   for (const m of members) {
     if (m.constructor) {
-      if (!d.constructors.some((c) => subsequence(m.params, c))) problems.push(`${where}: no constructor takes (${m.params.join(", ")}); has ${d.constructors.map((c) => "(" + c.join(", ") + ")").join(" | ")}`);
+      if (!d.constructors.some((c) => subsequence(m.params, c)))
+        problems.push(`${where}: no constructor takes (${m.params.join(", ")}); has ${d.constructors.map((c) => "(" + c.join(", ") + ")").join(" | ")}`);
       continue;
     }
     const found = d.members.get(m.name);
@@ -103,7 +105,8 @@ function checkMembers(where: string, members: JavaMember[], d: TsDeclaration, pr
       if (m.params.length > 0) problems.push(`${where}.${m.name} is a property, but Java's takes (${m.params.join(", ")})`);
       continue;
     }
-    if (!signatures.some((s) => subsequence(m.params, s))) problems.push(`${where}.${m.name}: no signature takes (${m.params.join(", ")}); has ${signatures.map((s) => "(" + s.join(", ") + ")").join(" | ")}`);
+    if (!signatures.some((s) => subsequence(m.params, s)))
+      problems.push(`${where}.${m.name}: no signature takes (${m.params.join(", ")}); has ${signatures.map((s) => "(" + s.join(", ") + ")").join(" | ")}`);
   }
 }
 
@@ -162,7 +165,8 @@ describe("Java parity", () => {
     expect((library as Record<string, unknown>)[name], name + " isn't exported from the package").toBeDefined();
     const problems: string[] = [];
     if (new RegExp(`public\\s+enum\\s+${name}\\b`).test(source)) {
-      for (const c of source.matchAll(/^\t([A-Z][A-Z_0-9]*)\(/gm)) if (!d!.members.get(c[1]!)?.some((m) => m.isStatic)) problems.push(`no enum constant ${c[1]}`);
+      for (const c of source.matchAll(/^\t([A-Z][A-Z_0-9]*)\(/gm))
+        if (!d!.members.get(c[1]!)?.some((m) => m.isStatic)) problems.push(`no enum constant ${c[1]}`);
       expect(problems).toEqual([]);
       return;
     }
@@ -185,7 +189,8 @@ describe("Java parity", () => {
       }
       if (n[1] === "enum") {
         const body = source.slice(n.index);
-        for (const c of body.matchAll(/^\t\t([A-Z][A-Z_0-9]*)\(/gm)) if (!inner.members.get(c[1]!)?.some((m) => m.isStatic)) problems.push(`${name}.${n[2]}: no enum constant ${c[1]}`);
+        for (const c of body.matchAll(/^\t\t([A-Z][A-Z_0-9]*)\(/gm))
+          if (!inner.members.get(c[1]!)?.some((m) => m.isStatic)) problems.push(`${name}.${n[2]}: no enum constant ${c[1]}`);
         checkMembers(name + "." + n[2], javaMembers(body.slice(0, body.indexOf("\n\t}")), 2, false), inner, problems);
       }
     }
@@ -210,7 +215,17 @@ describe("Java parity", () => {
         for (const r of m.returns) expect(r, `${d.name}.${m.name}`).toMatch(/^Promise</);
       }
     }
-    expect(io).toEqual(expect.arrayContaining(["Tm1ServerContainer.shared", "GenericContainer.start", "GenericContainer.stop", "PawContainer.start", "KeycloakContainer.idToken", "CognosContainer.passport", "PlanningAnalyticsEnvironment.start"]));
+    expect(io).toEqual(
+      expect.arrayContaining([
+        "Tm1ServerContainer.shared",
+        "GenericContainer.start",
+        "GenericContainer.stop",
+        "PawContainer.start",
+        "KeycloakContainer.idToken",
+        "CognosContainer.passport",
+        "PlanningAnalyticsEnvironment.start",
+      ]),
+    );
   });
 
   it.each(annotations)("@%s is a vitest helper with Java's messages", (name) => {

@@ -37,7 +37,10 @@ describe("Tm1Authenticator", () => {
     expect(Tm1Authenticator.basic("admin", "apple").toString()).not.toContain(base64("admin:apple"));
     expect(Tm1Authenticator.camNamespace("alice", "secret", "LDAP").toString()).not.toContain("secret");
     expect(Tm1Authenticator.camPassport(() => Promise.resolve("passport-value")).toString()).not.toContain("passport-value");
-    for (const shown of [JSON.stringify(Tm1Authenticator.basic("admin", "apple")), inspect(Tm1Authenticator.basic("admin", "apple"), { showHidden: true, depth: 5 })]) {
+    for (const shown of [
+      JSON.stringify(Tm1Authenticator.basic("admin", "apple")),
+      inspect(Tm1Authenticator.basic("admin", "apple"), { showHidden: true, depth: 5 }),
+    ]) {
       expect(shown).not.toContain(base64("admin:apple"));
     }
     expect(inspect(Tm1Authenticator.camNamespace("alice", "secret", "LDAP"), { showHidden: true })).not.toContain(base64("alice:secret:LDAP"));
@@ -127,7 +130,11 @@ describe("CognosPassports", () => {
   it("logs in to TM1 with a fresh passport each login", async () => {
     const tm1 = new ScriptedTm1()
       .on("GET Server", () => ScriptedTm1.json(200, "{}"))
-      .onEach("POST Dimensions", () => ScriptedTm1.status(401, "TM1SessionId=fresh; Path=/api/"), () => ScriptedTm1.json(201, "{}"));
+      .onEach(
+        "POST Dimensions",
+        () => ScriptedTm1.status(401, "TM1SessionId=fresh; Path=/api/"),
+        () => ScriptedTm1.json(201, "{}"),
+      );
     const session = tm1.sessionWithOwnCredentials((b) => b.authenticator(Tm1Authenticator.cognosLogon(dispatcher, "LDAP", "viewer", "viewerpw")));
     await session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none()));
     await session.execute(Tm1Request.post(ODataPath.of("Dimensions"), { Name: "d" }));

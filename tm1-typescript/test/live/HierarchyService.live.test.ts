@@ -1,5 +1,17 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
-import { DimensionPatch, EdgePatch, ElementPatch, ElementType, Hierarchy, HierarchyPatch, Member, ODataPath, ODataQuery, Tm1PreconditionFailedException, type Tm1Client } from "../../src/index.js";
+import {
+  DimensionPatch,
+  EdgePatch,
+  ElementPatch,
+  ElementType,
+  Hierarchy,
+  HierarchyPatch,
+  Member,
+  ODataPath,
+  ODataQuery,
+  Tm1PreconditionFailedException,
+  type Tm1Client,
+} from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 const numeric = (name: string): ElementPatch => ElementPatch.builder().name(name).type(ElementType.Numeric).build();
@@ -31,7 +43,12 @@ describe("HierarchyService on TM1" + liveReason, () => {
   beforeEach(async () => {
     if (!Live.configured) return;
     dimension = Live.name();
-    await tm1.dimensions.create(DimensionPatch.builder().name(dimension).hierarchies([structure(dimension)]).build());
+    await tm1.dimensions.create(
+      DimensionPatch.builder()
+        .name(dimension)
+        .hierarchies([structure(dimension)])
+        .build(),
+    );
   });
 
   afterEach(async () => {
@@ -39,12 +56,15 @@ describe("HierarchyService on TM1" + liveReason, () => {
     await tm1.dimensions.delete(dimension);
   });
 
-  const roots = async (): Promise<string[]> => (await tm1.hierarchies.rootMembers(dimension, dimension, ODataQuery.none().select(Member.Fields.Name)).toArray()).map((m) => m.Name!);
+  const roots = async (): Promise<string[]> =>
+    (await tm1.hierarchies.rootMembers(dimension, dimension, ODataQuery.none().select(Member.Fields.Name)).toArray()).map((m) => m.Name!);
   const elements = async () => (await tm1.hierarchies.get(dimension, dimension, ODataQuery.none().expand(Hierarchy.Fields.Elements))).Elements ?? [];
 
   tm1Test("creates, lists, reads and deletes a hierarchy", async () => {
     expect((await tm1.hierarchies.create(dimension, structure("Alt"))).Name).toBe("Alt");
-    expect((await tm1.hierarchies.list(dimension, ODataQuery.none().select(Hierarchy.Fields.Name)).toArray()).map((h) => h.Name)).toEqual(expect.arrayContaining([dimension, "Alt"]));
+    expect((await tm1.hierarchies.list(dimension, ODataQuery.none().select(Hierarchy.Fields.Name)).toArray()).map((h) => h.Name)).toEqual(
+      expect.arrayContaining([dimension, "Alt"]),
+    );
     expect((await tm1.hierarchies.get(dimension, "Alt", ODataQuery.none().expand(Hierarchy.Fields.Elements))).Elements).toHaveLength(4);
     expect((await tm1.hierarchies.defaultHierarchy(dimension)).Name).toBe(dimension);
     expect((await tm1.hierarchies.dimension(dimension, "Alt")).Name).toBe(dimension);
@@ -58,7 +78,16 @@ describe("HierarchyService on TM1" + liveReason, () => {
     // Binding the collection changes the structure too
     const north = ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements").key("North");
     expect(() => tm1.hierarchies.update(dimension, dimension, HierarchyPatch.builder().bindElements(north).build())).toThrow(RangeError);
-    expect(() => tm1.hierarchies.update(dimension, dimension, HierarchyPatch.builder().edges([edge("Total", "East")]).build(), 'W/"x"')).toThrow(RangeError);
+    expect(() =>
+      tm1.hierarchies.update(
+        dimension,
+        dimension,
+        HierarchyPatch.builder()
+          .edges([edge("Total", "East")])
+          .build(),
+        'W/"x"',
+      ),
+    ).toThrow(RangeError);
   });
 
   tm1Test("replaces the structure, deleting what it doesn't list", async () => {

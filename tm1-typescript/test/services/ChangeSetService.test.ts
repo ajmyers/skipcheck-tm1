@@ -60,7 +60,12 @@ describe("ChangeSetService", () => {
     expect(tm1.requests.map((r) => r.target)).toEqual(["BeginChangeSet", "EndChangeSet"]);
 
     tm1.requests.length = 0;
-    await expect(tm1.client().changeSets.within(async () => Promise.reject(new Error("later"))).toArray()).rejects.toThrow("later");
+    await expect(
+      tm1
+        .client()
+        .changeSets.within(async () => Promise.reject(new Error("later")))
+        .toArray(),
+    ).rejects.toThrow("later");
     expect(tm1.requests.map((r) => r.target)).toEqual(["BeginChangeSet", "EndChangeSet"]);
   });
 

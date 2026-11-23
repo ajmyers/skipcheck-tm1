@@ -39,7 +39,14 @@ describe("the dimension scenarios, offline", () => {
         const step = traffic.step;
         return answer(step.startsWith("steps[") ? live.substitute(scenario.steps[Number(step.slice(6, -1))]!.expect, names) : undefined);
       };
-      expect(await live.run(tm1.client((b) => b.transport(traffic)), traffic, scenario, names)).toEqual([]);
+      expect(
+        await live.run(
+          tm1.client((b) => b.transport(traffic)),
+          traffic,
+          scenario,
+          names,
+        ),
+      ).toEqual([]);
       const labels = [...scenario.steps.map((_, i) => `steps[${i}]`), ...(scenario.finally ?? []).map((_, i) => `finally[${i}]`)];
       expect(traffic.exchanges.map((e) => e["step"])).toEqual(labels);
     });

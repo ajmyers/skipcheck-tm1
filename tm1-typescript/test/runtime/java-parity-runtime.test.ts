@@ -85,7 +85,10 @@ export function javaMembers(file: string, nested: string | undefined): string[] 
     if (!wanted) continue;
     const trimmed = line.trim();
     if (trimmed.startsWith("private ") || trimmed.startsWith("protected ")) continue;
-    const m = /^(?<public>public\s+)?(static\s+)?(default\s+)?(synchronized\s+)?(<[^>]+>\s+)?(?<ret>[\w.<>[\]?, @]+?)\s+(?<name>\w+)\s*\([^)]*\)?\s*(throws [\w., ]+)?(\{|;)?$/.exec(trimmed);
+    const m =
+      /^(?<public>public\s+)?(static\s+)?(default\s+)?(synchronized\s+)?(<[^>]+>\s+)?(?<ret>[\w.<>[\]?, @]+?)\s+(?<name>\w+)\s*\([^)]*\)?\s*(throws [\w., ]+)?(\{|;)?$/.exec(
+        trimmed,
+      );
     if (!m || (!m.groups!["public"] && !isInterface) || ["if", "for", "while", "switch", "return", "new"].includes(m.groups!["name"]!)) continue;
     result.push(m.groups!["name"]!);
   }

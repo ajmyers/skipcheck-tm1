@@ -30,16 +30,23 @@
     "generate": "tsx codegen/main.ts ../spec/tm1-api.json src/generated",
     "prebuild": "npm run generate",
     "build": "tsc -p tsconfig.build.json && npm run build --workspace testcontainers",
-    "pretest": "npm run generate",
+    "pretest": "npm run generate && npm run format:check && npm run lint",
     "test": "vitest run && npm test --workspace testcontainers",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck --workspace testcontainers",
-    "test:live": "vitest run test/live"
+    "test:live": "vitest run test/live",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint ."
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@types/node": "20.19.43",
+    "eslint": "10.15.0",
+    "prettier": "3.10.1",
     "testcontainers": "11.14.0",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
+    "typescript-eslint": "8.73.0",
     "vitest": "3.2.7"
   }
 }

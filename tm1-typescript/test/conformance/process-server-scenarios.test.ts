@@ -58,7 +58,14 @@ describe("the live conformance runner, for the processes, chores and server scen
       const names = live.namesFor(scenario);
       const tm1 = fake(names);
       const traffic = new live.Traffic(tm1, FakeTm1.BASE);
-      expect(await live.run(tm1.client((b) => b.transport(traffic)), traffic, scenario, names)).toEqual([]);
+      expect(
+        await live.run(
+          tm1.client((b) => b.transport(traffic)),
+          traffic,
+          scenario,
+          names,
+        ),
+      ).toEqual([]);
       expect(traffic.exchanges).toHaveLength(scenario.steps.length + (scenario.finally?.length ?? 0));
     });
   }

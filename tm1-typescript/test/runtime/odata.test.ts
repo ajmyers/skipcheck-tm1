@@ -147,7 +147,11 @@ describe("Filter", () => {
     expect(ODataProperty.of("Value").gt(2.5).toString()).toBe("(Value gt 2.5)");
     expect(ODataProperty.of("Active").eq(true).toString()).toBe("(Active eq true)");
     expect(ODataProperty.of("Parent").isNull().toString()).toBe("(Parent eq null)");
-    expect(ODataProperty.of("Type").eq(new ODataLiterals.Raw(ODataLiterals.enumMember("ibm.tm1.api.v1.ElementType", "Numeric"))).toString()).toBe("(Type eq ibm.tm1.api.v1.ElementType'Numeric')");
+    expect(
+      ODataProperty.of("Type")
+        .eq(new ODataLiterals.Raw(ODataLiterals.enumMember("ibm.tm1.api.v1.ElementType", "Numeric")))
+        .toString(),
+    ).toBe("(Type eq ibm.tm1.api.v1.ElementType'Numeric')");
     expect(ODataProperty.of("Level").ne(1).toString()).toBe("(Level ne 1)");
     expect(ODataProperty.of("Level").le(1).toString()).toBe("(Level le 1)");
   });
@@ -211,7 +215,9 @@ describe("ODataPath", () => {
   });
 
   it("builds nested paths", () => {
-    expect(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements").toString()).toBe("Dimensions('Region')/Hierarchies('Region')/Elements");
+    expect(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements").toString()).toBe(
+      "Dimensions('Region')/Hierarchies('Region')/Elements",
+    );
     expect(ODataPath.of("Cubes").key("Sales").action("tm1.Reserve").toString()).toBe("Cubes('Sales')/tm1.Reserve");
     expect(ODataPath.of("Cubes").key("Sales").nav("Views").cast("tm1.NativeView").toString()).toBe("Cubes('Sales')/Views/tm1.NativeView");
     expect(ODataPath.of("Configuration").nav("ProductVersion").value().toString()).toBe("Configuration/ProductVersion/$value");
@@ -229,13 +235,22 @@ describe("ODataPath", () => {
   });
 
   it("calls functions with literals or aliases", () => {
-    expect(ODataPath.of("Cellsets").key("abc").function("tm1.GetPartition", { Begin: 0, End: 99 }).toString()).toBe("Cellsets('abc')/tm1.GetPartition(Begin=0,End=99)");
-    expect(ODataPath.of("Hierarchies").function("tm1.Fn", { p: new ODataPath.Alias("@p") }).toString()).toBe("Hierarchies/tm1.Fn(p=@p)");
+    expect(ODataPath.of("Cellsets").key("abc").function("tm1.GetPartition", { Begin: 0, End: 99 }).toString()).toBe(
+      "Cellsets('abc')/tm1.GetPartition(Begin=0,End=99)",
+    );
+    expect(
+      ODataPath.of("Hierarchies")
+        .function("tm1.Fn", { p: new ODataPath.Alias("@p") })
+        .toString(),
+    ).toBe("Hierarchies/tm1.Fn(p=@p)");
   });
 
-  it.each(["}Clients", "Year 2026", "O'Neil", "a/b", "50%", "{x}", "a&b=c+d#e", "Région", "日本", "😀", "''", "%2F", "?", "\\", "a\tb"])("keeps the awkward name %j intact", (name) => {
-    expect(keyOf(ODataPath.of("Dimensions").key(name).nav("Hierarchies"))).toBe(name);
-  });
+  it.each(["}Clients", "Year 2026", "O'Neil", "a/b", "50%", "{x}", "a&b=c+d#e", "Région", "日本", "😀", "''", "%2F", "?", "\\", "a\tb"])(
+    "keeps the awkward name %j intact",
+    (name) => {
+      expect(keyOf(ODataPath.of("Dimensions").key(name).nav("Hierarchies"))).toBe(name);
+    },
+  );
 
   it("encodes slashes so they can't split the path", () => {
     expect(ODataPath.of("Dimensions").key("a/b").toString()).toBe("Dimensions('a%2Fb')");

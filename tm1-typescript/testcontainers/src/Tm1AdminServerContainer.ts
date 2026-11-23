@@ -30,7 +30,11 @@ export class Tm1AdminServerContainer extends GenericContainer {
     this.withNetworkAliases(Tm1AdminServerContainer.NETWORK_ALIAS);
     // The image's healthcheck in admin mode: the server list answers without a login
     this.waitingForHttp("/api/v1/Servers", Tm1AdminServerContainer.REST_PORT, (s) => s === 200, STARTUP_TIMEOUT);
-    Tm1ServerContainer.mountSource(source, (s, t, ro) => this.withBind(s, t, ro), (n, v) => this.withEnv(n, v));
+    Tm1ServerContainer.mountSource(
+      source,
+      (s, t, ro) => this.withBind(s, t, ro),
+      (n, v) => this.withEnv(n, v),
+    );
   }
 
   /** Where TM1 comes from. */

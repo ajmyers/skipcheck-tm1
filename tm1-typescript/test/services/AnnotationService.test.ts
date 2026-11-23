@@ -20,7 +20,15 @@ describe("AnnotationService", () => {
     expect(made["commentLocation"]).toBe("Admin,ADMIN");
     expect(sent(tm1.last)).toBe("POST Annotations");
     const body = tm1.last.json;
-    expect(Object.keys(body)).toEqual(["Text", "ApplicationContext", "DimensionalContext@odata.bind", "objectName", "commentValue", "commentType", "commentLocation"]);
+    expect(Object.keys(body)).toEqual([
+      "Text",
+      "ApplicationContext",
+      "DimensionalContext@odata.bind",
+      "objectName",
+      "commentValue",
+      "commentType",
+      "commentLocation",
+    ]);
     expect(body.Text).toBe("first note");
     expect(body.ApplicationContext).toHaveLength(1);
     expect(decodeURIComponent(body.ApplicationContext[0]["Facet@odata.bind"])).toBe("ApplicationContextFacets('}Cubes')");

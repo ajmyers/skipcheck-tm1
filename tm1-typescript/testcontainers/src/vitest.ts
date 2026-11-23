@@ -97,7 +97,9 @@ export interface PawFixtures extends Tm1Fixtures {
 type Skip = (note?: string) => never;
 
 /** A check run before every test: skips it with Java's message, else lets it run. */
-function check(reason: () => Promise<string | undefined>): [(context: { skip: Skip }, use: (value: void) => Promise<void>) => Promise<void>, { auto: boolean }] {
+function check(
+  reason: () => Promise<string | undefined>,
+): [(context: { skip: Skip }, use: (value: void) => Promise<void>) => Promise<void>, { auto: boolean }] {
   return [
     async ({ skip }: { skip: Skip }, use: (value: void) => Promise<void>) => {
       const why = await reason();

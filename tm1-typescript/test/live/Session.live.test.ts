@@ -126,7 +126,13 @@ class RawTm1 {
   private async sendOnce(request: RawRequest): Promise<RawResponse> {
     const headers = new Headers(request.headers);
     if (request.body !== undefined) headers.set("Content-Type", "application/json");
-    const response = await fetch(this.root + request.path, { method: request.method, headers, body: request.body, redirect: "manual", signal: AbortSignal.timeout(60_000) });
+    const response = await fetch(this.root + request.path, {
+      method: request.method,
+      headers,
+      body: request.body,
+      redirect: "manual",
+      signal: AbortSignal.timeout(60_000),
+    });
     return { status: response.status, headers: response.headers, cookies: response.headers.getSetCookie(), body: await response.text() };
   }
 
@@ -194,12 +200,17 @@ class RawTm1 {
 
   /** Creates a TM1 user with no groups (so not an administrator). */
   async createUser(admin: string, name: string, password: string): Promise<void> {
-    const created = await this.request("POST", "Users").withCookie(admin).withBody(JSON.stringify({ Name: name, Password: password })).send();
+    const created = await this.request("POST", "Users")
+      .withCookie(admin)
+      .withBody(JSON.stringify({ Name: name, Password: password }))
+      .send();
     if (created.status !== 201) throw new Error(`Couldn't create user ${name}: ${created.status} ${created.body}`);
   }
 
   async deleteUser(admin: string, name: string): Promise<void> {
-    await this.request("DELETE", `Users('${encodeURIComponent(name.replace(/'/g, "''"))}')`).withCookie(admin).send();
+    await this.request("DELETE", `Users('${encodeURIComponent(name.replace(/'/g, "''"))}')`)
+      .withCookie(admin)
+      .send();
   }
 }
 
@@ -428,7 +439,11 @@ describe("Tm1SessionPool on TM1" + liveReason, () => {
 
   const start = async (): Promise<void> => {
     context = uniqueContext();
-    pool = Tm1SessionPool.builder((await sessions()).sessionContext(context)).idleTimeout(1_000).closeGrace(0).sweepInterval(3_600_000).build();
+    pool = Tm1SessionPool.builder((await sessions()).sessionContext(context))
+      .idleTimeout(1_000)
+      .closeGrace(0)
+      .sweepInterval(3_600_000)
+      .build();
   };
 
   afterEach(async () => {
@@ -487,7 +502,8 @@ describe("Tm1 capabilities on TM1" + liveReason, () => {
       expect(capabilities.schemaVersion).toBe(Tm1Capabilities.parse(xml).schemaVersion);
       const container = xml.slice(xml.indexOf("<EntityContainer"), xml.indexOf("</EntityContainer>"));
       for (const [, kind, n] of container.matchAll(/<(EntitySet|Singleton|ActionImport) Name="([^"]+)"/g)) {
-        const capability = kind === "EntitySet" ? Tm1Capability.entitySet(n!) : kind === "Singleton" ? Tm1Capability.singleton(n!) : Tm1Capability.unboundOperation(n!);
+        const capability =
+          kind === "EntitySet" ? Tm1Capability.entitySet(n!) : kind === "Singleton" ? Tm1Capability.singleton(n!) : Tm1Capability.unboundOperation(n!);
         expect(capabilities.supports(capability), `${kind} ${n}`).toBe(true);
       }
       expect(capabilities.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.Reserve"))).toBe(true);
@@ -541,90 +557,108 @@ describe("Tm1Session async on TM1" + liveReason, () => {
     return false;
   };
 
-  tm1Test("runs a process and reads a collection through the monitor", async () => {
-    const tm1 = await Live.client();
-    const async = tm1.withAsync(200);
-    const process = "tm1-client-" + randomUUID().replace(/-/g, "").slice(0, 8);
-    await tm1.session.execute(createProcess(process, "x = 1;\n"));
-    try {
-      expect((await async.session.execute(execute(process))).ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
-      expect((await async.session.stream(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none().select("Name"))).toArray()).length).toBeGreaterThan(0);
-    } finally {
-      await tm1.session.execute(Tm1Request.delete(ODataPath.of("Processes").key(process)));
-      await tm1.close();
-    }
-  }, 60_000);
+  tm1Test(
+    "runs a process and reads a collection through the monitor",
+    async () => {
+      const tm1 = await Live.client();
+      const async = tm1.withAsync(200);
+      const process = "tm1-client-" + randomUUID().replace(/-/g, "").slice(0, 8);
+      await tm1.session.execute(createProcess(process, "x = 1;\n"));
+      try {
+        expect((await async.session.execute(execute(process))).ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
+        expect((await async.session.stream(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none().select("Name"))).toArray()).length).toBeGreaterThan(0);
+      } finally {
+        await tm1.session.execute(Tm1Request.delete(ODataPath.of("Processes").key(process)));
+        await tm1.close();
+      }
+    },
+    60_000,
+  );
 
-  tm1Test("stops the work on TM1 when cancelled", async () => {
-    const tm1 = await Live.client();
-    const async = tm1.withAsync(200);
-    const process = "tm1-client-" + randomUUID().replace(/-/g, "").slice(0, 8);
-    await tm1.session.execute(createProcess(process, "i = 0;\nWhile(i < 300000000);\n  i = i + 1;\nEnd;\n"));
-    try {
-      const cancel = new AbortController();
-      const run = async.session.execute(execute(process), { signal: cancel.signal });
-      run.catch(() => undefined);
-      expect(await waitFor(tm1.session, process, true), "the process runs").toBe(true);
-      cancel.abort();
-      await expect(run).rejects.toBeDefined();
-      expect(await waitFor(tm1.session, process, false), "cancelling deleted the monitor, which stopped it").toBe(true);
-    } finally {
-      await waitFor(tm1.session, process, false);
-      await tm1.session.execute(Tm1Request.delete(ODataPath.of("Processes").key(process)));
-      await tm1.close();
-    }
-  }, 120_000);
+  tm1Test(
+    "stops the work on TM1 when cancelled",
+    async () => {
+      const tm1 = await Live.client();
+      const async = tm1.withAsync(200);
+      const process = "tm1-client-" + randomUUID().replace(/-/g, "").slice(0, 8);
+      await tm1.session.execute(createProcess(process, "i = 0;\nWhile(i < 300000000);\n  i = i + 1;\nEnd;\n"));
+      try {
+        const cancel = new AbortController();
+        const run = async.session.execute(execute(process), { signal: cancel.signal });
+        run.catch(() => undefined);
+        expect(await waitFor(tm1.session, process, true), "the process runs").toBe(true);
+        cancel.abort();
+        await expect(run).rejects.toBeDefined();
+        expect(await waitFor(tm1.session, process, false), "cancelling deleted the monitor, which stopped it").toBe(true);
+      } finally {
+        await waitFor(tm1.session, process, false);
+        await tm1.session.execute(Tm1Request.delete(ODataPath.of("Processes").key(process)));
+        await tm1.close();
+      }
+    },
+    120_000,
+  );
 });
 
 /** The Java client's `Tm1BatchTm1Test`. */
 describe("Tm1 batches on TM1" + liveReason, () => {
-  tm1Test("runs reads, writes and failures together", async () => {
-    const tm1 = await Live.client();
-    const dimension = "batch" + randomUUID().replace(/-/g, "").slice(0, 8);
-    const process = "tm1-client-" + randomUUID().replace(/-/g, "").slice(0, 8);
-    await tm1.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), { Name: dimension, Hierarchies: [{ Name: dimension }] }));
-    await tm1.session.execute(createProcess(process, "x = 1;\n"));
-    try {
-      const batch = tm1.batch();
-      const queued = batch.client.session;
-      const elements = ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements");
-      const cube = queued.execute(Tm1Request.get<{ Name: string }>(ODataPath.of("Cubes").key("}ClientGroups"), ODataQuery.none().select("Name")));
-      const missing = queued.execute(Tm1Request.get(ODataPath.of("Cubes").key("not-a-cube")));
-      const north = queued.execute(Tm1Request.post(elements, { Name: "North" }, Json) as Tm1Request<{ Name: string }>);
-      const twice = queued.execute(Tm1Request.post(elements, { Name: "North" }, Json));
-      const listed = queued
-        .stream(Tm1Request.list<{ Name: string }>(elements, null))
-        .map((e) => e.Name)
-        .toArray();
-      const run = queued.execute(execute(process));
-      expect(batch.size()).toBe(6);
-      await batch.run();
-      expect((await cube).Name).toBe("}ClientGroups");
-      expect(await failure(missing)).toBeInstanceOf(Tm1NotFoundException);
-      expect((await north).Name).toBe("North");
-      // TM1 carries on past it, in order
-      expect(await failure(twice)).toBeInstanceOf(Tm1Exception);
-      // Sees the element made before it
-      expect(await listed).toEqual(["North"]);
-      expect((await run).ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
-    } finally {
-      await tm1.session.execute(Tm1Request.delete(ODataPath.of("Processes").key(process)));
-      await tm1.session.execute(Tm1Request.delete(ODataPath.of("Dimensions").key(dimension)));
-      await tm1.close();
-    }
-  }, 60_000);
+  tm1Test(
+    "runs reads, writes and failures together",
+    async () => {
+      const tm1 = await Live.client();
+      const dimension = "batch" + randomUUID().replace(/-/g, "").slice(0, 8);
+      const process = "tm1-client-" + randomUUID().replace(/-/g, "").slice(0, 8);
+      await tm1.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), { Name: dimension, Hierarchies: [{ Name: dimension }] }));
+      await tm1.session.execute(createProcess(process, "x = 1;\n"));
+      try {
+        const batch = tm1.batch();
+        const queued = batch.client.session;
+        const elements = ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements");
+        const cube = queued.execute(Tm1Request.get<{ Name: string }>(ODataPath.of("Cubes").key("}ClientGroups"), ODataQuery.none().select("Name")));
+        const missing = queued.execute(Tm1Request.get(ODataPath.of("Cubes").key("not-a-cube")));
+        const north = queued.execute(Tm1Request.post(elements, { Name: "North" }, Json) as Tm1Request<{ Name: string }>);
+        const twice = queued.execute(Tm1Request.post(elements, { Name: "North" }, Json));
+        const listed = queued
+          .stream(Tm1Request.list<{ Name: string }>(elements, null))
+          .map((e) => e.Name)
+          .toArray();
+        const run = queued.execute(execute(process));
+        expect(batch.size()).toBe(6);
+        await batch.run();
+        expect((await cube).Name).toBe("}ClientGroups");
+        expect(await failure(missing)).toBeInstanceOf(Tm1NotFoundException);
+        expect((await north).Name).toBe("North");
+        // TM1 carries on past it, in order
+        expect(await failure(twice)).toBeInstanceOf(Tm1Exception);
+        // Sees the element made before it
+        expect(await listed).toEqual(["North"]);
+        expect((await run).ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
+      } finally {
+        await tm1.session.execute(Tm1Request.delete(ODataPath.of("Processes").key(process)));
+        await tm1.session.execute(Tm1Request.delete(ODataPath.of("Dimensions").key(dimension)));
+        await tm1.close();
+      }
+    },
+    60_000,
+  );
 
-  tm1Test("takes a thousand requests", async () => {
-    const tm1 = await Live.client();
-    try {
-      const batch = tm1.batch();
-      const reads = Array.from({ length: 1000 }, () => batch.client.session.execute(Tm1Request.get(ODataPath.of("Cubes").key("}ClientGroups"), ODataQuery.none().select("Name"))));
-      await batch.run(1000);
-      expect(await Promise.all(reads)).toHaveLength(1000);
-    } finally {
-      await tm1.close();
-    }
-  }, 60_000);
+  tm1Test(
+    "takes a thousand requests",
+    async () => {
+      const tm1 = await Live.client();
+      try {
+        const batch = tm1.batch();
+        const reads = Array.from({ length: 1000 }, () =>
+          batch.client.session.execute(Tm1Request.get(ODataPath.of("Cubes").key("}ClientGroups"), ODataQuery.none().select("Name"))),
+        );
+        await batch.run(1000);
+        expect(await Promise.all(reads)).toHaveLength(1000);
+      } finally {
+        await tm1.close();
+      }
+    },
+    60_000,
+  );
 });
 
 /** The Java client's `Tm1ClientTm1Test`. */
@@ -714,20 +748,24 @@ describe("TM1's session behaviour" + liveReason, () => {
 
   /** A closed session is refused at once, but TM1 lists it in `Sessions` for several seconds more, so
    * a check that no session is left behind has to wait for the count to settle. */
-  tm1Test("refuses a closed session at once but lists it for seconds more", async () => {
-    const admin = await tm1.login();
-    const cookie = await tm1.login();
-    const id = await tm1.sessionId(cookie);
-    try {
-      const reads = await Promise.all(Array.from({ length: 8 }, () => tm1.request("GET", "Server?$select=Name").withCookie(cookie).send()));
-      for (const r of reads) expect(r.status).toBe(200);
-      expect((await tm1.request("POST", "ActiveSession/tm1.Close").withCookie(cookie).withBody("{}").send()).status).toBe(204);
-      expect((await tm1.request("GET", `Sessions(${id})`).withCookie(admin).send()).status, "still listed just after close").toBe(200);
-      expect(await tm1.awaitGone(admin, id), "gone within 30 s").toBe(true);
-    } finally {
-      await tm1.close(admin);
-    }
-  }, 60_000);
+  tm1Test(
+    "refuses a closed session at once but lists it for seconds more",
+    async () => {
+      const admin = await tm1.login();
+      const cookie = await tm1.login();
+      const id = await tm1.sessionId(cookie);
+      try {
+        const reads = await Promise.all(Array.from({ length: 8 }, () => tm1.request("GET", "Server?$select=Name").withCookie(cookie).send()));
+        for (const r of reads) expect(r.status).toBe(200);
+        expect((await tm1.request("POST", "ActiveSession/tm1.Close").withCookie(cookie).withBody("{}").send()).status).toBe(204);
+        expect((await tm1.request("GET", `Sessions(${id})`).withCookie(admin).send()).status, "still listed just after close").toBe(200);
+        expect(await tm1.awaitGone(admin, id), "gone within 30 s").toBe(true);
+      } finally {
+        await tm1.close(admin);
+      }
+    },
+    60_000,
+  );
 
   /** Closing a session expires its cookie, and later requests with that cookie get a 401. */
   tm1Test("expires the cookie on close and refuses it afterwards", async () => {
@@ -748,9 +786,19 @@ describe("TM1's session behaviour" + liveReason, () => {
     const cookie = await tm1.login();
     const process = scratch();
     try {
-      expect((await tm1.request("POST", "Processes").withCookie(cookie).withBody(JSON.stringify({ Name: process, PrologProcedure: "Sleep(1000);" })).send()).status).toBe(201);
+      expect(
+        (
+          await tm1
+            .request("POST", "Processes")
+            .withCookie(cookie)
+            .withBody(JSON.stringify({ Name: process, PrologProcedure: "Sleep(1000);" }))
+            .send()
+        ).status,
+      ).toBe(201);
       const start = Date.now();
-      const runs = await Promise.all(Array.from({ length: 3 }, () => tm1.request("POST", `Processes('${process}')/tm1.ExecuteWithReturn`).withCookie(cookie).withBody("{}").send()));
+      const runs = await Promise.all(
+        Array.from({ length: 3 }, () => tm1.request("POST", `Processes('${process}')/tm1.ExecuteWithReturn`).withCookie(cookie).withBody("{}").send()),
+      );
       for (const r of runs) expect(RawTm1.json(r)["ProcessExecuteStatusCode"]).toBe("CompletedSuccessfully");
       expect(Date.now() - start, "three 1 s runs on one session").toBeLessThan(2_500);
     } finally {
@@ -802,7 +850,9 @@ describe("TM1's session behaviour" + liveReason, () => {
     try {
       await tm1.request("POST", "Dimensions").withCookie(cookie).withBody(dimensionJson(name)).send();
       const minimal = RawTm1.json(await tm1.request("GET", `Dimensions('${name}')`).withCookie(cookie).send());
-      const none = RawTm1.json(await tm1.request("GET", `Dimensions('${name}')`).withCookie(cookie).withHeader("Accept", "application/json;odata.metadata=none").send());
+      const none = RawTm1.json(
+        await tm1.request("GET", `Dimensions('${name}')`).withCookie(cookie).withHeader("Accept", "application/json;odata.metadata=none").send(),
+      );
       expect("@odata.etag" in minimal).toBe(true);
       expect("@odata.etag" in none).toBe(false);
       expect("@odata.context" in none).toBe(true);
@@ -816,38 +866,44 @@ describe("TM1's session behaviour" + liveReason, () => {
    * closes gets no response at all. Node's `fetch` (undici) keeps an idle connection for 4 seconds
    * unless the server asks for longer, far below that, so `fetchTransport` never reuses one TM1 is
    * closing. Takes up to 150 s. */
-  tm1Test("closes a connection idle for ninety seconds", async () => {
-    const t = await Live.target();
-    const url = new URL(t.url + "Server?$select=Name");
-    const secure = url.protocol === "https:";
-    const agent = secure ? new HttpsAgent({ keepAlive: true, maxSockets: 1, rejectUnauthorized: process.env["TM1_VERIFY"] !== "false" }) : new HttpAgent({ keepAlive: true, maxSockets: 1 });
-    try {
-      const socket = await new Promise<Socket>((resolve, reject) => {
-        const send = secure ? httpsRequest : httpRequest;
-        const req = send(url, { agent, headers: { Authorization: basic(t.user, t.password) } }, (response: IncomingMessage) => {
-          expect(response.statusCode).toBe(200);
-          response.resume();
-          response.on("end", () => resolve(req.socket!));
+  tm1Test(
+    "closes a connection idle for ninety seconds",
+    async () => {
+      const t = await Live.target();
+      const url = new URL(t.url + "Server?$select=Name");
+      const secure = url.protocol === "https:";
+      const agent = secure
+        ? new HttpsAgent({ keepAlive: true, maxSockets: 1, rejectUnauthorized: process.env["TM1_VERIFY"] !== "false" })
+        : new HttpAgent({ keepAlive: true, maxSockets: 1 });
+      try {
+        const socket = await new Promise<Socket>((resolve, reject) => {
+          const send = secure ? httpsRequest : httpRequest;
+          const req = send(url, { agent, headers: { Authorization: basic(t.user, t.password) } }, (response: IncomingMessage) => {
+            expect(response.statusCode).toBe(200);
+            response.resume();
+            response.on("end", () => resolve(req.socket!));
+          });
+          req.on("error", reject);
+          req.end();
         });
-        req.on("error", reject);
-        req.end();
-      });
-      const used = Date.now();
-      // Closed by TM1
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("TM1 didn't close the idle connection within 150 s")), 150_000);
-        socket.once("close", () => {
-          clearTimeout(timer);
-          resolve();
+        const used = Date.now();
+        // Closed by TM1
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error("TM1 didn't close the idle connection within 150 s")), 150_000);
+          socket.once("close", () => {
+            clearTimeout(timer);
+            resolve();
+          });
         });
-      });
-      const idle = (Date.now() - used) / 1000;
-      expect(idle, "seconds idle before TM1 closed it").toBeGreaterThanOrEqual(80);
-      expect(idle).toBeLessThanOrEqual(100);
-    } finally {
-      agent.destroy();
-    }
-  }, 200_000);
+        const idle = (Date.now() - used) / 1000;
+        expect(idle, "seconds idle before TM1 closed it").toBeGreaterThanOrEqual(80);
+        expect(idle).toBeLessThanOrEqual(100);
+      } finally {
+        agent.destroy();
+      }
+    },
+    200_000,
+  );
 });
 
 /** The Java client's `Tm1ImpersonationBehaviorTest`: how TM1 itself treats `TM1-Impersonate`, which
@@ -860,7 +916,11 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
   const impersonate = (user: string, password: string, target: string): Promise<RawResponse> =>
     tm1.request("GET", "ActiveUser?$select=Name").withHeader("Authorization", basic(user, password)).withHeader("TM1-Impersonate", target).send();
   const createUser = async (name: string, group: string): Promise<void> => {
-    await tm1.request("POST", "Users").withCookie(admin).withBody(JSON.stringify({ Name: name, Password: "p", "Groups@odata.bind": [`Groups('${group}')`] })).send();
+    await tm1
+      .request("POST", "Users")
+      .withCookie(admin)
+      .withBody(JSON.stringify({ Name: name, Password: "p", "Groups@odata.bind": [`Groups('${group}')`] }))
+      .send();
   };
   const nameOf = async (request: RawRequest): Promise<string> => RawTm1.json(await request.send())["Name"] as string;
   const closeIfSet = async (response: RawResponse): Promise<void> => {
@@ -1024,7 +1084,7 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
       // A character that isn't ASCII goes out as "?", as Java's HttpClient writes it, so this sends
       // what Java's test does. fetch would send it as a Latin-1 byte, and the UTF-8 bytes sent that
       // way are a name TM1 accepts: issue 184.
-      const asJavaSends = (s: string): string => s.replace(/[^\x00-\x7f]/g, "?");
+      const asJavaSends = (s: string): string => s.replace(/[^ -~]/g, "?");
       const utf8AsLatin1 = Buffer.from(accented, "utf8").toString("latin1");
       for (const written of [accented, utf8AsLatin1].map(asJavaSends)) {
         const refused = await impersonate(tm1.user, tm1.password, written);

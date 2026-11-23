@@ -14,7 +14,13 @@ export class GitCredentials {
   readonly #privateKey: string | null;
   readonly #passphrase: string | null;
 
-  constructor(username: string | null | undefined, password: string | null | undefined, publicKey: string | null | undefined, privateKey: string | null | undefined, passphrase: string | null | undefined) {
+  constructor(
+    username: string | null | undefined,
+    password: string | null | undefined,
+    publicKey: string | null | undefined,
+    privateKey: string | null | undefined,
+    passphrase: string | null | undefined,
+  ) {
     this.#username = username ?? null;
     this.#password = password ?? null;
     this.#publicKey = publicKey ?? null;

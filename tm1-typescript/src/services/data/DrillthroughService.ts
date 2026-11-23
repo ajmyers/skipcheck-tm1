@@ -57,20 +57,31 @@ export class DrillthroughService extends Tm1Service {
    * one parameter per dimension (see the class description). */
   execute(cellset: string, ordinal: number, drillthrough: string, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<Cellset> {
     const operation = Tm1Operations.CubeDrillthroughExecute;
-    return this.session.execute(Tm1Request.post(script(cellset, ordinal, drillthrough).action(operation.name), {}, Cellset).withQuery(query).requires(operation.capability()), options);
+    return this.session.execute(
+      Tm1Request.post(script(cellset, ordinal, drillthrough).action(operation.name), {}, Cellset)
+        .withQuery(query)
+        .requires(operation.capability()),
+      options,
+    );
   }
 
   /** `tm1.Execute` on a cell's relational drillthrough: its rows, as JSON, streamed. Needs schema 10.2.2.6. */
   executeRelational(cellset: string, ordinal: number, drillthrough: string, options?: Tm1CallOptions): Tm1Stream<unknown> {
     const operation = Tm1Operations.RelationalDrillthroughExecute;
-    return this.session.stream(Tm1Request.postList(script(cellset, ordinal, drillthrough).action(operation.name), {}, Json).requires(operation.capability()), options);
+    return this.session.stream(
+      Tm1Request.postList(script(cellset, ordinal, drillthrough).action(operation.name), {}, Json).requires(operation.capability()),
+      options,
+    );
   }
 
   /** `tm1.ExecuteWithRowset` on a cell's relational drillthrough: its rows, kept as a rowset to read
    * with {@link rows}. Needs schema 11.6.0. */
   executeRelationalWithRowset(cellset: string, ordinal: number, drillthrough: string, options?: Tm1CallOptions): Promise<Rowset> {
     const operation = Tm1Operations.RelationalDrillthroughExecuteWithRowset;
-    return this.session.execute(Tm1Request.post(script(cellset, ordinal, drillthrough).action(operation.name), {}, Rowset).requires(operation.capability()), options);
+    return this.session.execute(
+      Tm1Request.post(script(cellset, ordinal, drillthrough).action(operation.name), {}, Rowset).requires(operation.capability()),
+      options,
+    );
   }
 
   /** `ExecuteCubeDrillthrough`: runs a cube drillthrough process (such as `}Drill_Sales`) directly,
@@ -78,7 +89,10 @@ export class DrillthroughService extends Tm1Service {
    * deleted. Needs schema 11.2.0. */
   executeProcess(process: string, parameters: readonly ProcessParameterPatch[], query?: ODataQuery | null, options?: Tm1CallOptions): Promise<Cellset> {
     const operation = Tm1Operations.ExecuteCubeDrillthrough;
-    return this.session.execute(Tm1Request.post(root(operation), processBody(process, parameters), Cellset).withQuery(query).requires(operation.capability()), options);
+    return this.session.execute(
+      Tm1Request.post(root(operation), processBody(process, parameters), Cellset).withQuery(query).requires(operation.capability()),
+      options,
+    );
   }
 
   /** `ExecuteRelationalDrillthrough`: runs a relational drillthrough process directly; its rows, as

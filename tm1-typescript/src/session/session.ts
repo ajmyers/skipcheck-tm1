@@ -158,7 +158,8 @@ export class Tm1Session implements AsyncDisposable {
       const page = this.queue.add(this, request, (r) => readPage(request, r)) as Promise<Page<T>>;
       return Tm1Stream.from(async function* () {
         const p = await page;
-        if (p.nextLink !== undefined) throw new Tm1ProtocolException(`${request.toString()}: TM1 sent more than one page, which a batch can't follow; ask for fewer with top()`);
+        if (p.nextLink !== undefined)
+          throw new Tm1ProtocolException(`${request.toString()}: TM1 sent more than one page, which a batch can't follow; ask for fewer with top()`);
         yield* p.items;
       });
     }
@@ -204,14 +205,34 @@ export class Tm1Session implements AsyncDisposable {
     let reply: Reply;
     // Raw bytes (document content) aren't sent async
     if (this.asyncEvery !== undefined && request.response !== "Bytes" && !(request.body instanceof Uint8Array)) {
-      reply = await this.sendRespondAsync(request.method, url, content, contentType, request.headers, request.accept(), request.timeout, this.asyncEvery, signal);
+      reply = await this.sendRespondAsync(
+        request.method,
+        url,
+        content,
+        contentType,
+        request.headers,
+        request.accept(),
+        request.timeout,
+        this.asyncEvery,
+        signal,
+      );
     } else {
       reply = await this.connection.send(request.method, url, content, contentType, request.headers, request.accept(), request.timeout, signal);
     }
     return this.connection.check(request.method, url, reply);
   }
 
-  private async sendRespondAsync(method: string, url: string, content: Uint8Array | undefined, contentType: string | undefined, headers: Readonly<Record<string, string>>, accept: string, timeout: number | undefined, every: number, signal: AbortSignal | undefined): Promise<Reply> {
+  private async sendRespondAsync(
+    method: string,
+    url: string,
+    content: Uint8Array | undefined,
+    contentType: string | undefined,
+    headers: Readonly<Record<string, string>>,
+    accept: string,
+    timeout: number | undefined,
+    every: number,
+    signal: AbortSignal | undefined,
+  ): Promise<Reply> {
     const reply = await this.connection.send(method, url, content, contentType, { ...headers, Prefer: "respond-async" }, accept, timeout, signal);
     if (reply.status !== 202) return reply; // TM1 answered at once
     const location = reply.headers["location"];
@@ -262,7 +283,13 @@ function parse(request: Tm1Request<unknown>, reply: Reply): unknown {
   try {
     return JSON.parse(textOf(reply.body));
   } catch (e) {
-    throw new Tm1ProtocolException(`TM1 answered ${reply.status} to ${request.toString()} with something this client can't read: ${(e as Error).message}`, undefined, undefined, undefined, e);
+    throw new Tm1ProtocolException(
+      `TM1 answered ${reply.status} to ${request.toString()} with something this client can't read: ${(e as Error).message}`,
+      undefined,
+      undefined,
+      undefined,
+      e,
+    );
   }
 }
 
@@ -280,7 +307,8 @@ function encode(request: Tm1Request<unknown>): [Uint8Array | undefined, string |
 function readPage<T>(request: Tm1Request<T>, reply: Reply): Page<T> {
   if (reply.body.length === 0) throw new Tm1ProtocolException(`TM1 sent an empty response where a collection was expected for ${request.toString()}`);
   const doc = parse(request, reply);
-  if (typeof doc !== "object" || doc === null || Array.isArray(doc)) throw new Tm1ProtocolException(`TM1 sent something other than a collection for ${request.toString()}`);
+  if (typeof doc !== "object" || doc === null || Array.isArray(doc))
+    throw new Tm1ProtocolException(`TM1 sent something other than a collection for ${request.toString()}`);
   const d = doc as Record<string, unknown>;
   const items = d["value"];
   if (!Array.isArray(items)) {
@@ -289,7 +317,10 @@ function readPage<T>(request: Tm1Request<T>, reply: Reply): Page<T> {
     throw new Tm1ProtocolException(`TM1 sent an object without a value collection for ${request.toString()}`);
   }
   const next = d["@odata.nextLink"];
-  return { items: items.filter((i) => i !== null && i !== undefined).map((i) => readAs(request.type, i)), nextLink: typeof next === "string" ? next : undefined };
+  return {
+    items: items.filter((i) => i !== null && i !== undefined).map((i) => readAs(request.type, i)),
+    nextLink: typeof next === "string" ? next : undefined,
+  };
 }
 
 /** A JSON `$batch`, as the Java client's `Tm1SessionBatch`: requests through {@link session} are
@@ -345,7 +376,10 @@ export class BatchQueue {
 
   add<T>(view: Tm1Session, request: Tm1Request<T>, read: (reply: Reply) => unknown): Promise<unknown> {
     if (request.response === "Bytes" || request.body instanceof Uint8Array) throw new TypeError("Raw bytes can't go in a JSON batch: " + request.toString());
-    if (this.ran) throw new Error("The batch has already run, so this call can't join it: a call whose request depends on another's result can't be batched. " + request.toString());
+    if (this.ran)
+      throw new Error(
+        "The batch has already run, so this call can't join it: a call whose request depends on another's result can't be batched. " + request.toString(),
+      );
     let resolve!: (v: unknown) => void;
     let reject!: (e: unknown) => void;
     const result = new Promise<unknown>((res, rej) => {
@@ -354,7 +388,17 @@ export class BatchQueue {
     });
     // Each caller awaits its own result; one nobody awaits isn't an unhandled rejection
     result.catch(() => undefined);
-    this.entries.push({ id: String(this.entries.length + 1), method: request.method, url: view.contextual(request.relativeUri()), accept: request.accept(), headers: request.headers, body: request.body, read, resolve, reject });
+    this.entries.push({
+      id: String(this.entries.length + 1),
+      method: request.method,
+      url: view.contextual(request.relativeUri()),
+      accept: request.accept(),
+      headers: request.headers,
+      body: request.body,
+      read,
+      resolve,
+      reject,
+    });
     return result;
   }
 
@@ -548,7 +592,8 @@ export function checkImpersonated(user: string): string {
   if (!user.trim()) throw new RangeError("The user to impersonate is blank, which TM1 would take as no impersonation at all");
   for (const c of user) {
     const code = c.codePointAt(0)!;
-    if (code < 0x20 || code > 0x7e) throw new RangeError(`TM1 can't impersonate '${user}': it doesn't match user names with characters other than printable ASCII through TM1-Impersonate`);
+    if (code < 0x20 || code > 0x7e)
+      throw new RangeError(`TM1 can't impersonate '${user}': it doesn't match user names with characters other than printable ASCII through TM1-Impersonate`);
   }
   return user;
 }

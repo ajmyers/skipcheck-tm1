@@ -38,7 +38,8 @@ function split(parameters: string): string[] {
   return result.map((p) => p.replace(/\s+/g, " ").trim());
 }
 
-const METHOD = /(?<ann>(?:\s*@Tm1Endpoint\("[^"]+"\)\s*)*)(?<decl>\s+public\s+(?:static\s+)?(?:<[^>]+>\s+)?(?<ret>[\w.<>[\]?, ]+?)\s+(?<name>\w+)\s*\((?<params>[^)]*)\)\s*(?:throws [\w., ]+)?\{)/g;
+const METHOD =
+  /(?<ann>(?:\s*@Tm1Endpoint\("[^"]+"\)\s*)*)(?<decl>\s+public\s+(?:static\s+)?(?:<[^>]+>\s+)?(?<ret>[\w.<>[\]?, ]+?)\s+(?<name>\w+)\s*\((?<params>[^)]*)\)\s*(?:throws [\w., ]+)?\{)/g;
 
 /** The public methods of a Java service class, with their overloads' parameters and endpoints, as
  * the .NET client's JavaParityTests reads them. */
@@ -112,7 +113,14 @@ function problems(file: string): string[] {
     if (want.join("|") !== have.join("|")) out.push(`${method.name}: endpoints [${have.join(", ")}], Java [${want.join(", ")}]`);
     for (const overload of method.overloads) {
       const expected = overload.map((p) => (p.type === "ODataQuery" ? "query" : p.name));
-      if (!member.signatures.some((s) => subsequence(expected, s.filter((n) => n !== "options")))) {
+      if (
+        !member.signatures.some((s) =>
+          subsequence(
+            expected,
+            s.filter((n) => n !== "options"),
+          ),
+        )
+      ) {
         out.push(`${method.name}: no signature takes (${expected.join(", ")}); has ${member.signatures.map((s) => `(${s.join(", ")})`).join(" | ")}`);
       }
     }
@@ -148,7 +156,9 @@ describe("Java parity", () => {
     const client = Tm1Client.builder().baseUrl("http://tm1:8010/api/v1/").basicAuth("a", "b").build() as unknown as Record<string, unknown>;
     const skip = new Set(["builder", "session", "batch", "connect", "close", "withoutAsync", "toString"]);
     for (const m of methods.values()) {
-      const service = (m.overloads.every((o) => o.length === 0) && m.name.endsWith("s")) || ["server", "git", "encryption", "drillthrough", "processDebugging"].includes(m.name);
+      const service =
+        (m.overloads.every((o) => o.length === 0) && m.name.endsWith("s")) ||
+        ["server", "git", "encryption", "drillthrough", "processDebugging"].includes(m.name);
       if (!service || skip.has(m.name)) continue;
       expect(client[m.name], m.name).toBeDefined();
     }

@@ -107,6 +107,8 @@ export namespace Tm1Identity {
    * or a user's own credentials. */
   export type Kind = "ServiceAccount" | "Impersonating" | "OwnCredentials";
 
+  // The value beside the type of the same name: used by callers, not in this file
+  // eslint-disable-next-line no-useless-assignment
   export const Kind = {
     ServiceAccount: "ServiceAccount",
     Impersonating: "Impersonating",

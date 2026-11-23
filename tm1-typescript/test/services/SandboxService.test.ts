@@ -49,7 +49,11 @@ describe("SandboxService", () => {
     const client = tm1.client();
     tm1.respond = () => null;
     await client.sandboxes.publish("s", "UsingSource", true, false);
-    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Sandboxes('s')/tm1.Publish", '{"ConflictResolution":"UsingSource","AllowQueueing":true,"CleanAfter":false}']);
+    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual([
+      "POST",
+      "Sandboxes('s')/tm1.Publish",
+      '{"ConflictResolution":"UsingSource","AllowQueueing":true,"CleanAfter":false}',
+    ]);
 
     await client.sandboxes.merge("s", "t");
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Sandboxes('s')/tm1.Merge", `{"Target@odata.bind":"Sandboxes('t')"}`]);

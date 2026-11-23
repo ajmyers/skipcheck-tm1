@@ -83,7 +83,10 @@ export class ProcessDebugService extends Tm1Service {
   debug(process: string, parameters?: Tm1Map<unknown> | null, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<ProcessDebugContext> {
     const operation = Tm1Operations.ProcessDebug;
     const path = ODataPath.of("Processes").key(required(process, "process")).action(operation.name);
-    return this.session.execute(Tm1Request.post(path, withParameters({}, parameters), ProcessDebugContext).withQuery(query).requires(operation.capability()), options);
+    return this.session.execute(
+      Tm1Request.post(path, withParameters({}, parameters), ProcessDebugContext).withQuery(query).requires(operation.capability()),
+      options,
+    );
   }
 
   /** Debugs a process for the length of `work` (given the context: set breakpoints, step, read
@@ -91,7 +94,12 @@ export class ProcessDebugService extends Tm1Service {
    * stream is left early. TM1 (11.8) refuses to delete a debug context, so finishing it is how the
    * run ends. Streams what the work gives, as Java's `Flux`: an async iterable's items, or a
    * promise's value (nothing for `undefined` or `null`); `.first()` reads a single answer. */
-  debugging<R>(process: string, parameters: Tm1Map<unknown> | null | undefined, work: (context: ProcessDebugContext) => ProcessDebugWork<R>, options?: Tm1CallOptions): Tm1Stream<R> {
+  debugging<R>(
+    process: string,
+    parameters: Tm1Map<unknown> | null | undefined,
+    work: (context: ProcessDebugContext) => ProcessDebugWork<R>,
+    options?: Tm1CallOptions,
+  ): Tm1Stream<R> {
     required(process, "process");
     required(work, "work");
     const self = this;

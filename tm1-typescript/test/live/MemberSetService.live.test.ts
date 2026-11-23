@@ -17,7 +17,10 @@ describe("MemberSetService on TM1" + liveReason, () => {
   });
 
   tm1Test("keeps a set expression's result by ordinal, but lists none", async () => {
-    const set = await tm1.memberSets.execute("{TM1SUBSETALL([}Clients].[}Clients])}", ODataQuery.none().expand("Tuples", (t) => t.expand("Members", (m) => m.select("Name"))));
+    const set = await tm1.memberSets.execute(
+      "{TM1SUBSETALL([}Clients].[}Clients])}",
+      ODataQuery.none().expand("Tuples", (t) => t.expand("Members", (m) => m.select("Name"))),
+    );
     expect((set.Tuples ?? []).map((t) => (t.Members ?? []).map((m) => m.Name))).toContainEqual(["Admin"]);
     const ordinal = set.Ordinal!;
     expect((await tm1.memberSets.get(ordinal)).Cardinality).toBe(set.Cardinality);

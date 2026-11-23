@@ -65,7 +65,12 @@ describe("Tm1WebContainer", () => {
     // The shared server is on Docker's default bridge, where TM1's registered host name only
     // resolves because Tm1WebContainer maps it
     const registeredHost = "http://" + tm1.getContainer().getHostname() + ":" + Tm1ServerContainer.REST_PORT;
-    const result = await session.evaluateMdx(registeredHost, server, tm1SessionId, "SELECT {[}Groups].Members} ON 0, {[}Clients].Members} ON 1 FROM [}ClientGroups]");
+    const result = await session.evaluateMdx(
+      registeredHost,
+      server,
+      tm1SessionId,
+      "SELECT {[}Groups].Members} ON 0, {[}Clients].Members} ON 1 FROM [}ClientGroups]",
+    );
     expect(result).toContain('"success":true');
   });
 

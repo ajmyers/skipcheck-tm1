@@ -27,7 +27,10 @@ export interface Tm1Schema {
 export const Tm1Duration = {
   /** `P1DT2H` → 93_600_000. */
   toMillis(iso: string): number {
-    const m = /^(-)?P(?:(\d+(?:\.\d+)?)Y)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)W)?(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(iso.trim());
+    const m =
+      /^(-)?P(?:(\d+(?:\.\d+)?)Y)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)W)?(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(
+        iso.trim(),
+      );
     if (!m || iso.trim() === "P" || iso.trim().endsWith("T")) throw new RangeError("Not an ISO 8601 duration: " + iso);
     const n = (i: number): number => (m[i] ? Number(m[i]) : 0);
     const ms = ((((n(2) * 365 + n(3) * 30 + n(4) * 7 + n(5)) * 24 + n(6)) * 60 + n(7)) * 60 + n(8)) * 1000;
@@ -80,7 +83,12 @@ function javaDuration(value: unknown): unknown {
   if (minutes !== 0n) out += minutes + "M";
   if (secs === 0n && fraction === 0n && out.length > 2) return out;
   out += seconds < 0n && fraction > 0n && secs === 0n ? "-0" : String(secs);
-  if (fraction > 0n) out += "." + String(seconds < 0n ? 2n * NANOS - fraction : fraction + NANOS).slice(1).replace(/0+$/, "");
+  if (fraction > 0n)
+    out +=
+      "." +
+      String(seconds < 0n ? 2n * NANOS - fraction : fraction + NANOS)
+        .slice(1)
+        .replace(/0+$/, "");
   return out + "S";
 }
 
@@ -168,6 +176,6 @@ export function writeJson(body: unknown): string {
     return JSON.stringify(body);
   } catch (e) {
     // The caller's mistake, not a failure talking to TM1
-    throw new TypeError("The request body can't be written as JSON: " + (e as Error).message);
+    throw new TypeError("The request body can't be written as JSON: " + (e as Error).message, { cause: e });
   }
 }

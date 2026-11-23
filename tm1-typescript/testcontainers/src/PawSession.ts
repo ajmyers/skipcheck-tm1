@@ -27,7 +27,11 @@ export class PawSession {
     const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" };
     const csrf = this.#cookies.get("ba-sso-csrf");
     if (csrf !== undefined) headers["ba-sso-authenticity"] = csrf;
-    const response = await this.#send(this.#url + "login/form/", { method: "POST", headers, body: new URLSearchParams({ mode: "basic", username, password }).toString() });
+    const response = await this.#send(this.#url + "login/form/", {
+      method: "POST",
+      headers,
+      body: new URLSearchParams({ mode: "basic", username, password }).toString(),
+    });
     if (response.status !== 200 || response.body.includes('error = "')) {
       throw new Error(`PAW refused the logon of ${username} (${response.status})`);
     }
@@ -58,7 +62,14 @@ export class PawSession {
     for (const header of response.headers.getSetCookie()) {
       const pair = header.split(";", 1)[0]!;
       const eq = pair.indexOf("=");
-      if (eq > 0) this.#cookies.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim().replace(/^"(.*)"$/, "$1"));
+      if (eq > 0)
+        this.#cookies.set(
+          pair.slice(0, eq).trim(),
+          pair
+            .slice(eq + 1)
+            .trim()
+            .replace(/^"(.*)"$/, "$1"),
+        );
     }
     return { status: response.status, body: await response.text() };
   }

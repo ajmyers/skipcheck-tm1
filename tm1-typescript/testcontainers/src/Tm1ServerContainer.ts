@@ -75,7 +75,11 @@ export class Tm1ServerContainer extends GenericContainer {
     // TM1 serves $metadata without a login, so a 200 means the REST API is really up. This is
     // also the image's healthcheck.
     this.waitingForHttp("/api/v1/$metadata", Tm1ServerContainer.REST_PORT, (s) => s === 200, STARTUP_TIMEOUT);
-    Tm1ServerContainer.mountSource(source, (s, t, ro) => this.withBind(s, t, ro), (n, v) => this.withEnv(n, v));
+    Tm1ServerContainer.mountSource(
+      source,
+      (s, t, ro) => this.withBind(s, t, ro),
+      (n, v) => this.withEnv(n, v),
+    );
   }
 
   /** The container most tests share: one per test run (per vitest worker), started on first use
@@ -242,7 +246,9 @@ export class Tm1ServerContainer extends GenericContainer {
     const version = await this.#readVersion();
     this.#version = version;
     if (this.#expectedVersion && !this.#expectedVersion.equals(version)) {
-      throw new IllegalStateException(`Expected TM1 ${this.#expectedVersion.toString()} but the server from ${this.#source.describe()} reports ${version.toString()}`);
+      throw new IllegalStateException(
+        `Expected TM1 ${this.#expectedVersion.toString()} but the server from ${this.#source.describe()} reports ${version.toString()}`,
+      );
     }
     this.log(`TM1 ${version.toString()} is up at ${this.getRestUrl()} (${this.#source.describe()})`);
   }
@@ -262,7 +268,9 @@ export class Tm1ServerContainer extends GenericContainer {
       const current = container.getNetwork();
       if (current === undefined) container.withNetwork(network);
       else if (current !== network) {
-        throw new IllegalStateException(`Containers that work together must share one Network, but ${container.constructor.name} is on another. Give them the same Network.`);
+        throw new IllegalStateException(
+          `Containers that work together must share one Network, but ${container.constructor.name} is on another. Give them the same Network.`,
+        );
       }
     }
   }
@@ -271,7 +279,11 @@ export class Tm1ServerContainer extends GenericContainer {
    * cache, or the download settings. Shared with {@link Tm1AdminServerContainer}, which runs the
    * same image.
    * @internal */
-  static mountSource(source: Tm1Source, bind: (source: string, target: string, readOnly: boolean) => void, withEnv: (name: string, value: string) => void): void {
+  static mountSource(
+    source: Tm1Source,
+    bind: (source: string, target: string, readOnly: boolean) => void,
+    withEnv: (name: string, value: string) => void,
+  ): void {
     if (source instanceof Tm1Source.InstallDir) {
       bind(source.dir, INSTALL_PATH, true);
     } else if (source instanceof Tm1Source.InstallVolume) {
@@ -296,13 +308,18 @@ export class Tm1ServerContainer extends GenericContainer {
     let response: Response;
     let body: string;
     try {
-      response = await fetch(url + "Configuration/ProductVersion/$value", { headers: { Authorization: this.getAuthorization() }, signal: AbortSignal.timeout(REQUEST_TIMEOUT) });
+      response = await fetch(url + "Configuration/ProductVersion/$value", {
+        headers: { Authorization: this.getAuthorization() },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+      });
       body = await response.text();
     } catch (e) {
       throw new Error("Couldn't read the TM1 version from " + url, { cause: e });
     }
     if (response.status !== 200) {
-      throw new IllegalStateException(`TM1 refused the login '${this.#username}' (HTTP ${response.status}): ${body}. Set the database's login with withCredentials.`);
+      throw new IllegalStateException(
+        `TM1 refused the login '${this.#username}' (HTTP ${response.status}): ${body}. Set the database's login with withCredentials.`,
+      );
     }
     const cookie = response.headers
       .getSetCookie()
@@ -311,7 +328,12 @@ export class Tm1ServerContainer extends GenericContainer {
     if (cookie) {
       try {
         // TM1 rejects actions without a JSON content type, even with no parameters
-        const closed = await fetch(url + "ActiveSession/tm1.Close", { method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: "{}", signal: AbortSignal.timeout(REQUEST_TIMEOUT) });
+        const closed = await fetch(url + "ActiveSession/tm1.Close", {
+          method: "POST",
+          headers: { Cookie: cookie, "Content-Type": "application/json" },
+          body: "{}",
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+        });
         await closed.arrayBuffer();
       } catch {
         // Couldn't close the version-check session; TM1 will time it out
@@ -325,7 +347,9 @@ export class Tm1ServerContainer extends GenericContainer {
    * build).
    * @internal */
   static defaultImage(source: Tm1Source): string {
-    return source instanceof Tm1Source.PrivateImage ? source.image : Tm1ServerContainer.imageFor(Tm1ServerContainer.SERVER_IMAGE, Tm1ServerContainer.DEFAULT_IMAGE);
+    return source instanceof Tm1Source.PrivateImage
+      ? source.image
+      : Tm1ServerContainer.imageFor(Tm1ServerContainer.SERVER_IMAGE, Tm1ServerContainer.DEFAULT_IMAGE);
   }
 
   /** @internal */

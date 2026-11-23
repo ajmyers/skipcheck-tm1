@@ -145,7 +145,14 @@ export class ContentService extends Tm1Service {
     await this.session.execute(Tm1Request.put(path, bytes), options);
   }
 
-  private relocate(operation: Tm1Operation, entry: ContentPath, target: ContentPath, scope: ContentScope, name: string | null | undefined, options: Tm1CallOptions | undefined): Promise<Entry> {
+  private relocate(
+    operation: Tm1Operation,
+    entry: ContentPath,
+    target: ContentPath,
+    scope: ContentScope,
+    name: string | null | undefined,
+    options: Tm1CallOptions | undefined,
+  ): Promise<Entry> {
     ContentScope.navigation(scope);
     const body: Record<string, unknown> = { "Target@odata.bind": pathOf(target, "target").toString(), Private: scope === ContentScope.Private };
     if (name != null) body["Name"] = name;

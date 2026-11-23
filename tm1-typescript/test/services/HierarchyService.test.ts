@@ -34,7 +34,9 @@ describe("HierarchyService", () => {
   it("refuses an update with structure", () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    const withElements = HierarchyPatch.builder().elements([ElementPatch.builder().name("x").build()]).build();
+    const withElements = HierarchyPatch.builder()
+      .elements([ElementPatch.builder().name("x").build()])
+      .build();
     const withBinding = HierarchyPatch.builder().bindElements(ODataPath.of("Dimensions").key("d")).build();
     const withEdges = HierarchyPatch.builder().edges([]).build();
     for (const patch of [withElements, withBinding, withEdges]) {
@@ -50,7 +52,12 @@ describe("HierarchyService", () => {
     tm1.respond = () => null;
     await tm1
       .client()
-      .hierarchies.replaceStructure("Region", "Region", [ElementPatch.builder().name("All").type(ElementType.Consolidated).build()], [EdgePatch.builder().parentName("All").componentName("North").weight(1).build()]);
+      .hierarchies.replaceStructure(
+        "Region",
+        "Region",
+        [ElementPatch.builder().name("All").type(ElementType.Consolidated).build()],
+        [EdgePatch.builder().parentName("All").componentName("North").weight(1).build()],
+      );
     expect([tm1.last.method, tm1.last.target]).toEqual(["PATCH", HIERARCHY]);
     expect(tm1.last.json).toEqual({ Elements: [{ Name: "All", Type: "Consolidated" }], Edges: [{ ParentName: "All", ComponentName: "North", Weight: 1 }] });
   });
@@ -93,7 +100,11 @@ describe("HierarchyService", () => {
     tm1.respond = () => null;
     const client = tm1.client();
     await client.hierarchies.setElement("Region", "Region", "West");
-    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", `${HIERARCHY}/tm1.SetElement`, `{"Element@odata.bind":"${HIERARCHY}/Elements('West')"}`]);
+    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual([
+      "POST",
+      `${HIERARCHY}/tm1.SetElement`,
+      `{"Element@odata.bind":"${HIERARCHY}/Elements('West')"}`,
+    ]);
     await client.hierarchies.setElement("Region", "Region", "West", "East");
     expect(tm1.last.text).toBe(`{"Element@odata.bind":"${HIERARCHY}/Elements('West')","Before@odata.bind":"${HIERARCHY}/Elements('East')"}`);
     expect(tm1.requests.filter((r) => r.target.endsWith("tm1.SetElement")).length).toBe(2);

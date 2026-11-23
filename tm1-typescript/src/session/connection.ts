@@ -1,5 +1,12 @@
 import type { Tm1Authenticator } from "../auth/index.js";
-import { ODataError, Tm1ApiException, Tm1ProtocolException, Tm1SessionClosedException, Tm1TransportException, type Tm1ErrorClassifier } from "../errors/index.js";
+import {
+  ODataError,
+  Tm1ApiException,
+  Tm1ProtocolException,
+  Tm1SessionClosedException,
+  Tm1TransportException,
+  type Tm1ErrorClassifier,
+} from "../errors/index.js";
 import { Tm1Request } from "../request.js";
 import { Tm1Capabilities, Tm1Version } from "../version/index.js";
 import type { Tm1Timeouts } from "./timeouts.js";
@@ -20,7 +27,7 @@ const utf8 = new TextEncoder();
 const decoder = new TextDecoder();
 
 export function textOf(body: Uint8Array): string {
-  return decoder.decode(body).replace(/^﻿/, "");
+  return decoder.decode(body).replace(/^\uFEFF/, "");
 }
 
 interface Login {
@@ -180,18 +187,24 @@ export class Connection {
     const reply = await this.sendRaw("GET", url, headers, undefined, this.timeouts.login, true, undefined);
     if (reply.status === 401) {
       // TM1 answers a disabled impersonated user exactly like wrong credentials
-      const why = this.impersonateUser === undefined ? undefined : new ODataError("", `The credentials were refused, or the user being impersonated (${this.impersonateUser}) is disabled`);
+      const why =
+        this.impersonateUser === undefined
+          ? undefined
+          : new ODataError("", `The credentials were refused, or the user being impersonated (${this.impersonateUser}) is disabled`);
       throw Tm1ApiException.of(401, "CredentialRejected", why, "GET", url);
     }
     if (reply.status >= 400) {
       const error = Tm1ApiException.fromBody(reply.status, reply.body, "GET", url, this.classifier);
       // A login that impersonates and gets a 400 or 403 was refused for the impersonation
-      if (this.impersonateUser !== undefined && reply.status === 400 && error.kind !== "UnknownUser") throw Tm1ApiException.of(400, "UnknownUser", error.error, "GET", url);
-      if (this.impersonateUser !== undefined && reply.status === 403 && error.kind !== "ImpersonationRefused") throw Tm1ApiException.of(403, "ImpersonationRefused", error.error, "GET", url);
+      if (this.impersonateUser !== undefined && reply.status === 400 && error.kind !== "UnknownUser")
+        throw Tm1ApiException.of(400, "UnknownUser", error.error, "GET", url);
+      if (this.impersonateUser !== undefined && reply.status === 403 && error.kind !== "ImpersonationRefused")
+        throw Tm1ApiException.of(403, "ImpersonationRefused", error.error, "GET", url);
       throw error;
     }
     const cookie = sessionCookie(reply) ?? seedCookie;
-    if (cookie === undefined && !this.transport.keepsCookies) throw new Tm1ProtocolException(`TM1 accepted the login but set no ${COOKIE} cookie`, undefined, "GET", url);
+    if (cookie === undefined && !this.transport.keepsCookies)
+      throw new Tm1ProtocolException(`TM1 accepted the login but set no ${COOKIE} cookie`, undefined, "GET", url);
     let parsed: unknown;
     try {
       parsed = JSON.parse(textOf(reply.body));
@@ -206,7 +219,16 @@ export class Connection {
 
   /** Sends a request with the session cookie, logging in again once on 401; a second 401 is a
    * `Tm1AuthenticationException` of kind `Unauthenticated`. */
-  async send(method: string, url: string, body: Uint8Array | undefined, contentType: string | undefined, headers: Readonly<Record<string, string>>, accept: string, timeout: number | undefined, signal: AbortSignal | undefined): Promise<Reply> {
+  async send(
+    method: string,
+    url: string,
+    body: Uint8Array | undefined,
+    contentType: string | undefined,
+    headers: Readonly<Record<string, string>>,
+    accept: string,
+    timeout: number | undefined,
+    signal: AbortSignal | undefined,
+  ): Promise<Reply> {
     let used = this.current();
     let session = await this.wait(used.login, signal);
     for (let attempt = 1; ; attempt++) {
@@ -244,7 +266,16 @@ export class Connection {
     });
   }
 
-  private async sendRaw(method: string, url: string, headers: Record<string, string>, body: Uint8Array | undefined, timeout: number, idempotent: boolean, signal: AbortSignal | undefined, closeConnection = false): Promise<Reply> {
+  private async sendRaw(
+    method: string,
+    url: string,
+    headers: Record<string, string>,
+    body: Uint8Array | undefined,
+    timeout: number,
+    idempotent: boolean,
+    signal: AbortSignal | undefined,
+    closeConnection = false,
+  ): Promise<Reply> {
     if (signal?.aborted) throw abortError(signal);
     const deadline = new AbortController();
     const timer = setTimeout(() => deadline.abort(new Error(`no answer within ${timeout} ms`)), timeout);

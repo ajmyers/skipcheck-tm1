@@ -293,7 +293,10 @@ export abstract class GenericContainer implements Startable {
     if (this.#hostname !== undefined) c = c.withHostname(this.#hostname);
     const files = this.#copies.filter((f) => !(existsSync(f.source) && statSync(f.source).isDirectory()));
     const dirs = this.#copies.filter((f) => existsSync(f.source) && statSync(f.source).isDirectory());
-    if (files.length > 0) c = c.withCopyFilesToContainer(files.map((f) => ({ source: f.source, target: f.target.endsWith("/") ? f.target + f.source.split(/[\\/]/).pop() : f.target })));
+    if (files.length > 0)
+      c = c.withCopyFilesToContainer(
+        files.map((f) => ({ source: f.source, target: f.target.endsWith("/") ? f.target + f.source.split(/[\\/]/).pop() : f.target })),
+      );
     if (dirs.length > 0) c = c.withCopyDirectoriesToContainer(dirs);
     if (this.#reuse && DockerHost.reuseEnabled()) c = c.withReuse();
     const w = this.#wait;

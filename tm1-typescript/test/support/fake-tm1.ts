@@ -75,7 +75,12 @@ export class FakeTm1 implements Tm1Transport {
     }
     if (path === "/api/v1/Server?$select=ProductVersion") return FakeTm1.toResponse(FakeTm1.reply(200, { ProductVersion: this.productVersion }));
     if (path === "/api/v1/$metadata") return { status: 200, headers: {}, body: this.metadata };
-    const recorded = new Recorded(request.method, path.startsWith("/api/v1/") ? path.slice("/api/v1/".length) : path, headers, request.body ?? new Uint8Array());
+    const recorded = new Recorded(
+      request.method,
+      path.startsWith("/api/v1/") ? path.slice("/api/v1/".length) : path,
+      headers,
+      request.body ?? new Uint8Array(),
+    );
     this.requests.push(recorded);
     const answer = await this.respond(recorded);
     return FakeTm1.toResponse(answer);

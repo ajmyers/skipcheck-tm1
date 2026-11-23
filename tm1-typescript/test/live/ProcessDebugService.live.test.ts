@@ -90,7 +90,9 @@ describe("ProcessDebugService on TM1" + liveReason, () => {
     expect(done.Status).toBe("Complete");
     expect(done.Result?.ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
     expect((await debug.get(id, ODataQuery.none())).Status, "still readable, complete").toBe("Complete");
-    await expect(tm1.session.execute(Tm1Request.delete(ODataPath.of("ProcessDebugContexts").key(id))), "TM1 refuses to delete one").rejects.toBeInstanceOf(Tm1BadRequestException);
+    await expect(tm1.session.execute(Tm1Request.delete(ODataPath.of("ProcessDebugContexts").key(id))), "TM1 refuses to delete one").rejects.toBeInstanceOf(
+      Tm1BadRequestException,
+    );
   }
 
   tm1Test("needs a chosen breakpoint ID, and updates and removes by it", async () => {

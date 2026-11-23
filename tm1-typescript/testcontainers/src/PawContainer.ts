@@ -342,7 +342,10 @@ async function runnerImage(): Promise<string> {
   const context = mkdtempSync(join(tmpdir(), "tm1-paw-runner-"));
   try {
     writeFileSync(join(context, SCRIPT), script);
-    writeFileSync(join(context, "Dockerfile"), `FROM ${RUNNER_BASE}\nRUN apk add --no-cache bash curl\nCOPY ${SCRIPT} /usr/local/bin/${SCRIPT}\nRUN chmod 755 /usr/local/bin/${SCRIPT}\n`);
+    writeFileSync(
+      join(context, "Dockerfile"),
+      `FROM ${RUNNER_BASE}\nRUN apk add --no-cache bash curl\nCOPY ${SCRIPT} /usr/local/bin/${SCRIPT}\nRUN chmod 755 /usr/local/bin/${SCRIPT}\n`,
+    );
     await TcGenericContainer.fromDockerfile(context).build(name, { deleteOnExit: false });
     return name;
   } finally {

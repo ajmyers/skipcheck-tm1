@@ -115,7 +115,7 @@ export class ODataError {
   /** The error in a response body, whatever its form: JSON, then plain text; undefined if empty. */
   static parse(body: Uint8Array | string | null | undefined): ODataError | undefined {
     if (body === null || body === undefined || body.length === 0) return undefined;
-    const s = (typeof body === "string" ? body : new TextDecoder().decode(body)).replace(/^﻿/, "");
+    const s = (typeof body === "string" ? body : new TextDecoder().decode(body)).replace(/^\uFEFF/, "");
     try {
       const e = ODataError.from(JSON.parse(s));
       if (e) return e;
@@ -274,7 +274,9 @@ export class Tm1TransportException extends Tm1Exception {
     cause?: unknown,
   ) {
     super(
-      (phase === "Connect" ? "Couldn't send the request to TM1" : "No complete response from TM1") + describe(method, url) + (cause instanceof Error && cause.message ? ": " + cause.message : ""),
+      (phase === "Connect" ? "Couldn't send the request to TM1" : "No complete response from TM1") +
+        describe(method, url) +
+        (cause instanceof Error && cause.message ? ": " + cause.message : ""),
       method,
       url,
       cause,
@@ -345,18 +347,18 @@ export class Tm1ErrorClassifier {
 
   private static makeDefaults(): Tm1ErrorClassifier {
     return new Tm1ErrorClassifier([
-    Tm1ErrorClassifier.Rule.message("insufficient rights to impersonate", "ImpersonationRefused"),
-    Tm1ErrorClassifier.Rule.message("administrator to be able to impersonate", "ImpersonationRefused"),
-    Tm1ErrorClassifier.Rule.message("user specified in the impersonation request does not exist", "UnknownUser"),
-    Tm1ErrorClassifier.Rule.message("tm1userexception: cancel", "Cancelled"),
-    Tm1ErrorClassifier.Rule.message("DataSpreadFailed", "DataSpreadFailed"),
-    Tm1ErrorClassifier.Rule.code("248", "InvalidUniqueName"),
-    Tm1ErrorClassifier.Rule.code("65", "NoReadRights"),
-    Tm1ErrorClassifier.Rule.message("ObjectSecurityNoReadRights", "NoReadRights"),
-    Tm1ErrorClassifier.Rule.message("can ?not be found|not found|does not exist|doesn't exist|ObjectNotFound", "NotFound"),
-    Tm1ErrorClassifier.Rule.message("already exists", "AlreadyExists"),
-    Tm1ErrorClassifier.Rule.message("\\blocked\\b", "Locked"),
-    Tm1ErrorClassifier.Rule.message("\\bin use\\b|is used by|isbeingusedby|cannot be deleted", "InUse"),
+      Tm1ErrorClassifier.Rule.message("insufficient rights to impersonate", "ImpersonationRefused"),
+      Tm1ErrorClassifier.Rule.message("administrator to be able to impersonate", "ImpersonationRefused"),
+      Tm1ErrorClassifier.Rule.message("user specified in the impersonation request does not exist", "UnknownUser"),
+      Tm1ErrorClassifier.Rule.message("tm1userexception: cancel", "Cancelled"),
+      Tm1ErrorClassifier.Rule.message("DataSpreadFailed", "DataSpreadFailed"),
+      Tm1ErrorClassifier.Rule.code("248", "InvalidUniqueName"),
+      Tm1ErrorClassifier.Rule.code("65", "NoReadRights"),
+      Tm1ErrorClassifier.Rule.message("ObjectSecurityNoReadRights", "NoReadRights"),
+      Tm1ErrorClassifier.Rule.message("can ?not be found|not found|does not exist|doesn't exist|ObjectNotFound", "NotFound"),
+      Tm1ErrorClassifier.Rule.message("already exists", "AlreadyExists"),
+      Tm1ErrorClassifier.Rule.message("\\blocked\\b", "Locked"),
+      Tm1ErrorClassifier.Rule.message("\\bin use\\b|is used by|isbeingusedby|cannot be deleted", "InUse"),
     ]);
   }
 

@@ -104,7 +104,11 @@ export class UserService extends Tm1Service {
 }
 
 function withoutGroups(patch: UserPatch): UserPatch {
-  if (required(patch, "patch").values().some(([key]) => key === "Groups" || key.startsWith("Groups@"))) {
+  if (
+    required(patch, "patch")
+      .values()
+      .some(([key]) => key === "Groups" || key.startsWith("Groups@"))
+  ) {
     throw new RangeError("A user PATCH with Groups replaces them: use setGroups");
   }
   return patch;

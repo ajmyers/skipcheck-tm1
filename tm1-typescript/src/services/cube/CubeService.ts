@@ -124,7 +124,10 @@ export class CubeService extends Tm1Service {
    * change in memory use, as a percentage. */
   async reorderDimensions(name: string, dimensions: readonly string[], options?: Tm1CallOptions): Promise<number> {
     const bindings = required(dimensions, "dimensions").map((d) => ODataPath.of("Dimensions").key(d).toString());
-    const result = await this.session.execute(action(Tm1Operations.CubeReorderDimensions, name, { "Dimensions@odata.bind": bindings }, Primitive.number), options);
+    const result = await this.session.execute(
+      action(Tm1Operations.CubeReorderDimensions, name, { "Dimensions@odata.bind": bindings }, Primitive.number),
+      options,
+    );
     return typeof result === "number" ? result : 0;
   }
 
@@ -169,7 +172,10 @@ export class CubeService extends Tm1Service {
   /** `tm1.TraceCellCalculation`: how a cell's value is calculated, component by component; `tuple`
    * maps each dimension to an element. */
   traceCellCalculation(name: string, tuple: Tm1Map<string>, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<CalculationComponent> {
-    return this.session.execute(action(Tm1Operations.CubeTraceCellCalculation, name, { "Tuple@odata.bind": bindings(tuple) }, CalculationComponent).withQuery(query), options);
+    return this.session.execute(
+      action(Tm1Operations.CubeTraceCellCalculation, name, { "Tuple@odata.bind": bindings(tuple) }, CalculationComponent).withQuery(query),
+      options,
+    );
   }
 
   /** `tm1.TraceFeeders`: what a cell feeds. TM1 (11.8) needs a path to expand into a complex
@@ -180,15 +186,26 @@ export class CubeService extends Tm1Service {
 
   /** `tm1.CheckFeeders`: the cells under a consolidated cell that aren't fed though they have
    * values, chosen by `selection`. */
-  checkFeeders(name: string, tuple: Tm1Map<string>, selection: CheckFeedersSelection, query?: ODataQuery | null, options?: Tm1CallOptions): Tm1Stream<FedCellDescriptor> {
+  checkFeeders(
+    name: string,
+    tuple: Tm1Map<string>,
+    selection: CheckFeedersSelection,
+    query?: ODataQuery | null,
+    options?: Tm1CallOptions,
+  ): Tm1Stream<FedCellDescriptor> {
     const operation = Tm1Operations.CubeCheckFeeders;
     const body = { "Tuple@odata.bind": bindings(tuple), Selection: required(selection, "selection") };
-    return this.session.stream(Tm1Request.postList(cubePath(name).action(operation.name), body, FedCellDescriptor).withQuery(query).requires(operation.capability()), options);
+    return this.session.stream(
+      Tm1Request.postList(cubePath(name).action(operation.name), body, FedCellDescriptor).withQuery(query).requires(operation.capability()),
+      options,
+    );
   }
 }
 
 function bindings(tuple: Tm1Map<string>): string[] {
-  return entriesOf(required(tuple, "tuple")).map(([dimension, element]) => ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements").key(element).toString());
+  return entriesOf(required(tuple, "tuple")).map(([dimension, element]) =>
+    ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements").key(element).toString(),
+  );
 }
 
 function cubePath(name: string): ODataPath {

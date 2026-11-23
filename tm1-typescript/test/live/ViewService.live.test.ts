@@ -1,5 +1,19 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
-import { CubePatch, MDXViewPatch, NativeViewPatch, ODataQuery, Tm1PreconditionFailedException, View, ViewAxisSelectionPatch, ViewScope, ViewTitlePatch, typeOf, type MDXView, type NativeView, type Tm1Client } from "../../src/index.js";
+import {
+  CubePatch,
+  MDXViewPatch,
+  NativeViewPatch,
+  ODataQuery,
+  Tm1PreconditionFailedException,
+  View,
+  ViewAxisSelectionPatch,
+  ViewScope,
+  ViewTitlePatch,
+  typeOf,
+  type MDXView,
+  type NativeView,
+  type Tm1Client,
+} from "../../src/index.js";
 import { Fixtures } from "./data-fixtures.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
@@ -35,7 +49,9 @@ describe("ViewService on TM1" + liveReason, () => {
       await Fixtures.dimension(tm1, d, [...elements]);
       await Fixtures.subsetAll(tm1, d);
     }
-    await tm1.cubes.create(CubePatch.builder().name(cube).bindDimensions(Fixtures.dimensionPath(region), Fixtures.dimensionPath(measure), Fixtures.dimensionPath(year)).build());
+    await tm1.cubes.create(
+      CubePatch.builder().name(cube).bindDimensions(Fixtures.dimensionPath(region), Fixtures.dimensionPath(measure), Fixtures.dimensionPath(year)).build(),
+    );
   });
 
   afterEach(async () => {
@@ -50,7 +66,12 @@ describe("ViewService on TM1" + liveReason, () => {
       .name(name)
       .columns([ViewAxisSelectionPatch.builder().bindSubset(Fixtures.subset(measure)).build()])
       .rows([ViewAxisSelectionPatch.builder().bindSubset(Fixtures.subset(region)).build()])
-      .titles([ViewTitlePatch.builder().bindSubset(Fixtures.subset(year)).bindSelected(Fixtures.dimensionPath(year).nav("Hierarchies").key(year).nav("Elements").key("2026")).build()])
+      .titles([
+        ViewTitlePatch.builder()
+          .bindSubset(Fixtures.subset(year))
+          .bindSelected(Fixtures.dimensionPath(year).nav("Hierarchies").key(year).nav("Elements").key("2026"))
+          .build(),
+      ])
       .build();
 
   tm1Test("creates, reads, updates and deletes both kinds of view", async () => {
@@ -67,7 +88,9 @@ describe("ViewService on TM1" + liveReason, () => {
     const read = await tm1.views.get(cube, ViewScope.Public, "Mdx");
     expect(typeOf(View, read)).toBe("MDXView");
     expect((read as MDXView).MDX).toBe(changed);
-    await expect(tm1.views.update(cube, ViewScope.Public, "Mdx", MDXViewPatch.builder().mdx(mdx()).build(), etag)).rejects.toBeInstanceOf(Tm1PreconditionFailedException);
+    await expect(tm1.views.update(cube, ViewScope.Public, "Mdx", MDXViewPatch.builder().mdx(mdx()).build(), etag)).rejects.toBeInstanceOf(
+      Tm1PreconditionFailedException,
+    );
     expect((await tm1.views.cube(cube, ViewScope.Public, "Mdx")).Name).toBe(cube);
 
     await tm1.views.delete(cube, ViewScope.Public, "Mdx");
@@ -82,7 +105,12 @@ describe("ViewService on TM1" + liveReason, () => {
 
   tm1Test("expands a native view's axes through its type", async () => {
     await tm1.views.create(cube, ViewScope.Public, nativeView("Native"));
-    const read = await tm1.views.getNative(cube, ViewScope.Public, "Native", ODataQuery.none().expand("Columns/Subset").expand("Rows/Subset").expand("Titles/Subset").expand("Titles/Selected"));
+    const read = await tm1.views.getNative(
+      cube,
+      ViewScope.Public,
+      "Native",
+      ODataQuery.none().expand("Columns/Subset").expand("Rows/Subset").expand("Titles/Subset").expand("Titles/Selected"),
+    );
     expect(read.Columns?.map((c) => c.Subset?.Name)).toEqual(["All"]);
     expect(read.Rows).toHaveLength(1);
     expect(read.Rows![0]!.Subset?.UniqueName).toContain(region);

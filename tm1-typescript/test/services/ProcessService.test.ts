@@ -33,7 +33,9 @@ describe("ProcessService", () => {
   it("refuses a stale ETag", async () => {
     const tm1 = new FakeTm1();
     tm1.respond = () => FakeTm1.reply(412, { error: { code: "278", message: "stale" } });
-    await expect(tm1.client().processes.update("Load", ProcessPatch.builder().epilogProcedure("").build(), 'W/"0"')).rejects.toBeInstanceOf(Tm1PreconditionFailedException);
+    await expect(tm1.client().processes.update("Load", ProcessPatch.builder().epilogProcedure("").build(), 'W/"0"')).rejects.toBeInstanceOf(
+      Tm1PreconditionFailedException,
+    );
   });
 
   it("compiles by name or by definition", async () => {

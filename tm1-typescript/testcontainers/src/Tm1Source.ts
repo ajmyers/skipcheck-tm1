@@ -91,7 +91,9 @@ export namespace Tm1Source {
       super();
       this.dir = Settings.absolute(dir);
       if (!Settings.isFile(join(this.dir, "bin64", "tm1s.exe"))) {
-        throw new IllegalArgumentException(`Not a TM1 install: ${this.dir} has no bin64/tm1s.exe. Point ${Tm1Source.HOME_DIR} at the tm1_64 folder of a Linux TM1 Server install.`);
+        throw new IllegalArgumentException(
+          `Not a TM1 install: ${this.dir} has no bin64/tm1s.exe. Point ${Tm1Source.HOME_DIR} at the tm1_64 folder of a Linux TM1 Server install.`,
+        );
       }
     }
 
@@ -127,7 +129,9 @@ export namespace Tm1Source {
       super();
       this.dir = Settings.absolute(dir);
       if (!Settings.isDirectory(this.dir)) {
-        throw new IllegalArgumentException(`${Tm1Source.BUNDLE_DIR} is not a folder: ${this.dir}. Point it at the folder holding the bundle; name the file itself with ${Tm1Source.BUNDLE}.`);
+        throw new IllegalArgumentException(
+          `${Tm1Source.BUNDLE_DIR} is not a folder: ${this.dir}. Point it at the folder holding the bundle; name the file itself with ${Tm1Source.BUNDLE}.`,
+        );
       }
       this.file = file === undefined || file === null || file.trim() === "" ? undefined : file;
       if (this.file !== undefined && !Settings.isFile(join(this.dir, this.file))) {

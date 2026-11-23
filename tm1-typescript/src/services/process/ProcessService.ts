@@ -85,10 +85,16 @@ export class ProcessService extends Tm1Service {
   compile(nameOrDefinition: string | ProcessPatch, options?: Tm1CallOptions): Tm1Stream<ProcessSyntaxError> {
     if (typeof nameOrDefinition === "string") {
       const operation = Tm1Operations.ProcessCompile;
-      return this.session.stream(Tm1Request.postList(processPath(nameOrDefinition).action(operation.name), {}, ProcessSyntaxError).requires(operation.capability()), options);
+      return this.session.stream(
+        Tm1Request.postList(processPath(nameOrDefinition).action(operation.name), {}, ProcessSyntaxError).requires(operation.capability()),
+        options,
+      );
     }
     const operation = Tm1Operations.CompileProcess;
-    return this.session.stream(Tm1Request.postList(root(operation), { Process: required(nameOrDefinition, "definition") }, ProcessSyntaxError).requires(operation.capability()), options);
+    return this.session.stream(
+      Tm1Request.postList(root(operation), { Process: required(nameOrDefinition, "definition") }, ProcessSyntaxError).requires(operation.capability()),
+      options,
+    );
   }
 
   /** `tm1.ExecuteWithReturn`: runs a process and says how it ended (`ProcessExecuteStatusCode`, and
@@ -98,8 +104,18 @@ export class ProcessService extends Tm1Service {
    * instead, with a `Tm1ServerException` (`TM1UserException: Cancel`, code 174). */
   executeWithReturn(name: string, parameters?: Tm1Map<unknown> | null, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<ProcessExecuteResult>;
   /** `ExecuteProcessWithReturn`: runs a process definition that needn't be saved. Needs schema 11.3.0. */
-  executeWithReturn(definition: ProcessPatch, parameters?: Tm1Map<unknown> | null, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<ProcessExecuteResult>;
-  executeWithReturn(nameOrDefinition: string | ProcessPatch, parameters?: Tm1Map<unknown> | null, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<ProcessExecuteResult> {
+  executeWithReturn(
+    definition: ProcessPatch,
+    parameters?: Tm1Map<unknown> | null,
+    query?: ODataQuery | null,
+    options?: Tm1CallOptions,
+  ): Promise<ProcessExecuteResult>;
+  executeWithReturn(
+    nameOrDefinition: string | ProcessPatch,
+    parameters?: Tm1Map<unknown> | null,
+    query?: ODataQuery | null,
+    options?: Tm1CallOptions,
+  ): Promise<ProcessExecuteResult> {
     if (typeof nameOrDefinition === "string") {
       const operation = Tm1Operations.ProcessExecuteWithReturn;
       const request = Tm1Request.post(processPath(nameOrDefinition).action(operation.name), withParameters({}, parameters), ProcessExecuteResult);
@@ -119,7 +135,10 @@ export class ProcessService extends Tm1Service {
   execute(nameOrDefinition: string | ProcessPatch, parameters?: Tm1Map<unknown> | null, options?: Tm1CallOptions): Promise<void> {
     // As the Java client's, neither is checked against $metadata first
     if (typeof nameOrDefinition === "string") {
-      return this.session.execute(Tm1Request.post(processPath(nameOrDefinition).action(Tm1Operations.ProcessExecute.name), withParameters({}, parameters)), options);
+      return this.session.execute(
+        Tm1Request.post(processPath(nameOrDefinition).action(Tm1Operations.ProcessExecute.name), withParameters({}, parameters)),
+        options,
+      );
     }
     const body = withParameters({ Process: required(nameOrDefinition, "definition") }, parameters);
     return this.session.execute(Tm1Request.post(root(Tm1Operations.ExecuteProcess), body), options);
@@ -140,7 +159,10 @@ export class ProcessService extends Tm1Service {
    * `ErrorLogFile` that {@link executeWithReturn} returns. */
   errorLogContent(name: string, log: ProcessErrorLog, options?: Tm1CallOptions): Promise<string> {
     const timestamp = javaOffsetDateTime(required(required(log, "log").Timestamp, "the log's timestamp"));
-    const path = processPath(name).nav("ErrorLogs").key(new ODataLiterals.Raw(ODataLiterals.of(timestamp))).nav("Content");
+    const path = processPath(name)
+      .nav("ErrorLogs")
+      .key(new ODataLiterals.Raw(ODataLiterals.of(timestamp)))
+      .nav("Content");
     return this.session.execute(Tm1Request.text(path), options);
   }
 }

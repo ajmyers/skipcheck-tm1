@@ -55,7 +55,11 @@ describe("DrillthroughService", () => {
 
     tm1.respond = () => ({ ID: "r1" });
     expect((await client.drillthrough.executeRelationalProcessWithRowset("}Drill_Orders", [])).ID).toBe("r1");
-    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "ExecuteRelationalDrillthroughWithRowset", `{"DrillthroughProcess@odata.bind":"Processes('%7DDrill_Orders')"}`]);
+    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual([
+      "POST",
+      "ExecuteRelationalDrillthroughWithRowset",
+      `{"DrillthroughProcess@odata.bind":"Processes('%7DDrill_Orders')"}`,
+    ]);
   });
 
   it("reads and deletes rowsets", async () => {

@@ -99,7 +99,8 @@ export function declarations(dir: string): Map<string, TsDeclaration> {
           for (const m of s.members) {
             if (ts.isConstructorDeclaration(m)) {
               for (const p of m.parameters) {
-                if (ts.getModifiers(p)?.some((x) => x.kind === ts.SyntaxKind.ReadonlyKeyword || x.kind === ts.SyntaxKind.PublicKeyword) && isPublic(p)) add(d.members, p.name.getText(source), false, undefined);
+                if (ts.getModifiers(p)?.some((x) => x.kind === ts.SyntaxKind.ReadonlyKeyword || x.kind === ts.SyntaxKind.PublicKeyword) && isPublic(p))
+                  add(d.members, p.name.getText(source), false, undefined);
               }
             }
           }
@@ -131,7 +132,16 @@ export function declarations(dir: string): Map<string, TsDeclaration> {
               for (const p of init.properties) {
                 const name = nameOf(p as { name?: ts.PropertyName }, source);
                 if (!name) continue;
-                add(d.members, name, true, ts.isMethodDeclaration(p) ? params(p.parameters, source) : ts.isPropertyAssignment(p) && (ts.isArrowFunction(p.initializer) || ts.isFunctionExpression(p.initializer)) ? params(p.initializer.parameters, source) : undefined);
+                add(
+                  d.members,
+                  name,
+                  true,
+                  ts.isMethodDeclaration(p)
+                    ? params(p.parameters, source)
+                    : ts.isPropertyAssignment(p) && (ts.isArrowFunction(p.initializer) || ts.isFunctionExpression(p.initializer))
+                      ? params(p.initializer.parameters, source)
+                      : undefined,
+                );
               }
             }
           }

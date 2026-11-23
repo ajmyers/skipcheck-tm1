@@ -52,7 +52,10 @@ export abstract class CognosSource {
     // The TM1 downloads folder, when it holds Cognos too. Skipped quietly when it doesn't: that
     // folder is TM1's setting, and is valid without Cognos in it.
     const tm1Dir = get(Tm1Source.BUNDLE_DIR);
-    if (tm1Dir !== undefined && (get(CognosSource.ZIP) !== undefined || Settings.hasFile(tm1Dir, (n) => n.startsWith("casrv-") && n.endsWith("-linuxi38664h.zip")))) {
+    if (
+      tm1Dir !== undefined &&
+      (get(CognosSource.ZIP) !== undefined || Settings.hasFile(tm1Dir, (n) => n.startsWith("casrv-") && n.endsWith("-linuxi38664h.zip")))
+    ) {
       return new CognosSource.Zip(tm1Dir, get(CognosSource.ZIP));
     }
     return undefined;
@@ -96,7 +99,9 @@ export namespace CognosSource {
       super();
       this.dir = Settings.absolute(dir);
       if (!Settings.isDirectory(this.dir)) {
-        throw new IllegalArgumentException(`${CognosSource.ZIP_DIR} is not a folder: ${this.dir}. Point it at the folder holding the zip; name the file itself with ${CognosSource.ZIP}.`);
+        throw new IllegalArgumentException(
+          `${CognosSource.ZIP_DIR} is not a folder: ${this.dir}. Point it at the folder holding the zip; name the file itself with ${CognosSource.ZIP}.`,
+        );
       }
       this.file = file === undefined || file === null || file.trim() === "" ? undefined : file;
       if (this.file !== undefined && !Settings.isFile(join(this.dir, this.file))) {

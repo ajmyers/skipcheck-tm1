@@ -54,9 +54,26 @@ export class Tm1Request<T> {
     this.requirementValue = parts.requirement;
   }
 
-  private static make<T>(method: string, path: ODataPath, query: ODataQuery | null | undefined, body: unknown, response: Tm1Response, type?: Tm1Model<T>): Tm1Request<T> {
+  private static make<T>(
+    method: string,
+    path: ODataPath,
+    query: ODataQuery | null | undefined,
+    body: unknown,
+    response: Tm1Response,
+    type?: Tm1Model<T>,
+  ): Tm1Request<T> {
     if (!path) throw new TypeError("path is required");
-    return new Tm1Request<T>({ method, path, query: query ?? ODataQuery.none(), headers: {}, body, response, type, timeout: undefined, requirement: undefined });
+    return new Tm1Request<T>({
+      method,
+      path,
+      query: query ?? ODataQuery.none(),
+      headers: {},
+      body,
+      response,
+      type,
+      timeout: undefined,
+      requirement: undefined,
+    });
   }
 
   static get<T = unknown>(path: ODataPath, query?: ODataQuery | null, type?: Tm1Model<T>): Tm1Request<T> {

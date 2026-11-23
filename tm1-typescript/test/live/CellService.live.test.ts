@@ -1,5 +1,17 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
-import { CellsetUpdatePatch, CubePatch, CubeUpdatePatch, ODataPath, ODataQuery, Tm1BadRequestException, Tm1Request, Tuples, UpdateOrder, ViewScope, type Tm1Client } from "../../src/index.js";
+import {
+  CellsetUpdatePatch,
+  CubePatch,
+  CubeUpdatePatch,
+  ODataPath,
+  ODataQuery,
+  Tm1BadRequestException,
+  Tm1Request,
+  Tuples,
+  UpdateOrder,
+  ViewScope,
+  type Tm1Client,
+} from "../../src/index.js";
 import { Fixtures } from "./data-fixtures.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
@@ -53,7 +65,11 @@ describe("CellService on TM1" + liveReason, () => {
   const mdxOf = (r: string, m: string): string => `SELECT {[${measure}].[${measure}].[${m}]} ON 0, {[${region}].[${region}].[${r}]} ON 1 FROM [${cube}]`;
   const number = (r: string, m: string): Promise<number> => Fixtures.number(tm1, mdxOf(r, m));
   const read = (r: string, m: string): Promise<unknown> => Fixtures.value(tm1, mdxOf(r, m));
-  const write = (r: string, m: string, value: unknown): CubeUpdatePatch => CubeUpdatePatch.builder().bindTuple(...Tuples.of(cell(r, m))).value(value).build();
+  const write = (r: string, m: string, value: unknown): CubeUpdatePatch =>
+    CubeUpdatePatch.builder()
+      .bindTuple(...Tuples.of(cell(r, m)))
+      .value(value)
+      .build();
   const paths = (tuple: Map<string, string>): string[] => Tuples.of(tuple).map((p) => p.toString());
 
   tm1Test("writes numbers, text and nulls cell by cell", async () => {

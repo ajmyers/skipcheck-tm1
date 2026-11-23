@@ -82,7 +82,13 @@ export class SandboxService extends Tm1Service {
    * (`allowQueueing`), and whether to empty the sandbox once published (`cleanAfter`). */
   publish(name: string, options?: Tm1CallOptions): Promise<void>;
   publish(name: string, conflicts: ConflictResolution, allowQueueing: boolean, cleanAfter: boolean, options?: Tm1CallOptions): Promise<void>;
-  publish(name: string, conflicts?: ConflictResolution | Tm1CallOptions, allowQueueing?: boolean, cleanAfter?: boolean, options?: Tm1CallOptions): Promise<void> {
+  publish(
+    name: string,
+    conflicts?: ConflictResolution | Tm1CallOptions,
+    allowQueueing?: boolean,
+    cleanAfter?: boolean,
+    options?: Tm1CallOptions,
+  ): Promise<void> {
     if (typeof conflicts !== "string") return this.session.execute(action(Tm1Operations.SandboxPublish, name, {}), conflicts);
     return this.session.execute(action(Tm1Operations.SandboxPublish, name, publishOptions(conflicts, allowQueueing, cleanAfter)), options);
   }
@@ -92,7 +98,14 @@ export class SandboxService extends Tm1Service {
    * (`allowQueueing`), and whether to empty this sandbox once merged (`cleanAfter`). */
   merge(name: string, target: string, options?: Tm1CallOptions): Promise<void>;
   merge(name: string, target: string, conflicts: ConflictResolution, allowQueueing: boolean, cleanAfter: boolean, options?: Tm1CallOptions): Promise<void>;
-  merge(name: string, target: string, conflicts?: ConflictResolution | Tm1CallOptions, allowQueueing?: boolean, cleanAfter?: boolean, options?: Tm1CallOptions): Promise<void> {
+  merge(
+    name: string,
+    target: string,
+    conflicts?: ConflictResolution | Tm1CallOptions,
+    allowQueueing?: boolean,
+    cleanAfter?: boolean,
+    options?: Tm1CallOptions,
+  ): Promise<void> {
     const body: Record<string, unknown> = { "Target@odata.bind": sandbox(target).toString() };
     if (typeof conflicts !== "string") return this.session.execute(action(Tm1Operations.SandboxMerge, name, body), conflicts);
     return this.session.execute(action(Tm1Operations.SandboxMerge, name, { ...body, ...publishOptions(conflicts, allowQueueing, cleanAfter) }), options);

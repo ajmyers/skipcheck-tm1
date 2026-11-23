@@ -11,7 +11,8 @@ export function emitOperations(spec: Spec): string {
   const lit = (s: string | undefined | null): string => (s == null ? "null" : JSON.stringify(s));
   let out = HEADER;
   out += 'import { Tm1Operation } from "../operation.js";\n\n';
-  out += "/** Every action and function of the TM1 REST API, as `$metadata` declares them. Services refer to\n * these, so a request checks the server has the operation. */\n";
+  out +=
+    "/** Every action and function of the TM1 REST API, as `$metadata` declares them. Services refer to\n * these, so a request checks the server has the operation. */\n";
   out += "export const Tm1Operations = {\n";
   const taken = new Set(["All"]);
   const all: string[] = [];
@@ -23,9 +24,7 @@ export function emitOperations(spec: Spec): string {
     out += `  ${constant}: new Tm1Operation(${lit(op.kind === "action" ? "Action" : "Function")}, ${lit(name)}, ${lit(binding)}, ${lit(importName)}, [${params.join(", ")}], ${returns}, ${lit(op.since)}, ${deprecated}),\n`;
     all.push(constant);
   };
-  const bound = spec.doc.operations
-    .filter((op) => op.bound)
-    .sort((a, b) => cmp(a.binding!.type, b.binding!.type) || cmp(a.name, b.name));
+  const bound = spec.doc.operations.filter((op) => op.bound).sort((a, b) => cmp(a.binding!.type, b.binding!.type) || cmp(a.name, b.name));
   for (const op of bound) {
     const binding = spec.aliasName(op.binding!.type);
     const simple = binding.slice(binding.lastIndexOf(".") + 1);

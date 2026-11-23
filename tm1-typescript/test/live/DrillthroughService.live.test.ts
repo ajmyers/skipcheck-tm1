@@ -1,5 +1,16 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { CubePatch, Drillthrough, NativeViewPatch, ODataPath, ODataQuery, Tm1Request, ViewAxisSelectionPatch, ViewScope, typeOf, type Tm1Client } from "../../src/index.js";
+import {
+  CubePatch,
+  Drillthrough,
+  NativeViewPatch,
+  ODataPath,
+  ODataQuery,
+  Tm1Request,
+  ViewAxisSelectionPatch,
+  ViewScope,
+  typeOf,
+  type Tm1Client,
+} from "../../src/index.js";
 import { Fixtures } from "./data-fixtures.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
@@ -28,7 +39,15 @@ describe("DrillthroughService on TM1" + liveReason, () => {
         .drillthroughRules(`[] = S: '${process.slice("}Drill_".length)}';\n`)
         .build(),
     );
-    await tm1.views.create(cube, ViewScope.Public, NativeViewPatch.builder().name("Detail").columns([axis(dimensions[1]!)]).rows([axis(dimensions[0]!)]).build());
+    await tm1.views.create(
+      cube,
+      ViewScope.Public,
+      NativeViewPatch.builder()
+        .name("Detail")
+        .columns([axis(dimensions[1]!)])
+        .rows([axis(dimensions[0]!)])
+        .build(),
+    );
     // Processes through the session until ProcessService is ported
     await tm1.session.execute(
       Tm1Request.post(ODataPath.of("Processes"), {
@@ -48,7 +67,11 @@ describe("DrillthroughService on TM1" + liveReason, () => {
   });
 
   tm1Test("runs a drillthrough process directly", async () => {
-    const cellset = await tm1.drillthrough.executeProcess(process, [], ODataQuery.none().expand("Cells", (c) => c.select("Ordinal")));
+    const cellset = await tm1.drillthrough.executeProcess(
+      process,
+      [],
+      ODataQuery.none().expand("Cells", (c) => c.select("Ordinal")),
+    );
     try {
       expect(cellset.Cells, "the Detail view's 2 x 2 cells").toHaveLength(4);
     } finally {
@@ -63,7 +86,12 @@ describe("DrillthroughService on TM1" + liveReason, () => {
       const scripts = await tm1.drillthrough.scripts(source.ID!, 0).toArray();
       expect(scripts).toHaveLength(1);
       expect(typeOf(Drillthrough, scripts[0]!)).toBe("CubeDrillthrough");
-      const detail = await tm1.drillthrough.execute(source.ID!, 0, scripts[0]!.Name!, ODataQuery.none().expand("Cells", (c) => c.select("Ordinal")));
+      const detail = await tm1.drillthrough.execute(
+        source.ID!,
+        0,
+        scripts[0]!.Name!,
+        ODataQuery.none().expand("Cells", (c) => c.select("Ordinal")),
+      );
       try {
         expect(detail.Cells).toHaveLength(4);
       } finally {

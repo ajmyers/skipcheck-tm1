@@ -54,7 +54,13 @@ export function emitModel(spec: Spec): string {
     const members = e.members.map((m) => m.name);
     const fallback = members.includes("Unknown") ? "Unrecognized" : "Unknown";
     out += "\n";
-    out += jsdoc("", (e.description ?? `The \`${e.name}\` enum type of the TM1 REST API.`) + ` A value this client doesn't know reads as \`"${fallback}"\`, which is never sent.` + (e.flags ? " Its values combine, as in `\"Unfed, Fed\"`: a property of this type reads as a string." : ""), e);
+    out += jsdoc(
+      "",
+      (e.description ?? `The \`${e.name}\` enum type of the TM1 REST API.`) +
+        ` A value this client doesn't know reads as \`"${fallback}"\`, which is never sent.` +
+        (e.flags ? ' Its values combine, as in `"Unfed, Fed"`: a property of this type reads as a string.' : ""),
+      e,
+    );
     out += `export type ${e.name} = ${[...members, fallback].map((m) => JSON.stringify(m)).join(" | ")};\n`;
     out += `export const ${e.name} = {\n`;
     const taken = new Set<string>(["literal", "qualifiedName"]);
@@ -80,11 +86,16 @@ function emitType(spec: Spec, t: SpecType): string {
   let out = "\n";
   let head = t.description ?? `The \`${t.name}\` ${entity ? "entity" : "complex"} type of the TM1 REST API.`;
   if (base) head += ` A kind of {@link ${root.name}}, read by \`@odata.type\` \`#${t.qualifiedName}\`.`;
-  if (spec.derived(t).length) head += ` Reads as one of ${spec.derived(t).map((d) => `{@link ${d.name}}`).join(", ")} by \`@odata.type\`, or as this type itself.`;
+  if (spec.derived(t).length)
+    head += ` Reads as one of ${spec
+      .derived(t)
+      .map((d) => `{@link ${d.name}}`)
+      .join(", ")} by \`@odata.type\`, or as this type itself.`;
   out += jsdoc("", head + " Every property is optional: `$select` can leave any out, and navigation properties are there only when expanded.", t);
   out += `export interface ${t.name}${base ? ` extends ${base.name}` : ""} {\n`;
   if (entity && !base) out += `  /** The entity's ETag, for \`If-Match\`. */\n  "@odata.etag"?: string;\n`;
-  if (!base && spec.derived(t).length) out += `  /** The type TM1 says this is, such as \`#${spec.derived(t)[0]!.qualifiedName}\`. */\n  "@odata.type"?: string;\n`;
+  if (!base && spec.derived(t).length)
+    out += `  /** The type TM1 says this is, such as \`#${spec.derived(t)[0]!.qualifiedName}\`. */\n  "@odata.type"?: string;\n`;
   for (const p of t.properties ?? []) {
     const type = propertyType(spec, p);
     if (type === undefined) continue;
@@ -98,7 +109,8 @@ function emitType(spec: Spec, t: SpecType): string {
     out += jsdoc("  ", (n.description ?? "") + " (When expanded.)", n);
     out += `  ${Names.key(n.name)}?: ${type}${n.nullable === false ? "" : " | null"};\n`;
   }
-  if (t.open && !(base && base.open)) out += "  /** The properties `$metadata` doesn't declare, which an open type can have, such as attribute values. */\n  [property: string]: unknown;\n";
+  if (t.open && !(base && base.open))
+    out += "  /** The properties `$metadata` doesn't declare, which an open type can have, such as attribute values. */\n  [property: string]: unknown;\n";
   out += "}\n";
   // Fields, as the Java model's Cube.NAME: its own and its root's
   const fields: string[] = [];
@@ -147,7 +159,10 @@ export function emitSchema(spec: Spec): string {
     if (spec.derived(t).length) {
       const derived: string[] = [];
       for (const d of [...spec.derived(t), t]) {
-        derived.push(`${JSON.stringify(d.qualifiedName)}: ${JSON.stringify(d.name)}`, `${JSON.stringify(spec.aliasName(d.qualifiedName))}: ${JSON.stringify(d.name)}`);
+        derived.push(
+          `${JSON.stringify(d.qualifiedName)}: ${JSON.stringify(d.name)}`,
+          `${JSON.stringify(spec.aliasName(d.qualifiedName))}: ${JSON.stringify(d.name)}`,
+        );
       }
       parts.push(`derived: { ${derived.join(", ")} }`);
     }

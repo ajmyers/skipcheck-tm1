@@ -57,8 +57,13 @@ describe("LogService", () => {
   it("tails a log, skipping what it has yielded", async () => {
     const tm1 = new FakeTm1();
     // TM1 (11.8) answers the delta link with every entry since it was made, each time
-    const polls = [FakeTm1.collection({ Message: "a" }), FakeTm1.collection({ Message: "a" }), FakeTm1.collection({ Message: "a" }, { Message: "b" }, { Message: "c" })];
-    tm1.respond = (r) => (r.target === "TailMessageLog()" ? { "@odata.context": "$metadata#Edm.String", value: "MessageLogEntries/!delta('0[4096]38@11!19')" } : polls.shift());
+    const polls = [
+      FakeTm1.collection({ Message: "a" }),
+      FakeTm1.collection({ Message: "a" }),
+      FakeTm1.collection({ Message: "a" }, { Message: "b" }, { Message: "c" }),
+    ];
+    tm1.respond = (r) =>
+      r.target === "TailMessageLog()" ? { "@odata.context": "$metadata#Edm.String", value: "MessageLogEntries/!delta('0[4096]38@11!19')" } : polls.shift();
     const tail = tm1.client().logs.tailMessageLog(1);
     expect(tm1.requests).toEqual([]); // nothing until it's iterated
     const seen: MessageLogEntry[] = [];

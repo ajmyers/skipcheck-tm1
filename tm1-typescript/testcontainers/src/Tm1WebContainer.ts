@@ -37,7 +37,13 @@ export class Tm1WebContainer extends GenericContainer {
   constructor(imageOrSource: string | Tm1WebSource, maybeSource?: Tm1WebSource) {
     const source = typeof imageOrSource === "string" ? maybeSource : imageOrSource;
     if (!(source instanceof Tm1WebSource)) throw new TypeError("source must be a Tm1WebSource");
-    super(typeof imageOrSource === "string" ? imageOrSource : source instanceof Tm1WebSource.PrivateImage ? source.image : Tm1ServerContainer.imageFor(Tm1WebContainer.WEB_IMAGE, Tm1WebContainer.DEFAULT_IMAGE));
+    super(
+      typeof imageOrSource === "string"
+        ? imageOrSource
+        : source instanceof Tm1WebSource.PrivateImage
+          ? source.image
+          : Tm1ServerContainer.imageFor(Tm1WebContainer.WEB_IMAGE, Tm1WebContainer.DEFAULT_IMAGE),
+    );
     this.#source = source;
     this.withExposedPorts(Tm1WebContainer.HTTP_PORT);
     // The login page, as the image's healthcheck uses: 200 once both apps are up
@@ -145,7 +151,9 @@ export class Tm1WebContainer extends GenericContainer {
   }
 
   protected override async containerIsStarted(): Promise<void> {
-    this.log(`TM1 Web is up at ${this.getUrl()} (${this.#source.describe()}), listing servers from the Admin Server at ${this.getEnvMap().get("TM1_ADMIN_HOST") ?? "(none)"}`);
+    this.log(
+      `TM1 Web is up at ${this.getUrl()} (${this.#source.describe()}), listing servers from the Admin Server at ${this.getEnvMap().get("TM1_ADMIN_HOST") ?? "(none)"}`,
+    );
   }
 
   /** A started container's address on its {@link Network}, or on Docker's default bridge.
@@ -156,7 +164,9 @@ export class Tm1WebContainer extends GenericContainer {
     const names = started.getNetworkNames();
     const address = names.includes(name) ? started.getIpAddress(name) : "";
     if (!address || address.trim() === "") {
-      throw new IllegalStateException(`${who} can't reach the TM1 server: it's on [${names.join(", ")}]. Give the TM1 server a Network (withNetwork), or leave it on Docker's default bridge network.`);
+      throw new IllegalStateException(
+        `${who} can't reach the TM1 server: it's on [${names.join(", ")}]. Give the TM1 server a Network (withNetwork), or leave it on Docker's default bridge network.`,
+      );
     }
     return address;
   }

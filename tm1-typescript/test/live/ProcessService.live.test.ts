@@ -1,5 +1,15 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
-import { Filter, ODataQuery, Process, ProcessParameterPatch, ProcessPatch, Tm1NotFoundException, Tm1PreconditionFailedException, type ProcessExecuteStatusCode, type Tm1Client } from "../../src/index.js";
+import {
+  Filter,
+  ODataQuery,
+  Process,
+  ProcessParameterPatch,
+  ProcessPatch,
+  Tm1NotFoundException,
+  Tm1PreconditionFailedException,
+  type ProcessExecuteStatusCode,
+  type Tm1Client,
+} from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 const PROLOG = `If(pCount = 2);
@@ -16,7 +26,10 @@ EndIf;
 function definition(name: string, prolog: string): ProcessPatch {
   return ProcessPatch.builder()
     .name(name)
-    .parameters([ProcessParameterPatch.builder().name("pName").value("").type("String").build(), ProcessParameterPatch.builder().name("pCount").value(0).type("Numeric").build()])
+    .parameters([
+      ProcessParameterPatch.builder().name("pName").value("").type("String").build(),
+      ProcessParameterPatch.builder().name("pCount").value(0).type("Numeric").build(),
+    ])
     .prologProcedure(prolog)
     .build();
 }
@@ -52,7 +65,8 @@ describe("ProcessService on TM1" + liveReason, () => {
     if (tm1) await tm1.processes.delete(name).catch(() => undefined);
   });
 
-  const status = async (count: number): Promise<ProcessExecuteStatusCode | undefined> => (await tm1.processes.executeWithReturn(name, parameters(count), ODataQuery.none())).ProcessExecuteStatusCode;
+  const status = async (count: number): Promise<ProcessExecuteStatusCode | undefined> =>
+    (await tm1.processes.executeWithReturn(name, parameters(count), ODataQuery.none())).ProcessExecuteStatusCode;
 
   tm1Test("creates, reads, updates and deletes a process", async () => {
     const read = await tm1.processes.get(name, ODataQuery.none());
@@ -63,7 +77,9 @@ describe("ProcessService on TM1" + liveReason, () => {
 
     await tm1.processes.update(name, ProcessPatch.builder().epilogProcedure("nX = 1;\n").build(), read["@odata.etag"]);
     expect((await tm1.processes.get(name, ODataQuery.none())).EpilogProcedure).toContain("nX = 1;");
-    await expect(tm1.processes.update(name, ProcessPatch.builder().epilogProcedure("").build(), read["@odata.etag"])).rejects.toBeInstanceOf(Tm1PreconditionFailedException);
+    await expect(tm1.processes.update(name, ProcessPatch.builder().epilogProcedure("").build(), read["@odata.etag"])).rejects.toBeInstanceOf(
+      Tm1PreconditionFailedException,
+    );
 
     await tm1.processes.delete(name);
     await expect(tm1.processes.get(name, ODataQuery.none())).rejects.toBeInstanceOf(Tm1NotFoundException);
@@ -90,7 +106,9 @@ describe("ProcessService on TM1" + liveReason, () => {
   });
 
   tm1Test("runs unsaved code, and the deprecated ways", async () => {
-    expect((await tm1.processes.executeWithReturn(definition("unsaved", PROLOG), parameters(2), ODataQuery.none())).ProcessExecuteStatusCode).toBe("QuitCalled");
+    expect((await tm1.processes.executeWithReturn(definition("unsaved", PROLOG), parameters(2), ODataQuery.none())).ProcessExecuteStatusCode).toBe(
+      "QuitCalled",
+    );
     await tm1.processes.executeWithReturn(name, parameters(3), ODataQuery.none());
     await tm1.processes.execute(name, parameters(1));
     await tm1.processes.execute(definition("unsaved", PROLOG), parameters(1));

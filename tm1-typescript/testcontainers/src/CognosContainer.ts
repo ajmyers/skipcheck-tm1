@@ -46,7 +46,13 @@ export class CognosContainer extends GenericContainer {
   constructor(imageOrSource: string | CognosSource, maybeSource?: CognosSource) {
     const source = typeof imageOrSource === "string" ? maybeSource : imageOrSource;
     if (!(source instanceof CognosSource)) throw new TypeError("source must be a CognosSource");
-    super(typeof imageOrSource === "string" ? imageOrSource : source instanceof CognosSource.PrivateImage ? source.image : Tm1ServerContainer.imageFor(CognosContainer.SERVER_IMAGE, CognosContainer.DEFAULT_IMAGE));
+    super(
+      typeof imageOrSource === "string"
+        ? imageOrSource
+        : source instanceof CognosSource.PrivateImage
+          ? source.image
+          : Tm1ServerContainer.imageFor(CognosContainer.SERVER_IMAGE, CognosContainer.DEFAULT_IMAGE),
+    );
     this.#source = source;
     this.withExposedPorts(CognosContainer.DISPATCHER_PORT);
     this.withNetworkAliases(CognosContainer.NETWORK_ALIAS);
@@ -145,7 +151,8 @@ export class CognosContainer extends GenericContainer {
    * gets one, for TM1's `CAMPassport` logon.
    * @throws IllegalStateException if Cognos refused the token */
   async passport(idToken: string): Promise<string> {
-    const body = '{"parameters":[{"name":"CAMNamespace","value":"' + CognosContainer.Namespace.OIDC.id() + '"},{"name":"CAMOIDCIdToken","value":"' + idToken + '"}]}';
+    const body =
+      '{"parameters":[{"name":"CAMNamespace","value":"' + CognosContainer.Namespace.OIDC.id() + '"},{"name":"CAMOIDCIdToken","value":"' + idToken + '"}]}';
     const response = await fetch("http://" + this.getHost() + ":" + this.getMappedPort(CognosContainer.DISPATCHER_PORT) + "/api/v1/session", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

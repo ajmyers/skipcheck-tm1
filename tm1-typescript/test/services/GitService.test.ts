@@ -16,7 +16,10 @@ describe("GitService", () => {
     tm1.respond = () => ({ URL: "git://localhost/model.git", Remote: { Branches: ["main"] } });
     const git = await client.git.init("git://localhost/model.git", "dev", GitCredentials.password("me", "s3cret"), true, null);
     expect(git.Remote?.Branches).toEqual(["main"]);
-    expect([sent(tm1), tm1.last.text]).toEqual(["POST GitInit", '{"URL":"git://localhost/model.git","Username":"me","Password":"s3cret","Deployment":"dev","Force":true}']);
+    expect([sent(tm1), tm1.last.text]).toEqual([
+      "POST GitInit",
+      '{"URL":"git://localhost/model.git","Username":"me","Password":"s3cret","Deployment":"dev","Force":true}',
+    ]);
     await client.git.init("git://localhost/model.git", null, GitCredentials.none(), false, GitConfigurationPatch.builder().build());
     expect(tm1.last.text).toBe('{"URL":"git://localhost/model.git","Force":false,"Config":{}}');
 
@@ -41,7 +44,9 @@ describe("GitService", () => {
     expect(push.SourceFiles).toEqual(["/dimensions/Region.json"]);
     expect(typeOf(GitPlan, push)).toBe("GitPushPlan");
     expect(sent(tm1)).toBe("POST GitPush");
-    expect(tm1.last.text).toBe('{"Branch":"main","NewBranch":"feature","Message":"Add a dimension","Author":"tm1-client","Email":"tm1-client@example.com","Force":false}');
+    expect(tm1.last.text).toBe(
+      '{"Branch":"main","NewBranch":"feature","Message":"Add a dimension","Author":"tm1-client","Email":"tm1-client@example.com","Force":false}',
+    );
 
     tm1.respond = () => ({ "@odata.type": "#ibm.tm1.api.v1.GitPullPlan", ID: "p2", Operations: ["Skip Dimensions('Region')"] });
     const pull = await client.git.pull("main", GitCredentials.none(), GitPlanExecutionMode.MultipleCommit, true);
@@ -65,7 +70,8 @@ describe("GitService", () => {
   it("finds a plan in the list", async () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    tm1.respond = () => FakeTm1.collection({ "@odata.type": "#ibm.tm1.api.v1.GitPushPlan", ID: "p1" }, { "@odata.type": "#ibm.tm1.api.v1.GitPullPlan", ID: "p2" });
+    tm1.respond = () =>
+      FakeTm1.collection({ "@odata.type": "#ibm.tm1.api.v1.GitPushPlan", ID: "p1" }, { "@odata.type": "#ibm.tm1.api.v1.GitPullPlan", ID: "p2" });
     const plans = await client.git.plans(ODataQuery.none().select("ID")).toArray();
     expect(plans.map((p) => typeOf(GitPlan, p))).toEqual(["GitPushPlan", "GitPullPlan"]);
     expect(sent(tm1)).toBe("GET GitPlans?$select=ID");
@@ -80,7 +86,13 @@ describe("GitService", () => {
     expect(password.toString()).toBe("GitCredentials[username=me, password=***, sshKey=none]");
     const ssh = GitCredentials.sshKey("pub", "priv", "phrase");
     expect(ssh.toString()).toBe("GitCredentials[username=null, password=none, sshKey=***]");
-    for (const shown of [JSON.stringify(password), inspect(password), inspect({ nested: password }, { depth: 5, showHidden: true }), `${password}`, String(Object.keys(password))]) {
+    for (const shown of [
+      JSON.stringify(password),
+      inspect(password),
+      inspect({ nested: password }, { depth: 5, showHidden: true }),
+      `${password}`,
+      String(Object.keys(password)),
+    ]) {
       expect(shown).not.toContain("s3cret");
     }
     for (const shown of [JSON.stringify(ssh), inspect(ssh, { showHidden: true }), JSON.stringify({ ssh })]) {

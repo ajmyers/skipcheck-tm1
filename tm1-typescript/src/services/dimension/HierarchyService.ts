@@ -76,7 +76,13 @@ export class HierarchyService extends Tm1Service {
 
   /** `PATCH Dimensions('d')/Hierarchies('h')` with `Elements` and `Edges`: makes them exactly these.
    * TM1 deletes every element not listed, with its data. */
-  replaceStructure(dimension: string, hierarchy: string, elements: readonly ElementPatch[], edges: readonly EdgePatch[], options?: Tm1CallOptions): Promise<void> {
+  replaceStructure(
+    dimension: string,
+    hierarchy: string,
+    elements: readonly ElementPatch[],
+    edges: readonly EdgePatch[],
+    options?: Tm1CallOptions,
+  ): Promise<void> {
     const patch = HierarchyPatch.builder().elements(required(elements, "elements")).edges(required(edges, "edges")).build();
     return this.session.execute(Tm1Request.patch(hierarchyPath(dimension, hierarchy), patch), options);
   }
@@ -112,7 +118,10 @@ export class HierarchyService extends Tm1Service {
   /** `tm1.RootMembers()`: the members with no parent, streamed. Needs schema 11.4.7. */
   rootMembers(dimension: string, hierarchy: string, query?: ODataQuery | null, options?: Tm1CallOptions): Tm1Stream<Member> {
     const operation = Tm1Operations.HierarchyRootMembers;
-    return this.session.stream(Tm1Request.list(hierarchyPath(dimension, hierarchy).function(operation.name), query, Member).requires(operation.capability()), options);
+    return this.session.stream(
+      Tm1Request.list(hierarchyPath(dimension, hierarchy).function(operation.name), query, Member).requires(operation.capability()),
+      options,
+    );
   }
 
   /** `tm1.SaveAs`: copies a hierarchy under a new name in the same dimension, failing if one
@@ -121,8 +130,22 @@ export class HierarchyService extends Tm1Service {
   /** `tm1.SaveAs`: copies a hierarchy under a new name in the same dimension; `overwrite` replaces
    * a hierarchy that already has it, and `keepExistingAttributes`, when overwriting, keeps the
    * attributes of what's replaced (when not, true creates no attributes for the copy). */
-  saveAs(dimension: string, hierarchy: string, newName: string, overwrite: boolean, keepExistingAttributes: boolean, options?: Tm1CallOptions): Promise<Hierarchy>;
-  saveAs(dimension: string, hierarchy: string, newName: string, overwrite?: boolean | Tm1CallOptions, keepExistingAttributes?: boolean, options?: Tm1CallOptions): Promise<Hierarchy> {
+  saveAs(
+    dimension: string,
+    hierarchy: string,
+    newName: string,
+    overwrite: boolean,
+    keepExistingAttributes: boolean,
+    options?: Tm1CallOptions,
+  ): Promise<Hierarchy>;
+  saveAs(
+    dimension: string,
+    hierarchy: string,
+    newName: string,
+    overwrite?: boolean | Tm1CallOptions,
+    keepExistingAttributes?: boolean,
+    options?: Tm1CallOptions,
+  ): Promise<Hierarchy> {
     if (typeof overwrite !== "boolean") {
       return this.session.execute(action(Tm1Operations.HierarchySaveAs, dimension, hierarchy, { Name: required(newName, "newName") }, Hierarchy), overwrite);
     }
@@ -167,7 +190,13 @@ function elementPath(dimension: string, hierarchy: string, element: string): ODa
 /** A bound action reading nothing, or, with `type`, its answer. */
 function action(operation: Tm1Operation, dimension: string, hierarchy: string, body: Record<string, unknown>): Tm1Request<void>;
 function action<T>(operation: Tm1Operation, dimension: string, hierarchy: string, body: Record<string, unknown>, type: Tm1Model<T>): Tm1Request<T>;
-function action<T>(operation: Tm1Operation, dimension: string, hierarchy: string, body: Record<string, unknown>, type?: Tm1Model<T>): Tm1Request<T> | Tm1Request<void> {
+function action<T>(
+  operation: Tm1Operation,
+  dimension: string,
+  hierarchy: string,
+  body: Record<string, unknown>,
+  type?: Tm1Model<T>,
+): Tm1Request<T> | Tm1Request<void> {
   const path = hierarchyPath(dimension, hierarchy).action(operation.name);
   return (type ? Tm1Request.post(path, body, type) : Tm1Request.post(path, body)).requires(operation.capability());
 }

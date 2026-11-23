@@ -114,7 +114,10 @@ export function cognosSession(dispatcher: string): string {
 function cookieNamed(response: Response, name: string): string | undefined {
   // getSetCookie() keeps each Set-Cookie apart; a fetch without it joins them with commas, split
   // here before each name=
-  const all = typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : (response.headers.get("set-cookie") ?? "").split(/,(?=\s*[^;,=\s]+=)/);
+  const all =
+    typeof response.headers.getSetCookie === "function"
+      ? response.headers.getSetCookie()
+      : (response.headers.get("set-cookie") ?? "").split(/,(?=\s*[^;,=\s]+=)/);
   for (const header of all) {
     const first = header.split(";")[0] ?? "";
     const eq = first.indexOf("=");
@@ -132,7 +135,12 @@ function requireString(value: unknown, name: string): void {
   if (typeof value !== "string") throw new TypeError(name + " is required");
 }
 
-function logon(dispatcher: string, namespace: string, credentials: (signal?: AbortSignal) => Promise<Parameter[]>, fetchFn: typeof globalThis.fetch | undefined): (signal?: AbortSignal) => Promise<string> {
+function logon(
+  dispatcher: string,
+  namespace: string,
+  credentials: (signal?: AbortSignal) => Promise<Parameter[]>,
+  fetchFn: typeof globalThis.fetch | undefined,
+): (signal?: AbortSignal) => Promise<string> {
   requireString(dispatcher, "dispatcher");
   requireString(namespace, "namespace");
   const session = cognosSession(dispatcher);

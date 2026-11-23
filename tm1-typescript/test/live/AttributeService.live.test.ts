@@ -116,7 +116,10 @@ describe("AttributeService and LocalizedAttributeService on TM1" + liveReason, (
     const localized = tm1.localizedAttributes;
     const value = async (o: AttributeOwner): Promise<unknown> => (await localized.get(o, "fr")).Attributes?.[label];
     try {
-      await localized.create(owner, LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Nord").build()).build());
+      await localized.create(
+        owner,
+        LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Nord").build()).build(),
+      );
       expect((await localized.list(reader).toArray()).map((t) => t.LocaleID)).toContain("fr");
       expect(await value(reader)).toBe("Nord");
 
@@ -133,10 +136,16 @@ describe("AttributeService and LocalizedAttributeService on TM1" + liveReason, (
 
   tm1Test("needs the attribute defined, and refuses writes through a member", async () => {
     await expect(
-      tm1.localizedAttributes.create(AttributeOwner.element(d, d, "North"), LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().caption("Nord").build()).build()),
+      tm1.localizedAttributes.create(
+        AttributeOwner.element(d, d, "North"),
+        LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().caption("Nord").build()).build(),
+      ),
       "Caption isn't an attribute until it's defined",
     ).rejects.toBeInstanceOf(Tm1BadRequestException);
-    await expect(tm1.localizedAttributes.create(AttributeOwner.member(d, d, "North"), LocalizedAttributesPatch.builder().localeID("fr").build()), "POST not supported on a member's").rejects.toBeInstanceOf(Tm1BadRequestException);
+    await expect(
+      tm1.localizedAttributes.create(AttributeOwner.member(d, d, "North"), LocalizedAttributesPatch.builder().localeID("fr").build()),
+      "POST not supported on a member's",
+    ).rejects.toBeInstanceOf(Tm1BadRequestException);
   });
 });
 
@@ -150,11 +159,24 @@ describe("Cube and view attributes on TM1" + liveReason, () => {
     if (!Live.configured) return;
     tm1 = await Live.client();
     for (const d of dimensions) await createDimension(tm1, d, ["X"]);
-    await tm1.cubes.create(CubePatch.builder().name(cube).bindDimensions(...dimensions.map((d) => DIMENSIONS.key(d))).build());
+    await tm1.cubes.create(
+      CubePatch.builder()
+        .name(cube)
+        .bindDimensions(...dimensions.map((d) => DIMENSIONS.key(d)))
+        .build(),
+    );
     const [a, b] = dimensions as [string, string];
     await tm1.views.create(cube, ViewScope.Public, MDXViewPatch.builder().name("V").mdx(`SELECT {[${a}].[${a}].Members} ON 0 FROM [${cube}]`).build());
     for (const d of dimensions) await createSubset(tm1, d, SubsetPatch.builder().name("All").expression(`{TM1SUBSETALL([${d}].[${d}])}`).build());
-    await tm1.views.create(cube, ViewScope.Public, NativeViewPatch.builder().name("N").columns([axis(a)]).rows([axis(b)]).build());
+    await tm1.views.create(
+      cube,
+      ViewScope.Public,
+      NativeViewPatch.builder()
+        .name("N")
+        .columns([axis(a)])
+        .rows([axis(b)])
+        .build(),
+    );
   });
 
   afterAll(async () => {
@@ -174,7 +196,10 @@ describe("Cube and view attributes on TM1" + liveReason, () => {
     await tm1.attributes.create(set, AttributeDefinitionPatch.builder().name(label).type(AttributeType.String).build());
     try {
       expect((await tm1.attributes.list(set).toArray()).map((a) => a.Name)).toContain(label);
-      await tm1.localizedAttributes.create(owner, LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Ventes").build()).build());
+      await tm1.localizedAttributes.create(
+        owner,
+        LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Ventes").build()).build(),
+      );
       const fr = await tm1.localizedAttributes.get(owner, "fr");
       expect(fr.Attributes?.[label]).toBe("Ventes");
     } finally {
@@ -220,7 +245,10 @@ describe("Process and chore attributes on TM1" + liveReason, () => {
     await tm1.attributes.create(set, AttributeDefinitionPatch.builder().name(label).type(AttributeType.String).build());
     try {
       expect((await tm1.attributes.list(set).toArray()).map((a) => a.Name)).toContain(label);
-      await tm1.localizedAttributes.create(owner, LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Charger").build()).build());
+      await tm1.localizedAttributes.create(
+        owner,
+        LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Charger").build()).build(),
+      );
       expect((await tm1.localizedAttributes.get(owner, "fr")).Attributes?.[label]).toBe("Charger");
     } finally {
       await tm1.attributes.delete(set, label);

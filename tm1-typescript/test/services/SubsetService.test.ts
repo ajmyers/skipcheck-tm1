@@ -8,7 +8,11 @@ const HIERARCHY = "Dimensions('Region')/Hierarchies('Region')";
  * client's SubsetServiceTests; the Java client tests it only against TM1). */
 describe("SubsetService", () => {
   it("names each scope's collection", () => {
-    expect([SubsetScope.Public, SubsetScope.Private, SubsetScope.Session].map((s) => SubsetScope.navigation(s))).toEqual(["Subsets", "PrivateSubsets", "SessionSubsets"]);
+    expect([SubsetScope.Public, SubsetScope.Private, SubsetScope.Session].map((s) => SubsetScope.navigation(s))).toEqual([
+      "Subsets",
+      "PrivateSubsets",
+      "SessionSubsets",
+    ]);
     expect(() => SubsetScope.navigation("Shared" as SubsetScope)).toThrow(RangeError);
   });
 
@@ -44,7 +48,9 @@ describe("SubsetService", () => {
   it("refuses an update with elements, sending nothing", () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    const set = SubsetPatch.builder().elements([ElementPatch.builder().name("West").build()]).build();
+    const set = SubsetPatch.builder()
+      .elements([ElementPatch.builder().name("West").build()])
+      .build();
     const bound = SubsetPatch.builder().bindElements(ODataPath.of("x")).build();
     expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", set)).toThrow(RangeError);
     expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", set)).toThrow(/addElements/);

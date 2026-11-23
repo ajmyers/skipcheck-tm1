@@ -69,14 +69,18 @@ describe("conformance", () => {
       .orderByDescending("Name")
       .option("!sandbox", "What if");
     expect(q.toString()).toBe("$select=Name,Type&$expand=Hierarchies($select=Name;$top=2)&$filter=(Name eq 'a b')&$orderby=Name desc&$top=5&!sandbox=What if");
-    expect(q.toQueryString()).toBe("$select=Name,Type&$expand=Hierarchies($select%3DName;$top%3D2)&$filter=(Name%20eq%20'a%20b')&$orderby=Name%20desc&$top=5&!sandbox=What%20if");
+    expect(q.toQueryString()).toBe(
+      "$select=Name,Type&$expand=Hierarchies($select%3DName;$top%3D2)&$filter=(Name%20eq%20'a%20b')&$orderby=Name%20desc&$top=5&!sandbox=What%20if",
+    );
     expect(q.option("!sandbox")).toBe("What if");
     expect(ODataQuery.none().isEmpty()).toBe(true);
   });
 
   it("parenthesizes every binary filter", () => {
     const name = ODataProperty.of("Name");
-    expect(Filter.and(name.eq("a"), Filter.or(name.eq("b"), Filter.not(name.isNull()))).toString()).toBe("((Name eq 'a') and ((Name eq 'b') or not((Name eq null))))");
+    expect(Filter.and(name.eq("a"), Filter.or(name.eq("b"), Filter.not(name.isNull()))).toString()).toBe(
+      "((Name eq 'a') and ((Name eq 'b') or not((Name eq null))))",
+    );
     expect(Filter.any("Elements", "e", (e) => e.nav("Name").eq("x")).toString()).toBe("Elements/any(e:(e/Name eq 'x'))");
     expect(Filter.in(name, "a", 1).toString()).toBe("(Name in ('a',1))");
     expect(() => Filter.in(name)).toThrow();
@@ -86,6 +90,10 @@ describe("conformance", () => {
     expect(() => ODataPath.of("Cubes('x')")).toThrow(/Not an OData identifier/);
     expect(() => ODataPath.of("Cubes").key("a").key("b")).toThrow(/once/);
     expect(ODataPath.link("Cubes('a b')/Views").toString()).toBe("Cubes('a%20b')/Views");
-    expect(ODataPath.of("Cubes").function("tm1.Fn", { P: new ODataPath.Alias("@p") }).toString()).toBe("Cubes/tm1.Fn(P=@p)");
+    expect(
+      ODataPath.of("Cubes")
+        .function("tm1.Fn", { P: new ODataPath.Alias("@p") })
+        .toString(),
+    ).toBe("Cubes/tm1.Fn(P=@p)");
   });
 });

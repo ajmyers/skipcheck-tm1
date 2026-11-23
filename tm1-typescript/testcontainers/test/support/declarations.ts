@@ -66,14 +66,21 @@ export function declarations(dir: string): Map<string, TsDeclaration> {
               if (!has(m, ts.SyntaxKind.PrivateKeyword)) d.constructors.push(params(m.parameters, source));
               // Parameter properties: `constructor(readonly image: string)`
               for (const p of m.parameters) {
-                if ((has(p, ts.SyntaxKind.ReadonlyKeyword) || has(p, ts.SyntaxKind.PublicKeyword)) && isApi(p)) add(d, p.name.getText(source), false, undefined);
+                if ((has(p, ts.SyntaxKind.ReadonlyKeyword) || has(p, ts.SyntaxKind.PublicKeyword)) && isApi(p))
+                  add(d, p.name.getText(source), false, undefined);
               }
               continue;
             }
             if (!isApi(m)) continue;
             const name = m.name && (ts.isIdentifier(m.name) || ts.isStringLiteral(m.name)) ? m.name.text : undefined;
             if (!name) continue;
-            add(d, name, has(m, ts.SyntaxKind.StaticKeyword), ts.isMethodDeclaration(m) ? params(m.parameters, source) : undefined, ts.isMethodDeclaration(m) ? (m.type?.getText(source) ?? "") : "");
+            add(
+              d,
+              name,
+              has(m, ts.SyntaxKind.StaticKeyword),
+              ts.isMethodDeclaration(m) ? params(m.parameters, source) : undefined,
+              ts.isMethodDeclaration(m) ? (m.type?.getText(source) ?? "") : "",
+            );
           }
         } else if (ts.isVariableStatement(s)) {
           for (const v of s.declarationList.declarations) {

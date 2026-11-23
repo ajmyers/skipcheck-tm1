@@ -10,7 +10,21 @@ const SNAPSHOT = readFileSync(Repo.snapshot, "utf8");
  * it (a bound operation's binding parameter never goes), and reporting that schema version. */
 function asOf(xml: string, version: string): string {
   const target = Tm1Version.parse(version);
-  const removable = new Set(["EntityType", "ComplexType", "EnumType", "Member", "Property", "NavigationProperty", "Action", "Function", "Parameter", "EntitySet", "Singleton", "ActionImport", "FunctionImport"]);
+  const removable = new Set([
+    "EntityType",
+    "ComplexType",
+    "EnumType",
+    "Member",
+    "Property",
+    "NavigationProperty",
+    "Action",
+    "Function",
+    "Parameter",
+    "EntitySet",
+    "Singleton",
+    "ActionImport",
+    "FunctionImport",
+  ]);
   interface Open {
     name: string;
     start: number;
@@ -42,13 +56,21 @@ function asOf(xml: string, version: string): string {
     const name = m[2]!.replace(/^.*:/, "");
     if (m[1] === "/") {
       const open = stack.pop()!;
-      if (removable.has(open.name) && open.added && target.isBefore(Tm1Version.parse(open.added)) && !open.firstParameter) cuts.push([open.start, tag.lastIndex]);
+      if (removable.has(open.name) && open.added && target.isBefore(Tm1Version.parse(open.added)) && !open.firstParameter)
+        cuts.push([open.start, tag.lastIndex]);
       continue;
     }
     const open: Open = { name, start: m.index };
     const parent = stack[stack.length - 1];
     if (name === "Annotation" && /Term="Core\.Revisions"/.test(m[3]!) && parent && removable.has(parent.name)) open.owner = parent;
-    if (name === "Parameter" && parent && (parent.name === "Action" || parent.name === "Function") && /IsBound="true"/.test(xml.slice(parent.start, parent.start + 200)) && !xml.slice(parent.start, m.index).includes("<Parameter")) open.firstParameter = true;
+    if (
+      name === "Parameter" &&
+      parent &&
+      (parent.name === "Action" || parent.name === "Function") &&
+      /IsBound="true"/.test(xml.slice(parent.start, parent.start + 200)) &&
+      !xml.slice(parent.start, m.index).includes("<Parameter")
+    )
+      open.firstParameter = true;
     if (m[4] !== "/") stack.push(open);
   }
   let out = "";
@@ -58,7 +80,9 @@ function asOf(xml: string, version: string): string {
     at = end;
   }
   out += xml.slice(at);
-  return out.replace(/(<Annotation Term="Core\.SchemaVersion">\s*<String>)[^<]*(<\/String>)/, `$1${version}$2`).replace(/(<Annotation Term="Core\.SchemaVersion" String=")[^"]*"/, `$1${version}"`);
+  return out
+    .replace(/(<Annotation Term="Core\.SchemaVersion">\s*<String>)[^<]*(<\/String>)/, `$1${version}$2`)
+    .replace(/(<Annotation Term="Core\.SchemaVersion" String=")[^"]*"/, `$1${version}"`);
 }
 
 /** The Java client's `Tm1VersionTest`. */
@@ -150,7 +174,9 @@ describe("Tm1Capabilities", () => {
 
     const e = older.check(RESERVE, "http://tm1:8010/api/v1/")!;
     expect(e.missing).toBe("Cube.Reserve");
-    expect(e.message).toBe("Cube.Reserve isn't defined by the TM1 server at http://tm1:8010/api/v1/: it was added in schema 11.8.34, and the server reports schema 11.8.20");
+    expect(e.message).toBe(
+      "Cube.Reserve isn't defined by the TM1 server at http://tm1:8010/api/v1/: it was added in schema 11.8.34, and the server reports schema 11.8.20",
+    );
     expect(e.mayHaveApplied()).toBe(false);
     expect(current.check(RESERVE, "x")).toBeUndefined();
   });
@@ -251,7 +277,16 @@ describe("Tm1Operation", () => {
   });
 
   it("an unbound operation needs its import", () => {
-    const mdx = new Tm1Operation("Action", "tm1.ExecuteMDX", null, "ExecuteMDX", [{ name: "MDX", type: "Edm.String", nullable: false }], "tm1.Cellset", null, null);
+    const mdx = new Tm1Operation(
+      "Action",
+      "tm1.ExecuteMDX",
+      null,
+      "ExecuteMDX",
+      [{ name: "MDX", type: "Edm.String", nullable: false }],
+      "tm1.Cellset",
+      null,
+      null,
+    );
     expect(mdx.bound()).toBe(false);
     expect(mdx.deprecated()).toBe(false);
     expect(mdx.endpoint()).toBe("ActionImport ExecuteMDX");

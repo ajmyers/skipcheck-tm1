@@ -44,7 +44,13 @@ describe("ElementService on TM1" + liveReason, () => {
         .hierarchies([
           HierarchyPatch.builder()
             .name(d)
-            .elements([element("Total", ElementType.Consolidated), element("North", ElementType.Numeric), element("South", ElementType.Numeric), element("East", ElementType.Numeric), element("Label", ElementType.String)])
+            .elements([
+              element("Total", ElementType.Consolidated),
+              element("North", ElementType.Numeric),
+              element("South", ElementType.Numeric),
+              element("East", ElementType.Numeric),
+              element("Label", ElementType.String),
+            ])
             .edges([edge("Total", "North"), edge("Total", "South")])
             .build(),
         ])
@@ -63,12 +69,21 @@ describe("ElementService on TM1" + liveReason, () => {
 
   tm1Test("creates, reads, updates and deletes an element", async () => {
     expect((await tm1.elements.create(d, d, element("West", ElementType.Numeric))).Name).toBe("West");
-    expect((await tm1.elements.list(d, d, ODataQuery.none().select(Element.Fields.Name)).toArray()).map((e) => e.Name).sort()).toEqual(["East", "Label", "North", "South", "Total", "West"]);
+    expect((await tm1.elements.list(d, d, ODataQuery.none().select(Element.Fields.Name)).toArray()).map((e) => e.Name).sort()).toEqual([
+      "East",
+      "Label",
+      "North",
+      "South",
+      "Total",
+      "West",
+    ]);
 
     const etag = (await tm1.elements.get(d, d, "West"))["@odata.etag"]!;
     await tm1.elements.update(d, d, "West", ElementPatch.builder().type(ElementType.String).build(), etag);
     expect((await tm1.elements.get(d, d, "West")).Type).toBe(ElementType.String);
-    await expect(tm1.elements.update(d, d, "West", ElementPatch.builder().type(ElementType.Numeric).build(), etag)).rejects.toBeInstanceOf(Tm1PreconditionFailedException);
+    await expect(tm1.elements.update(d, d, "West", ElementPatch.builder().type(ElementType.Numeric).build(), etag)).rejects.toBeInstanceOf(
+      Tm1PreconditionFailedException,
+    );
 
     await tm1.elements.delete(d, d, "West");
     await expect(tm1.elements.get(d, d, "West")).rejects.toBeInstanceOf(Tm1NotFoundException);

@@ -22,7 +22,9 @@ describe("ChoreService", () => {
       .build();
     expect((await client.chores.create(ChorePatch.builder().name("Nightly Load").active(false).tasks([task]).build())).Name).toBe("Nightly Load");
     expect([tm1.last.method, tm1.last.target]).toEqual(["POST", "Chores"]);
-    expect(tm1.last.text).toBe('{"Name":"Nightly Load","Active":false,"Tasks":[{"Process@odata.bind":"Processes(\'Load%20Sales\')","Parameters":[{"Name":"pYear","Value":2026}]}]}');
+    expect(tm1.last.text).toBe(
+      '{"Name":"Nightly Load","Active":false,"Tasks":[{"Process@odata.bind":"Processes(\'Load%20Sales\')","Parameters":[{"Name":"pYear","Value":2026}]}]}',
+    );
 
     tm1.respond = () => null;
     await client.chores.update("Nightly Load", ChorePatch.builder().active(true).build());
@@ -79,7 +81,11 @@ describe("ChoreService", () => {
 
     // As Java's LocalDate and LocalTime write them
     await client.chores.setServerLocalStartTime("c", "2026-01-02", "02:00");
-    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Chores('c')/tm1.SetServerLocalStartTime", '{"StartDate":"2026-01-02","StartTime":"02:00"}']);
+    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual([
+      "POST",
+      "Chores('c')/tm1.SetServerLocalStartTime",
+      '{"StartDate":"2026-01-02","StartTime":"02:00"}',
+    ]);
     await client.chores.setServerLocalStartTime("c", "2026-01-02", "02:00:30");
     expect(tm1.last.text).toBe('{"StartDate":"2026-01-02","StartTime":"02:00:30"}');
     await client.chores.setServerLocalStartTime("c", "2026-01-02", "02:00:00");

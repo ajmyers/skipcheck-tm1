@@ -24,7 +24,10 @@ export const Fixtures = {
   /** A public subset "All" of every element of a dimension's same-named hierarchy. */
   async subsetAll(tm1: Tm1Client, dimension: string): Promise<void> {
     await tm1.session.execute(
-      Tm1Request.post(Fixtures.dimensionPath(dimension).nav("Hierarchies").key(dimension).nav("Subsets"), { Name: "All", Expression: `{TM1SUBSETALL([${dimension}].[${dimension}])}` }),
+      Tm1Request.post(Fixtures.dimensionPath(dimension).nav("Hierarchies").key(dimension).nav("Subsets"), {
+        Name: "All",
+        Expression: `{TM1SUBSETALL([${dimension}].[${dimension}])}`,
+      }),
     );
   },
 

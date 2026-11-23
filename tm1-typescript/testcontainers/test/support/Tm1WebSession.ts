@@ -61,7 +61,11 @@ export class Tm1WebSession {
     body += `batchId=${this.#batch}\ninstanceId=0\npage=${this.#base.pathname}\n`;
     body += `httpSessionId=${this.#cookies.get("JSESSIONID")?.value ?? ""}\n`;
     body += `scriptSessionId=${this.#scriptSessionId}\n`;
-    const response = await this.#send(new URL(`dwr/call/plaincall/${script}.${method}.dwr`, this.#base), { method: "POST", headers: { "Content-Type": "text/plain" }, body });
+    const response = await this.#send(new URL(`dwr/call/plaincall/${script}.${method}.dwr`, this.#base), {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body,
+    });
     const result = CALLBACK.exec(response.body);
     if (response.status === 200 && result) return result[1]!;
     const error = ERROR.exec(response.body);
@@ -78,7 +82,13 @@ export class Tm1WebSession {
       const [pair, ...attributes] = header.split(";");
       const eq = pair!.indexOf("=");
       if (eq <= 0) continue;
-      const path = attributes.map((a) => a.trim()).find((a) => a.toLowerCase().startsWith("path="))?.slice(5) ?? url.pathname.replace(/\/[^/]*$/, "") ?? "/";
+      const path =
+        attributes
+          .map((a) => a.trim())
+          .find((a) => a.toLowerCase().startsWith("path="))
+          ?.slice(5) ??
+        url.pathname.replace(/\/[^/]*$/, "") ??
+        "/";
       this.#cookies.set(pair!.slice(0, eq).trim(), { value: pair!.slice(eq + 1).trim(), path: path || "/" });
     }
     return { status: response.status, body: await response.text() };

@@ -96,7 +96,9 @@ export class ViewService extends Tm1Service {
 
 /** `Cubes('c')/Views` or `Cubes('c')/PrivateViews`. */
 function views(cube: string, scope: ViewScope): ODataPath {
-  return ODataPath.of("Cubes").key(required(cube, "cube")).nav(ViewScope.navigation(required(scope, "scope")));
+  return ODataPath.of("Cubes")
+    .key(required(cube, "cube"))
+    .nav(ViewScope.navigation(required(scope, "scope")));
 }
 
 function viewPath(cube: string, scope: ViewScope, view: string): ODataPath {

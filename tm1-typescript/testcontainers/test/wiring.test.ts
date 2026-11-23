@@ -79,7 +79,10 @@ describe("Admin Server wiring", () => {
 /** Java's CognosContainerTest. */
 describe("CognosContainer", () => {
   const cognos = (): CognosContainer =>
-    new CognosContainer(new CognosSource.PrivateImage("cognos-server:test")).withUser("admin", "adminpw", "Admins").withUser("analyst", "analyst#pw", "Analysts", "Readers").withUser("viewer", "viewerpw", "Readers");
+    new CognosContainer(new CognosSource.PrivateImage("cognos-server:test"))
+      .withUser("admin", "adminpw", "Admins")
+      .withUser("analyst", "analyst#pw", "Analysts", "Readers")
+      .withUser("viewer", "viewerpw", "Readers");
 
   it("passes the users to the image", () => {
     const c = cognos();

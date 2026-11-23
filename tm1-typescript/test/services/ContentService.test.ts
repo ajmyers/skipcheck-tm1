@@ -27,7 +27,11 @@ describe("ContentService", () => {
     const mine = ContentPath.applications().child("mine", ContentScope.Private);
     expect(mine.path().toString()).toBe("Contents('Applications')/PrivateContents('mine')");
     expect(mine.toString()).toBe("Applications/(private) mine");
-    expect(ContentPath.root("Applications").child("Planning").equals(ContentPath.applications().child({ ID: "Planning" }))).toBe(true);
+    expect(
+      ContentPath.root("Applications")
+        .child("Planning")
+        .equals(ContentPath.applications().child({ ID: "Planning" })),
+    ).toBe(true);
     expect(ContentPath.applications().child({ ID: "mine" }, ContentScope.Private).equals(mine)).toBe(true);
     expect(mine.equals(ContentPath.applications().child("mine"))).toBe(false);
     expect(ContentPath.root("O'Brien").path().toString()).toBe("Contents('O''Brien')");
@@ -51,7 +55,13 @@ describe("ContentService", () => {
     expect(sent(tm1)).toBe("GET Contents?$select=Name");
 
     const planning = ContentPath.applications().child("Planning");
-    await client.contents.contents(planning, ContentScope.Public, ODataQuery.none().expand("tm1.CubeReference/Cube", (q) => q.select("Name"))).toArray();
+    await client.contents
+      .contents(
+        planning,
+        ContentScope.Public,
+        ODataQuery.none().expand("tm1.CubeReference/Cube", (q) => q.select("Name")),
+      )
+      .toArray();
     expect(decodeURIComponent(sent(tm1))).toBe("GET Contents('Applications')/Contents('Planning')/Contents?$expand=tm1.CubeReference/Cube($select=Name)");
     await client.contents.contents(planning, ContentScope.Private).toArray();
     expect(sent(tm1)).toBe("GET Contents('Applications')/Contents('Planning')/PrivateContents");

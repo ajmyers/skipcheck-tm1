@@ -1,5 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ODataPath, ODataQuery, Tm1Authenticator, Tm1Clock, Tm1Identity, Tm1Request, Tm1Session, Tm1SessionClosedException, Tm1SessionPool, type Tm1SessionPoolBuilder } from "../../src/index.js";
+import {
+  ODataPath,
+  ODataQuery,
+  Tm1Authenticator,
+  Tm1Clock,
+  Tm1Identity,
+  Tm1Request,
+  Tm1Session,
+  Tm1SessionClosedException,
+  Tm1SessionPool,
+  type Tm1SessionPoolBuilder,
+} from "../../src/index.js";
 import { eventually, ManualClock, ScriptedTm1 } from "../support/scripted-tm1.js";
 
 const SERVER = Tm1Request.get(ODataPath.of("Server"), ODataQuery.none());
@@ -120,7 +131,12 @@ describe("Tm1SessionPool", () => {
 
   it("evicts on demand, and closes at once with no grace period", async () => {
     await pool.close();
-    pool = build((b) => b.idleTimeout(1_000).closeGrace(0).sweepInterval(60 * MINUTE));
+    pool = build((b) =>
+      b
+        .idleTimeout(1_000)
+        .closeGrace(0)
+        .sweepInterval(60 * MINUTE),
+    );
     const alice = pool.session(Tm1Identity.impersonating("alice"));
     await alice.execute(SERVER);
     time.advance(1_000);
@@ -168,13 +184,14 @@ describe("Tm1SessionPool", () => {
   });
 
   it("builds from a copy of the settings, sharing one $metadata fetch", async () => {
-    const settings = tm1
-      .builder()
-      .basicAuth("admin", "apple")
-      .checkCapabilities(true);
-    tm1.on("GET Server?$select=ProductVersion", () => ScriptedTm1.json(200, '{"ProductVersion":"11.8.03500.6"}')).on("GET $metadata", () =>
-      ScriptedTm1.xml('<?xml version="1.0"?><edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"><edmx:DataServices><Schema Namespace="ibm.tm1.api.v1" xmlns="http://docs.oasis-open.org/odata/ns/edm"/></edmx:DataServices></edmx:Edmx>'),
-    );
+    const settings = tm1.builder().basicAuth("admin", "apple").checkCapabilities(true);
+    tm1
+      .on("GET Server?$select=ProductVersion", () => ScriptedTm1.json(200, '{"ProductVersion":"11.8.03500.6"}'))
+      .on("GET $metadata", () =>
+        ScriptedTm1.xml(
+          '<?xml version="1.0"?><edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"><edmx:DataServices><Schema Namespace="ibm.tm1.api.v1" xmlns="http://docs.oasis-open.org/odata/ns/edm"/></edmx:DataServices></edmx:Edmx>',
+        ),
+      );
     const shared = Tm1SessionPool.builder(settings).clock(time).build();
     settings.impersonate("changed later");
     try {

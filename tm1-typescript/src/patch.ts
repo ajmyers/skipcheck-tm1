@@ -54,7 +54,10 @@ export abstract class Tm1PatchBuilder<P extends Tm1Patch> {
   }
 
   protected bindAll(name: string, targets: readonly ODataPath[]): this {
-    this.#values.set(name + "@odata.bind", targets.map((t) => t.toString()));
+    this.#values.set(
+      name + "@odata.bind",
+      targets.map((t) => t.toString()),
+    );
     return this;
   }
 

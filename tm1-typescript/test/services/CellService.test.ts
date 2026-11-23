@@ -10,7 +10,14 @@ describe("CellService", () => {
   it("writes a cell by its tuple", async () => {
     const tm1 = new FakeTm1();
     tm1.respond = () => null;
-    await tm1.client().cells.update("Sales", new Map([["Region", "North"], ["Month", "Jan"]]), 42);
+    await tm1.client().cells.update(
+      "Sales",
+      new Map([
+        ["Region", "North"],
+        ["Month", "Jan"],
+      ]),
+      42,
+    );
     expect([tm1.last.method, tm1.last.target]).toEqual(["POST", "Cubes('Sales')/tm1.Update"]);
     expect(tm1.last.text).toBe(`{"Cells":[{"Tuple@odata.bind":["${NORTH}","Dimensions('Month')/Hierarchies('Month')/Elements('Jan')"]}],"Value":42}`);
   });
@@ -27,8 +34,14 @@ describe("CellService", () => {
     tm1.respond = () => null;
     const client = tm1.client();
     const updates = [
-      CubeUpdatePatch.builder().bindTuple(...Tuples.of({ Region: "North" })).value(1).build(),
-      CubeUpdatePatch.builder().bindTuple(Tuples.element("Region", "Region", "South")).value("x").build(),
+      CubeUpdatePatch.builder()
+        .bindTuple(...Tuples.of({ Region: "North" }))
+        .value(1)
+        .build(),
+      CubeUpdatePatch.builder()
+        .bindTuple(Tuples.element("Region", "Region", "South"))
+        .value("x")
+        .build(),
     ];
     const updatesJson = `[{"Tuple@odata.bind":["${NORTH}"],"Value":1},{"Tuple@odata.bind":["Dimensions('Region')/Hierarchies('Region')/Elements('South')"],"Value":"x"}]`;
     await client.cells.updateCells("Sales", updates);
@@ -46,7 +59,14 @@ describe("CellService", () => {
       .build();
     await client.cells.updateCells("Sales", [reference]);
     expect(tm1.last.json).toEqual({
-      Updates: [{ "Tuple@odata.bind": ["Dimensions('Region')/Hierarchies('Region')/Elements('South')"], "ReferenceCube@odata.bind": "Cubes('Sales')", "ReferenceCell@odata.bind": [NORTH], Value: 5 }],
+      Updates: [
+        {
+          "Tuple@odata.bind": ["Dimensions('Region')/Hierarchies('Region')/Elements('South')"],
+          "ReferenceCube@odata.bind": "Cubes('Sales')",
+          "ReferenceCell@odata.bind": [NORTH],
+          Value: 5,
+        },
+      ],
     });
     expect(() => client.cells.updateCells("Sales", updates, UpdateOrder.Unknown)).toThrow(TypeError);
   });
@@ -56,7 +76,12 @@ describe("CellService", () => {
  * TuplesTests). */
 describe("Tuples", () => {
   it("places each element in its dimension's own hierarchy, in order", () => {
-    const tuple = Tuples.of(new Map([["Region", "North"], ["Month", "Jan's"]]));
+    const tuple = Tuples.of(
+      new Map([
+        ["Region", "North"],
+        ["Month", "Jan's"],
+      ]),
+    );
     expect(tuple.map((p) => p.toString())).toEqual([NORTH, "Dimensions('Month')/Hierarchies('Month')/Elements('Jan''s')"]);
   });
 

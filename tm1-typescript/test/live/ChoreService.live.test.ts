@@ -41,7 +41,10 @@ describe("ChoreService on TM1" + liveReason, () => {
     await tm1.processes.create(
       ProcessPatch.builder()
         .name(process)
-        .parameters([ProcessParameterPatch.builder().name("pName").value("").type("String").build(), ProcessParameterPatch.builder().name("pCount").value(0).type("Numeric").build()])
+        .parameters([
+          ProcessParameterPatch.builder().name("pName").value("").type("String").build(),
+          ProcessParameterPatch.builder().name("pCount").value(0).type("Numeric").build(),
+        ])
         .prologProcedure("If(DimensionExists(pName) = 0);\n  DimensionCreate(pName);\nEndIf;\n")
         .build(),
     );
@@ -68,7 +71,10 @@ describe("ChoreService on TM1" + liveReason, () => {
   });
 
   tm1Test("creates, reads, updates and deletes a chore and its tasks", async () => {
-    const read = await tm1.chores.get(chore, ODataQuery.none().expand(Chore.Fields.Tasks, (t) => t.expand(ChoreTask.Fields.Process)));
+    const read = await tm1.chores.get(
+      chore,
+      ODataQuery.none().expand(Chore.Fields.Tasks, (t) => t.expand(ChoreTask.Fields.Process)),
+    );
     expect(read.Tasks).toHaveLength(1);
     expect(read.Tasks![0]!.Step, "TM1 numbers the steps from 0").toBe(0);
     expect(read.Tasks![0]!.Process?.Name).toBe(process);
@@ -77,11 +83,20 @@ describe("ChoreService on TM1" + liveReason, () => {
 
     expect((await tm1.chores.addTask(chore, task("second-" + id))).Step).toBe(1);
     expect((await tm1.chores.tasks(chore, ODataQuery.none()).toArray()).map((t) => t.Step)).toEqual([0, 1]);
-    await tm1.chores.updateTask(chore, 1, ChoreTaskPatch.builder().parameters([parameter("pName", "third-" + id), parameter("pCount", 2)]).build());
+    await tm1.chores.updateTask(
+      chore,
+      1,
+      ChoreTaskPatch.builder()
+        .parameters([parameter("pName", "third-" + id), parameter("pCount", 2)])
+        .build(),
+    );
     const tasks = await tm1.chores.tasks(chore, ODataQuery.none()).toArray();
     expect((tasks[1]!.Parameters ?? []).some((p) => p.Value === "third-" + id)).toBe(true);
     await tm1.chores.deleteTask(chore, 0);
-    expect((await tm1.chores.tasks(chore, ODataQuery.none()).toArray()).map((t) => t.Step), "renumbered from 0").toEqual([0]);
+    expect(
+      (await tm1.chores.tasks(chore, ODataQuery.none()).toArray()).map((t) => t.Step),
+      "renumbered from 0",
+    ).toEqual([0]);
 
     const etag = (await tm1.chores.get(chore, ODataQuery.none()))["@odata.etag"];
     expect(etag, "task changes change the chore's ETag").not.toBe(read["@odata.etag"]);

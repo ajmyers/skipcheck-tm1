@@ -1,5 +1,17 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { Dimension, DimensionPatch, ElementPatch, ElementType, Filter, Hierarchy, HierarchyPatch, ODataQuery, Tm1NotFoundException, Tm1PreconditionFailedException, type Tm1Client } from "../../src/index.js";
+import {
+  Dimension,
+  DimensionPatch,
+  ElementPatch,
+  ElementType,
+  Filter,
+  Hierarchy,
+  HierarchyPatch,
+  ODataQuery,
+  Tm1NotFoundException,
+  Tm1PreconditionFailedException,
+  type Tm1Client,
+} from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 const element = (name: string): ElementPatch => ElementPatch.builder().name(name).type(ElementType.Numeric).build();
@@ -7,7 +19,12 @@ const element = (name: string): ElementPatch => ElementPatch.builder().name(name
 const dimension = (name: string): DimensionPatch =>
   DimensionPatch.builder()
     .name(name)
-    .hierarchies([HierarchyPatch.builder().name(name).elements([element("North"), element("South")]).build()])
+    .hierarchies([
+      HierarchyPatch.builder()
+        .name(name)
+        .elements([element("North"), element("South")])
+        .build(),
+    ])
     .build();
 
 const withElements = ODataQuery.none().expand(Dimension.Fields.Hierarchies, (h) => h.expand(Hierarchy.Fields.Elements));
@@ -62,7 +79,8 @@ describe("DimensionService on TM1" + liveReason, () => {
       // A new hierarchy changes it
       expect((await tm1.dimensions.get(name))["@odata.etag"]).not.toBe(etag);
       await expect(tm1.dimensions.update(name, patch, etag)).rejects.toBeInstanceOf(Tm1PreconditionFailedException);
-    }));
+    }),
+  );
 
   tm1Test("ignores hierarchies and the all-leaves name in a patch", () =>
     withDimension(async (name) => {
@@ -70,7 +88,12 @@ describe("DimensionService on TM1" + liveReason, () => {
         name,
         DimensionPatch.builder()
           .allLeavesHierarchyName("AllLeaves")
-          .hierarchies([HierarchyPatch.builder().name(name).elements([element("North"), element("South"), element("East")]).build()])
+          .hierarchies([
+            HierarchyPatch.builder()
+              .name(name)
+              .elements([element("North"), element("South"), element("East")])
+              .build(),
+          ])
           .build(),
       );
       const read = await tm1.dimensions.get(name, withElements);
@@ -78,7 +101,8 @@ describe("DimensionService on TM1" + liveReason, () => {
       expect(read.AllLeavesHierarchyName ?? "").toBe("");
       expect(read.Hierarchies).toHaveLength(1);
       expect(read.Hierarchies![0]!.Elements).toHaveLength(2);
-    }));
+    }),
+  );
 
   tm1Test("saves a copy and adds an all-leaves hierarchy", () =>
     withDimension(async (name) => {
@@ -90,7 +114,8 @@ describe("DimensionService on TM1" + liveReason, () => {
       expect(leaves.Name).toBe("Leaves");
       const hierarchies = (await tm1.dimensions.get(name, ODataQuery.none().expand(Dimension.Fields.Hierarchies))).Hierarchies ?? [];
       expect(hierarchies.map((h) => h.Name)).toEqual(expect.arrayContaining([name, "Leaves"]));
-    }));
+    }),
+  );
 
   tm1Test("locks and reserves", () =>
     withDimension(async (name) => {
@@ -98,5 +123,6 @@ describe("DimensionService on TM1" + liveReason, () => {
       await tm1.dimensions.unlock(name);
       await tm1.dimensions.reserve(name);
       await tm1.dimensions.release(name);
-    }));
+    }),
+  );
 });

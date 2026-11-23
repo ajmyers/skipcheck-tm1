@@ -1,4 +1,15 @@
-import { Cellset, CellsetAxis, CellsetAxisTuple, CellsetCell, Cube, Hierarchy, Member, Tm1Operations, View, type CellsetUpdatePatch } from "../../generated/index.js";
+import {
+  Cellset,
+  CellsetAxis,
+  CellsetAxisTuple,
+  CellsetCell,
+  Cube,
+  Hierarchy,
+  Member,
+  Tm1Operations,
+  View,
+  type CellsetUpdatePatch,
+} from "../../generated/index.js";
 import { ODataPath, ODataQuery } from "../../odata/index.js";
 import type { Tm1Model } from "../../model.js";
 import type { Tm1Operation } from "../../operation.js";
@@ -71,7 +82,12 @@ export class CellsetService extends Tm1Service {
    * has its `ID`. */
   execute(mdx: string, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<Cellset> {
     const operation = Tm1Operations.ExecuteMdx;
-    return this.session.execute(Tm1Request.post(ODataPath.of(operation.importName!), { MDX: required(mdx, "mdx") }, Cellset).withQuery(query).requires(operation.capability()), options);
+    return this.session.execute(
+      Tm1Request.post(ODataPath.of(operation.importName!), { MDX: required(mdx, "mdx") }, Cellset)
+        .withQuery(query)
+        .requires(operation.capability()),
+      options,
+    );
   }
 
   /** `ExecuteMDXStatement`: runs an MDX statement for its effect, keeping no cellset. Needs schema
@@ -203,13 +219,21 @@ export class CellsetService extends Tm1Service {
    * cellset (its `ID` and expanded `Axes`) and its cells, in ordinal order, and what it gives (a
    * stream, or a promise of one value) is what this streams. Nothing is sent until it's iterated.
    */
-  stream<R>(mdx: string, query: ODataQuery, pageSize: number, handler: (cellset: Cellset, cells: Tm1Stream<CellsetCell>) => Tm1Work<R>, options?: Tm1CallOptions): Tm1Stream<R> {
+  stream<R>(
+    mdx: string,
+    query: ODataQuery,
+    pageSize: number,
+    handler: (cellset: Cellset, cells: Tm1Stream<CellsetCell>) => Tm1Work<R>,
+    options?: Tm1CallOptions,
+  ): Tm1Stream<R> {
     if (!(pageSize >= 1) || !Number.isInteger(pageSize)) throw new RangeError("pageSize must be positive: " + pageSize);
     required(mdx, "mdx");
     required(query, "query");
     required(handler, "handler");
     const first = ODataQuery.none()
-      .expand("Axes", (a) => a.expand("Hierarchies", (h) => h.select("Name")).expand("Tuples", (t) => t.expand("Members", (m) => m.select("Name", "UniqueName"))))
+      .expand("Axes", (a) =>
+        a.expand("Hierarchies", (h) => h.select("Name")).expand("Tuples", (t) => t.expand("Members", (m) => m.select("Name", "UniqueName"))),
+      )
       .expand("Cells", () => query.top(pageSize));
     const self = this;
     return Tm1Stream.from(async function* () {

@@ -18,7 +18,8 @@ import {
 
 const error = (json: string): ODataError | undefined => ODataError.from(JSON.parse(json));
 const msg = (message: string): string => `{"error":{"code":"278","message":"${message}"}}`;
-const api = (status: number, body: string): Tm1ApiException => Tm1ApiException.of(status, Tm1ErrorClassifier.defaults(), body === "" ? undefined : error(body), "GET", "Cubes('NoSuchCube')");
+const api = (status: number, body: string): Tm1ApiException =>
+  Tm1ApiException.of(status, Tm1ErrorClassifier.defaults(), body === "" ? undefined : error(body), "GET", "Cubes('NoSuchCube')");
 
 /** The Java client's `Tm1ErrorsTest`: reading TM1's errors and classifying them. */
 describe("Tm1 errors", () => {
@@ -40,8 +41,12 @@ describe("Tm1 errors", () => {
     expect(unknown.code).toBe("");
     const classifier = Tm1ErrorClassifier.defaults();
     expect(classifier.classify(400, unknown)).toBe("UnknownUser");
-    expect(classifier.classify(403, ODataError.fromText("Error: Forbidden\r\nYou have insufficient rights to impersonate the user specified!\r\n"))).toBe("ImpersonationRefused");
-    expect(classifier.classify(403, ODataError.fromText("Error: Forbidden\r\nYou need to be a (data-)administrator to be able to impersonate another user.\r\n"))).toBe("ImpersonationRefused");
+    expect(classifier.classify(403, ODataError.fromText("Error: Forbidden\r\nYou have insufficient rights to impersonate the user specified!\r\n"))).toBe(
+      "ImpersonationRefused",
+    );
+    expect(
+      classifier.classify(403, ODataError.fromText("Error: Forbidden\r\nYou need to be a (data-)administrator to be able to impersonate another user.\r\n")),
+    ).toBe("ImpersonationRefused");
     expect(ODataError.fromText("Error: Unauthorized\r\n")).toBeUndefined();
     expect(ODataError.fromText("x".repeat(5000))!.message).toHaveLength(1001);
   });
@@ -90,7 +95,9 @@ describe("Tm1 errors", () => {
     const custom = Tm1ErrorClassifier.defaults().withRule(Tm1ErrorClassifier.Rule.message("frozen", "Locked"));
     expect(custom.classify(400, error(msg("Cube is frozen")))).toBe("Locked");
     expect(Tm1ErrorClassifier.defaults().classify(400, error(msg("Cube is frozen")))).toBe("Other");
-    expect(Tm1ErrorClassifier.defaults().withRule(Tm1ErrorClassifier.Rule.code("999", "InUse")).classify(400, error('{"error":{"code":"999","message":"x"}}'))).toBe("InUse");
+    expect(
+      Tm1ErrorClassifier.defaults().withRule(Tm1ErrorClassifier.Rule.code("999", "InUse")).classify(400, error('{"error":{"code":"999","message":"x"}}')),
+    ).toBe("InUse");
     expect(() => new Tm1ErrorClassifier.Rule(undefined, undefined, undefined, "Other")).toThrow(TypeError);
   });
 

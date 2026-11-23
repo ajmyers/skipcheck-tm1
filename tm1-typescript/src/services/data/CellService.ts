@@ -7,7 +7,12 @@ import { required, type Tm1Map } from "../../util.js";
 import { Tm1Service, type Tm1Endpoints } from "../service.js";
 import { Tuples } from "./Tuples.js";
 
-const UPDATE_CELLS = ["Action Cube/UpdateCells", "Navigation CubeUpdate/Tuple", "Navigation CubeUpdate/ReferenceCube", "Navigation CubeUpdate/ReferenceCell"] as const;
+const UPDATE_CELLS = [
+  "Action Cube/UpdateCells",
+  "Navigation CubeUpdate/Tuple",
+  "Navigation CubeUpdate/ReferenceCube",
+  "Navigation CubeUpdate/ReferenceCell",
+] as const;
 
 /** Cell writes to a cube, by coordinates. Cells are given as {@link Tuples.of} maps of dimension to
  * element; reading is through cellsets (`CellsetService`), and writing into one by ordinal is there

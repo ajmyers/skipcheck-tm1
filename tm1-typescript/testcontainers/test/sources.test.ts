@@ -29,8 +29,12 @@ describe("Tm1Source", () => {
     };
     expect(Tm1Source.discover(settings(all))).toBeInstanceOf(Tm1Source.PrivateImage);
     expect(Tm1Source.discover(settings(without(all, Tm1Source.PRIVATE_IMAGE)))).toStrictEqual(new Tm1Source.InstallDir(install));
-    expect(Tm1Source.discover(settings(without(all, Tm1Source.PRIVATE_IMAGE, Tm1Source.HOME_DIR)))).toStrictEqual(new Tm1Source.InstallVolume("tm1_tm1-install"));
-    expect(Tm1Source.discover(settings(without(all, Tm1Source.PRIVATE_IMAGE, Tm1Source.HOME_DIR, Tm1Source.INSTALL_VOLUME)))).toStrictEqual(new Tm1Source.Bundle(temp.path));
+    expect(Tm1Source.discover(settings(without(all, Tm1Source.PRIVATE_IMAGE, Tm1Source.HOME_DIR)))).toStrictEqual(
+      new Tm1Source.InstallVolume("tm1_tm1-install"),
+    );
+    expect(Tm1Source.discover(settings(without(all, Tm1Source.PRIVATE_IMAGE, Tm1Source.HOME_DIR, Tm1Source.INSTALL_VOLUME)))).toStrictEqual(
+      new Tm1Source.Bundle(temp.path),
+    );
     const url = Tm1Source.discover(settings({ [Tm1Source.BUNDLE_URL]: "https://example.com/b.tar.gz", [Tm1Source.BUNDLE_SHA256]: "abc" }));
     expect(url).toBeInstanceOf(Tm1Source.BundleUrl);
     expect((url as Tm1Source.BundleUrl).url.href).toBe("https://example.com/b.tar.gz");
@@ -53,7 +57,9 @@ describe("Tm1Source", () => {
 
   it("names a bundle file within its folder", () => {
     temp.touch("tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz");
-    const found = Tm1Source.discover(settings({ [Tm1Source.BUNDLE_DIR]: temp.path, [Tm1Source.BUNDLE]: "tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz" }));
+    const found = Tm1Source.discover(
+      settings({ [Tm1Source.BUNDLE_DIR]: temp.path, [Tm1Source.BUNDLE]: "tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz" }),
+    );
     expect(found).toStrictEqual(new Tm1Source.Bundle(temp.path, "tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz"));
     expect(found?.describe()).toBe("bundle " + join(temp.path, "tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz"));
     expect(new Tm1Source.Bundle(temp.path).describe()).toBe("bundle " + temp.path + " (newest)");
@@ -130,10 +136,18 @@ describe("CognosSource", () => {
   });
 
   it("tries sources in order", () => {
-    expect(CognosSource.discover(settings({ [CognosSource.PRIVATE_IMAGE]: "cognos-server:12.1.1-private", [CognosSource.INSTALL_VOLUME]: "v" }))).toStrictEqual(new CognosSource.PrivateImage("cognos-server:12.1.1-private"));
-    expect(CognosSource.discover(settings({ [CognosSource.INSTALL_VOLUME]: "v", [CognosSource.ZIP_DIR]: temp.path }))).toStrictEqual(new CognosSource.InstallVolume("v"));
-    expect(CognosSource.discover(settings({ [CognosSource.ZIP_DIR]: temp.path, [CognosSource.ZIP_URL]: "https://example.com/c.zip" }))).toStrictEqual(new CognosSource.Zip(temp.path));
-    const url = CognosSource.discover(settings({ [CognosSource.ZIP_URL]: "https://example.com/c.zip", [CognosSource.ZIP_SHA256]: "abc" })) as CognosSource.ZipUrl;
+    expect(CognosSource.discover(settings({ [CognosSource.PRIVATE_IMAGE]: "cognos-server:12.1.1-private", [CognosSource.INSTALL_VOLUME]: "v" }))).toStrictEqual(
+      new CognosSource.PrivateImage("cognos-server:12.1.1-private"),
+    );
+    expect(CognosSource.discover(settings({ [CognosSource.INSTALL_VOLUME]: "v", [CognosSource.ZIP_DIR]: temp.path }))).toStrictEqual(
+      new CognosSource.InstallVolume("v"),
+    );
+    expect(CognosSource.discover(settings({ [CognosSource.ZIP_DIR]: temp.path, [CognosSource.ZIP_URL]: "https://example.com/c.zip" }))).toStrictEqual(
+      new CognosSource.Zip(temp.path),
+    );
+    const url = CognosSource.discover(
+      settings({ [CognosSource.ZIP_URL]: "https://example.com/c.zip", [CognosSource.ZIP_SHA256]: "abc" }),
+    ) as CognosSource.ZipUrl;
     expect(url).toBeInstanceOf(CognosSource.ZipUrl);
     expect([url.url.href, url.sha256]).toEqual(["https://example.com/c.zip", "abc"]);
   });
@@ -142,7 +156,9 @@ describe("CognosSource", () => {
     expect(CognosSource.discover(settings({ TM1_BUNDLE_DIR: temp.path }))).toBeUndefined();
     temp.touch("casrv-12.1.1-2512181837-linuxi38664h.zip");
     expect(CognosSource.discover(settings({ TM1_BUNDLE_DIR: temp.path }))).toStrictEqual(new CognosSource.Zip(temp.path));
-    expect(CognosSource.discover(settings({ TM1_BUNDLE_DIR: temp.path, [CognosSource.ZIP]: "casrv-12.1.1-2512181837-linuxi38664h.zip" }))).toStrictEqual(new CognosSource.Zip(temp.path, "casrv-12.1.1-2512181837-linuxi38664h.zip"));
+    expect(CognosSource.discover(settings({ TM1_BUNDLE_DIR: temp.path, [CognosSource.ZIP]: "casrv-12.1.1-2512181837-linuxi38664h.zip" }))).toStrictEqual(
+      new CognosSource.Zip(temp.path, "casrv-12.1.1-2512181837-linuxi38664h.zip"),
+    );
   });
 
   it("fails on a wrong setting rather than skipping", () => {
@@ -221,11 +237,21 @@ describe("Tm1WebSource", () => {
 
   it("tries sources in the image's order", () => {
     const install = fakeInstall();
-    expect(Tm1WebSource.discover(settings({ [Tm1WebSource.PRIVATE_IMAGE]: "registry.example.com/private/tm1-web:2.1.19", [Tm1WebSource.HOME_DIR]: install }))).toBeInstanceOf(Tm1WebSource.PrivateImage);
-    expect(Tm1WebSource.discover(settings({ [Tm1WebSource.HOME_DIR]: install, [Tm1WebSource.INSTALL_VOLUME]: "v" }))).toStrictEqual(new Tm1WebSource.InstallDir(install));
-    expect(Tm1WebSource.discover(settings({ [Tm1WebSource.INSTALL_VOLUME]: "v", [Tm1WebSource.BUNDLE_DIR]: temp.path }))).toStrictEqual(new Tm1WebSource.InstallVolume("v"));
-    expect(Tm1WebSource.discover(settings({ [Tm1WebSource.BUNDLE_DIR]: temp.path, [Tm1WebSource.BUNDLE_URL]: "https://example.com/b.tar.gz" }))).toStrictEqual(new Tm1WebSource.Bundle(temp.path));
-    const url = Tm1WebSource.discover(settings({ [Tm1WebSource.BUNDLE_URL]: "https://example.com/b.tar.gz", [Tm1WebSource.BUNDLE_SHA256]: "abc" })) as Tm1WebSource.BundleUrl;
+    expect(
+      Tm1WebSource.discover(settings({ [Tm1WebSource.PRIVATE_IMAGE]: "registry.example.com/private/tm1-web:2.1.19", [Tm1WebSource.HOME_DIR]: install })),
+    ).toBeInstanceOf(Tm1WebSource.PrivateImage);
+    expect(Tm1WebSource.discover(settings({ [Tm1WebSource.HOME_DIR]: install, [Tm1WebSource.INSTALL_VOLUME]: "v" }))).toStrictEqual(
+      new Tm1WebSource.InstallDir(install),
+    );
+    expect(Tm1WebSource.discover(settings({ [Tm1WebSource.INSTALL_VOLUME]: "v", [Tm1WebSource.BUNDLE_DIR]: temp.path }))).toStrictEqual(
+      new Tm1WebSource.InstallVolume("v"),
+    );
+    expect(Tm1WebSource.discover(settings({ [Tm1WebSource.BUNDLE_DIR]: temp.path, [Tm1WebSource.BUNDLE_URL]: "https://example.com/b.tar.gz" }))).toStrictEqual(
+      new Tm1WebSource.Bundle(temp.path),
+    );
+    const url = Tm1WebSource.discover(
+      settings({ [Tm1WebSource.BUNDLE_URL]: "https://example.com/b.tar.gz", [Tm1WebSource.BUNDLE_SHA256]: "abc" }),
+    ) as Tm1WebSource.BundleUrl;
     expect([url.url.href, url.sha256]).toEqual(["https://example.com/b.tar.gz", "abc"]);
   });
 
@@ -233,9 +259,9 @@ describe("Tm1WebSource", () => {
     expect(Tm1WebSource.discover(settings({ TM1_BUNDLE_DIR: temp.path }))).toBeUndefined();
     temp.touch("tm1web-11.0.112-26031316-2.1.19-linuxi38664h_bundle.tar.gz");
     expect(Tm1WebSource.discover(settings({ TM1_BUNDLE_DIR: temp.path }))).toStrictEqual(new Tm1WebSource.Bundle(temp.path));
-    expect(Tm1WebSource.discover(settings({ TM1_BUNDLE_DIR: temp.path, [Tm1WebSource.BUNDLE]: "tm1web-11.0.112-26031316-2.1.19-linuxi38664h_bundle.tar.gz" }))).toStrictEqual(
-      new Tm1WebSource.Bundle(temp.path, "tm1web-11.0.112-26031316-2.1.19-linuxi38664h_bundle.tar.gz"),
-    );
+    expect(
+      Tm1WebSource.discover(settings({ TM1_BUNDLE_DIR: temp.path, [Tm1WebSource.BUNDLE]: "tm1web-11.0.112-26031316-2.1.19-linuxi38664h_bundle.tar.gz" })),
+    ).toStrictEqual(new Tm1WebSource.Bundle(temp.path, "tm1web-11.0.112-26031316-2.1.19-linuxi38664h_bundle.tar.gz"));
     const other = temp.mkdir("other");
     expect(Tm1WebSource.discover(settings({ TM1_BUNDLE_DIR: temp.path, [Tm1WebSource.BUNDLE_DIR]: other }))).toStrictEqual(new Tm1WebSource.Bundle(other));
   });

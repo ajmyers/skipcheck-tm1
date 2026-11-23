@@ -144,7 +144,15 @@ export class ElementService extends Tm1Service {
     return this.session.execute(action(Tm1Operations.ElementRelease, dimension, hierarchy, element, {}), options);
   }
 
-  private sendSetComponent(dimension: string, hierarchy: string, parent: string, child: string, before: string | undefined, weight: number | undefined, options: Tm1CallOptions | undefined): Promise<void> {
+  private sendSetComponent(
+    dimension: string,
+    hierarchy: string,
+    parent: string,
+    child: string,
+    before: string | undefined,
+    weight: number | undefined,
+    options: Tm1CallOptions | undefined,
+  ): Promise<void> {
     const body: Record<string, unknown> = { "Element@odata.bind": elementPath(dimension, hierarchy, child).toString() };
     if (before !== undefined) body["Before@odata.bind"] = elementPath(dimension, hierarchy, before).toString();
     if (weight !== undefined) body["Weight"] = weight;

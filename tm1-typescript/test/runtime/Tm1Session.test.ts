@@ -98,7 +98,9 @@ describe("Tm1Session", () => {
   });
 
   it("maps error responses through the classifier", async () => {
-    const tm1 = scripted().on("GET Cubes('Nope')", () => ScriptedTm1.json(404, `{"error":{"code":"278","message":"'Nope' can not be found in collection of type 'Cube'."}}`));
+    const tm1 = scripted().on("GET Cubes('Nope')", () =>
+      ScriptedTm1.json(404, `{"error":{"code":"278","message":"'Nope' can not be found in collection of type 'Cube'."}}`),
+    );
     const e = await failure(tm1.session().execute(Tm1Request.get(ODataPath.of("Cubes").key("Nope"), ODataQuery.none())));
     expect(e).toBeInstanceOf(Tm1NotFoundException);
     const n = e as Tm1NotFoundException;
@@ -132,7 +134,10 @@ describe("Tm1Session", () => {
   it("streams collections across next links", async () => {
     const tm1 = scripted()
       .on("GET Dimensions?$select=Name", () =>
-        ScriptedTm1.json(200, '{"@odata.context":"$metadata#Dimensions(Name)","value":[{"Name":"a"},{"Name":"b"}],"@odata.nextLink":"Dimensions?$skiptoken=2"}'),
+        ScriptedTm1.json(
+          200,
+          '{"@odata.context":"$metadata#Dimensions(Name)","value":[{"Name":"a"},{"Name":"b"}],"@odata.nextLink":"Dimensions?$skiptoken=2"}',
+        ),
       )
       .on("GET Dimensions?$skiptoken=2", () => ScriptedTm1.json(200, '{"value":[{"Name":"c"}]}'));
     const names = await tm1
@@ -170,7 +175,11 @@ describe("Tm1Session", () => {
         throw new Error("not readable");
       },
     };
-    const e = await failure(scripted().session().execute(Tm1Request.post(ODataPath.of("Cubes"), unwritable)));
+    const e = await failure(
+      scripted()
+        .session()
+        .execute(Tm1Request.post(ODataPath.of("Cubes"), unwritable)),
+    );
     expect(e).toBeInstanceOf(TypeError);
     expect(e).not.toBeInstanceOf(Tm1TransportException);
   });
@@ -354,7 +363,11 @@ describe("Tm1Session logging in again", () => {
 
   it("reports refused credentials on re-login without replaying", async () => {
     const tm1 = new ScriptedTm1()
-      .onEach(LOGIN, () => ScriptedTm1.json(200, '{"ID":1}', "TM1SessionId=c1; Path=/api/"), () => ScriptedTm1.status(401))
+      .onEach(
+        LOGIN,
+        () => ScriptedTm1.json(200, '{"ID":1}', "TM1SessionId=c1; Path=/api/"),
+        () => ScriptedTm1.status(401),
+      )
       .on(CREATE_KEY, () => ScriptedTm1.status(401, "TM1SessionId=anon; Path=/api/"));
     const session = tm1.session();
     await session.connect();
@@ -632,7 +645,13 @@ describe("Tm1Session batches", () => {
     const created = batch.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), { Name: "d" }).ifMatch("*"));
     await batch.run();
     await created;
-    expect(tm1.requests(BATCH)[0]!.json.requests[0]).toEqual({ id: "1", method: "POST", url: "Dimensions", headers: { accept: "application/json", "If-Match": "*", "content-type": "application/json" }, body: { Name: "d" } });
+    expect(tm1.requests(BATCH)[0]!.json.requests[0]).toEqual({
+      id: "1",
+      method: "POST",
+      url: "Dimensions",
+      headers: { accept: "application/json", "If-Match": "*", "content-type": "application/json" },
+      body: { Name: "d" },
+    });
   });
 
   it("refuses calls after it ran", async () => {
@@ -693,15 +712,24 @@ describe("Tm1Session batches", () => {
 describe("Tm1Session async", () => {
   const RUN = "POST Processes('p')/tm1.ExecuteWithReturn";
   const MONITOR = "GET _async('a1')";
-  const REQUEST = Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.ExecuteWithReturn"), null, Json) as Tm1Request<{ ProcessExecuteStatusCode: string }>;
+  const REQUEST = Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.ExecuteWithReturn"), null, Json) as Tm1Request<{
+    ProcessExecuteStatusCode: string;
+  }>;
   const accepted = () => ScriptedTm1.bytes(202, new Uint8Array(), "text/plain", { location: "../_async('a1')" });
   const done = (statusLine: string, body: string) =>
-    ScriptedTm1.bytes(200, new TextEncoder().encode(`HTTP/1.1 ${statusLine}\r\nContent-Type: application/json\r\nOData-Version: 4.0\r\n\r\n${body}`), "application/http");
+    ScriptedTm1.bytes(
+      200,
+      new TextEncoder().encode(`HTTP/1.1 ${statusLine}\r\nContent-Type: application/json\r\nOData-Version: 4.0\r\n\r\n${body}`),
+      "application/http",
+    );
 
   it("polls the monitor until the result is there", async () => {
-    const tm1 = new ScriptedTm1()
-      .on(RUN, accepted)
-      .onEach(MONITOR, () => ScriptedTm1.status(202), () => ScriptedTm1.status(202), () => done("201 Created", '{"ProcessExecuteStatusCode":"CompletedSuccessfully"}'));
+    const tm1 = new ScriptedTm1().on(RUN, accepted).onEach(
+      MONITOR,
+      () => ScriptedTm1.status(202),
+      () => ScriptedTm1.status(202),
+      () => done("201 Created", '{"ProcessExecuteStatusCode":"CompletedSuccessfully"}'),
+    );
     const result = await tm1.session().withAsync(10).execute(REQUEST);
     expect(result.ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
     expect(tm1.requests(RUN)).toHaveLength(1);
@@ -711,7 +739,9 @@ describe("Tm1Session async", () => {
   });
 
   it("raises the error the work ended with", async () => {
-    const tm1 = new ScriptedTm1().on(RUN, accepted).on(MONITOR, () => done("500 Internal Server Error", '{"error":{"code":"174","message":"TM1UserException: Cancel"}}'));
+    const tm1 = new ScriptedTm1()
+      .on(RUN, accepted)
+      .on(MONITOR, () => done("500 Internal Server Error", '{"error":{"code":"174","message":"TM1UserException: Cancel"}}'));
     const e = await failure(tm1.session().withAsync(10).execute(REQUEST));
     expect(e).toBeInstanceOf(Tm1ServerException);
     expect((e as Error).message).toContain("Cancel");
@@ -871,7 +901,12 @@ describe("Tm1Session reading collections", () => {
     const all = await tm1.session().stream(ELEMENTS).toArray();
     expect(all.map((e) => e.Name)).toEqual(["Q1", "Q'2 {x}", "Total", "p2", "p3"]);
     expect(all[0]!.Type).toBe("Numeric");
-    expect(tm1.requests().filter((r) => r.key.startsWith("GET Elements?")).map((r) => r.key)).toEqual(["GET Elements?$skiptoken=3", "GET Elements?$skiptoken=4&x='a b'"]);
+    expect(
+      tm1
+        .requests()
+        .filter((r) => r.key.startsWith("GET Elements?"))
+        .map((r) => r.key),
+    ).toEqual(["GET Elements?$skiptoken=3", "GET Elements?$skiptoken=4&x='a b'"]);
   });
 
   it("reads multibyte characters", async () => {

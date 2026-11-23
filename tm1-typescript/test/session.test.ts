@@ -47,7 +47,8 @@ describe("Tm1Session", () => {
 
   it("follows next links across pages", async () => {
     const tm1 = new FakeTm1();
-    tm1.respond = (r) => (r.target === "Cubes?$select=Name" ? { value: [{ Name: "a" }], "@odata.nextLink": "Cubes?$select=Name&$skiptoken=2" } : FakeTm1.collection({ Name: "b" }));
+    tm1.respond = (r) =>
+      r.target === "Cubes?$select=Name" ? { value: [{ Name: "a" }], "@odata.nextLink": "Cubes?$select=Name&$skiptoken=2" } : FakeTm1.collection({ Name: "b" });
     const names = await tm1
       .client()
       .cubes.list(ODataQuery.none().select("Name"))
@@ -118,7 +119,10 @@ describe("Tm1Session", () => {
     };
     // The Location is relative to the request's URL
     const path = ODataPath.of("Processes").key("p").action("tm1.ExecuteWithReturn");
-    const result = await tm1.client().withAsync(1).session.execute(Tm1Request.post(path, null, Cube));
+    const result = await tm1
+      .client()
+      .withAsync(1)
+      .session.execute(Tm1Request.post(path, null, Cube));
     expect(result.Name).toBe("c");
     expect(polls).toBe(2);
   });

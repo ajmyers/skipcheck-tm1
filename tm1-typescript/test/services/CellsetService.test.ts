@@ -114,8 +114,15 @@ describe("CellsetService", () => {
     await client.cellsets.update("c1", 5, null);
     expect(tm1.last.text).toBe('{"BeginOrdinal":5,"EndOrdinal":5,"Value":null}');
 
-    await client.cellsets.updateCells("c1", [CellsetUpdatePatch.builder().ordinal(0).value("x").build(), CellsetUpdatePatch.builder().ordinal(1).value(2.5).build()]);
-    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Cellsets('c1')/tm1.UpdateCells", '{"Updates":[{"Ordinal":0,"Value":"x"},{"Ordinal":1,"Value":2.5}]}']);
+    await client.cellsets.updateCells("c1", [
+      CellsetUpdatePatch.builder().ordinal(0).value("x").build(),
+      CellsetUpdatePatch.builder().ordinal(1).value(2.5).build(),
+    ]);
+    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual([
+      "POST",
+      "Cellsets('c1')/tm1.UpdateCells",
+      '{"Updates":[{"Ordinal":0,"Value":"x"},{"Ordinal":1,"Value":2.5}]}',
+    ]);
 
     tm1.respond = () => ({ Name: "Saved" });
     expect((await client.cellsets.saveViewAs("c1", "Saved")).Name).toBe("Saved");
@@ -145,21 +152,32 @@ describe("CellsetService", () => {
     // 2 columns × 7 rows in pages of 4 cells: 2 rows a page
     const tm1 = cellset(14, [2, 7], 4);
     expect(await tm1.client().cellsets.stream("SELECT", cells(), 4, ordinals).toArray()).toEqual(sequence(14));
-    expect(targets(tm1).filter((t) => t.includes("GetPartition")).map((t) => /Begin=\d+,End=\d+/.exec(t)![0])).toEqual(["Begin=4,End=7", "Begin=8,End=11", "Begin=12,End=13"]);
+    expect(
+      targets(tm1)
+        .filter((t) => t.includes("GetPartition"))
+        .map((t) => /Begin=\d+,End=\d+/.exec(t)![0]),
+    ).toEqual(["Begin=4,End=7", "Begin=8,End=11", "Begin=12,End=13"]);
   });
 
   it("streams at least a row per page", async () => {
     // 3 columns in pages of 1 cell: a row a page
     const tm1 = cellset(6, [3, 2], 1);
     expect(await tm1.client().cellsets.stream("SELECT", cells(), 1, ordinals).toArray()).toEqual(sequence(6));
-    expect(targets(tm1).filter((t) => t.includes("GetPartition")).map((t) => /Begin=\d+,End=\d+/.exec(t)![0])).toEqual(["Begin=0,End=2", "Begin=3,End=5"]);
+    expect(
+      targets(tm1)
+        .filter((t) => t.includes("GetPartition"))
+        .map((t) => /Begin=\d+,End=\d+/.exec(t)![0]),
+    ).toEqual(["Begin=0,End=2", "Begin=3,End=5"]);
   });
 
   it("streams more axes by $skip and $top", async () => {
     // 2 × 2 × 2: a third axis isn't a rectangle, so the pages are $skip and $top of Cells
     const tm1 = cellset(8, [2, 2, 2], 3);
     expect(await tm1.client().cellsets.stream("SELECT", cells(), 3, ordinals).toArray()).toEqual(sequence(8));
-    expect(targets(tm1).filter((t) => t.includes("/Cells?"))).toEqual(["Cellsets('c1')/Cells?$select=Ordinal,Value&$top=3&$skip=3", "Cellsets('c1')/Cells?$select=Ordinal,Value&$top=3&$skip=6"]);
+    expect(targets(tm1).filter((t) => t.includes("/Cells?"))).toEqual([
+      "Cellsets('c1')/Cells?$select=Ordinal,Value&$top=3&$skip=3",
+      "Cellsets('c1')/Cells?$select=Ordinal,Value&$top=3&$skip=6",
+    ]);
     expect(targets(tm1).at(-1)).toBe("DELETE Cellsets('c1')");
   });
 

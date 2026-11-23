@@ -154,7 +154,10 @@ describe("payloads", () => {
     const unknown = readAs(View, { "@odata.type": "#tm1.FutureView", Name: "a" });
     expect([typeOf(View, unknown), unknown.Name]).toEqual(["View", "a"]);
     // A subtype's own properties are read as its: NativeView's Columns hold ViewAxisSelections
-    const native = readAs(View, { "@odata.type": "#ibm.tm1.api.v1.NativeView", Columns: [{ Subset: { Name: "s", Elements: [{ Type: "Future" }] } }] }) as NativeView;
+    const native = readAs(View, {
+      "@odata.type": "#ibm.tm1.api.v1.NativeView",
+      Columns: [{ Subset: { Name: "s", Elements: [{ Type: "Future" }] } }],
+    }) as NativeView;
     expect(native.Columns?.[0]?.Subset?.Elements?.[0]?.Type).toBe("Unknown");
   });
 
@@ -192,7 +195,9 @@ describe("payloads", () => {
     const dimensions = ODataPath.of("Dimensions");
     const patch = CubePatch.builder().name("Sales").bindDimensions(dimensions.key("Region"), dimensions.key("Month")).rules(null).build();
     expect(JSON.stringify(patch)).toBe('{"Name":"Sales","Dimensions@odata.bind":["Dimensions(\'Region\')","Dimensions(\'Month\')"],"Rules":null}');
-    expect(JSON.stringify(NativeViewPatch.builder().name("v").suppressEmptyRows(true).build())).toBe('{"@odata.type":"#ibm.tm1.api.v1.NativeView","Name":"v","SuppressEmptyRows":true}');
+    expect(JSON.stringify(NativeViewPatch.builder().name("v").suppressEmptyRows(true).build())).toBe(
+      '{"@odata.type":"#ibm.tm1.api.v1.NativeView","Name":"v","SuppressEmptyRows":true}',
+    );
     expect(JSON.stringify(ChorePatch.builder().frequency("P1D").build())).toBe('{"Frequency":"P1D"}');
     expect(JSON.stringify(AttributesPatch.builder().property("Caption", "x").build())).toBe('{"Caption":"x"}');
     expect(CubePatch.builder().name("a").build().equals(CubePatch.builder().name("a").build())).toBe(true);

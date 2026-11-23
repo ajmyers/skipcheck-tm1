@@ -177,7 +177,11 @@ export function expectedResult(value: Json, _got?: unknown): Json {
 export function withoutTypes(value: unknown): Json {
   if (Array.isArray(value)) return value.map(withoutTypes);
   if (value !== null && typeof value === "object" && !(value instanceof Uint8Array)) {
-    return Object.fromEntries(Object.entries(value).filter(([k]) => k !== "@odata.type").map(([k, v]) => [k, withoutTypes(v)]));
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([k]) => k !== "@odata.type")
+        .map(([k, v]) => [k, withoutTypes(v)]),
+    );
   }
   return value as Json;
 }

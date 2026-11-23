@@ -145,7 +145,12 @@ describe("GitService on TM1" + gitReason, () => {
         await tm1.dimensions.create(
           DimensionPatch.builder()
             .name(dimension)
-            .hierarchies([HierarchyPatch.builder().name(dimension).elements([ElementPatch.builder().name("North").build()]).build()])
+            .hierarchies([
+              HierarchyPatch.builder()
+                .name(dimension)
+                .elements([ElementPatch.builder().name("North").build()])
+                .build(),
+            ])
             .build(),
         );
         const push = await tm1.git.push("main", null, COMMIT, none, true);

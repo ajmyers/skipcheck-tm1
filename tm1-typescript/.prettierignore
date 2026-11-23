@@ -1,0 +1,9 @@
+# Generated or copied, never committed
+dist/
+src/generated/
+node_modules/
+testcontainers/dist/
+testcontainers/paw-local.sh
+package-lock.json
+# Prose keeps its own line breaks
+*.md

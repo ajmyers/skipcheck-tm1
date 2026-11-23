@@ -141,7 +141,8 @@ function decodeEntities(s: string): string {
 function parseXml(text: string): XmlElement {
   const root: XmlElement = { name: "#document", attributes: {}, children: [], text: "" };
   const stack = [root];
-  const tag = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!\[CDATA\[([\s\S]*?)\]\]>|<!DOCTYPE[^>]*>|<(\/?)([A-Za-z_][\w.:-]*)((?:\s+[^\s=/>]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>|([^<]+)/g;
+  const tag =
+    /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!\[CDATA\[([\s\S]*?)\]\]>|<!DOCTYPE[^>]*>|<(\/?)([A-Za-z_][\w.:-]*)((?:\s+[^\s=/>]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>|([^<]+)/g;
   let m: RegExpExecArray | null;
   let last = 0;
   while ((m = tag.exec(text)) !== null) {
@@ -207,7 +208,7 @@ export class Tm1Capabilities {
   static parse(metadata: string, productVersion?: Tm1Version): Tm1Capabilities {
     let doc: XmlElement;
     try {
-      doc = parseXml(metadata.replace(/^﻿/, ""));
+      doc = parseXml(metadata.replace(/^\uFEFF/, ""));
     } catch (e) {
       throw new Tm1ProtocolException("TM1's $metadata isn't XML: " + (e as Error).message);
     }
@@ -278,7 +279,17 @@ export class Tm1Capabilities {
   }
 
   withProductVersion(productVersion: Tm1Version | undefined): Tm1Capabilities {
-    return new Tm1Capabilities(this.schemaVersion, productVersion, this.endpoints, this.types, this.bound, this.entitySets, this.singletons, this.imports, this.aliases);
+    return new Tm1Capabilities(
+      this.schemaVersion,
+      productVersion,
+      this.endpoints,
+      this.types,
+      this.bound,
+      this.entitySets,
+      this.singletons,
+      this.imports,
+      this.aliases,
+    );
   }
 
   supports(capability: Tm1Capability): boolean {
