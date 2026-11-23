@@ -87,7 +87,8 @@ def traffic_dir(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
 
 
 @pytest.mark.parametrize("name", ["server"])
-def test_runs_the_scenario_in_both_flavors(name: str, traffic_dir: Any) -> None:
+def test_runs_the_scenario_and_records_its_traffic(name: str, traffic_dir: Any) -> None:
+    # In both flavors
     scenario = json.loads((live.SCENARIOS / f"{name}.json").read_text(encoding="utf-8"))
     expected = len(scenario["steps"]) + len(scenario["finally"])
 
