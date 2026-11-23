@@ -1,6 +1,6 @@
 {
-  "name": "tm1-pa-developer-tools",
-  "description": "Agent plugins for IBM Planning Analytics (TM1) development, from ajmyers/tm1-pa-developer-tools.",
+  "name": "skipcheck-tm1",
+  "description": "Agent plugins for IBM Planning Analytics (TM1) development, from ajmyers/skipcheck-tm1.",
   "owner": {
     "name": "Andrew Myers",
     "url": "https://ajmyers.net"

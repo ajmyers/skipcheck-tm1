@@ -6,7 +6,7 @@ argument-hint: "[path to bundle, URL, or what you have]"
 
 # Set up TM1 locally with tm1-server
 
-tm1-server (https://github.com/ajmyers/tm1-pa-developer-tools, by Andrew Myers) runs
+tm1-server (https://github.com/ajmyers/skipcheck-tm1, by Andrew Myers) runs
 IBM Planning Analytics TM1 Server in Docker for development and tests. It contains no
 IBM software: the user brings their own licensed TM1 Server for Linux. Your job is to
 get it running for them with the setup script, check it, and explain how to use it.
@@ -77,7 +77,7 @@ Other flags: `--dir DIR` / `-Dir`, `--files-dir DIR` / `-FilesDir`, `--samples` 
 
 - **If the download returns HTML instead of a script** (some networks get a bot check from
   skipcheck.io), use the same script from GitHub:
-  `https://raw.githubusercontent.com/ajmyers/tm1-pa-developer-tools/master/docker/tm1-server/setup.sh`
+  `https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/master/docker/tm1-server/setup.sh`
   (or `setup.ps1`).
 - **If the image pull fails with `:latest`** (before the first release), add
   `--image ghcr.io/ajmyers/tm1-server:edge` / `-Image ghcr.io/ajmyers/tm1-server:edge`.
@@ -116,5 +116,5 @@ Read the script's error first: each one says what to do. Then `docker compose lo
 | Windows containers mode | Docker Desktop → *Switch to Linux containers*. |
 | Logins fail, `IntegratedSecurityMode` warning | Their `tm1s.cfg` uses CAM security; set `IntegratedSecurityMode=1`. |
 
-Full guide: https://github.com/ajmyers/tm1-pa-developer-tools/blob/master/docker/tm1-server/GETTING-STARTED.md
-If it's a bug in tm1-server, suggest opening an issue: https://github.com/ajmyers/tm1-pa-developer-tools/issues
+Full guide: https://github.com/ajmyers/skipcheck-tm1/blob/master/docker/tm1-server/GETTING-STARTED.md
+If it's a bug in tm1-server, suggest opening an issue: https://github.com/ajmyers/skipcheck-tm1/issues

@@ -477,7 +477,7 @@ def urls(m):
 
 
 SAMPLE = """# pa-environment.yaml: what pa-setup runs. Then run: setup.sh up
-# Every section is optional. Format: https://github.com/ajmyers/tm1-pa-developer-tools/tree/master/docker/pa-setup
+# Every section is optional. Format: https://github.com/ajmyers/skipcheck-tm1/tree/master/docker/pa-setup
 # Download links and other secrets go in .env, not here.
 version: 1
 ibm: ./ibm                 # the folder holding your IBM downloads (bundles, the Cognos zip)
