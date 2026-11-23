@@ -6,7 +6,7 @@ against a fake TM1: each method sends what the Java client's does."""
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 import httpx
@@ -114,7 +114,7 @@ def test_reads_error_logs_by_their_timestamp(api: Api, fake: FakeTm1) -> None:
     assert api.run(api.client.processes.error_log_content("Load", logs[0])) == "the log"
     # Keyed by the timestamp as a quoted string, as Java's OffsetDateTime writes it
     assert target(fake.last) == "GET Processes('Load')/ErrorLogs('2026-11-21T10%3A15%3A30.500Z')/Content"
-    api.run(api.client.processes.error_log_content("Load", ProcessErrorLog(timestamp=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc))))
+    api.run(api.client.processes.error_log_content("Load", ProcessErrorLog(timestamp=datetime(2026, 1, 2, 3, 4, tzinfo=UTC))))
     assert target(fake.last) == "GET Processes('Load')/ErrorLogs('2026-01-02T03%3A04Z')/Content"
 
 
@@ -289,7 +289,7 @@ def test_chores(api: Api, fake: FakeTm1) -> None:
         chores.create(
             ChorePatch.builder()
             .name("Nightly")
-            .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=timezone.utc))
+            .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=UTC))
             .dst_sensitive(False)
             .frequency(timedelta(days=1))
             .execution_mode(ChoreExecutionMode.SINGLE_COMMIT)

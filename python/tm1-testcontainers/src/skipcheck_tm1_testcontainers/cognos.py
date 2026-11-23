@@ -10,10 +10,9 @@ import enum
 import json
 import re
 from dataclasses import dataclass, field
-from typing import ClassVar
+from typing import ClassVar, Self
 
 import httpx
-from typing_extensions import Self
 
 from ._container import GenericContainer, share_network, wait_for_http
 from .sources import CognosSource, setting

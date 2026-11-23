@@ -6,7 +6,7 @@ creates the dimension its pName parameter names."""
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 import pytest
@@ -65,7 +65,7 @@ def chores(tm1: Tm1Client, name: str) -> Iterator[Chores]:
     tm1.chores.create(
         ChorePatch.builder()
         .name(c.chore)
-        .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=timezone.utc))
+        .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=UTC))
         .dst_sensitive(False)
         .active(False)
         .execution_mode(ChoreExecutionMode.SINGLE_COMMIT)

@@ -11,10 +11,9 @@ import enum
 import threading
 from importlib import metadata
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 import httpx
-from typing_extensions import Self
 
 from skipcheck_tm1 import Tm1Version
 

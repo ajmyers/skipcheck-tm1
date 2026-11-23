@@ -22,7 +22,7 @@ from __future__ import annotations
 import enum
 import math
 import uuid
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar
 
@@ -41,12 +41,12 @@ from pydantic import (
 from .odata import Bind, duration, string_literal
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 __all__ = ["LenientDateTime", "Tm1Enum", "Tm1Model", "Tm1Patch", "iso_datetime", "to_odata"]
 
 
-class Tm1Enum(str, enum.Enum):
+class Tm1Enum(enum.StrEnum):
     """A TM1 enum type: members are TM1's names; a value this client doesn't know reads as
     the fallback member (``UNKNOWN``), which is never sent."""
 
@@ -68,9 +68,6 @@ class Tm1Enum(str, enum.Enum):
         if not self.known:
             raise ValueError(f"{type(self).__name__}.{self.name} stands for a value this client doesn't know")
         return self.__odata_prefix__ + string_literal(self.value)
-
-    def __str__(self) -> str:
-        return self.value
 
 
 _DATETIME = TypeAdapter(datetime)
@@ -142,7 +139,7 @@ class Tm1Model(BaseModel):
         read = handler(value)
         given = not isinstance(value, str) or bool(info.context and info.context.get("as_given"))
         if isinstance(read, datetime) and read.tzinfo is not None and not given:
-            return read.astimezone(timezone.utc)
+            return read.astimezone(UTC)
         return read
 
     @field_serializer("*", mode="wrap", when_used="json")

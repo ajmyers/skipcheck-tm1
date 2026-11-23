@@ -6,7 +6,7 @@ client's ProcessAttributeTm1Test."""
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -38,7 +38,7 @@ def process_and_chore(tm1: Tm1Client, name: str) -> Iterator[tuple[str, str]]:
         tm1.chores.create(
             ChorePatch.builder()
             .name(chore)
-            .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=timezone.utc))
+            .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=UTC))
             .dst_sensitive(False)
             .active(False)
             .execution_mode(ChoreExecutionMode.SINGLE_COMMIT)

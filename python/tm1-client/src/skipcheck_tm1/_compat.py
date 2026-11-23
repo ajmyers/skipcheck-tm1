@@ -64,7 +64,7 @@ class AsyncIO:
 
         try:
             ok, result = await asyncio.wait_for(outcome(), seconds)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise Expired() from None
         if not ok:
             raise result

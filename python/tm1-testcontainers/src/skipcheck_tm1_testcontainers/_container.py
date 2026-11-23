@@ -20,7 +20,7 @@ import threading
 import uuid
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 from testcontainers.core.config import testcontainers_config as tc_config
 from testcontainers.core.container import DockerContainer, Reaper
@@ -29,7 +29,6 @@ from testcontainers.core.labels import LABEL_SESSION_ID, create_labels
 from testcontainers.core.network import Network as _TcNetwork
 from testcontainers.core.transferable import Transferable, build_transfer_tar
 from testcontainers.core.wait_strategies import HttpWaitStrategy
-from typing_extensions import Self
 
 __all__ = ["GenericContainer", "Network", "docker_available", "reuse_enabled"]
 

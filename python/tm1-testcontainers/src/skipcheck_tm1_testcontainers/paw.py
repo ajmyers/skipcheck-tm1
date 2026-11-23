@@ -20,13 +20,12 @@ import time
 from http.cookies import SimpleCookie
 from importlib import resources
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Self
 from urllib.parse import quote, quote_plus
 
 import httpx
 from testcontainers.core.config import testcontainers_config as tc_config
 from testcontainers.core.docker_client import DockerClient
-from typing_extensions import Self
 
 from .sources import PawSource, setting
 from .tm1 import Tm1AdminServerContainer, Tm1ServerContainer

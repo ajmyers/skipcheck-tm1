@@ -16,7 +16,7 @@ import json
 import uuid
 from collections import deque
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 import httpx
@@ -64,7 +64,7 @@ SAMPLES: dict[str, tuple[Any, str]] = {
     "Edm.Decimal": (1.5, "1.5"),
     "Edm.Date": (date(2026, 1, 2), "2026-01-02"),
     "Edm.TimeOfDay": (time(3, 4, 5), "03:04:05"),
-    "Edm.DateTimeOffset": (datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc), "2026-01-02T03:04:05Z"),
+    "Edm.DateTimeOffset": (datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC), "2026-01-02T03:04:05Z"),
     "Edm.Duration": (timedelta(seconds=90), "duration'PT1M30S'"),
     "Edm.Guid": (uuid.UUID(int=1), str(uuid.UUID(int=1))),
     "Edm.PrimitiveType": ("v", "'v'"),

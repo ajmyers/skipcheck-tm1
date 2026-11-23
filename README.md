@@ -26,7 +26,7 @@ Java is the reference: the other clients have its API, and their tests replay wh
 | [`docker/pa-setup`](docker/pa-setup) | One command for any mix of the above: TM1 servers, TM1 Web, PAW and Cognos, described in one file, `pa-environment.yaml`. |
 | [`agent-plugin`](agent-plugin) | Agent skills that set these up for you: `tm1-setup` for one TM1 server, `pa-setup` for the rest. |
 
-The Java libraries require Java 17+, the Python client Python 3.10+, the .NET client .NET 10, the TypeScript client Node 22+ or a modern browser (its testcontainers, Node 22.22+).
+The Java libraries require Java 17+, the Python client Python 3.11+, the .NET client .NET 10, the TypeScript client Node 22+ or a modern browser (its testcontainers, Node 22.22+).
 
 ## Building
 
@@ -42,7 +42,7 @@ The Java libraries require Java 17+, the Python client Python 3.10+, the .NET cl
 ./gradlew liveTest --continue            # every client's tests against a real TM1 (bring your own: see scripts/live-tests.sh)
 ```
 
-The `check` and `liveTest` tasks run each client's own tool, the same on macOS, Linux and Windows, and are what CI runs: `pytest python` in a virtual environment Gradle makes (`build/python-venv`), `dotnet test dotnet/Tm1.slnx`, and `npm ci`, `npm test` and `npm run build` in `typescript`. Those commands work on their own too. They need Python 3.10+, the .NET 10 SDK and Node 22+ installed; `./gradlew build` needs only a JDK. [CONTRIBUTING](CONTRIBUTING.md#checks) says which to run for what, and what a pull request has to pass.
+The `check` and `liveTest` tasks run each client's own tool, the same on macOS, Linux and Windows, and are what CI runs: `pytest python` in a virtual environment Gradle makes (`build/python-venv`), `dotnet test dotnet/Tm1.slnx`, and `npm ci`, `npm test` and `npm run build` in `typescript`. Those commands work on their own too. They need Python 3.11+, the .NET 10 SDK and Node 22+ installed; `./gradlew build` needs only a JDK. [CONTRIBUTING](CONTRIBUTING.md#checks) says which to run for what, and what a pull request has to pass.
 
 Builds use JDK 27 via Gradle toolchains; published libraries target Java 17 bytecode.
 

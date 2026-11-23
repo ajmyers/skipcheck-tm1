@@ -56,8 +56,8 @@ from ..timeouts import Tm1Timeouts
 from ..version import Tm1Capabilities, Tm1Dialect, Tm1Version
 
 if TYPE_CHECKING:
-    # For the checker only (pydantic brings it): a builder's methods return the builder they're called on
-    from typing_extensions import Self
+    # For the checker only: a builder's methods return the builder they're called on
+    from typing import Self
 
 __all__ = ["AsyncTm1Session", "AsyncTm1SessionBatch", "AsyncTm1SessionBuilder"]
 
