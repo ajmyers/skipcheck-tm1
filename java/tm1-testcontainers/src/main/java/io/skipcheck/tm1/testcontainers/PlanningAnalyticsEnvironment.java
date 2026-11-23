@@ -107,8 +107,8 @@ import io.skipcheck.tm1.testcontainers.CognosContainer.Namespace;
  * {@code docker network rm $(docker network ls -q --filter label=io.skipcheck.tm1.environment)}.
  * <li>The identity covers each part's image, source, environment variables, command,
  * network aliases, labels, exposed ports and copied files, the Cognos users and the CAM
- * settings. A change made with {@code withCreateContainerCmdModifier} isn't seen: remove
- * the containers after changing one.
+ * settings. A change to anything else about a container, such as how it's created, isn't
+ * seen: remove the containers after making one.
  * <li>PAW isn't a Testcontainers container: IBM's compose files give it fixed names, so
  * there's one per Docker host whatever the identity. Each start runs IBM's compose again,
  * which takes about a minute.

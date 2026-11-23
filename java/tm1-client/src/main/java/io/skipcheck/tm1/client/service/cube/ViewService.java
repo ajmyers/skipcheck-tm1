@@ -19,7 +19,7 @@ import reactor.core.publisher.Mono;
 /**
  * Views: a cube's public and private views ({@link ViewScope}), native
  * ({@code NativeView}: subsets on columns, rows and titles) or MDX ({@code MDXView}).
- * They're read as the sealed {@link View}, so each comes back as its own type.
+ * They're read as {@link View}, so each comes back as its own type.
  *
  * <p>
  * A native view's subsets are in complex properties, reached by expanding through the

@@ -9,10 +9,9 @@ import reactor.core.publisher.Mono;
 
 /**
  * A JSON {@code $batch} being put together, from {@link Tm1Client#batch()}: calls made
- * through {@link #client()} are queued rather than sent, each returning its own
- * {@code Mono} or {@code Flux}, and {@link #run()} sends them together. Every service's
- * methods work through it unchanged. See {@link Tm1SessionBatch} for what TM1 does with a
- * batch.
+ * through {@link #client()} are queued rather than sent, and {@link #run()} sends them
+ * together. Each call's result is there once the batch has run. Every service's methods
+ * work through it unchanged. See {@link Tm1SessionBatch} for what TM1 does with a batch.
  *
  * <p>
  * Read three things in one round trip:
