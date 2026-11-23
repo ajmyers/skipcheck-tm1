@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace AjMyers.Tm1.Client.OData;
+namespace Skipcheck.Tm1.Client.OData;
 
 /// <summary>OData query options: <c>$select</c>, <c>$expand</c> (with nested options),
 /// <c>$filter</c>, <c>$orderby</c>, <c>$top</c>, <c>$skip</c>, <c>$count</c>, custom options such as

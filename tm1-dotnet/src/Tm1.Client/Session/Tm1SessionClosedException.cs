@@ -1,6 +1,6 @@
 using System;
 
-namespace AjMyers.Tm1.Client.Session;
+namespace Skipcheck.Tm1.Client.Session;
 
 /// <summary>Using a session, or a pool, after it was closed.</summary>
 public sealed class Tm1SessionClosedException : InvalidOperationException

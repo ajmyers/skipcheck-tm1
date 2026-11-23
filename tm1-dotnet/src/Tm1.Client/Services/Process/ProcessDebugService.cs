@@ -4,12 +4,12 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Session;
-using Tm1Thread = AjMyers.Tm1.Client.Model.Thread;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Session;
+using Tm1Thread = Skipcheck.Tm1.Client.Model.Thread;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Process debugging: a run of a process that stops at breakpoints and steps line by line,
 /// held on the server as a <c>ProcessDebugContext</c> until deleted.

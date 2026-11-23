@@ -1,6 +1,6 @@
 using System;
 
-namespace AjMyers.Tm1.Client.Version;
+namespace Skipcheck.Tm1.Client.Version;
 
 /// <summary>Something a request needs the server's <c>$metadata</c> to define, as the Java
 /// client's <c>Tm1Capability</c>.</summary>

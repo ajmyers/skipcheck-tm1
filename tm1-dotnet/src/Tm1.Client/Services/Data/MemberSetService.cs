@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Session;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Member sets: the results of MDX set expressions, as a single axis of tuples, kept on the
 /// server in <c>/MemberSets</c> and keyed by an ordinal TM1 assigns (1, 2, … within the session).

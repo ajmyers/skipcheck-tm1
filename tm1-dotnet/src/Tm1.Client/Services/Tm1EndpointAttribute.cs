@@ -1,6 +1,6 @@
 using System;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>The endpoints of the REST API a method implements, as coverage-gate IDs
 /// (<c>EntitySet Cubes</c>, <c>Action Cube/Reserve</c>), as the Java client's <c>@Tm1Endpoint</c>.

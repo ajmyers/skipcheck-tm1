@@ -1,13 +1,13 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Auth;
-using AjMyers.Tm1.Client.Errors;
-using AjMyers.Tm1.Client.Services;
-using AjMyers.Tm1.Client.Session;
-using AjMyers.Tm1.Client.Version;
+using Skipcheck.Tm1.Client.Auth;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.Services;
+using Skipcheck.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Version;
 
-namespace AjMyers.Tm1.Client;
+namespace Skipcheck.Tm1.Client;
 
 /// <summary>The client for one TM1 server: one session, and every service built on it, as the Java
 /// client's <c>Tm1Client</c>:

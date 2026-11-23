@@ -1,4 +1,4 @@
-import { Tm1Version } from "@ajmyers/tm1-client";
+import { Tm1Version } from "@skipcheck/tm1-client";
 import { describe, expect } from "vitest";
 import { PawContainer, Tm1ServerContainer, Tm1WebContainer } from "../src/index.js";
 import { PawSession } from "../src/PawSession.js";

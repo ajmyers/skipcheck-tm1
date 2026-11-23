@@ -3,7 +3,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Client.Auth;
+namespace Skipcheck.Tm1.Client.Auth;
 
 /// <summary>How a session logs in: the <c>Authorization</c> header of its first request, as the
 /// Java client's <c>Tm1Authenticator</c>. TM1 answers with a <c>TM1SessionId</c> cookie, which

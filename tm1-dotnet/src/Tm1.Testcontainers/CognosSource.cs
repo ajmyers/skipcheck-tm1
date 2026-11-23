@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>Where a <see cref="CognosContainer"/> gets Cognos Analytics from: an image with it built
 /// in (<see cref="PrivateImage"/>), a volume holding an install (<see cref="InstallVolume"/>), a

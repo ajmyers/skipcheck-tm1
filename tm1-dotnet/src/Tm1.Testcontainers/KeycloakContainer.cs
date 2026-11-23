@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>Keycloak, the OpenID Connect provider behind a <see cref="CognosContainer"/>'s OIDC
 /// namespace, as the Java <c>KeycloakContainer</c>: reached as <c>keycloak</c> on its network, with

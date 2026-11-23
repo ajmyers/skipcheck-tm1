@@ -5,12 +5,12 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
-namespace AjMyers.Tm1.Testcontainers.Tests;
+namespace Skipcheck.Tm1.Testcontainers.Tests;
 
 /// <summary>The .NET library offers what the Java tm1-testcontainers does, read from the Java
 /// sources as tests/Tm1.Client.Tests/JavaParityTests.cs reads the client's: each public Java type
-/// is a type of the same name in <c>AjMyers.Tm1.Testcontainers</c> (its records nested in it, its
-/// annotations <c>[…Fact]</c> attributes in <c>AjMyers.Tm1.Testcontainers.Xunit</c>); each constant
+/// is a type of the same name in <c>Skipcheck.Tm1.Testcontainers</c> (its records nested in it, its
+/// annotations <c>[…Fact]</c> attributes in <c>Skipcheck.Tm1.Testcontainers.Xunit</c>); each constant
 /// a constant in Pascal case; each constructor and public method a .NET one, by Java's parameter
 /// names in order. Getters are properties (<c>getRestUrl()</c> → <c>RestUrl</c>,
 /// <c>isRunning()</c> → <c>IsRunning</c>), and what does I/O is <c>…Async</c>
@@ -61,8 +61,8 @@ public partial class JavaParityTests
     public void EveryJavaTypeHasItsDotNetCounterpart(string name)
     {
         var source = File.ReadAllText(Path.Combine(Repo.JavaSources, name + ".java"));
-        var type = Library.GetType("AjMyers.Tm1.Testcontainers." + name);
-        Assert.True(type is not null, "AjMyers.Tm1.Testcontainers has no " + name);
+        var type = Library.GetType("Skipcheck.Tm1.Testcontainers." + name);
+        Assert.True(type is not null, "Skipcheck.Tm1.Testcontainers has no " + name);
         var problems = new List<string>();
         if (Regex.IsMatch(source, $@"public\s+enum\s+{name}\b"))
         {
@@ -138,8 +138,8 @@ public partial class JavaParityTests
     public void EveryAnnotationIsAnXunitAttribute(string name)
     {
         var source = File.ReadAllText(Path.Combine(Repo.JavaSources, name + ".java"));
-        var type = Library.GetType("AjMyers.Tm1.Testcontainers.Xunit." + name + "FactAttribute");
-        Assert.True(type is not null, "no AjMyers.Tm1.Testcontainers.Xunit." + name + "FactAttribute");
+        var type = Library.GetType("Skipcheck.Tm1.Testcontainers.Xunit." + name + "FactAttribute");
+        Assert.True(type is not null, "no Skipcheck.Tm1.Testcontainers.Xunit." + name + "FactAttribute");
         Assert.True(typeof(FactAttribute).IsAssignableFrom(type));
         foreach (Match c in Regex.Matches(source, @"^\tString\s+([A-Z][A-Z_0-9]*)\s*=", RegexOptions.Multiline))
         {

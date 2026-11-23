@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
 
 #pragma warning disable CS0618 // the deprecated Activate, Deactivate and SetServerLocalStartTime are tested too
 
-namespace AjMyers.Tm1.Client.Tests.Services;
+namespace Skipcheck.Tm1.Client.Tests.Services;
 
 /// <summary>ChoreService against a fake TM1: each method sends what the Java client's does.</summary>
 public class ChoreServiceTests

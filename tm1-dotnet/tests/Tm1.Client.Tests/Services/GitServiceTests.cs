@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Services;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Services;
 
-namespace AjMyers.Tm1.Client.Tests.Services;
+namespace Skipcheck.Tm1.Client.Tests.Services;
 
 /// <summary>GitService against a fake TM1: each method sends what the Java client's does, with the
 /// credentials it was given and no others.</summary>

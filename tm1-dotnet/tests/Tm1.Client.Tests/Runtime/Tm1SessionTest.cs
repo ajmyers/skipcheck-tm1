@@ -7,12 +7,12 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Auth;
-using AjMyers.Tm1.Client.Errors;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Auth;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Session;
 
-namespace AjMyers.Tm1.Client.Tests.Runtime;
+namespace Skipcheck.Tm1.Client.Tests.Runtime;
 
 /// <summary>The Java client's <c>Tm1SessionTest</c>: login, cookie, errors, reading, streaming,
 /// transport failures and closing. (<c>observesLoginAndClose</c> is Micrometer's, which .NET doesn't have.)</summary>

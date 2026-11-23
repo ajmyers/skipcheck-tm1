@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace AjMyers.Tm1.Client.OData;
+namespace Skipcheck.Tm1.Client.OData;
 
 /// <summary>A <c>$filter</c> expression, built from <see cref="ODataProperty"/> comparisons and the
 /// canonical functions TM1 supports, as the Java client's <c>Filter</c>. Every binary expression

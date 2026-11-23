@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Text;
 
-namespace AjMyers.Tm1.Testcontainers.Tests;
+namespace Skipcheck.Tm1.Testcontainers.Tests;
 
 /// <summary>Java's AdminServerWiringTest.</summary>
 public class AdminServerWiringTests

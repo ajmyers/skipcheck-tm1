@@ -1,6 +1,6 @@
 using System;
 
-namespace AjMyers.Tm1.Client.Session;
+namespace Skipcheck.Tm1.Client.Session;
 
 /// <summary>How long a session waits, as the Java client's <c>Tm1Timeouts</c>: to connect, for a
 /// login, for a request's answer, for the close at the end, and how long a refused login is

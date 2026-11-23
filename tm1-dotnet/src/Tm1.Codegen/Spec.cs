@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace AjMyers.Tm1.Codegen;
+namespace Skipcheck.Tm1.Codegen;
 
 /// <summary>The spec, with the lookups every emitter needs (as tm1_pygen's spec.py).</summary>
 public sealed class Spec

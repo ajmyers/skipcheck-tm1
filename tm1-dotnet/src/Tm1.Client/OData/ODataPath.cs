@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace AjMyers.Tm1.Client.OData;
+namespace Skipcheck.Tm1.Client.OData;
 
 /// <summary>A resource path relative to the service root, as the Java client's <c>ODataPath</c>:
 /// <c>Cubes('Sales')/Views('Default')</c>. Immutable; names are checked and key values encoded.</summary>

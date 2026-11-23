@@ -1,7 +1,7 @@
 using System;
-using AjMyers.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.OData;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>A set of attribute definitions: the attributes that one kind of object has, such as every
 /// element of a hierarchy.</summary>

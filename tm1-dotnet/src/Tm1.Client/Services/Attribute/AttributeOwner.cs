@@ -1,7 +1,7 @@
 using System;
-using AjMyers.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.OData;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>An object whose attribute values can be translated: it has <c>LocalizedAttributes</c>.</summary>
 public sealed class AttributeOwner

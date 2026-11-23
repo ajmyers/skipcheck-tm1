@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     // The client from its sources, as tsconfig.json's paths
-    alias: { "@ajmyers/tm1-client": fileURLToPath(new URL("../src/index.ts", import.meta.url)) },
+    alias: { "@skipcheck/tm1-client": fileURLToPath(new URL("../src/index.ts", import.meta.url)) },
   },
   test: {
     include: ["test/**/*.test.ts"],

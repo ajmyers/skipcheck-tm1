@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { StartedTestContainer } from "testcontainers";
-import { Tm1ServerContainer } from "@ajmyers/tm1-testcontainers";
+import { Tm1ServerContainer } from "@skipcheck/tm1-testcontainers";
 import {
   DimensionPatch,
   ElementPatch,

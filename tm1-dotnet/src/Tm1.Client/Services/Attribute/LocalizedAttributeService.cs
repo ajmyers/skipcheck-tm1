@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Session;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Translated attribute values: an <see cref="AttributeOwner"/>'s <c>LocalizedAttributes</c>, one
 /// per locale, keyed by locale ID (<c>fr</c>, <c>de-CH</c>). The values are in <c>Attributes</c>:

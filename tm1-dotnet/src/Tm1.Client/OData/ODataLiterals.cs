@@ -2,9 +2,9 @@ using System;
 using System.Globalization;
 using System.Numerics;
 using System.Xml;
-using AjMyers.Tm1.Client.Json;
+using Skipcheck.Tm1.Client.Json;
 
-namespace AjMyers.Tm1.Client.OData;
+namespace Skipcheck.Tm1.Client.OData;
 
 /// <summary>Something that writes itself as an OData literal.</summary>
 public interface IODataLiteral

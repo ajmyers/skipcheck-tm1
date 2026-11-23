@@ -8,12 +8,12 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Errors;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Session;
 
-namespace AjMyers.Tm1.Client.Tests;
+namespace Skipcheck.Tm1.Client.Tests;
 
 /// <summary>The session against a fake TM1: login and cookie, re-login, views, batches, async
 /// operations and capability checks, as the Java and Python clients' session tests.</summary>

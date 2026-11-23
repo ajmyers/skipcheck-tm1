@@ -1,4 +1,4 @@
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>The database a <see cref="Tm1ServerContainer"/> starts with (<c>TM1_SEED</c>), and its login.</summary>
 public enum Tm1Seed

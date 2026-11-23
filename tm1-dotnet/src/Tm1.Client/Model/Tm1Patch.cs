@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using AjMyers.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.OData;
 
-namespace AjMyers.Tm1.Client.Model;
+namespace Skipcheck.Tm1.Client.Model;
 
 /// <summary>A write, as the Java model's patches (<c>CubePatch</c>): the properties set, explicit
 /// nulls included, and <c>@odata.bind</c> references, in the order they were set. A subtype's patch

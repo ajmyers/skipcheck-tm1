@@ -1,9 +1,9 @@
 using System;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Errors;
-using AjMyers.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.Model;
 
-namespace AjMyers.Tm1.Client.Tests.Live;
+namespace Skipcheck.Tm1.Client.Tests.Live;
 
 /// <summary>EncryptionService against a real TM1: a port of the Java client's EncryptionServiceTm1Test.
 /// The image has no GSKit command line, so the local key file provider can't make a key, and nothing

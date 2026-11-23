@@ -7,10 +7,10 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Version;
 using Microsoft.Extensions.Logging;
+using Skipcheck.Tm1.Client.Version;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>A TM1 server in Docker, as the Java <c>Tm1ServerContainer</c>: the <c>tm1-server</c>
 /// image (which holds no IBM software) with TM1 from a <see cref="Tm1Source"/>, its REST API on port

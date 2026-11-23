@@ -7,13 +7,13 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Auth;
-using AjMyers.Tm1.Client.Errors;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Session;
-using AjMyers.Tm1.Client.Version;
+using Skipcheck.Tm1.Client.Auth;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Version;
 
-namespace AjMyers.Tm1.Client.Tests.Runtime;
+namespace Skipcheck.Tm1.Client.Tests.Runtime;
 
 /// <summary>The Java client's <c>Tm1ErrorsTest</c>: reading TM1's errors and classifying them.</summary>
 public class Tm1ErrorsTest

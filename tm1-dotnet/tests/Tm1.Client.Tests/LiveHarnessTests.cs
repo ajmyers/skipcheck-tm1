@@ -1,10 +1,10 @@
-using AjMyers.Tm1.Client.Tests.Live;
-using AjMyers.Tm1.Testcontainers.Xunit;
-using LiveTm1 = AjMyers.Tm1.Client.Tests.Live.Live;
+using Skipcheck.Tm1.Client.Tests.Live;
+using Skipcheck.Tm1.Testcontainers.Xunit;
+using LiveTm1 = Skipcheck.Tm1.Client.Tests.Live.Live;
 
-namespace AjMyers.Tm1.Client.Tests;
+namespace Skipcheck.Tm1.Client.Tests;
 
-/// <summary>The live tests get TM1 from AjMyers.Tm1.Testcontainers, whose own tests check where it
+/// <summary>The live tests get TM1 from Skipcheck.Tm1.Testcontainers, whose own tests check where it
 /// finds TM1 and how it mounts it (tests/Tm1.Testcontainers.Tests): here, only that the live tests
 /// skip and run as the library's <c>[RequiresTm1Fact]</c> does, with <c>TM1_URL</c> on top.</summary>
 public class LiveHarnessTests

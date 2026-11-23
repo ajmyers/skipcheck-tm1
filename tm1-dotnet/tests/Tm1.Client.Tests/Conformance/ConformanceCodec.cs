@@ -10,12 +10,12 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
-using AjMyers.Tm1.Client.Errors;
-using AjMyers.Tm1.Client.Json;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.Json;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
 
-namespace AjMyers.Tm1.Client.Tests.Conformance;
+namespace Skipcheck.Tm1.Client.Tests.Conformance;
 
 /// <summary>A tag or type this runner can't decode: a failure, never a skip.</summary>
 public sealed class UnknownConformanceValueException(string message) : Exception(message);
@@ -107,7 +107,7 @@ public static class ConformanceCodec
             }
             case "$patch":
             {
-                var type = Client.GetType("AjMyers.Tm1.Client.Model." + body!.GetValue<string>())
+                var type = Client.GetType("Skipcheck.Tm1.Client.Model." + body!.GetValue<string>())
                     ?? throw new UnknownConformanceValueException("no patch " + body);
                 var values = new Dictionary<string, object?>();
                 foreach (var (key, value) in node["json"]!.AsObject())
@@ -120,7 +120,7 @@ public static class ConformanceCodec
             }
             case "$model":
             {
-                var type = Client.GetType("AjMyers.Tm1.Client.Model." + body!.GetValue<string>())
+                var type = Client.GetType("Skipcheck.Tm1.Client.Model." + body!.GetValue<string>())
                     ?? throw new UnknownConformanceValueException("no model " + body);
                 // An argument Java built: its date-times as given, as a caller's are
                 return JsonSerializer.Deserialize(JsonSerializer.SerializeToElement(node["json"]), type, AsGiven.Value);
@@ -151,7 +151,7 @@ public static class ConformanceCodec
             case "$type":
             {
                 var name = body!.GetValue<string>();
-                var type = Client.GetTypes().SingleOrDefault(t => t.IsPublic && t.Name == name && t.Namespace == "AjMyers.Tm1.Client.Services")
+                var type = Client.GetTypes().SingleOrDefault(t => t.IsPublic && t.Name == name && t.Namespace == "Skipcheck.Tm1.Client.Services")
                     ?? throw new UnknownConformanceValueException("no type " + name);
                 var args = node["args"]!.AsArray();
                 var factoryName = node["factory"]!.GetValue<string>();
@@ -407,7 +407,7 @@ public static class ConformanceCodec
             int or long or short => JsonValue.Create(Convert.ToInt64(value, CultureInfo.InvariantCulture)),
             double or float or decimal => JsonValue.Create(Convert.ToDouble(value, CultureInfo.InvariantCulture)),
             IList list => new JsonArray(list.Cast<object?>().Select(Result).ToArray()),
-            _ when value.GetType().Namespace == "AjMyers.Tm1.Client.Model" && !value.GetType().IsEnum => new JsonObject
+            _ when value.GetType().Namespace == "Skipcheck.Tm1.Client.Model" && !value.GetType().IsEnum => new JsonObject
             {
                 ["$model"] = value.GetType().Name,
                 ["json"] = WithoutTypes(JsonSerializer.SerializeToNode(value, value.GetType(), ResultOptions)),

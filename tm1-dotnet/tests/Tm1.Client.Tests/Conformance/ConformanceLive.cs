@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Client.Tests.Conformance;
+namespace Skipcheck.Tm1.Client.Tests.Conformance;
 
 /// <summary>Runs a live conformance scenario (spec/conformance/live/&lt;name&gt;.json), checks
 /// each step's expectation, and writes what the client sent to

@@ -9,7 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>Cognos Analytics in Docker, for TM1 in CAM security, as the Java <c>CognosContainer</c>:
 /// the <c>cognos-server</c> image (no IBM software in it) with Cognos from a

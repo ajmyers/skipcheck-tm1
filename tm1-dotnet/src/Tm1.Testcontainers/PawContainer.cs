@@ -12,7 +12,7 @@ using Docker.DotNet.Models;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Configurations;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>Planning Analytics Workspace, from IBM's PAW Local zip, logging users on with a TM1
 /// server's own security, as the Java <c>PawContainer</c>. PAW is several containers run by IBM's
@@ -374,7 +374,7 @@ public class PawContainer : IStartable
     private static byte[] ScriptBytes()
     {
         using var stream = typeof(PawContainer).Assembly.GetManifestResourceStream(Script)
-            ?? throw new InvalidOperationException($"Missing {Script} in the AjMyers.Tm1.Testcontainers assembly");
+            ?? throw new InvalidOperationException($"Missing {Script} in the Skipcheck.Tm1.Testcontainers assembly");
         using var copy = new MemoryStream();
         stream.CopyTo(copy);
         return copy.ToArray();

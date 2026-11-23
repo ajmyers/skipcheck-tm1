@@ -237,7 +237,7 @@ export class PawContainer implements Startable {
       const file = fileURLToPath(path);
       if (existsSync(file)) return readFileSync(file);
     }
-    throw new IllegalStateException("Missing " + SCRIPT + " in @ajmyers/tm1-testcontainers");
+    throw new IllegalStateException("Missing " + SCRIPT + " in @skipcheck/tm1-testcontainers");
   }
 
   /** Runs `paw-local.sh <command>` in the runner container, until it exits. */

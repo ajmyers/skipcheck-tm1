@@ -1,6 +1,6 @@
 using System;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Who sees an entry, and so which of a folder's collections holds it.</summary>
 public enum ContentScope

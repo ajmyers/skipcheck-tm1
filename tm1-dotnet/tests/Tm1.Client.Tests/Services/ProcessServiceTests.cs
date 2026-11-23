@@ -5,12 +5,12 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
 
 #pragma warning disable CS0618 // the deprecated Execute and ErrorLogs are tested too
 
-namespace AjMyers.Tm1.Client.Tests.Services;
+namespace Skipcheck.Tm1.Client.Tests.Services;
 
 /// <summary>ProcessService against a fake TM1: each method sends what the Java client's does.</summary>
 public class ProcessServiceTests
@@ -102,10 +102,10 @@ public class ProcessServiceTests
     [Fact]
     public void JavaFormatsForDatesAndTimes()
     {
-        Assert.Equal("2026-01-02", AjMyers.Tm1.Client.Services.ProcessFormats.Date(new DateOnly(2026, 1, 2)));
-        Assert.Equal("02:00", AjMyers.Tm1.Client.Services.ProcessFormats.Time(new TimeOnly(2, 0)));
-        Assert.Equal("02:00:30", AjMyers.Tm1.Client.Services.ProcessFormats.Time(new TimeOnly(2, 0, 30)));
-        Assert.Equal("2026-01-02T03:04Z", AjMyers.Tm1.Client.Services.ProcessFormats.DateTime(new DateTimeOffset(2026, 1, 2, 3, 4, 0, TimeSpan.Zero)));
-        Assert.Equal("02:00:30.500", AjMyers.Tm1.Client.Services.ProcessFormats.Time(new TimeOnly(2, 0, 30, 500)));
+        Assert.Equal("2026-01-02", Skipcheck.Tm1.Client.Services.ProcessFormats.Date(new DateOnly(2026, 1, 2)));
+        Assert.Equal("02:00", Skipcheck.Tm1.Client.Services.ProcessFormats.Time(new TimeOnly(2, 0)));
+        Assert.Equal("02:00:30", Skipcheck.Tm1.Client.Services.ProcessFormats.Time(new TimeOnly(2, 0, 30)));
+        Assert.Equal("2026-01-02T03:04Z", Skipcheck.Tm1.Client.Services.ProcessFormats.DateTime(new DateTimeOffset(2026, 1, 2, 3, 4, 0, TimeSpan.Zero)));
+        Assert.Equal("02:00:30.500", Skipcheck.Tm1.Client.Services.ProcessFormats.Time(new TimeOnly(2, 0, 30, 500)));
     }
 }

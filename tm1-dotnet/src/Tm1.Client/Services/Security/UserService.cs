@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Session;
-using ServerSession = AjMyers.Tm1.Client.Model.Session;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Session;
+using ServerSession = Skipcheck.Tm1.Client.Model.Session;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Users: <c>/Users</c>, the session's own user, their groups, and disconnecting them.
 /// <para>Group membership is set whole, with <see cref="SetGroupsAsync"/>: binding <c>Groups</c> in a

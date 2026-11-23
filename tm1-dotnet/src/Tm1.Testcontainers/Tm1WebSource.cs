@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>Where a <see cref="Tm1WebContainer"/> gets TM1 Web from, as <see cref="Tm1Source"/> for
 /// TM1: an image with TM1 Web built in, an installed <c>tm1web</c> folder, a volume holding one, a

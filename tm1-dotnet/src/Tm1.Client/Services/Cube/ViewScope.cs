@@ -1,4 +1,4 @@
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Who sees a view, and so which of a cube's collections holds it.</summary>
 public enum ViewScope

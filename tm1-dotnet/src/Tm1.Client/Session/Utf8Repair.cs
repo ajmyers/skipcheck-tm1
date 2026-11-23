@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Unicode;
 
-namespace AjMyers.Tm1.Client.Session;
+namespace Skipcheck.Tm1.Client.Session;
 
 /// <summary>Makes a response's bytes valid UTF-8 before they're read as JSON, as the Java client's
 /// <c>Utf8Repair</c>: each byte that isn't part of a character becomes U+FFFD, the replacement

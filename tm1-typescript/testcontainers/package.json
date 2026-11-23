@@ -1,5 +1,5 @@
 {
-  "name": "@ajmyers/tm1-testcontainers",
+  "name": "@skipcheck/tm1-testcontainers",
   "version": "0.1.0-dev",
   "description": "Testcontainers for IBM Planning Analytics: TM1, its Admin Server, TM1 Web, Planning Analytics Workspace, Cognos and Keycloak in Docker for Node tests, as the Java tm1-testcontainers",
   "license": "SEE LICENSE IN ../../LICENSE",
@@ -34,7 +34,7 @@
     "testcontainers": "11.14.0"
   },
   "peerDependencies": {
-    "@ajmyers/tm1-client": "*",
+    "@skipcheck/tm1-client": "*",
     "vitest": ">=3"
   },
   "peerDependenciesMeta": {
@@ -43,6 +43,6 @@
     }
   },
   "devDependencies": {
-    "@ajmyers/tm1-client": "file:.."
+    "@skipcheck/tm1-client": "file:.."
   }
 }

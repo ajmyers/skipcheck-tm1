@@ -7,10 +7,10 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
 
-namespace AjMyers.Tm1.Client.Json;
+namespace Skipcheck.Tm1.Client.Json;
 
 /// <summary>Marks a generated enum: its qualified CSDL name, for OData literals.</summary>
 [AttributeUsage(AttributeTargets.Enum)]

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { it } from "vitest";
-import { DockerHost, Tm1ServerContainer, Tm1Source } from "@ajmyers/tm1-testcontainers";
-import { RequiresTm1 } from "@ajmyers/tm1-testcontainers/vitest";
+import { DockerHost, Tm1ServerContainer, Tm1Source } from "@skipcheck/tm1-testcontainers";
+import { RequiresTm1 } from "@skipcheck/tm1-testcontainers/vitest";
 import { Tm1Authenticator, Tm1Client, Tm1ClientBuilder } from "../../src/index.js";
 
 const env = (name: string): string | undefined => {
@@ -36,7 +36,7 @@ async function containerSkipReason(): Promise<string | undefined> {
 
 const containerReason = env("TM1_URL") !== undefined ? undefined : await containerSkipReason();
 
-/** The shared TM1 server in Docker (`@ajmyers/tm1-testcontainers`), started once per run: an
+/** The shared TM1 server in Docker (`@skipcheck/tm1-testcontainers`), started once per run: an
  * empty database, `admin` with no password, or CAM security if the container has it. */
 async function sharedContainer(): Promise<Target> {
   const tm1 = await Tm1ServerContainer.shared();
@@ -51,7 +51,7 @@ async function sharedContainer(): Promise<Target> {
  *   certificate;
  * - otherwise the shared TM1 server in Docker ({@link Live.containerTarget}), started from the
  *   Java tests' sources (`TM1_PRIVATE_IMAGE`, `TM1_HOME_DIR`, `TM1_INSTALL_VOLUME`,
- *   `TM1_BUNDLE_DIR`, `TM1_BUNDLE_URL`) with `@ajmyers/tm1-testcontainers`.
+ *   `TM1_BUNDLE_DIR`, `TM1_BUNDLE_URL`) with `@skipcheck/tm1-testcontainers`.
  *
  * Without either (or without Docker) the tests are skipped. Tests make objects named
  * `tm1ts_test_…` and delete them afterwards. */

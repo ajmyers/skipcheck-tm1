@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
 
-namespace AjMyers.Tm1.Client.Tests.Services;
+namespace Skipcheck.Tm1.Client.Tests.Services;
 
 /// <summary>SandboxService against a fake TM1: the sandboxes themselves and their actions.</summary>
 public class SandboxServiceTests

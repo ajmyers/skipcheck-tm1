@@ -1,4 +1,4 @@
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Who sees a subset, and so which of a hierarchy's collections holds it, as the Java
 /// client's <c>SubsetScope</c>; <see cref="SubsetScopes.Navigation"/> names the collection.</summary>

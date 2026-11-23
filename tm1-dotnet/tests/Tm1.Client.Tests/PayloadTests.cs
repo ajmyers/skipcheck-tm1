@@ -4,11 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Xml;
-using AjMyers.Tm1.Client.Json;
-using AjMyers.Tm1.Client.Model;
-using ModelThread = AjMyers.Tm1.Client.Model.Thread;
+using Skipcheck.Tm1.Client.Json;
+using Skipcheck.Tm1.Client.Model;
+using ModelThread = Skipcheck.Tm1.Client.Model.Thread;
 
-namespace AjMyers.Tm1.Client.Tests;
+namespace Skipcheck.Tm1.Client.Tests;
 
 /// <summary>The payloads the Java client captured from a real TM1 read into the model and write back
 /// the same, as its PayloadRoundTripTest: control information other than <c>@odata.etag</c> and

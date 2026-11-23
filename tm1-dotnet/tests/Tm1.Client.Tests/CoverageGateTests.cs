@@ -4,9 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
-using AjMyers.Tm1.Client.Services;
+using Skipcheck.Tm1.Client.Services;
 
-namespace AjMyers.Tm1.Client.Tests;
+namespace Skipcheck.Tm1.Client.Tests;
 
 /// <summary>The endpoint coverage gate, as the Java client's CoverageGateTest (plan §12.3): every
 /// endpoint of the spec is implemented (a <see cref="Tm1EndpointAttribute"/>), excluded with a

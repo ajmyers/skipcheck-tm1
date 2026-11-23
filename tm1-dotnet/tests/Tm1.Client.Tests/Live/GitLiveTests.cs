@@ -4,12 +4,12 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Errors;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.Services;
-using AjMyers.Tm1.Testcontainers;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.Services;
+using Skipcheck.Tm1.Testcontainers;
 
-namespace AjMyers.Tm1.Client.Tests.Live;
+namespace Skipcheck.Tm1.Client.Tests.Live;
 
 /// <summary>A live test that needs a Git remote TM1 can reach: <c>TM1_GIT_URL</c> (a <c>git://</c> or
 /// <c>https://</c> repository whose <c>main</c> has a commit), or else, when the tests start TM1 in

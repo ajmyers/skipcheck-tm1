@@ -7,7 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Testcontainers.Tests;
+namespace Skipcheck.Tm1.Testcontainers.Tests;
 
 /// <summary>A browser's session with TM1 Web, as Java's test Tm1WebSession: TM1 Web's DWR calls
 /// (list servers, log on) and its evalservice.</summary>

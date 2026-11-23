@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Errors;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Services;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Services;
 
 #pragma warning disable CS0618 // the deprecated runs, error logs and chore actions are tested too
 
-namespace AjMyers.Tm1.Client.Tests.Live;
+namespace Skipcheck.Tm1.Client.Tests.Live;
 
 /// <summary>ProcessService against a real TM1, on a process whose numeric parameter picks how it
 /// ends: Java's <c>ProcessServiceTm1Test</c>.</summary>

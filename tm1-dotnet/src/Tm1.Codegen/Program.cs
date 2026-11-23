@@ -8,7 +8,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 
-namespace AjMyers.Tm1.Codegen;
+namespace Skipcheck.Tm1.Codegen;
 
 public static class Program
 {

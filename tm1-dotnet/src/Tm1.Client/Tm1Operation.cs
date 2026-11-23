@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using AjMyers.Tm1.Client.Version;
+using Skipcheck.Tm1.Client.Version;
 
-namespace AjMyers.Tm1.Client;
+namespace Skipcheck.Tm1.Client;
 
 /// <summary>An action or function of the REST API, as <c>$metadata</c> declares it: what the
 /// generated <c>Tm1Operations</c> catalog holds, as the Java client's <c>Tm1Operation</c>.</summary>

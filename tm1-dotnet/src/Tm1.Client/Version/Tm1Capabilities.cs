@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
-using AjMyers.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.Errors;
 
-namespace AjMyers.Tm1.Client.Version;
+namespace Skipcheck.Tm1.Client.Version;
 
 /// <summary>What a server's <c>$metadata</c> defines, and its versions: what requests check before
 /// they're sent, as the Java client's <c>Tm1Capabilities</c>. <see cref="Endpoints"/> are made the

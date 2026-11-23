@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Errors;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Services;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Services;
 
-namespace AjMyers.Tm1.Client.Tests.Live;
+namespace Skipcheck.Tm1.Client.Tests.Live;
 
 /// <summary>What the live tests build their cubes from: dimensions, subsets and cells, made through the
 /// raw session (as the Java tests make what a later service owns), so these tests need only the cube and

@@ -4,7 +4,7 @@ using System.Net;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Client.Tests.Conformance;
+namespace Skipcheck.Tm1.Client.Tests.Conformance;
 
 /// <summary>The dimension scenarios (dimensions, hierarchies, elements, levels), offline: against a
 /// fake TM1 that answers each step with what the step expects, so every step's call is made, sends

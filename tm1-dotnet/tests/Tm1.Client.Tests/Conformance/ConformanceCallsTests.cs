@@ -11,7 +11,7 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Client.Tests.Conformance;
+namespace Skipcheck.Tm1.Client.Tests.Conformance;
 
 /// <summary>Replays the Java client's recorded service calls (spec/conformance/calls): the same
 /// call, with the same arguments, must send exactly the requests the Java client sent and, given

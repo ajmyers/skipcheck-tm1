@@ -6,13 +6,13 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Auth;
-using AjMyers.Tm1.Client.Errors;
-using AjMyers.Tm1.Client.Json;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Version;
+using Skipcheck.Tm1.Client.Auth;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.Json;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Version;
 
-namespace AjMyers.Tm1.Client.Session;
+namespace Skipcheck.Tm1.Client.Session;
 
 /// <summary>A session with one TM1 server, and views of it, as the Java client's <c>Tm1Session</c>.
 /// A view shares the login and connections, and changes how requests are sent:

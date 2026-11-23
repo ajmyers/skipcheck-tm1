@@ -10,7 +10,7 @@ spec/tm1-overlay.json                              what TM1 does differently fro
 spec/tm1-api.json                                  the language-neutral spec (generated, committed)
         ├── Java:   tm1-codegen's ModelGenerator  → tm1-client's model (at build time)
         ├── Python: tm1-python/codegen (tm1_pygen) → skipcheck_tm1._generated (at build time)
-        ├── .NET:   tm1-dotnet/src/Tm1.Codegen    → AjMyers.Tm1.Client.Model (at build time)
+        ├── .NET:   tm1-dotnet/src/Tm1.Codegen    → Skipcheck.Tm1.Client.Model (at build time)
         └── TypeScript: tm1-typescript/codegen    → src/generated (before build and test)
 spec/conformance/*.json                            cases every client's tests must pass
 ```

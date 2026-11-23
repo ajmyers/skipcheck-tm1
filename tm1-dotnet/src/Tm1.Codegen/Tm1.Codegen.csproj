@@ -2,7 +2,7 @@
   <!-- Build tool, not published: generates the client's model from spec/tm1-api.json -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <RootNamespace>AjMyers.Tm1.Codegen</RootNamespace>
+    <RootNamespace>Skipcheck.Tm1.Codegen</RootNamespace>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 </Project>

@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
-using AjMyers.Tm1.Client.Json;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Version;
+using Skipcheck.Tm1.Client.Json;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Version;
 
-namespace AjMyers.Tm1.Client;
+namespace Skipcheck.Tm1.Client;
 
 /// <summary>The result of a request that reads nothing (Java's <c>Void</c>).</summary>
 public sealed class NoContent

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
-namespace AjMyers.Tm1.Client.Tests.Runtime;
+namespace Skipcheck.Tm1.Client.Tests.Runtime;
 
 /// <summary>The .NET runtime offers what the Java client's does, read from the Java sources: every
 /// public method of the session, version, error, auth, OData and request classes (and their nested
@@ -79,7 +79,7 @@ public partial class JavaParityRuntimeTests
     public void EveryPublicJavaMemberHasADotNetCounterpart(string name)
     {
         var (file, types) = Classes[name];
-        var resolved = types.Select(t => typeof(Tm1Client).Assembly.GetType("AjMyers.Tm1.Client." + t)).ToList();
+        var resolved = types.Select(t => typeof(Tm1Client).Assembly.GetType("Skipcheck.Tm1.Client." + t)).ToList();
         Assert.True(resolved.All(t => t is not null), $"{name}: no {string.Join(" or ", types)}");
         var nested = name.Contains('.') ? name[(name.IndexOf('.') + 1)..] : null;
         var missing = new List<string>();

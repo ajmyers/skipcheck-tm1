@@ -2,9 +2,9 @@ using System;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Tests.Conformance;
+using Skipcheck.Tm1.Client.Tests.Conformance;
 
-namespace AjMyers.Tm1.Client.Tests.Live;
+namespace Skipcheck.Tm1.Client.Tests.Live;
 
 /// <summary>The live conformance scenarios (spec/conformance/live) against a real TM1: each step must
 /// meet its expectation, and what the client sent is written to build/conformance-live/dotnet for
@@ -24,8 +24,8 @@ public sealed class ConformanceScenarioLiveTests
             {
                 inner.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
             }
-            var traffic = new ConformanceLive.Traffic(inner, global::AjMyers.Tm1.Client.Tests.Live.Live.Url);
-            await using var tm1 = global::AjMyers.Tm1.Client.Tests.Live.Live.Builder().HttpHandler(traffic).Build();
+            var traffic = new ConformanceLive.Traffic(inner, global::Skipcheck.Tm1.Client.Tests.Live.Live.Url);
+            await using var tm1 = global::Skipcheck.Tm1.Client.Tests.Live.Live.Builder().HttpHandler(traffic).Build();
             failures.AddRange((await ConformanceLive.Run(tm1, traffic, scenario, names)).Select(f => name + ": " + f));
             traffic.Write(scenario["name"]!.GetValue<string>(), names);
         }

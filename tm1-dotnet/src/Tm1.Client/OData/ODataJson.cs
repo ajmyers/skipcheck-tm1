@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace AjMyers.Tm1.Client.OData;
+namespace Skipcheck.Tm1.Client.OData;
 
 /// <summary>OData's JSON control information, as the Java client's <c>ODataJson</c>.</summary>
 public static class ODataJson

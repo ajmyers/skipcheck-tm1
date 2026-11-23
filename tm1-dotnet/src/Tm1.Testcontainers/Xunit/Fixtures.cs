@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client;
-using AjMyers.Tm1.Client.Auth;
+using Skipcheck.Tm1.Client;
+using Skipcheck.Tm1.Client.Auth;
 using Xunit;
 
-namespace AjMyers.Tm1.Testcontainers.Xunit;
+namespace Skipcheck.Tm1.Testcontainers.Xunit;
 
 /// <summary>The shared TM1 server for a test class (<c>IClassFixture&lt;Tm1ServerFixture&gt;</c>),
 /// as Java's <c>@RequiresTm1</c> resolves a <c>Tm1ServerContainer</c> parameter: every class gets

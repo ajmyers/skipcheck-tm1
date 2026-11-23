@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 
-namespace AjMyers.Tm1.Codegen;
+namespace Skipcheck.Tm1.Codegen;
 
 /// <summary>Emits Operations.g.cs: <c>Tm1Operations</c>, a <c>Tm1Operation</c> per action and
 /// function, named as in the Java client (<c>CHORE_ACTIVATE</c> → <c>ChoreActivate</c>).</summary>
@@ -31,9 +31,9 @@ public sealed class OperationEmitter
         o.Append(
             """
             using System.Collections.Generic;
-            using AjMyers.Tm1.Client;
+            using Skipcheck.Tm1.Client;
 
-            namespace AjMyers.Tm1.Client.Model;
+            namespace Skipcheck.Tm1.Client.Model;
 
             /// <summary>Every action and function of the TM1 REST API, as <c>$metadata</c> declares them.
             /// Services refer to these, so a request checks the server has the operation.</summary>

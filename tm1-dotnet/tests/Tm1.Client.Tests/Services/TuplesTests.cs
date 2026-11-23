@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using AjMyers.Tm1.Client.Services;
+using Skipcheck.Tm1.Client.Services;
 
-namespace AjMyers.Tm1.Client.Tests.Services;
+namespace Skipcheck.Tm1.Client.Tests.Services;
 
 /// <summary>Tuples: a cell's element paths, as the Java client's <c>Tuples</c> builds them.</summary>
 public class TuplesTests

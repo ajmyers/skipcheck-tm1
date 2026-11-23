@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace AjMyers.Tm1.Testcontainers.Tests;
+namespace Skipcheck.Tm1.Testcontainers.Tests;
 
 /// <summary>A folder for one test, removed afterwards, as JUnit's <c>@TempDir</c>.</summary>
 public abstract class TempDir : IDisposable

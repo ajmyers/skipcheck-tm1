@@ -1,4 +1,4 @@
-# AjMyers.Tm1.Testcontainers
+# Skipcheck.Tm1.Testcontainers
 
 The .NET port of the Java [`tm1-testcontainers`](../../../tm1-testcontainers) module, built on [Testcontainers for .NET](https://dotnet.testcontainers.org/). It runs TM1 and the rest of Planning Analytics in Docker for tests. It reads the same settings in the same order and uses the same images, mounts and cache volume as the Java module, so a bundle unpacked for the Java tests is reused here.
 

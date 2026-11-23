@@ -3,7 +3,7 @@
   "compilerOptions": {
     // The client from its sources, so the tests and typecheck need no build of it first
     "paths": {
-      "@ajmyers/tm1-client": ["../src/index.ts"]
+      "@skipcheck/tm1-client": ["../src/index.ts"]
     }
   },
   "include": ["src", "test", "vitest.config.ts"]

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace AjMyers.Tm1.Client.OData;
+namespace Skipcheck.Tm1.Client.OData;
 
 /// <summary>Percent-encoding, as the Java client's <c>ODataEncoding</c>: only unreserved characters
 /// stay, plus what each place allows.</summary>

@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>Where a <see cref="Tm1ServerContainer"/> gets TM1 from. The <c>tm1-server</c> image holds
 /// no IBM software, so one of these supplies it: an image with TM1 built in

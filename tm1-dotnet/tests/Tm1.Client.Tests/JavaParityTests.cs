@@ -4,13 +4,13 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using AjMyers.Tm1.Client.Services;
+using Skipcheck.Tm1.Client.Services;
 
-namespace AjMyers.Tm1.Client.Tests;
+namespace Skipcheck.Tm1.Client.Tests;
 
 /// <summary>The .NET client offers what the Java client does, method for method, read from the
 /// Java sources (tm1-client/src/main/java/.../service), as the Python client's test_java_parity.py:
-/// each Java class is a class of the same name in <c>AjMyers.Tm1.Client.Services</c>; each public
+/// each Java class is a class of the same name in <c>Skipcheck.Tm1.Client.Services</c>; each public
 /// method is named in Pascal case, with <c>Async</c> when Java returns a <c>Mono</c> or <c>Flux</c>
 /// (<c>modelCubes</c> → <c>ModelCubesAsync</c>), implements the same <c>@Tm1Endpoint</c> IDs, and
 /// takes Java's parameters, by Java's names, in order (an <c>ODataQuery</c> is <c>query</c>;
@@ -74,8 +74,8 @@ public partial class JavaParityTests
     public void EveryJavaClassHasItsDotNetCounterpart(string name)
     {
         var file = Directory.GetFiles(Repo.JavaServices, name + ".java", SearchOption.AllDirectories).Single();
-        var type = typeof(Tm1Client).Assembly.GetType("AjMyers.Tm1.Client.Services." + name);
-        Assert.True(type is not null, $"AjMyers.Tm1.Client.Services has no {name}");
+        var type = typeof(Tm1Client).Assembly.GetType("Skipcheck.Tm1.Client.Services." + name);
+        Assert.True(type is not null, $"Skipcheck.Tm1.Client.Services has no {name}");
         var source = File.ReadAllText(file);
         if (Regex.IsMatch(source, $@"public\s+enum\s+{name}\b"))
         {

@@ -11,13 +11,13 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-using AjMyers.Tm1.Client.Auth;
-using AjMyers.Tm1.Client.Errors;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Session;
-using AjMyers.Tm1.Client.Version;
+using Skipcheck.Tm1.Client.Auth;
+using Skipcheck.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Version;
 
-namespace AjMyers.Tm1.Client.Tests.Live;
+namespace Skipcheck.Tm1.Client.Tests.Live;
 
 // The Java client's session, pool, capability, async, batch and client tests against a real TM1
 // (Tm1SessionTm1Test, Tm1SessionImpersonationTm1Test, Tm1SessionPoolTm1Test, Tm1CapabilitiesTm1Test,

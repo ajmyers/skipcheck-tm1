@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>Where a <see cref="PawContainer"/> gets Planning Analytics Workspace from: IBM's PAW
 /// Local zip, <c>ipa_workspace_local_&lt;release&gt;.&lt;build&gt;.zip</c>, as the Java

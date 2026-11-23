@@ -1,5 +1,5 @@
-// @ajmyers/tm1-client: a client for the IBM Planning Analytics (TM1) REST API, with the Java
-// client's API. The model (interfaces, patches, operations) is also at "@ajmyers/tm1-client/model".
+// @skipcheck/tm1-client: a client for the IBM Planning Analytics (TM1) REST API, with the Java
+// client's API. The model (interfaces, patches, operations) is also at "@skipcheck/tm1-client/model".
 
 export * from "./auth/index.js";
 export { Tm1Batch, Tm1Client, Tm1ClientBuilder } from "./client.js";

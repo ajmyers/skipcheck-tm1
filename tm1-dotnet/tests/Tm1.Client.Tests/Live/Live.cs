@@ -1,13 +1,13 @@
 using System;
 using System.Net.Http;
-using AjMyers.Tm1.Client.Auth;
-using AjMyers.Tm1.Testcontainers;
-using AjMyers.Tm1.Testcontainers.Xunit;
+using Skipcheck.Tm1.Client.Auth;
+using Skipcheck.Tm1.Testcontainers;
+using Skipcheck.Tm1.Testcontainers.Xunit;
 
-namespace AjMyers.Tm1.Client.Tests.Live;
+namespace Skipcheck.Tm1.Client.Tests.Live;
 
 /// <summary>A test against a real TM1, as the Java client's <c>*Tm1Test</c> classes and the Python
-/// client's tests/live. The server is either the one AjMyers.Tm1.Testcontainers starts in Docker for
+/// client's tests/live. The server is either the one Skipcheck.Tm1.Testcontainers starts in Docker for
 /// the run (<see cref="Tm1ServerContainer.SharedAsync"/>, from the same TM1 sources the Java tests
 /// use: <c>TM1_PRIVATE_IMAGE</c>, <c>TM1_HOME_DIR</c>, <c>TM1_INSTALL_VOLUME</c>,
 /// <c>TM1_BUNDLE_DIR</c>, <c>TM1_BUNDLE_URL</c>), logging in as <c>admin</c> with no password; or

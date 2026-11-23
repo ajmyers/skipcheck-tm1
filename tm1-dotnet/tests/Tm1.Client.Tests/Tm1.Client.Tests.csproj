@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyName>AjMyers.Tm1.Client.Tests</AssemblyName>
-    <RootNamespace>AjMyers.Tm1.Client.Tests</RootNamespace>
+    <AssemblyName>Skipcheck.Tm1.Client.Tests</AssemblyName>
+    <RootNamespace>Skipcheck.Tm1.Client.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <!-- xUnit's analyzers ask for ConfigureAwait in tests; not useful here -->

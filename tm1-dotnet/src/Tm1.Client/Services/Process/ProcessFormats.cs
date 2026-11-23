@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>What the process services share: parameters as TM1's name-value pairs, and dates and
 /// times written as Java's <c>toString</c> writes them, which TM1 takes and keys by.</summary>

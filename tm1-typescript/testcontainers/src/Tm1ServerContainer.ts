@@ -1,4 +1,4 @@
-import { Tm1Version } from "@ajmyers/tm1-client";
+import { Tm1Version } from "@skipcheck/tm1-client";
 import { CognosContainer } from "./CognosContainer.js";
 import { GenericContainer } from "./GenericContainer.js";
 import { Messages } from "./messages.js";
@@ -19,7 +19,7 @@ let shared: Promise<Tm1ServerContainer> | undefined;
  *
  * The image contains no IBM software, so every container needs a {@link Tm1Source}. Most tests
  * don't create containers themselves: they use `requiresTm1` (from
- * `@ajmyers/tm1-testcontainers/vitest`), which finds a source from the environment, starts one
+ * `@skipcheck/tm1-testcontainers/vitest`), which finds a source from the environment, starts one
  * {@link Tm1ServerContainer.shared} container, and skips the tests when there's no source or no
  * Docker.
  *

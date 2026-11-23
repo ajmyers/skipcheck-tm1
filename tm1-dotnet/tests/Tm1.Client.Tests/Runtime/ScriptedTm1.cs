@@ -8,9 +8,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Session;
 
-namespace AjMyers.Tm1.Client.Tests.Runtime;
+namespace Skipcheck.Tm1.Client.Tests.Runtime;
 
 /// <summary>A scripted TM1, as the Java client's test <c>FakeTm1</c>: answers each request by its
 /// key (<c>METHOD path?query</c>, relative to <see cref="Root"/>) with the handler set for it, and

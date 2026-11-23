@@ -1,5 +1,5 @@
 {
-  "name": "@ajmyers/tm1-client",
+  "name": "@skipcheck/tm1-client",
   "version": "0.0.0",
   "description": "A client for the IBM Planning Analytics (TM1) REST API, with the Java client's API",
   "license": "SEE LICENSE IN ../LICENSE",

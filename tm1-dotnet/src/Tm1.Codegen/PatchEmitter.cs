@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 
-namespace AjMyers.Tm1.Codegen;
+namespace Skipcheck.Tm1.Codegen;
 
 /// <summary>Emits Patches.g.cs: a patch per type, as the Java model's <c>CubePatch</c>:
 /// <c>CubePatch.Builder().Name("Sales").BindDimensions(dims.Key("Region")).Build()</c>. Only the
@@ -24,9 +24,9 @@ public sealed class PatchEmitter
             using System;
             using System.Collections.Generic;
             using System.Text.Json;
-            using AjMyers.Tm1.Client.OData;
+            using Skipcheck.Tm1.Client.OData;
 
-            namespace AjMyers.Tm1.Client.Model;
+            namespace Skipcheck.Tm1.Client.Model;
 
             """
         );

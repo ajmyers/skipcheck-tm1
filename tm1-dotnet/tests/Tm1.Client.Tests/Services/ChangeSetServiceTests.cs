@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Session;
 
-namespace AjMyers.Tm1.Client.Tests.Services;
+namespace Skipcheck.Tm1.Client.Tests.Services;
 
 /// <summary>ChangeSetService against a fake TM1: begin, end and undo, and <c>WithinAsync</c>, which
 /// ends the change set however the work ends.</summary>
@@ -82,7 +82,7 @@ public class ChangeSetServiceTests
             ran = true;
             return Task.FromResult(1);
         };
-        await Assert.ThrowsAsync<AjMyers.Tm1.Client.Errors.Tm1ServerException>(() => _tm1.Client().ChangeSets.WithinAsync(work));
+        await Assert.ThrowsAsync<Skipcheck.Tm1.Client.Errors.Tm1ServerException>(() => _tm1.Client().ChangeSets.WithinAsync(work));
         Assert.False(ran);
         Assert.Equal(["BeginChangeSet"], _tm1.Requests.Select(r => r.Target));
     }

@@ -3,10 +3,10 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Version;
-using AjMyers.Tm1.Testcontainers.Xunit;
+using Skipcheck.Tm1.Client.Version;
+using Skipcheck.Tm1.Testcontainers.Xunit;
 
-namespace AjMyers.Tm1.Testcontainers.Tests;
+namespace Skipcheck.Tm1.Testcontainers.Tests;
 
 /// <summary>Java's Tm1ServerContainerTest: against the shared server, skipped without Docker or a TM1 source.</summary>
 public class Tm1ServerContainerTests(Tm1ServerFixture fixture) : IClassFixture<Tm1ServerFixture>

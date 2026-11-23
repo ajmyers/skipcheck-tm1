@@ -1,7 +1,7 @@
 using System;
-using AjMyers.Tm1.Client.Auth;
+using Skipcheck.Tm1.Client.Auth;
 
-namespace AjMyers.Tm1.Client.Session;
+namespace Skipcheck.Tm1.Client.Session;
 
 /// <summary>Who a pooled session acts as, as the Java client's <c>Tm1Identity</c>: the service
 /// account itself, the service account impersonating a user (<c>TM1-Impersonate</c>), or a user

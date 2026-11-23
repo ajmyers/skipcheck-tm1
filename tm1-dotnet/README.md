@@ -1,11 +1,11 @@
-# AjMyers.Tm1.Client (.NET)
+# Skipcheck.Tm1.Client (.NET)
 
 A .NET client for the **IBM Planning Analytics (TM1) REST API**, with the same API as the Java client (`tm1-client`): the same services, methods, parameters, queries, patches, session views and errors, named the .NET way. Its model is generated from the same language-neutral spec ([`spec/tm1-api.json`](../spec)). It requires .NET 10 and has no dependencies beyond the framework.
 
 ```csharp
-using AjMyers.Tm1.Client;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
+using Skipcheck.Tm1.Client;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
 
 await using var tm1 = Tm1Client.Builder().BaseUrl("http://localhost:8010/api/v1/").BasicAuth("admin", "apple").Build();
 
@@ -49,8 +49,8 @@ await tm1.WithAsync(TimeSpan.FromSeconds(2)).Processes.ExecuteWithReturnAsync("R
 
 | Part | Where | How |
 |---|---|---|
-| Model: an enum or class per CSDL type with its `Fields`, patch builders, `Tm1Operations` | `AjMyers.Tm1.Client.Model` | Generated from the spec at build time, by [`Tm1.Codegen`](src/Tm1.Codegen), into `obj/generated/` |
-| Services | `src/Tm1.Client/Services/` | Hand-written, one namespace (`AjMyers.Tm1.Client.Services`) |
+| Model: an enum or class per CSDL type with its `Fields`, patch builders, `Tm1Operations` | `Skipcheck.Tm1.Client.Model` | Generated from the spec at build time, by [`Tm1.Codegen`](src/Tm1.Codegen), into `obj/generated/` |
+| Services | `src/Tm1.Client/Services/` | Hand-written, one namespace (`Skipcheck.Tm1.Client.Services`) |
 | Session, views, batch, async operations, pool, auth, Cognos | `src/Tm1.Client/Session/`, `Auth/` | Hand-written |
 | Queries, requests, errors, versions, JSON | `OData/`, `Errors/`, `Version/`, `Json/` | Hand-written; JSON is System.Text.Json with converters for TM1's enums, durations, `@odata.type` and patches |
 
@@ -66,7 +66,7 @@ dotnet test Tm1.slnx
 - `CoverageGateTests` holds the client to the spec's 242 endpoints, by the Java gate's rules. It implements 240 and excludes the same 2 as Java ([`coverage/`](coverage)).
 - `ConformanceTests` shares OData encoding cases with Java and Python. `PayloadTests` round-trips the payloads the Java client captured from a real TM1.
 - `Services/` and `Runtime/` port the Java client's unit tests, against a fake TM1 (`FakeTm1`).
-- `Live/` ports the Java live tests (`*Tm1Test`). Like the Java ones, they start TM1 in Docker themselves, with [`AjMyers.Tm1.Testcontainers`](src/Tm1.Testcontainers) (the .NET port of Java's `tm1-testcontainers`). They read the same settings the Java tests do: `TM1_PRIVATE_IMAGE`, `TM1_HOME_DIR`, `TM1_INSTALL_VOLUME`, `TM1_BUNDLE_DIR` or `TM1_BUNDLE_URL`. To use a server that's already running instead, set `TM1_URL`, with `TM1_USER`, `TM1_PASSWORD`, `TM1_NAMESPACE` and `TM1_VERIFY=false` as needed. With neither, they're skipped.
+- `Live/` ports the Java live tests (`*Tm1Test`). Like the Java ones, they start TM1 in Docker themselves, with [`Skipcheck.Tm1.Testcontainers`](src/Tm1.Testcontainers) (the .NET port of Java's `tm1-testcontainers`). They read the same settings the Java tests do: `TM1_PRIVATE_IMAGE`, `TM1_HOME_DIR`, `TM1_INSTALL_VOLUME`, `TM1_BUNDLE_DIR` or `TM1_BUNDLE_URL`. To use a server that's already running instead, set `TM1_URL`, with `TM1_USER`, `TM1_PASSWORD`, `TM1_NAMESPACE` and `TM1_VERIFY=false` as needed. With neither, they're skipped.
 - `tests/Tm1.Testcontainers.Tests` ports the Java module's tests, including a parity test against its sources.
 
 [`scripts/live-tests.sh`](../scripts/live-tests.sh) runs the Java, Python and .NET live tests together.

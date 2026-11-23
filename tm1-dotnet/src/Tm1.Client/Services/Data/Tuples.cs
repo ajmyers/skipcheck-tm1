@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using AjMyers.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.OData;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Cell coordinates, as TM1 binds them: one element path per dimension of the cube, in the
 /// cube's order, as the Java client's <c>Tuples</c>.</summary>

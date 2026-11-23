@@ -1,7 +1,7 @@
 using System;
-using AjMyers.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Session;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>What every service is: methods over one session. A client over a view of the session
 /// (a sandbox, a batch) makes services over that view.</summary>

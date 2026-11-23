@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>A user's session with PAW, as a browser has one: PAW's logon form in TM1-security mode,
 /// then calls to TM1 through PAW's proxy. Package-private in Java, as here; the tests use it.</summary>

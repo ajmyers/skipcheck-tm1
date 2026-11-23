@@ -8,9 +8,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Session;
 
-namespace AjMyers.Tm1.Client.Tests;
+namespace Skipcheck.Tm1.Client.Tests;
 
 /// <summary>Where the repository's shared files are.</summary>
 public static class Repo

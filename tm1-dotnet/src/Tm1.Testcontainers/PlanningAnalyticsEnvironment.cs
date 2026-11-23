@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>A whole Planning Analytics setup on one network, wired as the Java
 /// <c>PlanningAnalyticsEnvironment</c>: TM1 servers by name, a shared Admin Server when there's more

@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace AjMyers.Tm1.Client.Version;
+namespace Skipcheck.Tm1.Client.Version;
 
 /// <summary>A TM1 version, such as <c>11.8.03500.6</c> or schema <c>11.8.35</c>: compared part by
 /// part, missing parts as 0, as the Java client's <c>Tm1Version</c>.</summary>

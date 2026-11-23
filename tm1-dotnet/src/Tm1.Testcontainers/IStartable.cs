@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>Something that starts and stops: a container, PAW (several containers run by IBM's
 /// compose file), or a whole <see cref="PlanningAnalyticsEnvironment"/>, as Testcontainers for

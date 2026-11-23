@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Client.Session;
+namespace Skipcheck.Tm1.Client.Session;
 
 /// <summary>One TM1 session per identity, built from shared settings and kept while it's used, as the
 /// Java client's <c>Tm1SessionPool</c>: for a server that acts for many users, each through their own

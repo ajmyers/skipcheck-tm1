@@ -5,9 +5,9 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Errors;
+using Skipcheck.Tm1.Client.Errors;
 
-namespace AjMyers.Tm1.Client.Auth;
+namespace Skipcheck.Tm1.Client.Auth;
 
 /// <summary>CAM passports from Cognos, for <see cref="Tm1Authenticator.CamPassport"/>, as the Java
 /// client's <c>CognosPassports</c>: the client logs on to Cognos itself, rather than being handed a

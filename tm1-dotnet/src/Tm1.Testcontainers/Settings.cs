@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>Where the settings come from: an <see cref="AppContext"/> switch (.NET's counterpart of a
 /// Java system property: <c>RuntimeHostConfigurationOption</c> in a test project, or

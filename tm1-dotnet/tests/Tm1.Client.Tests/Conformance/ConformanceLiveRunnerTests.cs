@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Client.Tests.Conformance;
+namespace Skipcheck.Tm1.Client.Tests.Conformance;
 
 /// <summary>The live conformance runner, offline: the cubes scenario against a fake TM1 that
 /// answers as TM1 would, writing traffic without the session's own requests.</summary>

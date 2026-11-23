@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace AjMyers.Tm1.Client.Errors;
+namespace Skipcheck.Tm1.Client.Errors;
 
 /// <summary>What a refusal means, from TM1's status, code and message, as the Java client's
 /// <c>Tm1ErrorClassifier</c>: the first rule that matches, else by status.</summary>

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>How TM1 signs in to the Git remote: nothing (a public or <c>git://</c> remote), a user
 /// name and password or token (HTTPS), or an SSH key pair. TM1 doesn't keep them, so every call that

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Networks;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>A Docker network for containers that work together, as Testcontainers for Java's
 /// <c>Network</c>: made without Docker (so wiring can be set up and checked anywhere), created when

@@ -1,7 +1,7 @@
 using System;
 using Xunit;
 
-namespace AjMyers.Tm1.Testcontainers.Xunit;
+namespace Skipcheck.Tm1.Testcontainers.Xunit;
 
 /// <summary>A test against TM1 in Docker, as Java's <c>@RequiresTm1</c>: skipped when Docker isn't
 /// available or no <see cref="Tm1Source"/> is configured; run (and failing) when a source is set but

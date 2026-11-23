@@ -9,7 +9,7 @@ using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Microsoft.Extensions.Logging;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>A container configured as Testcontainers for Java's <c>GenericContainer</c> is: its
 /// environment, network, aliases and dependencies are set and read before it starts (which is what

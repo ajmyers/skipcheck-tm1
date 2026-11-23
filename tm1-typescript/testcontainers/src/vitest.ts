@@ -117,7 +117,7 @@ function check(
  * file in a worker.
  *
  * ```ts
- * import { requiresTm1 } from "@ajmyers/tm1-testcontainers/vitest";
+ * import { requiresTm1 } from "@skipcheck/tm1-testcontainers/vitest";
  *
  * requiresTm1("lists cubes", async ({ tm1 }) => {
  *   const url = tm1.getRestUrl(); // http://localhost:54321/api/v1/

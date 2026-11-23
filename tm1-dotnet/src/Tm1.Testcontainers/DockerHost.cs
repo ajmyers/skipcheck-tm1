@@ -6,7 +6,7 @@ using Docker.DotNet;
 using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>The Docker daemon Testcontainers uses, for what its builders don't cover (inspecting a
 /// container's networks, volumes, PAW's compose containers), as Java's <c>DockerClientFactory</c>.</summary>

@@ -1,6 +1,6 @@
 using System;
 
-namespace AjMyers.Tm1.Client.Version;
+namespace Skipcheck.Tm1.Client.Version;
 
 /// <summary>How a server's address becomes its REST API's service root, as the Java client's
 /// <c>Tm1Dialect</c>: <see cref="V11"/> turns <c>http://tm1:8010</c> into <c>http://tm1:8010/api/v1/</c>.</summary>

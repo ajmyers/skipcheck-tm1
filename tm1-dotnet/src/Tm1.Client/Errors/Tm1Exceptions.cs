@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 
-namespace AjMyers.Tm1.Client.Errors;
+namespace Skipcheck.Tm1.Client.Errors;
 
 /// <summary>What went wrong, independent of the status TM1 chose to report it with. A
 /// <see cref="Tm1ErrorClassifier"/> picks the kind from the status, TM1's error code and its

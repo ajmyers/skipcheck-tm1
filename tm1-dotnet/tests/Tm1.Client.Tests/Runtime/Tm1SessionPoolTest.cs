@@ -2,11 +2,11 @@ using System;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Auth;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Auth;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Session;
 
-namespace AjMyers.Tm1.Client.Tests.Runtime;
+namespace Skipcheck.Tm1.Client.Tests.Runtime;
 
 /// <summary>The Java client's <c>Tm1SessionPoolTest</c>: one session per identity, evicted when
 /// idle, old or least recently used, and closed after a grace period, on a clock the test moves.

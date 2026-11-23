@@ -1,8 +1,8 @@
 using System.Linq;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.Model;
 
-namespace AjMyers.Tm1.Client.Tests.Live;
+namespace Skipcheck.Tm1.Client.Tests.Live;
 
 /// <summary>The client against a real TM1: the server's <c>$metadata</c> against the spec, and cubes.</summary>
 public class ServerLiveTests

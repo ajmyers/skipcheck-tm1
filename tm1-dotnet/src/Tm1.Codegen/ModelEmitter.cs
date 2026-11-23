@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 
-namespace AjMyers.Tm1.Codegen;
+namespace Skipcheck.Tm1.Codegen;
 
 /// <summary>Emits Model.g.cs: an enum per CSDL enum type, a class per entity and complex type, and
 /// the registry of hierarchies read by <c>@odata.type</c>, as the Java client's generated model.</summary>
@@ -89,10 +89,10 @@ public sealed class ModelEmitter
             using System.Collections.Generic;
             using System.Text.Json;
             using System.Text.Json.Serialization;
-            using AjMyers.Tm1.Client.Json;
-            using AjMyers.Tm1.Client.OData;
+            using Skipcheck.Tm1.Client.Json;
+            using Skipcheck.Tm1.Client.OData;
 
-            namespace AjMyers.Tm1.Client.Model;
+            namespace Skipcheck.Tm1.Client.Model;
 
             """
         );

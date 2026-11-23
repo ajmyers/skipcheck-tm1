@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>A TM1 Admin Server shared by several TM1 servers, as the Java
 /// <c>Tm1AdminServerContainer</c>: the <c>tm1-server</c> image run with <c>admin</c>, reached as

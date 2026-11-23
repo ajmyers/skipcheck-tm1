@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AjMyers.Tm1.Client.Model;
-using AjMyers.Tm1.Client.OData;
-using AjMyers.Tm1.Client.Session;
-using ServerSession = AjMyers.Tm1.Client.Model.Session;
-using ServerThread = AjMyers.Tm1.Client.Model.Thread;
+using Skipcheck.Tm1.Client.Model;
+using Skipcheck.Tm1.Client.OData;
+using Skipcheck.Tm1.Client.Session;
+using ServerSession = Skipcheck.Tm1.Client.Model.Session;
+using ServerThread = Skipcheck.Tm1.Client.Model.Thread;
 
-namespace AjMyers.Tm1.Client.Services;
+namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Server sessions: every session logged in to the server (<c>/Sessions</c>), this one's
 /// (<c>ActiveSession</c>), their users and threads, and closing another session.

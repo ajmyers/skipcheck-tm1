@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace AjMyers.Tm1.Testcontainers;
+namespace Skipcheck.Tm1.Testcontainers;
 
 /// <summary>TM1 Web in Docker, as the Java <c>Tm1WebContainer</c>: the <c>tm1-web</c> image (no IBM
 /// software in it) with TM1 Web from a <see cref="Tm1WebSource"/>, at <c>/tm1web/</c> on port 9510,

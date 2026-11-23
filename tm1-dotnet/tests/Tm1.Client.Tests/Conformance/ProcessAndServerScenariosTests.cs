@@ -5,7 +5,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace AjMyers.Tm1.Client.Tests.Conformance;
+namespace Skipcheck.Tm1.Client.Tests.Conformance;
 
 /// <summary>The live conformance runner, offline: the processes, chores and server scenarios
 /// against a fake TM1 that answers as TM1 would (the Java client's ProcessAndServerScenariosTest,

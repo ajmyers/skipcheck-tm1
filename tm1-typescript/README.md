@@ -1,9 +1,9 @@
-# @ajmyers/tm1-client (TypeScript)
+# @skipcheck/tm1-client (TypeScript)
 
 A TypeScript client for the **IBM Planning Analytics (TM1) REST API**, with the same API as the Java client (`tm1-client`): the same services, methods, parameters, queries, patches, session views and errors, named the TypeScript way. Its model is generated from the same language-neutral spec ([`spec/tm1-api.json`](../spec)). ESM, for Node 20+ and browsers, with no runtime dependencies: it sends with `fetch`.
 
 ```ts
-import { Cube, CubePatch, Filter, ODataPath, ODataQuery, Tm1Client } from "@ajmyers/tm1-client";
+import { Cube, CubePatch, Filter, ODataPath, ODataQuery, Tm1Client } from "@skipcheck/tm1-client";
 
 await using tm1 = Tm1Client.builder().baseUrl("http://localhost:8010/api/v1/").basicAuth("admin", "apple").build();
 
@@ -73,7 +73,7 @@ npm run build
 - `test/runtime/` ports the Java client's unit tests of the session, pool, auth, error, OData, request and version classes, against a scripted TM1 (`test/support/scripted-tm1.ts`, the Java tests' `FakeTm1`).
 - `test/live/` ports the Java live tests (`*Tm1Test`), against `TM1_URL` (with `TM1_USER`, `TM1_PASSWORD`, `TM1_NAMESPACE`, `TM1_VERIFY=false`), or else against TM1 in Docker, started from the Java tests' sources (`TM1_PRIVATE_IMAGE`, `TM1_HOME_DIR`, `TM1_INSTALL_VOLUME`, `TM1_BUNDLE_DIR`, `TM1_BUNDLE_URL`) by [`testcontainers/`](testcontainers) (`Live.containerTarget`). Without either, or without Docker, they're skipped. `Live.builder(user, password)` logs a second user in the same way, through the CAM namespace if there is one.
 
-`testcontainers/` is `@ajmyers/tm1-testcontainers`, the port of the Java `tm1-testcontainers`, an npm workspace of this package: `npm ci` here installs both, and `npm test`, `npm run typecheck` and `npm run build` run the client's, then its. Each uses the other from its sources (`paths` in `tsconfig.json`, `alias` in `vitest.config.ts`), so neither needs building first; `npm run build` builds the client first, as the testcontainers build uses its declarations.
+`testcontainers/` is `@skipcheck/tm1-testcontainers`, the port of the Java `tm1-testcontainers`, an npm workspace of this package: `npm ci` here installs both, and `npm test`, `npm run typecheck` and `npm run build` run the client's, then its. Each uses the other from its sources (`paths` in `tsconfig.json`, `alias` in `vitest.config.ts`), so neither needs building first; `npm run build` builds the client first, as the testcontainers build uses its declarations.
 
 ## Porting a service
 
