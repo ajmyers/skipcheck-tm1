@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The examples the guide shows (api-site/scripts/guide.mjs), the same ones as the Java module's
+       src/examples. Built with the solution so they can't rot; never run, packed or published. -->
+  <PropertyGroup>
+    <RootNamespace>Examples</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- CA2007: an application awaits without ConfigureAwait(false), which is a library's concern -->
+    <NoWarn>$(NoWarn);CA2007</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Tm1.Client/Tm1.Client.csproj" />
+    <ProjectReference Include="../../src/Tm1.Testcontainers/Tm1.Testcontainers.csproj" />
+    <!-- For the examples that are tests: only Assert, so this isn't a test project and no runner picks it up -->
+    <PackageReference Include="xunit.assert" Version="2.9.3" />
+  </ItemGroup>
+</Project>
