@@ -16,6 +16,7 @@
 FROM --platform=linux/amd64 ubuntu:24.04
 
 LABEL org.opencontainers.image.authors="Andrew Myers (https://ajmyers.net)" \
+      org.opencontainers.image.url="https://skipcheck.io" \
       org.opencontainers.image.vendor="Andrew Myers" \
       org.opencontainers.image.description="A local IBM Cognos Analytics runtime for development and tests. Contains no IBM software. Not affiliated with IBM." \
       org.opencontainers.image.documentation="https://github.com/ajmyers/tm1-pa-developer-tools/blob/master/docker/cognos-server/README.md"

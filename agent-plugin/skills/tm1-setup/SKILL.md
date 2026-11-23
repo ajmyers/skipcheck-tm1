@@ -55,11 +55,11 @@ Silicon, WSL 2 on Windows, free ports) and explains any fix.
 
 **Mac / Linux:**
 ```sh
-curl -fsSL https://ajmyers.net/tm1/setup.sh | sh -s -- --yes --dir ~/tm1 --bundle ~/Downloads/tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz
+curl -fsSL https://skipcheck.io/tm1/setup.sh | sh -s -- --yes --dir ~/tm1 --bundle ~/Downloads/tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz
 ```
 **Windows (PowerShell):**
 ```powershell
-& ([scriptblock]::Create((irm https://ajmyers.net/tm1/setup.ps1))) -Yes -Dir "$HOME\tm1" -Bundle "$HOME\Downloads\tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz"
+& ([scriptblock]::Create((irm https://skipcheck.io/tm1/setup.ps1))) -Yes -Dir "$HOME\tm1" -Bundle "$HOME\Downloads\tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz"
 ```
 
 Pick the source flag from step 1:
@@ -76,7 +76,7 @@ Other flags: `--dir DIR` / `-Dir`, `--files-dir DIR` / `-FilesDir`, `--samples` 
 `--no-start` / `-NoStart`, `--timeout SECONDS` / `-Timeout`. Run with `--help` / `-Help` for all.
 
 - **If the download returns HTML instead of a script** (some networks get a bot check from
-  ajmyers.net), use the same script from GitHub:
+  skipcheck.io), use the same script from GitHub:
   `https://raw.githubusercontent.com/ajmyers/tm1-pa-developer-tools/master/docker/tm1-server/setup.sh`
   (or `setup.ps1`).
 - **If the image pull fails with `:latest`** (before the first release), add

@@ -4,11 +4,11 @@
 # tm1-server setup: installs and starts a local IBM Planning Analytics (TM1) server
 # with Docker, doing the steps in GETTING-STARTED.md and checking them as it goes.
 #
-#   curl -fsSL https://ajmyers.net/tm1/setup.sh | sh
-#   curl -fsSL https://ajmyers.net/tm1/setup.sh | sh -s -- --bundle ~/Downloads/tm1server-...-linuxi38664h_bundle.tar.gz
+#   curl -fsSL https://skipcheck.io/tm1/setup.sh | sh
+#   curl -fsSL https://skipcheck.io/tm1/setup.sh | sh -s -- --bundle ~/Downloads/tm1server-...-linuxi38664h_bundle.tar.gz
 #
 # Run with --help for every option. The options are a stable interface: the setup
-# page on ajmyers.net builds one-liners from them, so don't rename or remove any.
+# page on skipcheck.io builds one-liners from them, so don't rename or remove any.
 # setup.ps1 is the Windows twin and takes the same options; keep them in step.
 #
 # Questions are only asked when someone is at a terminal and CI isn't set. Otherwise
@@ -44,7 +44,7 @@ usage() {
 tm1-server setup: install and start a local TM1 server with Docker.
 
 Usage: setup.sh [options]
-  piped: curl -fsSL https://ajmyers.net/tm1/setup.sh | sh -s -- [options]
+  piped: curl -fsSL https://skipcheck.io/tm1/setup.sh | sh -s -- [options]
 
 Where TM1 comes from (pick one; asked if not given):
   --bundle FILE        A: your IBM download, tm1server-<ver>-linuxi38664h_bundle.tar.gz.
@@ -76,7 +76,7 @@ Each option can also be set in the environment as TM1_SETUP_<NAME>, with the nam
 in upper case and - as _: TM1_SETUP_BUNDLE, TM1_SETUP_FILES_DIR, TM1_SETUP_SAMPLES=1,
 TM1_SETUP_YES=1, ... Flags win over the environment.
 
-Build the command for your choices at https://ajmyers.net/tm1/
+Build the command for your choices at https://skipcheck.io/tm1/
 EOF
 }
 
@@ -96,9 +96,9 @@ banner() {
   cat <<'EOF'
   ------------------------------------------------------------------
    tm1-server: a local IBM Planning Analytics (TM1) server in Docker
-   Free and open source, made by Andrew Myers
+   Free and open source, made by Andrew Myers (https://ajmyers.net)
 
-     Website  https://ajmyers.net
+     Website  https://skipcheck.io
      GitHub   https://github.com/ajmyers
      Issues   https://github.com/ajmyers/tm1-pa-developer-tools/issues
 
@@ -234,7 +234,7 @@ case $OS in
     ok "Linux ($(uname -m))" ;;
   MINGW*|MSYS*|CYGWIN*)
     die "This is the Mac/Linux script. On Windows, use setup.ps1 in PowerShell:" \
-        "irm https://ajmyers.net/tm1/setup.ps1 | iex" ;;
+        "irm https://skipcheck.io/tm1/setup.ps1 | iex" ;;
   *) die "Unsupported system: $OS. tm1-server runs on Mac, Linux and Windows." ;;
 esac
 

@@ -10,9 +10,9 @@ built for local development and integration tests of TM1 client libraries.
 
 **New here? Follow [GETTING-STARTED.md](GETTING-STARTED.md)** for step-by-step
 instructions on Mac, Windows and Linux, or let the setup script do them:
-`curl -fsSL https://ajmyers.net/tm1/setup.sh | sh` (Mac/Linux, [`setup.sh`](setup.sh)) or
-`irm https://ajmyers.net/tm1/setup.ps1 | iex` (Windows, [`setup.ps1`](setup.ps1)).
-The interactive guide at <https://ajmyers.net/tm1/> shows only the steps for your
+`curl -fsSL https://skipcheck.io/tm1/setup.sh | sh` (Mac/Linux, [`setup.sh`](setup.sh)) or
+`irm https://skipcheck.io/tm1/setup.ps1 | iex` (Windows, [`setup.ps1`](setup.ps1)).
+The interactive guide at <https://skipcheck.io/tm1/> shows only the steps for your
 choices. This README is the reference.
 
 The shortest path: put your IBM bundle (`tm1server-*-linuxi38664h_bundle.tar.gz`)

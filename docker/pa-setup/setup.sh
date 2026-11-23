@@ -4,8 +4,8 @@
 # pa-setup: one command for a whole IBM Planning Analytics environment in Docker,
 # described by pa-environment.yaml in the current folder.
 #
-#   curl -fsSL https://ajmyers.net/pa/setup.sh | sh -s -- init    # write a starting file
-#   curl -fsSL https://ajmyers.net/pa/setup.sh | sh -s -- up      # start everything
+#   curl -fsSL https://skipcheck.io/pa/setup.sh | sh -s -- init    # write a starting file
+#   curl -fsSL https://skipcheck.io/pa/setup.sh | sh -s -- up      # start everything
 #   ./setup.sh urls | status | logs [service] | down | generate
 #
 # This script only checks Docker and runs the setup tool in a container, with the

