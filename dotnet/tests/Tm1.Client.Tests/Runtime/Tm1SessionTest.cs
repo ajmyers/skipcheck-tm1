@@ -788,6 +788,34 @@ public class Tm1SessionAsyncTest
         Assert.Single(tm1.Requests("DELETE _async('a1')"));
     }
 
+    /// <summary>Java's codecs refused to buffer more than 256 KB; .NET reads a body whole, whatever its size, which this pins.</summary>
+    [Fact]
+    public async Task ReadsAResultBiggerThanTheCodecsBufferLimit()
+    {
+        var big = new string('x', 300_000);
+        var tm1 = new ScriptedTm1().On(Run, _ => Accepted()).On(Monitor, _ => Done("200 OK", "{\"Text\":\"" + big + "\"}"));
+        var result = await tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10)).ExecuteAsync(Request);
+        Assert.Equal(300_000, result.GetProperty("Text").GetString()!.Length);
+    }
+
+    [Fact]
+    public async Task ReadsABigCollectionTm1GaveAtOnce()
+    {
+        var big = new string('x', 300_000);
+        var tm1 = new ScriptedTm1().On("GET Cubes", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"" + big + "\"}]}"));
+        var cubes = await tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10)).StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"))).ToListAsync();
+        Assert.Equal(300_000, Assert.Single(cubes).GetProperty("Name").GetString()!.Length);
+    }
+
+    [Fact]
+    public async Task ReadsABigErrorBody()
+    {
+        var big = new string('x', 300_000);
+        var tm1 = new ScriptedTm1().On(Run, _ => ScriptedTm1.Json(500, "{\"error\":{\"code\":\"174\",\"message\":\"" + big + "\"}}"));
+        var e = await Assert.ThrowsAsync<Tm1ServerException>(() => tm1.Session().ExecuteAsync(Request));
+        Assert.Contains(big, e.Message);
+    }
+
     [Fact]
     public void UnwrapsAnApplicationHttpMessage()
     {
