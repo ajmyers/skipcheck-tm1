@@ -88,12 +88,13 @@ test("an example's regions are read from its file, without their indentation", a
 	}
 });
 
-test('every project has a route on each zone, and the old addresses have theirs', () => {
+test('every project has a route on each zone, and the docs landing page and the old addresses have theirs', () => {
 	const wrangler = readFileSync(fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)), 'utf8');
 	const patterns = [...wrangler.matchAll(/"pattern":\s*"([^"]+)"/g)].map((match) => match[1]);
 	for (const zone of ['skipcheck.io', 'skipcheck.dev']) {
 		for (const project of PROJECTS) assert.ok(patterns.includes('*' + zone + '/' + project.id + '*'), 'no route for ' + project.id + ' on ' + zone);
 		assert.ok(patterns.includes('*' + zone + '/projects/tm1*'), 'no route for the old addresses on ' + zone);
+		assert.ok(patterns.includes('*' + zone + '/docs*'), 'no route for the docs landing page on ' + zone);
 	}
-	assert.equal(patterns.length, 2 * (PROJECTS.length + 1), 'a route that no project in scripts/site.mjs accounts for');
+	assert.equal(patterns.length, 2 * (PROJECTS.length + 2), 'a route that no project in scripts/site.mjs accounts for');
 });

@@ -178,6 +178,51 @@ for (const { project, content } of landings) {
 		'</main></body></html>\n';
 	await writeFile(path.join(out, 'index.html'), page);
 }
+// The docs landing page, /docs/: every project, what it is, and its docs in each language, from
+// the same projects and content files as the landing pages, so a new project appears without an
+// edit. The masthead's Docs link opens it.
+{
+	const entry = (project, text) => {
+		const languages = languagesOf(project);
+		const perLanguage = languages
+			.filter((language) => DOC_LANGUAGES.includes(language.id))
+			.map((language) => '<a href="/' + project.id + '/docs/' + language.id + '/">' + escape(language.label) + '</a>')
+			.join(' · ');
+		return (
+			'<li class="card"><div class="card-head"><h3>' + escape(project.title) + '</h3>' +
+			'<span class="badge">' + escape(languages.length > 1 ? languages.length + ' languages' : languages[0].label) + '</span></div>' +
+			'<p>' + inline(text) + '</p>' +
+			'<p class="card-links">Docs: ' + perLanguage + (project.landing ? ' · <a href="/' + project.id + '/">Overview</a>' : '') + '</p></li>'
+		);
+	};
+	const main = landings.map(({ project, content }) => entry(project, content.meta.card));
+	const more = PROJECTS.filter((p) => !p.landing).map((project) => entry(project, project.summary ?? ''));
+	const body =
+		'<section class="hero wrap" aria-labelledby="title"><p class="kicker">Java · Python · .NET · TypeScript</p><h1 id="title">Docs</h1>' +
+		'<p class="lead">Every library, in each language it comes in. Each one has a page per type, with its members and examples in your language; ' +
+		'pick a language here, or switch on any page. New to a library? Its overview has a quick start.</p></section>' +
+		'<section id="libraries" class="section wrap" aria-labelledby="libraries-heading"><h2 id="libraries-heading" class="section-label">Libraries</h2><ul class="cards">' +
+		main.join('') +
+		'</ul></section>' +
+		(more.length > 0
+			? '<section id="more" class="section wrap" aria-labelledby="more-heading"><h2 id="more-heading" class="section-label">Also</h2><ul class="cards">' + more.join('') + '</ul></section>'
+			: '') +
+		'<section id="running" class="section wrap" aria-labelledby="running-heading"><h2 id="running-heading" class="section-label">Running TM1</h2><div class="steps">' +
+		'<p class="more">To run TM1, TM1 Web, Workspace or Cognos security on your own computer, for development and tests, see <a href="/projects/pa-docker/">Planning Analytics in Docker</a>.</p></div></section>';
+	await mkdir(path.join(distDir, 'docs'), { recursive: true });
+	await writeFile(
+		path.join(distDir, 'docs', 'index.html'),
+		head({
+			title: 'Docs · Skipcheck',
+			description: 'The docs of every Skipcheck library for IBM Planning Analytics (TM1), in Java, Python, .NET and TypeScript.',
+			canonical: CANONICAL_ORIGIN + '/docs/',
+			styles: ['/styles.css'],
+			scripts: [],
+		}) +
+			'<body><main id="main" class="projects">' + body + '</main></body></html>\n',
+	);
+}
+
 // Each project's release, for pages built elsewhere that show it (the site's home page reads
 // /<project>/release.json): the version these pages describe, and whether it is a release
 for (const project of PROJECTS) {
