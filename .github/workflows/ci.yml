@@ -8,9 +8,10 @@ on:
 permissions:
   contents: read
 
-# A newer push to a pull request replaces the run before it; every push to master runs to the end
+# A newer push to a pull request replaces the run before it. Every push to master runs to the end,
+# in a group of its own: in a shared group, a run waiting behind another is cancelled by the next
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

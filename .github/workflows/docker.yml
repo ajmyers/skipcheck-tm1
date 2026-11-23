@@ -40,7 +40,9 @@ on:
   pull_request:
 
 concurrency:
-  group: docker-${{ github.ref }}
+  # A pull request's newer push replaces the run before it; a push to master or a tag has a group
+  # of its own, or a run waiting behind another would be cancelled by the next
+  group: docker-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
