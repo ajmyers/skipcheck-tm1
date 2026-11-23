@@ -241,6 +241,7 @@ class CognosSource:
     ZipUrl: ClassVar[type[_CognosZipUrl]]
 
     def describe(self) -> str:
+        """A short description for logs and messages. Never includes a URL's query string."""
         raise NotImplementedError
 
     @staticmethod
@@ -346,6 +347,7 @@ class Tm1WebSource:
     BundleUrl: ClassVar[type[_WebBundleUrl]]
 
     def describe(self) -> str:
+        """A short description for logs and messages. Never includes a URL's query string."""
         raise NotImplementedError
 
     @staticmethod
@@ -472,6 +474,7 @@ class PawSource:
             )
 
     def describe(self) -> str:
+        """A short description for logs and messages."""
         return f"PAW Local zip {self.zip}"
 
     @staticmethod

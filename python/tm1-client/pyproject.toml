@@ -15,8 +15,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Ruff is pinned: a newer one may lay code out differently, and tests/test_format.py checks the layout
-test = ["pytest>=8", "ruff==0.17.6"]
+# Ruff is pinned: a newer one may lay code out differently, and tests/test_format.py checks the layout.
+# Pyright is pinned too: a newer one may report more, and tests/test_types.py fails on a finding
+test = ["pytest>=8", "ruff==0.17.6", "pyright==1.1.414"]
 
 [tool.hatch.build.hooks.custom]
 # hatch_build.py generates src/skipcheck_tm1/_generated from ../../spec/tm1-api.json, and

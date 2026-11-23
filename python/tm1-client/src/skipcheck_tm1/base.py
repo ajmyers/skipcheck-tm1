@@ -54,6 +54,8 @@ class Tm1Enum(str, enum.Enum):
 
     @property
     def known(self) -> bool:
+        """Whether this is one of TM1's members, rather than the fallback a value this client
+        doesn't know reads as."""
         return self.name != self.__odata_fallback__
 
     def odata_literal(self) -> str:
@@ -195,6 +197,9 @@ class Tm1Patch:
         return f"{type(self).__name__}{self._values}"
 
     class Builder:
+        """Builds a patch property by property: only what's set is sent, a property set to None as
+        an explicit ``null``."""
+
         def __init__(self, patch: type[Tm1Patch]):
             self._patch = patch
             self._values: dict[str, Any] = {}
@@ -219,6 +224,7 @@ class Tm1Patch:
             return self
 
         def build(self) -> Any:
+            """The patch, with the properties set so far."""
             return self._patch(self._values)
 
 

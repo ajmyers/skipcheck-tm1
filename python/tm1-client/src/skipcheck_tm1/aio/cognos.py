@@ -13,7 +13,6 @@ This module is the source of truth for both flavors (``tm1_pygen.unasync``).
 
 from __future__ import annotations
 
-import inspect
 import re
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -45,9 +44,7 @@ class _Logon:
         self._http = http or runtime.HttpClient
 
     async def __call__(self) -> str:
-        parameters = self._credentials()
-        if inspect.isawaitable(parameters):
-            parameters = await parameters
+        parameters = await runtime.resolve(self._credentials())
         body = {"parameters": [{"name": "CAMNamespace", "value": self._namespace}, *parameters]}
         async with self._http() as http:
             try:
@@ -55,7 +52,7 @@ class _Logon:
             except httpx.HTTPError as e:
                 raise Tm1ProtocolError(f"Logging on to Cognos failed: {e}", None, "PUT", self._url) from e
         if response.status_code in (401, 403):
-            raise Tm1ApiError.of_kind(response.status_code, Tm1ErrorKind.CREDENTIAL_REJECTED, ODataError(None, "Cognos refused the logon"), "PUT", self._url)
+            raise Tm1ApiError.of_kind(response.status_code, Tm1ErrorKind.CREDENTIAL_REJECTED, ODataError(message="Cognos refused the logon"), "PUT", self._url)
         passport = response.cookies.get("cam_passport")
         if response.status_code >= 300 or not passport:
             raise Tm1ProtocolError(f"Cognos answered the logon with {response.status_code} and no cam_passport cookie", None, "PUT", self._url)
@@ -86,9 +83,7 @@ class CognosPassports:
             raise TypeError("id_token is required")
 
         async def parameters() -> list[dict[str, str]]:
-            token = id_token()
-            if inspect.isawaitable(token):
-                token = await token
+            token = await runtime.resolve(id_token())
             return [{"name": "CAMOIDCIdToken", "value": token}]
 
         return _Logon(dispatcher, namespace, parameters, "ID token", http_client)

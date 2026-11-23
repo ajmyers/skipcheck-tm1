@@ -150,6 +150,8 @@ class Rule:
         return Rule(None, code, None, kind)
 
     def matches(self, status: int, error: ODataError | None) -> bool:
+        """Whether the rule matches an error response: each condition that's set must match, the
+        status, the code exactly, and the message pattern (ignoring case, anywhere in the message)."""
         if self.status is not None and self.status != status:
             return False
         if self.code is not None and (error is None or error.code != self.code):
@@ -169,6 +171,7 @@ class Tm1ErrorClassifier:
 
     @staticmethod
     def defaults() -> Tm1ErrorClassifier:
+        """The rules this client knows about."""
         return _DEFAULTS
 
     def with_rule(self, rule: Rule) -> Tm1ErrorClassifier:
@@ -179,9 +182,12 @@ class Tm1ErrorClassifier:
 
     @property
     def rules(self) -> tuple[Rule, ...]:
+        """The rules, in the order they are tried."""
         return self._rules
 
     def classify(self, status: int, error: ODataError | None) -> Tm1ErrorKind:
+        """Classifies an error response: the first matching rule's kind, or else the kind for the
+        status. ``error`` may be None if the body wasn't an OData error."""
         for rule in self._rules:
             if rule.matches(status, error):
                 return rule.kind
@@ -289,9 +295,11 @@ class Tm1ApiError(Tm1Error):
         return cls(status, kind, error, method, url)
 
     def is_retryable(self) -> bool:
+        """True for statuses where trying again later may work: 429, 502, 503 and 504."""
         return self.status in (429, 502, 503, 504)
 
     def may_have_applied(self) -> bool:
+        """False for client errors (4xx), which TM1 rejected; true for server errors, except 501."""
         return self.status >= 500 and self.status != 501
 
 
@@ -332,6 +340,8 @@ class Tm1TransportError(Tm1Error):
     whole (``RESPONSE``: a timeout, a dropped connection)."""
 
     class Phase(enum.Enum):
+        """How far the request got."""
+
         CONNECT = "connect"
         RESPONSE = "response"
 
@@ -351,9 +361,11 @@ class Tm1TransportError(Tm1Error):
         self.__cause__ = cause
 
     def is_retryable(self) -> bool:
+        """Connect failures are always retryable; response failures only for idempotent requests."""
         return self.phase is Tm1TransportError.Phase.CONNECT or self.idempotent
 
     def may_have_applied(self) -> bool:
+        """False only if the request was never sent."""
         return self.phase is Tm1TransportError.Phase.RESPONSE
 
 
@@ -365,6 +377,7 @@ class Tm1ProtocolError(Tm1Error):
         self.error = error
 
     def may_have_applied(self) -> bool:
+        """True: the server got the request and started answering."""
         return True
 
 

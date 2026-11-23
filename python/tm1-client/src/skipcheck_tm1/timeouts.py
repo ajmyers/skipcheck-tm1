@@ -40,9 +40,11 @@ class Tm1Timeouts:
 
     @staticmethod
     def builder() -> Tm1Timeouts.Builder:
+        """A builder starting from the defaults."""
         return Tm1Timeouts.Builder(Tm1Timeouts.DEFAULTS)
 
     def to_builder(self) -> Tm1Timeouts.Builder:
+        """A builder starting from these timeouts, to change some of them."""
         return Tm1Timeouts.Builder(self)
 
     class Builder:
@@ -52,29 +54,37 @@ class Tm1Timeouts:
             self._values = {f: getattr(start, f) for f in ("connect", "login", "request", "close", "refused_login")}
 
         def connect(self, value: float | timedelta) -> Tm1Timeouts.Builder:
+            """Sets the connect timeout: how long to wait for a connection, including TLS."""
             self._values["connect"] = value
             return self
 
         def login(self, value: float | timedelta) -> Tm1Timeouts.Builder:
+            """Sets the login timeout: how long to wait for a login response."""
             self._values["login"] = value
             return self
 
         def request(self, value: float | timedelta) -> Tm1Timeouts.Builder:
+            """Sets the request idle timeout: how long a request may go without receiving any data."""
             self._values["request"] = value
             return self
 
         def close(self, value: float | timedelta) -> Tm1Timeouts.Builder:
+            """Sets the close timeout: how long to wait for TM1 to close the session."""
             self._values["close"] = value
             return self
 
         def refused_login(self, value: float | timedelta) -> Tm1Timeouts.Builder:
+            """Sets how long a refused login is remembered: how long requests fail at once after TM1
+            refused a login; zero to log in again straight away."""
             self._values["refused_login"] = value
             return self
 
         def build(self) -> Tm1Timeouts:
+            """The timeouts, with unset values at the defaults."""
             return Tm1Timeouts(**self._values)
 
     def with_request(self, seconds: float | timedelta) -> Tm1Timeouts:
+        """A copy with this request idle timeout instead."""
         return replace(self, request=seconds)
 
 

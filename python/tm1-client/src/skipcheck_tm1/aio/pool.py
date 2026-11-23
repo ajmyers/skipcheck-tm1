@@ -165,6 +165,7 @@ class AsyncTm1SessionPool:
 
     @property
     def is_closed(self) -> bool:
+        """Whether :meth:`close` has been called."""
         return self._closed
 
     async def close(self) -> None:
@@ -282,6 +283,7 @@ class AsyncTm1SessionPoolBuilder:
         return self
 
     def build(self) -> AsyncTm1SessionPool:
+        """The pool. It opens sessions only when asked."""
         return AsyncTm1SessionPool(self)
 
 

@@ -4,7 +4,8 @@ code lives once, in ``skipcheck_tm1/aio``, and ``skipcheck_tm1/_sync`` is made f
 The transform works on tokens: code changes by its grammar, strings and comments by the
 same renames (so examples read right in each flavor):
 
-* ``async def``, ``async for``, ``async with`` lose ``async``; ``await`` goes;
+* ``async def``, ``async for``, ``async with`` lose ``async``; ``await`` goes, and
+  ``Awaitable[X]`` becomes ``X``;
 * names are mapped: ``AsyncTm1Session`` → ``Tm1Session`` (any ``AsyncTm1…``),
   ``AsyncIterator`` → ``Iterator``, ``__aenter__`` → ``__enter__``, ``AsyncIO`` → ``SyncIO``
   (the primitives in ``skipcheck_tm1._compat``), ``aio_api`` → ``api``…;
@@ -89,6 +90,16 @@ def transform(source: str) -> str:
                 edits.append((start, at(following.start), ""))
             elif tok.string == "await":
                 edits.append((start, at(following.start) if following is not None else end, ""))
+            elif tok.string == "Awaitable" and following is not None and following.string == "[":
+                # Awaitable[str] → str: what's awaited there is the value itself here
+                depth, j = 0, i + 1
+                while True:
+                    depth += {"[": 1, "]": -1}.get(tokens[j].string, 0)
+                    if depth == 0:
+                        break
+                    j += 1
+                edits.append((start, at(following.end), ""))
+                edits.append((at(tokens[j].start), at(tokens[j].end), ""))
             else:
                 renamed = _name(tok.string)
                 if renamed != tok.string:

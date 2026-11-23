@@ -14,7 +14,10 @@ extend-exclude = ["tm1-client/src/skipcheck_tm1/_generated", "tm1-client/src/ski
 src = ["tm1-client/src", "tm1-testcontainers/src"]
 
 [lint]
-select = ["E", "F", "W", "I", "B", "UP"]
+# D100 to D104 and D106: the public API is documented, as the Java build requires Javadoc on its
+# public classes and methods. Presence only, no docstring style: magic methods (D105) are left
+# out, and constructors (D107), whose parameters the class's docstring describes.
+select = ["E", "F", "W", "I", "B", "UP", "D100", "D101", "D102", "D103", "D104", "D106"]
 isort.known-first-party = ["skipcheck_tm1", "skipcheck_tm1_testcontainers"]
 ignore = [
     # The formatter lays code out; what it leaves long is a string or a comment it won't break
@@ -22,3 +25,8 @@ ignore = [
     # zip() without strict=: where lengths could differ, the code checks them and says which
     "B905",
 ]
+
+[lint.per-file-ignores]
+# Docstrings are required of the two packages' sources only: not of tests, the code generator or
+# the build hook
+"!tm1-*/src/**" = ["D"]

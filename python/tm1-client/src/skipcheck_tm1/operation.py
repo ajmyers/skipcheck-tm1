@@ -20,11 +20,16 @@ class Tm1Operation:
     """An action or function: bound to a type (``binding_type``), or imported (``import_name``)."""
 
     class Kind(enum.Enum):
+        """Whether an operation is an action or a function."""
+
         ACTION = "action"
         FUNCTION = "function"
 
     @dataclass(frozen=True)
     class Parameter:
+        """A parameter: its name, its type as ``$metadata`` writes it, such as ``Edm.String`` or
+        ``Collection(tm1.Element)``, and whether it may be null or left out."""
+
         name: str
         type: str
         nullable: bool
@@ -44,9 +49,11 @@ class Tm1Operation:
         object.__setattr__(self, "parameters", tuple(self.parameters))
 
     def bound(self) -> bool:
+        """Whether it's bound to a type, rather than invoked from the service root."""
         return self.binding_type is not None
 
     def deprecated(self) -> bool:
+        """Whether ``$metadata`` marks it deprecated."""
         return self.deprecated_in is not None
 
     def endpoint(self) -> str:
@@ -57,6 +64,8 @@ class Tm1Operation:
         return f"{kind}Import {self.import_name}"
 
     def capability(self) -> Tm1Capability:
+        """What a request using it needs the server to have, with the version that added it, for
+        :meth:`Tm1Request.requires`."""
         if self.binding_type is not None:
             capability = Tm1Capability.bound_operation(self.binding_type, self.name)
         else:

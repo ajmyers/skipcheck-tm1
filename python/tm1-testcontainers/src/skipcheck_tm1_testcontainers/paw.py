@@ -120,12 +120,17 @@ class PawContainer:
             return PawContainer._shared
 
     def with_tm1_server(self, tm1: Tm1ServerContainer) -> Self:
+        """Logs PAW users on to ``tm1``, and lists servers from its Admin Server. Starts ``tm1``
+        first if it isn't running."""
         if tm1 is None:
             raise ValueError("tm1 must not be None")
         self._tm1 = tm1
         return self
 
     def with_admin_server(self, admin: Tm1AdminServerContainer) -> Self:
+        """Lists servers from a separate Admin Server (:meth:`Tm1ServerContainer.with_admin_server`)
+        instead of the TM1 server's own. Users still log on through that TM1 server, which must be
+        registered with this Admin Server and on its network."""
         if admin is None:
             raise ValueError("admin must not be None")
         self._admin_server = admin
@@ -152,23 +157,30 @@ class PawContainer:
 
     @property
     def source(self) -> PawSource:
+        """Where PAW comes from."""
         return self._source
 
     @property
     def tm1_server(self) -> Tm1ServerContainer | None:
+        """The TM1 server set with :meth:`with_tm1_server`, or None if none was set."""
         return self._tm1
 
     @property
     def is_running(self) -> bool:
+        """Whether PAW is started: true between :meth:`start` and :meth:`stop`."""
         return self._running
 
     @property
     def url(self) -> str:
+        """PAW's address as seen from the host, such as ``http://localhost:54321/``, ending in
+        ``/``. A RuntimeError if PAW isn't started."""
         if not self._running:
             raise RuntimeError("PAW isn't started")
         return f"http://{DockerClient().host()}:{self._http_port}/"
 
     def start(self) -> None:
+        """Starts the TM1 server if needed, then PAW, and waits until a TM1 call through PAW works.
+        A RuntimeError if the license isn't accepted or no TM1 server is set."""
         with self._lock:
             if self._running:
                 return
@@ -208,6 +220,7 @@ class PawContainer:
             _log.info("PAW is up at %s, logging users on to the TM1 server at %s", self.url, tm1_address)
 
     def stop(self) -> None:
+        """Removes the PAW containers, keeping PAW's data."""
         with self._lock:
             if not self._running:
                 return
@@ -218,6 +231,7 @@ class PawContainer:
                 _log.warning("Couldn't stop PAW; its containers may still be running", exc_info=True)
 
     def close(self) -> None:
+        """The same as :meth:`stop`."""
         self.stop()
 
     def __enter__(self) -> Self:
@@ -229,6 +243,8 @@ class PawContainer:
 
     @staticmethod
     def license_accepted_by_setting() -> bool:
+        """Whether IBM's PAW license is accepted by the ``PAW_ACCEPT_LICENSE`` setting: true if it's
+        set to ``true``."""
         value = setting(PawContainer.ACCEPT_LICENSE)
         return value is not None and value.strip().lower() == "true"
 
@@ -367,6 +383,7 @@ class PawSession:
         return self.get(f"tm1/{quote(server, safe='')}/api/v1/{path}")
 
     def get(self, path: str) -> httpx.Response:
+        """A GET request on PAW, relative to its address: ``path`` has no leading ``/``."""
         return self._send("GET", path)
 
     def _send(self, method: str, path: str, **kwargs: Any) -> httpx.Response:

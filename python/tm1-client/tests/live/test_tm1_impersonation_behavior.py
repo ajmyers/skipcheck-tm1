@@ -184,7 +184,7 @@ def test_impersonates_users_with_non_ascii_names_only_as_utf8(raw: RawTm1, admin
     """A user whose name has characters outside ASCII is impersonated when the header carries the
     name as UTF-8, and only then: as ISO 8859-1 bytes or percent-encoded, TM1 reports the user
     unknown. The header values are bytes, which httpx sends as they are. The client sends UTF-8
-    (``header_text``)."""
+    (``HEADER_ENCODING``)."""
     accented = users.alice + "_ë"
     raw.create_user(admin, accented, "p")
     try:

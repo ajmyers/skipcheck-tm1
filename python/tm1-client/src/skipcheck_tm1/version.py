@@ -33,6 +33,8 @@ class Tm1Version:
 
     @staticmethod
     def parse(text: str) -> Tm1Version:
+        """Parses a version such as ``11.8.03500.6``. Surrounding whitespace is ignored; a
+        ValueError if the text isn't dot-separated numbers."""
         trimmed = text.strip()
         if not _FORMAT.match(trimmed):
             raise ValueError(f"Not a TM1 version: {text!r} (expected numbers separated by dots, like 11.8.03500.6)")
@@ -51,9 +53,11 @@ class Tm1Version:
         return tuple(parts)
 
     def is_at_least(self, other: Tm1Version | str) -> bool:
+        """True if this version is the same as or newer than ``other``."""
         return self >= _version(other)
 
     def is_before(self, other: Tm1Version | str) -> bool:
+        """True if this version is older than ``other``."""
         return self < _version(other)
 
     def __eq__(self, other: object) -> bool:
@@ -88,6 +92,8 @@ class Tm1Capability:
     singleton, an operation (bound to a type, or imported) or a property of a type."""
 
     class Kind(enum.Enum):
+        """The kinds of element a request can need."""
+
         ENTITY_SET = "entity-set"
         SINGLETON = "singleton"
         BOUND_OPERATION = "bound-operation"
@@ -105,31 +111,44 @@ class Tm1Capability:
 
     @staticmethod
     def entity_set(name: str) -> Tm1Capability:
+        """An entity set, by its name, such as ``GitPlans``."""
         return Tm1Capability(Tm1Capability.Kind.ENTITY_SET, None, name)
 
     @staticmethod
     def singleton(name: str) -> Tm1Capability:
+        """A singleton, by its name, such as ``ActiveSession``."""
         return Tm1Capability(Tm1Capability.Kind.SINGLETON, None, name)
 
     @staticmethod
     def bound_operation(binding_type: str, operation: str) -> Tm1Capability:
+        """An action or function bound to a type, or to one of its base types: the qualified type,
+        such as ``tm1.Cube``, and the qualified operation name, such as ``tm1.Reserve``."""
         return Tm1Capability(Tm1Capability.Kind.BOUND_OPERATION, binding_type, operation)
 
     @staticmethod
     def unbound_operation(name: str) -> Tm1Capability:
+        """An action or function import, invoked from the service root, by the import's name, such
+        as ``ExecuteMDX``."""
         return Tm1Capability(Tm1Capability.Kind.UNBOUND_OPERATION, None, name)
 
     @staticmethod
     def property(type: str, prop: str) -> Tm1Capability:
+        """A structural or navigation property of a type, or of one of its base types: the qualified
+        type, such as ``tm1.Cube``, and the property's name, such as ``Rules``."""
         return Tm1Capability(Tm1Capability.Kind.PROPERTY, type, prop)
 
     def since(self, schema_version: str) -> Tm1Capability:
+        """A copy recording the schema version that added it: the version from ``Core.Revisions``,
+        such as ``11.8.34``."""
         return replace(self, added_in=schema_version)
 
     def added_in_version(self) -> str | None:
+        """The schema version that added it, or None if not known."""
         return self.added_in
 
     def describe(self) -> str:
+        """How it reads in messages, with aliases and namespaces dropped: ``Cube.Reserve``, ``entity
+        set GitPlans``."""
         k = Tm1Capability.Kind
         if self.kind is k.ENTITY_SET:
             return "entity set " + self.name
@@ -247,14 +266,18 @@ class Tm1Capabilities:
         return Tm1Capabilities(version, product_version, frozenset(endpoints), types, bound, container, aliases)
 
     def with_product_version(self, product_version: Tm1Version | None) -> Tm1Capabilities:
+        """A copy with the server's product version, which ``$metadata`` doesn't say, for messages."""
         return Tm1Capabilities(self._schema_version, product_version, self.endpoints, self._types, self._bound, self._container, self._aliases)
 
     @property
     def schema_version(self) -> str | None:
+        """The REST API schema version the server reports in ``Core.SchemaVersion``, such as
+        ``11.8.35``, or None if it reports none. Not the product version: a different number."""
         return self._schema_version
 
     @property
     def product_version(self) -> Tm1Version | None:
+        """The server's product version, such as ``11.8.03500.6``, or None if not known."""
         return self._product_version
 
     def _qualify(self, name: str) -> str:
@@ -320,9 +343,13 @@ class Tm1Dialect:
 
     @property
     def name(self) -> str:
+        """The deployment kind, for logs and messages, such as ``TM1 11``."""
         return self._name
 
     def service_root(self, address: str) -> str:
+        """The REST API's service root for a server's address, ending in ``/``. ``address`` is where
+        the server is, such as ``http://tm1:8010``; a full service root is accepted too. A
+        ValueError if it isn't an address."""
         return self._service_root(address)
 
     def __repr__(self) -> str:

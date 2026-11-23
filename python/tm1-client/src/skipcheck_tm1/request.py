@@ -65,6 +65,8 @@ class Tm1Request(Generic[T]):
     """A request: method, path, query, headers, body, and how its answer is read."""
 
     class Response(enum.Enum):
+        """How the response body is read."""
+
         SINGLE = "single"
         """One JSON value, read as ``type``."""
         COLLECTION = "collection"
@@ -88,26 +90,37 @@ class Tm1Request(Generic[T]):
 
     @staticmethod
     def get(path: ODataPath, query: ODataQuery | None, type: Any) -> Tm1Request[Any]:
+        """``GET`` of one entity or value, read as ``type``."""
         return Tm1Request("GET", path, query or ODataQuery.none(), response=Tm1Request.Response.SINGLE, type=type)
 
     @staticmethod
     def list(path: ODataPath, query: ODataQuery | None, item_type: Any) -> Tm1Request[Any]:
+        """``GET`` of a collection, read item by item as ``item_type``."""
         return Tm1Request("GET", path, query or ODataQuery.none(), response=Tm1Request.Response.COLLECTION, type=item_type)
 
     @staticmethod
     def bytes(path: ODataPath) -> Tm1Request[bytes]:
+        """``GET`` of raw bytes, such as a document's ``Content``."""
         return Tm1Request("GET", path, response=Tm1Request.Response.BYTES, type=bytes)
 
     @staticmethod
     def put(path: ODataPath, content: bytes, content_type: str = "application/octet-stream") -> Tm1Request[None]:
+        """``PUT`` of raw bytes, as ``application/octet-stream`` unless said otherwise, such as a
+        document's ``Content``. TM1 (11.8) refuses a chunked body (400, with no message), so the
+        bytes are sent with their ``Content-Length``: the whole content is held in memory while it's
+        sent."""
         return Tm1Request("PUT", path, body=bytes(content), content_type=content_type)
 
     @staticmethod
     def text(path: ODataPath) -> Tm1Request[str]:
+        """``GET`` of plain text, such as ``Configuration/ProductVersion/$value``."""
         return Tm1Request("GET", path, response=Tm1Request.Response.TEXT, type=str)
 
     @staticmethod
     def post_list(path: ODataPath, body: Any, item_type: Any) -> Tm1Request[Any]:
+        """``POST`` whose response is a collection, read item by item as ``item_type``: an action
+        returning ``Collection(...)``, such as ``tm1.CheckRules``. ``body`` is the parameters,
+        written as JSON."""
         if body is None:
             raise ValueError("body")
         return Tm1Request("POST", path, body=body, response=Tm1Request.Response.COLLECTION, type=item_type)
@@ -120,23 +133,30 @@ class Tm1Request(Generic[T]):
 
     @staticmethod
     def patch(path: ODataPath, body: Any) -> Tm1Request[None]:
+        """``PATCH``: change the properties in ``body``, leaving the rest as they are."""
         if body is None:
             raise ValueError("body")
         return Tm1Request("PATCH", path, body=body)
 
     @staticmethod
     def delete(path: ODataPath) -> Tm1Request[None]:
+        """``DELETE`` of the entity at ``path``."""
         return Tm1Request("DELETE", path)
 
     # Derived requests
 
     def with_query(self, query: ODataQuery | None) -> Tm1Request[T]:
+        """A copy with these query options instead."""
         return replace(self, query=query or ODataQuery.none())
 
     def with_header(self, name: str, value: str) -> Tm1Request[T]:
+        """A copy with a header added or replaced, such as ``If-Match``."""
         return replace(self, headers={**self.headers, name: value})
 
     def with_timeout(self, seconds: float) -> Tm1Request[T]:
+        """A copy that may go ``seconds`` without receiving any data before it fails, instead of the
+        session's request timeout. For calls TM1 only answers when the work is done, such as a long
+        process run. Must be positive."""
         if seconds <= 0:
             raise ValueError(f"timeout must be positive: {seconds}")
         return replace(self, timeout=float(seconds))
@@ -147,9 +167,11 @@ class Tm1Request(Generic[T]):
         return replace(self, capability=capability)
 
     def requirement(self) -> Tm1Capability | None:
+        """What this request needs the server to define, or None."""
         return self.capability
 
     def if_match(self, etag: str) -> Tm1Request[T]:
+        """A copy sent with ``If-Match: etag``, failing with 412 if the entity has changed since."""
         return self.with_header("If-Match", etag)
 
     def is_idempotent(self) -> bool:
@@ -157,12 +179,16 @@ class Tm1Request(Generic[T]):
         return self.method.upper() in ("GET", "PUT", "DELETE", "HEAD")
 
     def relative_uri(self) -> str:
+        """The encoded path and query relative to the service root, such as
+        ``Cubes('Sales')?$select=Name``."""
         q = self.query.to_query_string()
         return str(self.path) + ("?" + q if q else "")
 
     # Sending
 
     def read(self, reply: Reply) -> Any:
+        """Reads the answer as the request says to: nothing, bytes, text (without a byte order
+        mark), one value, or a page of a collection."""
         r = Tm1Request.Response
         if self.response is r.NONE:
             return None

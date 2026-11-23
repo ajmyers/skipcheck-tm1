@@ -101,18 +101,23 @@ class Tm1WebContainer(GenericContainer):
 
     @property
     def admin_server(self) -> Tm1AdminServerContainer | None:
+        """The Admin Server set with :meth:`with_admin_server`, or None if none was set."""
         return self._admin_server
 
     @property
     def source(self) -> Tm1WebSource:
+        """Where TM1 Web comes from."""
         return self._source
 
     @property
     def tm1_server(self) -> Tm1ServerContainer | None:
+        """The TM1 server set with :meth:`with_tm1_server`, or None if none was set."""
         return self._tm1
 
     @property
     def url(self) -> str:
+        """TM1 Web's address as seen from the host, such as ``http://localhost:54321/tm1web/``,
+        ending in ``/``."""
         return f"http://{self.host}:{self.get_mapped_port(self.HTTP_PORT)}/tm1web/"
 
     @property
@@ -124,6 +129,8 @@ class Tm1WebContainer(GenericContainer):
         return host
 
     def configure(self) -> None:
+        """Called by testcontainers before the container is created: points TM1 Web at the Admin
+        Server it lists servers from."""
         if self._admin_server is not None:
             self.with_env("TM1_ADMIN_HOST", Tm1AdminServerContainer.NETWORK_ALIAS)
             return
@@ -144,6 +151,7 @@ class Tm1WebContainer(GenericContainer):
         self.with_env("TM1_ADMIN_HOST", address)
 
     def container_is_started(self) -> None:
+        """Called once the container is up: logs where it is and what it came from."""
         self.logger.info(
             "TM1 Web is up at %s (%s), listing servers from the Admin Server at %s",
             self.url,

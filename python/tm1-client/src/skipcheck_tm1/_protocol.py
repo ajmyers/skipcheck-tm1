@@ -131,19 +131,17 @@ def relative_url(path: str, query: ODataQuery | None, context: Context) -> str:
     return path + ("&" if "?" in path else "?") + "&".join(parts)
 
 
-def header_text(text: str) -> bytes:
-    """Text for a header TM1 reads as UTF-8: a user name in ``TM1-Impersonate``, a label in
-    ``TM1-SessionContext``. TM1 (11.8) decodes these as UTF-8 and nothing else: a name sent as ISO
-    8859-1 bytes, percent-encoded or as an RFC 2047 encoded word isn't found. httpx refuses a
-    ``str`` header value outside ASCII, but sends ``bytes`` as they are, so the value is handed to
-    it as the text's UTF-8 bytes."""
-    return text.encode("utf-8")
+HEADER_ENCODING = "utf-8"
+"""How the text of a login's headers is encoded. TM1 (11.8) reads a user name in
+``TM1-Impersonate`` and a label in ``TM1-SessionContext`` as UTF-8 and nothing else: a name sent
+as ISO 8859-1 bytes, percent-encoded or as an RFC 2047 encoded word isn't found. httpx refuses
+a header value outside ASCII unless its ``Headers`` are given the encoding."""
 
 
-def headers(session_context: str | None, accept: str = JSON, extra: Mapping[str, str | bytes] | None = None) -> dict[str, str | bytes]:
-    out: dict[str, str | bytes] = {"OData-Version": "4.0", "OData-MaxVersion": "4.0", "Accept": accept}
+def headers(session_context: str | None, accept: str = JSON, extra: Mapping[str, str] | None = None) -> dict[str, str]:
+    out = {"OData-Version": "4.0", "OData-MaxVersion": "4.0", "Accept": accept}
     if session_context:
-        out[SESSION_CONTEXT] = header_text(session_context)
+        out[SESSION_CONTEXT] = session_context
     if extra:
         out.update(extra)
     return out

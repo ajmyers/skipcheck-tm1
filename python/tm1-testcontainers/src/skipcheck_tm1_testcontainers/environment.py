@@ -81,6 +81,7 @@ class PlanningAnalyticsEnvironment:
 
     @staticmethod
     def builder() -> PlanningAnalyticsEnvironment.Builder:
+        """Starts building an environment."""
         return PlanningAnalyticsEnvironment.Builder()
 
     def start(self) -> None:
@@ -92,12 +93,14 @@ class PlanningAnalyticsEnvironment:
             self._paw.start()
 
     def stop(self) -> None:
+        """Stops every part, the dependents first, and removes the network if it made it."""
         for part in reversed(self.containers()):
             part.stop()
         if self._owns_network and isinstance(self._network, Network):
             self._network.close()
 
     def close(self) -> None:
+        """The same as :meth:`stop`."""
         self.stop()
 
     def __enter__(self) -> Self:
@@ -108,30 +111,39 @@ class PlanningAnalyticsEnvironment:
         self.stop()
 
     def tm1(self, name: str) -> Tm1ServerContainer:
+        """A TM1 server by the name it was added with. A ValueError if there's no such server."""
         server = self._tm1_servers.get(name)
         if server is None:
             raise ValueError(f"No TM1 server {name}; there's {list(self._tm1_servers)}")
         return server
 
     def tm1_servers(self) -> dict[str, Tm1ServerContainer]:
+        """The TM1 servers, by name, in the order they were added."""
         return dict(self._tm1_servers)
 
     def admin_server(self) -> Tm1AdminServerContainer | None:
+        """The shared Admin Server, present with more than one TM1 server or when asked for; None
+        otherwise."""
         return self._admin_server
 
     def tm1_web(self) -> Tm1WebContainer:
+        """TM1 Web. A RuntimeError if it wasn't added."""
         return _require(self._tm1_web, "TM1 Web", "tm1_web()")
 
     def paw(self) -> PawContainer:
+        """PAW. A RuntimeError if it wasn't added."""
         return _require(self._paw, "PAW", "paw(...)")
 
     def cognos(self) -> CognosContainer:
+        """Cognos, with the test users. A RuntimeError if it wasn't added."""
         return _require(self._cognos, "Cognos", "cognos(...)")
 
     def keycloak(self) -> KeycloakContainer:
+        """Keycloak, the OIDC provider. A RuntimeError if it wasn't added."""
         return _require(self._keycloak, "Keycloak", "keycloak()")
 
     def network(self) -> Any:
+        """The Docker network every part is on."""
         return self._network
 
     def containers(self) -> list[Part]:
@@ -151,6 +163,8 @@ class PlanningAnalyticsEnvironment:
         return parts
 
     class Builder:
+        """Builds a :class:`PlanningAnalyticsEnvironment`. Every part is optional."""
+
         def __init__(self) -> None:
             self._tm1: dict[str, Callable[[Tm1ServerContainer], Any]] = {}
             self._admin_server: Callable[[Tm1AdminServerContainer], Any] | None = None
@@ -181,10 +195,15 @@ class PlanningAnalyticsEnvironment:
             return self
 
         def tm1_web(self, customizer: Callable[[Tm1WebContainer], Any] = _nothing) -> Self:
+            """Adds TM1 Web, listing every TM1 server. ``customizer`` configures the container."""
             self._tm1_web = _required(customizer)
             return self
 
         def paw(self, customizer: Callable[[PawContainer], Any]) -> Self:
+            """Adds PAW, logging users on to the first TM1 server and listing every one. IBM's
+            license must be accepted (:meth:`PawContainer.accept_license` in the customizer, or
+            ``PAW_ACCEPT_LICENSE=true``). Not available with Cognos yet: PAW logs users on with
+            TM1's own security."""
             self._paw = _required(customizer)
             return self
 
@@ -194,6 +213,8 @@ class PlanningAnalyticsEnvironment:
             return self
 
         def keycloak(self, customizer: Callable[[KeycloakContainer], Any] = _nothing) -> Self:
+            """Adds Keycloak, giving Cognos an OIDC namespace with the same test users. Needs
+            :meth:`cognos`."""
             self._keycloak = _required(customizer)
             return self
 
@@ -207,26 +228,35 @@ class PlanningAnalyticsEnvironment:
             return self
 
         def tm1_source(self, source: Tm1Source) -> Self:
+            """Where TM1 comes from; :meth:`Tm1Source.discover` by default."""
             self._tm1_source = _required(source)
             return self
 
         def tm1_web_source(self, source: Tm1WebSource) -> Self:
+            """Where TM1 Web comes from; :meth:`Tm1WebSource.discover` by default."""
             self._tm1_web_source = _required(source)
             return self
 
         def paw_source(self, source: PawSource) -> Self:
+            """Where PAW comes from; :meth:`PawSource.discover` by default."""
             self._paw_source = _required(source)
             return self
 
         def cognos_source(self, source: CognosSource) -> Self:
+            """Where Cognos comes from; :meth:`CognosSource.discover` by default."""
             self._cognos_source = _required(source)
             return self
 
         def network(self, network: Any) -> Self:
+            """The Docker network to put everything on; a new one, removed by
+            :meth:`PlanningAnalyticsEnvironment.close`, by default."""
             self._network = _required(network)
             return self
 
         def build(self) -> PlanningAnalyticsEnvironment:
+            """Creates the containers and wires them together. Nothing starts until
+            :meth:`PlanningAnalyticsEnvironment.start`. A RuntimeError if a part needs one that's
+            missing, or a source can't be found."""
             if not self._tm1:
                 raise RuntimeError("Add at least one TM1 server with tm1(name)")
             if self._keycloak is not None and self._cognos is None:

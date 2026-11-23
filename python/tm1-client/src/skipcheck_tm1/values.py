@@ -17,7 +17,7 @@ from .odata import ODataPath
 def _navigation(scope: Any) -> str:
     """A scope's navigation property: a ``SubsetScope`` or ``ViewScope``, or its name."""
     navigation = getattr(scope, "navigation", None)
-    return navigation() if callable(navigation) else str(_require(scope, "scope"))
+    return str(navigation() if callable(navigation) else _require(scope, "scope"))
 
 
 def _hierarchy(dimension: str, hierarchy: str) -> ODataPath:
@@ -116,6 +116,7 @@ class AttributeOwner:
         return AttributeOwner(ODataPath.of("Chores").key(_require(chore, "chore")))
 
     def path(self) -> ODataPath:
+        """The resource path, relative to the service root."""
         return self._path
 
     def __eq__(self, other: object) -> bool:
@@ -184,6 +185,7 @@ class AttributeSet:
         return AttributeSet(ODataPath.of("ChoreAttributes"))
 
     def path(self) -> ODataPath:
+        """The resource path, relative to the service root."""
         return self._path
 
     def __eq__(self, other: object) -> bool:

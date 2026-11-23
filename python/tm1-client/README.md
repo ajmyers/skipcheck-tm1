@@ -73,6 +73,9 @@ pip install -e '.[test]' -e './testcontainers[test]'
 pytest
 ```
 
+- `test_format.py` runs Ruff ([`ruff.toml`](../ruff.toml)): layout, lint, and a docstring on every public module, class, method and function of the two packages, as the Java build requires Javadoc.
+- `test_types.py` runs Pyright ([`pyrightconfig.json`](../pyrightconfig.json)) over both packages' sources, the generated modules included, as the Java build runs NullAway and Error Prone.
+- `test_architecture.py` keeps the rules of Java's `ArchitectureTest`: the asyncio flavor never blocks or starts work nobody awaits, request URLs come from `ODataPath` and `ODataQuery`, logging goes through `logging` only, `odata.py` knows nothing of TM1, and services are stateless, async and declare their endpoints.
 - `test_java_parity.py` and `runtime/test_java_parity_runtime.py` read the Java sources and require every public class and method, with the same `@Tm1Endpoint` IDs and parameters.
 - `test_coverage_gate.py` holds each flavor to the spec's 242 endpoints, by the Java gate's rules.
 - `test_contract.py` calls every endpoint through the generated API, in both flavors, against a fake TM1, and checks the request.

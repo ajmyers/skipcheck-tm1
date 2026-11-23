@@ -359,8 +359,9 @@ class CellsetService(Service):
         first page's last row, if it came incomplete, is dropped and fetched again with the
         next. With more axes, rows aren't rectangles, so pages come from ``Cells`` with
         ``$skip`` and ``$top``."""
-        inline = list(cellset.cells or [])
-        axes = list(cellset.axes or [])
+        # A cellset TM1 sent holds cells and axes, never the references a request can bind
+        inline = [cell for cell in cellset.cells or [] if isinstance(cell, CellsetCell)]
+        axes = [axis for axis in cellset.axes or [] if isinstance(axis, CellsetAxis)]
         total = 1
         for axis in axes:
             total *= _cardinality(axis)

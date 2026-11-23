@@ -109,7 +109,7 @@ def literal(value: Any) -> str:
         return value.literal
     odata = getattr(value, "odata_literal", None)
     if callable(odata):
-        return odata()
+        return str(odata())
     if isinstance(value, enum.Enum):
         return literal(value.value)
     if isinstance(value, str):
@@ -171,14 +171,19 @@ class ODataPath:
 
     @staticmethod
     def of(name: str) -> ODataPath:
+        """A path starting at an entity set, singleton or operation import, such as ``Cubes``.
+        ``name`` must be an OData identifier."""
         return ODataPath((_identifier(name),))
 
     @staticmethod
     def metadata() -> ODataPath:
+        """The service's metadata document, ``$metadata``: its CSDL XML. A path of its own, since
+        ``$metadata`` isn't an identifier :meth:`of` accepts."""
         return ODataPath(("$metadata",))
 
     @staticmethod
     def batch() -> ODataPath:
+        """The service's batch endpoint, ``$batch``: a path of its own, as for :meth:`metadata`."""
         return ODataPath(("$batch",))
 
     @staticmethod
@@ -190,6 +195,9 @@ class ODataPath:
 
     @staticmethod
     def function_import(name: str, parameters: Mapping[str, Any] | None = None) -> ODataPath:
+        """A function import called from the service root, such as ``ModelCubes()`` or
+        ``TailMessageLog(Top=10)``. ``name`` is unqualified; the parameters are written in order, as
+        for :meth:`function`."""
         return ODataPath((_call(_identifier(name), parameters or {}),))
 
     def key(self, value: Any) -> ODataPath:
@@ -202,24 +210,37 @@ class ODataPath:
         return self._append_to_last(f"({_key_value(value)})")
 
     def nav(self, prop: str) -> ODataPath:
+        """Adds a navigation property or structural property segment, such as ``Views``. Returns a
+        new path."""
         return self._append(_identifier(prop))
 
     def cast(self, qualified_type: str) -> ODataPath:
+        """Adds a type-cast segment, such as ``tm1.NativeView``: the namespace-qualified type name.
+        Returns a new path."""
         return self._append(_qualified(qualified_type))
 
     def action(self, qualified_name: str) -> ODataPath:
+        """Adds a bound action segment, such as ``tm1.Reserve``. Actions are invoked with POST.
+        Returns a new path."""
         return self._append(_qualified(qualified_name))
 
     def function(self, qualified_name: str, parameters: Mapping[str, Any] | None = None) -> ODataPath:
+        """Adds a bound function call with literal parameters, such as
+        ``tm1.GetPartition(Begin=0,End=99)``. Use parameter aliases (:meth:`ODataQuery.alias`) for
+        complex or collection parameters. Returns a new path."""
         return self._append(_call(_qualified(qualified_name), parameters or {}))
 
     def value(self) -> ODataPath:
+        """Adds ``$value``: a property's or media entity's raw value. Returns a new path."""
         return self._append("$value")
 
     def count(self) -> ODataPath:
+        """Adds ``$count``: the number of items in a collection, as plain text. Returns a new path."""
         return self._append("$count")
 
     def ref(self) -> ODataPath:
+        """Adds ``$ref``: references to entities rather than the entities themselves. Returns a new
+        path."""
         return self._append("$ref")
 
     def __str__(self) -> str:
@@ -316,9 +337,11 @@ class ODataProperty:
 
     @staticmethod
     def of(path: str) -> ODataProperty:
+        """A property path from text, with ``/`` between segments."""
         return ODataProperty(path)
 
     def path(self) -> str:
+        """The path, with ``/`` between segments, unencoded."""
         return self._path
 
     def __str__(self) -> str:
@@ -334,24 +357,37 @@ class ODataProperty:
         return hash(self._path)
 
     def eq(self, value: Any) -> Filter:
+        """``this eq value``, the value written as an OData literal (:meth:`ODataLiterals.of`). None
+        isn't allowed: use :meth:`is_null`."""
         return Filter._compare(self, "eq", value)
 
     def ne(self, value: Any) -> Filter:
+        """``this ne value``, the value written as an OData literal (:meth:`ODataLiterals.of`). None
+        isn't allowed: use :meth:`is_null`."""
         return Filter._compare(self, "ne", value)
 
     def gt(self, value: Any) -> Filter:
+        """``this gt value``, the value written as an OData literal (:meth:`ODataLiterals.of`). None
+        isn't allowed: use :meth:`is_null`."""
         return Filter._compare(self, "gt", value)
 
     def ge(self, value: Any) -> Filter:
+        """``this ge value``, the value written as an OData literal (:meth:`ODataLiterals.of`). None
+        isn't allowed: use :meth:`is_null`."""
         return Filter._compare(self, "ge", value)
 
     def lt(self, value: Any) -> Filter:
+        """``this lt value``, the value written as an OData literal (:meth:`ODataLiterals.of`). None
+        isn't allowed: use :meth:`is_null`."""
         return Filter._compare(self, "lt", value)
 
     def le(self, value: Any) -> Filter:
+        """``this le value``, the value written as an OData literal (:meth:`ODataLiterals.of`). None
+        isn't allowed: use :meth:`is_null`."""
         return Filter._compare(self, "le", value)
 
     def is_null(self) -> Filter:
+        """``this eq null``."""
         return Filter._compare(self, "eq", None)
 
 
@@ -388,38 +424,53 @@ class Filter:
 
     @staticmethod
     def and_(*filters: Filter) -> Filter:
+        """All of the given filters, at least one: joined with ``and``, or the filter itself if
+        there's only one."""
         return Filter._join("and", filters)
 
     @staticmethod
     def or_(*filters: Filter) -> Filter:
+        """Any of the given filters, at least one: joined with ``or``, or the filter itself if
+        there's only one."""
         return Filter._join("or", filters)
 
     @staticmethod
     def not_(filter: Filter) -> Filter:
+        """``not filter``."""
         return Filter(f"not({filter._expression})")
 
     @staticmethod
     def starts_with(prop: str | ODataProperty, prefix: str) -> Filter:
+        """``startswith(property,'prefix')``, for a string property."""
         return Filter._function("startswith", prop, prefix)
 
     @staticmethod
     def ends_with(prop: str | ODataProperty, suffix: str) -> Filter:
+        """``endswith(property,'suffix')``, for a string property."""
         return Filter._function("endswith", prop, suffix)
 
     @staticmethod
     def contains(prop: str | ODataProperty, text: str) -> Filter:
+        """``contains(property,'text')``, for a string property."""
         return Filter._function("contains", prop, text)
 
     @staticmethod
     def any(collection_path: str, variable: str, condition: Callable[[Variable], Filter]) -> Filter:
+        """``collection/any(v:condition)``: true if any member of a collection matches.
+        ``collection_path`` is used as is, such as ``Hierarchies``; ``condition`` receives the range
+        variable, from which to build paths (``v.nav("Name")``)."""
         return Filter._lambda("any", collection_path, variable, condition)
 
     @staticmethod
     def all(collection_path: str, variable: str, condition: Callable[[Variable], Filter]) -> Filter:
+        """``collection/all(v:condition)``: true if every member of a collection matches. The
+        arguments are as for :meth:`any`."""
         return Filter._lambda("all", collection_path, variable, condition)
 
     @staticmethod
     def in_(prop: str | ODataProperty, *values: Any) -> Filter:
+        """``property in (a,b,c)``, with at least one value, each written as an OData literal. Not
+        every TM1 version supports ``in``; :meth:`or_` of ``eq`` comparisons always works."""
         if not values:
             raise ValueError("in_() needs at least one value: an empty set matches nothing")
         return Filter(f"({_property(prop)} in ({','.join(literal(v) for v in values)}))")
@@ -454,6 +505,8 @@ class Filter:
             self._name = name
 
         def nav(self, path: str) -> ODataProperty:
+            """A path through the variable, ``v/Name``: ``path`` is the path from the variable, with
+            ``/`` between segments."""
             return ODataProperty(f"{self._name}/{path}")
 
         def self_(self) -> ODataProperty:
@@ -576,6 +629,9 @@ class ODataQuery:
     # The builder, as in Java
 
     def select(self, *properties: str | ODataProperty) -> ODataQuery:
+        """Adds properties to ``$select``, after any already selected. Like every option here it's
+        an instance method, so it works the same at the top level and inside :meth:`expand`. Returns
+        a new query."""
         out = self._copy()
         out._select += tuple(_property(p) for p in properties)
         return out
@@ -598,31 +654,37 @@ class ODataQuery:
         return out
 
     def filter(self, filter: Filter | str) -> ODataQuery:
+        """Sets ``$filter``, replacing any set before. Returns a new query."""
         out = self._copy()
         out._filter = str(filter)
         return out
 
     def order_by(self, prop: str | ODataProperty) -> ODataQuery:
+        """Adds an ascending ``$orderby`` key, after any keys already added. Returns a new query."""
         out = self._copy()
         out._orderby += (_property(prop),)
         return out
 
     def order_by_descending(self, prop: str | ODataProperty) -> ODataQuery:
+        """Adds a descending ``$orderby`` key, after any keys already added. Returns a new query."""
         out = self._copy()
         out._orderby += (_property(prop) + " desc",)
         return out
 
     def top(self, n: int) -> ODataQuery:
+        """Sets ``$top``: at most this many items, zero or more. Returns a new query."""
         out = self._copy()
         out._top = _non_negative("$top", n)
         return out
 
     def skip(self, n: int) -> ODataQuery:
+        """Sets ``$skip``: skip this many items first, zero or more. Returns a new query."""
         out = self._copy()
         out._skip = _non_negative("$skip", n)
         return out
 
     def with_count(self) -> ODataQuery:
+        """Sets ``$count=true``: include the total number of matching items. Returns a new query."""
         out = self._copy()
         out._count = True
         return out
@@ -646,14 +708,17 @@ class ODataQuery:
         return out
 
     def is_empty(self) -> bool:
+        """True if this query has no options."""
         return not self._system() and not self._custom and not self._aliases
 
     @property
     def custom(self) -> dict[str, str]:
+        """The custom options (those that are not OData system options), by name."""
         return dict(self._custom)
 
     @property
     def aliases(self) -> dict[str, str]:
+        """The parameter aliases, by name with its ``@``, each with its literal or JSON value."""
         return dict(self._aliases)
 
     def params(self) -> list[tuple[str, str]]:
@@ -727,14 +792,21 @@ class ODataLiterals:
 
     @staticmethod
     def string(value: str) -> str:
+        """A string literal: single-quoted, with single quotes doubled (``'O''Neil'``). Not yet
+        percent-encoded."""
         return string_literal(value)
 
     @staticmethod
     def enum_member(qualified_type: str, member: str) -> str:
+        """An enumeration literal in OData 4.0 form, with its namespace-qualified type:
+        ``ibm.tm1.api.v1.ElementType'Numeric'``. Not yet percent-encoded."""
         return qualified_type + string_literal(member)
 
     @staticmethod
     def of(value: Any) -> str:
+        """A literal for a Python value: strings are quoted, numbers and booleans written as is,
+        None as ``null``. Use :class:`Raw` for an already-formed literal, such as an enum member or
+        a date. Not yet percent-encoded."""
         return literal(value)
 
 

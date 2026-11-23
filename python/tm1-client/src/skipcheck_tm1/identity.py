@@ -38,6 +38,8 @@ class Tm1Identity:
     same user, as TM1 compares user names (ignoring case and spaces)."""
 
     class Kind(enum.Enum):
+        """The kinds of identity."""
+
         SERVICE_ACCOUNT = "service-account"
         IMPERSONATING = "impersonating"
         OWN_CREDENTIALS = "own-credentials"
@@ -72,6 +74,7 @@ class Tm1Identity:
 
     @property
     def kind(self) -> Tm1Identity.Kind:
+        """What kind of identity this is."""
         return self._kind
 
     @property

@@ -57,14 +57,20 @@ def tm1_skip_reason() -> str | None:
 
 
 def cognos_skip_reason() -> str | None:
+    """Why a Cognos test is skipped, or None when it runs: as for TM1, or no Cognos source is
+    configured."""
     return tm1_skip_reason() or (None if CognosSource.discover() is not None else NO_COGNOS_MESSAGE)
 
 
 def tm1_web_skip_reason() -> str | None:
+    """Why a TM1 Web test is skipped, or None when it runs: as for TM1, or no TM1 Web source is
+    configured."""
     return tm1_skip_reason() or (None if Tm1WebSource.discover() is not None else NO_TM1_WEB_MESSAGE)
 
 
 def paw_skip_reason() -> str | None:
+    """Why a PAW test is skipped, or None when it runs: as for TM1, or no PAW source is configured,
+    or IBM's license isn't accepted."""
     reason = tm1_skip_reason()
     if reason is not None:
         return reason
@@ -84,11 +90,13 @@ _CONDITIONS: dict[str, Callable[[], str | None]] = {
 
 
 def pytest_configure(config: Any) -> None:
+    """pytest's hook: registers the ``requires_…`` markers, so ``--strict-markers`` accepts them."""
     for name, help_text in _MARKERS.items():
         config.addinivalue_line("markers", f"{name}: {help_text}")
 
 
 def pytest_runtest_setup(item: Any) -> None:
+    """pytest's hook: skips a test marked ``requires_…`` when what it needs isn't there."""
     names = {marker.name for marker in item.iter_markers()}
     for name, condition in _CONDITIONS.items():
         if name in names:
@@ -98,6 +106,7 @@ def pytest_runtest_setup(item: Any) -> None:
 
 
 def pytest_unconfigure(config: Any) -> None:
+    """pytest's hook: removes the shared containers as the session ends, unless reuse is enabled."""
     # Not left to the end of the process: removed as the session ends, unless kept for reuse
     if reuse_enabled():
         return

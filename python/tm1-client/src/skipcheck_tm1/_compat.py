@@ -8,6 +8,7 @@ The asyncio code (:mod:`skipcheck_tm1.aio`) is the source of truth; the sync fla
 from __future__ import annotations
 
 import asyncio
+import inspect
 import threading
 import time
 from collections.abc import Awaitable
@@ -32,6 +33,11 @@ class AsyncIO:
     def monotonic() -> float:
         return time.monotonic()
 
+    @staticmethod
+    async def resolve(value: Any) -> Any:
+        """What a caller's function returned: awaited, if it's awaitable."""
+        return await value if inspect.isawaitable(value) else value
+
 
 class _SyncLock:
     """A re-entrant-free lock used with ``with``, as ``asyncio.Lock`` is with ``async with``."""
@@ -54,6 +60,10 @@ class SyncIO:
 
     @staticmethod
     def shield(value: T) -> T:
+        return value
+
+    @staticmethod
+    def resolve(value: Any) -> Any:
         return value
 
     @staticmethod

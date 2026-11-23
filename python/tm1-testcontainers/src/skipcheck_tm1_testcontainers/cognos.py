@@ -41,10 +41,12 @@ class Namespace(enum.Enum):
 
     @property
     def id(self) -> str:
+        """The namespace's ID: the ``CAMNamespace`` users log on with."""
         return str(self.value)
 
     @property
     def type(self) -> str:
+        """The image's ``TM1_CAM_NAMESPACE_TYPE``."""
         return str(self.value).lower()
 
 
@@ -130,13 +132,16 @@ class CognosContainer(GenericContainer):
 
     @property
     def keycloak(self) -> KeycloakContainer | None:
+        """The Keycloak set with :meth:`with_keycloak`, or None if there's no OIDC namespace."""
         return self._keycloak
 
     @property
     def users(self) -> list[User]:
+        """The test users, in the order they were added."""
         return list(self._users.values())
 
     def get_user(self, name: str) -> User:
+        """A test user by name. A ValueError if there's no such user."""
         user = self._users.get(name)
         if user is None:
             raise ValueError(f"No test user {name}; add it with with_user")
@@ -149,10 +154,12 @@ class CognosContainer(GenericContainer):
 
     @property
     def source(self) -> CognosSource:
+        """Where Cognos comes from."""
         return self._source
 
     @property
     def url(self) -> str:
+        """Cognos as seen from the host, such as ``http://localhost:54321/bi/``, ending in ``/``."""
         return f"http://{self.host}:{self.get_mapped_port(self.DISPATCHER_PORT)}/bi/"
 
     @property
@@ -184,10 +191,13 @@ class CognosContainer(GenericContainer):
         return " ".join(u.name + ":" + u.password + (":" + ",".join(u.groups) if u.groups else "") for u in self._users.values())
 
     def configure(self) -> None:
+        """Called by testcontainers before the container is created: passes the test users to the
+        image as ``COGNOS_USERS``."""
         if self._users:
             self.with_env("COGNOS_USERS", self.users_spec())
 
     def container_is_started(self) -> None:
+        """Called once the container is up: logs where it is and what it came from."""
         self.logger.info("Cognos is up at %s (%s), with %d test user(s) in namespace %s", self.url, self._source.describe(), len(self._users), self.NAMESPACE)
 
 
@@ -217,10 +227,14 @@ class KeycloakContainer(GenericContainer):
 
     @property
     def network_url(self) -> str:
+        """Keycloak as other containers on its network reach it: ``http://keycloak:8080``. Also its
+        issuer's base. No trailing slash."""
         return f"http://{self.NETWORK_ALIAS}:{self.HTTP_PORT}"
 
     @property
     def url(self) -> str:
+        """Keycloak as seen from the host, such as ``http://localhost:54321``, without a trailing
+        slash. Its admin console logs on as ``admin`` / ``admin``."""
         return f"http://{self.host}:{self.get_mapped_port(self.HTTP_PORT)}"
 
     def id_token(self, user: str, password: str) -> str:

@@ -64,16 +64,26 @@ E = TypeVar("E", bound="EntityResource[Any]")
 
 
 class EntityResource(Resource, Generic[M]):
+    """One entity of the generated API, at its path, such as ``tm1.api.cubes['Sales']``: read,
+    changed and deleted here, with its navigation properties and bound operations in the generated
+    subclasses."""
+
     model: ClassVar[type[Tm1Model]] = Tm1Model
 
     async def get(self, query: ODataQuery | None = None, **options: Any) -> M:
+        """``GET`` of the entity, read as its model. Query options come as a query or as keywords
+        (``select=``, ``expand=``)."""
         return await self._session.execute(c.get_entity(self._path, query_of(query, options), self.model))
 
     async def update(self, changes: M | Mapping[str, Any], *, if_match: str | None = None) -> None:
+        """``PATCH``: changes the properties ``changes`` sets, leaving the rest as they are. With
+        ``if_match``, an ETag, TM1 refuses the change with 412 if the entity has changed since."""
         self._check("update")
         return await self._session.execute(c.update(self._path, changes, if_match))
 
     async def delete(self, *, if_match: str | None = None) -> None:
+        """``DELETE`` of the entity. With ``if_match``, an ETag, TM1 refuses with 412 if the entity
+        has changed since."""
         self._check("delete")
         return await self._session.execute(c.delete(self._path, if_match))
 
@@ -86,12 +96,17 @@ class EntityResource(Resource, Generic[M]):
 
 
 class CollectionResource(_CollectionBase, Resource, Generic[M, E]):
+    """A collection of the generated API, at its path, such as ``tm1.api.cubes``: listed, counted
+    and added to here; ``[key]`` gives one entity's resource without sending anything."""
+
     entity: ClassVar[type[Any]] = EntityResource
 
     def __getitem__(self, key: Any) -> E:
         return super().__getitem__(key)
 
     async def list(self, query: ODataQuery | None = None, **options: Any) -> list[M]:
+        """``GET`` of the whole collection, every page of it, each item read as its model. Query
+        options come as a query or as keywords (``select=``, ``filter=``, ``top=``)."""
         return await self._session.collect(c.page(self._path, query_of(query, options), self.model))
 
     def iter(self, query: ODataQuery | None = None, **options: Any) -> AsyncIterator[M]:
@@ -99,8 +114,11 @@ class CollectionResource(_CollectionBase, Resource, Generic[M, E]):
         return self._session.iterate(c.page(self._path, query_of(query, options), self.model))
 
     async def count(self, filter: str | None = None) -> int:
+        """``GET`` of ``$count``: how many entities the collection has, or how many match
+        ``filter``."""
         return await self._session.execute(c.count(self._path, filter))
 
     async def create(self, entity: M | Mapping[str, Any]) -> M:
+        """``POST``: adds an entity to the collection, and returns it as TM1 created it."""
         self._check("create")
         return await self._session.execute(c.create(self._path, entity, self.model))

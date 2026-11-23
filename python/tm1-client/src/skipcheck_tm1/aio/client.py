@@ -130,130 +130,163 @@ class AsyncTm1Client:
 
     @property
     def dimensions(self) -> DimensionService:
+        """Dimensions: the dimension service, on this client's session."""
         return self._dimensions
 
     @property
     def hierarchies(self) -> HierarchyService:
+        """Hierarchies: the hierarchy service, on this client's session."""
         return self._hierarchies
 
     @property
     def elements(self) -> ElementService:
+        """Elements: the element service, on this client's session."""
         return self._elements
 
     @property
     def edges(self) -> EdgeService:
+        """Edges: the edge service, on this client's session."""
         return self._edges
 
     @property
     def levels(self) -> LevelService:
+        """Levels: the level service, on this client's session."""
         return self._levels
 
     @property
     def members(self) -> MemberService:
+        """Members: the member service, on this client's session."""
         return self._members
 
     @property
     def subsets(self) -> SubsetService:
+        """Subsets: the subset service, on this client's session."""
         return self._subsets
 
     @property
     def attributes(self) -> AttributeService:
+        """Attribute definitions: the attribute service, on this client's session."""
         return self._attributes
 
     @property
     def localized_attributes(self) -> LocalizedAttributeService:
+        """Translated attribute values: the localized attribute service, on this client's session."""
         return self._localized_attributes
 
     @property
     def cubes(self) -> CubeService:
+        """Cubes: the cube service, on this client's session."""
         return self._cubes
 
     @property
     def views(self) -> ViewService:
+        """Views: the view service, on this client's session."""
         return self._views
 
     @property
     def cellsets(self) -> CellsetService:
+        """Cellsets: the cellset service, on this client's session."""
         return self._cellsets
 
     @property
     def cells(self) -> CellService:
+        """Cell writes: the cell service, on this client's session."""
         return self._cells
 
     @property
     def member_sets(self) -> MemberSetService:
+        """Member sets: the member set service, on this client's session."""
         return self._member_sets
 
     @property
     def sandboxes(self) -> SandboxService:
+        """Sandboxes: the sandbox service, on this client's session."""
         return self._sandboxes
 
     @property
     def change_sets(self) -> ChangeSetService:
+        """Change sets: the change set service, on this client's session."""
         return self._change_sets
 
     @property
     def drillthrough(self) -> DrillthroughService:
+        """Drillthrough: the drillthrough service, on this client's session."""
         return self._drillthrough
 
     @property
     def processes(self) -> ProcessService:
+        """Processes: the process service, on this client's session."""
         return self._processes
 
     @property
     def process_debugging(self) -> ProcessDebugService:
+        """Process debugging: the process debug service, on this client's session."""
         return self._process_debugging
 
     @property
     def chores(self) -> ChoreService:
+        """Chores: the chore service, on this client's session."""
         return self._chores
 
     @property
     def users(self) -> UserService:
+        """Users: the user service, on this client's session."""
         return self._users
 
     @property
     def groups(self) -> GroupService:
+        """Groups: the group service, on this client's session."""
         return self._groups
 
     @property
     def sessions(self) -> SessionService:
+        """Server sessions: the session service, on this client's session."""
         return self._sessions
 
     @property
     def threads(self) -> ThreadService:
+        """Server threads: the thread service, on this client's session."""
         return self._threads
 
     @property
     def server(self) -> ServerService:
+        """The server: the server service, on this client's session."""
         return self._server
 
     @property
     def logs(self) -> LogService:
+        """The server's logs: the log service, on this client's session."""
         return self._logs
 
     @property
     def contents(self) -> ContentService:
+        """The contents tree: the content service, on this client's session."""
         return self._contents
 
     @property
     def annotations(self) -> AnnotationService:
+        """Annotations on cube cells: the annotation service, on this client's session."""
         return self._annotations
 
     @property
     def git(self) -> GitService:
+        """TM1 Git: the Git service, on this client's session."""
         return self._git
 
     @property
     def encryption(self) -> EncryptionService:
+        """Encryption at rest: the encryption service, on this client's session."""
         return self._encryption
 
     @property
     def oidc_keys(self) -> OidcKeyService:
+        """The cached OpenID Connect keys: the OIDC key service, on this client's session."""
         return self._oidc_keys
 
     @property
     def sql_data_sources(self) -> SqlDataSourceService:
+        """The ODBC data sources on TM1's host: the SQL data source service, on this client's
+        session."""
         return self._sql_data_sources
 
     # Views of the client
@@ -267,6 +300,8 @@ class AsyncTm1Client:
         return AsyncTm1Client(self._session.with_async(every))
 
     def without_async(self) -> AsyncTm1Client:
+        """A client on a synchronous view of this client's session
+        (:meth:`AsyncTm1Session.without_async`)."""
         return AsyncTm1Client(self._session.without_async())
 
     def with_sandbox(self, name: str) -> AsyncTm1Client:
@@ -274,6 +309,8 @@ class AsyncTm1Client:
         return AsyncTm1Client(self._session.with_sandbox(name))
 
     def without_sandbox(self) -> AsyncTm1Client:
+        """A client on a view of this client's session whose requests run outside any sandbox, in
+        base data (:meth:`AsyncTm1Session.without_sandbox`)."""
         return AsyncTm1Client(self._session.without_sandbox())
 
     def with_change_set(self, change_set_id: str) -> AsyncTm1Client:
@@ -281,6 +318,8 @@ class AsyncTm1Client:
         return AsyncTm1Client(self._session.with_change_set(change_set_id))
 
     def without_change_set(self) -> AsyncTm1Client:
+        """A client on a view of this client's session whose writes go into no change set
+        (:meth:`AsyncTm1Session.without_change_set`)."""
         return AsyncTm1Client(self._session.without_change_set())
 
     # Lifecycle
@@ -326,6 +365,7 @@ class AsyncTm1Batch:
         return self._client
 
     def size(self) -> int:
+        """How many requests have joined."""
         return self._batch.size()
 
     def __len__(self) -> int:
@@ -348,7 +388,9 @@ class AsyncTm1ClientBuilder(AsyncTm1SessionBuilder):
     makes the client."""
 
     def build(self) -> AsyncTm1Client:  # type: ignore[override]
+        """The client. Nothing is sent to TM1 until the first request."""
         return AsyncTm1Client(AsyncTm1Session(**self._settings))
 
     def build_session(self) -> AsyncTm1Session:
+        """The session alone, with these settings. Nothing is sent to TM1 until the first request."""
         return AsyncTm1Session(**self._settings)

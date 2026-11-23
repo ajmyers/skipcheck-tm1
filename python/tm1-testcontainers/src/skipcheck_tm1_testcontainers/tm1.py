@@ -46,10 +46,12 @@ class Tm1Seed(enum.Enum):
 
     @property
     def username(self) -> str:
+        """The user the seed's database logs in as."""
         return _SEED_LOGINS[self.value][0]
 
     @property
     def password(self) -> str:
+        """That user's password, empty for none."""
         return _SEED_LOGINS[self.value][1]
 
 
@@ -139,6 +141,8 @@ class Tm1ServerContainer(GenericContainer):
 
     @staticmethod
     def default_image(source: Tm1Source) -> str:
+        """The image a server from this source runs in: a private image as it is, else
+        ``TM1_SERVER_IMAGE`` if set, else the published image at the tag for this library's version."""
         return default_image(source, Tm1ServerContainer.DEFAULT_IMAGE, Tm1ServerContainer.SERVER_IMAGE)
 
     @staticmethod
@@ -148,6 +152,7 @@ class Tm1ServerContainer(GenericContainer):
 
     @staticmethod
     def library_version() -> str:
+        """This library's version, which picks the image's tag."""
         return library_version()
 
     @classmethod
@@ -224,14 +229,20 @@ class Tm1ServerContainer(GenericContainer):
 
     @property
     def admin_server(self) -> Tm1AdminServerContainer | None:
+        """The Admin Server set with :meth:`with_admin_server`, or None if this container runs its
+        own."""
         return self._admin_server
 
     @property
     def cognos(self) -> CognosContainer | None:
+        """The Cognos set with :meth:`with_cam_security`, or None if TM1 uses its own (native)
+        security."""
         return self._cognos
 
     @property
     def cam_namespace(self) -> Namespace | None:
+        """The Cognos namespace TM1's users log on through, set with :meth:`with_cam_security`, or
+        None if TM1 uses its own (native) security."""
         return None if self._cognos is None else self._cam_namespace
 
     @property
@@ -246,6 +257,7 @@ class Tm1ServerContainer(GenericContainer):
 
     @property
     def source(self) -> Tm1Source:
+        """Where TM1 comes from."""
         return self._source
 
     @property
@@ -255,19 +267,25 @@ class Tm1ServerContainer(GenericContainer):
 
     @property
     def username(self) -> str:
+        """The TM1 user name tests should log in as; ``admin`` unless set."""
         return self._username
 
     @property
     def password(self) -> str:
+        """The password for :attr:`username`; empty unless set."""
         return self._password
 
     @property
     def tm1_version(self) -> Tm1Version:
+        """The version the running server reports. Only available once started: a RuntimeError
+        before."""
         if self._version is None:
             raise RuntimeError("The container isn't started yet")
         return self._version
 
     def configure(self) -> None:
+        """Called by testcontainers before the container is created: in CAM security, passes
+        Cognos's address, the namespace and the administrators to the image."""
         cognos = self._cognos
         if cognos is None or self._cam_namespace is None:
             return
@@ -288,6 +306,8 @@ class Tm1ServerContainer(GenericContainer):
             self.with_env("TM1_CAM_GROUPS", " ".join(cognos.groups))
 
     def container_is_started(self) -> None:
+        """Called once the container is up: reads the server's version, and fails the start if it
+        isn't the expected one."""
         self._version = self._read_version()
         if self._expected_version is not None and self._expected_version != self._version:
             raise RuntimeError(f"Expected TM1 {self._expected_version} but the server from {self._source.describe()} reports {self._version}")
@@ -344,11 +364,16 @@ class Tm1AdminServerContainer(GenericContainer):
 
     @property
     def source(self) -> Tm1Source:
+        """Where TM1 comes from."""
         return self._source
 
     @property
     def rest_url(self) -> str:
+        """The Admin Server's REST API as seen from the host, such as
+        ``http://localhost:54321/api/v1/``, ending in ``/``. ``Servers`` lists the registered TM1
+        servers."""
         return f"http://{self.host}:{self.get_mapped_port(self.REST_PORT)}/api/v1/"
 
     def container_is_started(self) -> None:
+        """Called once the container is up: logs where it is and what it came from."""
         self.logger.info("TM1 Admin Server is up at %s (%s)", self.rest_url, self._source.describe())

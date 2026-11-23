@@ -9,13 +9,23 @@ import base64
 import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
-# CognosPassports is the sync flavor's, generated at build time: __getattr__ below imports it
-__all__ = ["Authenticator", "CognosPassports", "basic", "cam_namespace", "cam_passport", "cognos_id_token", "cognos_logon"]  # noqa: F822
+if TYPE_CHECKING:
+    # The sync flavor's, generated at build time: __getattr__ below imports it when it's asked for
+    from ._sync.cognos import CognosPassports
+
+__all__ = ["Authenticator", "CognosPassports", "basic", "cam_namespace", "cam_passport", "cognos_id_token", "cognos_logon"]
 
 
 class Authenticator(Protocol):
+    """Supplies the credentials for logging in to TM1: the value of the ``Authorization`` header of
+    a login request. It's asked once per login, not once per session: a session logs in again when
+    TM1 reports it expired, and credentials that expire themselves (a CAM passport) can be fresh
+    each time. Only the login carries credentials; every other request carries the session cookie.
+    Implementations must not log or otherwise reveal the credentials; :meth:`describe` is what logs
+    show."""
+
     def authorization(self) -> str:
         """The ``Authorization`` header to log in with; called at each login."""
         ...

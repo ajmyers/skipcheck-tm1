@@ -200,15 +200,17 @@ class _AsyncConnection:
             authorization = await authorization
         if not authorization:
             raise RuntimeError(f"The authenticator {self.authenticator.describe()} supplied no credentials")
-        extra: dict[str, str | bytes] = {"Authorization": authorization}
+        extra = {"Authorization": authorization}
         if self.impersonate is not None:
             # At login only: TM1 decides the identity then and ignores the header afterwards
-            extra[p.IMPERSONATE] = p.header_text(self.impersonate)
+            extra[p.IMPERSONATE] = self.impersonate
         if seed is not None:
             # Log in the session TM1 opened for a 401, rather than opening another
             extra["Cookie"] = f"{p.COOKIE}={seed}"
         try:
-            response = await self.http.get(url, headers=p.headers(self.session_context, p.JSON, extra), timeout=self._timeout(self.timeouts.login))
+            # As UTF-8, which is how TM1 reads the user to impersonate and the session's label
+            headers = httpx.Headers(p.headers(self.session_context, p.JSON, extra), encoding=p.HEADER_ENCODING)
+            response = await self.http.get(url, headers=headers, timeout=self._timeout(self.timeouts.login))
         except httpx.HTTPError as e:
             raise _transport(e, "GET", url) from e
         self.http.cookies.clear()
@@ -425,25 +427,48 @@ class AsyncTm1Session:
         return view
 
     def with_sandbox(self, name: str) -> AsyncTm1Session:
+        """A view of this session whose requests run in sandbox ``name``: each gets TM1's
+        ``!sandbox`` query option, unless the request sets its own. The view shares this session's
+        login, cookie and connections, so it costs nothing; closing either closes both. Derived
+        rather than set on the session, so one caller's sandbox can't leak into another caller's
+        requests. TM1 evaluates ``NON EMPTY`` and filters in the request's sandbox, so every request
+        of an operation needs it, cellset reads and deletes included; a service given this view gets
+        that for free. A ValueError if ``name`` is blank."""
         if not name or not name.strip():
             raise ValueError("sandbox name is blank")
         return self._view(p.Context(name, self._context.change_set), self._async_every, self._queue)
 
     def without_sandbox(self) -> AsyncTm1Session:
+        """A view of this session whose requests run outside any sandbox, in base data."""
         return self._view(p.Context(None, self._context.change_set), self._async_every, self._queue)
 
     def with_change_set(self, change_set: str) -> AsyncTm1Session:
+        """A view of this session whose writes are recorded in change set ``change_set`` (its ID,
+        from ``BeginChangeSet``): each request gets TM1's ``!ChangeSet`` query option, unless it
+        sets its own, so ``UndoChangeSet`` can revert them together. Like :meth:`with_sandbox`, the
+        view shares this session's login and connections; it keeps the sandbox, if any. A ValueError
+        if the ID is blank."""
         if not change_set or not change_set.strip():
             raise ValueError("change set ID is blank")
         return self._view(p.Context(self._context.sandbox, change_set), self._async_every, self._queue)
 
     def without_change_set(self) -> AsyncTm1Session:
+        """A view of this session whose writes go into no change set."""
         return self._view(p.Context(self._context.sandbox, None), self._async_every, self._queue)
 
     def with_async(self, every: float | timedelta = 1.0) -> AsyncTm1Session:
+        """A view of this session whose requests TM1 runs asynchronously (OData's ``Prefer:
+        respond-async``): each returns at once with a monitor, which the client polls every
+        ``every`` seconds until the result is there, so a long process or chore never holds a
+        request open for its whole run. Methods return what they always do. Cancelling the call
+        before the result deletes the monitor, which stops the work on TM1: a process run ends as
+        ``TM1UserException: Cancel``. Raw byte requests (document content) aren't sent async. TM1
+        (11.8) sends no ``Retry-After``, so ``every`` is the only pace. A ValueError if ``every``
+        isn't positive."""
         return self._view(self._context, poll_interval(every), self._queue)
 
     def without_async(self) -> AsyncTm1Session:
+        """A view of this session whose requests run synchronously, as usual."""
         return self._view(self._context, None, self._queue)
 
     def batch(self) -> AsyncTm1SessionBatch:
@@ -465,14 +490,17 @@ class AsyncTm1Session:
 
     @property
     def sandbox(self) -> str | None:
+        """The sandbox this view's requests run in, or None for base data."""
         return self._context.sandbox
 
     @property
     def change_set(self) -> str | None:
+        """The ID of the change set this view's writes are recorded in, or None."""
         return self._context.change_set
 
     @property
     def base_url(self) -> str:
+        """The service root, such as ``http://localhost:8010/api/v1/``, always ending in ``/``."""
         return self._connection.base_url
 
     @property
@@ -492,10 +520,12 @@ class AsyncTm1Session:
 
     @property
     def timeouts(self) -> Tm1Timeouts:
+        """The session's timeouts, by kind of work."""
         return self._connection.timeouts
 
     @property
     def error_classifier(self) -> Tm1ErrorClassifier:
+        """How the session classifies error responses."""
         return self._connection.classifier
 
     async def __aenter__(self) -> AsyncTm1Session:
@@ -540,6 +570,8 @@ class AsyncTm1Session:
 
     @property
     def service_root(self) -> str:
+        """The service root, such as ``http://localhost:8010/api/v1/``, always ending in ``/``:
+        Java's name for :attr:`base_url`."""
         return self._connection.base_url
 
     async def _check(self, call: p.Call) -> None:
@@ -580,6 +612,8 @@ class AsyncTm1Session:
         return [item async for item in self.iterate(call)]
 
     async def iterate(self, call: p.Call) -> AsyncIterator[Any]:
+        """The items of a collection, page by page, following TM1's next links: what :meth:`stream`
+        iterates, for a call rather than a request. Can't join a batch."""
         if self._queue is not None:
             raise RuntimeError("A collection can't be iterated in a batch: use collect(), which returns its first page")
         page = await self.execute(call)
@@ -627,9 +661,13 @@ class AsyncTm1Session:
         headers: dict[str, str] | None = None,
         accept: str = p.JSON,
     ) -> p.Reply:
+        """Sends one request the services have no method for, and returns the raw reply: its status,
+        headers and content. ``path`` is relative to the service root; ``json_body`` is written as
+        JSON, ``content`` sent as it is."""
         return await self.execute(p.Call(method, str(path), query, json_body, content, headers or {}, accept, read=lambda r: r))
 
     async def get_json(self, path: ODataPath | str, query: ODataQuery | None = None) -> Any:
+        """``GET`` of ``path``, with its answer as parsed JSON."""
         return (await self.request("GET", path, query=query)).json()
 
 
@@ -706,9 +744,11 @@ class AsyncTm1SessionBuilder:
         self._settings: dict[str, Any] = dict(settings or {})
 
     def copy(self) -> AsyncTm1SessionBuilder:
+        """A copy of these settings, for the pool to build one session per identity."""
         return type(self)(self._settings)
 
     def settings(self) -> dict[str, Any]:
+        """The settings so far, by name, as a new dict."""
         return dict(self._settings)
 
     def _set(self, **values: Any) -> AsyncTm1SessionBuilder:
@@ -726,12 +766,17 @@ class AsyncTm1SessionBuilder:
         return self._set(address=address)
 
     def dialect(self, dialect: Tm1Dialect) -> AsyncTm1SessionBuilder:
+        """The kind of deployment, for :meth:`address`. :attr:`Tm1Dialect.V11` unless set."""
         return self._set(dialect=dialect)
 
     def basic_auth(self, user: str, password: str | None) -> AsyncTm1SessionBuilder:
+        """Basic authentication, for TM1 security modes 1 and 2: shorthand for
+        ``authenticator(auth.basic(user, password))``. A password of None counts as empty."""
         return self._set(authenticator=basic(user, password))
 
     def authenticator(self, authenticator: Authenticator) -> AsyncTm1SessionBuilder:
+        """How to log in: TM1's own security, CAM, or credentials of your own. Asked for credentials
+        on every login."""
         return self._set(authenticator=authenticator)
 
     def impersonate(self, user: str) -> AsyncTm1SessionBuilder:
@@ -742,6 +787,7 @@ class AsyncTm1SessionBuilder:
         return self._set(impersonate=check_impersonated(user))
 
     def without_impersonation(self) -> AsyncTm1SessionBuilder:
+        """Logs in as the credentials' own user: no impersonation."""
         self._settings.pop("impersonate", None)
         return self
 
@@ -753,9 +799,11 @@ class AsyncTm1SessionBuilder:
         return self._set(session_context=_check_session_context(session_context))
 
     def timeouts(self, timeouts: Tm1Timeouts) -> AsyncTm1SessionBuilder:
+        """Timeouts by kind of work; :attr:`Tm1Timeouts.DEFAULTS` unless set."""
         return self._set(timeouts=timeouts)
 
     def error_classifier(self, classifier: Tm1ErrorClassifier) -> AsyncTm1SessionBuilder:
+        """How error responses are classified; :meth:`Tm1ErrorClassifier.defaults` unless set."""
         return self._set(error_classifier=classifier)
 
     def http_client(self, client: httpx.AsyncClient) -> AsyncTm1SessionBuilder:
@@ -767,6 +815,9 @@ class AsyncTm1SessionBuilder:
         return self._set(verify=verify)
 
     def check_capabilities(self, check: bool) -> AsyncTm1SessionBuilder:
+        """Whether a request is checked against the server's ``$metadata`` before it's sent, and
+        refused with a :class:`~skipcheck_tm1.errors.Tm1UnsupportedOperationError` if the server
+        doesn't define what it needs. On unless set."""
         return self._set(check_capabilities=check)
 
     def clock(self, clock: Callable[[], float]) -> AsyncTm1SessionBuilder:
@@ -779,4 +830,5 @@ class AsyncTm1SessionBuilder:
         return str(self._settings.get("base_url") or self._settings.get("address") or "(no server set)")
 
     def build(self) -> AsyncTm1Session:
+        """The session. Nothing is sent to TM1 until the first request."""
         return AsyncTm1Session(**self._settings)
