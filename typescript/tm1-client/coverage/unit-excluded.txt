@@ -1,0 +1,34 @@
+# Java unit tests this client doesn't port, and why. test/java-unit-parity.test.ts fails on a test
+# method of a Java unit test class (java/tm1-client/src/test/java, leaving out the live *Tm1Test and
+# *BehaviorTest classes and the service tests that record conformance calls) that has neither a test
+# of the same name somewhere under test/ outside test/live nor a line in this file, and on a line that
+# names a class or method Java doesn't have, a test this client has after all, or a method of a class
+# excluded whole.
+#
+#   ClassName#methodName: reason
+#   ClassName: reason            (the whole class)
+#
+# Only for what has no meaning in this client, with a specific reason: a behaviour this client has is
+# ported, under Java's name.
+
+# Java's own machinery
+
+ArchitectureTest: ArchUnit rules on the Java classes (no blocking on a Reactor chain, no unsubscribed Mono, no UriTemplate, SLF4J only, final service classes with @Tm1Endpoint); test/architecture.test.ts holds this client's sources to its own counterparts of each
+ConformanceFixturesTest: checks that each fixture in spec/conformance/calls names a Java test class that records it with a Conformance extension; recording is Java's, and this client only replays the fixtures (test/conformance/calls.test.ts)
+ApiSpecInventoryTest: checks spec/tm1-api.json against the endpoints Java's CSDL reader finds in its snapshot, the reader that writes the spec; this client reads the spec as given, and its coverage gate counts the same 242 endpoints
+MetadataSnapshotTest: checks Java's CSDL model of the snapshot (CsdlDocument's schemas, CsdlRevision, Core.Description annotations, Signatures); this client doesn't model CSDL: Tm1Capabilities keeps only endpoints and revisions, and is tested against the same snapshot in test/runtime/version.test.ts
+MetadataDriftTest: a test against a running TM1 (@RequiresTm1) that compares its $metadata with Java's committed snapshot; the snapshot is Java's, and there is one to keep current
+MetadataSnapshotUpdateTest: a tool, run by hand against a running TM1, that writes Java's metadata snapshot
+PayloadCaptureTest: a tool, run by hand against a running TM1, that captures the payloads under java/tm1-client/src/test/resources/payloads, which this client reads in "decodes and encodes back to the same JSON"
+GeneratedModelTest#sendsASubtypeWithItsOdataTypeAndWithoutNulls: writes a model read from TM1 (an MDXView record) back as JSON; here a model read is TM1's JSON as is and is never sent back, writes go through patches ("sends a subtype's patch with its @odata.type, and keeps its builder when chaining")
+
+# Reactor and the streaming decoder
+
+ODataCollectionDecoderTest#decodesItemsAndControlInformation: tests the decoder's event stream (Item and Control events, such as @odata.count); this client reads a page whole and keeps only its items and next link, with no events to test
+ODataCollectionDecoderTest#streamsALargeCollectionWithoutReadingAheadOfDemand: bounds how far Java's decoder reads ahead within a page, buffer by buffer; here a page is read whole, and that pages are fetched only as items are taken is "asks for buffers only as items are taken"
+
+# Micrometer observations: this client has no observation registry (Tm1Session.Builder.observationRegistry is Java-only, see test/runtime/java-parity-runtime.test.ts)
+
+Tm1SessionTest#observesLoginAndClose: checks the tm1.session.login and tm1.session.close Micrometer observations
+Tm1SessionReloginTest#observesTheReloginWithItsReason: checks the tm1.session.login Micrometer observation's tm1.reason on a re-login
+Tm1SessionPoolTest#observesEvictionsWithTheirReason: checks the tm1.session.pool.evict Micrometer observation's tm1.reason

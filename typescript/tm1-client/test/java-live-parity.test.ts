@@ -41,12 +41,17 @@ export function portFile(javaClass: string): string {
 
 /** A live test file's top-level describes and its tests' titles, read from the source: the calls of
  * `it`, `test` and the files' own `…Test` (`tm1Test`, `cognosTest`). A title's
- * placeholders for a parameter (`%s`, `$name`) don't count: Java's parameterized test is one method. */
+ * placeholders for a parameter (`%s` and `$name` in an `.each` title, `${name}` in a template)
+ * don't count: Java's parameterized test is one method. A `$` in any other title is the title's
+ * own (`$metadata`). */
 export function portTests(source: string): { describes: number; titles: string[] } {
-  const title = /\b(?:it|test|[a-z]\w*Test)(?:\.(?!each\b)\w+)*(?:\.each\([\s\S]*?\))?\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+  const title = /\b(?:it|test|[a-z]\w*Test)(?:\.(?!each\b)\w+)*(\.each\([\s\S]*?\))?\(\s*(["'`])((?:\\.|(?!\2)[^\\])*)\2/g;
   return {
     describes: [...source.matchAll(/^describe(?:\.\w+)*\(/gm)].length,
-    titles: [...source.matchAll(title)].map((m) => m[2]!.replace(/%[a-zA-Z%]|\$\w+/g, "")),
+    titles: [...source.matchAll(title)].map((m) => {
+      const text = m[3]!.replace(/\$\{[^}]*\}/g, "");
+      return m[1] ? text.replace(/%[a-zA-Z%]|\$\w+/g, "") : text;
+    }),
   };
 }
 
