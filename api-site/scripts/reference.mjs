@@ -14,14 +14,14 @@
 //                                                    replaced by that region in the page's language
 //                                                    (or by the file of the Java examples it names),
 //                                                    and the Java names in it named the page's way
-//   which member is which across languages           the parity rule each language's tests enforce:
+//   which type and member is which across languages  the parity rule each language's tests enforce:
 //                                                    modelCubes is model_cubes in Python, and each
 //                                                    language's members-excluded.txt (members.mjs)
 //   the areas types are grouped in                   the Java packages (AREAS below)
 //   TM1's own types (Cube, Dimension...)             spec/tm1-api.json
 //
-// It fails when a language lacks an example the Java documentation quotes, or a Java member its
-// members-excluded.txt doesn't list, or when an overview in another language names what only Java
+// It fails when a language lacks an example the Java documentation quotes, or a Java type or member
+// its members-excluded.txt doesn't list, or when an overview in another language names what only Java
 // has (--allow-missing lists them instead), and writes .generated/site.json for the Worker and
 // .generated/reference.json, each type's overview in each language, for llms-full.txt (llms.mjs).
 // It also fails, always, when a doc comment it reads has code typed into it (doc-code.mjs): code
@@ -33,7 +33,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { typedCode } from './doc-code.mjs';
-import { checkMembers, findMember, guessMember, javaIsms, javaOnlyNames, languageNames, listFile, readList, stale, typeCandidates, withoutComments } from './members.mjs';
+import { checkMembers, checkTypes, findMember, guessMember, javaIsms, javaOnlyNames, languageNames, listFile, readList, stale, typeCandidates, withoutComments } from './members.mjs';
 import { searchIndex } from './search.mjs';
 import { CANONICAL_ORIGIN, copyAssets, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, searchBox, SECTIONS } from './site.mjs';
 import { typeHeader } from './type-page.mjs';
@@ -378,9 +378,12 @@ for (const project of PROJECTS) {
 		}
 		counterparts.set(type.name, each);
 	}
-	// Every Java member has its counterpart, or a line in the list
+	// Every Java type and member has its counterpart, or a line in the list
 	for (const language of languages.filter((l) => l !== 'java')) {
 		const inLanguage = new Map(types.map((t) => [t.name, counterparts.get(t.name)[language]]));
+		const lacking = checkTypes({ javaTypes: types, counterparts: inLanguage, list: listOf[language].entries, used: listOf[language].used });
+		for (const name of lacking.missing) memberFaults.push(project.id + ' ' + language + ': type ' + name);
+		for (const fault of lacking.wrong) memberFaults.push(listFile(project, language) + ': ' + fault);
 		const { missing, wrong } = checkMembers({ language, javaTypes: types, counterparts: inLanguage, list: listOf[language].entries, used: listOf[language].used });
 		for (const key of missing) memberFaults.push(project.id + ' ' + language + ': ' + key);
 		for (const fault of wrong) memberFaults.push(listFile(project, language) + ': ' + fault);
@@ -812,7 +815,7 @@ if (javaWords.length > 0) {
 }
 for (const [file, { entries, used }] of lists) for (const fault of stale(entries, used)) memberFaults.push(file + ': ' + fault);
 if (memberFaults.length > 0) {
-	const line = memberFaults.length + ' Java member(s) without a counterpart, or list line(s) that are wrong: give the language the member, or list it with the reason in its members-excluded.txt (scripts/members.mjs)';
+	const line = memberFaults.length + ' Java type(s) or member(s) without a counterpart, or list line(s) that are wrong: give the language the type or member, or list it with the reason in its members-excluded.txt (scripts/members.mjs)';
 	if (!allowMissing) throw new Error(line + ':\n  ' + memberFaults.join('\n  '));
 	console.warn(line + ':\n  ' + memberFaults.join('\n  '));
 }

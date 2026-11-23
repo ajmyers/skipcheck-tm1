@@ -1,7 +1,8 @@
-# Java members the Python client doesn't have, or names another way, as:
+# Java types and members the Python client doesn't have, or names another way, as:
+#   <Java type> | <reason>
 #   <Java type>.<member> | <reason>
 #   <Java type>.<member or type> -> <Python name> | <reason>
-# Read by api-site/scripts/members.mjs, which fails the docs build on a Java member that is neither
+# Read by api-site/scripts/members.mjs, which fails the docs build on a Java type or member that is neither
 # found by the parity tests' naming rule nor listed here, and on a line here that is wrong or stale.
 Tm1Session.Builder.jsonMapper | Jackson's ObjectMapper is Java's: Python reads JSON with the standard library
 Tm1Session.Builder.observationRegistry | Micrometer's ObservationRegistry is Java's: there is no Micrometer here
@@ -25,3 +26,13 @@ Tm1Authenticator.camPassport | a function of skipcheck_tm1.auth: auth.cam_passpo
 Tm1Authenticator.cognosLogon | a function of skipcheck_tm1.auth: auth.cognos_logon(dispatcher, namespace, user, password)
 Tm1Authenticator.cognosIdToken | a function of skipcheck_tm1.auth: auth.cognos_id_token(dispatcher, namespace, id_token)
 Filter.Variable.self -> self_ | self names the instance in a Python method
+
+# Types. A line for a type covers the types nested in it.
+Tm1SessionPool.Stats -> Tm1PoolStats | a class of its own, which the sync and the asyncio pools both return
+Tm1Request.Bytes | a body of Reactor's DataBuffers: Python's Tm1Request.put takes bytes
+ODataLiteral | Python's literals are duck-typed: a value with an odata_literal() method writes itself
+LenientOffsetDateTimeDeserializer | a Jackson deserializer the generated models use: Python's models take LenientDateTime, an Annotated datetime pydantic validates
+Since | the annotation Java's generated models carry the schema version in: Python's models don't record it, and a request checks what it needs with Tm1Capability
+Tm1Endpoint | Java's annotation of the endpoints a service method calls: Python's services use the endpoint decorator
+ODataCollectionDecoder | a Java internal, public only because its session package uses it: it decodes Reactor's byte buffers as they arrive
+Utf8Repair | a Java internal, public only because its session package uses it: Python's session repairs a body's bytes privately

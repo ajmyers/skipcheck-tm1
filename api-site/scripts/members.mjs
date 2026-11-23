@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Which member is which across languages, and the gate that every Java member has its
-// counterpart in each language, as the clients' parity tests hold every Java method to one.
+// Which type and member is which across languages, and the gate that every Java type and member
+// has its counterpart in each language, as the clients' parity tests hold every Java method to one.
 //
 // A Java member is found in another language by the rule the parity tests enforce (modelCubes is
 // model_cubes in Python, ModelCubesAsync in .NET; a getter is a property; NOT_FOUND is NotFound
@@ -10,10 +10,13 @@
 //
 //   Tm1Session.Builder.jsonMapper | Jackson is Java's: Python reads JSON with the standard library
 //   Tm1Source.PRIVATE_IMAGE -> PrivateImageSetting | the PrivateImage record has the name
+//   Utf8Repair | a part of Java's response decoding: the other clients read text whole
+//   Tm1Timeouts.Builder -> TimeoutsBuilder | a nested type can't share its outer type's member's name
 //
-// The build fails on a Java member that is neither found nor listed, on a listed member the
-// language has after all, on a renamed member that isn't there under its new name, and on a line Java no longer
-// has a member for. A renamed member is looked for by its new name only.
+// A line for a type covers the types nested in it. The build fails on a Java type or member that
+// is neither found nor listed, on a listed one the language has after all, on a renamed one that
+// isn't there under its new name, and on a line Java no longer has a type or member for. A renamed
+// one is looked for by its new name only.
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -103,15 +106,48 @@ export async function readList(repoDir, file) {
 	return parseList(text, file);
 }
 
+/** The line of a list that excuses a Java type a language lacks: its own, or its outer type's (a
+ * line for ODataCollectionDecoder covers ODataCollectionDecoder.Event). Null if there's none. */
+function typeLine(list, name) {
+	const parts = name.split('.');
+	for (let n = parts.length; n > 0; n--) {
+		const entry = list.get(parts.slice(0, n).join('.'));
+		if (entry && !entry.renamed) return entry;
+	}
+	return null;
+}
+
+/** Checks one project's Java types against one language's: counterparts maps each Java type's name
+ * to its type in the language (null where there's none), list is the language's list, and used
+ * collects the list's lines that name something in Java. A type the language lacks needs a line, or
+ * its outer type's. Returns the faults, as text. */
+export function checkTypes({ javaTypes, counterparts, list, used }) {
+	const missing = [];
+	const wrong = [];
+	for (const type of javaTypes) {
+		const counterpart = counterparts.get(type.name);
+		const entry = list.get(type.name);
+		if (entry) used.add(type.name);
+		if (entry?.renamed) {
+			if (!counterpart) wrong.push(type.name + ' is listed as ' + entry.renamed + ', which the language lacks (line ' + entry.line + ')');
+		} else if (entry && counterpart) {
+			wrong.push(type.name + ' is listed as missing, but the language has ' + counterpart.name + ': take its line out (line ' + entry.line + ')');
+		} else if (!counterpart && !typeLine(list, type.name)) {
+			missing.push(type.name);
+		}
+	}
+	return { missing, wrong };
+}
+
 /** Checks one project's Java members against one language's: counterparts maps each Java type's
  * name to its type in the language (null where there's none), list is the language's list, and
- * used collects the list's lines that name something in Java. Returns the faults, as text. */
+ * used collects the list's lines that name something in Java. A type the language lacks is
+ * checkTypes's. Returns the faults, as text. */
 export function checkMembers({ language, javaTypes, counterparts, list, used }) {
 	const missing = [];
 	const wrong = [];
 	for (const type of javaTypes) {
 		const counterpart = counterparts.get(type.name);
-		if (list.has(type.name) && counterpart) used.add(type.name);
 		if (!counterpart) continue;
 		for (const member of type.members.filter(checked)) {
 			const key = type.name + '.' + member.name;
@@ -134,9 +170,9 @@ export function checkMembers({ language, javaTypes, counterparts, list, used }) 
 	return { missing, wrong };
 }
 
-/** The lines of a list that name nothing Java has (for a type the language has). */
+/** The lines of a list that name nothing Java has (a member of a type the language has, or a type). */
 export function stale(list, used) {
-	return [...list].filter(([key]) => !used.has(key)).map(([key, entry]) => key + ' (line ' + entry.line + '): Java has no such member, or the language no such type: take its line out');
+	return [...list].filter(([key]) => !used.has(key)).map(([key, entry]) => key + ' (line ' + entry.line + '): Java has no such type or member, or the language no such type: take its line out');
 }
 
 // ---- a language's names, and the Java names it lacks ---------------------------------

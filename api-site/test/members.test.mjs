@@ -4,7 +4,7 @@
 // (scripts/members.mjs).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkMembers, findMember, guessMember, javaIsms, javaOnlyNames, languageNames, listFile, parseList, readList, stale, withoutComments } from '../scripts/members.mjs';
+import { checkMembers, checkTypes, findMember, guessMember, javaIsms, javaOnlyNames, languageNames, listFile, parseList, readList, stale, typeCandidates, withoutComments } from '../scripts/members.mjs';
 import { PROJECTS, repoDir } from '../scripts/site.mjs';
 
 const member = (name, kind = 'method', extra = {}) => ({ name, kind, static: false, signature: name, returns: '', params: [], endpoints: [], doc: '', deprecated: false, ...extra });
@@ -26,6 +26,40 @@ test('a Java member is found by the parity rule in each language', () => {
 	assert.deepEqual(gate('typescript', java, [member('modelCubes'), member('url', 'property'), member('NOT_FOUND', 'constant'), member('DEFAULT_IMAGE', 'property'), member('and')]).missing, []);
 	// An enum is a string union in TypeScript, whose values are PascalCase
 	assert.deepEqual(gate('typescript', [member('NOT_FOUND', 'constant')], [member('NotFound', 'constant')]).missing, []);
+});
+
+/** The type gate on Java types (by name) and a language's (by name), with a list, and the list's
+ * stale lines. */
+function typeGate(language, javaNames, names, listText = '') {
+	const list = parseList(listText, 'list.txt');
+	const used = new Set();
+	const api = names.map((n) => type(n, []));
+	const counterparts = new Map(javaNames.map((n) => [n, typeCandidates(language, n, list.get(n)?.renamed).map((c) => api.find((t) => t.name === c)).find(Boolean) ?? null]));
+	const result = checkTypes({ javaTypes: javaNames.map((n) => type(n, [])), counterparts, list, used });
+	return { ...result, stale: stale(list, used) };
+}
+
+test("a Java type a language lacks fails, unless it's listed with a reason", () => {
+	assert.deepEqual(typeGate('python', ['Tm1Client', 'Utf8Repair'], ['Tm1Client']).missing, ['Utf8Repair']);
+	assert.deepEqual(typeGate('python', ['Tm1Client', 'Utf8Repair'], ['Tm1Client'], "Utf8Repair | a Java internal"), { missing: [], wrong: [], stale: [] });
+});
+
+test('a nested Java type is found nested, joined or alone, and as an Error in Python', () => {
+	assert.deepEqual(typeGate('typescript', ['Tm1Timeouts.Builder', 'Tm1Client.Builder', 'CognosContainer.User'], ['Tm1Timeouts.Builder', 'Tm1ClientBuilder', 'User']).missing, []);
+	assert.deepEqual(typeGate('python', ['Tm1TransportException.Phase', 'Tm1NotFoundException'], ['Tm1TransportError.Phase', 'Tm1NotFoundError']).missing, []);
+});
+
+test("a line for a type covers the types nested in it, but a renamed one doesn't", () => {
+	const java = ['ODataCollectionDecoder', 'ODataCollectionDecoder.Event', 'ODataCollectionDecoder.Event.Item'];
+	assert.deepEqual(typeGate('dotnet', java, [], 'ODataCollectionDecoder | a Java internal'), { missing: [], wrong: [], stale: [] });
+	assert.deepEqual(typeGate('dotnet', ['Tm1Endpoint', 'Tm1Endpoint.List'], ['Tm1EndpointAttribute'], 'Tm1Endpoint -> Tm1EndpointAttribute | an attribute').missing, ['Tm1Endpoint.List']);
+});
+
+test('a listed type the language has after all fails, as does a renamed one it lacks, and a line for a type Java lacks', () => {
+	assert.match(typeGate('typescript', ['Tuples'], ['Tuples'], 'Tuples | an object').wrong[0], /Tuples is listed as missing, but the language has Tuples: take its line out \(line 1\)/);
+	assert.match(typeGate('dotnet', ['Tm1Timeouts.Builder'], ['Tm1Timeouts.Builder'], 'Tm1Timeouts.Builder -> TimeoutsBuilder | the method has the name').wrong[0], /Tm1Timeouts\.Builder is listed as TimeoutsBuilder, which the language lacks \(line 1\)/);
+	assert.deepEqual(typeGate('dotnet', ['Tm1Timeouts.Builder'], ['Tm1Timeouts.TimeoutsBuilder'], 'Tm1Timeouts.Builder -> TimeoutsBuilder | the method has the name'), { missing: [], wrong: [], stale: [] });
+	assert.match(typeGate('python', [], [], 'Gone | was Java only').stale[0], /^Gone \(line 1\): Java has no such type or member/);
 });
 
 test('.NET names are compared without case: odataLiteral is ODataLiteral, ETAG is ETag', () => {
@@ -60,7 +94,7 @@ test('a renamed member is found by its new name, and fails when that is missing'
 });
 
 test('a line for a member Java no longer has fails', () => {
-	assert.deepEqual(gate('python', [member('build')], [member('build')], 'Thing.gone | was Java only').stale, ["Thing.gone (line 1): Java has no such member, or the language no such type: take its line out"]);
+	assert.deepEqual(gate('python', [member('build')], [member('build')], 'Thing.gone | was Java only').stale, ["Thing.gone (line 1): Java has no such type or member, or the language no such type: take its line out"]);
 });
 
 test("a list's lines need a reason, and say each member once", () => {
