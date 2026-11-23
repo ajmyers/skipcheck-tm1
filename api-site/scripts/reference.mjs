@@ -409,7 +409,9 @@ for (const project of PROJECTS) {
 			const memberName = (owner, javaName) => {
 				const javaMember = owner?.members.find((m) => m.name === javaName) ?? { name: javaName, kind: 'method' };
 				const found = owner ? findMember(language, javaMember, counterpartOf(owner), renamedIn(language, owner.name + '.' + javaName)) : null;
-				return found ? { name: found.name, kind: found.kind, has: true } : { name: guessMember(language, javaMember, names[language]), kind: javaMember.kind, has: false };
+				// has: the page has an anchor for it. Java's findMember answers even for a member Java's model
+				// lacks (Testcontainers' withReuse, AutoCloseable's close), which has none
+				return found ? { name: found.name, kind: found.kind, has: counterpartOf(owner).members.some((m) => m.name === found.name) } : { name: guessMember(language, javaMember, names[language]), kind: javaMember.kind, has: false };
 			};
 			// Examples are read up front, so rendering stays synchronous
 			const exampleBlocks = new Map();
@@ -481,7 +483,9 @@ for (const project of PROJECTS) {
 					// A Java method that's a property in this language loses its parentheses
 					const shownArgs = member && member.kind !== 'method' && member.kind !== 'constructor' ? '' : args;
 					const shown = [path || !javaName ? nameOf(owner) : '', member?.name].filter(Boolean).join('.') + shownArgs;
-					return '<a href="' + pageOf(owner) + (member?.has ? '#' + member.name : '') + '"><code>' + escape(shown) + '</code></a>';
+					// A member with no anchor on the page (one inherited from outside the library) stays plain code
+					if (member && !member.has) return '<code>' + escape(shown) + '</code>';
+					return '<a href="' + pageOf(owner) + (member ? '#' + member.name : '') + '"><code>' + escape(shown) + '</code></a>';
 				},
 				// {@value Type#CONSTANT}: the constant's value, as Javadoc shows it, or its name if the model has no value
 				value(target) {
