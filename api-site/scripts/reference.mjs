@@ -13,17 +13,20 @@
 //   a type's overview                                the Java type's Javadoc, with its {@snippet}s
 //                                                    replaced by that region in the page's language
 //   which member is which across languages           the parity rule each language's tests enforce:
-//                                                    modelCubes is model_cubes in Python
+//                                                    modelCubes is model_cubes in Python, and each
+//                                                    language's members-excluded.txt (members.mjs)
 //   the areas types are grouped in                   the Java packages (AREAS below)
 //   TM1's own types (Cube, Dimension...)             spec/tm1-api.json
 //
-// It fails when a language lacks an example the Java documentation quotes (--allow-missing lists
-// them instead), and writes .generated/site.json for the Worker.
+// It fails when a language lacks an example the Java documentation quotes, or a Java member its
+// members-excluded.txt doesn't list (--allow-missing lists them instead), and writes
+// .generated/site.json for the Worker.
 //
 //   node scripts/reference.mjs [--allow-missing]
 
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { checkMembers, findMember, listFile, memberCandidates, readList, stale, typeCandidates } from './members.mjs';
 import { CANONICAL_ORIGIN, copyAssets, dedent, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, SECTIONS } from './site.mjs';
 
 const allowMissing = process.argv.includes('--allow-missing');
@@ -63,45 +66,6 @@ function areaOf(type) {
 		}
 	}
 	return best?.area ?? OTHER;
-}
-
-// ---- names across languages -------------------------------------------------
-
-const snake = (name) =>
-	name
-		.replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-		.replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
-		.toLowerCase();
-const capital = (name) => name.charAt(0).toUpperCase() + name.slice(1);
-
-/** The names a Java type may have in another language, most likely first: a nested Builder is
- * Tm1Client.Builder in Java and Tm1ClientBuilder elsewhere, an exception is an Error in Python. */
-function typeCandidates(language, javaName) {
-	const last = javaName.split('.').at(-1);
-	if (language === 'python') return [last.replace(/Exception$/, 'Error'), javaName.replace('.', '').replace(/Exception$/, 'Error')];
-	return [javaName, javaName.replace('.', ''), last];
-}
-
-/** The names a Java member may have in another language, as each language's parity tests require:
- * modelCubes is model_cubes in Python, ModelCubesAsync (or ModelCubes) in .NET. */
-function memberCandidates(language, javaMember, typeName) {
-	const name = javaMember.name;
-	if (javaMember.kind === 'constructor') return language === 'python' ? ['__init__'] : [typeName];
-	// A Java getter (getUrl) is a property elsewhere (url, Url)
-	const property = /^(?:get|is)([A-Z]\w*)$/.exec(name)?.[1];
-	const lower = property ? property.charAt(0).toLowerCase() + property.slice(1) : null;
-	if (language === 'python') return [snake(name), name.toLowerCase(), ...(lower ? [snake(lower)] : [])];
-	if (language === 'dotnet') return [capital(name) + 'Async', capital(name), name, ...(property ? [property] : [])];
-	return [name, ...(lower ? [lower] : [])];
-}
-
-function findMember(language, javaMember, counterpart) {
-	if (language === 'java') return javaMember;
-	for (const candidate of memberCandidates(language, javaMember, counterpart.name)) {
-		const found = counterpart.members.find((m) => m.name === candidate);
-		if (found) return found;
-	}
-	return null;
 }
 
 // ---- doc comments -------------------------------------------------------------
@@ -321,7 +285,9 @@ const packageNames = {
 // ---- pages --------------------------------------------------------------------
 
 const missing = new Set();
-const gaps = new Map();
+// Java members a language lacks, unlisted, and lines of the lists that are wrong
+const memberFaults = [];
+const lists = new Map();
 // Pages showing Java code in another language, and overviews with fewer examples than Java's
 const foreign = [];
 const fewer = [];
@@ -346,24 +312,30 @@ for (const project of PROJECTS) {
 	await copyAssets(project);
 	const tsPackage = languages.includes('typescript') ? await packageNames.typescript(project) : '';
 
+	// Each language's list of the Java members it lacks or names another way
+	const listOf = {};
+	for (const language of languages.filter((l) => l !== 'java')) {
+		const file = listFile(project, language);
+		if (!lists.has(file)) lists.set(file, { entries: await readList(repoDir, file), used: new Set() });
+		listOf[language] = lists.get(file);
+	}
+	const renamedIn = (language, key) => (language === 'java' ? null : (listOf[language].entries.get(key)?.renamed ?? null));
+
 	// For each Java type, its counterpart in each language
 	const counterparts = new Map();
 	for (const type of types) {
 		const each = { java: type };
 		for (const language of languages.filter((l) => l !== 'java')) {
-			each[language] = typeCandidates(language, type.name).map((n) => apis[language].find((t) => t.name === n)).find(Boolean) ?? null;
-			if (each[language]) {
-				for (const member of type.members) {
-					// Java's Object and enum plumbing has no counterpart to find
-					if (member.kind === 'constructor' || member.kind === 'field' || ['toString', 'hashCode', 'equals', 'values', 'valueOf'].includes(member.name)) continue;
-					if (!findMember(language, member, each[language])) {
-						const key = project.id + ' ' + language;
-						gaps.set(key, [...(gaps.get(key) ?? []), type.name + '.' + member.name]);
-					}
-				}
-			}
+			each[language] = typeCandidates(language, type.name, renamedIn(language, type.name)).map((n) => apis[language].find((t) => t.name === n)).find(Boolean) ?? null;
 		}
 		counterparts.set(type.name, each);
+	}
+	// Every Java member has its counterpart, or a line in the list
+	for (const language of languages.filter((l) => l !== 'java')) {
+		const inLanguage = new Map(types.map((t) => [t.name, counterparts.get(t.name)[language]]));
+		const { missing, wrong } = checkMembers({ language, javaTypes: types, counterparts: inLanguage, list: listOf[language].entries, used: listOf[language].used });
+		for (const key of missing) memberFaults.push(project.id + ' ' + language + ': ' + key);
+		for (const fault of wrong) memberFaults.push(listFile(project, language) + ': ' + fault);
 	}
 	const documented = (language) => types.filter((t) => counterparts.get(t.name)[language]);
 	const usesModel = new Set();
@@ -410,7 +382,7 @@ for (const project of PROJECTS) {
 					if (memberPart) {
 						const javaName = memberPart.replace(/\(.*$/, '');
 						const javaMember = owner?.members.find((m) => m.name === javaName) ?? { name: javaName, kind: 'method' };
-						member = owner ? (findMember(language, javaMember, counterpartOf(owner))?.name ?? '') : '';
+						member = owner ? (findMember(language, javaMember, counterpartOf(owner), renamedIn(language, owner.name + '.' + javaName))?.name ?? '') : '';
 						if (!member) member = memberCandidates(language, javaMember, '')[0];
 					}
 					const ownerName = owner ? nameOf(owner) : simple;
@@ -454,7 +426,7 @@ for (const project of PROJECTS) {
 			// Members: this language's own, each with Java's examples where Java's has them
 			const javaFor = new Map();
 			for (const member of javaType.members) {
-				const found = findMember(language, member, type);
+				const found = findMember(language, member, type, renamedIn(language, javaType.name + '.' + member.name));
 				if (found && !javaFor.has(found)) javaFor.set(found, member);
 			}
 			const members = language === 'java' ? javaType.members : type.members;
@@ -686,5 +658,10 @@ if (foreign.length > 0) {
 	if (!allowMissing) throw new Error(line + ':\n  ' + list.join('\n  '));
 	console.warn(line + ':\n  ' + list.join('\n  '));
 }
-for (const [key, list] of gaps) console.warn('Not found in ' + key + ' (' + list.length + '): ' + list.slice(0, 12).join(', ') + (list.length > 12 ? ', ...' : ''));
+for (const [file, { entries, used }] of lists) for (const fault of stale(entries, used)) memberFaults.push(file + ': ' + fault);
+if (memberFaults.length > 0) {
+	const line = memberFaults.length + ' Java member(s) without a counterpart, or list line(s) that are wrong: give the language the member, or list it with the reason in its members-excluded.txt (scripts/members.mjs)';
+	if (!allowMissing) throw new Error(line + ':\n  ' + memberFaults.join('\n  '));
+	console.warn(line + ':\n  ' + memberFaults.join('\n  '));
+}
 console.log('Docs: ' + pageCount + ' type pages, in ' + DOC_LANGUAGES.join(', '));

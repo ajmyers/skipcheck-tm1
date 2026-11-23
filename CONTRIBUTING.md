@@ -41,8 +41,8 @@ tasks only set them up and run them.
 **The four clients change together.** They are one API in four languages, and Java is the
 reference. A change to how a client behaves lands in all four in the same pull request, each with
 a test: write the Java test first, then the same test under the same name in Python, .NET and
-TypeScript. A fix found in another client goes into Java as well. Four gates read the Java sources
-and fail a client's checks when it lacks something Java has:
+TypeScript. A fix found in another client goes into Java as well. These gates read the Java sources
+and fail a client's checks, or the docs build, when it lacks something Java has:
 
 | What Java has | What holds the other clients to it |
 |---|---|
@@ -50,6 +50,7 @@ and fail a client's checks when it lacks something Java has:
 | A service call and what it sends | The recorded calls in [`spec/conformance`](spec/conformance/README.md), which every client replays |
 | A live test | The live-parity tests, and each client's `coverage/live-excluded.txt` |
 | A unit test of the runtime (session, pool, batch, authenticators, OData, errors) | The unit-parity tests, and each client's `coverage/unit-excluded.txt` |
+| A public member of a documented type | The docs build ([`api-site/scripts/members.mjs`](api-site/scripts/members.mjs)), and each client's `coverage/members-excluded.txt` |
 
 A test with no meaning in a client gets a line in its exclusions file saying why; a line that has
 gone stale fails the gate. "Not ported yet" is not a reason. The gates can't see a behaviour change
