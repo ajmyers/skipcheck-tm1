@@ -3,6 +3,7 @@
   "private": true,
   "description": "Serves the Java API docs at skipcheck.io/projects/<module>/api/ and the guide at skipcheck.io/projects/tm1/guide/",
   "scripts": {
+    "test": "node --test test/",
     "assemble": "node scripts/assemble.mjs && node scripts/guide.mjs",
     "guide": "node scripts/guide.mjs",
     "dev": "wrangler dev",

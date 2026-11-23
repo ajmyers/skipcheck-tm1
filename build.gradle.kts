@@ -9,6 +9,7 @@
 //   ./gradlew checkTypescript      npm test (with prettier, eslint and tsc), then the build
 //   ./gradlew checkLicense         every source file starts with its license line
 //   ./gradlew checkScripts         the tests of scripts/ and the git hooks, and ShellCheck
+//   ./gradlew checkApiSite         the tests of the API docs site's Worker
 //   ./gradlew checkAll             all of the above, and ./gradlew build
 //
 //   ./gradlew packageTest          builds every package as a release does, installs each somewhere
@@ -89,10 +90,17 @@ val checkScripts = tasks.register<PythonTask>("checkScripts") {
 	commands = listOf(listOf("python", "-m", "pytest", "scripts/tests"))
 }
 
+val checkApiSite = tasks.register<ToolTask>("checkApiSite") {
+	group = "verification"
+	description = "Tests the API docs site's Worker (api-site/test)."
+	directory = root.dir("api-site")
+	commands = listOf(listOf("node", "--test", "test/"))
+}
+
 tasks.register("checkAll") {
 	group = "verification"
-	description = "Checks every codebase: the Java build, the Python, .NET and TypeScript clients, the scripts and hooks, and the license lines."
-	dependsOn(checkPython, checkDotnet, checkTypescript, checkLicense, checkScripts)
+	description = "Checks every codebase: the Java build, the Python, .NET and TypeScript clients, the scripts and hooks, the API docs site, and the license lines."
+	dependsOn(checkPython, checkDotnet, checkTypescript, checkLicense, checkScripts, checkApiSite)
 	dependsOn(provider { subprojects.mapNotNull { it.tasks.findByName("build") } })
 }
 
