@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { it } from "vitest";
-import { DockerHost, Tm1ServerContainer, Tm1Source } from "@skipcheck/tm1-testcontainers";
-import { RequiresTm1 } from "@skipcheck/tm1-testcontainers/vitest";
+import { CognosSource, DockerHost, Tm1ServerContainer, Tm1Source } from "@skipcheck/tm1-testcontainers";
+import { RequiresCognos, RequiresTm1 } from "@skipcheck/tm1-testcontainers/vitest";
 import { Tm1Authenticator, Tm1Client, Tm1ClientBuilder } from "../../src/index.js";
 
 const env = (name: string): string | undefined => {
@@ -107,3 +107,28 @@ export const tm1Test: typeof it = (Live.configured ? it : it.skip) as typeof it;
 
 /** The reason the live tests are skipped, for a describe's title. */
 export const liveReason = Live.configured ? "" : ` (skipped: ${Live.reason})`;
+
+/** Why the tests that start their own Cognos can't run, or undefined if they can, as Java's
+ * `@RequiresCognos`. Docker is only asked when a Cognos source is set; a source that's set but wrong
+ * runs the tests, which fail on it. */
+async function cognosSkipReason(): Promise<string | undefined> {
+  try {
+    if (!CognosSource.discover()) return RequiresCognos.NO_SOURCE_MESSAGE;
+  } catch {
+    // Set but wrong
+  }
+  return RequiresCognos.skipReason();
+}
+
+const cognosSkip = await cognosSkipReason();
+
+/** `it`, skipped without a Cognos (and a TM1) to start in Docker: set a Cognos source
+ * (`COGNOS_PRIVATE_IMAGE`, `COGNOS_INSTALL_VOLUME`, `COGNOS_ZIP_DIR` or `COGNOS_ZIP_URL`) and a TM1
+ * source to run them. */
+export const cognosTest: typeof it = (cognosSkip === undefined ? it : it.skip) as typeof it;
+
+/** Whether the Cognos tests run. */
+export const cognosConfigured = cognosSkip === undefined;
+
+/** The reason the Cognos tests are skipped, for a describe's title. */
+export const cognosReason = cognosSkip === undefined ? "" : ` (skipped: ${cognosSkip})`;

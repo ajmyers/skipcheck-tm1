@@ -113,7 +113,7 @@ describe("ChoreService on TM1" + liveReason, () => {
     await expect(tm1.chores.addTask(chore, partial)).rejects.toBeInstanceOf(Tm1Exception);
   });
 
-  tm1Test("activates by patch, or by the deprecated actions", async () => {
+  tm1Test("activates by patch or the deprecated actions", async () => {
     await tm1.chores.update(chore, ChorePatch.builder().active(true).build());
     expect(await active(), "by PATCH, as IBM recommends").toBe(true);
     await tm1.chores.deactivate(chore);

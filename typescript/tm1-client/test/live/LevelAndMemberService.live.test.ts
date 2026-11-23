@@ -6,8 +6,8 @@ const numeric = (name: string): ElementPatch => ElementPatch.builder().name(name
 const consolidated = (name: string): ElementPatch => ElementPatch.builder().name(name).type(ElementType.Consolidated).build();
 const edge = (parent: string, component: string): EdgePatch => EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
 
-/** LevelService against a real TM1, on World > Europe (France, Spain), Asia (Japan): the levels half
- * of the Java client's `LevelAndMemberServiceTm1Test` (the members half is MemberService's). */
+/** LevelService against a real TM1, on World > Europe (France, Spain), Asia (Japan): the Java
+ * client's `LevelAndMemberServiceTm1Test`. */
 describe("LevelService on TM1" + liveReason, () => {
   let tm1: Tm1Client;
   const d = Live.name();

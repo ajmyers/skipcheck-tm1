@@ -1,0 +1,10 @@
+# Java live tests (the *Tm1Test and *BehaviorTest classes) this client doesn't port, and why.
+# test/java-live-parity.test.ts fails on a Java live test that has neither a test here
+# (test/live/<Class>.live.test.ts, same name) nor a line in this file, and on a line that names a
+# class or method Java doesn't have, or one that is ported after all.
+#
+#   ClassName#methodName: reason
+#   ClassName: reason            (the whole class)
+#
+# Keep it rare and the reason specific. "Needs Cognos" isn't one: those tests are ported and skip
+# at run time.

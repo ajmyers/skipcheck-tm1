@@ -4,7 +4,6 @@ import {
   MDXViewPatch,
   NativeViewPatch,
   ODataQuery,
-  Tm1BadRequestException,
   Tm1NotFoundException,
   ViewAxisSelectionPatch,
   ViewScope,
@@ -18,8 +17,7 @@ const REGIONS = ["N", "S", "E", "W"];
 const MEASURES = ["Amount", "Count"];
 
 /** CellsetService against a real TM1, on Region (N, S, E, W) by Measure (Amount, Count), cell values
- * 1 to 8 in ordinal order: the Java client's `CellsetServiceTm1Test`, and `MdxAndModelTm1Test`'s MDX
- * statements. */
+ * 1 to 8 in ordinal order: the Java client's `CellsetServiceTm1Test`. */
 describe("CellsetService on TM1" + liveReason, () => {
   let tm1: Tm1Client;
   const cube = Live.name();
@@ -121,7 +119,7 @@ describe("CellsetService on TM1" + liveReason, () => {
     ]);
   });
 
-  tm1Test("deletes the cellset when the stream is abandoned", async () => {
+  tm1Test("deletes the cellset when the stream is cancelled", async () => {
     let id = "";
     const first: number[] = [];
     for await (const ordinal of tm1.cellsets.stream(mdx, ODataQuery.none().select("Ordinal"), 2, (cellset, cells) => {
@@ -163,12 +161,5 @@ describe("CellsetService on TM1" + liveReason, () => {
         await tm1.cellsets.delete(cellset.ID!);
       }
     }
-  });
-
-  tm1Test("runs an MDX statement, but not CREATE SET", async () => {
-    await tm1.cellsets.executeStatement("SELECT {} ON 0 FROM [}ClientGroups]");
-    await expect(tm1.cellsets.executeStatement("CREATE SET [}Clients].[Probe] AS {TM1SUBSETALL([}Clients].[}Clients])}")).rejects.toBeInstanceOf(
-      Tm1BadRequestException,
-    );
   });
 });

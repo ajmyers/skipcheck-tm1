@@ -30,6 +30,9 @@ export const Repo = {
   get javaClient(): string {
     return join(this.root, "java", "tm1-client", "src", "main", "java", "io", "skipcheck", "tm1", "client");
   },
+  get javaTests(): string {
+    return join(this.root, "java", "tm1-client", "src", "test", "java", "io", "skipcheck", "tm1", "client");
+  },
   get javaServices(): string {
     return join(this.javaClient, "service");
   },

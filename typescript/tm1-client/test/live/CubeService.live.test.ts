@@ -1,64 +1,113 @@
-import { afterAll, beforeAll, describe, expect } from "vitest";
-import { CubePatch, ODataPath, ODataQuery, Cube, Filter, Tm1NotFoundException, Tm1Request, type Tm1Client } from "../../src/index.js";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
+import {
+  Cube,
+  CubePatch,
+  Dimension,
+  DimensionPatch,
+  ElementPatch,
+  ElementType,
+  Filter,
+  HierarchyPatch,
+  ODataPath,
+  ODataQuery,
+  Tm1NotFoundException,
+  Tm1PreconditionFailedException,
+  type Tm1Client,
+  type Tm1Stream,
+} from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
-/** CubeService against a real TM1, on a cube of its own: the Java client's `CubeTm1Test`. */
+const dim = (name: string): ODataPath => ODataPath.of("Dimensions").key(name);
+
+const names = async (dimensions: Tm1Stream<Dimension>): Promise<(string | null | undefined)[]> => (await dimensions.toArray()).map((d) => d.Name);
+
+/** CubeService against a real TM1, on a cube of two fresh dimensions, Region and Measure: the Java
+ * client's `CubeServiceTm1Test`. */
 describe("CubeService on TM1" + liveReason, () => {
   let tm1: Tm1Client;
-  const cube = Live.name();
-  const dimensions = [Live.name(), Live.name()];
+  let cube: string;
+  let region: string;
+  let measure: string;
+
+  const dimension = (name: string, ...elements: string[]): Promise<unknown> =>
+    tm1.dimensions.create(
+      DimensionPatch.builder()
+        .name(name)
+        .hierarchies([
+          HierarchyPatch.builder()
+            .name(name)
+            .elements(elements.map((e) => ElementPatch.builder().name(e).type(ElementType.Numeric).build()))
+            .build(),
+        ])
+        .build(),
+    );
+
+  const rules = async (): Promise<string | null | undefined> => (await tm1.cubes.get(cube, ODataQuery.none().select(Cube.Fields.Rules))).Rules;
 
   beforeAll(async () => {
     if (!Live.configured) return;
     tm1 = await Live.client();
-    // Dimensions through the session until DimensionService is ported
-    // Different elements in each: a rule's ['a'] is ambiguous to TM1 if both dimensions have an "a"
-    for (const [d, elements] of [
-      [dimensions[0]!, ["a", "b"]],
-      [dimensions[1]!, ["x", "y"]],
-    ] as const) {
-      await tm1.session.execute(
-        Tm1Request.post(ODataPath.of("Dimensions"), { Name: d, Hierarchies: [{ Name: d, Elements: elements.map((e) => ({ Name: e })) }] }),
-      );
-    }
-    const all = ODataPath.of("Dimensions");
-    await tm1.cubes.create(
-      CubePatch.builder()
-        .name(cube)
-        .bindDimensions(...dimensions.map((d) => all.key(d)))
-        .build(),
-    );
   });
 
   afterAll(async () => {
-    if (!tm1) return;
+    if (tm1) await tm1.close();
+  });
+
+  beforeEach(async () => {
+    if (!Live.configured) return;
+    cube = Live.name();
+    region = cube + "-region";
+    measure = cube + "-measure";
+    await dimension(region, "North", "South");
+    await dimension(measure, "Amount");
+    await tm1.cubes.create(CubePatch.builder().name(cube).bindDimensions(dim(region), dim(measure)).build());
+  });
+
+  afterEach(async () => {
+    if (!tm1 || !cube) return;
     await tm1.cubes.delete(cube).catch(() => undefined);
-    for (const d of dimensions) await tm1.session.execute(Tm1Request.delete(ODataPath.of("Dimensions").key(d))).catch(() => undefined);
-    await tm1.close();
+    await tm1.dimensions.delete(region);
+    await tm1.dimensions.delete(measure);
   });
 
-  tm1Test("finds the cube among the model cubes, by a filter", async () => {
-    const found = await tm1.cubes.modelCubes(ODataQuery.none().select(Cube.Fields.Name).filter(Filter.startsWith(Cube.Fields.Name, cube))).toArray();
-    expect(found.map((c) => c.Name)).toEqual([cube]);
-    expect((await tm1.cubes.dimensions(cube).toArray()).map((d) => d.Name).filter((n) => n !== "Sandboxes")).toEqual(dimensions);
+  tm1Test("creates, reads, lists and deletes a cube", async () => {
+    expect((await tm1.cubes.get(cube))["@odata.etag"]?.trim()).toBeTruthy();
+    const listed = await tm1.cubes.list(ODataQuery.none().select(Cube.Fields.Name).filter(Filter.startsWith(Cube.Fields.Name, cube))).toArray();
+    expect(listed.map((c) => c.Name)).toEqual([cube]);
+    // Sandboxes first
+    expect(await names(tm1.cubes.dimensions(cube, ODataQuery.none().select(Dimension.Fields.Name)))).toEqual(["Sandboxes", region, measure]);
+
+    await tm1.cubes.delete(cube);
+    await expect(tm1.cubes.get(cube)).rejects.toBeInstanceOf(Tm1NotFoundException);
+    expect((await tm1.dimensions.get(region)).Name, "its dimensions stay").toBe(region);
   });
 
-  tm1Test("checks rules before saving them, and saves them with an ETag", async () => {
-    expect(await tm1.cubes.checkRules(cube, "SKIPCHECK;\n['a'] = N: 1;").toArray()).toEqual([]);
-    expect((await tm1.cubes.checkRules(cube, "nonsense").toArray()).length).toBeGreaterThan(0);
-    const read = await tm1.cubes.get(cube);
-    await tm1.cubes.update(cube, CubePatch.builder().rules("SKIPCHECK;").build(), read["@odata.etag"]);
-    expect((await tm1.cubes.get(cube, ODataQuery.none().select(Cube.Fields.Rules))).Rules).toContain("SKIPCHECK");
+  tm1Test("saves rules even if they don't compile, and checks the ETag", async () => {
+    const etag = (await tm1.cubes.get(cube))["@odata.etag"]!;
+    await tm1.cubes.update(cube, CubePatch.builder().rules("SKIPCHECK;\n").build(), etag);
+    expect(await rules()).toContain("SKIPCHECK");
+    await expect(tm1.cubes.update(cube, CubePatch.builder().rules("").build(), etag)).rejects.toBeInstanceOf(Tm1PreconditionFailedException);
+
+    await tm1.cubes.update(cube, CubePatch.builder().rules("['Nowhere'] = N: 1 +;\n").build());
+    expect(await rules(), "TM1 keeps rules that don't compile").toContain("Nowhere");
+    await tm1.cubes.update(cube, CubePatch.builder().rules(null).build());
+    expect((await rules()) ?? "").toBe("");
   });
 
-  tm1Test("loads, unloads, locks and unlocks", async () => {
-    await tm1.cubes.load(cube);
+  tm1Test("reorders the storage order", async () => {
+    expect((await names(tm1.cubes.dimensionsStorageOrder(cube))).sort()).toEqual([region, measure].sort());
+    const change = await tm1.cubes.reorderDimensions(cube, [measure, region]);
+    expect(typeof change).toBe("number");
+    expect(await names(tm1.cubes.dimensionsStorageOrder(cube))).toEqual([measure, region]);
+    expect(await names(tm1.cubes.dimensions(cube)), "presentation order unchanged").toEqual(["Sandboxes", region, measure]);
+  });
+
+  tm1Test("loads, unloads, locks and reserves", async () => {
     await tm1.cubes.unload(cube);
+    await tm1.cubes.load(cube);
     await tm1.cubes.lock(cube);
     await tm1.cubes.unlock(cube);
-  });
-
-  tm1Test("says a cube that isn't there isn't", async () => {
-    await expect(tm1.cubes.get(Live.name())).rejects.toBeInstanceOf(Tm1NotFoundException);
+    await tm1.cubes.reserve(cube);
+    await tm1.cubes.release(cube);
   });
 });

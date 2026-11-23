@@ -89,7 +89,7 @@ describe("ElementService on TM1" + liveReason, () => {
     await expect(tm1.elements.get(d, d, "West")).rejects.toBeInstanceOf(Tm1NotFoundException);
   });
 
-  tm1Test("refuses a name and attributes in an update, as TM1 ignores or rejects them", async () => {
+  tm1Test("refuses name and attributes in an update, as TM1 ignores or rejects them", async () => {
     expect(() => tm1.elements.update(d, d, "East", ElementPatch.builder().name("Est").build())).toThrow(/renamed/);
     expect(() => tm1.elements.update(d, d, "East", ElementPatch.builder().name("Est").build(), 'W/"x"')).toThrow(RangeError);
 
@@ -129,22 +129,5 @@ describe("ElementService on TM1" + liveReason, () => {
     await tm1.elements.unlock(d, d, "North");
     await tm1.elements.reserve(d, d, "North");
     await tm1.elements.release(d, d, "North");
-  });
-
-  tm1Test("creates, reads, reweights and deletes edges", async () => {
-    expect(await tm1.edges.list(d, d).toArray()).toHaveLength(2);
-    expect((await edgeOf("Total", "North")).Weight).toBe(1.0);
-    await tm1.edges.update(d, d, "Total", "North", EdgePatch.builder().weight(3.0).build());
-    expect((await edgeOf("Total", "North")).Weight).toBe(3.0);
-
-    expect((await tm1.edges.parent(d, d, "Total", "North")).Name).toBe("Total");
-    expect((await tm1.edges.component(d, d, "Total", "North")).Name).toBe("North");
-    expect((await tm1.edges.hierarchy(d, d, "Total", "North")).Name).toBe(d);
-
-    expect((await tm1.edges.create(d, d, edge("Total", "East"))).ComponentName).toBe("East");
-    await tm1.edges.delete(d, d, "Total", "North");
-    expect(await components("Total")).toEqual(["South", "East"]);
-    // Still an element, now a root
-    expect(await tm1.elements.parents(d, d, "North").toArray()).toEqual([]);
   });
 });
