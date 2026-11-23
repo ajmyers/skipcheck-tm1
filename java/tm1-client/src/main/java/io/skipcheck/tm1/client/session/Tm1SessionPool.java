@@ -48,10 +48,11 @@ import reactor.core.scheduler.Schedulers;
  * request.</li>
  * <li><b>Eviction</b> happens when a session has been idle for {@code idleTimeout}, is
  * older than {@code maxAge}, or the pool is over {@code maxSize} (least recently used
- * first). It's checked on each {@link #session} call and every
- * {@code sweepInterval}.</li>
- * <li><b>An evicted session is closed after {@code closeGrace}</b>, so requests already
- * running on it can finish. The next request for that identity gets a new session.</li>
+ * first). It's checked on each {@link #session} call and every {@code sweepInterval}. A
+ * session with a request running isn't idle, however long ago it was asked for.</li>
+ * <li><b>An evicted session is closed after {@code closeGrace}</b>, or when the requests
+ * running on it have finished, if that's later: closing it would end them on TM1. The
+ * next request for that identity gets a new session.</li>
  * <li><b>{@link #close()}</b> closes every session at once, and the pool refuses new
  * ones.</li>
  * <li><b>Nothing falls back:</b> a refused identity fails, and the pool never uses
@@ -65,6 +66,9 @@ import reactor.core.scheduler.Schedulers;
  */
 @Slf4j
 public final class Tm1SessionPool {
+
+	/** How often an evicted session with a request still running is looked at again. */
+	private static final Duration BUSY_RECHECK = Duration.ofSeconds(1);
 
 	private final Tm1Session.Builder sessions;
 
@@ -245,6 +249,11 @@ public final class Tm1SessionPool {
 		if (now - entry.createdAt >= maxAge.toNanos()) {
 			return "age";
 		}
+		if (entry.session.isBusy()) {
+			// A request running on it is use, however long ago the session was asked for
+			entry.lastUsed = now;
+			return null;
+		}
 		if (now - entry.lastUsed >= idleTimeout.toNanos()) {
 			return "idle";
 		}
@@ -285,7 +294,16 @@ public final class Tm1SessionPool {
 		Tm1Session session = entry.session;
 		Closer closer = new Closer(session);
 		closing.put(session, closer);
-		Mono.delay(closeGrace, scheduler).then(session.close()).subscribe(closer);
+		Mono.delay(closeGrace, scheduler).then(closeWhenFree(session)).subscribe(closer);
+	}
+
+	/**
+	 * Closes {@code session} once no request is running on it, looking again every
+	 * {@link #BUSY_RECHECK}: closing it sooner would end those requests on TM1.
+	 */
+	private Mono<Void> closeWhenFree(Tm1Session session) {
+		return Mono.defer(() -> session.isBusy() ? Mono.delay(BUSY_RECHECK, scheduler).then(closeWhenFree(session))
+				: session.close());
 	}
 
 	/**
@@ -434,8 +452,10 @@ public final class Tm1SessionPool {
 		}
 
 		/**
-		 * How long an evicted session stays open before it's closed, so requests already
-		 * running on it can finish. Default 30 s; zero closes at once.
+		 * How long an evicted session stays open before it's closed, for a caller that
+		 * got it just before and hasn't sent its request yet. A session with a request
+		 * running stays open until that finishes, however long the grace period. Default
+		 * 30 s; zero closes at once.
 		 * @param closeGrace the grace period
 		 * @return this builder
 		 */

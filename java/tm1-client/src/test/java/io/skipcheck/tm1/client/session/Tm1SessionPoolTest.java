@@ -8,11 +8,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.ClientRequest;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import io.micrometer.observation.tck.TestObservationRegistry;
@@ -22,6 +24,7 @@ import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.test.scheduler.VirtualTimeScheduler;
 import tools.jackson.databind.JsonNode;
 
@@ -96,6 +99,45 @@ class Tm1SessionPoolTest {
 			time.advanceTimeBy(Duration.ofMinutes(9));
 			assertThat(pool.session(Tm1Identity.impersonating("alice"))).isSameAs(alice);
 		}
+	}
+
+	@Test
+	void keepsASessionWhileARequestIsRunningOnIt() {
+		Sinks.One<ClientResponse> answer = Sinks.one();
+		tm1.on("GET Server", r -> answer.asMono());
+		Tm1Session alice = pool.session(Tm1Identity.impersonating("alice"));
+		AtomicReference<JsonNode> result = new AtomicReference<>();
+		alice.execute(SERVER).subscribe(result::set);
+
+		time.advanceTimeBy(Duration.ofMinutes(25));
+		assertThat(pool.stats().evictedIdle()).as("a running request is use").isZero();
+		assertThat(alice.isClosed()).isFalse();
+
+		answer.tryEmitValue(FakeTm1.json(200, "{}"));
+		assertThat(result.get()).isNotNull();
+		time.advanceTimeBy(Duration.ofMinutes(12));
+		assertThat(pool.stats().evictedIdle()).as("idle once it has finished").isEqualTo(1);
+		assertThat(alice.isClosed()).isTrue();
+	}
+
+	@Test
+	void closesAnEvictedSessionOnlyOnceItsRequestsHaveFinished() {
+		pool.close().block();
+		pool = pool(b -> b.maxAge(Duration.ofMinutes(30)));
+		Sinks.One<ClientResponse> answer = Sinks.one();
+		tm1.on("GET Server", r -> answer.asMono());
+		Tm1Session alice = pool.session(Tm1Identity.impersonating("alice"));
+		AtomicReference<JsonNode> result = new AtomicReference<>();
+		alice.execute(SERVER).subscribe(result::set);
+
+		time.advanceTimeBy(Duration.ofMinutes(40));
+		assertThat(pool.stats().evictedAge()).as("out of the pool at its age").isEqualTo(1);
+		assertThat(alice.isClosed()).as("but open for the request still running").isFalse();
+
+		answer.tryEmitValue(FakeTm1.json(200, "{}"));
+		assertThat(result.get()).isNotNull();
+		time.advanceTimeBy(Duration.ofSeconds(31));
+		assertThat(alice.isClosed()).isTrue();
 	}
 
 	@Test

@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
@@ -122,6 +123,9 @@ final class Connection {
 
 	private final CapabilitiesCache capabilitiesCache;
 
+	/** Requests running now: see {@link #isBusy()}. */
+	private final AtomicInteger running = new AtomicInteger();
+
 	/** Set once by {@link #close()}. Guarded by this. */
 	private boolean closed;
 
@@ -146,6 +150,14 @@ final class Connection {
 
 	String root() {
 		return root;
+	}
+
+	/**
+	 * Whether a request is running: sent, or waiting for the login, and not yet answered
+	 * in full, failed or cancelled. An async request counts until its result is read.
+	 */
+	boolean isBusy() {
+		return running.get() > 0;
 	}
 
 	synchronized boolean isClosed() {
@@ -378,12 +390,16 @@ final class Connection {
 	 * replay is final, so a server that keeps refusing can't cause a loop of logins.
 	 */
 	private <T, R> Flux<R> exchange(Tm1Request<T> request, URI uri, Function<ClientResponse, Flux<R>> onSuccess) {
-		return Flux.defer(() -> {
+		Flux<R> exchange = Flux.defer(() -> {
 			Attempt used = current();
 			return used.login.flatMapMany(session -> send(request, uri, session, onSuccess))
 				.onErrorResume(Expired.class, expired -> relogin(used, expired.cookie).login
 					.flatMapMany(session -> send(request, uri, session, onSuccess)));
 		}).onErrorMap(Expired.class, expired -> unauthenticated(request, uri));
+		return Flux.defer(() -> {
+			running.incrementAndGet();
+			return exchange.doFinally(signal -> running.decrementAndGet());
+		});
 	}
 
 	private <T, R> Flux<R> send(Tm1Request<T> request, URI uri, LoggedIn session,
