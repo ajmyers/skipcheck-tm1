@@ -205,6 +205,17 @@ describe("Tm1Capabilities", () => {
     `<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"><edmx:DataServices>` +
     `<Schema Namespace="ibm.tm1.api.v1" Alias="tm1" xmlns="http://docs.oasis-open.org/odata/ns/edm">${body}</Schema></edmx:DataServices></edmx:Edmx>`;
 
+  it("refuses doctypes so entities can't be expanded", () => {
+    const xxe = `<?xml version="1.0"?>
+<!DOCTYPE edmx:Edmx [<!ENTITY x SYSTEM "file:///etc/passwd">]>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">&x;</edmx:Edmx>
+`;
+    expect(() => Tm1Capabilities.parse(xxe)).toThrow(Tm1ProtocolException);
+    expect(() => Tm1Capabilities.parse(xxe)).toThrow(/DOCTYPE/);
+    // Only a declaration: the word in a comment or in text is nothing to refuse
+    expect(Tm1Capabilities.parse(csdl('<!-- <!DOCTYPE x> --><EntityType Name="Cube"/>')).schemaVersion).toBeUndefined();
+  });
+
   it("reports an operation it can't model as a parse error", () => {
     // Bound to nothing: an operation is bound to its first parameter
     const boundToNothing = csdl('<Action Name="Reserve" IsBound="true"/>');

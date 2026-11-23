@@ -178,6 +178,9 @@ function parseXml(text: string): XmlElement {
     if (m.index !== last) throw new SyntaxError("Not XML near offset " + last);
     last = tag.lastIndex;
     const top = stack[stack.length - 1]!;
+    // Refused, as the Java and .NET clients refuse it: with no DOCTYPE there are no entities of the
+    // document's own to expand, and nothing outside it to fetch
+    if (m[0].startsWith("<!DOCTYPE")) throw new Tm1ProtocolException("TM1's $metadata has a DOCTYPE, which this client refuses to read");
     if (m[1] !== undefined) top.text += m[1];
     else if (m[6] !== undefined) top.text += decodeEntities(m[6]);
     else if (m[3] !== undefined) {
@@ -234,13 +237,14 @@ export class Tm1Capabilities {
   ) {}
 
   /** Reads a `$metadata` document.
-   * @throws Tm1ProtocolException if it isn't XML, isn't CSDL, or defines something this client can't
-   * model, such as a bound operation with no binding parameter: never any other error */
+   * @throws Tm1ProtocolException if it isn't XML, has a DOCTYPE, isn't CSDL, or defines something this
+   * client can't model, such as a bound operation with no binding parameter: never any other error */
   static parse(metadata: string, productVersion?: Tm1Version): Tm1Capabilities {
     let doc: XmlElement;
     try {
       doc = parseXml(metadata.replace(/^\uFEFF/, ""));
     } catch (e) {
+      if (e instanceof Tm1ProtocolException) throw e;
       throw new Tm1ProtocolException("TM1's $metadata isn't XML: " + (e as Error).message);
     }
     const top = doc.children[0];
