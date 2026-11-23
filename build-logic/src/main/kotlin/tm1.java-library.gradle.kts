@@ -78,7 +78,7 @@ tasks.withType<Javadoc>().configureEach {
 	}
 }
 
-// The same Javadoc, themed for skipcheck.io/projects/<module>/api/ (api-site/README.md). A separate
+// The same Javadoc, themed for skipcheck.io/<module>/api/java/ (api-site/README.md). A separate
 // task, so the javadoc jar on Maven Central stays plain: the theme imports the site's styles from
 // the same origin, which only works there.
 val apiSiteBaseUrl = providers.gradleProperty("apiSiteBaseUrl")
@@ -103,7 +103,7 @@ tasks.register<Javadoc>("apiSiteJavadoc") {
 		configurations.getByName("api").dependencies.withType<ProjectDependency>().forEach { dependency ->
 			val other = project(dependency.path)
 			dependsOn("${dependency.path}:apiSiteJavadoc")
-			linksOffline("${apiSiteBaseUrl.get()}${other.name}/api/",
+			linksOffline("${apiSiteBaseUrl.get()}${other.name}/api/java/",
 					other.layout.buildDirectory.dir("docs/api-site").get().asFile.path)
 		}
 	}
