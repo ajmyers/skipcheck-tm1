@@ -5,13 +5,16 @@
 // must be a file in dist/; any other local link must be one of the site's own addresses listed
 // below, since those pages live in ajmyers/skipcheck.io and can't be seen from here. Run after the pages are built; it fails with the list of broken links.
 //
+// Each docs language's search index (search.json, search.mjs) is checked the same way: every type
+// and member it lists must be on a page there.
+//
 // The Javadoc is left out: its links are javadoc's own, and there are thousands of them.
 //
 //   node scripts/check-links.mjs
 
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { distDir, SECTIONS } from './site.mjs';
+import { distDir, PROJECTS, SECTIONS } from './site.mjs';
 
 // What these pages may link to on the site itself. Add an address here when a page starts to use
 // it, after checking that the site serves it.
@@ -58,6 +61,31 @@ for await (const file of htmlFiles(distDir)) {
 		} else if (target.hash && asset.endsWith('.html')) {
 			const there = await readFile(asset, 'utf8');
 			if (!there.includes(' id="' + decodeURIComponent(target.hash.slice(1)) + '"')) broken.push(page + ': ' + link + ' (no such id on that page)');
+		}
+	}
+}
+for (const project of PROJECTS) {
+	for (const entry of await readdir(path.join(distDir, project.id, 'docs'), { withFileTypes: true }).catch(() => [])) {
+		const file = path.join(distDir, project.id, 'docs', entry.name, 'search.json');
+		if (!entry.isDirectory() || !(await exists(file))) continue;
+		const where = '/' + path.relative(distDir, file).split(path.sep).join('/');
+		const index = JSON.parse(await readFile(file, 'utf8'));
+		const pages = new Map();
+		const idsOf = async (page) => {
+			if (!pages.has(page)) {
+				const html = await readFile(path.join(path.dirname(file), page), 'utf8').catch(() => null);
+				pages.set(page, html === null ? null : new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1])));
+			}
+			return pages.get(page);
+		};
+		for (const [name, page] of index.types) {
+			checked++;
+			if (!(await idsOf(page))) broken.push(where + ': ' + name + ' is on ' + page + ', which is not there');
+		}
+		for (const [name, type, , anchor = name] of index.members) {
+			checked++;
+			const page = index.types[type][1];
+			if (!(await idsOf(page))?.has(anchor)) broken.push(where + ': ' + name + ' is at ' + page + '#' + anchor + ', which is not there');
 		}
 	}
 }
