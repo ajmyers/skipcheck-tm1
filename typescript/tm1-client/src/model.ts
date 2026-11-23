@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { ODataProperty } from "./odata/index.js";
 
 /** What reads a type of the model: the generated constant of the same name as its interface

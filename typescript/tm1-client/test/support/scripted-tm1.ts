@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { expect } from "vitest";
 import { Tm1Session, type Tm1Clock, type Tm1HttpRequest, type Tm1HttpResponse, type Tm1SessionBuilder, type Tm1Transport } from "../../src/index.js";
 

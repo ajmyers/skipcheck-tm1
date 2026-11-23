@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /** A collection TM1 sends, item by item, fetching pages as they're needed (Java's `Flux`):
  * `for await (const cube of tm1.cubes.list())`, or `await tm1.cubes.list().toArray()`. Nothing is
  * sent until it's iterated, except in a batch, where the request joins the batch at once; each

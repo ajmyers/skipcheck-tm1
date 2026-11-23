@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Primitive } from "../../model.js";
 import { Tm1Operations } from "../../generated/index.js";
 import { ODataPath, ODataQuery } from "../../odata/index.js";

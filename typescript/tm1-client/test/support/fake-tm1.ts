@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { readFileSync } from "node:fs";
 import { Tm1Client, Tm1Session, type Tm1HttpRequest, type Tm1HttpResponse, type Tm1SessionBuilder, type Tm1Transport } from "../../src/index.js";
 import { Repo } from "./repo.js";

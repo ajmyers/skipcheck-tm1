@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect, it } from "vitest";
 import { MDXViewPatch, ODataQuery, Tm1PreconditionFailedException, View, ViewPatch, ViewScope, typeOf } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { Tm1ServerContainer, Tm1Source } from "@skipcheck/tm1-testcontainers";
 import { EncryptionFileType, LocalKeyFileProviderSettingsPatch, Tm1BadRequestException, Tm1Client } from "../../src/index.js";

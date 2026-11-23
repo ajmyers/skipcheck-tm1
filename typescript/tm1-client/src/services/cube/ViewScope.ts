@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /** Who sees a view, and so which of a cube's collections holds it: the Java client's `ViewScope`.
  * {@link ViewScope.navigation} names the collection. */
 export type ViewScope = "Public" | "Private";

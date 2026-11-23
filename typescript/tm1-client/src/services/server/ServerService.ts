@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Configuration, Logger, Server, ServerSettings, type LogLevel, type ServerSettingsPatch } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import { Tm1Request } from "../../request.js";

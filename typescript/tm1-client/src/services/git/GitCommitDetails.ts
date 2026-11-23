@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { required } from "../../util.js";
 
 /** What a push's commit says, and who it's by: the message, the author's name and email address,

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 const INSPECT = Symbol.for("nodejs.util.inspect.custom");
 
 /** How TM1 signs in to the Git remote: nothing (a public or `git://` remote), a user name and

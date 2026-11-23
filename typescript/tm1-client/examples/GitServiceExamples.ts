@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { GitCommitDetails, GitCredentials, type Git, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for GitService, quoted in its documentation.

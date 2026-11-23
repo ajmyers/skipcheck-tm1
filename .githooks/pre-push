@@ -12,6 +12,9 @@
 #   (TM1_* settings are cleared), as in CI, since they take minutes per commit; run them by hand.
 # - For a commit that touches the Python, TypeScript or .NET client, it also runs that client's
 #   layout and lint checks (ruff, prettier and eslint, CSharpier), but not its tests.
+# - Every commit is also checked for the license line each source file starts with
+#   (scripts/license-headers.py), from the commit whose own copy of this hook checks it: older
+#   commits were made before every file had the line.
 # - Branch deletions push nothing and are let through. CI skips the hook.
 #
 # Enabled with the other hooks: git config core.hooksPath .githooks
@@ -63,6 +66,9 @@ unset TM1_PRIVATE_IMAGE TM1_HOME_DIR TM1_INSTALL_VOLUME TM1_BUNDLE_DIR TM1_BUNDL
 # commit is worth. A check whose tool is missing fails, with what to install.
 top="$(pwd)"
 ports() {
+	if grep -q 'license-headers\.py)' "$worktree/.githooks/pre-push" 2> /dev/null; then
+		(cd "$worktree" && python3 scripts/license-headers.py) || return 1
+	fi
 	local changed
 	changed="$(git diff-tree --no-commit-id --name-only -r --root "$1")"
 	if grep -q '^python/' <<< "$changed"; then
@@ -100,7 +106,7 @@ for commit in "${unique[@]}"; do
 		exit 1
 	fi
 	if ! ports "$commit" > "$worktree/ports.log" 2>&1; then
-		warn "commit $n of ${#unique[@]} fails a layout or lint check: $subject"
+		warn "commit $n of ${#unique[@]} fails a layout, lint or license line check: $subject"
 		tail -30 "$worktree/ports.log" >&2
 		warn "push refused. Fix that commit (an interactive rebase, or a fixup commit), then push again."
 		exit 1

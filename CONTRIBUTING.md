@@ -68,7 +68,10 @@ again. Generated code is never formatted, and neither are the recorded fixtures 
 
 **Every source file names its license.** Code, scripts, stylesheets and Dockerfiles start with
 `SPDX-License-Identifier: Apache-2.0`, in a comment. The pre-commit hook adds the line to what you
-stage; `scripts/license-headers.py --fix` adds it everywhere, and says which files get one.
+stage; `scripts/license-headers.py --fix` adds it everywhere, and says which files get one. Each
+client's build fails on a file without it (`./gradlew build`, `pytest`, `npm test`, `dotnet build`),
+the pre-push hook checks every commit, and CI checks the whole repository. Generated code gets the
+line from its generator.
 
 **Public API needs Javadoc.** In the published libraries, every public class, method, constructor
 and record component is documented, with `@param` and `@return`. `./gradlew build` runs Javadoc

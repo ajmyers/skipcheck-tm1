@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { Tm1Model } from "../../model.js";
 import { Dimension, Hierarchy, HierarchyPatch, Member, Tm1Operations, type EdgePatch, type ElementPatch } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";

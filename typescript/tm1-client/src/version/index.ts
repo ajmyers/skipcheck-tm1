@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Tm1ProtocolException, Tm1UnsupportedOperationException } from "../errors/index.js";
 
 /** A TM1 version, such as `11.8.03500.6` or schema `11.8.35`: compared part by part, missing parts

@@ -17,6 +17,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew build
 
+  # Every source file starts with its license line; scripts/license-headers.py says which files
+  # those are. The clients' own builds check their languages; this covers the rest too.
+  license:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 scripts/license-headers.py
+
   # The Python client, generated from spec/tm1-api.json; the build job above fails when that
   # spec is out of date with the $metadata snapshot (ApiSpecTest)
   python:

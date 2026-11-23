@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { AuditLogEntry, ErrorLogFile, MessageLogEntry, Tm1Operations, TransactionLogEntry } from "../../generated/index.js";
 import { Json, type Tm1Model } from "../../model.js";
 import { ODataPath, ODataQuery } from "../../odata/index.js";

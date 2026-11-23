@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // The Getting started example on tm1-testcontainers' overview page: a vitest test, type-checked but
 // never run.
 

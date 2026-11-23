@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Tm1SessionClosedException } from "../errors/index.js";
 import { Tm1Identity } from "./identity.js";
 import type { Tm1Session, Tm1SessionBuilder } from "./session.js";

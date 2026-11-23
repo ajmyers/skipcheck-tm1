@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { KeyProtectSettingsPatch, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for EncryptionService, quoted in its documentation.

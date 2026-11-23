@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import { GitCommitDetails, GitConfigurationPatch, GitCredentials, GitPlan, GitPlanExecutionMode, ODataQuery, typeOf } from "../../src/index.js";

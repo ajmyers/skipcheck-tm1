@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { Tm1Model } from "../../model.js";
 import { Git, GitPlan, GitPullPlan, GitPushPlan, Tm1Operations, type GitConfigurationPatch, type GitPlanExecutionMode } from "../../generated/index.js";
 import { typeOf } from "../../json.js";

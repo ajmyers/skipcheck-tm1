@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { Tm1Model } from "./model.js";
 import { ODataQuery, type ODataPath } from "./odata/index.js";
 import type { Tm1Capability } from "./version/index.js";

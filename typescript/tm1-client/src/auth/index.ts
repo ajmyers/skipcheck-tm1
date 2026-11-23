@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { ODataError, Tm1ApiException, Tm1ProtocolException } from "../errors/index.js";
 
 function base64(text: string): string {

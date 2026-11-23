@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Dimension, DimensionPatch, EdgePatch, ElementPatch, ElementType, Hierarchy, HierarchyPatch, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for DimensionService, quoted in its documentation.

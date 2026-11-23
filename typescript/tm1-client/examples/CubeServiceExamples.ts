@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Cube, CubePatch, Filter, ODataPath, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for CubeService, quoted in its documentation.

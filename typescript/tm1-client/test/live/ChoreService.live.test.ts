@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { afterEach, beforeEach, describe, expect } from "vitest";
 import {
   Chore,

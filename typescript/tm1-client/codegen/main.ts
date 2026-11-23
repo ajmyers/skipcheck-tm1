@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Generates the TypeScript client's model from the language-neutral API spec (spec/tm1-api.json),
 // as tm1-codegen does for Java, tm1_pygen for Python and Tm1.Codegen for .NET: run by `npm run
 // generate` (before build and test) into src/generated/, never committed.

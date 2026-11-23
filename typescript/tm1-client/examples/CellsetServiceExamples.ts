@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Cellset, CellsetCell, CellsetUpdatePatch, ODataQuery, ViewScope, type Tm1Client, type Tm1Stream } from "@skipcheck/tm1-client";
 
 // Examples for CellsetService, quoted in its documentation.

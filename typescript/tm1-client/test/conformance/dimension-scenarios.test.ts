@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /** The dimension scenarios (dimensions, hierarchies, elements, levels), offline: against a fake TM1
  * that answers each step with what the step expects, so every step's call is made, sends one
  * request, and reads its answer. */

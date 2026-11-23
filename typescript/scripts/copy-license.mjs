@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Copies the repository's LICENSE and NOTICE into the package being packed (npm's prepack runs this
 // in the package's folder), so the tarball carries them, as Apache 2.0 asks. The copies aren't
 // committed.

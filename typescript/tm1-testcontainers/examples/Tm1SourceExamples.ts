@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Tm1ServerContainer, Tm1Source } from "@skipcheck/tm1-testcontainers";
 
 // Examples for Tm1Source, quoted in its documentation.

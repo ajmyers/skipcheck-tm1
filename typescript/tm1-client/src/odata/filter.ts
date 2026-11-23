@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { ODataLiterals } from "./literals.js";
 
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;

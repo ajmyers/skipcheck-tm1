@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Lint for the TypeScript client and tm1-testcontainers: the counterpart of the Java build's Error
 // Prone. Layout is Prettier's (.prettierrc.json), so no rule here is about layout. `npm test` runs
 // both checks first, as `./gradlew build` runs checkFormat.
@@ -5,10 +7,30 @@ import js from "@eslint/js";
 import jsdoc from "eslint-plugin-jsdoc";
 import tseslint from "typescript-eslint";
 
+// Every source file starts with its license, as scripts/license-headers.py writes it for every
+// language: `npm test` fails on a file without the line, and `eslint --fix .` adds it.
+const LICENSE = "// SPDX-License-Identifier: Apache-2.0";
+const license = {
+  rules: {
+    header: {
+      meta: { type: "problem", fixable: "code", schema: [], messages: { missing: `The file doesn't start with "${LICENSE}"` } },
+      create(context) {
+        return {
+          Program() {
+            if (context.sourceCode.text.startsWith(LICENSE + "\n")) return;
+            context.report({ loc: { line: 1, column: 0 }, messageId: "missing", fix: (fixer) => fixer.insertTextBeforeRange([0, 0], LICENSE + "\n\n") });
+          },
+        };
+      },
+    },
+  },
+};
+
 export default tseslint.config(
   { ignores: ["**/dist/", "tm1-client/src/generated/", "**/node_modules/"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  { plugins: { license }, rules: { "license/header": "error" } },
   {
     rules: {
       // A type and a namespace of the same name stand for a Java type with nested types

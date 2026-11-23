@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 export { Tm1Service, type Tm1Endpoints } from "./service.js";
 export { AnnotationService } from "./annotation/AnnotationService.js";
 export { AttributeOwner } from "./attribute/AttributeOwner.js";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect } from "vitest";
 import { Live, liveReason, tm1Test } from "./live.js";
 import { SERVER } from "./raw-tm1.js";

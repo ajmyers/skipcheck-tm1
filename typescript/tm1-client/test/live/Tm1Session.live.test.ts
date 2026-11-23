@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { afterAll, beforeAll, beforeEach, describe, expect } from "vitest";
 import { ODataPath, ODataQuery, Tm1ApiException, Tm1Exception, Tm1NotFoundException, Tm1Request, Tm1Session } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";

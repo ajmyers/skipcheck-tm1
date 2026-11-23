@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { Live, liveReason, tm1Test } from "./live.js";

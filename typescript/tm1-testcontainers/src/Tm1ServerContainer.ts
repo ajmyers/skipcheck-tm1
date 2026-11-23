@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Tm1Version } from "@skipcheck/tm1-client";
 import { CognosContainer } from "./CognosContainer.js";
 import { GenericContainer } from "./GenericContainer.js";

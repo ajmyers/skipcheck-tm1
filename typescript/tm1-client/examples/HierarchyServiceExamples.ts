@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { EdgePatch, ElementPatch, ElementType, HierarchyPatch, Member, ODataQuery, type Hierarchy, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for HierarchyService, quoted in its documentation.

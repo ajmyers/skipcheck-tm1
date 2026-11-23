@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";

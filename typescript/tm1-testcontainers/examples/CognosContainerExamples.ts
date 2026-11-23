@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { ODataQuery, Tm1Authenticator, Tm1Client, User } from "@skipcheck/tm1-client";
 import { CognosContainer, Tm1ServerContainer, type CognosSource, type Tm1Source } from "@skipcheck/tm1-testcontainers";
 
