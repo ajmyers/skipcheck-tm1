@@ -802,9 +802,7 @@ def test_reports_whatever_stops_metadata_being_read_as_a_protocol_error(monkeypa
         Tm1Capabilities.parse(SNAPSHOT.read_bytes())
 
 
-def test_reads_past_an_operation_it_cant_model(rt: Runtime) -> None:
-    # Java's reportsAnOperationItCantModelAsAParseError: its model refuses an operation bound to nothing, so the
-    # whole document is a parse error there. This client models only what it checks, and leaves the operation out.
+def test_reports_an_operation_it_cant_model_as_a_parse_error(rt: Runtime) -> None:
     rt.fake.metadata = b"""
         <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
           <edmx:DataServices>
@@ -814,8 +812,8 @@ def test_reads_past_an_operation_it_cant_model(rt: Runtime) -> None:
             </Schema>
           </edmx:DataServices>
         </edmx:Edmx>"""
-    capabilities = rt.run(rt.session().capabilities())
-    assert capabilities.endpoints == {"EntitySet Cubes"}
+    error = rt.raises(Tm1ProtocolError, lambda: rt.session().capabilities())
+    assert "Reserve" in str(error)
 
 
 def test_doesnt_keep_a_failed_read(rt: Runtime) -> None:

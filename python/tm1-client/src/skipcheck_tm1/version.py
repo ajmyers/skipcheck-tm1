@@ -207,8 +207,8 @@ class Tm1Capabilities:
         is (``Endpoints`` in the Java client). Whatever stops it being read is a
         :class:`~skipcheck_tm1.errors.Tm1ProtocolError`, never the parser's own error, so a caller
         of a session has one error to catch for a server that answers ``$metadata`` with
-        something else. An operation marked bound that has no binding parameter isn't an error
-        here, as it is in the Java client, whose model refuses it: it's left out."""
+        something else. That includes a document with an operation marked bound that has no
+        binding parameter, which is refused whole, as the other clients refuse it."""
         try:
             return Tm1Capabilities._parse(metadata, product_version)
         except Tm1ProtocolError:
@@ -252,7 +252,8 @@ class Tm1Capabilities:
                         continue
                     params = op.findall(f"{_EDM}Parameter")
                     if not params:
-                        continue
+                        # Bound to nothing: not a document this client, or any of the others, reads
+                        raise Tm1ProtocolError(f"TM1 sent $metadata that isn't valid CSDL: bound operation {op.get('Name')} has no binding parameter")
                     binding = params[0].get("Type", "")
                     collection = binding.startswith("Collection(")
                     inner = binding.removeprefix("Collection(").removesuffix(")")
