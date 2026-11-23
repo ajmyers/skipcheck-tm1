@@ -115,6 +115,8 @@ export class Connection {
   private version: { read: Promise<Tm1Version>; for: Attempt } | undefined;
   private closed = false;
   private closing: Promise<void> | undefined;
+  /** Requests running now: see {@link isBusy}. */
+  private running = 0;
 
   /** @internal A connection to the service root `root`, logging in with `authenticator`. */
   constructor(
@@ -135,6 +137,33 @@ export class Connection {
   /** Whether the session was closed. */
   get isClosed(): boolean {
     return this.closed;
+  }
+
+  /** Whether a request is running: sent, or waiting for the login, and not yet answered in full,
+   * failed or cancelled. An async request counts until its result is read, and a stream from its
+   * first page until it is finished or stopped. */
+  get isBusy(): boolean {
+    return this.running > 0;
+  }
+
+  /** @internal Counts one more request as running, until the function it returns is called. */
+  hold(): () => void {
+    this.running++;
+    let held = true;
+    return () => {
+      if (held) this.running--;
+      held = false;
+    };
+  }
+
+  /** @internal Runs `work`, counted as a running request until it settles. */
+  async busy<T>(work: () => Promise<T>): Promise<T> {
+    const release = this.hold();
+    try {
+      return await work();
+    } finally {
+      release();
+    }
   }
 
   /** The URL of a path relative to the service root (or of a link TM1 sent), as sent: not
@@ -255,8 +284,22 @@ export class Connection {
   }
 
   /** Sends a request with the session cookie, logging in again once on 401; a second 401 is a
-   * `Tm1AuthenticationException` of kind `Unauthenticated`. */
-  async send(
+   * `Tm1AuthenticationException` of kind `Unauthenticated`. The session is busy ({@link isBusy})
+   * until it has its answer. */
+  send(
+    method: string,
+    url: string,
+    body: Uint8Array | undefined,
+    contentType: string | undefined,
+    headers: Readonly<Record<string, string>>,
+    accept: string,
+    timeout: number | undefined,
+    signal: AbortSignal | undefined,
+  ): Promise<Reply> {
+    return this.busy(() => this.exchange(method, url, body, contentType, headers, accept, timeout, signal));
+  }
+
+  private async exchange(
     method: string,
     url: string,
     body: Uint8Array | undefined,

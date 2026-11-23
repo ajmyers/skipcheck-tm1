@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  Json,
   ODataPath,
   ODataQuery,
   Tm1Authenticator,
@@ -13,7 +14,7 @@ import {
   Tm1SessionPool,
   type Tm1SessionPoolBuilder,
 } from "../../src/index.js";
-import { eventually, ManualClock, ScriptedTm1 } from "../support/scripted-tm1.js";
+import { eventually, ManualClock, Pending, ScriptedTm1, settle } from "../support/scripted-tm1.js";
 
 const SERVER = Tm1Request.get(ODataPath.of("Server"), ODataQuery.none());
 const MINUTE = 60_000;
@@ -93,6 +94,89 @@ describe("Tm1SessionPool", () => {
       time.advance(9 * MINUTE);
       expect(pool.session(Tm1Identity.impersonating("alice"))).toBe(alice);
     }
+  });
+
+  it("keeps a session while a request is running on it", async () => {
+    const answer = new Pending();
+    tm1.on("GET Server", answer.reply);
+    const alice = pool.session(Tm1Identity.impersonating("alice"));
+    const result = alice.execute(SERVER);
+    await settle();
+
+    time.advance(25 * MINUTE);
+    expect(pool.stats().evictedIdle, "a running request is use").toBe(0);
+    expect(alice.isClosed()).toBe(false);
+
+    answer.answer(ScriptedTm1.json(200, "{}"));
+    expect(await result).toEqual({});
+    time.advance(12 * MINUTE);
+    expect(pool.stats().evictedIdle, "idle once it has finished").toBe(1);
+    expect(alice.isClosed()).toBe(true);
+  });
+
+  it("closes an evicted session only once its requests have finished", async () => {
+    await pool.close();
+    pool = build((b) => b.maxAge(30 * MINUTE));
+    const answer = new Pending();
+    tm1.on("GET Server", answer.reply);
+    const alice = pool.session(Tm1Identity.impersonating("alice"));
+    const result = alice.execute(SERVER);
+    await settle();
+
+    time.advance(40 * MINUTE);
+    expect(pool.stats().evictedAge, "out of the pool at its age").toBe(1);
+    expect(alice.isClosed(), "but open for the request still running").toBe(false);
+
+    answer.answer(ScriptedTm1.json(200, "{}"));
+    expect(await result).toEqual({});
+    time.advance(31_000);
+    expect(alice.isClosed()).toBe(true);
+  });
+
+  it("counts a stream as running until it is finished or stopped", async () => {
+    tm1
+      .on("GET Cubes", () => ScriptedTm1.json(200, '{"value":[{"Name":"a"}],"@odata.nextLink":"Cubes?$skiptoken=2"}'))
+      .on("GET Cubes?$skiptoken=2", () => ScriptedTm1.json(200, '{"value":[{"Name":"b"}]}'));
+    const alice = pool.session(Tm1Identity.impersonating("alice"));
+    const cubes = alice.stream(Tm1Request.list<{ Name: string }>(ODataPath.of("Cubes"), ODataQuery.none()))[Symbol.asyncIterator]();
+    expect((await cubes.next()).value).toEqual({ Name: "a" });
+
+    // The caller is slow with the first page: the next is still to be asked for
+    time.advance(25 * MINUTE);
+    expect(pool.stats().evictedIdle, "a stream being read is use").toBe(0);
+    expect((await cubes.next()).value).toEqual({ Name: "b" });
+    expect((await cubes.next()).done).toBe(true);
+
+    time.advance(12 * MINUTE);
+    expect(pool.stats().evictedIdle, "idle once it has finished").toBe(1);
+
+    const again = pool.session(Tm1Identity.impersonating("alice"));
+    for await (const cube of again.stream(Tm1Request.list<{ Name: string }>(ODataPath.of("Cubes"), ODataQuery.none()))) {
+      expect(cube.Name).toBe("a");
+      break;
+    }
+    time.advance(12 * MINUTE);
+    expect(pool.stats().evictedIdle, "and once it has been stopped").toBe(2);
+  });
+
+  it("counts an async request as running while it is polled", async () => {
+    const run = Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.ExecuteWithReturn"), null, Json);
+    const done = new Pending();
+    tm1
+      .on("POST Processes('p')/tm1.ExecuteWithReturn", () => ScriptedTm1.bytes(202, new Uint8Array(), "text/plain", { location: "../_async('a1')" }))
+      .onEach("GET _async('a1')", () => ScriptedTm1.status(202), done.reply);
+    const alice = pool.session(Tm1Identity.impersonating("alice"));
+    // Between its polls no request is being sent: a minute apart, so the test's clock decides
+    const cancel = new AbortController();
+    const result = alice.withAsync(60_000).execute(run, { signal: cancel.signal });
+    await eventually(() => tm1.requests("GET _async('a1')").length === 1, "for the first poll");
+    await settle();
+
+    time.advance(25 * MINUTE);
+    expect(pool.stats().evictedIdle, "waiting to poll is use").toBe(0);
+    expect(alice.isClosed()).toBe(false);
+    cancel.abort();
+    await expect(result).rejects.toBeDefined();
   });
 
   it("evicts a session past its maximum age even if in use", async () => {

@@ -33,6 +33,9 @@ export const Tm1Clock = {
 
 type Reason = "idle" | "age" | "size";
 
+/** How often an evicted session with a request still running is looked at again, in milliseconds. */
+const BUSY_RECHECK = 1_000;
+
 interface Entry {
   readonly identity: Tm1Identity;
   readonly session: Tm1Session;
@@ -53,9 +56,15 @@ interface Entry {
  *   sends nothing; the session logs in on its first request.
  * - **Eviction** happens when a session has been idle for `idleTimeout`, is older than `maxAge`, or
  *   the pool is over `maxSize` (least recently used first). It's checked on each {@link session}
- *   call and every `sweepInterval`.
- * - **An evicted session is closed after `closeGrace`**, so requests already running on it can
- *   finish. The next request for that identity gets a new session.
+ *   call and every `sweepInterval`. A session with a request running isn't idle, however long ago
+ *   it was asked for.
+ * - **An evicted session is closed after `closeGrace`**, or when the requests running on it have
+ *   finished, if that's later: closing it would end them on TM1. The next request for that identity
+ *   gets a new session.
+ * - **A request is running** from when it's sent (or waits for the login) until it's answered in
+ *   full, fails or is cancelled: an async request while it's polled, and a stream until it's
+ *   finished or stopped. A stream that is never finished or stopped (an iterator dropped half way,
+ *   without `return()`) keeps its session open until the pool closes.
  * - **{@link close}** closes every session at once, and the pool refuses new ones.
  * - **Nothing falls back:** a refused identity fails, and the pool never uses another identity in
  *   its place.
@@ -205,6 +214,11 @@ export class Tm1SessionPool implements AsyncDisposable {
   /** Why `entry` has expired at `now`, or undefined if it hasn't. */
   private expiry(entry: Entry, now: number): Reason | undefined {
     if (now - entry.createdAt >= this.maxAge) return "age";
+    if (entry.session.isBusy()) {
+      // A request running on it is use, however long ago the session was asked for
+      entry.lastUsed = now;
+      return undefined;
+    }
     if (now - entry.lastUsed >= this.idleTimeout) return "idle";
     return undefined;
   }
@@ -218,7 +232,9 @@ export class Tm1SessionPool implements AsyncDisposable {
     }
   }
 
-  /** Removes a session and closes it after the grace period. */
+  /** Removes a session and closes it after the grace period, or once no request is running on it if
+   * that's later, looking again every {@link BUSY_RECHECK}: closing it sooner would end those
+   * requests on TM1. */
   private evict(entry: Entry, reason: Reason): void {
     this.entries.delete(entry.identity.key());
     if (reason === "idle") this.evictedIdle++;
@@ -227,6 +243,10 @@ export class Tm1SessionPool implements AsyncDisposable {
     const session = entry.session;
     const pending: { timer: unknown; started?: Promise<void> } = { timer: undefined };
     const close = (): void => {
+      if (session.isBusy()) {
+        pending.timer = this.clock.setTimeout(close, BUSY_RECHECK);
+        return;
+      }
       // Detached on purpose: a failure to close is the session's own, and isn't the caller's
       pending.started = session.close().then(
         () => {
@@ -317,8 +337,9 @@ export class Tm1SessionPoolBuilder {
     return this;
   }
 
-  /** How long an evicted session stays open before it's closed, so requests already running on it
-   * can finish. Default 30 s; zero closes at once. */
+  /** How long an evicted session stays open before it's closed, for a caller that got it just before
+   * and hasn't sent its request yet. A session with a request running stays open until that
+   * finishes, however long the grace period. Default 30 s; zero closes at once. */
   closeGrace(ms: number): this {
     if (typeof ms !== "number" || !(ms >= 0)) throw new RangeError("closeGrace must not be negative: " + ms);
     this.closeGraceMs = ms;

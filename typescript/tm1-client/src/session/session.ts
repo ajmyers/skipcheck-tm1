@@ -73,6 +73,11 @@ export class Tm1Session implements AsyncDisposable {
     return this.connection.isClosed;
   }
 
+  /** @internal Whether a request is running on the session, through any view of it. */
+  isBusy(): boolean {
+    return this.connection.isBusy;
+  }
+
   // Views
 
   /** A view of this session whose requests run in sandbox `name`: each gets TM1's `!sandbox` query
@@ -208,11 +213,18 @@ export class Tm1Session implements AsyncDisposable {
   private async *items<T>(request: Tm1Request<T>, first: Page<T>, signal: AbortSignal | undefined): AsyncGenerator<T> {
     // The link carries the query and TM1's options already
     const later = request.withQuery(ODataQuery.none());
-    for (let page = first; ;) {
-      yield* page.items;
-      if (page.nextLink === undefined) return;
-      // Next links are opaque: resolved against the service root, never changed
-      page = readPage(later, await this.send(later, this.connection.url(page.nextLink), signal, true));
+    // A stream is a request still running until it is finished or stopped, however long the caller
+    // takes over a page: a pool keeps its session open meanwhile
+    const release = this.connection.hold();
+    try {
+      for (let page = first; ;) {
+        yield* page.items;
+        if (page.nextLink === undefined) return;
+        // Next links are opaque: resolved against the service root, never changed
+        page = readPage(later, await this.send(later, this.connection.url(page.nextLink), signal, true));
+      }
+    } finally {
+      release();
     }
   }
 
@@ -243,16 +255,10 @@ export class Tm1Session implements AsyncDisposable {
     let reply: Reply;
     // Raw bytes (document content) aren't sent async
     if (!ordinary && this.asyncEvery !== undefined && request.response !== "Bytes" && !(request.body instanceof Uint8Array)) {
-      reply = await this.sendRespondAsync(
-        request.method,
-        url,
-        content,
-        contentType,
-        request.headers,
-        request.accept(),
-        request.timeout,
-        this.asyncEvery,
-        signal,
+      // Running until its result is read, the waits between polls included
+      const every = this.asyncEvery;
+      reply = await this.connection.busy(() =>
+        this.sendRespondAsync(request.method, url, content, contentType, request.headers, request.accept(), request.timeout, every, signal),
       );
     } else {
       reply = await this.connection.send(request.method, url, content, contentType, request.headers, request.accept(), request.timeout, signal);
