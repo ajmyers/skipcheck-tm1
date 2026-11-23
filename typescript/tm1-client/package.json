@@ -55,6 +55,6 @@
   },
   "devDependencies": {
     "@skipcheck/tm1-testcontainers": "*",
-    "testcontainers": "11.14.0"
+    "testcontainers": "12.2.2"
   }
 }

@@ -52,7 +52,7 @@
     "prepack": "npm run build && node ../scripts/copy-license.mjs"
   },
   "dependencies": {
-    "testcontainers": "11.14.0"
+    "testcontainers": "12.2.2"
   },
   "peerDependencies": {
     "@skipcheck/tm1-client": "*",
