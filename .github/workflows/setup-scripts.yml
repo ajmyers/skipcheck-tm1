@@ -14,12 +14,10 @@
 #            runner's Docker service hasn't started yet).
 name: Setup scripts
 
+# Runs as part of CI (ci.yml calls it), so its result counts towards the required ci-ok check.
 on:
-  push:
-    branches: [master]
-    paths: ['docker/tm1-server/**', '.github/workflows/setup-scripts.yml']
-  pull_request:
-    paths: ['docker/tm1-server/**', '.github/workflows/setup-scripts.yml']
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read

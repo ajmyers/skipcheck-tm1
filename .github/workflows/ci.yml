@@ -89,12 +89,21 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
+  # The scripts under docker/, which have workflows of their own. They run on every change, not
+  # only one to their folder: a required check can't wait for a workflow that didn't start, and
+  # each takes under a minute
+  paw:
+    uses: ./.github/workflows/paw.yml
+
+  setup-scripts:
+    uses: ./.github/workflows/setup-scripts.yml
+
   # The one check the master ruleset requires: it passes only when every job above did, whatever
   # their matrices are called. It always runs: a job that's skipped because one it needs failed
   # would count as passing. A new job goes in its needs.
   ci-ok:
     if: always()
-    needs: [build, license, python, dotnet, typescript]
+    needs: [build, license, python, dotnet, typescript, paw, setup-scripts]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

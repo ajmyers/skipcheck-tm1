@@ -5,11 +5,10 @@
 # missing zip, a file that isn't a PAW zip, and a license that hasn't been accepted.
 name: paw
 
+# Runs as part of CI (ci.yml calls it), so its result counts towards the required ci-ok check.
 on:
-  push:
-    paths: ['docker/paw/**', '.github/workflows/paw.yml']
-  pull_request:
-    paths: ['docker/paw/**', '.github/workflows/paw.yml']
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,6 +16,7 @@ permissions:
 jobs:
   paw-local:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     defaults:
       run:
         working-directory: docker/paw
