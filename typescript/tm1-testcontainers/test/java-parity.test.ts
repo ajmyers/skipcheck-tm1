@@ -179,21 +179,23 @@ describe("Java parity", () => {
       for (const c of components(record[1]!)) if (!d!.members.has(c)) problems.push(`${name}: no property ${c}`);
       if (!d!.constructors.some((c) => subsequence(components(record[1]!), c))) problems.push(`${name}: no constructor takes the record's components`);
     }
-    for (const n of source.matchAll(/^\t(?:public\s+)?(?:static\s+)?(?:final\s+)?(record|enum|class)\s+(\w+)(?:\(([^)]*)\))?/gm)) {
-      const inner = TS.get(name + "." + n[2]);
+    for (const n of source.matchAll(/^\t(public\s+)?(?:static\s+)?(?:final\s+)?(record|enum|class)\s+(\w+)(?:\(([^)]*)\))?/gm)) {
+      // A class's nested type without "public" is package-private (an interface's are public)
+      if (n[1] === undefined && !isInterface) continue;
+      const inner = TS.get(name + "." + n[3]);
       if (!inner) {
-        problems.push(`no nested ${n[1]} ${name}.${n[2]}`);
+        problems.push(`no nested ${n[2]} ${name}.${n[3]}`);
         continue;
       }
-      if (n[1] === "record") {
-        for (const c of components(n[3]!)) if (!inner.members.has(c)) problems.push(`${name}.${n[2]}: no property ${c}`);
-        if (!inner.constructors.some((c) => subsequence(components(n[3]!), c))) problems.push(`${name}.${n[2]}: no constructor takes the record's components`);
+      if (n[2] === "record") {
+        for (const c of components(n[4]!)) if (!inner.members.has(c)) problems.push(`${name}.${n[3]}: no property ${c}`);
+        if (!inner.constructors.some((c) => subsequence(components(n[4]!), c))) problems.push(`${name}.${n[3]}: no constructor takes the record's components`);
       }
-      if (n[1] === "enum") {
+      if (n[2] === "enum") {
         const body = source.slice(n.index);
         for (const c of body.matchAll(/^\t\t([A-Z][A-Z_0-9]*)\(/gm))
-          if (!inner.members.get(c[1]!)?.some((m) => m.isStatic)) problems.push(`${name}.${n[2]}: no enum constant ${c[1]}`);
-        checkMembers(name + "." + n[2], javaMembers(body.slice(0, body.indexOf("\n\t}")), 2, false), inner, problems);
+          if (!inner.members.get(c[1]!)?.some((m) => m.isStatic)) problems.push(`${name}.${n[3]}: no enum constant ${c[1]}`);
+        checkMembers(name + "." + n[3], javaMembers(body.slice(0, body.indexOf("\n\t}")), 2, false), inner, problems);
       }
     }
     checkMembers(name, javaMembers(source, 1, isInterface), d!, problems);
@@ -202,7 +204,9 @@ describe("Java parity", () => {
 
   it("the environment's builder has every builder method", () => {
     const source = javaFile("PlanningAnalyticsEnvironment");
-    const builder = source.slice(source.indexOf("public static final class Builder"));
+    const from = source.slice(source.indexOf("public static final class Builder"));
+    // Up to the Builder's closing brace: the package-private types after it aren't the builder's
+    const builder = from.slice(0, from.indexOf("\n\t}\n"));
     const problems: string[] = [];
     checkMembers("PlanningAnalyticsEnvironment.Builder", javaMembers(builder, 2, false), TS.get("PlanningAnalyticsEnvironment.Builder")!, problems);
     expect(problems).toEqual([]);

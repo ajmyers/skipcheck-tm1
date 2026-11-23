@@ -77,13 +77,18 @@ public partial class JavaParityTests
         }
         var isInterface = Regex.IsMatch(source, $@"interface\s+{name}\b");
         CheckConstants(name, source, type!, isInterface, problems);
-        foreach (Match r in Regex.Matches(source, @"^\t(?:public\s+)?(?:static\s+)?(?:final\s+)?(record|enum|class)\s+(\w+)", RegexOptions.Multiline))
+        foreach (Match r in Regex.Matches(source, @"^\t(public\s+)?(?:static\s+)?(?:final\s+)?(record|enum|class)\s+(\w+)", RegexOptions.Multiline))
         {
-            var nested = r.Groups[2].Value;
+            // A class's nested type without "public" is Java's own (an interface's is public anyway)
+            if (!isInterface && !r.Groups[1].Success)
+            {
+                continue;
+            }
+            var nested = r.Groups[3].Value;
             var dotnet = Renamed.TryGetValue(name + "." + nested, out var renamed) ? renamed.DotNet : nested;
             if (type!.GetNestedType(dotnet) is null)
             {
-                problems.Add($"no nested {r.Groups[1].Value} {nested} → {dotnet}");
+                problems.Add($"no nested {r.Groups[2].Value} {nested} → {dotnet}");
             }
         }
         CheckMembers(name, Members(source, 1, isInterface), type!, problems);
@@ -95,6 +100,8 @@ public partial class JavaParityTests
     {
         var source = File.ReadAllText(Path.Combine(Repo.JavaSources, "PlanningAnalyticsEnvironment.java"));
         var builder = source[source.IndexOf("public static final class Builder", StringComparison.Ordinal)..];
+        // Up to the Builder's closing brace, not the nested types after it
+        builder = builder[..builder.IndexOf("\n\t}\n", StringComparison.Ordinal)];
         var problems = new List<string>();
         CheckMembers("PlanningAnalyticsEnvironment.Builder", Members(builder, 2, false), typeof(PlanningAnalyticsEnvironment.EnvironmentBuilder), problems);
         Assert.True(problems.Count == 0, string.Join("\n", problems));
