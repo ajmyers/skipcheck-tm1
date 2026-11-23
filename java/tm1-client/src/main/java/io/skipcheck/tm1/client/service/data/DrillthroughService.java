@@ -41,8 +41,8 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>
  * {@code $metadata} declares a relational row ({@code DrillthroughRow}) with no
- * properties and not open, so its columns would all be lost in a record: relational rows
- * come as {@code JsonNode}. A rowset's rows ({@code RowsetRow}) are open, and keep theirs
+ * properties and not open, so its columns would all be lost in a typed row: relational
+ * rows come as plain JSON. A rowset's rows ({@code RowsetRow}) are open, and keep theirs
  * in {@code dynamicProperties}.
  *
  * <p>

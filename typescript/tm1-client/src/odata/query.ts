@@ -14,7 +14,7 @@ function pathOf(p: string | ODataProperty): string {
 
 /** OData query options: `$select`, `$expand` (with nested options), `$filter`, `$orderby`, `$top`,
  * `$skip`, `$count`, custom options such as TM1's `!sandbox`, and parameter aliases. Immutable:
- * each method returns a new query, as the Java client's `ODataQuery`:
+ * each method returns a new query:
  * ```ts
  * ODataQuery.none().select("Name", "Type").expand("Hierarchies", (h) => h.select("Name").top(5))
  * ```

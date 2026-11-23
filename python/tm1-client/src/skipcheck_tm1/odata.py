@@ -554,7 +554,7 @@ _MISSING: Any = object()
 class ODataQuery:
     """OData query options: ``$select``, ``$expand`` (with nested options), ``$filter``,
     ``$orderby``, ``$top``, ``$skip``, ``$count``, custom options such as TM1's ``!sandbox``,
-    and parameter aliases. Immutable: each method returns a new query, as the Java client's::
+    and parameter aliases. Immutable: each method returns a new query::
 
         ODataQuery.none().select("Name", "Type") \\
             .expand("Hierarchies", lambda h: h.select("Name").top(5)) \\

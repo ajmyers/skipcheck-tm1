@@ -11,7 +11,8 @@
 //                                                    Java by java/tools/docs-doclet, Python by
 //                                                    extract/python_api.py
 //   a type's overview                                the Java type's Javadoc, with its {@snippet}s
-//                                                    replaced by that region in the page's language
+//                                                    replaced by that region in the page's language,
+//                                                    and the Java names in it named the page's way
 //   which member is which across languages           the parity rule each language's tests enforce:
 //                                                    modelCubes is model_cubes in Python, and each
 //                                                    language's members-excluded.txt (members.mjs)
@@ -19,15 +20,16 @@
 //   TM1's own types (Cube, Dimension...)             spec/tm1-api.json
 //
 // It fails when a language lacks an example the Java documentation quotes, or a Java member its
-// members-excluded.txt doesn't list (--allow-missing lists them instead), and writes
+// members-excluded.txt doesn't list, or when an overview in another language names what only Java
+// has (--allow-missing lists them instead), and writes
 // .generated/site.json for the Worker.
 //
 //   node scripts/reference.mjs [--allow-missing]
 
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { checkMembers, findMember, listFile, memberCandidates, readList, stale, typeCandidates } from './members.mjs';
+import { checkMembers, findMember, guessMember, javaIsms, javaOnlyNames, languageNames, listFile, readList, stale, typeCandidates, withoutComments } from './members.mjs';
 import { searchIndex } from './search.mjs';
 import { CANONICAL_ORIGIN, copyAssets, dedent, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, SECTIONS } from './site.mjs';
 import { walkthroughsOf } from './walkthroughs.mjs';
@@ -72,6 +74,12 @@ function areaOf(type) {
 }
 
 // ---- doc comments -------------------------------------------------------------
+
+// Java's literals and Object's methods in a {@code}, as each language writes them
+const LITERALS = {
+	python: { null: 'None', true: 'True', false: 'False', equals: '__eq__', hashCode: '__hash__', toString: '__str__' },
+	dotnet: { equals: 'Equals', hashCode: 'GetHashCode', toString: 'ToString' },
+};
 
 /** The end of the inline tag that opens at open: braces nest. */
 function closing(text, open) {
@@ -132,11 +140,16 @@ function javadocHtml(doc, page) {
 				at = close + 1 + after[0].length;
 				continue;
 			}
-		} else if (tag === 'code' || tag === 'literal') {
-			html += tag === 'code' ? '<code>' + escape(body) + '</code>' : escape(body);
+		} else if (tag === 'code') {
+			html += page.code ? page.code(body) : '<code>' + escape(body) + '</code>';
+		} else if (tag === 'literal') {
+			html += escape(body);
+		} else if (tag === 'value' && body) {
+			html += page.value ? page.value(body) : '<code>' + escape(body) + '</code>';
 		} else if (tag === 'link' || tag === 'linkplain') {
-			const [target, ...label] = body.split(/\s+/);
-			html += page.link(target, label.join(' '), tag === 'link');
+			// The target ends at the first space outside its parameter list: #withCredentials(String, Tm1Authenticator)
+			const [, target, label = ''] = /^([^\s(]*(?:\([^)]*\))?)\s*([\s\S]*)$/.exec(body);
+			html += page.link(target, label.trim(), tag === 'link');
 		} else if (tag === 'inheritDoc') {
 			// nothing to inherit from here
 		} else {
@@ -281,6 +294,22 @@ async function api(project, language) {
 
 const spec = await readJson(path.join(repoDir, 'spec', 'tm1-api.json'));
 const specTypes = new Map([...spec.types, ...spec.enums].map((t) => [t.name, t]));
+// A language's code for a project, its sources and its examples, without comments: the names it has
+const CODE = {
+	python: (project) => ({ dirs: [project.python, path.join('python', project.id, 'examples')], ext: '.py' }),
+	dotnet: (project) => ({ dirs: [path.join('dotnet', 'src', project.dotnet), path.join('dotnet', 'examples', project.dotnet + '.Examples')], ext: '.cs' }),
+	typescript: (project) => ({ dirs: [path.join('typescript', project.id, 'src'), path.join('typescript', project.id, 'examples')], ext: '.ts' }),
+};
+async function codeOf(project, language) {
+	const { dirs, ext } = CODE[language](project);
+	let text = '';
+	for (const dir of dirs) {
+		const files = await readdir(path.join(repoDir, dir), { recursive: true }).catch(() => []);
+		for (const file of files.filter((f) => f.endsWith(ext)).sort()) text += withoutComments(await readFile(path.join(repoDir, dir, file), 'utf8'), language) + '\n';
+	}
+	return text;
+}
+
 const packageNames = {
 	typescript: async (project) => JSON.parse(await readFile(path.join(repoDir, 'typescript', project.id, 'package.json'), 'utf8')).name,
 };
@@ -291,9 +320,11 @@ const missing = new Set();
 // Java members a language lacks, unlisted, and lines of the lists that are wrong
 const memberFaults = [];
 const lists = new Map();
-// Pages showing Java code in another language, and overviews with fewer examples than Java's
+// Pages showing Java code in another language, overviews with fewer examples than Java's, and
+// overviews naming what only Java has
 const foreign = [];
 const fewer = [];
+const javaWords = [];
 // Every path the Worker serves: the projects, the Docker pages and the docs landing page
 const site = { projects: SECTIONS, guide: {} };
 let pageCount = 0;
@@ -310,6 +341,13 @@ for (const project of PROJECTS) {
 		const found = await api(project, language);
 		if (!found) throw new Error('No ' + language + ' API for ' + project.id);
 		apis[language] = found;
+	}
+	// Each language's names, and the Java names it doesn't have
+	const names = {};
+	const javaOnly = {};
+	for (const language of languages.filter((l) => l !== 'java')) {
+		names[language] = languageNames(apis[language], await codeOf(project, language));
+		javaOnly[language] = javaOnlyNames(types, names[language]);
 	}
 	const out = path.join(distDir, project.id, 'docs');
 	await rm(out, { recursive: true, force: true });
@@ -352,6 +390,9 @@ for (const project of PROJECTS) {
 		const nameOf = (javaType) => counterpartOf(javaType).name;
 		const pageOf = (javaType) => nameOf(javaType) + '.html';
 		const byJavaSimple = new Map(here.map((t) => [t.name.split('.').at(-1), t]));
+		const simpleCount = new Map();
+		for (const t of here) simpleCount.set(t.name.split('.').at(-1), (simpleCount.get(t.name.split('.').at(-1)) ?? 0) + 1);
+		const byJavaName = new Map(here.map((t) => [t.name, t]));
 		const byName = new Map(here.map((t) => [nameOf(t), t]));
 		const nav = navHtml(project, language, here, pageOf, nameOf);
 		// Each page's members, for the search index (search.mjs)
@@ -359,6 +400,19 @@ for (const project of PROJECTS) {
 
 		for (const javaType of here) {
 			const type = counterpartOf(javaType);
+			// A Java type a comment names: as written (Tm1Client.Builder), else nested in this type or its
+			// outer type (Builder, in PlanningAnalyticsEnvironment), else by its simple name if one type has it
+			const outer = javaType.name.split('.')[0];
+			const javaTypeNamed = (name) =>
+				byJavaName.get(name) ?? byJavaName.get(javaType.name + '.' + name) ?? byJavaName.get(outer + '.' + name) ?? (simpleCount.get(name.split('.').at(-1)) === 1 ? byJavaSimple.get(name.split('.').at(-1)) : null) ?? null;
+			// A Java member's name in this language, its kind there, and whether the page has it
+			const memberName = (owner, javaName) => {
+				const javaMember = owner?.members.find((m) => m.name === javaName) ?? { name: javaName, kind: 'method' };
+				const found = owner ? findMember(language, javaMember, counterpartOf(owner), renamedIn(language, owner.name + '.' + javaName)) : null;
+				// has: the page has an anchor for it. Java's findMember answers even for a member Java's model
+				// lacks (Testcontainers' withReuse, AutoCloseable's close), which has none
+				return found ? { name: found.name, kind: found.kind, has: counterpartOf(owner).members.some((m) => m.name === found.name) } : { name: guessMember(language, javaMember, names[language]), kind: javaMember.kind, has: false };
+			};
 			// Examples are read up front, so rendering stays synchronous
 			const exampleBlocks = new Map();
 			for (const doc of [javaType.doc, ...javaType.members.map((m) => m.doc)]) {
@@ -383,26 +437,63 @@ for (const project of PROJECTS) {
 				link(target, linkLabel, asCode) {
 					const [typePart, memberPart] = target.split('#');
 					const simple = typePart.replace(/^.*\.(?=[A-Z])/, '');
-					const owner = simple ? byJavaSimple.get(simple.split('.').at(-1)) : javaType;
-					let member = '';
-					if (memberPart) {
-						const javaName = memberPart.replace(/\(.*$/, '');
-						const javaMember = owner?.members.find((m) => m.name === javaName) ?? { name: javaName, kind: 'method' };
-						member = owner ? (findMember(language, javaMember, counterpartOf(owner), renamedIn(language, owner.name + '.' + javaName))?.name ?? '') : '';
-						if (!member) member = memberCandidates(language, javaMember, '')[0];
-					}
+					const owner = simple ? javaTypeNamed(simple) : javaType;
+					const member = memberPart ? memberName(owner, memberPart.replace(/\(.*$/, '')) : null;
 					const ownerName = owner ? nameOf(owner) : simple;
-					const shown = linkLabel || [simple ? ownerName : '', member].filter(Boolean).join('.');
+					const shown = linkLabel || [simple ? ownerName : '', member?.name].filter(Boolean).join('.');
 					const text = asCode ? '<code>' + escape(shown) + '</code>' : escape(shown);
-					if (owner) {
-						const has = member && counterpartOf(owner).members.some((m) => m.name === member);
-						return '<a href="' + pageOf(owner) + (has ? '#' + member : '') + '">' + text + '</a>';
-					}
+					if (owner) return '<a href="' + pageOf(owner) + (member?.has ? '#' + member.name : '') + '">' + text + '</a>';
 					if (simple && specTypes.has(simple)) {
 						usesModel.add(simple);
 						return '<a href="../model/' + simple + '.html">' + text + '</a>';
 					}
 					return text;
+				},
+				// {@code ...}: a Java type or member named in it is named the page's way (Tm1Client.withSandbox
+				// is Tm1Client.with_sandbox in Python), a literal the language's (null is None in Python), and
+				// anything else (a TM1 name, a path, a value) is shown as written
+				code(text) {
+					const plain = '<code>' + escape(text) + '</code>';
+					if (language === 'java') return plain;
+					if (LITERALS[language]?.[text]) return '<code>' + LITERALS[language][text] + '</code>';
+					const ref = /^((?:[A-Za-z_$][\w$]*[.#])*)([A-Za-z_$][\w$]*)(\([^)]*\))?$/.exec(text);
+					if (!ref) return plain;
+					const [, qualifier, last, args = ''] = ref;
+					const path = qualifier.replace(/[.#]$/, '');
+					let owner = path ? javaTypeNamed(path) : null;
+					let javaName = last;
+					if (!path) {
+						// A type, or a member of this type or of a type nested in it (a builder's)
+						owner = /^[A-Z]/.test(last) && !args ? javaTypeNamed(last) : null;
+						if (owner) javaName = null;
+						else owner = [javaType, ...here.filter((t) => t.name.startsWith(javaType.name + '.'))].find((t) => t.members.some((m) => m.name === last && m.kind !== 'constructor')) ?? null;
+						if (!owner) return plain;
+					} else if (!owner || !owner.members.some((m) => m.name === last)) {
+						// Not a member: a nested type (Tm1Source.PrivateImage), or not Java's at all
+						owner = javaTypeNamed(path + '.' + last);
+						if (!owner) {
+							// A member of a type with no page here, such as a model type's builder
+							// (ChoreTaskPatch.Builder#bindProcess): named by the rule, if the language has that name
+							const guessed = /^[A-Z]/.test(path) && /^[a-z]/.test(last) ? guessMember(language, { name: last, kind: 'method' }, names[language]) : null;
+							return guessed && names[language].has(guessed) ? '<code>' + escape(path.replaceAll('#', '.') + '.' + guessed + args) + '</code>' : plain;
+						}
+						javaName = null;
+					}
+					const member = javaName ? memberName(owner, javaName) : null;
+					// A Java method that's a property in this language loses its parentheses
+					const shownArgs = member && member.kind !== 'method' && member.kind !== 'constructor' ? '' : args;
+					const shown = [path || !javaName ? nameOf(owner) : '', member?.name].filter(Boolean).join('.') + shownArgs;
+					// A member with no anchor on the page (one inherited from outside the library) stays plain code
+					if (member && !member.has) return '<code>' + escape(shown) + '</code>';
+					return '<a href="' + pageOf(owner) + (member ? '#' + member.name : '') + '"><code>' + escape(shown) + '</code></a>';
+				},
+				// {@value Type#CONSTANT}: the constant's value, as Javadoc shows it, or its name if the model has no value
+				value(target) {
+					const [typePart, memberPart = ''] = target.split('#');
+					const owner = typePart ? javaTypeNamed(typePart.replace(/^.*\.(?=[A-Z])/, '')) : javaType;
+					const constant = owner?.members.find((m) => m.name === memberPart);
+					if (constant?.value !== undefined) return '<code>' + escape(constant.value) + '</code>';
+					return this.link(target, '', true);
 				},
 			};
 			const linkTypes = (signature) =>
@@ -427,6 +518,8 @@ for (const project of PROJECTS) {
 			if (language !== 'java') {
 				const javaBlocks = (javaDescription.match(/\{@snippet|<pre[^>]*>\s*\{@code/g) ?? []).length;
 				if (blocks(overview) < javaBlocks) fewer.push(project.id + ' ' + language + ' ' + javaType.name + ' (' + blocks(overview) + ' of ' + javaBlocks + ')');
+				const words = javaIsms(overview, javaOnly[language]);
+				if (words.length > 0) javaWords.push(project.id + ' ' + language + ' ' + javaType.name + ': ' + words.join(', '));
 			}
 
 			// Members: this language's own, each with Java's examples where Java's has them
@@ -690,6 +783,11 @@ if (foreign.length > 0) {
 	const line = list.length + ' page(s) show Java code in another language: give the type an examples region in each language, or a doc comment of its own with its own examples';
 	if (!allowMissing) throw new Error(line + ':\n  ' + list.join('\n  '));
 	console.warn(line + ':\n  ' + list.join('\n  '));
+}
+if (javaWords.length > 0) {
+	const line = javaWords.length + " overview(s) name what only Java has: word the Javadoc for every language, or name it in a {@code} or {@link} the page can translate (members.mjs, javaIsms)";
+	if (!allowMissing) throw new Error(line + ':\n  ' + javaWords.join('\n  '));
+	console.warn(line + ':\n  ' + javaWords.join('\n  '));
 }
 for (const [file, { entries, used }] of lists) for (const fault of stale(entries, used)) memberFaults.push(file + ': ' + fault);
 if (memberFaults.length > 0) {

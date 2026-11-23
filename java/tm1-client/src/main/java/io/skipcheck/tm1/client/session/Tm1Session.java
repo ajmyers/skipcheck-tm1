@@ -30,7 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * One TM1 session, shared by every service. Thread-safe, and safe to share between any
- * number of concurrent subscribers: TM1 runs requests on one session in parallel.
+ * number of concurrent callers: TM1 runs requests on one session in parallel.
  *
  * <ul>
  * <li><b>Login is lazy and happens once.</b> The first request logs in, and concurrent

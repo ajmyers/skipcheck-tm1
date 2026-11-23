@@ -33,8 +33,8 @@ import reactor.core.publisher.Mono;
  * <p>
  * Parameters go as a map of name to value, in order; a numeric parameter needs a number,
  * not text. Running a process returns when it ends, however long that takes: give the
- * request a timeout that fits, and know that cancelling the subscription doesn't stop the
- * process on the server.
+ * request a timeout that fits, and know that cancelling the call doesn't stop the process
+ * on the server.
  *
  * <p>
  * Create a process, compiling it first, since TM1 saves code that doesn't compile:

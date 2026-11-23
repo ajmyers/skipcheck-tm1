@@ -9,8 +9,7 @@ namespace Skipcheck.Tm1.Client.OData;
 
 /// <summary>OData query options: <c>$select</c>, <c>$expand</c> (with nested options),
 /// <c>$filter</c>, <c>$orderby</c>, <c>$top</c>, <c>$skip</c>, <c>$count</c>, custom options such as
-/// TM1's <c>!sandbox</c>, and parameter aliases. Immutable: each method returns a new query, as the
-/// Java client's <c>ODataQuery</c>:
+/// TM1's <c>!sandbox</c>, and parameter aliases. Immutable: each method returns a new query:
 /// <code>ODataQuery.None().Select("Name", "Type").Expand("Hierarchies", h => h.Select("Name").Top(5))</code>
 /// Options are written in a fixed order, and each value is percent-encoded once by
 /// <see cref="ToQueryString"/>. Nested options inside <c>$expand</c> are separated by <c>;</c>.</summary>

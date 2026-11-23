@@ -12,10 +12,9 @@ import reactor.core.publisher.Mono;
  * {@code Tm1Client.batch()} offers the same with a client.
  *
  * <p>
- * Each call through the view returns its own {@code Mono} or {@code Flux}, which
- * completes with that request's result, or fails with its error, once the batch has run;
- * one request's failure doesn't affect the others. Subscribe to them before or after
- * {@link #run()}: each result is kept.
+ * Each call through the view has its own result: that request's value, or its error, once
+ * the batch has run. One request's failure doesn't affect the others. A result is kept,
+ * so it can be waited for before or after {@link #run()}.
  *
  * <p>
  * What TM1 (11.8) does here that you might not expect:

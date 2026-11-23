@@ -18,3 +18,9 @@ ODataError.from -> from_json | from is a Python keyword; it takes the parsed JSO
 ODataLiterals.Raw.odataLiteral | literal() writes a Raw by its literal field; Python's ODataLiteral is a duck-typed odata_literal(), which Raw doesn't need
 Tm1Session.async -> async_every | async is a Python keyword
 Tm1Version.compareTo | Python compares versions with <, <= and the rest (functools.total_ordering)
+Tm1Authenticator -> Authenticator | a Protocol in skipcheck_tm1.auth, whose ready-made authenticators are the module's functions
+Tm1Authenticator.basic | a function of skipcheck_tm1.auth: auth.basic(user, password)
+Tm1Authenticator.camNamespace | a function of skipcheck_tm1.auth: auth.cam_namespace(user, password, namespace)
+Tm1Authenticator.camPassport | a function of skipcheck_tm1.auth: auth.cam_passport(passport), given the passport or a function that returns one
+Tm1Authenticator.cognosLogon | a function of skipcheck_tm1.auth: auth.cognos_logon(dispatcher, namespace, user, password)
+Tm1Authenticator.cognosIdToken | a function of skipcheck_tm1.auth: auth.cognos_id_token(dispatcher, namespace, id_token)
