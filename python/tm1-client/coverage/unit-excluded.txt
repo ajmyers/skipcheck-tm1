@@ -1,0 +1,27 @@
+# Java unit tests (java/tm1-client/src/test/java, less the live *Tm1Test and *BehaviorTest classes
+# and the service tests that record conformance calls) that have no test of the same name in tests/,
+# and why. tests/test_java_unit_parity.py reads this.
+#
+#   ClassName#methodName: reason     one test
+#   ClassName: reason                a whole class
+#
+# Only for a test that has no meaning in this client, with a specific reason. A Java test whose
+# behaviour this client has is ported, under Java's name. A line for a class or a test Java doesn't
+# have, or one tests/ has after all, fails the gate.
+
+# Java-only machinery
+
+ArchitectureTest: ArchUnit rules over Java's compiled classes (Reactor blocking calls, subscribe(), WebClient URI templates, SLF4J, final service classes); tests/test_architecture.py has each rule's Python counterpart, under a Python name because the rules differ (an event loop, not a Reactor chain; the logging module, not SLF4J)
+ConformanceFixturesTest: checks that each fixture in spec/conformance/calls belongs to the Java test class that records it; Java writes the fixtures, this client only replays them (tests/conformance/test_calls.py)
+ApproximateSchemasTest: tests Java's ApproximateSchemas, metadata tooling that derives older schemas from the snapshot for Java's capability tests; this client has no such tooling, and its capability tests use a hand-written older schema (OLD_SERVER in tests/test_views.py)
+MetadataSnapshotTest: checks Java's CSDL document model (CsdlDocument, CsdlRevision, Signatures) of the committed snapshot; this client parses $metadata only into Tm1Capabilities, with no CSDL model, and tests what it reads from the snapshot in tests/test_views.py and tests/runtime/test_units.py
+MetadataDriftTest: a Java tool that needs a TM1 server (@RequiresTm1) to compare its $metadata with the committed snapshot and write a drift report; the snapshot and its tooling are Java's
+MetadataSnapshotUpdateTest: a Java tool, run by hand against a TM1 server, that writes the committed $metadata snapshot every client reads
+PayloadCaptureTest: a Java tool, run by hand against a TM1 server, that captures the JSON payloads every client's round trip test reads (this client's is test_decodes_and_encodes_back_to_the_same_json)
+GeneratedModelTest: tests Java's generated records, patch builders and Jackson mapping; this client's model is generated pydantic classes, tested by tests shaped to it in tests/test_model.py and tests/test_session.py (subtypes by @odata.type, the enum fallback, patches with explicit nulls, binds)
+
+# This client reads a page of a collection whole, by design, so a stream stopped early leaves no
+# response open: demand within one page is Reactor's
+
+ODataCollectionDecoderTest#asksForBuffersOnlyAsItemsAreTaken: counts the Reactor buffers asked for within one body; this client reads a page whole, and test_asks_for_pages_only_as_items_are_taken checks it asks for no page before its items are wanted
+ODataCollectionDecoderTest#streamsALargeCollectionWithoutReadingAheadOfDemand: checks Java decodes one 100,000-item body no further than the items taken; this client reads a page whole before giving its items
