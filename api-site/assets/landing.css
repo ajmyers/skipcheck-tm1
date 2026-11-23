@@ -20,3 +20,8 @@
     background: var(--chip, #eef2f7);
     font-size: 0.85em;
 }
+
+/* A prompt for a coding agent (prompts.mjs): its text wraps, and the links that open it in Claude sit
+   under it, inside the panel */
+.tabs pre.prompt { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 28rem; overflow-y: auto; }
+.tabs .actions { margin: 0; padding: 0.9rem 1rem 0; border-top: 1px solid var(--rule, #d8d8d8); }

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Checks the links of the pages this site generates: every landing page and docs page in dist/,
-// and every address in the docs for agents (llms.txt and llms-full.txt, from llms.mjs).
+// every address in the docs for agents (llms.txt and llms-full.txt, from llms.mjs), and every
+// address and install command in the prompts for coding agents (prompts.mjs).
 // A link to a path this site serves (a project's, the Docker pages', the docs landing page's)
 // must be a file in dist/; any other local link must be one of the site's own addresses listed
 // below, since those pages live in ajmyers/skipcheck.io and can't be seen from here. Run after the pages are built; it fails with the list of broken links.
@@ -18,6 +19,7 @@
 
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { allPrompts, commandProblems } from './prompts.mjs';
 import { CANONICAL_ORIGIN, distDir, PROJECTS, repoDir, SECTIONS } from './site.mjs';
 
 const repository = /^githubRepo=(.+)$/m.exec(await readFile(path.join(repoDir, 'gradle.properties'), 'utf8'))[1].trim();
@@ -88,6 +90,17 @@ async function checkAddress(address) {
 
 /** The absolute addresses in a text, without the punctuation that ends a sentence or a Markdown link. */
 const addressesIn = (text) => [...text.matchAll(/https?:\/\/[^\s<>"'`)\]]+/g)].map((match) => match[0].replace(/[.,;:!?]+$/, ''));
+
+// The prompts: their addresses, and that every install command is packages.mjs's
+for (const prompt of await allPrompts()) {
+	const where = 'the ' + prompt.project.id + ' prompt' + (prompt.language ? ' in ' + prompt.language : '');
+	for (const address of new Set(addressesIn(prompt.text))) {
+		checked++;
+		const problem = await checkAddress(address);
+		if (problem) broken.push(where + ': ' + address + problem);
+	}
+	broken.push(...(await commandProblems(prompt)));
+}
 
 // The docs for agents
 for (const name of ['llms.txt', 'llms-full.txt']) {

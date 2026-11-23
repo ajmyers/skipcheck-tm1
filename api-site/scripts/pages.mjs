@@ -12,6 +12,8 @@
 //                                language's examples file, which its tests compile or type-check
 //   ::file <path> <language>     a whole file from the repository, such as a configuration example
 //   ::walkthroughs               the project's walkthroughs, as a list of links
+//   ::prompt                     the prompt to hand to a coding agent, in each language, with a
+//                                copy button and links that open it in Claude (prompts.mjs)
 //
 // Under an example's code is what it printed, as the live tests recorded it (output.mjs). On a
 // walkthrough, an example that prints must have its output recorded.
@@ -30,6 +32,7 @@ import path from 'node:path';
 import { inline, parse, slug } from './markdown.mjs';
 import { exampleOutput, strayRecordings } from './output.mjs';
 import { docsVersion, installHtml, packageOf } from './packages.mjs';
+import { promptHtml, promptText } from './prompts.mjs';
 import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, DOC_LANGUAGES, escape, head, languagesOf, PA_DOCKER, PROJECTS, regions, repoDir, siteDir, tabGroup } from './site.mjs';
 import { walkthroughsOf } from './walkthroughs.mjs';
 
@@ -86,6 +89,11 @@ async function directive(project, { name, args }, page) {
 		const list = await walkthroughsOf(project);
 		if (list.length === 0) throw new Error(project.id + ': ::walkthroughs, but content/walkthroughs/' + project.id + ' has none');
 		return '<ul class="points">' + list.map((w) => '<li><a href="walkthroughs/' + w.slug + '/"><strong>' + escape(w.meta.title) + '</strong></a>: ' + inline(w.meta.summary) + '</li>').join('') + '</ul>';
+	}
+	if (name === 'prompt') {
+		const tabs = [];
+		for (const language of languagesOf(project)) tabs.push({ language, html: promptHtml(await promptText(project, language.id, { version })) });
+		return perLanguage(project, tabs, (tab) => '<div class="tabs">' + tab.html + '</div>');
 	}
 	throw new Error(project.id + ': no such directive ::' + name);
 }

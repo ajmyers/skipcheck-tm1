@@ -23,6 +23,7 @@ import path from 'node:path';
 import { Marked } from 'marked';
 import { inline, parse } from './markdown.mjs';
 import { docsVersion } from './packages.mjs';
+import { promptHtml, promptText } from './prompts.mjs';
 import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, escape, head, PA_DOCKER, PROJECTS, repoDir, siteDir } from './site.mjs';
 
 const version = await docsVersion();
@@ -156,11 +157,14 @@ async function build() {
 		if (!meta[key]) throw new Error(path.relative(repoDir, file) + ' has no ' + key + ' in its front matter');
 	}
 	const [lead, ...rest] = sections;
+	// The one directive here is ::prompt, the prompt for a coding agent (prompts.mjs), in no language
+	const prompt = '<div class="tabs">' + promptHtml(await promptText(PA_DOCKER, null, { version })) + '</div>';
 	const blocks = (list) =>
 		list
 			.map((block) => {
 				if (block.type === 'p') return '<p class="more">' + inline(block.text) + '</p>';
-				if (block.type === 'directive') throw new Error(path.relative(repoDir, file) + ': no directives on this page (::' + block.name + ')');
+				if (block.type === 'directive' && block.name === 'prompt') return prompt;
+				if (block.type === 'directive') throw new Error(path.relative(repoDir, file) + ': no such directive on this page (::' + block.name + ')');
 				const items = block.items.map((item) => '<li>' + item.map((part) => (part.type === 'p' ? inline(part.text) : '')).join(' ') + '</li>').join('');
 				return block.type === 'ol' ? '<ol class="numbered">' + items + '</ol>' : '<ul class="points">' + items + '</ul>';
 			})
@@ -190,7 +194,7 @@ async function build() {
 
 	await writeFile(
 		path.join(distDir, PA_DOCKER.id, 'index.html'),
-		head({ title: PA_DOCKER.title + ' · Skipcheck', description: meta.description, canonical: CANONICAL_ORIGIN + root, styles: ['/styles.css', 'assets/landing.css'], scripts: [] }) +
+		head({ title: PA_DOCKER.title + ' · Skipcheck', description: meta.description, canonical: CANONICAL_ORIGIN + root, styles: ['/styles.css', 'assets/tabs.css', 'assets/landing.css'], scripts: [] }) +
 			'<body><main id="main" class="project">' + body + '</main></body></html>\n',
 	);
 	await writeFile(path.join(distDir, PA_DOCKER.id, 'release.json'), JSON.stringify(version) + '\n');

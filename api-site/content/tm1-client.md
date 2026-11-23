@@ -21,6 +21,12 @@ Step by step, with the code in your language and what it printed:
 
 ::walkthroughs
 
+## Build it with an agent
+
+Hand this prompt to a coding agent to build a first prototype. It names the package, how to install it, the docs and the walkthroughs, and asks you for anything it can't work out.
+
+::prompt
+
 ## What's in it
 
 - **A service for each area of TM1:** dimensions, hierarchies, elements and subsets; cubes, views and rules; cellsets, cell writes, sandboxes and drillthrough; processes, chores and debugging; users, groups, sessions and threads; server configuration and logs.

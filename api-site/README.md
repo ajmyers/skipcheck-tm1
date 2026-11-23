@@ -31,6 +31,7 @@ Javadoc; everything else is read from the repository when the pages are built:
 | A Docker page | Its README under `docker/`, as GitHub renders it (`marked`, with GitHub's heading ids). A link to another of those READMEs goes to its page, a link to any other file goes to it on GitHub, and a link to a file that isn't there fails the build. `PA_DOCKER` in `scripts/site.mjs` lists the pages. |
 | The text of a landing page | `content/<project>.md`: Markdown with no code in it. `::install`, `::example <Class> <region>` and `::file <path> <language>` are replaced with the above (`scripts/pages.mjs`, `scripts/markdown.mjs`); `::walkthroughs` lists the project's walkthroughs. |
 | The text of a walkthrough | `content/walkthroughs/<project>/<slug>.md`, written the same way, with its title, summary, description and order in its front matter (`scripts/walkthroughs.mjs`). |
+| A prompt for a coding agent | `content/prompts/<project>.md`: plain text with placeholders (`{{package}}`, `{{install}}`, `{{docs}}`...) filled in from the above, per language. `::prompt` shows it on the landing page, with a copy button and links that open it in Claude (`scripts/prompts.mjs`). A prompt file has no code or command of its own. |
 | What an example printed | `example-output/<project>/<language>/<Class>.json`, written by the live tests (below). |
 
 The build fails when a page names an example that isn't there, when a language lacks an example
@@ -80,8 +81,9 @@ has one, and isn't required.
 | `scripts/walkthroughs.mjs` | Each project's walkthroughs, from `content/walkthroughs/`. |
 | `scripts/output.mjs` | What the examples printed (`example-output/`), and the checks on it. |
 | `scripts/docker.mjs` | The Docker pages, from the READMEs. |
+| `scripts/prompts.mjs` | The prompts for coding agents, one per landing page and language. |
 | `scripts/llms.mjs` | `llms.txt` and `llms-full.txt`, from the content files, the examples and the overviews `reference.mjs` writes to `.generated/reference.json`. |
-| `scripts/check-links.mjs` | Checks every link on the landing and docs pages, every entry of the search indexes, and every address in `llms.txt` and `llms-full.txt`. |
+| `scripts/check-links.mjs` | Checks every link on the landing and docs pages, every entry of the search indexes, every address in `llms.txt`, `llms-full.txt` and the prompts, and that a prompt's install commands are `packages.mjs`'s. |
 | `assets/` | The generated pages' own styles and script, copied to `/<project>/assets/`: `docs.css` (the reference's layout), `docs.js` (the reference's language memory), `search.js` and `search-rank.js` (the reference's search box, and how it matches and ranks), `tabs.css` and `tabs.js` (the landing pages' language tabs), `readme.css` (what the Docker pages add to `docs.css`). A language chosen anywhere is remembered and followed everywhere. |
 | `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, serves the site's 404 page for missing paths, and sends the addresses these pages had under `/projects/` to the new ones. |
 | `wrangler.jsonc` | The Worker's config: a route per project, for `/docs/` and for `/pa-docker/` on each zone, and one per zone for the old addresses. |
