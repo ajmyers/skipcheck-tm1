@@ -3,10 +3,13 @@
 package io.skipcheck.tm1.spring.boot.autoconfigure;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.BeanFactory;
@@ -61,6 +64,17 @@ final class Tm1ServersRegistrar implements ImportBeanDefinitionRegistrar {
 
 	private static final ConfigurationPropertyName DEFAULT_SERVER = ConfigurationPropertyName.of("tm1.servers.default");
 
+	/**
+	 * A server's properties, as their names' uniform form: {@code base-url} is
+	 * {@code baseurl}.
+	 */
+	private static final Set<String> PROPERTIES = Arrays.stream(Tm1Properties.class.getRecordComponents())
+		.map(component -> component.getName().toLowerCase(Locale.ROOT))
+		.collect(Collectors.toUnmodifiableSet());
+
+	/** The properties that say where a server is, so that {@code tm1.*} makes one. */
+	private static final Set<String> ADDRESSES = Set.of("address", "baseurl");
+
 	private static final List<Class<?>> TYPES = List.of(Tm1ConnectionDetails.class, Tm1Session.class, Tm1Client.class,
 			Tm1SessionPool.class);
 
@@ -101,13 +115,12 @@ final class Tm1ServersRegistrar implements ImportBeanDefinitionRegistrar {
 		boolean tm1 = false;
 		boolean address = false;
 		for (ConfigurationPropertyName name : names(environment)) {
-			if (SERVERS.isAncestorOf(name) && name.getNumberOfElements() > 3) {
+			if (SERVERS.isAncestorOf(name) && isServerProperty(name, 3)) {
 				servers.add(name.getElement(2, Form.ORIGINAL));
 			}
-			else if (!SERVERS.equals(name) && !SERVERS.isAncestorOf(name)) {
+			else if (isServerProperty(name, 1)) {
 				tm1 = true;
-				String property = name.toString();
-				address |= property.equals("tm1.address") || property.equals("tm1.base-url");
+				address |= name.getNumberOfElements() == 2 && ADDRESSES.contains(name.getElement(1, Form.UNIFORM));
 			}
 		}
 		if (tm1 && servers.contains(DEFAULT)) {
@@ -122,11 +135,22 @@ final class Tm1ServersRegistrar implements ImportBeanDefinitionRegistrar {
 	}
 
 	/**
+	 * Whether {@code name} is one of a server's properties, a {@link Tm1Properties}
+	 * component (or under one) at element {@code index}. Other {@code tm1.*} names don't
+	 * make a server: the environment variables tm1-testcontainers reads, such as
+	 * {@code TM1_HOME_DIR}, reach Spring as {@code tm1.home-dir} and the like.
+	 */
+	private static boolean isServerProperty(ConfigurationPropertyName name, int index) {
+		return name.getNumberOfElements() > index && PROPERTIES.contains(name.getElement(index, Form.UNIFORM));
+	}
+
+	/**
 	 * The prefix of a server's properties: {@code tm1.servers.<name>}, or {@code tm1} for
 	 * the default server unless it's set as {@code tm1.servers.default}.
 	 */
 	static String prefix(Environment environment, String server) {
-		if (server.equals(DEFAULT) && names(environment).stream().noneMatch(DEFAULT_SERVER::isAncestorOf)) {
+		if (server.equals(DEFAULT) && names(environment).stream()
+			.noneMatch(name -> DEFAULT_SERVER.isAncestorOf(name) && isServerProperty(name, 3))) {
 			return "tm1";
 		}
 		return "tm1.servers." + server;

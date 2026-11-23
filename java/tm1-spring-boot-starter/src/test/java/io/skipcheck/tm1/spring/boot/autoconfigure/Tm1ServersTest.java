@@ -53,6 +53,25 @@ class Tm1ServersTest {
 	}
 
 	@Test
+	void ignoresTm1PropertiesThatAreNoServers() {
+		// As TM1_HOME_DIR and TM1_PRIVATE_IMAGE, for tm1-testcontainers, reach Spring
+		runner
+			.withPropertyValues("tm1.home-dir=/tmp/x", "tm1.private-image=tm1-server:test",
+					"tm1.servers.planning.home-dir=/tmp/y")
+			.run(context -> assertThat(context).hasNotFailed().doesNotHaveBean(Tm1Client.class));
+	}
+
+	@Test
+	void takesTm1ServersDefaultBesideTm1PropertiesThatAreNoServers() {
+		runner
+			.withPropertyValues("tm1.home-dir=/tmp/x", "tm1.servers.default.address=http://tm1:8010",
+					"tm1.servers.default.user=admin")
+			.withUserConfiguration(DefaultServer.class)
+			.run(context -> assertThat(context.getBean(DefaultServer.class).plain.session().serviceRoot())
+				.isEqualTo("http://tm1:8010/api/v1/"));
+	}
+
+	@Test
 	void refusesTm1AndTm1ServersDefaultTogether() {
 		runner.withPropertyValues("tm1.address=http://tm1:8010", "tm1.servers.default.address=http://other:8010")
 			.run(context -> assertThat(context).hasFailed()
