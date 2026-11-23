@@ -108,3 +108,27 @@ tasks.register<Javadoc>("apiSiteJavadoc") {
 		}
 	}
 }
+
+// The library's API as JSON, for the docs site's reference pages (api-site/README.md): the same
+// sources as the Javadoc, read by the doclet in java/tools/docs-doclet instead of written as HTML.
+val docsDoclet = configurations.create("docsDoclet") {
+	isCanBeConsumed = false
+	isCanBeResolved = true
+}
+dependencies {
+	docsDoclet(project(":tools:docs-doclet"))
+}
+tasks.register<Javadoc>("docsModel") {
+	group = "documentation"
+	description = "Writes the library's API as JSON for the docs site."
+	val javadoc = tasks.named<Javadoc>("javadoc").get()
+	source = javadoc.source
+	classpath = javadoc.classpath
+	val out = layout.buildDirectory.file("docs/model.json")
+	outputs.file(out)
+	setDestinationDir(layout.buildDirectory.dir("docs/model").get().asFile)
+	inputs.files(docsDoclet)
+	options.doclet = "io.skipcheck.tm1.docs.ModelDoclet"
+	options.docletpath = docsDoclet.files.toList()
+	(options as CoreJavadocOptions).addStringOption("o", out.get().asFile.path)
+}
