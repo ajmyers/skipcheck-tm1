@@ -1,5 +1,4 @@
-"""ServerService and LogService against a real TM1: ports of the Java client's
-ServerServiceTm1Test and LogServiceTm1Test (see conftest.py for how to point them at one)."""
+"""LogService against a real TM1: a port of the Java client's LogServiceTm1Test."""
 
 from __future__ import annotations
 
@@ -9,45 +8,12 @@ from typing import Any
 
 import pytest
 
-from skipcheck_tm1 import ODataPath, ODataQuery, Tm1BadRequestError, Tm1Client, Tm1Request
-from skipcheck_tm1.model import LogLevel, ProcessPatch, ServerSettingsPatch, UserPatch
+from skipcheck_tm1 import ODataQuery, Tm1Client
+from skipcheck_tm1.model import ProcessPatch, UserPatch
 
 from .conftest import CONFIGURED, REASON, client
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
-
-
-def test_reads_the_server_and_its_configurations(tm1: Tm1Client) -> None:
-    read = tm1.server.server()
-    assert read.product_version
-    assert read.etag is None, "none for the Server"
-    fixed = tm1.server.static_configuration()
-    active = tm1.server.active_configuration()
-    assert fixed.server_name == read.name
-    assert active.server_name == read.name
-    assert tm1.server.configuration().server_name == read.name
-
-    tm1.server.update_static_configuration(ServerSettingsPatch.builder().server_name(fixed.server_name).build())
-    with pytest.raises(Tm1BadRequestError):
-        # The active configuration is read only
-        tm1.session.execute(Tm1Request.patch(ODataPath.of("ActiveConfiguration"), ServerSettingsPatch.builder().server_name(active.server_name).build()))
-    # A duration here, though declared Int32
-    assert isinstance(active.access.cam.client_ping_cam_passport, str)
-
-
-def test_reads_and_sets_logger_levels(tm1: Tm1Client) -> None:
-    loggers = tm1.server.loggers()
-    assert loggers
-    # Not the first, TM1's root logger: at DEBUG it floods the message log of the server every
-    # test shares, with lines alike to the millisecond
-    first = next(logger for logger in loggers if logger.name == "TM1.Blob")
-    assert tm1.server.logger(first.name).level == first.level
-    other = LogLevel.INFO if first.level == LogLevel.DEBUG else LogLevel.DEBUG
-    tm1.server.set_logger_level(first.name, other)
-    try:
-        assert tm1.server.logger(first.name).level == other
-    finally:
-        tm1.server.set_logger_level(first.name, first.level)
 
 
 def test_reads_the_message_log(tm1: Tm1Client) -> None:
@@ -83,6 +49,12 @@ def test_follows_the_message_log_without_repeating(tm1: Tm1Client) -> None:
     assert len(distinct) == len(seen), "no entry twice, though each poll returns them all again"
 
 
+def test_reads_the_transaction_and_audit_logs(tm1: Tm1Client) -> None:
+    assert tm1.logs.transaction_log_entries(ODataQuery.none().top(5))
+    assert all(e.status_message is None for e in tm1.logs.transaction_log(True, True, ODataQuery.none().top(5)))
+    assert tm1.logs.audit_log_entries(ODataQuery.none().expand("AuditDetails").top(5)) == [], "the audit log is off on the test server"
+
+
 def test_reads_a_passwords_hash_that_isnt_utf8_as_replacement_characters(tm1: Tm1Client, name: str) -> None:
     tm1.users.create(UserPatch.builder().name(name).password("pw").build())
     try:
@@ -92,12 +64,6 @@ def test_reads_a_passwords_hash_that_isnt_utf8_as_replacement_characters(tm1: Tm
         assert chr(0xFFFD) in str(entry.new_value)
     finally:
         tm1.users.delete(name)
-
-
-def test_reads_the_transaction_and_audit_logs(tm1: Tm1Client) -> None:
-    assert tm1.logs.transaction_log_entries(ODataQuery.none().top(5))
-    assert all(e.status_message is None for e in tm1.logs.transaction_log(True, True, ODataQuery.none().top(5)))
-    assert tm1.logs.audit_log_entries(ODataQuery.none().expand("AuditDetails").top(5)) == [], "the audit log is off on the test server"
 
 
 def test_reads_a_process_error_log(tm1: Tm1Client, name: str) -> None:

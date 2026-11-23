@@ -1,0 +1,9 @@
+# Java live tests (java/tm1-client/src/test/java/.../*Tm1Test.java and *BehaviorTest.java) that
+# have no port in tests/live, and why. tests/test_java_live_parity.py reads this.
+#
+#   ClassName#methodName: reason     one test
+#   ClassName: reason                a whole class
+#
+# Keep it short, and the reasons specific. "Needs Cognos" (or TM1 Web, or PAW) is not a reason:
+# those tests are ported, and skip at run time. A line for a class or a test Java doesn't have,
+# or one tests/live has after all, fails the gate.

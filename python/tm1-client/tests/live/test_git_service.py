@@ -187,5 +187,6 @@ def test_pushes_the_model_and_pulls_it_back(tm1: Tm1Client, remote: GitDaemon) -
         _delete_dimension(tm1, copy)
 
 
-def test_keeps_passwords_out_of_repr() -> None:
+def test_keeps_passwords_out_of_to_string() -> None:
+    # repr is Python's toString
     assert repr(GitCredentials.password("me", "s3cret")) == "GitCredentials[username=me, password=***, sshKey=none]"

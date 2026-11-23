@@ -1,4 +1,8 @@
-"""Tests against a real TM1, as the Java client's ``*Tm1Test`` classes. The server is either:
+"""Tests against a real TM1: the Java client's ``*Tm1Test`` and ``*BehaviorTest`` classes, one file
+each (``CubeServiceTm1Test`` is test_cube_service.py, ``Tm1SessionBehaviorTest`` is
+test_tm1_session_behavior.py), with each test under its Java name in snake case. The offline
+tests/test_java_live_parity.py checks that against the Java sources. Tests only this client has
+are in test_python_only.py. The server is either:
 
 * started in Docker for the run by tm1-testcontainers (``python/tm1-testcontainers``), as Java's
   ``@RequiresTm1`` tests start theirs: :meth:`Tm1ServerContainer.shared`, from the same TM1
@@ -18,11 +22,14 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from skipcheck_tm1 import Tm1Client
+from skipcheck_tm1 import Tm1Client, Tm1Session, Tm1Version
+
+if TYPE_CHECKING:
+    from .raw_tm1 import RawTm1
 
 _RUNNING = os.environ.get("TM1_URL")
 _ALREADY_RUNNING = " Or set TM1_URL for a server that's already running."
@@ -75,6 +82,40 @@ def async_client() -> Any:
     return _builder(AsyncTm1Client.builder()).build()
 
 
+def session(**settings: Any) -> Tm1Session:
+    """A new session of the configured TM1, with these builder settings (``session_context``,
+    ``impersonate``...)."""
+    builder = _builder(Tm1Session.builder())
+    for setting, value in settings.items():
+        builder = getattr(builder, setting)(value)
+    return builder.build()
+
+
+ADMIN = os.environ.get("TM1_USER", "admin")
+"""The user the tests log in as."""
+
+
+def other_client(**settings: Any) -> Tm1Client:
+    """Another client of the configured TM1: as the admin, or as ``user``/``password``."""
+    from skipcheck_tm1 import auth
+
+    builder = _builder(Tm1Client.builder())
+    if "user" in settings:
+        builder = builder.authenticator(auth.basic(settings["user"], settings["password"]))
+    if "session_context" in settings:
+        builder = builder.session_context(settings["session_context"])
+    return builder.build()
+
+
+def started_version() -> Tm1Version | None:
+    """The version the TM1 container read as it started, as Java's ``getTm1Version``; None for a
+    server at ``TM1_URL``, which has no container to ask."""
+    if _RUNNING:
+        return None
+    target()
+    return Tm1ServerContainer.shared().tm1_version
+
+
 @pytest.fixture(scope="session")
 def tm1() -> Iterator[Tm1Client]:
     if not CONFIGURED:
@@ -86,3 +127,63 @@ def tm1() -> Iterator[Tm1Client]:
 @pytest.fixture
 def name() -> str:
     return "tm1py_test_" + uuid.uuid4().hex[:8]
+
+
+@pytest.fixture
+def raw() -> Iterator[RawTm1]:
+    """Bare HTTP to the configured TM1."""
+    from .raw_tm1 import RawTm1
+
+    if not CONFIGURED:
+        pytest.skip(REASON)
+    tm1 = RawTm1()
+    try:
+        yield tm1
+    finally:
+        tm1.shutdown()
+
+
+@pytest.fixture
+def admin(raw: RawTm1) -> Iterator[str]:
+    """The cookie of an administrator's session, opened over bare HTTP and closed afterwards."""
+    cookie = raw.login()
+    try:
+        yield cookie
+    finally:
+        raw.close(cookie)
+
+
+@pytest.fixture
+def elements_dim(tm1: Tm1Client, name: str) -> Iterator[str]:
+    """ElementServiceTm1Test's and EdgeServiceTm1Test's dimension: Total = North + South, East,
+    and Label, a string element."""
+    from .support import consolidated, dimension_of, edge, made, numeric, string
+
+    with made(
+        tm1,
+        name,
+        dimension_of(
+            name,
+            [consolidated("Total"), numeric("North"), numeric("South"), numeric("East"), string("Label")],
+            [edge("Total", "North"), edge("Total", "South")],
+        ),
+    ) as d:
+        yield d
+
+
+@pytest.fixture
+def world(tm1: Tm1Client, name: str) -> Iterator[str]:
+    """LevelAndMemberServiceTm1Test's and MemberServiceTm1Test's dimension: World over Europe
+    (France, Spain) and Asia (Japan)."""
+    from .support import consolidated, dimension_of, edge, made, numeric
+
+    with made(
+        tm1,
+        name,
+        dimension_of(
+            name,
+            [consolidated("World"), consolidated("Europe"), consolidated("Asia"), numeric("France"), numeric("Spain"), numeric("Japan")],
+            [edge("World", "Europe"), edge("World", "Asia"), edge("Europe", "France"), edge("Europe", "Spain"), edge("Asia", "Japan")],
+        ),
+    ) as d:
+        yield d

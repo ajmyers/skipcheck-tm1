@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import os
+from collections.abc import Iterator
+
+import httpx
 import pytest
 
 from skipcheck_tm1 import ODataPath, Tm1BadRequestError, Tm1Client, Tm1NotFoundError, Tm1Request
 from skipcheck_tm1._sync.services.content import ContentPath, ContentScope
 from skipcheck_tm1.model import CubeReference, CubeReferencePatch, DocumentPatch, DocumentReference, Folder, FolderPatch, Link, LinkPatch
 
-from .conftest import CONFIGURED, REASON
+from .conftest import CONFIGURED, REASON, target
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
@@ -81,3 +85,28 @@ def test_makes_links_and_references_and_moves_them(tm1: Tm1Client, name: str) ->
     finally:
         tm1.contents.delete(folder)
         tm1.contents.delete(other)
+
+
+def test_refuses_a_chunked_upload(tm1: Tm1Client, name: str) -> None:
+    folder = ContentPath.applications().child(name)
+    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name).build())
+    try:
+        made = tm1.contents.create(folder, ContentScope.PUBLIC, DocumentPatch.builder().name("notes.txt").build())
+        url, user, password = target()
+        content = f"{url.rstrip('/')}/{folder.child(made.id).path()}/tm1.DocumentReference/Document/Content"
+
+        def pieces() -> Iterator[bytes]:
+            yield b"hello"
+
+        # A body of unknown length is sent chunked
+        chunked = httpx.put(
+            content,
+            content=pieces(),
+            auth=(user, password),
+            headers={"Content-Type": "application/octet-stream"},
+            verify=os.environ.get("TM1_VERIFY", "true").lower() != "false",
+        )
+        assert chunked.request.headers["Transfer-Encoding"] == "chunked"
+        assert chunked.status_code == 400
+    finally:
+        tm1.contents.delete(folder)
