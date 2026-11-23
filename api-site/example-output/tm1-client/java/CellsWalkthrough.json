@@ -1,0 +1,18 @@
+{
+  "example" : "CellsWalkthrough",
+  "language" : "java",
+  "regions" : {
+    "read" : {
+      "source" : "abd3e348be67821c9a51f9c4f221c090598ddb65a54011c02aaca598305eb691",
+      "output" : [ "Jan: 1410", "Feb: 1526", "Mar: 1567" ]
+    },
+    "read-back" : {
+      "source" : "46b828220ca67cf89c8f843c71f4863dc4f7ba5e7b95e60a3e44518ac06e0c5d",
+      "output" : [ "Budget for Jan: 150" ]
+    },
+    "write" : {
+      "source" : "2d1882db48872c6f2ef81c2009ee77a5fc67929a082fee7a0c6b268c388c5014",
+      "output" : [ ]
+    }
+  }
+}

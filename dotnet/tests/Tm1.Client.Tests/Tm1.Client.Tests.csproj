@@ -16,6 +16,8 @@
     <ProjectReference Include="../../src/Tm1.Client/Tm1.Client.csproj" />
     <!-- The live tests start TM1 with it, as the Java ones use tm1-testcontainers -->
     <ProjectReference Include="../../src/Tm1.Testcontainers/Tm1.Testcontainers.csproj" />
+    <!-- The walkthrough examples, which the live tests run and record (WalkthroughExamplesLiveTests) -->
+    <ProjectReference Include="../../examples/Tm1.Client.Examples/Tm1.Client.Examples.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

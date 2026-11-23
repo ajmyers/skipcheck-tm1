@@ -1,0 +1,24 @@
+{
+  "example": "ConnectWalkthrough",
+  "language": "typescript",
+  "regions": {
+    "list-cubes": {
+      "source": "a9959e0caee7772a06bcf0a815a46909fb02c00205b7da1ab389de99961329b0",
+      "output": [
+        "PNLCube",
+        "PriceCube",
+        "SalesByQuarterCube",
+        "SalesByQuarterCube-TotalModel",
+        "SalesCube",
+        "SalesCube_metrics",
+        "SalesPriorCube"
+      ]
+    },
+    "version": {
+      "source": "57ba986c7f907a1f2224c0195c9619cef5f51bef48cd633cc08912633ae7a8f7",
+      "output": [
+        "Connected to TM1 11.8.03500.6"
+      ]
+    }
+  }
+}

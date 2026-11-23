@@ -1,0 +1,14 @@
+{
+  "example" : "ConnectWalkthrough",
+  "language" : "java",
+  "regions" : {
+    "list-cubes" : {
+      "source" : "6aaa18929be0452d494445d869b20511c31aaa3f8b30d7848a0b0190165f46d9",
+      "output" : [ "PNLCube", "PriceCube", "SalesByQuarterCube", "SalesByQuarterCube-TotalModel", "SalesCube", "SalesCube_metrics", "SalesPriorCube" ]
+    },
+    "version" : {
+      "source" : "0e298e19fbe95dae452ac70c90afd7094c53a55a42a46ca44e59716f99af1d64",
+      "output" : [ "Connected to TM1 11.8.03500.6" ]
+    }
+  }
+}

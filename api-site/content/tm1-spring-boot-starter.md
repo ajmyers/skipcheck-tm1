@@ -32,6 +32,10 @@ The starter builds a client for each, and a session pool for each that turns the
 
 The `tm1` settings are the server named `default`, the same as `tm1.servers.default`; set one or the other. Its client is the one you get without a qualifier. Every other server's is injected only by its name, even when there's just one. In Spring Boot tests, `Tm1EnvironmentServers` from tm1-spring-boot-testcontainers wires in each server of a `PlanningAnalyticsEnvironment` by its name. [Tm1ServersProperties](docs/Tm1ServersProperties.html) has the details.
 
+## Walkthroughs
+
+::walkthroughs
+
 ## What's in it
 
 - **Auto-configuration:** a `Tm1Client` bean from `tm1.*` properties.

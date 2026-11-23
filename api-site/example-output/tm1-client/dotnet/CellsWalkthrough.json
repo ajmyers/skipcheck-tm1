@@ -1,0 +1,24 @@
+{
+  "example": "CellsWalkthrough",
+  "language": "dotnet",
+  "regions": {
+    "read": {
+      "source": "a2b4b426f37fcec3b8ce06c119ab6a9338206e71c1f0be477c87f1225cbd7e4c",
+      "output": [
+        "Jan: 1410",
+        "Feb: 1526",
+        "Mar: 1567"
+      ]
+    },
+    "read-back": {
+      "source": "06438510bc047788c2cabead12b0350093983569a6c4c199d0df1658c731ffb0",
+      "output": [
+        "Budget for Jan: 150"
+      ]
+    },
+    "write": {
+      "source": "7c6247c7fdd4c217354445e4f7867840ddf1d34d636cc96f901f0b88799088d3",
+      "output": []
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "example": "CellsWalkthrough",
+  "language": "typescript",
+  "regions": {
+    "read": {
+      "source": "2cf4c219069a109c8e83af8cafe232ef422fddfeaa66376b368efa04f84b2a90",
+      "output": [
+        "Jan: 1410",
+        "Feb: 1526",
+        "Mar: 1567"
+      ]
+    },
+    "read-back": {
+      "source": "2511443a04d035d306b294758113f0600e8200197f11fa1bf44495e36bafe7ba",
+      "output": [
+        "Budget for Jan: 150"
+      ]
+    },
+    "write": {
+      "source": "85b3e353bde7046212a9604de8e93400660debe8b4f8e9fa36431c605ea4c954",
+      "output": []
+    }
+  }
+}

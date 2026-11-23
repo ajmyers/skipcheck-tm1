@@ -15,6 +15,12 @@ Every endpoint of the TM1 REST API as a typed service: cubes, dimensions, cellse
 
 Next: [the client](docs/Tm1Client.html), with a service for each area of TM1, such as [cubes](docs/CubeService.html) and [cellsets](docs/CellsetService.html) for reading data; and [the session](docs/Tm1Session.html), for logging in with CAM, sandboxes, and sending a request no service covers. Every page shows its examples in each language.
 
+## Walkthroughs
+
+Step by step, with the code in your language and what it printed:
+
+::walkthroughs
+
 ## What's in it
 
 - **A service for each area of TM1:** dimensions, hierarchies, elements and subsets; cubes, views and rules; cellsets, cell writes, sandboxes and drillthrough; processes, chores and debugging; users, groups, sessions and threads; server configuration and logs.

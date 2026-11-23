@@ -26,30 +26,35 @@ const snake = (name) =>
 
 // highlight is the language's name in the site's highlighter (/highlight.js on skipcheck.io), which
 // colours a block marked lang-<name>. examples is where a project's examples file for a class is.
+// prints matches an example's code that prints, which then needs its output recorded (output.mjs).
 export const LANGUAGES = [
 	{
 		id: 'java',
 		label: 'Java',
 		highlight: 'java',
 		examples: (project, cls) => path.join('java', project.id, 'src', 'examples', 'java', 'examples', cls + '.java'),
+		prints: /\bSystem\.out\.print/,
 	},
 	{
 		id: 'python',
 		label: 'Python',
 		highlight: 'python',
 		examples: (project, cls) => path.join('python', project.id, 'examples', snake(cls) + '.py'),
+		prints: /(?<![\w.])print\(/,
 	},
 	{
 		id: 'dotnet',
 		label: '.NET',
 		highlight: 'csharp',
 		examples: (project, cls) => path.join('dotnet', 'examples', project.dotnet + '.Examples', cls + '.cs'),
+		prints: /\bConsole\.Write/,
 	},
 	{
 		id: 'typescript',
 		label: 'TypeScript',
 		highlight: 'typescript',
 		examples: (project, cls) => path.join('typescript', project.id, 'examples', cls + '.ts'),
+		prints: /\bconsole\.log\(/,
 	},
 ];
 const ALL = LANGUAGES.map((language) => language.id);

@@ -1,0 +1,24 @@
+{
+  "example": "CellsWalkthrough",
+  "language": "python",
+  "regions": {
+    "read": {
+      "source": "eb8c853e448f00e3754aff7b061753ce6e4cf3b8bf3bd334db3ce2e652204ee0",
+      "output": [
+        "Jan: 1410",
+        "Feb: 1526",
+        "Mar: 1567"
+      ]
+    },
+    "read-back": {
+      "source": "ed5667d4bbaea923484e3b9609dcada4652acc5ab7b62234c86afd87711d4187",
+      "output": [
+        "Budget for Jan: 150"
+      ]
+    },
+    "write": {
+      "source": "1bd5214f8c6f455de3e9dc25d3000fbc75aae8cd16fdf38659a900e485f5f4f5",
+      "output": []
+    }
+  }
+}
