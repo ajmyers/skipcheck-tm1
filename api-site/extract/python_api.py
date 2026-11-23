@@ -113,9 +113,30 @@ def member(node: ast.AST) -> dict | None:
         return {"kind": "field", "name": node.target.id, "static": False, "signature": node.target.id + ": " + type_, "returns": type_, "params": [], "endpoints": [], "doc": "", "deprecated": False}
     if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
         name = node.targets[0].id
-        if not name.startswith("_") and name[:1].isupper():
+        if name.startswith("_"):
+            return None
+        if name[:1].isupper():
             return {"kind": "constant", "name": name, "static": True, "signature": name, "returns": "", "params": [], "endpoints": [], "doc": "", "deprecated": False}
+        # path_value = staticmethod(path_value): a function of the module, made a static method
+        wrapped = isinstance(node.value, ast.Call) and getattr(node.value.func, "id", None) in ("staticmethod", "classmethod")
+        kind = "method" if wrapped else "property"
+        return {"kind": kind, "name": name, "static": wrapped, "signature": name, "returns": "", "params": [], "endpoints": [], "doc": "", "deprecated": False}
     return None
+
+
+def attributes(cls: ast.ClassDef) -> list[dict]:
+    """The public attributes __init__ sets (self.status = status): a class's fields, as Java's
+    accessors are."""
+    init = next((n for n in cls.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == "__init__"), None)
+    found: dict[str, dict] = {}
+    for node in ast.walk(init) if init is not None else []:
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+        for target in targets:
+            if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self" and not target.attr.startswith("_"):
+                type_ = annotation(node.annotation) if isinstance(node, ast.AnnAssign) else ""
+                shown = target.attr + (": " + type_ if type_ else "")
+                found.setdefault(target.attr, {"kind": "field", "name": target.attr, "static": False, "signature": shown, "returns": type_, "params": [], "endpoints": [], "doc": "", "deprecated": False})
+    return list(found.values())
 
 
 def classes(path: Path, package: str) -> list[dict]:
@@ -127,6 +148,8 @@ def classes(path: Path, package: str) -> list[dict]:
         bases = [annotation(b) for b in node.bases]
         kind = "enum" if any("Enum" in b for b in bases) else ("protocol" if "Protocol" in bases else "class")
         members = [m for m in (member(child) for child in node.body) if m is not None]
+        declared = {m["name"] for m in members}
+        members += [a for a in attributes(node) if a["name"] not in declared]
         found.append(
             {
                 "name": sync(node.name),
@@ -136,6 +159,8 @@ def classes(path: Path, package: str) -> list[dict]:
                 "doc": sync(ast.get_docstring(node) or ""),
                 "deprecated": False,
                 "members": members,
+                # The names of its bases, for inherit() to follow; not written out
+                "bases": [sync(b.split("[")[0].split(".")[-1]) for b in bases],
             }
         )
     return found
@@ -149,6 +174,34 @@ def exported(init: Path) -> set[str]:
         if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "__all__" for t in node.targets) and isinstance(node.value, ast.List):
             return {e.value for e in node.value.elts if isinstance(e, ast.Constant)}
     return set()
+
+
+def inherit(types: dict[str, dict]) -> None:
+    """Gives each class the members it inherits from its bases in the package, as members of its
+    own marked with the class they come from (``inherited``): Tm1ClientBuilder has
+    Tm1SessionBuilder's base_url, as Java's Tm1Client.Builder declares baseUrl. Bases outside the
+    package (Exception, enum.Enum) are not followed."""
+    done: set[str] = set()
+
+    def resolve(name: str, seen: tuple[str, ...]) -> None:
+        cls = types[name]
+        if name in done or name in seen:
+            return
+        names = {m["name"] for m in cls["members"]}
+        for base in cls.get("bases", []):
+            if base not in types or base == name:
+                continue
+            resolve(base, (*seen, name))
+            for m in types[base]["members"]:
+                if m["name"] not in names and m["kind"] != "constructor":
+                    cls["members"].append({**m, "inherited": m.get("inherited", base)})
+                    names.add(m["name"])
+        done.add(name)
+
+    for name in types:
+        resolve(name, ())
+    for cls in types.values():
+        cls.pop("bases", None)
 
 
 def main(source: str, out: str) -> None:
@@ -170,6 +223,7 @@ def main(source: str, out: str) -> None:
                 cls["package"] = root.name
             # A class in aio/ and its sync twin are one class; aio/ is the source of truth
             types.setdefault(cls["name"], cls)
+    inherit(types)
     with Path(out).open("w", encoding="utf-8") as file:
         json.dump(sorted(types.values(), key=lambda t: t["name"]), file)
 
