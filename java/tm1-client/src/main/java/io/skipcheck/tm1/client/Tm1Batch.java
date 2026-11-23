@@ -11,7 +11,9 @@ import reactor.core.publisher.Mono;
  * A JSON {@code $batch} being put together, from {@link Tm1Client#batch()}: calls made
  * through {@link #client()} are queued rather than sent, and {@link #run()} sends them
  * together. Each call's result is there once the batch has run. Every service's methods
- * work through it unchanged. See {@link Tm1SessionBatch} for what TM1 does with a batch.
+ * work through it unchanged. TM1 (11.8) runs the calls in the order they were made, so a
+ * later call sees an earlier one's writes. See {@link Tm1SessionBatch} for what else TM1
+ * does with a batch.
  *
  * <p>
  * Read three things in one round trip:

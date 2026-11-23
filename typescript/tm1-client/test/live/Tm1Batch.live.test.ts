@@ -49,6 +49,41 @@ describe("Tm1 batches on TM1" + liveReason, () => {
   );
 
   tm1Test(
+    "runs requests in order",
+    async () => {
+      const tm1 = await Live.client();
+      const dimension = "batch" + randomUUID().replace(/-/g, "").slice(0, 8);
+      await tm1.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), { Name: dimension, Hierarchies: [{ Name: dimension }] }));
+      try {
+        const batch = tm1.batch();
+        const queued = batch.client.session;
+        const elements = ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements");
+        const before: Promise<unknown>[] = [];
+        const after: Promise<{ Name: string }>[] = [];
+        const created: Promise<unknown>[] = [];
+        // Ten times over, so that requests run side by side would show
+        for (let i = 0; i < 10; i++) {
+          before.push(queued.execute(Tm1Request.get(elements.key("e" + i))));
+          created.push(queued.execute(Tm1Request.post(elements, { Name: "e" + i }, Json)));
+          after.push(queued.execute(Tm1Request.get<{ Name: string }>(elements.key("e" + i))));
+        }
+        await batch.run();
+        await Promise.all(created);
+        for (let i = 0; i < 10; i++) {
+          // Runs before the element is made
+          expect(await failure(before[i]!)).toBeInstanceOf(Tm1NotFoundException);
+          // Sees the element an earlier request made
+          expect((await after[i]!).Name).toBe("e" + i);
+        }
+      } finally {
+        await tm1.session.execute(Tm1Request.delete(ODataPath.of("Dimensions").key(dimension)));
+        await tm1.close();
+      }
+    },
+    60_000,
+  );
+
+  tm1Test(
     "takes a thousand requests",
     async () => {
       const tm1 = await Live.client();

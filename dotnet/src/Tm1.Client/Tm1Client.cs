@@ -203,7 +203,9 @@ public sealed class Tm1Client : IAsyncDisposable
 }
 
 /// <summary>A JSON <c>$batch</c> of client calls, as the Java client's <c>Tm1Batch</c>: each call's
-/// task completes with its own result or error once the batch has run.</summary>
+/// task completes with its own result or error once the batch has run. TM1 (11.8) runs the calls in
+/// the order they were made, so a later call sees an earlier one's writes
+/// (<see cref="Tm1SessionBatch"/>).</summary>
 public sealed class Tm1Batch
 {
     private readonly Tm1SessionBatch _batch;

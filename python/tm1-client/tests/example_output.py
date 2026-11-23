@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import importlib.util
 import io
 import json
 import re
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -28,6 +30,17 @@ _END = re.compile(r"@end\b")
 def snake(name: str) -> str:
     s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
     return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", s).lower()
+
+
+def example(name: str) -> ModuleType:
+    """A tm1-client examples file, which isn't a package's module, by its Java class's name: ``HelloWorld``
+    is examples/hello_world.py."""
+    path = ROOT / "python" / "tm1-client" / "examples" / (snake(name) + ".py")
+    spec = importlib.util.spec_from_file_location("examples_" + snake(name), path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def source_hash(source: str, region: str) -> str:

@@ -51,6 +51,30 @@ def test_runs_reads_writes_and_failures_together(tm1: Tm1Client) -> None:
         tm1.dimensions.delete(dimension)
 
 
+def test_runs_requests_in_order(tm1: Tm1Client) -> None:
+    dimension = "batch" + uuid.uuid4().hex[:8]
+    tm1.dimensions.create(DimensionPatch.builder().name(dimension).hierarchies([HierarchyPatch.builder().name(dimension).build()]).build())
+    try:
+        batch = tm1.batch()
+        queued = batch.client
+        before = []
+        after = []
+        # Ten times over, so that requests run side by side would show
+        for i in range(10):
+            before.append(queued.elements.get(dimension, dimension, f"e{i}"))
+            queued.elements.create(dimension, dimension, ElementPatch.builder().name(f"e{i}").build())
+            after.append(queued.elements.get(dimension, dimension, f"e{i}"))
+
+        batch.run()
+
+        for i in range(10):
+            with pytest.raises(Tm1NotFoundError):  # runs before the element is made
+                before[i].result()
+            assert after[i].result().name == f"e{i}", "sees the element an earlier request made"
+    finally:
+        tm1.dimensions.delete(dimension)
+
+
 def test_takes_a_thousand_requests(tm1: Tm1Client) -> None:
     batch = tm1.batch()
     reads = [batch.client.cubes.get("}ClientGroups", ODataQuery.none().select(Cube.NAME)) for _ in range(1000)]

@@ -8,15 +8,13 @@ to start it from (TM1_URL alone isn't enough)."""
 
 from __future__ import annotations
 
-import importlib.util
 from collections.abc import Iterator
-from types import ModuleType
 
 import pytest
 
 from skipcheck_tm1 import Tm1Client
 
-from ..example_output import ROOT, ExampleOutput, snake
+from ..example_output import ExampleOutput, example
 
 try:
     from skipcheck_tm1_testcontainers import Tm1Seed, Tm1ServerContainer, Tm1Source, docker_available
@@ -28,16 +26,6 @@ else:
     _DOCKER = _SOURCE is not None and docker_available()
 
 pytestmark = pytest.mark.skipif(not _DOCKER, reason="Needs a TM1 source and Docker, to start a server with IBM's SData sample")
-
-
-def example(name: str) -> ModuleType:
-    """An examples file, which isn't a package's module."""
-    path = ROOT / "python" / "tm1-client" / "examples" / (snake(name) + ".py")
-    spec = importlib.util.spec_from_file_location("examples_" + snake(name), path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 @pytest.fixture(scope="module")

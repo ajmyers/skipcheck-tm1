@@ -103,6 +103,43 @@ class Tm1BatchTm1Test {
 	}
 
 	@Test
+	void runsRequestsInOrder() {
+		String dimension = "batch" + UUID.randomUUID().toString().substring(0, 8);
+		tm1.dimensions()
+			.create(DimensionPatch.builder()
+				.name(dimension)
+				.hierarchies(List.of(HierarchyPatch.builder().name(dimension).build()))
+				.build())
+			.block(WAIT);
+		try {
+			Tm1Batch batch = tm1.batch();
+			Tm1Client queued = batch.client();
+			List<Mono<Element>> before = new ArrayList<>();
+			List<Mono<Element>> after = new ArrayList<>();
+			// Ten times over, so that requests run side by side would show
+			for (int i = 0; i < 10; i++) {
+				String name = "e" + i;
+				before.add(queued.elements().get(dimension, dimension, name, ODataQuery.none()));
+				queued.elements().create(dimension, dimension, ElementPatch.builder().name(name).build());
+				after.add(queued.elements().get(dimension, dimension, name, ODataQuery.none()));
+			}
+
+			batch.run().block(WAIT);
+
+			for (int i = 0; i < 10; i++) {
+				Mono<Element> read = before.get(i);
+				assertThatThrownBy(() -> read.block(WAIT)).as("runs before the element is made")
+					.isInstanceOf(Tm1NotFoundException.class);
+				assertThat(after.get(i).block(WAIT).name()).as("sees the element an earlier request made")
+					.isEqualTo("e" + i);
+			}
+		}
+		finally {
+			tm1.dimensions().delete(dimension).block(WAIT);
+		}
+	}
+
+	@Test
 	void takesAThousandRequests() {
 		Tm1Batch batch = tm1.batch();
 		List<Mono<Cube>> reads = new ArrayList<>();

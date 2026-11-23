@@ -190,6 +190,8 @@ Flux<String> list(Tm1Client tm1) {
   and record what they print, which the pages show under the code. Change one, run the live tests,
   and commit the recording in `api-site/example-output` with it: the site's build fails on a
   stale one ([api-site/README.md](api-site/README.md#walkthroughs-and-what-the-examples-print)).
+  The quick start's `HelloWorld` is run the same way: its `main` connects to localhost:8010 and
+  calls `hello`, which the live test (`HelloWorldTm1Test`) calls with a server of its own.
 - Spring Java Format writes `region = list` with spaces, in the comment and the `{@snippet}`
   tag. Javadoc accepts both forms.
 - **Never write code into the site's Markdown.** Every code block on a landing page or
