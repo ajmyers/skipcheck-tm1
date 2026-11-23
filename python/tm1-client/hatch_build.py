@@ -3,7 +3,8 @@
 """Generates the model and API (src/skipcheck_tm1/_generated) from the API spec at build time,
 as Gradle does for the Java client: generated code is never committed.
 
-The spec is the repository's spec/tm1-api.json; an sdist carries a copy in spec/.
+The spec is the repository's spec/tm1-api.json. An sdist doesn't carry it: it carries the code
+generated from it, so a wheel built from an sdist uses that as it is.
 """
 
 from __future__ import annotations
@@ -17,11 +18,8 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 ROOT = Path(__file__).parent
 
 
-def spec_path() -> Path:
-    for candidate in (ROOT.parent.parent / "spec" / "tm1-api.json", ROOT / "spec" / "tm1-api.json"):
-        if candidate.is_file():
-            return candidate
-    raise FileNotFoundError("spec/tm1-api.json: not in the repository root or the sdist")
+SPEC = ROOT.parent.parent / "spec" / "tm1-api.json"
+GENERATED = ROOT / "src" / "skipcheck_tm1" / "_generated"
 
 
 def generate() -> None:
@@ -29,7 +27,7 @@ def generate() -> None:
     try:
         from tm1_pygen import generate as run
 
-        run(spec_path(), ROOT / "src" / "skipcheck_tm1")
+        run(SPEC, ROOT / "src" / "skipcheck_tm1")
     finally:
         sys.path.pop(0)
 
@@ -46,9 +44,11 @@ def copy_license() -> None:
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         copy_license()
-        # An sdist carries the spec instead (pyproject.toml's force-include)
-        if self.target_name != "sdist":
+        if SPEC.is_file():
+            # In the repository: generate, for the sdist too, which carries the generated code
             generate()
+        elif not GENERATED.is_dir():
+            raise FileNotFoundError(f"{SPEC} isn't here to generate from, and there's no generated code (an sdist carries it)")
 
 
 if __name__ == "__main__":

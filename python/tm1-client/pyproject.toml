@@ -31,13 +31,10 @@ artifacts = ["src/skipcheck_tm1/_generated/*.py", "src/skipcheck_tm1/_sync/**/*.
 
 [tool.hatch.build.targets.sdist]
 include = ["src", "codegen", "tests", "coverage", "hatch_build.py"]
-exclude = ["src/skipcheck_tm1/_generated", "src/skipcheck_tm1/_sync"]
-# Copied here by hatch_build.py and not committed, so named as artifacts
-artifacts = ["/LICENSE", "/NOTICE"]
-
-[tool.hatch.build.targets.sdist.force-include]
-# The sdist builds without the repository, so it takes the spec along
-"../../spec/tm1-api.json" = "spec/tm1-api.json"
+# The sdist builds without the repository, so it carries the generated code rather than the spec
+# it's generated from: the spec and IBM's $metadata stay in the repository (#258). They and the
+# LICENSE and NOTICE copied here aren't committed, so they're named as artifacts
+artifacts = ["/LICENSE", "/NOTICE", "src/skipcheck_tm1/_generated/*.py", "src/skipcheck_tm1/_sync/**/*.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import json
 import sys
+import tarfile
 import threading
+import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import metadata, resources
 from pathlib import Path
@@ -98,7 +100,27 @@ def main() -> None:
     for name in versions:
         licenses = [str(file) for file in metadata.files(name) or [] if file.name in ("LICENSE", "NOTICE")]
         assert len(licenses) == 2, f"{name} doesn't carry LICENSE and NOTICE: {licenses}"
+    check_archives()
     print(f"ok: Hello from TM1 {version}, cubes {cubes}, packages {versions}")
+
+
+def check_archives() -> None:
+    """The built wheels and sdists carry the generated code, not the API spec or IBM's $metadata
+    it comes from (#258): those stay in the repository, and NOTICE says where the model comes from."""
+    built = sorted((REPO / "build" / "packages" / "python").glob("*"))
+    archives = [path for path in built if path.name.endswith((".whl", ".tar.gz"))]
+    assert len(archives) == 4, f"expected a wheel and an sdist of each package: {[path.name for path in built]}"
+    for archive in archives:
+        if archive.suffix == ".whl":
+            with zipfile.ZipFile(archive) as whl:
+                names = whl.namelist()
+        else:
+            with tarfile.open(archive) as sdist:
+                names = sdist.getnames()
+        leaked = [name for name in names if name.endswith(("tm1-api.json", ".xml"))]
+        assert not leaked, f"{archive.name} ships the API spec or $metadata: {leaked}"
+        if archive.name.startswith("skipcheck_tm1-"):
+            assert any("/_generated/" in name and name.endswith(".py") for name in names), f"{archive.name} has no generated code"
 
 
 if __name__ == "__main__":
