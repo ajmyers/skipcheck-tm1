@@ -10,6 +10,7 @@ Builds and serves each project's pages on skipcheck.io (and on skipcheck.dev, wh
 | `/<project>/walkthroughs/<slug>/` | A task done step by step, such as connecting and listing cubes, with each step's code in every language and what it printed. Listed on the landing page and the docs home. | `scripts/pages.mjs`, from `content/walkthroughs/<project>/<slug>.md` |
 | `/docs/` | The docs landing page: every project, its languages, and links to its docs in each. The masthead's Docs link opens it. | `scripts/pages.mjs`, from the same content files as the landing pages |
 | `/pa-docker/` | Planning Analytics in Docker: a landing page, and a page per image and for `pa-setup` (`/pa-docker/tm1-server/`...). | `scripts/docker.mjs`, from `content/pa-docker.md` and the READMEs under `docker/` |
+| `/llms.txt`, `/llms-full.txt` | The docs for coding agents, as the [llms.txt convention](https://llmstxt.org) has them: a list of the pages, each with a line saying what's there, and the full text of the landing pages, the walkthroughs and every type's overview in Markdown. | `scripts/llms.mjs`, from the same sources as the pages |
 | `/<project>/release.json` | The version the pages describe, and whether it's a release: the site's home page reads it for each project's badge. | `scripts/pages.mjs` |
 | `/<project>/api/java/` | The Javadoc, themed, linked from each Java page. | `./gradlew apiSiteJavadoc`, collected by `scripts/assemble.mjs` |
 
@@ -79,7 +80,8 @@ has one, and isn't required.
 | `scripts/walkthroughs.mjs` | Each project's walkthroughs, from `content/walkthroughs/`. |
 | `scripts/output.mjs` | What the examples printed (`example-output/`), and the checks on it. |
 | `scripts/docker.mjs` | The Docker pages, from the READMEs. |
-| `scripts/check-links.mjs` | Checks every link on the landing and docs pages, and every entry of the search indexes. |
+| `scripts/llms.mjs` | `llms.txt` and `llms-full.txt`, from the content files, the examples and the overviews `reference.mjs` writes to `.generated/reference.json`. |
+| `scripts/check-links.mjs` | Checks every link on the landing and docs pages, every entry of the search indexes, and every address in `llms.txt` and `llms-full.txt`. |
 | `assets/` | The generated pages' own styles and script, copied to `/<project>/assets/`: `docs.css` (the reference's layout), `docs.js` (the reference's language memory), `search.js` and `search-rank.js` (the reference's search box, and how it matches and ranks), `tabs.css` and `tabs.js` (the landing pages' language tabs), `readme.css` (what the Docker pages add to `docs.css`). A language chosen anywhere is remembered and followed everywhere. |
 | `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, serves the site's 404 page for missing paths, and sends the addresses these pages had under `/projects/` to the new ones. |
 | `wrangler.jsonc` | The Worker's config: a route per project, for `/docs/` and for `/pa-docker/` on each zone, and one per zone for the old addresses. |

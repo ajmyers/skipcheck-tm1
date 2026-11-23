@@ -39,6 +39,9 @@
     { "pattern": "*skipcheck.io/pa-docker*", "zone_name": "skipcheck.io" },
     // The docs landing page, which lists every project
     { "pattern": "*skipcheck.io/docs*", "zone_name": "skipcheck.io" },
+    // The docs for coding agents, at the site's root as the llms.txt convention has them
+    { "pattern": "*skipcheck.io/llms.txt*", "zone_name": "skipcheck.io" },
+    { "pattern": "*skipcheck.io/llms-full.txt*", "zone_name": "skipcheck.io" },
     // Where these pages were before: /projects/<project>/..., and the guide at /projects/tm1/guide/.
     // The Worker sends them to the addresses above. /projects/pa-docker/ is the site's, and
     // doesn't match: the site sends it to /pa-docker/, and keeps its setup page there.
@@ -52,6 +55,8 @@
     { "pattern": "*skipcheck.dev/tm1-csdl*", "zone_name": "skipcheck.dev" },
     { "pattern": "*skipcheck.dev/pa-docker*", "zone_name": "skipcheck.dev" },
     { "pattern": "*skipcheck.dev/docs*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/llms.txt*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/llms-full.txt*", "zone_name": "skipcheck.dev" },
     { "pattern": "*skipcheck.dev/projects/tm1*", "zone_name": "skipcheck.dev" }
   ],
   "workers_dev": false,

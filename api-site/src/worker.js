@@ -7,7 +7,8 @@
 // nav reaches these pages without a rebuild. skipcheck.dev serves the same pages, each naming its
 // skipcheck.io address as canonical.
 //
-// The Docker pages, from the READMEs under docker/, are served the same way at /pa-docker/.
+// The Docker pages, from the READMEs under docker/, are served the same way at /pa-docker/, and
+// the docs for coding agents, /llms.txt and /llms-full.txt (scripts/llms.mjs), as they are.
 //
 // The addresses these pages had before, under /projects/, are sent to the new ones. The theme stylesheet imports the site's tokens and chrome
 // styles the same way (api-site/theme/javadoc-theme.css).
@@ -50,8 +51,8 @@ export default {
 		const project = site.projects.find((p) => url.pathname === '/' + p.id || url.pathname.startsWith('/' + p.id + '/'));
 		if (!project) return fetch(new URL(url.pathname + url.search, env.SITE_ORIGIN), request);
 
-		// A project without a landing page opens at its docs
-		if (!project.landing && (url.pathname === '/' + project.id || url.pathname === '/' + project.id + '/')) {
+		// A library without a landing page opens at its docs
+		if (project.docs && !project.landing && (url.pathname === '/' + project.id || url.pathname === '/' + project.id + '/')) {
 			return Response.redirect(url.origin + '/' + project.id + '/docs/' + url.search, 302);
 		}
 

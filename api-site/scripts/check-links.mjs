@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Checks the links of the pages this site generates: every landing page and docs page in dist/.
+// Checks the links of the pages this site generates: every landing page and docs page in dist/,
+// and every address in the docs for agents (llms.txt and llms-full.txt, from llms.mjs).
 // A link to a path this site serves (a project's, the Docker pages', the docs landing page's)
 // must be a file in dist/; any other local link must be one of the site's own addresses listed
 // below, since those pages live in ajmyers/skipcheck.io and can't be seen from here. Run after the pages are built; it fails with the list of broken links.
+//
+// In the docs for agents every address is absolute: one on the site is checked as a link would be,
+// one to a file of this repository on GitHub must be a file here, and any other is left alone.
 //
 // Each docs language's search index (search.json, search.mjs) is checked the same way: every type
 // and member it lists must be on a page there.
@@ -14,7 +18,9 @@
 
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { distDir, PROJECTS, SECTIONS } from './site.mjs';
+import { CANONICAL_ORIGIN, distDir, PROJECTS, repoDir, SECTIONS } from './site.mjs';
+
+const repository = /^githubRepo=(.+)$/m.exec(await readFile(path.join(repoDir, 'gradle.properties'), 'utf8'))[1].trim();
 
 // What these pages may link to on the site itself. Add an address here when a page starts to use
 // it, after checking that the site serves it.
@@ -50,18 +56,50 @@ for await (const file of htmlFiles(distDir)) {
 			if (!ids.has(decodeURIComponent(target.hash.slice(1)))) broken.push(page + ': no #' + target.hash.slice(1) + ' on the page');
 			continue;
 		}
-		const section = SECTIONS.find((s) => target.pathname === '/' + s.id || target.pathname.startsWith('/' + s.id + '/'));
-		if (!section) {
-			if (!SITE_PATHS.has(target.pathname)) broken.push(page + ': ' + link + " isn't one of the site's addresses in check-links.mjs");
-			continue;
-		}
-		const asset = path.join(distDir, target.pathname.endsWith('/') ? target.pathname + 'index.html' : target.pathname);
-		if (!(await exists(asset))) {
-			broken.push(page + ': ' + link + ' (no ' + path.relative(distDir, asset) + ' in dist)');
-		} else if (target.hash && asset.endsWith('.html')) {
-			const there = await readFile(asset, 'utf8');
-			if (!there.includes(' id="' + decodeURIComponent(target.hash.slice(1)) + '"')) broken.push(page + ': ' + link + ' (no such id on that page)');
-		}
+		const problem = await onSite(target);
+		if (problem) broken.push(page + ': ' + link + problem);
+	}
+}
+
+/** What's wrong with a link to an address on the site (a URL), or null. */
+async function onSite(target) {
+	const section = SECTIONS.find((s) => target.pathname === '/' + s.id || target.pathname.startsWith('/' + s.id + '/'));
+	if (!section) return SITE_PATHS.has(target.pathname) ? null : " isn't one of the site's addresses in check-links.mjs";
+	const asset = path.join(distDir, target.pathname.endsWith('/') ? target.pathname + 'index.html' : target.pathname);
+	if (!(await exists(asset))) return ' (no ' + path.relative(distDir, asset) + ' in dist)';
+	if (target.hash && asset.endsWith('.html')) {
+		const there = await readFile(asset, 'utf8');
+		if (!there.includes(' id="' + decodeURIComponent(target.hash.slice(1)) + '"')) return ' (no such id on that page)';
+	}
+	return null;
+}
+
+/** What's wrong with an absolute address in a text, or null: one on the site must be there, one to
+ * a file of this repository on GitHub (raw, or a blob or tree) must be a file or folder here. */
+async function checkAddress(address) {
+	const url = new URL(address);
+	if (url.origin === CANONICAL_ORIGIN) return onSite(url);
+	const github =
+		(url.host === 'raw.githubusercontent.com' && new RegExp('^/' + repository + '/[^/]+/(.+)$').exec(url.pathname)) ||
+		(url.host === 'github.com' && new RegExp('^/' + repository + '/(?:blob|tree)/[^/]+/(.+)$').exec(url.pathname));
+	if (!github) return null;
+	return (await stat(path.join(repoDir, decodeURIComponent(github[1]))).then(() => true, () => false)) ? null : ' (no ' + github[1] + ' in the repository)';
+}
+
+/** The absolute addresses in a text, without the punctuation that ends a sentence or a Markdown link. */
+const addressesIn = (text) => [...text.matchAll(/https?:\/\/[^\s<>"'`)\]]+/g)].map((match) => match[0].replace(/[.,;:!?]+$/, ''));
+
+// The docs for agents
+for (const name of ['llms.txt', 'llms-full.txt']) {
+	const text = await readFile(path.join(distDir, name), 'utf8').catch(() => null);
+	if (text === null) {
+		broken.push('/' + name + ' is not in dist: run scripts/llms.mjs');
+		continue;
+	}
+	for (const address of new Set(addressesIn(text))) {
+		checked++;
+		const problem = await checkAddress(address);
+		if (problem) broken.push('/' + name + ': ' + address + problem);
 	}
 }
 for (const project of PROJECTS) {
