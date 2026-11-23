@@ -405,7 +405,7 @@ def test_rejects_non_versions(text: str) -> None:
         Tm1Version.parse(text)
 
 
-def test_finds_the_tm1_11_service_root_from_an_address() -> None:
+def test_finds_the_tm111_service_root_from_an_address() -> None:
     assert Tm1Dialect.V11.service_root("http://tm1:8010") == "http://tm1:8010/api/v1/"
     assert Tm1Dialect.V11.service_root("https://tm1.example.com:12354/") == "https://tm1.example.com:12354/api/v1/"
     assert Tm1Dialect.V11.service_root("http://tm1:8010/api/v1") == "http://tm1:8010/api/v1/", "already a root"
