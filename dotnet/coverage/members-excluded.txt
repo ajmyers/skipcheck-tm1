@@ -34,3 +34,7 @@ PawSource.ZIP -> ZipSetting | the Zip property (Java's record component zip()) h
 PawContainer.ACCEPT_LICENSE -> AcceptLicenseSetting | the AcceptLicense() method has the name
 CognosContainer.NAMESPACE -> NamespaceId | the Namespace enum has the name
 PlanningAnalyticsEnvironment.Builder -> EnvironmentBuilder | the Builder() method has the name
+RequiresTm1 -> RequiresTm1FactAttribute | an xUnit fact, written [RequiresTm1Fact], where Java's is a JUnit annotation
+RequiresTm1Web -> RequiresTm1WebFactAttribute | an xUnit fact, written [RequiresTm1WebFact], where Java's is a JUnit annotation
+RequiresCognos -> RequiresCognosFactAttribute | an xUnit fact, written [RequiresCognosFact], where Java's is a JUnit annotation
+RequiresPaw -> RequiresPawFactAttribute | an xUnit fact, written [RequiresPawFact], where Java's is a JUnit annotation
