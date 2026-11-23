@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { LocalizedAttributes, type LocalizedAttributesPatch } from "../../generated/index.js";
 import type { ODataPath, ODataQuery } from "../../odata/index.js";
 import { Tm1Request } from "../../request.js";

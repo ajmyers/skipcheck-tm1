@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 const REQUEST_TIMEOUT = 30_000;
 const NAME = /"Name"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
 

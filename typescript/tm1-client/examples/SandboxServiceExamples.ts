@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { CellsetCell, ODataQuery, SandboxPatch, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for SandboxService, quoted in its documentation.

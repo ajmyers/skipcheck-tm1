@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Tm1Authenticator } from "../auth/index.js";
 import { checkImpersonated, type Tm1SessionBuilder } from "./session.js";
 

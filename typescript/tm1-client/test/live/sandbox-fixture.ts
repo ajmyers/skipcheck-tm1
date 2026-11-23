@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { afterEach, beforeEach } from "vitest";
 import { CubePatch, type Tm1Client } from "../../src/index.js";
 import { Fixtures } from "./data-fixtures.js";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Element, ElementPatch, ElementType, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for ElementService, quoted in its documentation.

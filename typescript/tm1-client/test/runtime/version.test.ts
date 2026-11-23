@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ODataPath, ODataQuery, Tm1Capabilities, Tm1Capability, Tm1Dialect, Tm1Operation, Tm1Request, Tm1Session, Tm1Version } from "../../src/index.js";

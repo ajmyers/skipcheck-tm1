@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Emits operations.ts: `Tm1Operations`, a `Tm1Operation` per action and function, named as in the
 // Java client (`CHORE_ACTIVATE` → `ChoreActivate`, as the .NET client).
 

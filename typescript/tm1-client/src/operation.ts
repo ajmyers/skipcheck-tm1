@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Tm1Capability } from "./version/index.js";
 
 function unqualified(name: string): string {

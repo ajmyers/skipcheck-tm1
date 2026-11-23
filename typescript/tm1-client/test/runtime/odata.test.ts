@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect, it } from "vitest";
 import { Filter, ODataLiterals, ODataPath, ODataProperty, ODataQuery, type ODataLiteral } from "../../src/index.js";
 import { seeded } from "../support/scripted-tm1.js";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 const UNRESERVED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
 const utf8 = new TextEncoder();
 

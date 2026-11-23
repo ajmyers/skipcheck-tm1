@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect, it } from "vitest";
 import { DimensionPatch, ODataQuery, Tm1PreconditionFailedException } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";

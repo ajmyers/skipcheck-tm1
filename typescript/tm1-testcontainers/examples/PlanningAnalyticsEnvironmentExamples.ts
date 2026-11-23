@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Cube, ODataQuery, Tm1Authenticator, Tm1Client } from "@skipcheck/tm1-client";
 import { CognosContainer, PlanningAnalyticsEnvironment, Tm1Seed } from "@skipcheck/tm1-testcontainers";
 

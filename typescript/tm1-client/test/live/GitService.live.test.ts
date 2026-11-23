@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { StartedTestContainer } from "testcontainers";

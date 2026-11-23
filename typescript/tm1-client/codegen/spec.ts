@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // The spec (spec/tm1-api.json), with the lookups every emitter needs, as tm1_pygen's spec.py and
 // Tm1.Codegen's Spec.cs.
 
@@ -170,7 +172,8 @@ export const Names = {
   },
 };
 
-export const HEADER = "// Generated from spec/tm1-api.json by the TypeScript client's codegen: don't edit, don't commit.\n/* eslint-disable */\n";
+export const HEADER =
+  "// SPDX-License-Identifier: Apache-2.0\n\n// Generated from spec/tm1-api.json by the TypeScript client's codegen: don't edit, don't commit.\n/* eslint-disable */\n";
 
 /** A JSDoc comment from a description and the item's since/deprecated notes, or nothing. */
 export function jsdoc(indent: string, text: string | undefined, item: { since?: string; deprecated?: { version?: string; reason?: string } | null }): string {

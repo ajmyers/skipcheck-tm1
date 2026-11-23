@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { randomUUID } from "node:crypto";
 import type { Tm1WebContainer } from "../../src/index.js";
 

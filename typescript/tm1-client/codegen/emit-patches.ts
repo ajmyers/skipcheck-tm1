@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Emits patches.ts: a patch per type, as the Java model's `CubePatch`:
 // `CubePatch.builder().name("Sales").bindDimensions(dims.key("Region")).build()`. Only the properties
 // set are sent, an explicit `null` included; a subtype's patch sends its `@odata.type` first.

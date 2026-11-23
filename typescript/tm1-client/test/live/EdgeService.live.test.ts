@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
 import { DimensionPatch, EdgePatch, ElementPatch, ElementType, HierarchyPatch, type Tm1Client } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";

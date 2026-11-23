@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { AttributeOwner, AttributesPatch, LocalizedAttributesPatch, type LocalizedAttributes, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for LocalizedAttributeService, quoted in its documentation.

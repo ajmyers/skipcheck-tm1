@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Tm1Version } from "@skipcheck/tm1-client";
 import { describe, expect } from "vitest";
 import { PawContainer, Tm1ServerContainer, Tm1WebContainer } from "../src/index.js";

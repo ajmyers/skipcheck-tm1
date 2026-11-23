@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /** The live conformance runner, offline: the cubes scenario against a fake TM1 that answers as TM1
  * would, writing traffic without the session's own requests. */
 import { mkdtempSync, readFileSync } from "node:fs";

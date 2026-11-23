@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { ODataEncoding } from "./encoding.js";
 import { Filter, ODataProperty } from "./filter.js";
 import type { ODataPath } from "./path.js";

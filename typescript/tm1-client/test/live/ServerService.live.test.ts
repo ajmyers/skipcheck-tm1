@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { LogLevel, ODataPath, ODataQuery, ServerSettingsPatch, Tm1BadRequestException, Tm1Request, type Tm1Client } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";

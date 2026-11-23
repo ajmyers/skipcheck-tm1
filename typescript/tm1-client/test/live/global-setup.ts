@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { DockerHost, Tm1ServerContainer, Tm1Source } from "@skipcheck/tm1-testcontainers";
 import type { TestProject } from "vitest/node";
 

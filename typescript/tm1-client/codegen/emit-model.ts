@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Emits model.ts: an enum per CSDL enum type (a string union and a const of its members), an
 // interface per entity and complex type with TM1's own property names, and a model constant of the
 // same name with its `Fields` (`Cube.Fields.Name`, the Java model's `Cube.NAME`); and schema.ts, what

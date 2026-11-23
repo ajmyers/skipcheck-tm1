@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 const encoder = new TextEncoder();
 
 /** @internal Text for a request header that TM1 reads as UTF-8 (a user name in `TM1-Impersonate`, a

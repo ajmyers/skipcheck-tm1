@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Tm1Authenticator, Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for CognosPassports, quoted in its documentation.

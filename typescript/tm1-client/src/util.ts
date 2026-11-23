@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /** A map argument: a `Map` (which keeps its order whatever the keys) or a plain object (which
  * puts integer-like keys such as `"2024"` first, as JavaScript objects do). Where order matters,
  * such as a tuple's dimensions, pass a `Map` if a key may look like an integer. */

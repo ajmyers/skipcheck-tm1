@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect, it } from "vitest";
 import { Tm1Client, Tm1ServerException, type Tm1Session } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";

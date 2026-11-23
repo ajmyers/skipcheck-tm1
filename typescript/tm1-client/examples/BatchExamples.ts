@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { ElementPatch, ODataQuery, Process, type Cube, type Dimension, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for Tm1Batch, quoted in its documentation.

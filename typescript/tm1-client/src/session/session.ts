@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Tm1Authenticator } from "../auth/index.js";
 import { ODataError, Tm1ErrorClassifier, Tm1ProtocolException } from "../errors/index.js";
 import { readAs, writeJson } from "../json.js";

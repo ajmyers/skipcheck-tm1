@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { ODataPath } from "./odata/index.js";
 
 /** A write, as the Java model's patches (`CubePatch`): the properties set, explicit nulls included,

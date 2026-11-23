@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { LogLevel, ODataQuery, type MessageLogEntry, type Tm1Client, type Tm1Stream } from "@skipcheck/tm1-client";
 
 // Examples for LogService, quoted in its documentation.

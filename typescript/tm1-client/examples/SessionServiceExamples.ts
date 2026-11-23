@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { ODataQuery, Session, User, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for SessionService, quoted in its documentation.

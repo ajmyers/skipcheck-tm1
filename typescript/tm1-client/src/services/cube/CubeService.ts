@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Primitive, type Tm1Model } from "../../model.js";
 import {
   CalculationComponent,

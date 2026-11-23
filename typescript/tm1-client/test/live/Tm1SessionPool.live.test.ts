@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect } from "vitest";
 import { Tm1ApiException, Tm1Authenticator, Tm1Identity, Tm1Session, Tm1SessionPool } from "../../src/index.js";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { Tm1Session } from "../session/session.js";
 
 /** The endpoints of the REST API each method implements, as coverage-gate IDs (`EntitySet Cubes`,

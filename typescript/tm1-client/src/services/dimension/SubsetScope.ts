@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /** Who sees a subset, and so which of a hierarchy's collections holds it: the Java client's
  * `SubsetScope`; {@link SubsetScope.navigation} names the collection. */
 export type SubsetScope = "Public" | "Private" | "Session";

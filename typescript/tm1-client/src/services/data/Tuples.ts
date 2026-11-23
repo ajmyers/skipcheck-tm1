@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { ODataPath } from "../../odata/index.js";
 import { entriesOf, required, type Tm1Map } from "../../util.js";
 

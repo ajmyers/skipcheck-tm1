@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Process, ProcessErrorLog, ProcessExecuteResult, ProcessSyntaxError, Tm1Operations, type ProcessPatch } from "../../generated/index.js";
 import { ODataLiterals, ODataPath, type ODataQuery } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";

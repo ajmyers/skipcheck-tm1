@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { GenericContainer } from "./GenericContainer.js";
 import { Messages } from "./messages.js";
 import { Network } from "./Network.js";

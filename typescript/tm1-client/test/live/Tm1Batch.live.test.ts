@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { randomUUID } from "node:crypto";
 import { describe, expect } from "vitest";
 import { Json, ODataPath, ODataQuery, Tm1Exception, Tm1NotFoundException, Tm1Request } from "../../src/index.js";

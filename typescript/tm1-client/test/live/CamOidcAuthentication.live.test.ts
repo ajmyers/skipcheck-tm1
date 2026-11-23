@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { CognosContainer, CognosSource, KeycloakContainer, Tm1ServerContainer, Tm1Source } from "@skipcheck/tm1-testcontainers";
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { Tm1Authenticator, Tm1Client } from "../../src/index.js";

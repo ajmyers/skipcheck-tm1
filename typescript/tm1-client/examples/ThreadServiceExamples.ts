@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Filter, ODataQuery, Thread, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for ThreadService, quoted in its documentation.
