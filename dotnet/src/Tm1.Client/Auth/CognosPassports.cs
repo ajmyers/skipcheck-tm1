@@ -11,7 +11,7 @@ using Skipcheck.Tm1.Client.Errors;
 
 namespace Skipcheck.Tm1.Client.Auth;
 
-/// <summary>CAM passports from Cognos, for <see cref="Tm1Authenticator.CamPassport"/>, as the Java
+/// <summary>CAM passports from Cognos, for <see cref="Tm1Authenticator.CamPassport(Func{CancellationToken, ValueTask{string}})"/>, as the Java
 /// client's <c>CognosPassports</c>: the client logs on to Cognos itself, rather than being handed a
 /// passport. Each function logs on again every time it's called, so every TM1 login (including the
 /// one after TM1 drops a session) gets a fresh passport, and an expired one is never reused.

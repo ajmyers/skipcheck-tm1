@@ -79,6 +79,58 @@ public sealed class Tm1SessionPoolTest : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GivesDifferentCredentialsForTheSameNameTheirOwnSession()
+    {
+        var carol = _pool.Session(Tm1Identity.WithCredentials("carol", Tm1Authenticator.Basic("carol", "c")));
+        Assert.Same(carol, _pool.Session(Tm1Identity.WithCredentials("Carol", Tm1Authenticator.Basic("carol", "c")))); // the same credentials, made again
+        await carol.ExecuteAsync(Server);
+
+        var other = _pool.Session(Tm1Identity.WithCredentials("carol", Tm1Authenticator.Basic("carol", "wrong")));
+        Assert.NotSame(carol, other); // never the session someone else's credentials opened
+        await other.ExecuteAsync(Server);
+        // Each logs in with what it was given
+        Assert.Equal(["Basic Y2Fyb2w6Yw==", "Basic Y2Fyb2w6d3Jvbmc="], _tm1.Requests(ScriptedTm1.Login).Select(r => r.Authorization));
+    }
+
+    [Fact]
+    public void SharesASessionForTheSameAuthenticatorWhenItsCredentialsCantBeCompared()
+    {
+        var passport = Tm1Authenticator.CamPassport(_ => ValueTask.FromResult("p1"));
+        var dave = _pool.Session(Tm1Identity.WithCredentials("dave", passport));
+        Assert.Same(dave, _pool.Session(Tm1Identity.WithCredentials("dave", passport)));
+        Assert.NotSame(dave, _pool.Session(Tm1Identity.WithCredentials("dave", Tm1Authenticator.CamPassport(_ => ValueTask.FromResult("p1")))));
+        Assert.Equal(Tm1Authenticator.CamPassport("p1"), Tm1Authenticator.CamPassport("p1"));
+        Assert.NotEqual(Tm1Authenticator.CamPassport("p1"), Tm1Authenticator.CamPassport("p2"));
+        Assert.Equal(
+            Tm1Authenticator.CognosLogon("http://cognos:9300", "LDAP", "dave", "d"),
+            Tm1Authenticator.CognosLogon("http://cognos:9300", "LDAP", "dave", "d")
+        );
+        Assert.NotEqual(
+            Tm1Authenticator.CognosLogon("http://cognos:9300", "LDAP", "dave", "d"),
+            Tm1Authenticator.CognosLogon("http://cognos:9300", "LDAP", "dave", "other")
+        );
+    }
+
+    /// <summary>.NET only: what the fixed authenticators send and show, and that equal ones hash alike.</summary>
+    [Fact]
+    public async Task LogsInWithAPassportItWasHandedAndNeverShowsIt()
+    {
+        var passport = Tm1Authenticator.CamPassport("p1");
+        Assert.Equal("CAMPassport p1", await passport.AuthorizationAsync());
+        Assert.Equal("CAMPassport", passport.Describe());
+        Assert.DoesNotContain("p1", passport.ToString());
+        Assert.Equal(passport.GetHashCode(), Tm1Authenticator.CamPassport("p1").GetHashCode());
+        Assert.Equal(Tm1Authenticator.Basic("carol", "c"), Tm1Authenticator.Basic("carol", "c"));
+        Assert.NotEqual(Tm1Authenticator.Basic("carol", "c"), Tm1Authenticator.CamNamespace("carol", "c", "LDAP"));
+        Assert.Equal(Tm1Authenticator.CamNamespace("carol", "c", "LDAP"), Tm1Authenticator.CamNamespace("carol", "c", "LDAP"));
+        Assert.Equal(
+            Tm1Identity.WithCredentials("carol", Tm1Authenticator.Basic("carol", "c")).GetHashCode(),
+            Tm1Identity.WithCredentials("Carol", Tm1Authenticator.Basic("carol", "c")).GetHashCode()
+        );
+        Assert.Throws<ArgumentNullException>(() => Tm1Authenticator.CamPassport((string)null!));
+    }
+
+    [Fact]
     public async Task KeepsASessionWhileARequestIsRunningOnIt()
     {
         var answer = new ScriptedTm1.Pending();
