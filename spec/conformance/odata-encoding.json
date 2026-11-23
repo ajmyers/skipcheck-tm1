@@ -1,5 +1,5 @@
 {
-	"$comment": "OData encoding every client must agree on, read by the Java client's ODataConformanceTest and the Python client's test_conformance.py. A path is built step by step: [\"of\", name], [\"key\", value], [\"compoundKey\", {part: value}], [\"nav\", name], [\"cast\", type], [\"action\", name], [\"function\", name, {parameter: value}], [\"functionImport\", name, {parameter: value}], [\"value\"], [\"count\"], [\"ref\"]. A literal is {\"value\": …, \"as\": \"double\"} when JSON's number would be ambiguous.",
+	"$comment": "OData encoding every client must agree on, read by the Java client's ODataConformanceTest and the Python client's tests/conformance/test_encoding.py. A path is built step by step: [\"of\", name], [\"key\", value], [\"compoundKey\", {part: value}], [\"nav\", name], [\"cast\", type], [\"action\", name], [\"function\", name, {parameter: value}], [\"functionImport\", name, {parameter: value}], [\"value\"], [\"count\"], [\"ref\"]. A literal is {\"value\": …, \"as\": \"double\"} when JSON's number would be ambiguous.",
 	"paths": [
 		{ "steps": [["of", "Dimensions"], ["key", "Region"], ["nav", "Hierarchies"], ["key", "Region"], ["nav", "Elements"]], "expect": "Dimensions('Region')/Hierarchies('Region')/Elements" },
 		{ "steps": [["of", "Cubes"], ["key", "Sales"], ["action", "tm1.Reserve"]], "expect": "Cubes('Sales')/tm1.Reserve" },

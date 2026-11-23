@@ -10,7 +10,7 @@ import pytest
 
 from skipcheck_tm1.odata import ODataPath, literal
 
-from .conftest import CONFORMANCE
+from ..conftest import CONFORMANCE
 
 CASES = json.loads((CONFORMANCE / "odata-encoding.json").read_text(encoding="utf-8"))
 

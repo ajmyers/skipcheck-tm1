@@ -14,8 +14,8 @@ import pytest
 from skipcheck_tm1 import Tm1Client, Tm1Session, auth
 from skipcheck_tm1.aio import AsyncTm1Client, AsyncTm1Session
 
-from . import conformance_live as live
-from .conftest import BASE, FakeTm1
+from ..conftest import BASE, FakeTm1
+from . import scenarios as live
 
 SCENARIOS = ["dimensions", "hierarchies", "elements", "levels"]
 

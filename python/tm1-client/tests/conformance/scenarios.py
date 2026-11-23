@@ -13,10 +13,10 @@ from typing import Any
 
 import httpx
 
-from . import conformance_codec as codec
-from .conformance_codec import snake
+from . import codec
+from .codec import snake
 
-REPO = Path(__file__).resolve().parents[3]
+REPO = Path(__file__).resolve().parents[4]
 SCENARIOS = REPO / "spec" / "conformance" / "live"
 TRAFFIC = REPO / "build" / "conformance-live"
 

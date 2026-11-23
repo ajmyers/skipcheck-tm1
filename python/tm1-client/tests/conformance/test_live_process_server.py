@@ -15,8 +15,8 @@ import pytest
 from skipcheck_tm1 import Tm1Client, Tm1Session, auth
 from skipcheck_tm1.aio import AsyncTm1Client, AsyncTm1Session
 
-from . import conformance_live as live
-from .conftest import BASE, FakeTm1
+from ..conftest import BASE, FakeTm1
+from . import scenarios as live
 
 _ENTITY = re.compile(r"(Processes|Chores|Loggers|ErrorLogFiles|SQLDataSources)\('([^']*)'\)(\?.*)?")
 _TOP = re.compile(r"(MessageLogEntries|MessageLog\(Reverse=true\))\?\$top=(\d+)")

@@ -17,12 +17,12 @@ import pytest
 from skipcheck_tm1 import Tm1Client, Tm1Session, auth
 from skipcheck_tm1.aio import AsyncTm1Client, AsyncTm1Session
 
-from . import conformance_codec as codec
-from .conformance_codec import Unknown, snake
-from .conftest import BASE, CONFORMANCE, FakeTm1
+from ..conftest import BASE, CONFORMANCE, FakeTm1
+from . import codec
+from .codec import Unknown, snake
 
 CALLS = CONFORMANCE / "calls"
-UNSUPPORTED = Path(__file__).resolve().parents[1] / "conformance" / "unsupported.txt"
+UNSUPPORTED = Path(__file__).resolve().parents[2] / "conformance" / "unsupported.txt"
 
 
 def _unsupported() -> dict[str, str]:
