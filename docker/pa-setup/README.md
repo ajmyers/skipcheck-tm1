@@ -25,7 +25,8 @@ Windows (PowerShell):
 ```
 
 Or save [`setup.sh`](setup.sh) / [`setup.ps1`](setup.ps1) next to your file and run it
-from there. **Docker is all you need**: the scripts only check it and run the setup tool
+from there. A coding agent can do all of this for you with the
+[`pa-setup` skill](../../agent-plugin/README.md). **Docker is all you need**: the scripts only check it and run the setup tool
 in a container (`ghcr.io/ajmyers/pa-setup`), with the Docker socket and the current
 folder mounted. `PA_IMAGE_TAG` picks the images' tag: `edge` (built from `master`) until
 the first release.
@@ -42,7 +43,7 @@ the first release.
 | `down` | Stops and removes the containers. Data (TM1 databases, installs, the Cognos content store) is kept. |
 | `generate` | Only writes `compose.yaml` |
 
-`-f other.yaml` uses another file. The generated `compose.yaml` works with plain
+`-f other.yaml` uses another file in the same folder. The generated `compose.yaml` works with plain
 `docker compose` too, but change `pa-environment.yaml` and rerun `up` rather than editing it.
 
 ## pa-environment.yaml
@@ -76,7 +77,7 @@ cognos:
 | `files` | `./pa-files` | Where each TM1 server keeps `config`, `data` and `logs`, in a folder per server |
 | `images` | the published images, `:edge` until the first release (`PA_IMAGE_TAG` picks a release) | `tm1Server`, `tm1Web`, `cognosServer`, `keycloak`: other images, e.g. local builds or **private images with IBM software built in** |
 | `tm1.servers.<name>` | | A TM1 server. `port` (REST API; default 8010, 8011, ...), `seed` (`empty`, `sdata`, `24retail`), `cfg` (any `tm1s.cfg` parameter) |
-| `tm1.adminServer` | automatic | A shared Admin Server: on with more than one server, where every server registers. `adminPort` defaults to 5895. |
+| `tm1.adminServer`, `tm1.adminPort` | automatic, 5895 | A shared Admin Server: on with more than one server, where every server registers |
 | `tm1Web` | off | `true`, or `port` (9510) and `heap` (`1g`). Lists every server. |
 | `paw` | off | `acceptLicense: true` (required: IBM's PAW license), `port` (8800), `zip` (default: the newest in `ibm`) |
 | `cognos` | off | `port` (9300), `users` (`user:password[:group,group]`), `oidc` (`true` or `keycloakPort`, 8180), `cam`, `memory` (dispatcher heap MB, 6144) |
