@@ -29,6 +29,7 @@ public class CubeTests(Tm1ServerFixture tm1) : IClassFixture<Tm1ServerFixture>
 | `Tm1Source.PRIVATE_IMAGE` and similar constants | `Tm1Source.PrivateImageSetting` (the `PrivateImage` record has the name); see `Renamed` in the parity test |
 | `Network.newNetwork()` | `Network.NewNetwork()` (`Network.Of(…)` wraps a Testcontainers for .NET network) |
 | `PlanningAnalyticsEnvironment.builder()….build()` | `PlanningAnalyticsEnvironment.Builder()….Build()` |
+| `PlanningAnalyticsEnvironment.fromConfig(Path.of("pa-environment.yaml"))` | `PlanningAnalyticsEnvironment.FromConfig("pa-environment.yaml")` |
 | `@RequiresTm1`, `@RequiresCognos`, `@RequiresTm1Web`, `@RequiresPaw` | `[RequiresTm1Fact]`, `[RequiresCognosFact]`, `[RequiresTm1WebFact]`, `[RequiresPawFact]` |
 | A `Tm1ServerContainer` / `Tm1WebContainer` / `PawContainer` / `CognosSource` test parameter | `Tm1ServerFixture` / `Tm1WebFixture` / `PawFixture` / `CognosFixture` as an `IClassFixture` |
 
@@ -43,6 +44,24 @@ Reuse follows the same switch as Java: set `testcontainers.reuse.enable=true` in
 ### Image tag
 
 The image tag is the library's version. For a development build it's `edge`: Java's `-SNAPSHOT`, .NET's `-dev` and a published `-dev.1`.
+
+### From pa-environment.yaml
+
+`FromConfig` reads the [`pa-environment.yaml`](../../../docker/pa-setup/README.md#pa-environmentyaml) that `pa-setup` runs, so tests run the environment developers run, from one file:
+
+```csharp
+await using var env = PlanningAnalyticsEnvironment.FromConfig("pa-environment.yaml").Build();
+await env.StartAsync();
+var url = env.Tm1("planning").RestUrl;
+```
+
+It returns the builder, configured, so you can still change it before `Build()`. The file is checked as `pa-setup` checks it, with the same defaults and messages. A file it refuses throws an `ArgumentException`.
+
+- **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`, `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `Keycloak()`, `cam` as `CamSecurity`, `memory`) and `paw` (`acceptLicense`, `zip`).
+- **Sources:** a part's source set on the builder wins; then `ibm`, the folder of IBM downloads; then the settings above (pa-setup's `.env` sets the same `*_URL` names); then the part's `images` entry, as a private image with IBM's software built in. With another source, an `images` entry is the image the part runs.
+- **Ignored:** `name`, every port, and `files`. Testcontainers gives the environment its own network, random host ports and a new database each time.
+- **Refused** with a message naming the setting: `cognos` without `tm1.servers`, `paw` with `cognos`, and `seed: 24retail`, which the environment can't run yet.
+- **YAML** is read with [YamlDotNet](https://github.com/aaubry/YamlDotNet), as YAML 1.1, the way pa-setup's PyYAML reads it: `yes`, `no`, `on` and `off` are booleans too.
 
 ### PAW
 

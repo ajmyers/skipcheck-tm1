@@ -109,7 +109,8 @@ Each part is the project's own image, documented in its README:
 [`tm1-server`](../tm1-server/README.md) (CAM security: [here](../tm1-server/README.md#cognos-cam-security)),
 [`tm1-web`](../tm1-web/README.md), [`paw`](../paw/README.md) and
 [`cognos-server`](../cognos-server/README.md) (users, LDAP and [OIDC](../cognos-server/README.md#oidc)).
-For tests, `tm1-testcontainers`'s `PlanningAnalyticsEnvironment` runs the same parts.
+For tests, `tm1-testcontainers`'s `PlanningAnalyticsEnvironment` runs the same parts, and
+`PlanningAnalyticsEnvironment.fromConfig` reads this same file (in Java, Python, .NET and TypeScript).
 
 **Memory:** about 0.5 GB per TM1 server, 1 GB for TM1 Web, 8 GB for Cognos and 15 GB for
 PAW. `up` warns when Docker has less than the parts need; raise it in Docker Desktop

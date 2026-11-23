@@ -147,6 +147,33 @@ try (var env = PlanningAnalyticsEnvironment.builder()
   `tm1Source(...)`, `cognosSource(...)` and so on. `start()` starts parts in dependency
   order, in parallel where it can; `close()` stops everything and removes the network.
 
+### From pa-environment.yaml
+
+`fromConfig` reads the [`pa-environment.yaml`](../../docker/pa-setup/README.md#pa-environmentyaml)
+that `pa-setup` runs, so tests run the environment developers run, from one file:
+
+```java
+try (var env = PlanningAnalyticsEnvironment.fromConfig(Path.of("pa-environment.yaml")).build()) {
+    env.start();
+    env.tm1("planning").getRestUrl();
+}
+```
+
+It returns the builder, configured, so you can still change it before `build()`. The file is
+checked as `pa-setup` checks it, with the same defaults and messages.
+
+- **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`,
+  `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `keycloak()`, `cam` as `camSecurity`,
+  `memory`) and `paw` (`acceptLicense`, `zip`).
+- **Sources:** a part's source set on the builder wins; then `ibm`, the folder of IBM downloads;
+  then the settings above (pa-setup's `.env` sets the same `*_URL` names); then the part's
+  `images` entry, as a private image with IBM's software built in. With another source, an
+  `images` entry is the image the part runs.
+- **Ignored:** `name`, every port, and `files`. Testcontainers gives the environment its own
+  network, random host ports and a new database each time.
+- **Refused** with a message naming the setting: `cognos` without `tm1.servers`, `paw` with
+  `cognos`, and `seed: 24retail`, which the environment can't run yet.
+
 ## Several servers, one Admin Server
 
 By default each `Tm1ServerContainer` runs its own Admin Server. For a deployment-like
