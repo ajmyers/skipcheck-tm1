@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 using System.Threading.Tasks;
 using Skipcheck.Tm1.Client;
 using Skipcheck.Tm1.Client.Model;

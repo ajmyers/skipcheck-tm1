@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 namespace Skipcheck.Tm1.Client.OData;
 
 /// <summary>A property path, for queries and filters: the generated models have one per property,

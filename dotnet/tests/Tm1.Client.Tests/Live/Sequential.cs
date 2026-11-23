@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 using Xunit;
 
 // The live tests share one TM1, as Java's do, and Java's run one class at a time. Several count

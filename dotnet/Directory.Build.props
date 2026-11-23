@@ -18,13 +18,15 @@
     <!-- A build fails on a file CSharpier would reformat (.csharpierrc.json), as the Java build's
          checkFormat: fix with "dotnet csharpier format dotnet". It never formats during a build. -->
     <CSharpier_Check>true</CSharpier_Check>
+    <!-- Code style rules count in a build, in tests too. Only the ones .editorconfig makes errors
+         fail it: the license line every file starts with (IDE0073). -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
   <!-- .NET's own analyzers, as the Java build's Error Prone: their findings are errors. For the
        libraries only, as Error Prone's stricter checks are: tests take certificates as they come
        and parse JSON without ceremony. -->
   <PropertyGroup Condition="!$(MSBuildProjectName.EndsWith('.Tests'))">
     <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
   <!-- Public API needs documentation, as the Java build's Javadoc check (CONTRIBUTING.md): the two
        published libraries write their XML documentation, so a public type or member without a
