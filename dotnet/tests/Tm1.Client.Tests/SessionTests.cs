@@ -69,15 +69,33 @@ public class SessionTests
         Assert.Equal("TM1SessionId=s2", _tm1.Last.Headers["cookie"]);
     }
 
+    /// <summary>The Java client's <c>ODataCollectionDecoderTest.followsNextLinksAsGiven</c>: each
+    /// page's link is followed as TM1 wrote it, quotes and spaces too.</summary>
     [Fact]
-    public async Task FollowsNextLinksAcrossPages()
+    public async Task FollowsNextLinksAsGiven()
     {
         _tm1.Respond = r =>
-            r.Target == "Cubes?$select=Name"
-                ? new Dictionary<string, object?> { ["value"] = new[] { new { Name = "a" } }, ["@odata.nextLink"] = "Cubes?$select=Name&$skiptoken=2" }
-                : FakeTm1.Collection(new { Name = "b" });
+            r.Target switch
+            {
+                "Cubes?$select=Name" => new Dictionary<string, object?>
+                {
+                    ["value"] = new[] { new { Name = "a" } },
+                    ["@odata.nextLink"] = "Cubes?$select=Name&$skiptoken=2",
+                },
+                "Cubes?$select=Name&$skiptoken=2" => new Dictionary<string, object?>
+                {
+                    ["value"] = new[] { new { Name = "b" } },
+                    ["@odata.nextLink"] = "Cubes?$skiptoken=3&x='a b'",
+                },
+                _ => FakeTm1.Collection(new { Name = "c" }),
+            };
         var names = await _tm1.Client().Cubes.ListAsync(ODataQuery.None().Select("Name")).Select(c => c.Name).ToListAsync();
-        Assert.Equal(["a", "b"], names);
+        Assert.Equal(["a", "b", "c"], names);
+        // Only the space is changed, as a URL must
+        Assert.Equal(
+            ["Cubes?$select=Name", "Cubes?$select=Name&$skiptoken=2", "Cubes?$skiptoken=3&x='a%20b'"],
+            _tm1.Requests.Select(r => r.Target).Where(t => t.StartsWith("Cubes", System.StringComparison.Ordinal))
+        );
     }
 
     [Fact]
@@ -92,8 +110,11 @@ public class SessionTests
         Assert.Equal(1, _tm1.Logins);
     }
 
+    /// <summary>The Java client's <c>ODataCollectionDecoderTest</c> test of the same name. A body is
+    /// read whole here, so there's no split for a character to fall across: what's left is that
+    /// bytes that aren't UTF-8 become U+FFFD, in an entity and in a collection.</summary>
     [Fact]
-    public async Task ReadsBytesThatArentUtf8AsTheReplacementCharacter()
+    public async Task ReadsBytesThatArentUtf8AsTheReplacementCharacterHoweverTheyAreSplit()
     {
         // As TM1's transaction log gives a password's hash, with "é" (two bytes) beside it
         byte[] hash = [0xe0, 0xec, (byte)'r', 0xff, 0xff];
