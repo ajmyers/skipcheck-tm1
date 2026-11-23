@@ -23,7 +23,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { inline, parse, slug } from './markdown.mjs';
 import { docsVersion, installHtml, packageOf } from './packages.mjs';
-import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, escape, head, languagesOf, PROJECTS, regions, repoDir, siteDir, tabGroup } from './site.mjs';
+import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, DOC_LANGUAGES, escape, head, languagesOf, PROJECTS, regions, repoDir, siteDir, tabGroup } from './site.mjs';
 
 const version = await docsVersion();
 const github = 'https://github.com/' + /^githubRepo=(.+)$/m.exec(await readFile(path.join(repoDir, 'gradle.properties'), 'utf8'))[1].trim();
@@ -66,17 +66,23 @@ async function directive(project, { name, args }) {
 	throw new Error(project.id + ': no such directive ::' + name);
 }
 
+/** Inline Markdown, with links into the docs pointed at a language: Java's, until tabs.js follows
+ * the visitor's choice (data-docs lists the languages the docs have). */
+function inlineDocs(project, text) {
+	return inline(text).replace(/href="docs\/([A-Z][\w.]*\.html(?:#[\w-]+)?)"/g, (match, file) => 'href="docs/java/' + file + '" data-docs="' + DOC_LANGUAGES.filter((l) => project.languages.includes(l)).join(' ') + '"');
+}
+
 async function blocks(project, list, { inItem = false } = {}) {
 	let html = '';
 	for (const block of list) {
-		if (block.type === 'p') html += '<p' + (inItem ? '' : ' class="more"') + '>' + inline(block.text) + '</p>';
+		if (block.type === 'p') html += '<p' + (inItem ? '' : ' class="more"') + '>' + inlineDocs(project, block.text) + '</p>';
 		else if (block.type === 'directive') html += await directive(project, block);
 		else {
 			let items = '';
 			for (const item of block.items) {
 				// A bullet that is one paragraph is just its text, as the site writes its lists
 				const single = item.length === 1 && item[0].type === 'p';
-				items += '<li>' + (single ? inline(item[0].text) : await blocks(project, item, { inItem: true })) + '</li>';
+				items += '<li>' + (single ? inlineDocs(project, item[0].text) : await blocks(project, item, { inItem: true })) + '</li>';
 			}
 			html += block.type === 'ol' ? '<ol class="numbered">' + items + '</ol>' : '<ul class="points">' + items + '</ul>';
 		}
@@ -99,8 +105,7 @@ function links(project) {
 	const several = project.languages.length > 1;
 	return [
 		{ href: '/' + project.id + '/', label: 'Overview' },
-		...(project.guide ? [{ href: '/' + project.id + '/docs/', label: several ? 'Docs, in every language' : 'Docs' }] : []),
-		{ href: '/' + project.id + '/api/java/', label: several ? 'API reference (Java)' : 'API reference' },
+		{ href: '/' + project.id + '/docs/', label: several ? 'Docs, in every language' : 'Docs' },
 	];
 }
 

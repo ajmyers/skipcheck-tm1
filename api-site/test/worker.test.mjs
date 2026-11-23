@@ -193,8 +193,9 @@ test('the addresses the pages had under /projects/ are sent to the new ones, que
 		'/projects/tm1-client/api/io/skipcheck/Cube.html?q=1': '/tm1-client/api/java/io/skipcheck/Cube.html?q=1',
 		'/projects/tm1/guide/': '/tm1-client/docs/',
 		'/projects/tm1/guide': '/tm1-client/docs/',
-		'/projects/tm1/guide/CubeService.html': '/tm1-client/docs/CubeService.html',
-		'/projects/tm1/guide/RequiresTm1.html': '/tm1-testcontainers/docs/RequiresTm1.html',
+		'/projects/tm1/guide/CubeService.html': '/tm1-client/docs/java/CubeService.html',
+		'/projects/tm1/guide/RequiresTm1.html': '/tm1-testcontainers/docs/java/RequiresTm1.html',
+		'/tm1-client/docs/CubeService.html': '/tm1-client/docs/java/CubeService.html',
 		'/projects/tm1/guide/Gone.html': '/tm1-client/docs/',
 		'/projects/tm1-csdl/': '/tm1-csdl/',
 	};
@@ -206,11 +207,11 @@ test('the addresses the pages had under /projects/ are sent to the new ones, que
 	assert.deepEqual(assetRequests, []);
 });
 
-test('a project without a landing page opens at its API reference', async () => {
+test('a project without a landing page opens at its docs', async () => {
 	for (const path of ['/tm1-csdl', '/tm1-csdl/']) {
 		const response = await get(path);
 		assert.equal(response.status, 302, path);
-		assert.equal(response.headers.get('Location'), ORIGIN + '/tm1-csdl/api/java/', path);
+		assert.equal(response.headers.get('Location'), ORIGIN + '/tm1-csdl/docs/', path);
 	}
 });
 

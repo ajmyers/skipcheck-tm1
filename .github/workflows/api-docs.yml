@@ -59,9 +59,9 @@ jobs:
       - name: Build the themed Javadoc
         run: |
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            ./gradlew apiSiteJavadoc -Pversion="${GITHUB_REF_NAME#v}"
+            ./gradlew apiSiteJavadoc docsModel -Pversion="${GITHUB_REF_NAME#v}"
           else
-            ./gradlew apiSiteJavadoc
+            ./gradlew apiSiteJavadoc docsModel
           fi
 
       - name: Assemble the site

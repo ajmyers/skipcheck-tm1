@@ -48,10 +48,14 @@ export default {
 		const project = site.projects.find((p) => url.pathname === '/' + p.id || url.pathname.startsWith('/' + p.id + '/'));
 		if (!project) return fetch(new URL(url.pathname + url.search, env.SITE_ORIGIN), request);
 
-		// A project without a landing page is its API reference
+		// A project without a landing page opens at its docs
 		if (!project.landing && (url.pathname === '/' + project.id || url.pathname === '/' + project.id + '/')) {
-			return Response.redirect(url.origin + '/' + project.id + '/api/java/' + url.search, 302);
+			return Response.redirect(url.origin + '/' + project.id + '/docs/' + url.search, 302);
 		}
+
+		// A docs page from before the docs had a page per language is the Java one
+		const unversioned = new RegExp('^/' + project.id + '/docs/([A-Z][\\w.]*\\.html)$').exec(url.pathname);
+		if (unversioned) return Response.redirect(url.origin + '/' + project.id + '/docs/java/' + unversioned[1] + url.search, 301);
 
 		// A page is the Javadoc file plus the site's partials, so the file's ETag doesn't identify it:
 		// answering a browser's revalidation from the file alone would keep an old masthead or
@@ -111,7 +115,7 @@ async function partial(env, name) {
 // Where a page that used to be under /projects/ is now, or null for any other path:
 //
 //   /projects/<project>/api/...         /<project>/api/java/...
-//   /projects/tm1/guide/<Type>.html     /<the project that documents Type>/docs/<Type>.html
+//   /projects/tm1/guide/<Type>.html     /<the project that documents Type>/docs/java/<Type>.html
 //   /projects/tm1/guide/                /tm1-client/docs/
 //   /projects/<project>/                /<project>/
 //
@@ -124,7 +128,7 @@ function formerAddress(pathname) {
 		const guide = /^\/guide(?:\/(.*))?$/.exec(rest);
 		if (!guide) return null;
 		const owner = site.guide[(guide[1] ?? '').replace(/\.html$/, '')];
-		return owner ? '/' + owner + '/docs/' + guide[1] : '/tm1-client/docs/';
+		return owner ? '/' + owner + '/docs/java/' + guide[1] : '/tm1-client/docs/';
 	}
 	if (!site.projects.some((project) => project.id === name)) return null;
 	const api = /^\/api(?:\/(.*))?$/.exec(rest);
