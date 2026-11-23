@@ -170,7 +170,8 @@ export class Tm1Session implements AsyncDisposable {
   async execute<T>(request: Tm1Request<T>, options?: Tm1CallOptions): Promise<T> {
     if (!(request instanceof Tm1Request)) throw new TypeError("execute() takes a Tm1Request");
     if (request.response === "Collection") throw new TypeError("Collection requests are streamed: use stream() for " + request.toString());
-    // A batched request joins the batch as it is, as Java's: TM1 answers for it in the batch
+    // A batched request joins the batch as it is, as Java's: TM1 answers for it in the batch. What it
+    // requires is checked when the batch runs.
     if (this.queue) return (await this.queue.add(this, request, (r) => this.read(request, r))) as T;
     await this.check(request.requirement(), options);
     const reply = await this.send(request, this.target(request.relativeUri()), options?.signal);
@@ -209,7 +210,8 @@ export class Tm1Session implements AsyncDisposable {
     });
   }
 
-  private async check(requirement: Tm1Capability | undefined, options: Tm1CallOptions | undefined): Promise<void> {
+  /** @internal Fails if the server doesn't define what a request requires, unless the session was told not to check. */
+  async check(requirement: Tm1Capability | undefined, options: Tm1CallOptions | undefined): Promise<void> {
     if (!requirement || !this.connection.checkCapabilities) return;
     const refused = (await this.connection.capabilities(options?.signal)).check(requirement, this.connection.root);
     if (refused) throw refused;
@@ -362,7 +364,11 @@ function readPage<T>(request: Tm1Request<T>, reply: Reply): Page<T> {
  * A request's body is written as JSON when the call is made, so a body that can't be written fails
  * that call at once (a `TypeError`) and it never joins the batch, and a body changed afterwards is
  * sent as it was. If TM1 answers a `$batch` with no body, every call in it fails with a
- * {@link Tm1ProtocolException}. */
+ * {@link Tm1ProtocolException}.
+ *
+ * A request that {@link Tm1Request.requires | requires} something the server doesn't define is
+ * checked when the batch runs: its call fails with a `Tm1UnsupportedOperationException` and it
+ * isn't sent, and the others still are. */
 export class Tm1SessionBatch {
   /** How many requests {@link run} sends in each `$batch`. */
   static readonly DEFAULT_PER_REQUEST = 500;
@@ -397,6 +403,8 @@ interface Entry {
   headers: Readonly<Record<string, string>>;
   /** The body as JSON, written when the call was queued; undefined for none. */
   body: unknown;
+  /** What the server must define for the request, checked when the batch runs. */
+  requirement: Tm1Capability | undefined;
   read: (reply: Reply) => unknown;
   resolve: (value: unknown) => void;
   reject: (error: unknown) => void;
@@ -442,6 +450,7 @@ export class BatchQueue {
       accept: request.accept(),
       headers: request.headers,
       body,
+      requirement: request.requirement(),
       read,
       resolve,
       reject,
@@ -453,8 +462,20 @@ export class BatchQueue {
   async run(perRequest: number, signal: AbortSignal | undefined): Promise<void> {
     if (this.ran) throw new Error("The batch has already run");
     this.ran = true;
-    const all = [...this.entries];
     const connection = this.sender.connection;
+    // Checked now and not when the call was queued: it may need the server's $metadata, and
+    // queueing sends nothing. A request the server can't serve (or whose requirement can't be
+    // checked, if the capabilities can't be read) fails its own call and isn't sent, as outside a
+    // batch; the rest are.
+    const all: Entry[] = [];
+    for (const e of this.entries) {
+      try {
+        await this.sender.check(e.requirement, { signal });
+        all.push(e);
+      } catch (error) {
+        e.reject(error);
+      }
+    }
     for (let start = 0; start < all.length; start += perRequest) {
       const chunk = all.slice(start, start + perRequest);
       const requests = chunk.map((e) => {

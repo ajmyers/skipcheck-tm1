@@ -982,6 +982,50 @@ describe("Tm1Session capabilities", () => {
     expect(tm1.requests("GET Bananas")).toHaveLength(0);
   });
 
+  it("refuses a request the server can't serve in a batch and still sends the rest", async () => {
+    const tm1 = scripted().on("POST $batch", () => ScriptedTm1.json(200, '{"responses":[{"id":"2","status":200,"body":{}}]}'));
+    const batch = tm1.session().batch();
+    const bananas = batch.session
+      .stream(Tm1Request.list(ODataPath.of("Bananas"), ODataQuery.none()).requires(Tm1Capability.entitySet("Bananas").since("99.0")))
+      .toArray();
+    const server = batch.session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), Json));
+
+    await batch.run();
+    expect(await Promise.race([failure(bananas), settle().then(() => "still waiting")])).toBeInstanceOf(Tm1UnsupportedOperationException);
+    expect(await server).toEqual({});
+    const sent = tm1.requests("POST $batch");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.text).toContain("Server");
+    expect(sent[0]!.text).not.toContain("Bananas");
+  });
+
+  it("fails the calls that need the capabilities when they can't be read, and sends the rest", async () => {
+    const tm1 = scripted()
+      .on(METADATA, () => ScriptedTm1.json(503, '{"error":{"code":"1","message":"busy"}}'))
+      .on("POST $batch", () => ScriptedTm1.json(200, '{"responses":[{"id":"2","status":200,"body":{}}]}'));
+    const batch = tm1.session().batch();
+    const bananas = batch.session.execute(
+      Tm1Request.get(ODataPath.of("Bananas"), ODataQuery.none(), Json).requires(Tm1Capability.entitySet("Bananas").since("99.0")),
+    );
+    const server = batch.session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), Json));
+
+    await batch.run();
+    expect(await Promise.race([failure(bananas), settle().then(() => "still waiting")])).toBeInstanceOf(Tm1ServerException);
+    expect(await server).toEqual({});
+    expect(tm1.requests("POST $batch")[0]!.text).not.toContain("Bananas");
+  });
+
+  it("doesn't check in a batch what a session told not to check needs", async () => {
+    const tm1 = scripted().on("POST $batch", () => ScriptedTm1.json(200, '{"responses":[{"id":"1","status":200,"body":{}}]}'));
+    const batch = tm1.session((b) => b.checkCapabilities(false)).batch();
+    const bananas = batch.session.execute(
+      Tm1Request.get(ODataPath.of("Bananas"), ODataQuery.none(), Json).requires(Tm1Capability.entitySet("Bananas").since("99.0")),
+    );
+    await batch.run();
+    expect(await bananas).toEqual({});
+    expect(tm1.requests(METADATA)).toHaveLength(0);
+  });
+
   it("doesn't check what a session told not to check needs", async () => {
     const bananas = Tm1Request.get(ODataPath.of("Bananas"), ODataQuery.none()).requires(Tm1Capability.entitySet("Bananas").since("99.0"));
     const tm1 = scripted().on("GET Bananas", () => ScriptedTm1.json(200, "{}"));
