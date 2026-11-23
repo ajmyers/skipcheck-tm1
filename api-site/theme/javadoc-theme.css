@@ -84,9 +84,12 @@
 
 /* Javadoc's icons are dark line drawings; light them up on the dark palette */
 @media (prefers-color-scheme: dark) {
-    :root, :root[data-theme] {
+    :root:not([data-color-mode="light"]), :root:not([data-color-mode="light"])[data-theme] {
         --icon-filter: invert(100%) brightness(160%);
     }
+}
+:root[data-color-mode="dark"], :root[data-color-mode="dark"][data-theme] {
+    --icon-filter: invert(100%) brightness(160%);
 }
 
 /* The palette follows the OS, so the theme switch would do nothing */
@@ -160,7 +163,7 @@ pre, .snippet {
     --code-variable: #9d174d;
 }
 @media (prefers-color-scheme: dark) {
-    :root, :root[data-theme] {
+    :root:not([data-color-mode="light"]), :root:not([data-color-mode="light"])[data-theme] {
         --code-keyword: #93c5fd;
         --code-function: #67e8f9;
         --code-string: #86efac;
@@ -168,6 +171,14 @@ pre, .snippet {
         --code-annotation: #c4b5fd;
         --code-variable: #f9a8d4;
     }
+}
+:root[data-color-mode="dark"], :root[data-color-mode="dark"][data-theme] {
+    --code-keyword: #93c5fd;
+    --code-function: #67e8f9;
+    --code-string: #86efac;
+    --code-number: #fcd34d;
+    --code-annotation: #c4b5fd;
+    --code-variable: #f9a8d4;
 }
 html:root[data-theme] :is(.hljs-keyword, .hljs-literal, .hljs-built_in, .hljs-symbol, .hljs-name,
         .hljs-template-tag, .hljs-char.escape_) { color: var(--code-keyword); }

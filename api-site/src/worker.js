@@ -78,6 +78,12 @@ export default {
 
 		const [masthead, footer] = await Promise.all([partial(env, 'masthead'), partial(env, 'footer')]);
 		const page = new HTMLRewriter()
+			// The site's colour mode (system, light or dark), set before the page is drawn
+			.on('head', {
+				element(head) {
+					head.prepend('<script src="/theme.js"></script>', { html: true });
+				},
+			})
 			.on('body', {
 				element(body) {
 					if (masthead) body.prepend(masthead, { html: true });

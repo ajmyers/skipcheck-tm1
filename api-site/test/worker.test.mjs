@@ -36,15 +36,22 @@ const worker = (await import(pathToFileURL(module).href)).default;
 globalThis.HTMLRewriter = class {
 	#handlers = [];
 	on(selector, handlers) {
-		assert.equal(selector, 'body');
-		this.#handlers.push(handlers);
+		assert.ok(selector === 'body' || selector === 'head', selector);
+		this.#handlers.push({ selector, handlers });
 		return this;
 	}
 	transform(response) {
-		const added = { before: '', after: '' };
-		const body = { prepend: (html) => (added.before += html), append: (html) => (added.after += html) };
-		for (const handlers of this.#handlers) handlers.element(body);
-		const rewritten = response.text().then((html) => html.replace('<body>', '<body>' + added.before).replace('</body>', added.after + '</body>'));
+		const added = { head: '', before: '', after: '' };
+		for (const { selector, handlers } of this.#handlers) {
+			const element =
+				selector === 'head'
+					? { prepend: (html) => (added.head += html), append: (html) => (added.head += html) }
+					: { prepend: (html) => (added.before += html), append: (html) => (added.after += html) };
+			handlers.element(element);
+		}
+		const rewritten = response.text().then((html) =>
+			html.replace('<head>', '<head>' + added.head).replace('<body>', '<body>' + added.before).replace('</body>', added.after + '</body>'),
+		);
 		return new Response(streamOf(rewritten), response);
 	}
 };
@@ -220,4 +227,10 @@ test('a landing page is served at the project, dressed like any page', async () 
 	const response = await get('/tm1-client/');
 	assert.equal(await response.text(), '<html><body><div class="masthead"><nav>Home</nav></div><main>Client</main><footer>The end</footer></body></html>');
 	assert.equal(response.headers.get('Link'), '<' + SITE + '/tm1-client/>; rel="canonical"');
+});
+
+test("every page loads the site's colour mode before it's drawn", async () => {
+	assets['/tm1-client/api/java/mode.html'] = () => new Response('<html><head><title>T</title></head><body>x</body></html>', { headers: { 'Content-Type': 'text/html' } });
+	const html = await (await get('/tm1-client/api/java/mode.html')).text();
+	assert.ok(html.startsWith('<html><head><script src="/theme.js"></script><title>'), html);
 });
