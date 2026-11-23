@@ -24,26 +24,15 @@ public partial class JavaParityTests
     private static readonly HashSet<string> Io = ["shared", "start", "stop", "idToken", "passport"];
 
     /// <summary>Java names .NET can't keep: a constant can't share its name with a nested type, a
-    /// method or a property of the same type.</summary>
-    public static readonly Dictionary<string, (string DotNet, string Why)> Renamed = new()
-    {
-        ["Tm1Source.PRIVATE_IMAGE"] = ("PrivateImageSetting", "the PrivateImage record has the name"),
-        ["Tm1Source.INSTALL_VOLUME"] = ("InstallVolumeSetting", "the InstallVolume record has the name"),
-        ["Tm1Source.BUNDLE"] = ("BundleSetting", "the Bundle record has the name"),
-        ["Tm1Source.BUNDLE_URL"] = ("BundleUrlSetting", "the BundleUrl record has the name"),
-        ["Tm1WebSource.PRIVATE_IMAGE"] = ("PrivateImageSetting", "the PrivateImage record has the name"),
-        ["Tm1WebSource.INSTALL_VOLUME"] = ("InstallVolumeSetting", "the InstallVolume record has the name"),
-        ["Tm1WebSource.BUNDLE"] = ("BundleSetting", "the Bundle record has the name"),
-        ["Tm1WebSource.BUNDLE_URL"] = ("BundleUrlSetting", "the BundleUrl record has the name"),
-        ["CognosSource.PRIVATE_IMAGE"] = ("PrivateImageSetting", "the PrivateImage record has the name"),
-        ["CognosSource.INSTALL_VOLUME"] = ("InstallVolumeSetting", "the InstallVolume record has the name"),
-        ["CognosSource.ZIP"] = ("ZipSetting", "the Zip record has the name"),
-        ["CognosSource.ZIP_URL"] = ("ZipUrlSetting", "the ZipUrl record has the name"),
-        ["PawSource.ZIP"] = ("ZipSetting", "the Zip property (Java's record component zip()) has the name"),
-        ["PawContainer.ACCEPT_LICENSE"] = ("AcceptLicenseSetting", "the AcceptLicense() method has the name"),
-        ["CognosContainer.NAMESPACE"] = ("NamespaceId", "the Namespace enum has the name"),
-        ["PlanningAnalyticsEnvironment.Builder"] = ("EnvironmentBuilder", "the Builder() method has the name"),
-    };
+    /// method or a property of the same type. They're the lines with a new name in
+    /// dotnet/coverage/members-excluded.txt, which the docs build reads too
+    /// (&lt;c&gt;Tm1Source.PRIVATE_IMAGE -&gt; PrivateImageSetting | why&lt;/c&gt;).</summary>
+    public static readonly Dictionary<string, (string DotNet, string Why)> Renamed = File.ReadLines(
+            Path.Combine(Repo.Root, "dotnet", "coverage", "members-excluded.txt")
+        )
+        .Select(line => Regex.Match(line, @"^([\w.]+)\s*->\s*(\w+)\s*\|\s*(.+)$"))
+        .Where(m => m.Success)
+        .ToDictionary(m => m.Groups[1].Value, m => (m.Groups[2].Value, m.Groups[3].Value.Trim()));
 
     public static IEnumerable<object[]> Types() =>
         Directory

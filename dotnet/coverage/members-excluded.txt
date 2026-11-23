@@ -3,6 +3,8 @@
 #   <Java type>.<member or type> -> <.NET name> | <reason>
 # Read by api-site/scripts/members.mjs, which fails the docs build on a Java member that is neither
 # found by the parity tests' naming rule nor listed here, and on a line here that is wrong or stale.
+# The renamed lines are also the Java names that tests/Tm1.Testcontainers.Tests/JavaParityTests.cs
+# lets .NET change: a constant can't share its name with a nested type, a method or a property.
 Tm1Session.Builder.jsonMapper | Jackson's ObjectMapper is Java's: .NET reads JSON with System.Text.Json
 Tm1Session.Builder.observationRegistry | Micrometer's ObservationRegistry is Java's: there is no Micrometer here
 Tm1Session.Builder.webClient | Spring's WebClient is Java's HTTP client: .NET takes an HttpMessageHandler instead (HttpHandler)
