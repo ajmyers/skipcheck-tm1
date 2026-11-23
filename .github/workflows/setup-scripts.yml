@@ -32,7 +32,7 @@ jobs:
     env:
       CI: 'true'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Fake bundle
         run: |
@@ -130,7 +130,7 @@ jobs:
       matrix:
         shell: [powershell, pwsh]   # Windows PowerShell 5.1, PowerShell 7
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: setup.ps1 under ${{ matrix.shell }}
         shell: pwsh
         run: |
