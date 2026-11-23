@@ -460,9 +460,24 @@ final class Connection {
 	 */
 	private Mono<Throwable> errorOf(ClientResponse response, String method, URI uri) {
 		int status = response.statusCode().value();
-		return response.bodyToMono(byte[].class)
-			.defaultIfEmpty(new byte[0])
-			.map(body -> errorFrom(status, body, method, uri));
+		return bytes(response).map(body -> errorFrom(status, body, method, uri));
+	}
+
+	/**
+	 * A response's whole body, empty if it has none. Joined from its buffers rather than
+	 * read with {@code bodyToMono(byte[].class)}, whose codec refuses bodies over 256 KB.
+	 */
+	private static Mono<byte[]> bytes(ClientResponse response) {
+		return DataBufferUtils.join(response.bodyToFlux(DataBuffer.class)).map(buffer -> {
+			try {
+				byte[] bytes = new byte[buffer.readableByteCount()];
+				buffer.read(bytes);
+				return bytes;
+			}
+			finally {
+				DataBufferUtils.release(buffer);
+			}
+		}).defaultIfEmpty(new byte[0]);
 	}
 
 	/** The exception for an error status and its body, wherever the body came from. */
@@ -534,9 +549,7 @@ final class Connection {
 			if (response.statusCode().value() != 202) {
 				// TM1 answered at once: read it as an ordinary response
 				return request.response() == Tm1Request.Response.COLLECTION
-						? response.bodyToMono(byte[].class)
-							.defaultIfEmpty(new byte[0])
-							.flatMapMany(body -> decode(request, uri, response.statusCode().value(), body))
+						? bytes(response).flatMapMany(body -> decode(request, uri, response.statusCode().value(), body))
 						: read(request, uri, response).flux();
 			}
 			String location = response.headers().asHttpHeaders().getFirst(HttpHeaders.LOCATION);
@@ -557,7 +570,7 @@ final class Connection {
 			if (response.statusCode().value() == 202) {
 				return response.releaseBody().thenMany(Flux.<byte[]>empty());
 			}
-			return response.bodyToMono(byte[].class).defaultIfEmpty(new byte[0]).flux();
+			return bytes(response).flux();
 		}).next();
 		Flux<T> result = Mono.defer(() -> once)
 			.repeatWhenEmpty(Integer.MAX_VALUE, polls -> polls.concatMap(n -> Mono.delay(every)))
