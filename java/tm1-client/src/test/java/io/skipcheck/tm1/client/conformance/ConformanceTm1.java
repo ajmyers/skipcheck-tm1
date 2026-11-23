@@ -374,7 +374,7 @@ public final class ConformanceTm1 implements ExchangeFunction {
 	}
 
 	@SuppressWarnings("unchecked")
-	static Mono<byte[]> body(ClientRequest request) {
+	public static Mono<byte[]> body(ClientRequest request) {
 		MockClientHttpRequest mock = new MockClientHttpRequest(request.method(), request.url());
 		BodyInserter<?, ? super MockClientHttpRequest> inserter = request.body();
 		List<HttpMessageWriter<?>> writers = ExchangeStrategies.withDefaults().messageWriters();

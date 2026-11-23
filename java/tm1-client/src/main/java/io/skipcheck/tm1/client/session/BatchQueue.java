@@ -90,12 +90,28 @@ final class BatchQueue {
 				ran = true;
 				all = List.copyOf(entries);
 			}
-			List<List<Entry>> chunks = new ArrayList<>();
-			for (int i = 0; i < all.size(); i += perRequest) {
-				chunks.add(all.subList(i, Math.min(all.size(), i + perRequest)));
-			}
-			return Flux.fromIterable(chunks).concatMap(this::send).then();
+			return Flux.fromIterable(all).concatMap(this::supported).collectList().flatMap(sendable -> {
+				List<List<Entry>> chunks = new ArrayList<>();
+				for (int i = 0; i < sendable.size(); i += perRequest) {
+					chunks.add(sendable.subList(i, Math.min(sendable.size(), i + perRequest)));
+				}
+				return Flux.fromIterable(chunks).concatMap(this::send).then();
+			});
 		});
+	}
+
+	/**
+	 * The entry, if the server defines what its request requires. If it doesn't (or that
+	 * can't be found out), the entry's call fails and it isn't sent, as outside a batch.
+	 */
+	private Mono<Entry> supported(Entry entry) {
+		return entry.request()
+			.requirement()
+			.map(needed -> connection.require(needed).then(Mono.just(entry)).onErrorResume(e -> {
+				entry.sink().tryEmitError(e);
+				return Mono.empty();
+			}))
+			.orElseGet(() -> Mono.just(entry));
 	}
 
 	private Mono<Void> send(List<Entry> chunk) {

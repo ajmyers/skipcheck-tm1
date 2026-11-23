@@ -31,6 +31,12 @@ import reactor.core.publisher.Mono;
  * queue.</li>
  * <li>Raw bytes (document content) can't go in a JSON batch.</li>
  * </ul>
+ *
+ * <p>
+ * A request that {@linkplain io.skipcheck.tm1.client.Tm1Request#requires requires}
+ * something the server doesn't define is checked when the batch runs: its call fails with
+ * {@link io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException} and it isn't
+ * sent, and the others still are.
  */
 public final class Tm1SessionBatch {
 
