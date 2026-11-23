@@ -13,12 +13,7 @@ import org.jspecify.annotations.Nullable;
  * A {@code $filter} expression, built from {@link ODataProperty} comparisons and the
  * canonical functions TM1 supports:
  *
- * <pre>{@code
- * Filter.and(Filter.startsWith(Element.NAME, "Q"), Element.TYPE.eq(ODataLiterals.enumMember("ibm.tm1.api.v1.ElementType", "Numeric")))
- *     // (startswith(Name,'Q') and (Type eq ibm.tm1.api.v1.ElementType'Numeric'))
- * Filter.any("Hierarchies", "h", h -> h.nav("Name").eq("Region"))
- *     // Hierarchies/any(h:h/Name eq 'Region')
- * }</pre>
+ * {@snippet class = examples.FilterExamples region = build}
  *
  * <p>
  * Every binary expression is parenthesized, so precedence never depends on how a filter
