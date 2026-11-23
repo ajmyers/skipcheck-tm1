@@ -1,5 +1,5 @@
 # Release: the Java libraries to Maven Central, the Python packages to PyPI, the .NET packages to
-# NuGet and the TypeScript packages to npm.
+# NuGet and the TypeScript packages to npm, then the Docker images and the API docs.
 #
 #   Real release: push a tag like v0.1.0. Publishes that version everywhere, permanently.
 #   Dry run:      run this workflow manually (Actions tab, or `gh workflow run release.yml`).
@@ -20,6 +20,7 @@
 #   gate       passes only when all of the above did
 #   publish-*  after the gate. PyPI, NuGet and npm get the very files that were tested. Maven
 #              Central gets a build of the same commit: its plugin builds what it uploads
+#   images, docs  the Docker images and the API docs of a tag, after the gate too
 #
 # A version can't be taken back from a registry, so a failure after the gate (a registry that's
 # down, say) leaves the others published: run the workflow again by hand for what's missing.
@@ -27,6 +28,7 @@
 # Repo secrets needed:
 #   MAVEN_CENTRAL_USERNAME / MAVEN_CENTRAL_PASSWORD  - Central Portal user token
 #   SIGNING_KEY / SIGNING_KEY_PASSWORD               - ASCII-armored GPG private key
+#   CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID     - the API docs (api-docs.yml)
 # PyPI, NuGet and npm need none: each trusts this workflow by name (PyPI: each project's Publishing
 # settings; NuGet: the account's Trusted Publishing policy for Skipcheck.*; npm: each package's
 # Trusted Publisher setting), so renaming this file, or moving a publish step out of it, breaks
@@ -418,3 +420,19 @@ jobs:
           ls packages
           npm publish packages/skipcheck-tm1-client-*.tgz --provenance --tag "$TAG"
           npm publish packages/skipcheck-tm1-testcontainers-*.tgz --provenance --tag "$TAG"
+
+  # The Docker images of a tag (:1.2.3, :1.2, :latest), after the same gate
+  images:
+    needs: gate
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/docker.yml
+
+  # The API docs of a tag, after the same gate
+  docs:
+    needs: gate
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/api-docs.yml
+    secrets: inherit
