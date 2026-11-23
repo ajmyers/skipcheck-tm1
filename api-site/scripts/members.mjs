@@ -139,7 +139,7 @@ export function stale(list, used) {
 	return [...list].filter(([key]) => !used.has(key)).map(([key, entry]) => key + ' (line ' + entry.line + '): Java has no such member, or the language no such type: take its line out');
 }
 
-// ---- a language's names ------------------------------------------------------------
+// ---- a language's names, and the Java names it lacks ---------------------------------
 
 const identifiers = (text) => text.match(/[A-Za-z_$][\w$]*/g) ?? [];
 
@@ -167,6 +167,12 @@ export function languageNames(types, code) {
 	return names;
 }
 
+/** The names Java has and a language doesn't: Java's type and member names and the types its
+ * signatures use (Mono, Flux, JsonNode), less the language's names (languageNames). */
+export function javaOnlyNames(javaTypes, names) {
+	return new Set([...apiNames(javaTypes)].filter((name) => !names.has(name)));
+}
+
 /** A Java member's likely name in a language that has no counterpart of its type to look in: the
  * first of its candidates the language's names have, a constant's PascalCase too (TypeScript's
  * Tm1ErrorKind.CredentialRejected), or else the first candidate. */
@@ -180,4 +186,29 @@ export function guessMember(language, javaMember, names) {
 export function withoutComments(text, language) {
 	if (language === 'python') return text.replace(/"""[\s\S]*?"""|'''[\s\S]*?'''/g, ' ').replace(/#.*$/gm, '');
 	return text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
+const ENTITIES = { lt: '<', gt: '>', amp: '&', quot: '"', '#39': "'", '#123': '{', '#125': '}' };
+const decode = (text) => text.replace(/&(lt|gt|amp|quot|#39|#123|#125);/g, (m, name) => ENTITIES[name]);
+// A file name or a path in a code fragment (paw.sh, docker/paw/paw-local.sh, git://) isn't a name of the API
+const FILE = /\/|^[\w.*<>-]*\.(?:sh|zip|txt|json|cfg|properties|env|gz|exe|html|xml|ya?ml|blob|extr|jar)$/;
+
+/** The Java-only names in a page's text (HTML), outside its code blocks, which are the page's own
+ * examples. In a code fragment, any name counts. In the prose, only a capitalized name that doesn't
+ * start a sentence (Mono, Flux): so English words ("close", "List cubes...") don't count. */
+export function javaIsms(html, javaOnly) {
+	const text = html.replace(/<pre[\s\S]*?<\/pre>/g, ' ');
+	const found = new Set();
+	for (const [, fragment] of text.matchAll(/<code>([\s\S]*?)<\/code>/g)) {
+		const code = decode(fragment);
+		if (FILE.test(code)) continue;
+		for (const name of identifiers(code)) if (javaOnly.has(name)) found.add(name);
+	}
+	const prose = decode(text.replace(/<code>[\s\S]*?<\/code>/g, ' x ').replace(/<\/?(?:p|li|ul|ol|dt|dd|dl|h\d|div|table|tr|td|th)\b[^>]*>/g, '. ').replace(/<[^>]+>/g, ' '));
+	for (const match of prose.matchAll(/[A-Za-z_$][\w$]*/g)) {
+		const name = match[0];
+		const before = prose.slice(0, match.index).trimEnd();
+		if (/^[A-Z]/.test(name) && /[a-z]/.test(name) && javaOnly.has(name) && before !== '' && !/[.!?:]$/.test(before)) found.add(name);
+	}
+	return [...found].sort();
 }

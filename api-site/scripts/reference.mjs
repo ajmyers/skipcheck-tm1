@@ -20,7 +20,8 @@
 //   TM1's own types (Cube, Dimension...)             spec/tm1-api.json
 //
 // It fails when a language lacks an example the Java documentation quotes, or a Java member its
-// members-excluded.txt doesn't list (--allow-missing lists them instead), and writes
+// members-excluded.txt doesn't list, or when an overview in another language names what only Java
+// has (--allow-missing lists them instead), and writes
 // .generated/site.json for the Worker.
 //
 //   node scripts/reference.mjs [--allow-missing]
@@ -28,7 +29,7 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { checkMembers, findMember, guessMember, languageNames, listFile, readList, stale, typeCandidates, withoutComments } from './members.mjs';
+import { checkMembers, findMember, guessMember, javaIsms, javaOnlyNames, languageNames, listFile, readList, stale, typeCandidates, withoutComments } from './members.mjs';
 import { searchIndex } from './search.mjs';
 import { CANONICAL_ORIGIN, copyAssets, dedent, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, SECTIONS } from './site.mjs';
 import { walkthroughsOf } from './walkthroughs.mjs';
@@ -319,9 +320,11 @@ const missing = new Set();
 // Java members a language lacks, unlisted, and lines of the lists that are wrong
 const memberFaults = [];
 const lists = new Map();
-// Pages showing Java code in another language, and overviews with fewer examples than Java's
+// Pages showing Java code in another language, overviews with fewer examples than Java's, and
+// overviews naming what only Java has
 const foreign = [];
 const fewer = [];
+const javaWords = [];
 // Every path the Worker serves: the projects, the Docker pages and the docs landing page
 const site = { projects: SECTIONS, guide: {} };
 let pageCount = 0;
@@ -339,9 +342,13 @@ for (const project of PROJECTS) {
 		if (!found) throw new Error('No ' + language + ' API for ' + project.id);
 		apis[language] = found;
 	}
-	// Each language's names, for a Java name the page can't look up
+	// Each language's names, and the Java names it doesn't have
 	const names = {};
-	for (const language of languages.filter((l) => l !== 'java')) names[language] = languageNames(apis[language], await codeOf(project, language));
+	const javaOnly = {};
+	for (const language of languages.filter((l) => l !== 'java')) {
+		names[language] = languageNames(apis[language], await codeOf(project, language));
+		javaOnly[language] = javaOnlyNames(types, names[language]);
+	}
 	const out = path.join(distDir, project.id, 'docs');
 	await rm(out, { recursive: true, force: true });
 	await copyAssets(project);
@@ -507,6 +514,8 @@ for (const project of PROJECTS) {
 			if (language !== 'java') {
 				const javaBlocks = (javaDescription.match(/\{@snippet|<pre[^>]*>\s*\{@code/g) ?? []).length;
 				if (blocks(overview) < javaBlocks) fewer.push(project.id + ' ' + language + ' ' + javaType.name + ' (' + blocks(overview) + ' of ' + javaBlocks + ')');
+				const words = javaIsms(overview, javaOnly[language]);
+				if (words.length > 0) javaWords.push(project.id + ' ' + language + ' ' + javaType.name + ': ' + words.join(', '));
 			}
 
 			// Members: this language's own, each with Java's examples where Java's has them
@@ -770,6 +779,11 @@ if (foreign.length > 0) {
 	const line = list.length + ' page(s) show Java code in another language: give the type an examples region in each language, or a doc comment of its own with its own examples';
 	if (!allowMissing) throw new Error(line + ':\n  ' + list.join('\n  '));
 	console.warn(line + ':\n  ' + list.join('\n  '));
+}
+if (javaWords.length > 0) {
+	const line = javaWords.length + " overview(s) name what only Java has: word the Javadoc for every language, or name it in a {@code} or {@link} the page can translate (members.mjs, javaIsms)";
+	if (!allowMissing) throw new Error(line + ':\n  ' + javaWords.join('\n  '));
+	console.warn(line + ':\n  ' + javaWords.join('\n  '));
 }
 for (const [file, { entries, used }] of lists) for (const fault of stale(entries, used)) memberFaults.push(file + ': ' + fault);
 if (memberFaults.length > 0) {

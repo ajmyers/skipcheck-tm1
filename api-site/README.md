@@ -35,6 +35,8 @@ Javadoc; everything else is read from the repository when the pages are built:
 The build fails when a page names an example that isn't there, when a language lacks an example
 the Java documentation quotes, when a language lacks a Java member that its
 `coverage/members-excluded.txt` doesn't list (or lists one it has, or one Java no longer has), or
+when an overview on another language's page names something only Java has (`Mono`, `JsonNode`, a
+Java member name that the language's API and code don't have: `javaIsms` in `scripts/members.mjs`), or
 when a link on a generated page goes nowhere (`scripts/check-links.mjs`). So a new Java example
 needs its three counterparts before the build passes, and so does a new Java member.
 
