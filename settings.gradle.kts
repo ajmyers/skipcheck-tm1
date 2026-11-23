@@ -16,7 +16,7 @@ dependencyResolutionManagement {
 	}
 }
 
-rootProject.name = "tm1-pa-developer-tools"
+rootProject.name = "skipcheck-tm1"
 
 // Published libraries (Maven Central)
 include("tm1-csdl")

@@ -83,8 +83,8 @@ Set-StrictMode -Version 2
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest is very slow with its progress bar
 
-$DefaultBaseUrl = 'https://raw.githubusercontent.com/ajmyers/tm1-pa-developer-tools/master/docker/tm1-server'
-$Guide = 'https://github.com/ajmyers/tm1-pa-developer-tools/blob/master/docker/tm1-server/GETTING-STARTED.md'
+$DefaultBaseUrl = 'https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/master/docker/tm1-server'
+$Guide = 'https://github.com/ajmyers/skipcheck-tm1/blob/master/docker/tm1-server/GETTING-STARTED.md'
 $DefaultImage = 'ghcr.io/ajmyers/tm1-server:latest'
 $OnWindows = [System.Environment]::OSVersion.Platform -eq 'Win32NT'
 
@@ -103,9 +103,9 @@ function Show-Banner {
 
      Website  https://skipcheck.io
      GitHub   https://github.com/ajmyers
-     Issues   https://github.com/ajmyers/tm1-pa-developer-tools/issues
+     Issues   https://github.com/ajmyers/skipcheck-tm1/issues
 
-   Useful? A star helps: https://github.com/ajmyers/tm1-pa-developer-tools
+   Useful? A star helps: https://github.com/ajmyers/skipcheck-tm1
    Need help with TM1? https://ajmyers.net
    Not affiliated with IBM. You need your own licensed copy of TM1.
   ------------------------------------------------------------------
@@ -675,6 +675,6 @@ catch [System.OperationCanceledException] {
   foreach ($line in $script:FailFix) { Write-Host "  $line" }
   Write-Host ''
   Write-Host "Help: $Guide"
-  Write-Host 'Still stuck? Open an issue: https://github.com/ajmyers/tm1-pa-developer-tools/issues'
+  Write-Host 'Still stuck? Open an issue: https://github.com/ajmyers/skipcheck-tm1/issues'
 }
 if ($failed -and $PSCommandPath) { exit 1 }

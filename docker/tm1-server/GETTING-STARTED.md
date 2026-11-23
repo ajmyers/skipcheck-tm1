@@ -154,14 +154,14 @@ settings into it:
 ```sh
 # Mac / Linux
 mkdir tm1 && cd tm1
-curl -fsSLO https://raw.githubusercontent.com/ajmyers/tm1-pa-developer-tools/master/docker/tm1-server/compose.yaml
-curl -fsSLO https://raw.githubusercontent.com/ajmyers/tm1-pa-developer-tools/master/docker/tm1-server/.env.example
+curl -fsSLO https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/master/docker/tm1-server/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/master/docker/tm1-server/.env.example
 mkdir bundles
 ```
 ```powershell
 # Windows
 mkdir tm1; cd tm1
-$base = "https://raw.githubusercontent.com/ajmyers/tm1-pa-developer-tools/master/docker/tm1-server"
+$base = "https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/master/docker/tm1-server"
 Invoke-WebRequest "$base/compose.yaml" -OutFile compose.yaml
 Invoke-WebRequest "$base/.env.example" -OutFile .env.example
 mkdir bundles
@@ -178,15 +178,15 @@ Clone the repository, build the image, and tell compose to use your build:
 
 ```sh
 # Mac / Linux
-git clone https://github.com/ajmyers/tm1-pa-developer-tools.git
-cd tm1-pa-developer-tools/docker/tm1-server
+git clone https://github.com/ajmyers/skipcheck-tm1.git
+cd skipcheck-tm1/docker/tm1-server
 docker build --platform linux/amd64 -t tm1-server:local .
 echo "TM1_SERVER_IMAGE=tm1-server:local" >> .env
 ```
 ```powershell
 # Windows
-git clone https://github.com/ajmyers/tm1-pa-developer-tools.git
-cd tm1-pa-developer-tools\docker\tm1-server
+git clone https://github.com/ajmyers/skipcheck-tm1.git
+cd skipcheck-tm1\docker\tm1-server
 docker build --platform linux/amd64 -t tm1-server:local .
 Add-Content .env "TM1_SERVER_IMAGE=tm1-server:local"
 ```

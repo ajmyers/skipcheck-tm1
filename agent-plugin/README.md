@@ -14,8 +14,8 @@ be added as the project grows.
 ## Claude Code
 
 ```
-/plugin marketplace add ajmyers/tm1-pa-developer-tools
-/plugin install tm1@tm1-pa-developer-tools
+/plugin marketplace add ajmyers/skipcheck-tm1
+/plugin install tm1@skipcheck-tm1
 ```
 
 Then ask Claude to set up TM1, or run `/tm1:tm1-setup` (optionally followed by your bundle's
@@ -30,7 +30,7 @@ Gemini CLI, and by Cursor):
 ```sh
 mkdir -p ~/.agents/skills/tm1-setup
 curl -fsSL -o ~/.agents/skills/tm1-setup/SKILL.md \
-  https://raw.githubusercontent.com/ajmyers/tm1-pa-developer-tools/master/agent-plugin/skills/tm1-setup/SKILL.md
+  https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/master/agent-plugin/skills/tm1-setup/SKILL.md
 ```
 
 Agents without skills can be pointed at the same file: *"follow these instructions to set
@@ -39,4 +39,4 @@ up TM1"*, with the URL above.
 ---
 
 Made by Andrew Myers ([ajmyers.net](https://ajmyers.net)). Bugs and ideas:
-[issues](https://github.com/ajmyers/tm1-pa-developer-tools/issues).
+[issues](https://github.com/ajmyers/skipcheck-tm1/issues).
