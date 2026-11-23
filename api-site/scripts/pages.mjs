@@ -122,6 +122,12 @@ async function blocks(project, list, page, { inItem = false } = {}) {
 	return html;
 }
 
+/** Under a landing page's quick start, the way on: the project's first walkthrough, if it has one. */
+async function firstWalkthrough(project) {
+	const [first] = await walkthroughsOf(project);
+	return first ? '<p class="more">New to it? Take it step by step: <a href="walkthroughs/' + first.slug + '/">' + escape(first.meta.title) + '</a>.</p>' : '';
+}
+
 const landings = [];
 for (const project of PROJECTS.filter((p) => p.landing)) {
 	const file = path.join(siteDir, 'content', project.id + '.md');
@@ -190,6 +196,7 @@ for (const { project, content } of landings) {
 		body +=
 			'<section id="' + id + '" class="section wrap" aria-labelledby="' + id + '-heading"><h2 id="' + id + '-heading" class="section-label">' + escape(section.title) + '</h2><div class="steps">' +
 			(await blocks(project, section.blocks, { walkthrough: false })) +
+			(id === 'quick-start' ? await firstWalkthrough(project) : '') +
 			'</div></section>';
 	}
 	const related = landings.filter((other) => other.project !== project).map((other) => card(other.project, other.content.meta.card));

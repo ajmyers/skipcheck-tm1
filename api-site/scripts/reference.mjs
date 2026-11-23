@@ -634,7 +634,7 @@ for (const project of PROJECTS) {
 		let home =
 			(project.landing ? '<p class="crumbs"><a href="../../">' + escape(project.title) + '</a> · Docs</p>' : '') +
 			'<h1>' + escape(project.title) + ' docs <span class="lang">' + escape(label) + '</span></h1>' +
-			'<p class="lead">Every part of the library, with its members and examples in ' + escape(label) + '.' + (project.landing ? ' New here? Start with the <a href="../../#quick-start">quick start</a>.' : '') + '</p>';
+			'<p class="lead">Every part of the library, with its members and examples in ' + escape(label) + '.' + (project.landing ? ' New here? Start with the <a href="../../#quick-start">quick start</a>' + (walkthroughs.length > 0 ? ', then the walkthrough <a href="' + walkthroughPage(walkthroughs[0]) + '">' + escape(walkthroughs[0].meta.title) + '</a>' : '') + '.' : '') + '</p>';
 		if (start.length > 0) {
 			home += '<h2>Start here</h2><ul class="start">' + start.map((t) => '<li><a href="' + pageOf(t) + '"><strong>' + escape(nameOf(t)) + '</strong><span>' + escape(summaries.get(t.name)) + '</span></a></li>').join('') + '</ul>';
 		}
