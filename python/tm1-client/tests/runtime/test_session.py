@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import gzip
+import http.server
 import json
 import logging
 import random
 import threading
 import time
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import httpx
@@ -1331,6 +1334,94 @@ def test_follows_next_links_as_given(rt: Runtime) -> None:
     assert [e["Name"] for e in rt.run(rt.session().collect(ELEMENTS))] == ["Q1", "Q'2 {x}", "Total", "p2", "p3"]
     # As TM1 gave them: only the space is percent-encoded, which a URL on the wire needs
     assert [target(r) for r in rt.fake.requests][1:] == ["GET Elements?$skiptoken=3", "GET Elements?$skiptoken=4&x='a%20b'"]
+
+
+# Tm1TimeoutsTest, against a real server
+
+# The request timeout in the tests against a slow server: ten times the pause between pieces
+IDLE = 1.0
+PAUSE = 0.1
+
+
+@contextlib.contextmanager
+def slow_tm1(rt: Runtime, body: Callable[[Callable[[str], None], threading.Event], None]) -> Iterator[Any]:
+    """A session with a short request timeout, against a real server that logs in and answers
+    anything else with a 200 whose body ``body`` writes, ended by closing the connection. The event
+    is set when the test is over."""
+    done = threading.Event()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            if self.path.startswith("/api/v1/ActiveSession?"):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Set-Cookie", "TM1SessionId=s1; Path=/api/; HttpOnly")
+                self.send_header("Content-Length", "8")
+                self.end_headers()
+                self.wfile.write(b'{"ID":1}')
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+
+            def write(text: str) -> None:
+                self.wfile.write(text.encode())
+                self.wfile.flush()
+
+            with contextlib.suppress(OSError):  # the client gave up
+                body(write, done)
+
+        def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        root = f"http://127.0.0.1:{server.server_address[1]}/api/v1/"
+        yield rt.Session.builder().base_url(root).basic_auth("admin", "apple").timeouts(Tm1Timeouts.builder().request(IDLE).build()).build()
+    finally:
+        done.set()
+        server.shutdown()
+        server.server_close()
+
+
+def test_keeps_reading_a_body_that_arrives_slowly_but_steadily(rt: Runtime) -> None:
+    # Twice the request timeout in all, never pausing for more than a tenth of it
+    def body(write: Callable[[str], None], done: threading.Event) -> None:
+        write('{"Name":"tm1"')
+        for _ in range(20):
+            done.wait(PAUSE)
+            write(" ")
+        write("}")
+
+    with slow_tm1(rt, body) as session:
+        read: list[Any] = []
+
+        def call() -> Any:
+            if rt.flavor == "sync":
+                read.append(session.execute(SERVER))
+                return None
+
+            async def execute() -> None:
+                read.append(await session.execute(SERVER))
+
+            return execute()
+
+        started = time.monotonic()
+        assert outcome(rt, call, 20) is None
+        assert read == [{"Name": "tm1"}]
+        assert time.monotonic() - started > IDLE, "the body took longer than the timeout"
+
+
+def test_fails_a_body_that_stalls_for_longer_than_the_request_timeout(rt: Runtime) -> None:
+    def body(write: Callable[[str], None], done: threading.Event) -> None:
+        write('{"Name":')
+        done.wait()
+
+    with slow_tm1(rt, body) as session:
+        e = outcome(rt, lambda: session.execute(SERVER), 20)
+        assert isinstance(e, Tm1TransportError) and e.phase is Tm1TransportError.Phase.RESPONSE
 
 
 # Tm1Dialect, through a session
