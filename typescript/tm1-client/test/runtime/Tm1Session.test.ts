@@ -1153,6 +1153,79 @@ describe("Tm1Session reading collections", () => {
     ).toEqual(["GET Elements?$skiptoken=3", "GET Elements?$skiptoken=4&x='a b'"]);
   });
 
+  it("asks for pages only as items are taken", async () => {
+    // The Java decoder's asksForBuffersOnlyAsItemsAreTaken: here a page is read whole, so what's
+    // read no faster than the items are taken is the pages
+    const tm1 = new ScriptedTm1()
+      .on("GET Elements", () => ScriptedTm1.json(200, BODY))
+      .on("GET Elements?$skiptoken=3", () => ScriptedTm1.json(200, '{"value":[{"Name":"p2"}]}'));
+    const session = tm1.session();
+
+    expect((await session.stream(ELEMENTS).first())!.Name).toBe("Q1");
+    let taken = 0;
+    for await (const element of session.stream(ELEMENTS)) {
+      expect(element.Name).toBeDefined();
+      if (++taken === 3) break;
+    }
+    await settle();
+    expect(tm1.requests("GET Elements"), "one request for each time it was iterated").toHaveLength(2);
+    expect(tm1.requests("GET Elements?$skiptoken=3"), "no more than the items taken need").toHaveLength(0);
+  });
+
+  /** A real server whose `Elements` sends the start of a collection and then nothing more, and which
+   * records when the connection carrying it has gone. */
+  async function stalling(use: (root: string, state: { asked: number; released: number }) => Promise<void>): Promise<void> {
+    const state = { asked: 0, released: 0 };
+    const server = createServer((request, response) => {
+      request.resume();
+      const path = request.url ?? "";
+      if (path.includes("ActiveSession?"))
+        response.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": "TM1SessionId=c1; Path=/api/; HttpOnly" }).end('{"ID":1}');
+      else if (path.includes("Elements")) {
+        state.asked++;
+        response.on("close", () => {
+          if (!response.writableEnded) state.released++;
+        });
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.write(BODY.slice(0, BODY.indexOf("Total")));
+      } else response.writeHead(204).end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      await use(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1/`, state);
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  }
+
+  it("releases a response it hasn't read when cancelled", async () => {
+    // The Java decoder's releasesBuffersItHasntReadWhenCancelled: what's held here isn't pooled
+    // buffers but the response and its connection, which Node's fetch gives up when aborted
+    await stalling(async (root, state) => {
+      const session = Tm1Session.builder().baseUrl(root).basicAuth("admin", "").build();
+      const cancel = new AbortController();
+      const reading = session.stream(ELEMENTS, { signal: cancel.signal }).toArray();
+      await eventually(() => state.asked === 1, "for the request");
+      await settle();
+      cancel.abort();
+      await expect(reading).rejects.toBeDefined();
+      await eventually(() => state.released === 1, "for the response to be released");
+      await session.close();
+    });
+  });
+
+  it("releases a response it hasn't read when the request fails", async () => {
+    await stalling(async (root, state) => {
+      const session = Tm1Session.builder().baseUrl(root).basicAuth("admin", "").build();
+      const e = await failure(session.stream(ELEMENTS.withTimeout(200)).toArray());
+      expect(e).toBeInstanceOf(Tm1TransportException);
+      expect((e as Tm1TransportException).phase).toBe("Response");
+      await eventually(() => state.released === 1, "for the response to be released");
+      await session.close();
+    });
+  });
+
   it("reads multibyte characters", async () => {
     expect(await read('{"value":[{"Name":"Région 日本 😀","Type":"String"}]}')).toEqual([{ Name: "Région 日本 😀", Type: "String" }]);
   });
