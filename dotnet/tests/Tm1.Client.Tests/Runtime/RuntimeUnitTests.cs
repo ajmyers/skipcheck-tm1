@@ -671,6 +671,47 @@ public class Tm1VersionTest
         Assert.Contains("EntityType has no Name", Assert.Throws<Tm1ProtocolException>(() => Tm1Capabilities.Parse(csdl)).Message);
     }
 
+    /// <summary>Java's <c>reportsAnOperationItCantModelAsAParseError</c>: a bound operation needs the parameter it's bound to.</summary>
+    [Fact]
+    public void ReportsAnOperationItCantModelAsAParseError()
+    {
+        const string boundToNothing = """
+            <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+              <edmx:DataServices>
+                <Schema Namespace="ibm.tm1.api.v1" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+                  <Action Name="Reserve" IsBound="true"/>
+                </Schema>
+              </edmx:DataServices>
+            </edmx:Edmx>
+            """;
+        Assert.Contains("Reserve", Assert.Throws<Tm1ProtocolException>(() => Tm1Capabilities.Parse(boundToNothing)).Message);
+    }
+
+    /// <summary>.NET only, for the same rule: whatever the reader can't make a model of is a document
+    /// the client can't read, never .NET's own exception. (Java's
+    /// <c>usesTheJdksParserWhateverTheApplicationHasInstalled</c> has no counterpart: an application
+    /// can't replace .NET's XML parser.)</summary>
+    [Theory]
+    [InlineData("<Schema Namespace=\"a\" Alias=\"x\"/><Schema Namespace=\"b\" Alias=\"x\"/>")]
+    [InlineData("<Schema Namespace=\"a\"><Action Name=\"Reserve\" IsBound=\"true\"><Parameter Name=\"it\" Type=\"Collection(\"/></Action></Schema>")]
+    public void ReportsMetadataItCantModelAsAParseError(string schemas)
+    {
+        var csdl =
+            "<edmx:Edmx xmlns:edmx=\"http://docs.oasis-open.org/odata/ns/edmx\" Version=\"4.0\"><edmx:DataServices>"
+            + schemas.Replace("<Schema ", "<Schema xmlns=\"http://docs.oasis-open.org/odata/ns/edm\" ", StringComparison.Ordinal)
+            + "</edmx:DataServices></edmx:Edmx>";
+        Assert.Contains("$metadata", Assert.Throws<Tm1ProtocolException>(() => Tm1Capabilities.Parse(csdl)).Message);
+    }
+
+    /// <summary>As Java's parser: refusing a DOCTYPE rules out external entities and entity expansion entirely.</summary>
+    [Fact]
+    public void RefusesADoctypeAsAParseError()
+    {
+        const string csdl =
+            "<!DOCTYPE x [<!ENTITY e SYSTEM \"file:///etc/passwd\">]><edmx:Edmx xmlns:edmx=\"http://docs.oasis-open.org/odata/ns/edmx\">&e;</edmx:Edmx>";
+        Assert.Contains("DTD", Assert.Throws<Tm1ProtocolException>(() => Tm1Capabilities.Parse(csdl)).Message);
+    }
+
     [Fact]
     public void AnswersRangeQuestions()
     {
