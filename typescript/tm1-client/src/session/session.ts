@@ -357,7 +357,12 @@ function readPage<T>(request: Tm1Request<T>, reply: Reply): Page<T> {
 /** A JSON `$batch`, as the Java client's `Tm1SessionBatch`: requests through {@link session} are
  * queued, and `run()` sends them together. TM1 (11.8) runs them in order (a later one sees an
  * earlier one's writes) and carries on past failed ones: each request's promise gets its own result
- * or error. */
+ * or error.
+ *
+ * A request's body is written as JSON when the call is made, so a body that can't be written fails
+ * that call at once (a `TypeError`) and it never joins the batch, and a body changed afterwards is
+ * sent as it was. If TM1 answers a `$batch` with no body, every call in it fails with a
+ * {@link Tm1ProtocolException}. */
 export class Tm1SessionBatch {
   /** How many requests {@link run} sends in each `$batch`. */
   static readonly DEFAULT_PER_REQUEST = 500;
@@ -390,6 +395,7 @@ interface Entry {
   url: string;
   accept: string;
   headers: Readonly<Record<string, string>>;
+  /** The body as JSON, written when the call was queued; undefined for none. */
   body: unknown;
   read: (reply: Reply) => unknown;
   resolve: (value: unknown) => void;
@@ -409,13 +415,18 @@ export class BatchQueue {
     return this.entries.length;
   }
 
-  /** Queues a request, and returns its result, there once the batch has run. */
+  /** Queues a request, and returns its result, there once the batch has run. A request whose body
+   * can't be written as JSON is refused here, and never joins the batch. */
   add<T>(view: Tm1Session, request: Tm1Request<T>, read: (reply: Reply) => unknown): Promise<unknown> {
     if (request.response === "Bytes" || request.body instanceof Uint8Array) throw new TypeError("Raw bytes can't go in a JSON batch: " + request.toString());
     if (this.ran)
       throw new Error(
         "The batch has already run, so this call can't join it: a call whose request depends on another's result can't be batched. " + request.toString(),
       );
+    // Written now, so a body that can't be written fails its own call, where it was made, rather
+    // than the run and every other call with it. The body is what it was when the call was queued.
+    const written = request.body === undefined ? undefined : writeJson(request.body);
+    const body: unknown = written === undefined ? undefined : JSON.parse(written);
     let resolve!: (v: unknown) => void;
     let reject!: (e: unknown) => void;
     const result = new Promise<unknown>((res, rej) => {
@@ -430,7 +441,7 @@ export class BatchQueue {
       url: view.contextual(request.relativeUri()),
       accept: request.accept(),
       headers: request.headers,
-      body: request.body,
+      body,
       read,
       resolve,
       reject,

@@ -711,6 +711,48 @@ describe("Tm1Session batches", () => {
     expect((e as Error).message).toContain("no answer for request 1");
   });
 
+  it("refuses a call whose body can't be written and still runs the rest", async () => {
+    const tm1 = new ScriptedTm1().on(BATCH, () => ScriptedTm1.json(200, '{"responses":[{"id":"1","status":204}]}'));
+    const batch = tm1.session().batch();
+    const deleted = batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("Old")));
+    const body = {
+      get Name(): string {
+        throw new Error("not readable");
+      },
+    };
+    const unwritable = batch.session.execute(Tm1Request.post(ODataPath.of("Cubes"), body, Json));
+
+    // Before the batch runs: the call fails where it was made
+    const e = await Promise.race([failure(unwritable), settle().then(() => "still waiting")]);
+    expect(e).toBeInstanceOf(TypeError);
+    expect(batch.size(), "never queued").toBe(1);
+    await batch.run();
+    expect(await deleted).toBeUndefined();
+    expect(tm1.requests(BATCH)).toHaveLength(1);
+  });
+
+  it("sends a body as it was when the call was queued", async () => {
+    const tm1 = new ScriptedTm1().on(BATCH, () => ScriptedTm1.json(200, '{"responses":[{"id":"1","status":204}]}'));
+    const batch = tm1.session().batch();
+    const body = { Name: "before" };
+    const created = batch.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), body));
+    body.Name = "after";
+    await batch.run();
+    await created;
+    expect(tm1.requests(BATCH)[0]!.json.requests[0].body).toEqual({ Name: "before" });
+  });
+
+  it("fails every call when TM1 answers the batch with no body", async () => {
+    const tm1 = new ScriptedTm1().on(BATCH, () => ScriptedTm1.status(200));
+    const batch = tm1.session().batch();
+    const first = batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("a")));
+    const second = batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("b")));
+
+    await batch.run();
+    expect(await Promise.race([failure(first), settle().then(() => "still waiting")])).toBeInstanceOf(Tm1ProtocolException);
+    expect(await Promise.race([failure(second), settle().then(() => "still waiting")])).toBeInstanceOf(Tm1ProtocolException);
+  });
+
   it("splits a big queue", async () => {
     const tm1 = new ScriptedTm1().on(BATCH, () => ScriptedTm1.json(200, '{"responses":[]}'));
     const batch = tm1.session().batch();
