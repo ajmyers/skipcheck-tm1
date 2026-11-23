@@ -67,6 +67,46 @@ test('the .NET extractor follows base classes and extension methods, and joins a
 	assert.deepEqual(names(types.Tm1Request), ['Get', 'Path']);
 });
 
+test('the TypeScript extractor follows extends, and reads parameter properties and set statics', () => {
+	const types = extract(
+		{
+			'errors.ts': [
+				'export class Tm1Exception extends Error {',
+				'  constructor(',
+				'    message: string,',
+				'    /** The request\'s method. */',
+				'    readonly method: string,',
+				'    private readonly secret: string,',
+				'  ) {',
+				'    super(message);',
+				'  }',
+				'',
+				'  isRetryable(): boolean {',
+				'    return false;',
+				'  }',
+				'}',
+				'',
+				'export class Tm1ApiException extends Tm1Exception {}',
+				'',
+				'export class ODataProperty {',
+				'  static readonly DEFAULTS = new ODataProperty("x");',
+				'',
+				'  private constructor(readonly path: string) {}',
+				'',
+				'  eq(value: unknown): string {',
+				'    return "";',
+				'  }',
+				'}',
+			].join('\n'),
+		},
+		(dir, out) => execFileSync(process.execPath, [path.join(siteDir, 'extract', 'typescript_api.mjs'), dir, out, 'pkg']),
+	);
+	assert.deepEqual(names(types.Tm1Exception), ['Tm1Exception', 'method', 'isRetryable']);
+	assert.equal(types.Tm1Exception.members[1].doc, "The request's method.");
+	assert.deepEqual(names(types.Tm1ApiException), ['method<Tm1Exception', 'isRetryable<Tm1Exception']);
+	assert.deepEqual(names(types.ODataProperty), ['DEFAULTS', 'path', 'eq']);
+});
+
 /** A Python of 3.11 or later, as scripts/extract.mjs finds one, or null. */
 function python() {
 	for (const candidate of [process.env.PYTHON, 'python3', 'python3.14', 'python3.13', 'python3.12', 'python3.11'].filter(Boolean)) {

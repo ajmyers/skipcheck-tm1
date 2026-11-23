@@ -70,7 +70,10 @@ function parseFile(text, pkg) {
 		}
 		const decl = /^export\s+(?:default\s+)?(?:abstract\s+)?(class|interface|enum)\s+(\w+)(<[^{]*>)?/.exec(raw);
 		if (decl) {
-			type = { name: decl[2], package: pkg, kind: decl[1], signature: line.replace(/\s*\{\s*$/, ''), doc: docText(doc), deprecated: false, members: [] };
+			// What it extends, for complete() to follow: class Tm1ApiException extends Tm1Exception
+			const ext = /\bextends\s+([^{]*?)\s*(?:\bimplements\b.*)?(?:\{\}?)?\s*$/.exec(line.slice(decl[0].length));
+			const bases = ext ? splitTop(ext[1]).map((b) => b.replace(/<.*$/, '').split('.').at(-1).trim()) : [];
+			type = { name: decl[2], package: pkg, kind: decl[1], signature: line.replace(/\s*\{\s*$/, ''), doc: docText(doc), deprecated: false, members: [], bases };
 			types.push(type);
 			endpoints = null;
 			doc = [];
@@ -98,7 +101,9 @@ function parseFile(text, pkg) {
 			doc = [];
 			continue;
 		}
-		if (/^(?:private|protected|#)/.test(line) || /^(?:static\s+)?(?:private|protected)\b/.test(line)) {
+		// A private constructor's parameter properties can still be public: private constructor(readonly path: string)
+		const hidden = /^(?:private|protected)\s+constructor\b/.test(line);
+		if (!hidden && (/^(?:private|protected|#)/.test(line) || /^(?:static\s+)?(?:private|protected)\b/.test(line))) {
 			doc = [];
 			continue;
 		}
@@ -114,10 +119,14 @@ function parseFile(text, pkg) {
 		}
 		let declText = line;
 		let j = i;
-		while (!/[{;]\s*$/.test(declText) && j + 1 < lines.length && j < i + 20) declText += ' ' + lines[++j].trim();
-		const head = declText.replace(/\s*\{\s*$/, '').replace(/;\s*$/, '').trim();
+		// Up to the body ({, or {} when it's empty) or the ;
+		while (!/(?:[{;]|\{\})\s*$/.test(declText) && j + 1 < lines.length && j < i + 20) declText += '\n' + lines[++j].trim();
+		// Doc comments in a parameter list document the parameter properties they precede
+		const comments = [];
+		declText = declText.replace(/\/\*\*[\s\S]*?\*\//g, (c) => '\x00' + (comments.push(c) - 1) + '\x00').replace(/\n/g, ' ');
+		const head = declText.replace(/\s*\{\}?\s*$/, '').replace(/;\s*$/, '').trim();
 		const isStatic = /^(?:public\s+)?static\b/.test(head);
-		const bare = head.replace(/^(?:public\s+)?(?:static\s+)?(?:readonly\s+)?(?:override\s+)?(?:abstract\s+)?/, '');
+		const bare = head.replace(/^(?:public\s+|private\s+(?=constructor)|protected\s+(?=constructor))?(?:static\s+)?(?:readonly\s+)?(?:override\s+)?(?:abstract\s+)?/, '');
 		const method = /^(async\s+)?(\*\s*)?(get\s+|set\s+)?(\[?[\w.]+\]?|constructor)(\?)?\s*(<[^(]*>)?\s*\((.*)\)\s*(?::\s*(.+))?$/.exec(bare);
 		let member = null;
 		if (method) {
@@ -130,20 +139,58 @@ function parseFile(text, pkg) {
 					static: isStatic,
 					signature: (isStatic ? 'static ' : '') + bare.replace(/^async\s+/, ''),
 					returns: ret,
-					params: splitTop(params).map((p) => {
+					params: splitTop(params.replace(/\x00\d+\x00\s*/g, '')).map((p) => {
+						p = p.replace(/^(?:(?:public|private|protected|readonly|override)\s+)+/, '');
 						const m = /^(\.\.\.)?(\w+)(\?)?\s*(?::\s*(.*?))?(?:\s*=\s*(.*))?$/.exec(p);
 						return m ? { name: (m[1] ?? '') + m[2], type: m[4] ?? '', ...(m[5] ? { default: m[5] } : {}) } : { name: p, type: '' };
 					}),
 				};
 		} else {
-			const prop = /^(\w+)(\?)?\s*:\s*(.+)$/.exec(bare.replace(/\s*=.*$/, ''));
-			if (prop) member = { kind: 'property', name: prop[1], static: isStatic, signature: (isStatic ? 'static ' : '') + bare.replace(/\s*=.*$/, ''), returns: prop[3], params: [] };
+			// A property, typed (connect: number) or set (static readonly DEFAULTS = new Tm1Timeouts(...))
+			const prop = /^(\w+)(\?)?\s*(?::\s*(.+))?$/.exec(bare.replace(/\s*=.*$/, ''));
+			if (prop) member = { kind: 'property', name: prop[1], static: isStatic, signature: (isStatic ? 'static ' : '') + bare.replace(/\s*=.*$/, ''), returns: prop[3] ?? '', params: [] };
 		}
-		if (member && !(member.name === 'endpoints' && isStatic)) type.members.push({ ...member, endpoints: [], doc: docText(doc), deprecated: /@deprecated/.test(doc.join('\n')) });
+		if (member && !hidden && !(member.name === 'endpoints' && isStatic)) type.members.push({ ...member, signature: member.signature.replace(/\x00\d+\x00\s*/g, ''), endpoints: [], doc: docText(doc), deprecated: /@deprecated/.test(doc.join('\n')) });
+		// A constructor's public parameter properties (constructor(readonly status: number)) are the
+		// class's properties
+		if (member?.kind === 'constructor' && method) {
+			for (const p of splitTop(method[7])) {
+				const property = /^(?:\x00(\d+)\x00\s*)?((?:(?:public|readonly|override)\s+)+)(\w+)\??\s*(?::\s*(.*?))?(?:\s*=.*)?$/.exec(p);
+				if (!property) continue;
+				const own = property[1] === undefined ? '' : docText(comments[Number(property[1])].split('\n'));
+				const shown = property[3] + (property[4] ? ': ' + property[4] : '');
+				type.members.push({ kind: 'property', name: property[3], static: false, signature: (/readonly/.test(property[2]) ? 'readonly ' : '') + shown, returns: property[4] ?? '', params: [], endpoints: [], doc: own, deprecated: false });
+			}
+		}
 		doc = [];
 		if (member) i = Math.max(i, line.endsWith('{') || line.endsWith(';') ? i : j);
 	}
 	return types;
+}
+
+/** Gives each type the members of the types it extends in the package, marked with where they
+ * come from (inherited): Tm1NotFoundException has Tm1ApiException's status. */
+function complete(types) {
+	const byName = new Map(types.map((t) => [t.name, t]));
+	const done = new Set();
+	const inherit = (type, seen) => {
+		if (done.has(type) || seen.has(type)) return;
+		const names = new Set(type.members.map((m) => m.name));
+		for (const name of type.bases ?? []) {
+			const base = byName.get(name);
+			if (!base || base === type) continue;
+			inherit(base, new Set([...seen, type]));
+			for (const member of base.members) {
+				if (member.kind === 'constructor' || names.has(member.name)) continue;
+				type.members.push({ ...member, inherited: member.inherited ?? base.name });
+			}
+			for (const member of base.members) names.add(member.name);
+		}
+		done.add(type);
+	};
+	for (const type of types) inherit(type, new Set());
+	for (const type of types) delete type.bases;
+	return types.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 const [source, out, pkg] = process.argv.slice(2);
@@ -155,5 +202,4 @@ for await (const file of files(source)) {
 		seen.add(type.name);
 	}
 }
-types.sort((a, b) => a.name.localeCompare(b.name));
-await writeFile(out, JSON.stringify(types));
+await writeFile(out, JSON.stringify(complete(types)));
