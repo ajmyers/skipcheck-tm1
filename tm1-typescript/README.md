@@ -20,7 +20,7 @@ if ((await tm1.cubes.checkRules("Plan", rules).toArray()).length === 0) {
 }
 ```
 
-**Status:** at parity with the Java client: every service class and method (240 endpoints, the same 2 excluded), the runtime (session, views, batches, async operations, capabilities, errors, auth, pool, identities, Cognos passports) and tm1-testcontainers. The live tests haven't yet run against a real TM1, nor have the containers been started here. Cognos passports work in Node only: a browser never lets a page read the `Set-Cookie` header they come back in.
+**Status:** at parity with the Java client: every service class and method (240 endpoints, the same 2 excluded), the runtime (session, views, batches, async operations, capabilities, errors, auth, pool, identities, Cognos passports) and tm1-testcontainers. The live tests pass against TM1 11.8.03500.6 (Planning Analytics 2.1.19), started in Docker by tm1-testcontainers from an installed `tm1_64` folder (`TM1_HOME_DIR`): 168 tests, with relational drillthrough skipped for want of an ODBC source. tm1-testcontainers' own tests pass for the TM1 server; the TM1 Web and Planning Analytics Workspace ones haven't run, for want of those products. `TM1_URL` hasn't been tried. Cognos passports work in Node only: a browser never lets a page read the `Set-Cookie` header they come back in.
 
 ## From the Java client
 

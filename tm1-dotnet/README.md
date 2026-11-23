@@ -71,4 +71,4 @@ dotnet test Tm1.slnx
 
 [`scripts/live-tests.sh`](../scripts/live-tests.sh) runs the Java, Python and .NET live tests together.
 
-None of the live tests have run against a real TM1 yet. The container harness has run, against a stand-in.
+The live tests pass against TM1 11.8.03500.6 (Planning Analytics 2.1.19), started in Docker by Tm1.Testcontainers from an installed `tm1_64` folder (`TM1_HOME_DIR`): 143 tests, with relational drillthrough skipped for want of an ODBC source. They run one class at a time, since they share the server. Tm1.Testcontainers' own tests pass for the TM1 server; the TM1 Web and Planning Analytics Workspace ones haven't run, for want of those products. `TM1_URL` hasn't been tried.
