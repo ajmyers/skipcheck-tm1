@@ -184,7 +184,12 @@ Flux<String> list(Tm1Client tm1) {
 - Use what users can use: the public API only, so the examples sit in their own package.
 - Respect TM1's quirks: an example mustn't do what the Javadoc says TM1 refuses or ignores. The
   integration tests (`*Tm1Test`) show what works.
-- The examples are compiled but not run, since they need a TM1 server.
+- The examples are compiled but not run, since they need a TM1 server. The walkthroughs'
+  examples (`<Task>Walkthrough`, shown on the site's walkthrough pages) are the exception: they
+  block, since a walkthrough runs its steps in order from a `main`, and the live tests run them
+  and record what they print, which the pages show under the code. Change one, run the live tests,
+  and commit the recording in `api-site/example-output` with it: the site's build fails on a
+  stale one ([api-site/README.md](api-site/README.md#walkthroughs-and-what-the-examples-print)).
 - Spring Java Format writes `region = list` with spaces, in the comment and the `{@snippet}`
   tag. Javadoc accepts both forms.
 

@@ -30,6 +30,7 @@ import { gzipSync } from 'node:zlib';
 import { checkMembers, findMember, listFile, memberCandidates, readList, stale, typeCandidates } from './members.mjs';
 import { searchIndex } from './search.mjs';
 import { CANONICAL_ORIGIN, copyAssets, dedent, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, SECTIONS } from './site.mjs';
+import { walkthroughsOf } from './walkthroughs.mjs';
 
 const allowMissing = process.argv.includes('--allow-missing');
 
@@ -530,6 +531,12 @@ for (const project of PROJECTS) {
 			'<p class="lead">Every part of the library, with its members and examples in ' + escape(label) + '.' + (project.landing ? ' New here? Start with the <a href="../../#quick-start">quick start</a>.' : '') + '</p>';
 		if (start.length > 0) {
 			home += '<h2>Start here</h2><ul class="start">' + start.map((t) => '<li><a href="' + pageOf(t) + '"><strong>' + escape(nameOf(t)) + '</strong><span>' + escape(summaries.get(t.name)) + '</span></a></li>').join('') + '</ul>';
+		}
+		// The walkthroughs, which pages.mjs builds: their examples are in every language, behind tabs
+		// that open in the language last chosen, this one when it's read here
+		const walkthroughs = await walkthroughsOf(project);
+		if (walkthroughs.length > 0) {
+			home += '<h2 id="walkthroughs">Walkthroughs</h2><ul class="start">' + walkthroughs.map((w) => '<li><a href="../../walkthroughs/' + w.slug + '/"><strong>' + escape(w.meta.title) + '</strong><span>' + escape(w.meta.summary) + '</span></a></li>').join('') + '</ul>';
 		}
 		home += grouped
 			.map(({ area, list }) => '<h2 id="' + area.id + '">' + escape(area.title) + '</h2><ul class="areas">' + list.map((t) => '<li><a href="' + pageOf(t) + '"><code>' + escape(nameOf(t)) + '</code></a><span>' + escape(summaries.get(t.name)) + '</span></li>').join('') + '</ul>')

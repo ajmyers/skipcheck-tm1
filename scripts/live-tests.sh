@@ -15,7 +15,8 @@
 #
 # Each suite also runs the live conformance scenarios (spec/conformance/live) and writes what it
 # sent to build/conformance-live/<language>; afterwards scripts/compare-live-traffic.py requires
-# every language to have sent the same requests.
+# every language to have sent the same requests. And each runs the walkthroughs' examples, and
+# records what they print in api-site/example-output, which the docs show: commit what changed.
 #
 #   scripts/live-tests.sh                  # all four
 #   scripts/live-tests.sh python dotnet    # some

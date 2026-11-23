@@ -10,7 +10,9 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { inline, parse, slug } from '../scripts/markdown.mjs';
 import { docsVersion, installCommands, packageOf } from '../scripts/packages.mjs';
+import { judge, sourceHash } from '../scripts/output.mjs';
 import { head, languagesOf, PROJECTS, regions, SECTIONS } from '../scripts/site.mjs';
+import { walkthroughsOf } from '../scripts/walkthroughs.mjs';
 
 test('inline Markdown is escaped, then marked up', () => {
 	assert.equal(inline('**Bold** and `a<b>` with [a link](docs/X.html) & more'), '<strong>Bold</strong> and <code>a&lt;b&gt;</code> with <a href="docs/X.html">a link</a> &amp; more');
@@ -107,4 +109,41 @@ test('a page with a description has the link preview image, and one without has 
 	assert.match(page, /<meta name="twitter:card" content="summary_large_image">/);
 	const bare = head({ title: 'T', canonical: 'https://skipcheck.io/x/docs/', styles: [], scripts: [] });
 	assert.doesNotMatch(bare, /og:image|twitter:card/);
+});
+
+// The file every language's recorder hashes, with this result (java/tm1-client/src/test/java/examples/ExampleOutputTest.java)
+const SOURCE = 'class Example {\n\tvoid other() {\n\t\t// @start region = other\n\t\tignored();\n\t\t// @end\n\t}\n\n\tvoid list(List<String> names) {\n\t\t// @start region = list\n\t\tfor (String name : names) {\n\n\t\t\tSystem.out.println(name);\n\t\t}\n\t\t// @end\n\t}\n}\n';
+const HASH = '674465729e3fa78a6fe01513b135a8aeaad2efe66b046efc5cd13eb55235eebc';
+
+test("a region's code is hashed as every language's recorder hashes it", () => {
+	assert.equal(sourceHash(SOURCE, 'list'), HASH);
+	assert.equal(sourceHash(SOURCE.replaceAll('\t', '  ').replaceAll('\n', '\r\n'), 'list'), HASH, 'indented and ended another way');
+	assert.notEqual(sourceHash(SOURCE.replace('println(name)', 'println(name.strip())'), 'list'), HASH);
+	assert.throws(() => sourceHash(SOURCE, 'missing'), /no region missing/);
+});
+
+test('a recorded output is shown when it is current, and fails the build when stale, missing or different', () => {
+	const at = (id, entry, prints = true) => ({ id, where: id + '/Example', hash: 'h', prints, entry });
+	const ok = (output) => ({ source: 'h', output });
+	assert.deepEqual(judge('x', [at('java', ok(['a'])), at('python', ok(['a']))], true), { outputs: new Map([['java', ['a']], ['python', ['a']]]), problems: [] });
+	const stale = judge('x', [at('java', { source: 'old', output: ['a'] }), at('python', ok(['a']))], false);
+	assert.deepEqual([...stale.outputs.keys()], ['python']);
+	assert.match(stale.problems[0], /^java\/Example: x has changed since its output was recorded/);
+	assert.match(judge('x', [at('java', ok(['a'])), at('python', undefined)], true).problems[0], /^python\/Example: x prints, but its output was never recorded/);
+	assert.deepEqual(judge('x', [at('java', ok(['a'])), at('python', undefined)], false).problems, [], 'only a walkthrough requires it');
+	assert.deepEqual(judge('x', [at('java', undefined, false), at('python', undefined, false)], true).problems, [], 'an example that prints nothing needs no recording');
+	assert.match(judge('x', [at('java', ok([]), false), at('python', undefined, false)], true).problems[0], /has no recorded output, and another language's has/);
+	assert.match(judge('x', [at('java', ok(['a'])), at('python', ok(['b']))], false).problems[0], /^x printed something else in python than in java/);
+});
+
+test('every walkthrough has its front matter, and a lead before its steps', async () => {
+	let count = 0;
+	for (const project of PROJECTS) {
+		for (const walkthrough of await walkthroughsOf(project)) {
+			count++;
+			assert.ok(walkthrough.sections[0].blocks.length > 0 && walkthrough.sections[0].blocks.every((block) => block.type === 'p'), walkthrough.file + ' starts with its lead');
+			assert.ok(walkthrough.sections.some((section) => section.title === 'Steps'), walkthrough.file + ' has its steps');
+		}
+	}
+	assert.ok(count >= 3, 'the walkthroughs were not found');
 });

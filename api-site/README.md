@@ -7,6 +7,7 @@ Builds and serves each project's pages on skipcheck.io (and on skipcheck.dev, wh
 | `/<project>/` | The landing page: what it is, a quick start in every language it has, what's in it. | `scripts/pages.mjs`, from `content/<project>.md` |
 | `/<project>/docs/<language>/` | The reference: a page per type in each language, where the signatures, the descriptions and the examples are all that language's, with a switch to the same page in another. `/<project>/docs/` opens the language last chosen. A search box finds a type or member by name in the page's language. | `scripts/reference.mjs`, from each language's API (below) |
 | `/<project>/docs/model/` | TM1's own types (Cube, Dimension...), the same in every language. | `scripts/reference.mjs`, from `spec/tm1-api.json` |
+| `/<project>/walkthroughs/<slug>/` | A task done step by step, such as connecting and listing cubes, with each step's code in every language and what it printed. Listed on the landing page and the docs home. | `scripts/pages.mjs`, from `content/walkthroughs/<project>/<slug>.md` |
 | `/docs/` | The docs landing page: every project, its languages, and links to its docs in each. The masthead's Docs link opens it. | `scripts/pages.mjs`, from the same content files as the landing pages |
 | `/pa-docker/` | Planning Analytics in Docker: a landing page, and a page per image and for `pa-setup` (`/pa-docker/tm1-server/`...). | `scripts/docker.mjs`, from `content/pa-docker.md` and the READMEs under `docker/` |
 | `/<project>/release.json` | The version the pages describe, and whether it's a release: the site's home page reads it for each project's badge. | `scripts/pages.mjs` |
@@ -27,13 +28,39 @@ Javadoc; everything else is read from the repository when the pages are built:
 | Which member is which across languages | The rule each language's parity tests enforce: `modelCubes` is `model_cubes` in Python and `ModelCubesAsync` in .NET; a getter is a property; `NOT_FOUND` is `NotFound` in .NET. A member a type inherits counts as its own. What a language lacks by design, or names another way, is in its `coverage/members-excluded.txt` (`scripts/members.mjs`). |
 | A type's overview | The Java type's Javadoc, with its examples in the page's language. There is one text, so its prose is Java's; links in it name members the page's way. |
 | A Docker page | Its README under `docker/`, as GitHub renders it (`marked`, with GitHub's heading ids). A link to another of those READMEs goes to its page, a link to any other file goes to it on GitHub, and a link to a file that isn't there fails the build. `PA_DOCKER` in `scripts/site.mjs` lists the pages. |
-| The text of a landing page | `content/<project>.md`: Markdown with no code in it. `::install`, `::example <Class> <region>` and `::file <path> <language>` are replaced with the above (`scripts/pages.mjs`, `scripts/markdown.mjs`). |
+| The text of a landing page | `content/<project>.md`: Markdown with no code in it. `::install`, `::example <Class> <region>` and `::file <path> <language>` are replaced with the above (`scripts/pages.mjs`, `scripts/markdown.mjs`); `::walkthroughs` lists the project's walkthroughs. |
+| The text of a walkthrough | `content/walkthroughs/<project>/<slug>.md`, written the same way, with its title, summary, description and order in its front matter (`scripts/walkthroughs.mjs`). |
+| What an example printed | `example-output/<project>/<language>/<Class>.json`, written by the live tests (below). |
 
 The build fails when a page names an example that isn't there, when a language lacks an example
 the Java documentation quotes, when a language lacks a Java member that its
 `coverage/members-excluded.txt` doesn't list (or lists one it has, or one Java no longer has), or
 when a link on a generated page goes nowhere (`scripts/check-links.mjs`). So a new Java example
 needs its three counterparts before the build passes, and so does a new Java member.
+
+## Walkthroughs, and what the examples print
+
+A walkthrough is a task, step by step, for someone new to a library. Each step's code is a region
+of a `<Task>Walkthrough` examples class (`ConnectWalkthrough`, in every language), and under the
+code is what it printed when it ran against a real TM1. That output is never typed by hand:
+
+1. The live tests run each walkthrough's steps against IBM's SData sample, on a TM1 they start
+   for it: `WalkthroughExamplesTm1Test` in tm1-client (and its ports, `test_walkthrough_examples.py`,
+   `WalkthroughExamplesLiveTests`, `WalkthroughExamples.live.test.ts`), and
+   `HelloTm1ApplicationTm1Test` in the Spring Boot starter.
+2. Each language's `ExampleOutput` captures what a step prints, and writes
+   `example-output/<project>/<language>/<Class>.json`: each region's output, as lines, and a hash
+   of its code (each line trimmed, blank ones left out, SHA-256), worked out the same way in every
+   language and here (`scripts/output.mjs`).
+3. The build shows a region's output under its code, and fails when a region's code has changed
+   since its output was recorded, when the languages printed different things, when a
+   walkthrough's region prints and has no recording, or when a recording names a file or region
+   that's gone.
+
+So after changing a walkthrough's example, run the live tests (`./gradlew liveTest --continue`,
+with a TM1 source such as `TM1_HOME_DIR`; the starter's test runs in `./gradlew test` with one),
+and commit the recordings with the change. On a landing page an example's output is shown when it
+has one, and isn't required.
 
 ## How it fits together
 
@@ -46,7 +73,9 @@ needs its three counterparts before the build passes, and so does a new Java mem
 | `scripts/reference.mjs` | The reference pages and `.generated/site.json` for the Worker: the projects, and which one documents each type. |
 | `scripts/members.mjs` | Which member is which across languages, and the gate that each language has every Java member or lists it with the reason. |
 | `scripts/search.mjs` | The search index of each docs language, `search.json` beside its pages: every type and member, a short summary, and where it is. `reference.mjs` writes it from the data it renders the pages with. |
-| `scripts/pages.mjs` | The landing pages. |
+| `scripts/pages.mjs` | The landing pages and the walkthroughs. |
+| `scripts/walkthroughs.mjs` | Each project's walkthroughs, from `content/walkthroughs/`. |
+| `scripts/output.mjs` | What the examples printed (`example-output/`), and the checks on it. |
 | `scripts/docker.mjs` | The Docker pages, from the READMEs. |
 | `scripts/check-links.mjs` | Checks every link on the landing and docs pages, and every entry of the search indexes. |
 | `assets/` | The generated pages' own styles and script, copied to `/<project>/assets/`: `docs.css` (the reference's layout), `docs.js` (the reference's language memory), `search.js` and `search-rank.js` (the reference's search box, and how it matches and ranks), `tabs.css` and `tabs.js` (the landing pages' language tabs), `readme.css` (what the Docker pages add to `docs.css`). A language chosen anywhere is remembered and followed everywhere. |
