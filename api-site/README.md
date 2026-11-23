@@ -31,7 +31,7 @@ Javadoc; everything else is read from the repository when the pages are built:
 | A Docker page | Its README under `docker/`, as GitHub renders it (`marked`, with GitHub's heading ids). A link to another of those READMEs goes to its page, a link to any other file goes to it on GitHub, and a link to a file that isn't there fails the build. `PA_DOCKER` in `scripts/site.mjs` lists the pages. |
 | The text of a landing page | `content/<project>.md`: Markdown with no code in it. `::install`, `::example <Class> <region>` and `::file <path> <language>` are replaced with the above (`scripts/pages.mjs`, `scripts/markdown.mjs`); `::walkthroughs` lists the project's walkthroughs. |
 | The text of a walkthrough | `content/walkthroughs/<project>/<slug>.md`, written the same way, with its title, summary, description and order in its front matter (`scripts/walkthroughs.mjs`). |
-| A prompt for a coding agent | `content/prompts/<project>.md`: plain text with placeholders (`{{package}}`, `{{install}}`, `{{docs}}`...) filled in from the above, per language. `::prompt` shows it on the landing page, with a copy button and links that open it in Claude (`scripts/prompts.mjs`). A prompt file has no code or command of its own. |
+| A prompt for a coding agent | `content/prompts/<project>.md`: plain text with placeholders (`{{package}}`, `{{install}}`, `{{docs}}`...) filled in from the above, per language. `::prompt` shows it on the landing page, collapsed until the reader opens it (the site's `details.prompt`), with a copy button and links that open it in Claude (`scripts/prompts.mjs`). A prompt file has no code or command of its own. |
 | What an example printed | `example-output/<project>/<language>/<Class>.json`, written by the live tests (below). |
 
 The build fails when a page names an example that isn't there, when a language lacks an example
@@ -104,7 +104,7 @@ has one, and isn't required.
 What the pages take from the site (ajmyers/skipcheck.io, `public/`) at view time: `tokens.css`,
 `chrome.css` and `code.css`; `highlight.js`, which colours the examples; the masthead and footer in
 `partials/`; and, for the landing pages, `styles.css`, whose classes they are written in (`hero`,
-`section`, `steps`, `numbered`, `points`, `code`, `cards`, `callout`). A change to the site's palette,
+`section`, `steps`, `numbered`, `points`, `code`, `cards`, `callout`, and `prompt`, the collapsed agent prompt, whose Copy button the site's `copy.js` places). A change to the site's palette,
 fonts, masthead or footer reaches these pages without a rebuild; renaming one of those classes
 there changes the landing pages too.
 

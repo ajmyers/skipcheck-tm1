@@ -52,7 +52,10 @@ test("every prompt's install commands are packages.mjs's, and its own is there",
 
 test('a prompt on a page opens in Claude Desktop and Claude Code, filled in', () => {
 	const html = promptHtml('Build "this" & that\n');
-	assert.ok(html.includes('<pre class="prompt"><code>Build &quot;this&quot; &amp; that\n</code></pre>'), html);
+	assert.ok(html.includes('<pre><code>Build &quot;this&quot; &amp; that\n</code></pre>'), html);
+	// Collapsed until opened, in the site's <details class="prompt">, with the links outside it
+	assert.match(html, /^<details class="prompt"><summary>Prompt <span class="prompt-toggle">.*<\/summary><pre>.*<\/pre><\/details><p class="actions">/s);
+	assert.ok(!html.includes('<details class="prompt" open'), html);
 	assert.ok(html.includes('href="claude://code/new?q=Build%20%22this%22%20%26%20that%0A"'), html);
 	assert.ok(html.includes('href="claude-cli://open?q=Build%20%22this%22%20%26%20that%0A"'), html);
 });
