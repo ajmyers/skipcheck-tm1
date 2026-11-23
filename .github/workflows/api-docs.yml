@@ -1,6 +1,7 @@
 # Publish the Java API docs and the guide to skipcheck.io/projects/ (see api-site/README.md).
 #
-#   Pull request: builds the themed Javadoc and bundles the Worker; deploys nothing.
+#   Every change: tests the Worker, builds the themed Javadoc and bundles the Worker; deploys
+#                 nothing. It runs as part of CI (ci.yml calls it), under the required ci-ok check.
 #   Tag v1.2.3:   deploys that version's docs, alongside the Maven Central release. The release
 #                 workflow calls this one for a tag, after its gate: a tag doesn't start it
 #                 directly, or docs would ship for a release that didn't.
@@ -12,19 +13,21 @@
 name: API Docs
 
 on:
+  # ci.yml calls this for every change: it tests the Worker, builds the site and bundles the
+  # Worker, and deploys nothing. release.yml calls it for a tag, with deploy
   workflow_call:
-  pull_request:
-    paths:
-      - 'api-site/**'
-      # The guide's prose is the Java types' Javadoc, and its examples are each language's
-      - 'java/**'
-      - 'python/**/examples/**'
-      - 'dotnet/examples/**'
-      - 'typescript/**/examples/**'
-      - 'build-logic/**'
-      - 'gradle.properties'
-      - '.github/workflows/api-docs.yml'
+    inputs:
+      deploy:
+        description: Deploy the site, rather than only build it and bundle the Worker
+        type: boolean
+        default: false
+  # By hand, it deploys the chosen branch
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy the site, rather than only build it and bundle the Worker
+        type: boolean
+        default: true
 
 concurrency:
   group: api-docs-${{ github.ref }}
@@ -44,6 +47,14 @@ jobs:
           java-version: '27'
       - uses: gradle/actions/setup-gradle@v6
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Test the Worker
+        working-directory: api-site
+        run: npm test
+
       - name: Build the themed Javadoc
         run: |
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
@@ -59,12 +70,12 @@ jobs:
           npm run assemble
 
       - name: Bundle the Worker (no deploy)
-        if: github.event_name == 'pull_request'
+        if: ${{ !inputs.deploy }}
         working-directory: api-site
         run: npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker"
 
       - name: Deploy
-        if: github.event_name != 'pull_request'
+        if: ${{ inputs.deploy }}
         working-directory: api-site
         run: npx wrangler deploy
         env:

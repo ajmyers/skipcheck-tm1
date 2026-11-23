@@ -152,6 +152,11 @@ jobs:
           cache-dependency-path: typescript/package-lock.json
       - run: ./gradlew packageTest
 
+  # The API docs site (api-site/): the Worker's tests, the site built from the themed Javadoc and
+  # each language's examples, and the Worker bundled. Nothing is deployed from here
+  api-site:
+    uses: ./.github/workflows/api-docs.yml
+
   # The scripts under docker/, which have workflows of their own. They run on every change, not
   # only one to their folder: a required check can't wait for a workflow that didn't start, and
   # each takes under a minute
@@ -166,7 +171,7 @@ jobs:
   # would count as passing. A new job goes in its needs.
   ci-ok:
     if: always()
-    needs: [build, license, python, dotnet, typescript, scripts, packages, paw, setup-scripts]
+    needs: [build, license, python, dotnet, typescript, scripts, packages, api-site, paw, setup-scripts]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
