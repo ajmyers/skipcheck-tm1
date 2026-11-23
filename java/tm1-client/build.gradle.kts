@@ -81,7 +81,7 @@ sourceSets.main {
 }
 
 // The language-neutral API spec, which ApiSpecInventoryTest holds to this client's coverage gate
-tasks.test {
+tasks.withType<Test>().configureEach {
 	val spec = rootDir.resolve("spec/tm1-api.json")
 	systemProperty("tm1.spec", spec.path)
 	inputs.file(spec).withPathSensitivity(PathSensitivity.RELATIVE)
@@ -94,4 +94,19 @@ tasks.test {
 	if (record) {
 		outputs.upToDateWhen { false }
 	}
+}
+
+// The tests against a real TM1 on their own (the *Tm1Test classes), for ./gradlew liveTest: test
+// runs them too when a TM1 is configured, among the rest. Never up to date: Gradle doesn't know
+// the TM1 it talks to is an input.
+tasks.register<Test>("liveTest") {
+	group = "verification"
+	description = "Runs the tests against a real TM1 (the *Tm1Test classes)."
+	testClassesDirs = sourceSets.test.get().output.classesDirs
+	classpath = sourceSets.test.get().runtimeClasspath
+	filter {
+		includeTestsMatching("*Tm1Test")
+	}
+	outputs.upToDateWhen { false }
+	dependsOn(":liveTestPrepare")
 }
