@@ -1,0 +1,6 @@
+{
+  "name": "skipcheck-package-test",
+  "private": true,
+  "description": "An empty project the packed @skipcheck packages are installed into (see ../README.md)",
+  "type": "module"
+}

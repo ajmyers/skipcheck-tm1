@@ -48,3 +48,15 @@ mavenPublishing {
 		}
 	}
 }
+
+// A repository in the build folder (build/packages/maven), for the package test: it publishes
+// every module there as a release would publish it to Central, then builds an application that
+// takes them from it (package-tests/java, ./gradlew packageTestJava).
+publishing {
+	repositories {
+		maven {
+			name = "packageTest"
+			url = uri(rootProject.layout.buildDirectory.dir("packages/maven"))
+		}
+	}
+}

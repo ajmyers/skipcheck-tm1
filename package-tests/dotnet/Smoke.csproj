@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- An application that uses the packed Skipcheck.Tm1.* packages, as one that got them from
+       nuget.org would (see ../README.md). nuget.config beside it takes them from
+       build/packages/dotnet only, so the floating version is whatever was just packed. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Skipcheck.Tm1.Client" Version="*-*" />
+    <PackageReference Include="Skipcheck.Tm1.Testcontainers" Version="*-*" />
+  </ItemGroup>
+</Project>
