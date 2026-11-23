@@ -16,6 +16,12 @@ Start a real TM1 server for your tests, shared across the test run, and skipped 
 
 Next: [test classes in full](docs/RequiresTm1.html), and skipping by TM1 version; [a server of your own](docs/Tm1ServerContainer.html), with the sample data or your own database; and [whole environments](docs/PlanningAnalyticsEnvironment.html), with several servers, TM1 Web, Workspace and Cognos security together.
 
+## Walkthroughs
+
+Step by step, with the code in your language:
+
+::walkthroughs
+
 ## What's in it
 
 - **One server per test run:** started on first use, handed to each test that asks for it, and skipped, not failed, when it can't start. In Java that is the `@RequiresTm1` annotation; the other languages have the same as a fixture.

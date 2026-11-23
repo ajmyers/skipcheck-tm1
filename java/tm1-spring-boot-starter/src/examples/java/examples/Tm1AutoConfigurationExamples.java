@@ -19,10 +19,7 @@ import reactor.core.publisher.Flux;
 final class Tm1AutoConfigurationExamples {
 
 	// @start region = inject
-	// In application.properties:
-	// tm1.address=http://tm1:8010
-	// tm1.user=reporting
-	// tm1.password=${TM1_PASSWORD}
+	// Its settings are tm1.address, tm1.user and tm1.password, in application.yml
 	@Service
 	static class SalesCubes {
 
