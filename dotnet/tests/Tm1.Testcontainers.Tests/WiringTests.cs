@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -270,6 +271,92 @@ public class PlanningAnalyticsEnvironmentTests
         var env = Builder().Tm1("a").Build();
         Assert.Contains("Tm1Web()", Assert.Throws<InvalidOperationException>(env.Tm1Web).Message);
         Assert.Contains("[a]", Assert.Throws<ArgumentException>(() => env.Tm1("b")).Message);
+    }
+
+    private static string Fixture(string name) => Path.Combine(Repo.Root, "spec", "conformance", "pa-environment", name);
+
+    [Fact]
+    public void FromConfigBuildsTheExampleWithEverything()
+    {
+        var env = PlanningAnalyticsEnvironment
+            .FromConfig(Path.Combine(Repo.Root, "docker", "pa-setup", "examples", "everything.yaml"))
+            .Tm1Source(new Tm1Source.PrivateImage("tm1-server:test"))
+            .Tm1WebSource(new Tm1WebSource.PrivateImage("tm1-web:test"))
+            .CognosSource(new CognosSource.PrivateImage("cognos-server:test"))
+            .Build();
+        Assert.Equal(["planning", "reporting"], env.Tm1Servers.Keys);
+        Assert.Equal("sdata", env.Tm1("planning").EnvMap["TM1_SEED"]);
+        Assert.Equal("empty", env.Tm1("reporting").EnvMap["TM1_SEED"]);
+        Assert.NotNull(env.AdminServer);
+        Assert.Equal("1g", env.Tm1Web().EnvMap["TM1_WEB_HEAP"]);
+        Assert.Equal(["admin", "analyst", "viewer"], env.Cognos().Users.Select(u => u.Name));
+        Assert.Equal(["Analysts", "Readers"], env.Cognos().GetUser("analyst").Groups);
+        Assert.Equal("6144", env.Cognos().EnvMap["COGNOS_MAX_MEMORY"]);
+        Assert.Same(env.Keycloak(), env.Cognos().Keycloak);
+        // The sources set on the builder win over the file's ibm folder
+        Assert.Equal(new Tm1Source.PrivateImage("tm1-server:test"), env.Tm1("planning").Source);
+        var planning = env.Tm1("planning");
+        planning.Configure();
+        Assert.Equal("LDAP", planning.EnvMap["TM1_CAM_NAMESPACE"]);
+        Assert.Equal("admin", planning.EnvMap["TM1_CAM_ADMINS"]);
+        Assert.Equal("Admins Analysts Readers", planning.EnvMap["TM1_CAM_GROUPS"]);
+    }
+
+    [Fact]
+    public void FromConfigMapsEverySetting()
+    {
+        var env = PlanningAnalyticsEnvironment.FromConfig(Fixture("settings.yaml")).Build();
+        var ibm = Path.GetFullPath(Fixture("ibm"));
+        var planning = env.Tm1("planning");
+        Assert.Equal("sdata", planning.EnvMap["TM1_SEED"]);
+        Assert.Equal("4", planning.EnvMap["TM1_CFG_MaxThreads"]);
+        Assert.Equal("True", planning.EnvMap["TM1_CFG_EnableNewHierarchyCreation"]);
+        Assert.Equal("Measures", planning.EnvMap["TM1_CFG_DefaultMeasuresDimension"]);
+        // adminServer: true, with one server
+        Assert.NotNull(env.AdminServer);
+        Assert.Same(env.AdminServer, planning.AdminServer);
+        Assert.Equal("2g", env.Tm1Web().EnvMap["TM1_WEB_HEAP"]);
+        Assert.Equal(["Admins", "Planners"], env.Cognos().GetUser("boss").Groups);
+        Assert.Equal("8192", env.Cognos().EnvMap["COGNOS_MAX_MEMORY"]);
+        planning.Configure();
+        Assert.Equal("OIDC", planning.EnvMap["TM1_CAM_NAMESPACE"]);
+        Assert.Equal("boss", planning.EnvMap["TM1_CAM_ADMINS"]);
+        // ibm is every part's source; images are what they run
+        Assert.Equal(new Tm1Source.Bundle(ibm), planning.Source);
+        Assert.Equal(new Tm1WebSource.Bundle(ibm), env.Tm1Web().Source);
+        Assert.Equal(new CognosSource.Zip(ibm), env.Cognos().Source);
+        Assert.Equal("registry.example.com/tm1-server:local", planning.DockerImageName);
+        Assert.Equal("registry.example.com/tm1-server:local", env.AdminServer.DockerImageName);
+        Assert.Equal("registry.example.com/tm1-web:local", env.Tm1Web().DockerImageName);
+        Assert.Equal("registry.example.com/cognos-server:local", env.Cognos().DockerImageName);
+        Assert.Equal("registry.example.com/keycloak:26", env.Keycloak().DockerImageName);
+    }
+
+    [Fact]
+    public void FromConfigRunsPawFromTheIbmFolder()
+    {
+        var env = PlanningAnalyticsEnvironment.FromConfig(Fixture("paw.yaml")).Build();
+        var ibm = Path.GetFullPath(Fixture("ibm"));
+        Assert.Equal(new PawSource(Path.Combine(ibm, "ipa_workspace_local_0.0.0.zip")), env.Paw().Source);
+        Assert.True(env.Paw().LicenseAccepted);
+        Assert.Same(env.Tm1("tm1"), env.Paw().Tm1Server);
+        Assert.Null(env.AdminServer);
+    }
+
+    [Fact]
+    public void FromConfigRefusesWhatItCannotRun()
+    {
+        var invalid = Directory.GetFiles(Fixture("invalid"), "*.yaml").Order(StringComparer.Ordinal).ToList();
+        Assert.NotEmpty(invalid);
+        foreach (var file in invalid)
+        {
+            var first = File.ReadLines(file).First();
+            Assert.True(first.StartsWith("# error: ", StringComparison.Ordinal), file);
+            var message = Assert.Throws<ArgumentException>(() => PlanningAnalyticsEnvironment.FromConfig(file)).Message;
+            Assert.True(message.StartsWith(Path.GetFileName(file) + ": ", StringComparison.Ordinal), file + ": " + message);
+            Assert.True(message.Contains(first["# error: ".Length..], StringComparison.Ordinal), file + ": " + message);
+        }
+        Assert.Contains("not found", Assert.Throws<ArgumentException>(() => PlanningAnalyticsEnvironment.FromConfig(Fixture("missing.yaml"))).Message);
     }
 
     private static PlanningAnalyticsEnvironment.EnvironmentBuilder Builder() =>

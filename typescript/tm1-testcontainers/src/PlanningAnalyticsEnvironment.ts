@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { join } from "node:path";
 import { CognosContainer } from "./CognosContainer.js";
 import { CognosSource } from "./CognosSource.js";
 import type { Startable } from "./GenericContainer.js";
 import { KeycloakContainer } from "./KeycloakContainer.js";
 import { Messages } from "./messages.js";
+import { readPaEnvironment, type FileSources } from "./PaEnvironmentFile.js";
 import { Network } from "./Network.js";
 import { PawContainer } from "./PawContainer.js";
 import { PawSource } from "./PawSource.js";
-import { IllegalArgumentException, IllegalStateException } from "./settings.js";
+import { IllegalArgumentException, IllegalStateException, Settings } from "./settings.js";
 import { Tm1AdminServerContainer } from "./Tm1AdminServerContainer.js";
 import { Tm1ServerContainer } from "./Tm1ServerContainer.js";
 import { Tm1Source } from "./Tm1Source.js";
@@ -59,19 +61,44 @@ export class PlanningAnalyticsEnvironment implements Startable {
   constructor(parts: BuilderParts, network: Network) {
     this.#network = network;
     this.#ownsNetwork = parts.network === undefined;
-    this.#keycloak = parts.keycloak === undefined ? undefined : new KeycloakContainer().withNetwork(network);
+    this.#keycloak = parts.keycloak === undefined ? undefined : new KeycloakContainer(parts.keycloakImage).withNetwork(network);
     if (parts.cognos !== undefined) {
-      const cognos = new CognosContainer(get(parts.cognosSource, () => CognosSource.discover(), Messages.COGNOS_NO_SOURCE)).withNetwork(network);
+      const source = get(
+        parts,
+        parts.cognosSource,
+        (ibm) => new CognosSource.Zip(ibm),
+        () => CognosSource.discover(),
+        (image) => new CognosSource.PrivateImage(image),
+        parts.cognosImage,
+        Messages.COGNOS_NO_SOURCE,
+      );
+      const image = runs(parts.cognosImage, source instanceof CognosSource.PrivateImage);
+      const cognos = (image !== undefined ? new CognosContainer(image, source) : new CognosContainer(source)).withNetwork(network);
       if (this.#keycloak) cognos.withKeycloak(this.#keycloak);
       // First: the TM1 servers' CAM security is wired from the test users
       parts.cognos(cognos);
       this.#cognos = cognos;
     }
-    const tm1Source = get(parts.tm1Source, () => Tm1Source.discover(), Messages.TM1_NO_SOURCE);
-    this.#adminServer = parts.adminServer !== undefined || parts.tm1.size > 1 ? new Tm1AdminServerContainer(tm1Source).withNetwork(network) : undefined;
+    const tm1Source = get(
+      parts,
+      parts.tm1Source,
+      (ibm) => new Tm1Source.Bundle(ibm),
+      () => Tm1Source.discover(),
+      (image) => new Tm1Source.PrivateImage(image),
+      parts.tm1Image,
+      Messages.TM1_NO_SOURCE,
+    );
+    const tm1Image = runs(parts.tm1Image, tm1Source instanceof Tm1Source.PrivateImage);
+    this.#adminServer =
+      parts.adminServer !== undefined || parts.tm1.size > 1
+        ? (tm1Image !== undefined ? new Tm1AdminServerContainer(tm1Image, tm1Source) : new Tm1AdminServerContainer(tm1Source)).withNetwork(network)
+        : undefined;
     const servers = new Map<string, Tm1ServerContainer>();
     for (const name of parts.tm1.keys()) {
-      const server = new Tm1ServerContainer(tm1Source).withNetwork(network).withNetworkAliases(name).withEnv("TM1_SERVER_NAME", name);
+      const server = (tm1Image !== undefined ? new Tm1ServerContainer(tm1Image, tm1Source) : new Tm1ServerContainer(tm1Source))
+        .withNetwork(network)
+        .withNetworkAliases(name)
+        .withEnv("TM1_SERVER_NAME", name);
       if (this.#adminServer) server.withAdminServer(this.#adminServer);
       if (this.#cognos) server.withCamSecurity(this.#cognos, parts.camNamespace, ...camAdmins(parts, this.#cognos));
       servers.set(name, server);
@@ -79,14 +106,34 @@ export class PlanningAnalyticsEnvironment implements Startable {
     this.#tm1Servers = servers;
     const first = servers.values().next().value!;
     if (parts.tm1Web !== undefined) {
-      const web = new Tm1WebContainer(get(parts.tm1WebSource, () => Tm1WebSource.discover(), Messages.TM1_WEB_NO_SOURCE)).withTm1Server(first);
+      const source = get(
+        parts,
+        parts.tm1WebSource,
+        (ibm) => new Tm1WebSource.Bundle(ibm),
+        () => Tm1WebSource.discover(),
+        (image) => new Tm1WebSource.PrivateImage(image),
+        parts.tm1WebImage,
+        Messages.TM1_WEB_NO_SOURCE,
+      );
+      const image = runs(parts.tm1WebImage, source instanceof Tm1WebSource.PrivateImage);
+      const web = (image !== undefined ? new Tm1WebContainer(image, source) : new Tm1WebContainer(source)).withTm1Server(first);
       if (this.#adminServer) web.withAdminServer(this.#adminServer);
       // List every server: start them all before TM1 Web
       for (const server of servers.values()) web.dependsOn(server);
       this.#tm1Web = web;
     }
     if (parts.paw !== undefined) {
-      const paw = new PawContainer(get(parts.pawSource, () => PawSource.discover(), Messages.PAW_NO_SOURCE)).withTm1Server(first);
+      const paw = new PawContainer(
+        get(
+          parts,
+          parts.pawSource,
+          (ibm) => pawFromIbm(ibm, parts.pawZip),
+          () => PawSource.discover(),
+          undefined,
+          undefined,
+          Messages.PAW_NO_SOURCE,
+        ),
+      ).withTm1Server(first);
       if (this.#adminServer) paw.withAdminServer(this.#adminServer);
       this.#paw = paw;
     }
@@ -101,6 +148,61 @@ export class PlanningAnalyticsEnvironment implements Startable {
   /** A builder for an environment. */
   static builder(): PlanningAnalyticsEnvironment.Builder {
     return new PlanningAnalyticsEnvironment.Builder();
+  }
+
+  /** Starts building the environment a `pa-environment.yaml` describes, the file `pa-setup` reads
+   * (`docker/pa-setup`), so tests run what developers run. The file is checked as `pa-setup`
+   * checks it, with its defaults. The builder comes back configured; change it further, or call
+   * {@link PlanningAnalyticsEnvironment.Builder.build}:
+   *
+   * ```ts
+   * await using env = PlanningAnalyticsEnvironment.fromConfig("pa-environment.yaml").build();
+   * await env.start();
+   * env.tm1("planning").getRestUrl();
+   * ```
+   *
+   * How each setting maps:
+   * - `tm1.servers.<name>`: {@link PlanningAnalyticsEnvironment.Builder.tm1}, with `seed` as
+   *   {@link Tm1ServerContainer.withSeed} and each `cfg` parameter as `TM1_CFG_<name>`, written as
+   *   `pa-setup` writes it (`true` is `True`);
+   * - `tm1.adminServer`: {@link PlanningAnalyticsEnvironment.Builder.adminServer}; with more than
+   *   one server there's one anyway, and `false` then fails, as in `pa-setup`;
+   * - `tm1Web`: {@link PlanningAnalyticsEnvironment.Builder.tm1Web}, with `heap` as `TM1_WEB_HEAP`
+   *   (`1g`);
+   * - `cognos`: {@link PlanningAnalyticsEnvironment.Builder.cognos}, with `users` as
+   *   {@link CognosContainer.withUser} and `memory` as `COGNOS_MAX_MEMORY` (`6144`); `oidc` adds
+   *   {@link PlanningAnalyticsEnvironment.Builder.keycloak}; `cam` is
+   *   {@link PlanningAnalyticsEnvironment.Builder.camSecurity}, by default LDAP with the first user
+   *   as administrator;
+   * - `paw`: {@link PlanningAnalyticsEnvironment.Builder.paw} with {@link PawContainer.acceptLicense},
+   *   which the file must say (`acceptLicense: true`); the zip is `zip` in `ibm`, or the newest
+   *   there;
+   * - `ibm`: each part's source, the folder as {@link Tm1Source.Bundle}, {@link Tm1WebSource.Bundle}
+   *   and {@link CognosSource.Zip}. A relative path is from the file's folder; `~` is the user's
+   *   home;
+   * - `images`: the image each part runs, as a container's `image` argument. A part with no other
+   *   source takes its image as the private image with IBM's software built in
+   *   ({@link Tm1Source.PrivateImage} and the like).
+   *
+   * A part's source is the one set on the builder, else `ibm`, else what `discover()` finds (the
+   * variables pa-setup's `.env` sets, such as `TM1_BUNDLE_URL`), else its image as a private
+   * image.
+   *
+   * Ignored, because they place things on the host that Testcontainers manages itself: `name` (the
+   * compose project; the environment has its own network), every `port`, `adminPort` and
+   * `keycloakPort` (Testcontainers maps random host ports), and `files` (the host folder pa-setup
+   * keeps databases in; each test environment starts from a new database, or one copied in with
+   * {@link Tm1ServerContainer.withData}). They're still checked as `pa-setup` checks them.
+   *
+   * Refused, because the environment can't run them yet: `cognos` without `tm1.servers`, `paw`
+   * with `cognos`, and `seed: 24retail`.
+   * @param path the file, usually `pa-environment.yaml`
+   * @returns a builder configured from the file
+   * @throws IllegalArgumentException if the file can't be read, isn't valid, or asks for what the
+   * environment can't run; the message names the setting */
+  static fromConfig(path: string): PlanningAnalyticsEnvironment.Builder {
+    if (typeof path !== "string") throw new TypeError("path must be a string");
+    return readPaEnvironment(path, new PlanningAnalyticsEnvironment.Builder());
   }
 
   /** Starts everything, what's depended on first and in parallel where it can, then PAW. */
@@ -219,6 +321,19 @@ export interface BuilderParts {
   cognosSource?: CognosSource;
   /** The network the containers share, if given rather than made. */
   network?: Network;
+  /** From pa-environment.yaml ({@link PlanningAnalyticsEnvironment.fromConfig}): the IBM downloads
+   * folder, absolute. */
+  ibm?: string;
+  /** PAW's zip in {@link ibm}, or `undefined` for the newest there. */
+  pawZip?: string;
+  /** The TM1 servers' and Admin Server's image, from pa-environment.yaml. */
+  tm1Image?: string;
+  /** TM1 Web's image, from pa-environment.yaml. */
+  tm1WebImage?: string;
+  /** Cognos's image, from pa-environment.yaml. */
+  cognosImage?: string;
+  /** Keycloak's image, from pa-environment.yaml. */
+  keycloakImage?: string;
 }
 
 const SERVER_NAME = /^[A-Za-z0-9_-]+$/;
@@ -310,6 +425,13 @@ export namespace PlanningAnalyticsEnvironment {
       return this;
     }
 
+    /** The sources and images read from pa-environment.yaml.
+     * @internal */
+    withFileSources(sources: FileSources): this {
+      Object.assign(this.#parts, sources);
+      return this;
+    }
+
     /** The environment, wired.
      * @throws IllegalStateException if parts are missing, or don't go together */
     build(): PlanningAnalyticsEnvironment {
@@ -333,9 +455,38 @@ function camAdmins(parts: BuilderParts, cognos: CognosContainer): string[] {
   return [users[0]!.name];
 }
 
-function get<T>(configured: T | undefined, discover: () => T | undefined, message: string): T {
-  const found = configured ?? discover();
-  if (found === undefined) throw new IllegalStateException(message);
+/** A part's source: the one set on the builder, else the file's `ibm` folder, else what
+ * `discover` finds, else the file's image as a private image. */
+function get<T>(
+  parts: BuilderParts,
+  configured: T | undefined,
+  fromIbm: (ibm: string) => T,
+  discover: () => T | undefined,
+  privateImage: ((image: string) => T) | undefined,
+  image: string | undefined,
+  message: string,
+): T {
+  if (configured !== undefined) return configured;
+  if (parts.ibm !== undefined) {
+    if (!Settings.isDirectory(parts.ibm)) throw new IllegalStateException("ibm in pa-environment.yaml isn't a folder: " + parts.ibm);
+    return fromIbm(parts.ibm);
+  }
+  const found = discover();
+  if (found !== undefined) return found;
+  if (privateImage !== undefined && image !== undefined) return privateImage(image);
+  throw new IllegalStateException(message);
+}
+
+/** The image a part runs from pa-setup's image setting: none when its source is a private image,
+ * which is the image. */
+function runs(image: string | undefined, privateImage: boolean): string | undefined {
+  return privateImage ? undefined : image;
+}
+
+function pawFromIbm(ibm: string, pawZip: string | undefined): PawSource {
+  if (pawZip !== undefined) return new PawSource(join(ibm, pawZip));
+  const found = PawSource.discover((name) => (name === PawSource.BUNDLE_DIR ? ibm : undefined));
+  if (found === undefined) throw new IllegalStateException("No PAW Local zip in " + ibm);
   return found;
 }
 

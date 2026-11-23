@@ -1,0 +1,7 @@
+# error: paw: PlanningAnalyticsEnvironment can't run PAW with Cognos (CAM) security yet
+# pa-setup: accepts
+version: 1
+ibm: ../ibm
+tm1: { servers: { tm1: {} } }
+cognos: { users: [admin:adminpw] }
+paw: { acceptLicense: true }

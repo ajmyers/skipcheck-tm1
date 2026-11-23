@@ -1,0 +1,7 @@
+# error: several servers need a shared Admin Server
+version: 1
+tm1:
+  servers:
+    planning: {}
+    reporting: {}
+  adminServer: false

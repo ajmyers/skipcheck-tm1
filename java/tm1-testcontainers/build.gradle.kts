@@ -22,6 +22,18 @@ dependencies {
 	// @RequiresTm1 is a JUnit Jupiter extension
 	api(platform(libs.junit.bom))
 	api(libs.junit.jupiter.api)
+	// PlanningAnalyticsEnvironment.fromConfig reads pa-setup's pa-environment.yaml
+	implementation(libs.snakeyaml)
+}
+
+// The pa-environment.yaml files fromConfig's tests read, shared with the other clients
+tasks.withType<Test>().configureEach {
+	val fixtures = rootDir.resolve("spec/conformance/pa-environment")
+	val examples = rootDir.resolve("docker/pa-setup/examples")
+	systemProperty("tm1.paEnvironment.fixtures", fixtures.path)
+	systemProperty("tm1.paEnvironment.examples", examples.path)
+	inputs.dir(fixtures).withPathSensitivity(PathSensitivity.RELATIVE)
+	inputs.dir(examples).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 // The default image tag follows the library version, so record it in the jar.

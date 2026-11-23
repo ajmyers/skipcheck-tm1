@@ -66,4 +66,11 @@ export const Repo = {
   get pawScript(): string {
     return join(this.root, "docker", "paw", "paw-local.sh");
   },
+  /** The pa-environment.yaml files fromConfig's tests read, shared with the other clients. */
+  get paEnvironmentFixtures(): string {
+    return join(this.root, "spec", "conformance", "pa-environment");
+  },
+  get paEnvironmentExamples(): string {
+    return join(this.root, "docker", "pa-setup", "examples");
+  },
 };

@@ -1,0 +1,7 @@
+# PAW, from the PAW Local zip in the ibm folder.
+version: 1
+ibm: ibm
+tm1:
+  servers:
+    tm1: {}
+paw: { port: 8801, acceptLicense: true, zip: ipa_workspace_local_0.0.0.zip }

@@ -1,0 +1,6 @@
+# error: cognos.cam.admins: boss isn't one of cognos.users
+version: 1
+tm1: { servers: { tm1: {} } }
+cognos:
+  users: [admin:adminpw]
+  cam: { admins: [boss] }

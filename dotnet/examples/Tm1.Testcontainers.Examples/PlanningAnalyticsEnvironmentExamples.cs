@@ -49,4 +49,14 @@ public static class PlanningAnalyticsEnvironmentExamples
         return await viewer.Cubes.ModelCubesAsync(ODataQuery.None().Select(Cube.Fields.Name)).Select(cube => cube.Name!).ToListAsync();
         // @end
     }
+
+    public static async Task<string> FromConfig()
+    {
+        // @start region = file
+        // The environment pa-setup runs from the same file, with random host ports
+        await using var env = PlanningAnalyticsEnvironment.FromConfig("pa-environment.yaml").Build();
+        await env.StartAsync();
+        return env.Tm1("planning").RestUrl;
+        // @end
+    }
 }

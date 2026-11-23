@@ -108,6 +108,9 @@ public class PawContainer : IStartable
         return this;
     }
 
+    /// <summary>Whether <see cref="AcceptLicense"/> or <c>PAW_ACCEPT_LICENSE=true</c> accepted IBM's license.</summary>
+    internal bool LicenseAccepted => licenseAccepted;
+
     /// <summary>Sets a <c>paw-local.sh</c> setting.</summary>
     /// <exception cref="ArgumentException">It doesn't start with <c>PAW_</c>.</exception>
     public PawContainer WithSetting(string name, string value)

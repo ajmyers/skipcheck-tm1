@@ -143,6 +143,10 @@ class PawContainer:
         self._license_accepted = True
         return self
 
+    def _is_license_accepted(self) -> bool:
+        """Whether :meth:`accept_license` or ``PAW_ACCEPT_LICENSE=true`` accepted IBM's license."""
+        return self._license_accepted
+
     def with_setting(self, name: str, value: str) -> Self:
         """A ``paw-local.sh`` setting (``PAW_…``)."""
         if not name.startswith("PAW_"):

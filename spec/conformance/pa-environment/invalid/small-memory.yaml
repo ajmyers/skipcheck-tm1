@@ -1,0 +1,4 @@
+# error: cognos.memory: the dispatcher heap in MB, at least 2048
+version: 1
+tm1: { servers: { tm1: {} } }
+cognos: { users: [admin:adminpw], memory: 1024 }

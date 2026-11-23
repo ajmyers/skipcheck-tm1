@@ -1,0 +1,6 @@
+# error: cognos.users[0]: user name
+version: 1
+tm1: { servers: { tm1: {} } }
+cognos:
+  users:
+    - { password: adminpw }

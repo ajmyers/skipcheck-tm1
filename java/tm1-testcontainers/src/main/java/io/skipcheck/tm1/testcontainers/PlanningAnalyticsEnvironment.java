@@ -2,6 +2,8 @@
 
 package io.skipcheck.tm1.testcontainers;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -10,12 +12,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.jspecify.annotations.Nullable;
 import org.testcontainers.containers.Network;
 import org.testcontainers.lifecycle.Startable;
 import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.utility.DockerImageName;
 
 import io.skipcheck.tm1.testcontainers.CognosContainer.Namespace;
 
@@ -82,11 +86,16 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 	private PlanningAnalyticsEnvironment(Builder b, Network network) {
 		this.network = network;
 		this.ownsNetwork = b.network == null;
-		this.keycloak = b.keycloak == null ? null : new KeycloakContainer().withNetwork(network);
+		this.keycloak = b.keycloak == null ? null : (b.keycloakImage == null ? new KeycloakContainer()
+				: new KeycloakContainer(DockerImageName.parse(b.keycloakImage)))
+			.withNetwork(network);
 		CognosContainer cognos = null;
 		if (b.cognos != null) {
-			cognos = new CognosContainer(
-					b.get(b.cognosSource, CognosSource::discover, RequiresCognos.NO_SOURCE_MESSAGE))
+			CognosSource source = b.get(b.cognosSource, ibm -> new CognosSource.Zip(ibm, null), CognosSource::discover,
+					CognosSource.PrivateImage::new, b.cognosImage, RequiresCognos.NO_SOURCE_MESSAGE);
+			cognos = (runs(b.cognosImage, source instanceof CognosSource.PrivateImage)
+					? new CognosContainer(image(b.cognosImage, CognosContainer.DEFAULT_IMAGE), source)
+					: new CognosContainer(source))
 				.withNetwork(network);
 			if (keycloak != null) {
 				cognos.withKeycloak(keycloak);
@@ -95,12 +104,19 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 			b.cognos.accept(cognos);
 		}
 		this.cognos = cognos;
-		Tm1Source tm1Source = b.get(b.tm1Source, Tm1Source::discover, RequiresTm1.NO_SOURCE_MESSAGE);
-		this.adminServer = b.adminServer != null || b.tm1.size() > 1
-				? new Tm1AdminServerContainer(tm1Source).withNetwork(network) : null;
+		Tm1Source tm1Source = b.get(b.tm1Source, ibm -> new Tm1Source.Bundle(ibm, null), Tm1Source::discover,
+				Tm1Source.PrivateImage::new, b.tm1Image, RequiresTm1.NO_SOURCE_MESSAGE);
+		boolean tm1Image = runs(b.tm1Image, tm1Source instanceof Tm1Source.PrivateImage);
+		this.adminServer = b.adminServer != null || b.tm1.size() > 1 ? (tm1Image
+				? new Tm1AdminServerContainer(image(b.tm1Image, Tm1ServerContainer.DEFAULT_IMAGE), tm1Source)
+				: new Tm1AdminServerContainer(tm1Source))
+			.withNetwork(network) : null;
 		Map<String, Tm1ServerContainer> servers = new LinkedHashMap<>();
 		for (String name : b.tm1.keySet()) {
-			Tm1ServerContainer server = new Tm1ServerContainer(tm1Source).withNetwork(network)
+			Tm1ServerContainer server = (tm1Image
+					? new Tm1ServerContainer(image(b.tm1Image, Tm1ServerContainer.DEFAULT_IMAGE), tm1Source)
+					: new Tm1ServerContainer(tm1Source))
+				.withNetwork(network)
 				.withNetworkAliases(name)
 				.withEnv("TM1_SERVER_NAME", name);
 			if (adminServer != null) {
@@ -115,7 +131,12 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		Tm1ServerContainer first = servers.values().iterator().next();
 		Tm1WebContainer web = null;
 		if (b.tm1Web != null) {
-			web = new Tm1WebContainer(b.get(b.tm1WebSource, Tm1WebSource::discover, RequiresTm1Web.NO_SOURCE_MESSAGE))
+			Tm1WebSource source = b.get(b.tm1WebSource, ibm -> new Tm1WebSource.Bundle(ibm, null),
+					Tm1WebSource::discover, Tm1WebSource.PrivateImage::new, b.tm1WebImage,
+					RequiresTm1Web.NO_SOURCE_MESSAGE);
+			web = (runs(b.tm1WebImage, source instanceof Tm1WebSource.PrivateImage)
+					? new Tm1WebContainer(image(b.tm1WebImage, Tm1WebContainer.DEFAULT_IMAGE), source)
+					: new Tm1WebContainer(source))
 				.withTm1Server(first);
 			if (adminServer != null) {
 				web.withAdminServer(adminServer);
@@ -128,7 +149,8 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		this.tm1Web = web;
 		PawContainer paw = null;
 		if (b.paw != null) {
-			paw = new PawContainer(b.get(b.pawSource, PawSource::discover, RequiresPaw.NO_SOURCE_MESSAGE))
+			paw = new PawContainer(
+					b.get(b.pawSource, b::pawFromIbm, PawSource::discover, null, null, RequiresPaw.NO_SOURCE_MESSAGE))
 				.withTm1Server(first);
 			if (adminServer != null) {
 				paw.withAdminServer(adminServer);
@@ -150,6 +172,66 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 	 */
 	public static Builder builder() {
 		return new Builder();
+	}
+
+	/**
+	 * Starts building the environment a {@code pa-environment.yaml} describes, the file
+	 * {@code pa-setup} reads ({@code docker/pa-setup}), so tests run what developers run.
+	 * The file is checked as {@code pa-setup} checks it, with its defaults. The builder
+	 * comes back configured; change it further, or call {@link Builder#build()}:
+	 *
+	 * {@snippet class = examples.PlanningAnalyticsEnvironmentExamples region = file}
+	 *
+	 * <p>
+	 * How each setting maps:
+	 * <ul>
+	 * <li>{@code tm1.servers.<name>}: {@link Builder#tm1(String, Consumer)}, with
+	 * {@code seed} as {@link Tm1ServerContainer#withSeed} and each {@code cfg} parameter
+	 * as {@code TM1_CFG_<name>}, written as {@code pa-setup} writes it ({@code true} is
+	 * {@code True});
+	 * <li>{@code tm1.adminServer}: {@link Builder#adminServer()}; with more than one
+	 * server there's one anyway, and {@code false} then fails, as in {@code pa-setup};
+	 * <li>{@code tm1Web}: {@link Builder#tm1Web()}, with {@code heap} as
+	 * {@code TM1_WEB_HEAP} ({@code 1g});
+	 * <li>{@code cognos}: {@link Builder#cognos}, with {@code users} as
+	 * {@link CognosContainer#withUser} and {@code memory} as {@code COGNOS_MAX_MEMORY}
+	 * ({@code 6144}); {@code oidc} adds {@link Builder#keycloak()}; {@code cam} is
+	 * {@link Builder#camSecurity}, by default LDAP with the first user as administrator;
+	 * <li>{@code paw}: {@link Builder#paw} with {@link PawContainer#acceptLicense()},
+	 * which the file must say ({@code acceptLicense: true}); the zip is {@code zip} in
+	 * {@code ibm}, or the newest there;
+	 * <li>{@code ibm}: each part's source, the folder as {@link Tm1Source.Bundle},
+	 * {@link Tm1WebSource.Bundle} and {@link CognosSource.Zip}. A relative path is from
+	 * the file's folder; {@code ~} is the user's home;
+	 * <li>{@code images}: the image each part runs, as a container's image argument. A
+	 * part with no other source takes its image as the private image with IBM's software
+	 * built in ({@link Tm1Source.PrivateImage} and the like).
+	 * </ul>
+	 *
+	 * <p>
+	 * A part's source is the one set on the builder, else {@code ibm}, else what
+	 * {@code discover()} finds (the variables pa-setup's {@code .env} sets, such as
+	 * {@code TM1_BUNDLE_URL}), else its image as a private image.
+	 *
+	 * <p>
+	 * Ignored, because they place things on the host that Testcontainers manages itself:
+	 * {@code name} (the compose project; the environment has its own network), every
+	 * {@code port}, {@code adminPort} and {@code keycloakPort} (Testcontainers maps
+	 * random host ports), and {@code files} (the host folder pa-setup keeps databases in;
+	 * each test environment starts from a new database, or one copied in with
+	 * {@link Tm1ServerContainer#withData}). They're still checked as {@code pa-setup}
+	 * checks them.
+	 *
+	 * <p>
+	 * Refused, because the environment can't run them yet: {@code cognos} without
+	 * {@code tm1.servers}, {@code paw} with {@code cognos}, and {@code seed: 24retail}.
+	 * @param path the file, usually {@code pa-environment.yaml}
+	 * @return a builder configured from the file
+	 * @throws IllegalArgumentException if the file can't be read, isn't valid, or asks
+	 * for what the environment can't run; the message names the setting
+	 */
+	public static Builder fromConfig(Path path) {
+		return PaEnvironmentFile.read(Objects.requireNonNull(path, "path"));
 	}
 
 	/**
@@ -276,6 +358,18 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		return all;
 	}
 
+	/**
+	 * Whether a part runs pa-setup's image setting: not when its source is a private
+	 * image, which is the image.
+	 */
+	private static boolean runs(@Nullable String image, boolean privateImage) {
+		return image != null && !privateImage;
+	}
+
+	private static DockerImageName image(@Nullable String image, DockerImageName compatibleWith) {
+		return DockerImageName.parse(Objects.requireNonNull(image, "image")).asCompatibleSubstituteFor(compatibleWith);
+	}
+
 	private static <T> void apply(@Nullable Consumer<T> customizer, @Nullable T part) {
 		if (customizer != null && part != null) {
 			customizer.accept(part);
@@ -317,6 +411,21 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		private @Nullable CognosSource cognosSource;
 
 		private @Nullable Network network;
+
+		// From pa-environment.yaml (fromConfig): the IBM downloads folder, PAW's zip in
+		// it,
+		// and each part's image
+		@Nullable Path ibm;
+
+		@Nullable String pawZip;
+
+		@Nullable String tm1Image;
+
+		@Nullable String tm1WebImage;
+
+		@Nullable String cognosImage;
+
+		@Nullable String keycloakImage;
 
 		private Builder() {
 		}
@@ -536,9 +645,38 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 			return new String[] { users.get(0).name() };
 		}
 
-		private <T> T get(@Nullable T configured, Supplier<Optional<T>> discover, String message) {
-			return configured != null ? configured
-					: discover.get().orElseThrow(() -> new IllegalStateException(message));
+		/**
+		 * A part's source: the one set on the builder, else the file's {@code ibm}
+		 * folder, else what {@code discover} finds, else the file's image as a private
+		 * image.
+		 */
+		private <T> T get(@Nullable T configured, Function<Path, T> fromIbm, Supplier<Optional<T>> discover,
+				@Nullable Function<String, T> privateImage, @Nullable String image, String message) {
+			if (configured != null) {
+				return configured;
+			}
+			if (ibm != null) {
+				if (!Files.isDirectory(ibm)) {
+					throw new IllegalStateException("ibm in pa-environment.yaml isn't a folder: " + ibm);
+				}
+				return fromIbm.apply(ibm);
+			}
+			Optional<T> found = discover.get();
+			if (found.isPresent()) {
+				return found.get();
+			}
+			if (privateImage != null && image != null) {
+				return privateImage.apply(image);
+			}
+			throw new IllegalStateException(message);
+		}
+
+		private PawSource pawFromIbm(Path ibm) {
+			if (pawZip != null) {
+				return new PawSource(ibm.resolve(pawZip));
+			}
+			return PawSource.discover(name -> PawSource.BUNDLE_DIR.equals(name) ? ibm.toString() : null)
+				.orElseThrow(() -> new IllegalStateException("No PAW Local zip in " + ibm));
 		}
 
 	}

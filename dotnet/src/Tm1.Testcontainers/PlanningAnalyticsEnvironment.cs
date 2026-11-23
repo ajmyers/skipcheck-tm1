@@ -2,6 +2,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -34,23 +36,49 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     {
         Network = network;
         ownsNetwork = b.NetworkSet is null;
-        keycloak = b.KeycloakCustomizer is null ? null : new KeycloakContainer().WithNetwork(network);
+        keycloak = b.KeycloakCustomizer is null
+            ? null
+            : (b.KeycloakImage is null ? new KeycloakContainer() : new KeycloakContainer(b.KeycloakImage)).WithNetwork(network);
         if (b.CognosCustomizer is not null)
         {
-            cognos = new CognosContainer(Get(b.CognosSourceSet, CognosSource.Discover, Xunit.RequiresCognosFactAttribute.NoSourceMessage)).WithNetwork(network);
+            var source = b.Get(
+                b.CognosSourceSet,
+                ibm => new CognosSource.Zip(ibm),
+                CognosSource.Discover,
+                image => new CognosSource.PrivateImage(image),
+                b.CognosImage,
+                Xunit.RequiresCognosFactAttribute.NoSourceMessage
+            );
+            cognos = (
+                Runs(b.CognosImage, source is CognosSource.PrivateImage) ? new CognosContainer(b.CognosImage, source) : new CognosContainer(source)
+            ).WithNetwork(network);
             if (keycloak is not null)
             {
                 cognos.WithKeycloak(keycloak);
             }
             b.CognosCustomizer(cognos);
         }
-        var tm1Source = Get(b.Tm1SourceSet, Tm1Source.Discover, Xunit.RequiresTm1FactAttribute.NoSourceMessage);
-        AdminServer = b.AdminServerCustomizer is not null || b.Tm1Customizers.Count > 1 ? new Tm1AdminServerContainer(tm1Source).WithNetwork(network) : null;
+        var tm1Source = b.Get(
+            b.Tm1SourceSet,
+            ibm => new Tm1Source.Bundle(ibm),
+            Tm1Source.Discover,
+            image => new Tm1Source.PrivateImage(image),
+            b.Tm1Image,
+            Xunit.RequiresTm1FactAttribute.NoSourceMessage
+        );
+        var tm1Image = Runs(b.Tm1Image, tm1Source is Tm1Source.PrivateImage) ? b.Tm1Image : null;
+        AdminServer =
+            b.AdminServerCustomizer is not null || b.Tm1Customizers.Count > 1
+                ? (tm1Image is not null ? new Tm1AdminServerContainer(tm1Image, tm1Source) : new Tm1AdminServerContainer(tm1Source)).WithNetwork(network)
+                : null;
         var servers = new Dictionary<string, Tm1ServerContainer>(StringComparer.Ordinal);
         var order = new List<string>();
         foreach (var name in b.Tm1Names)
         {
-            var server = new Tm1ServerContainer(tm1Source).WithNetwork(network).WithNetworkAliases(name).WithEnv("TM1_SERVER_NAME", name);
+            var server = (tm1Image is not null ? new Tm1ServerContainer(tm1Image, tm1Source) : new Tm1ServerContainer(tm1Source))
+                .WithNetwork(network)
+                .WithNetworkAliases(name)
+                .WithEnv("TM1_SERVER_NAME", name);
             if (AdminServer is not null)
             {
                 server.WithAdminServer(AdminServer);
@@ -66,7 +94,17 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         var first = servers[order[0]];
         if (b.Tm1WebCustomizer is not null)
         {
-            tm1Web = new Tm1WebContainer(Get(b.Tm1WebSourceSet, Tm1WebSource.Discover, Xunit.RequiresTm1WebFactAttribute.NoSourceMessage)).WithTm1Server(first);
+            var source = b.Get(
+                b.Tm1WebSourceSet,
+                ibm => new Tm1WebSource.Bundle(ibm),
+                Tm1WebSource.Discover,
+                image => new Tm1WebSource.PrivateImage(image),
+                b.Tm1WebImage,
+                Xunit.RequiresTm1WebFactAttribute.NoSourceMessage
+            );
+            tm1Web = (
+                Runs(b.Tm1WebImage, source is Tm1WebSource.PrivateImage) ? new Tm1WebContainer(b.Tm1WebImage, source) : new Tm1WebContainer(source)
+            ).WithTm1Server(first);
             if (AdminServer is not null)
             {
                 tm1Web.WithAdminServer(AdminServer);
@@ -78,7 +116,9 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         }
         if (b.PawCustomizer is not null)
         {
-            paw = new PawContainer(Get(b.PawSourceSet, PawSource.Discover, Xunit.RequiresPawFactAttribute.NoSourceMessage)).WithTm1Server(first);
+            paw = new PawContainer(
+                b.Get(b.PawSourceSet, b.PawFromIbm, PawSource.Discover, null, null, Xunit.RequiresPawFactAttribute.NoSourceMessage)
+            ).WithTm1Server(first);
             if (AdminServer is not null)
             {
                 paw.WithAdminServer(AdminServer);
@@ -96,6 +136,54 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
 
     /// <summary>A builder for an environment.</summary>
     public static EnvironmentBuilder Builder() => new();
+
+    /// <summary>Starts building the environment a <c>pa-environment.yaml</c> describes, the file <c>pa-setup</c> reads
+    /// (<c>docker/pa-setup</c>), so tests run what developers run. The file is checked as <c>pa-setup</c> checks it, with its
+    /// defaults. The builder comes back configured; change it further, or call <see cref="EnvironmentBuilder.Build"/>.</summary>
+    /// <remarks>
+    /// <para>How each setting maps:</para>
+    /// <list type="bullet">
+    /// <item><c>tm1.servers.&lt;name&gt;</c>: <see cref="EnvironmentBuilder.Tm1(string, Action{Tm1ServerContainer})"/>, with <c>seed</c> as
+    /// <see cref="Tm1ServerContainer.WithSeed"/> and each <c>cfg</c> parameter as <c>TM1_CFG_&lt;name&gt;</c>, written as <c>pa-setup</c>
+    /// writes it (<c>true</c> is <c>True</c>);</item>
+    /// <item><c>tm1.adminServer</c>: <see cref="EnvironmentBuilder.AdminServer()"/>; with more than one server there's one anyway, and
+    /// <c>false</c> then fails, as in <c>pa-setup</c>;</item>
+    /// <item><c>tm1Web</c>: <see cref="EnvironmentBuilder.Tm1Web()"/>, with <c>heap</c> as <c>TM1_WEB_HEAP</c> (<c>1g</c>);</item>
+    /// <item><c>cognos</c>: <see cref="EnvironmentBuilder.Cognos"/>, with <c>users</c> as <see cref="CognosContainer.WithUser"/> and
+    /// <c>memory</c> as <c>COGNOS_MAX_MEMORY</c> (<c>6144</c>); <c>oidc</c> adds <see cref="EnvironmentBuilder.Keycloak()"/>; <c>cam</c> is
+    /// <see cref="EnvironmentBuilder.CamSecurity"/>, by default LDAP with the first user as administrator;</item>
+    /// <item><c>paw</c>: <see cref="EnvironmentBuilder.Paw"/> with <see cref="PawContainer.AcceptLicense"/>, which the file must say
+    /// (<c>acceptLicense: true</c>); the zip is <c>zip</c> in <c>ibm</c>, or the newest there;</item>
+    /// <item><c>ibm</c>: each part's source, the folder as <see cref="Testcontainers.Tm1Source.Bundle"/>,
+    /// <see cref="Testcontainers.Tm1WebSource.Bundle"/> and <see cref="Testcontainers.CognosSource.Zip"/>. A relative path is from the
+    /// file's folder; <c>~</c> is the user's home;</item>
+    /// <item><c>images</c>: the image each part runs, as a container's image argument. A part with no other source takes its image as
+    /// the private image with IBM's software built in (<see cref="Testcontainers.Tm1Source.PrivateImage"/> and the like).</item>
+    /// </list>
+    /// <para>A part's source is the one set on the builder, else <c>ibm</c>, else what <c>Discover()</c> finds (the variables
+    /// pa-setup's <c>.env</c> sets, such as <c>TM1_BUNDLE_URL</c>), else its image as a private image.</para>
+    /// <para>Ignored, because they place things on the host that Testcontainers manages itself: <c>name</c> (the compose project; the
+    /// environment has its own network), every <c>port</c>, <c>adminPort</c> and <c>keycloakPort</c> (Testcontainers maps random host
+    /// ports), and <c>files</c> (the host folder pa-setup keeps databases in; each test environment starts from a new database, or one
+    /// copied in with <see cref="Tm1ServerContainer.WithData"/>). They're still checked as <c>pa-setup</c> checks them.</para>
+    /// <para>Refused, because the environment can't run them yet: <c>cognos</c> without <c>tm1.servers</c>, <c>paw</c> with
+    /// <c>cognos</c>, and <c>seed: 24retail</c>.</para>
+    /// </remarks>
+    /// <example><code>
+    /// // The environment pa-setup runs from the same file, with random host ports
+    /// await using var env = PlanningAnalyticsEnvironment.FromConfig("pa-environment.yaml").Build();
+    /// await env.StartAsync();
+    /// var url = env.Tm1("planning").RestUrl;
+    /// </code></example>
+    /// <param name="path">The file, usually <c>pa-environment.yaml</c>.</param>
+    /// <returns>A builder configured from the file.</returns>
+    /// <exception cref="ArgumentException">The file can't be read, isn't valid, or asks for what the environment can't run; the
+    /// message names the setting.</exception>
+    public static EnvironmentBuilder FromConfig(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        return PaEnvironmentFile.Read(path);
+    }
 
     /// <summary>Starts everything, what's depended on first, then PAW.</summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
@@ -198,8 +286,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     private static T Require<T>(T? part, string what, string how)
         where T : class => part ?? throw new InvalidOperationException($"This environment has no {what}; add it with {how}");
 
-    private static T Get<T>(T? configured, Func<T?> discover, string message)
-        where T : class => configured ?? discover() ?? throw new InvalidOperationException(message);
+    /// <summary>Whether a part runs pa-setup's image setting: not when its source is a private image, which is the image.</summary>
+    private static bool Runs([NotNullWhen(true)] string? image, bool privateImage) => image is not null && !privateImage;
 
     /// <summary>The TM1 servers by name, enumerated in the order added.</summary>
     private sealed class OrderedServers(List<string> order, Dictionary<string, Tm1ServerContainer> servers) : IReadOnlyDictionary<string, Tm1ServerContainer>
@@ -254,6 +342,19 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         internal CognosSource? CognosSourceSet { get; private set; }
 
         internal Testcontainers.Network? NetworkSet { get; private set; }
+
+        // From pa-environment.yaml (FromConfig): the IBM downloads folder, PAW's zip in it, and each part's image
+        internal string? Ibm { get; set; }
+
+        internal string? PawZip { get; set; }
+
+        internal string? Tm1Image { get; set; }
+
+        internal string? Tm1WebImage { get; set; }
+
+        internal string? CognosImage { get; set; }
+
+        internal string? KeycloakImage { get; set; }
 
         /// <summary>Adds a TM1 server, named <paramref name="name"/> (its server name and network alias).</summary>
         public EnvironmentBuilder Tm1(string name) => Tm1(name, _ => { });
@@ -393,6 +494,44 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             }
             var users = cognos.Users;
             return users.Count == 0 ? throw new InvalidOperationException("Cognos needs test users for CAM security: add them with WithUser") : [users[0].Name];
+        }
+
+        /// <summary>A part's source: the one set on the builder, else the file's <c>ibm</c> folder, else what
+        /// <paramref name="discover"/> finds, else the file's image as a private image.</summary>
+        internal T Get<T>(T? configured, Func<string, T> fromIbm, Func<T?> discover, Func<string, T>? privateImage, string? image, string message)
+            where T : class
+        {
+            if (configured is not null)
+            {
+                return configured;
+            }
+            if (Ibm is not null)
+            {
+                if (!Directory.Exists(Ibm))
+                {
+                    throw new InvalidOperationException("ibm in pa-environment.yaml isn't a folder: " + Ibm);
+                }
+                return fromIbm(Ibm);
+            }
+            if (discover() is { } found)
+            {
+                return found;
+            }
+            if (privateImage is not null && image is not null)
+            {
+                return privateImage(image);
+            }
+            throw new InvalidOperationException(message);
+        }
+
+        internal PawSource PawFromIbm(string ibm)
+        {
+            if (PawZip is not null)
+            {
+                return new PawSource(Path.Combine(ibm, PawZip));
+            }
+            return Testcontainers.PawSource.Discover(name => name == Testcontainers.PawSource.BundleDir ? ibm : null)
+                ?? throw new InvalidOperationException("No PAW Local zip in " + ibm);
         }
 
         [GeneratedRegex("^[A-Za-z0-9_-]+$")]

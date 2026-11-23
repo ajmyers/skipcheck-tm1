@@ -1,0 +1,6 @@
+# error: cognos.users[0]: group
+version: 1
+tm1: { servers: { tm1: {} } }
+cognos:
+  users:
+    - { name: admin, password: adminpw, groups: [7] }
