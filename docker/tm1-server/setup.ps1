@@ -8,10 +8,10 @@
 
 .DESCRIPTION
   Interactive (asks the questions):
-    irm https://ajmyers.net/tm1/setup.ps1 | iex
+    irm https://skipcheck.io/tm1/setup.ps1 | iex
 
   With options (irm | iex can't pass parameters, so make a script block):
-    & ([scriptblock]::Create((irm https://ajmyers.net/tm1/setup.ps1))) -Bundle "$HOME\Downloads\tm1server-...-linuxi38664h_bundle.tar.gz"
+    & ([scriptblock]::Create((irm https://skipcheck.io/tm1/setup.ps1))) -Bundle "$HOME\Downloads\tm1server-...-linuxi38664h_bundle.tar.gz"
 
   Or download it and run it as a file:
     .\setup.ps1 -Bundle ... -Yes
@@ -19,7 +19,7 @@
   This is the Windows twin of setup.sh and takes the same options, in PowerShell
   spelling (--tm1-home is -Tm1Home, --files-dir is -FilesDir, ...), and the same
   TM1_SETUP_* environment variables. The options are a stable interface: the setup
-  page on ajmyers.net builds one-liners from them, so keep the two scripts in step
+  page on skipcheck.io builds one-liners from them, so keep the two scripts in step
   and don't rename or remove any.
 
   Questions are only asked in an interactive console with CI unset. Otherwise every
@@ -99,9 +99,9 @@ function Show-Banner {
 @'
   ------------------------------------------------------------------
    tm1-server: a local IBM Planning Analytics (TM1) server in Docker
-   Free and open source, made by Andrew Myers
+   Free and open source, made by Andrew Myers (https://ajmyers.net)
 
-     Website  https://ajmyers.net
+     Website  https://skipcheck.io
      GitHub   https://github.com/ajmyers
      Issues   https://github.com/ajmyers/tm1-pa-developer-tools/issues
 
@@ -134,8 +134,8 @@ function Show-Usage {
   @'
 tm1-server setup for Windows: install and start a local TM1 server with Docker.
 
-  irm https://ajmyers.net/tm1/setup.ps1 | iex
-  & ([scriptblock]::Create((irm https://ajmyers.net/tm1/setup.ps1))) [options]
+  irm https://skipcheck.io/tm1/setup.ps1 | iex
+  & ([scriptblock]::Create((irm https://skipcheck.io/tm1/setup.ps1))) [options]
 
 Where TM1 comes from (pick one; asked if not given):
   -Bundle FILE       A: your IBM download, tm1server-<ver>-linuxi38664h_bundle.tar.gz.
@@ -167,7 +167,7 @@ Each option can also be set in the environment as TM1_SETUP_<NAME>, with the nam
 in upper case and - as _: TM1_SETUP_BUNDLE, TM1_SETUP_FILES_DIR, TM1_SETUP_SAMPLES=1,
 TM1_SETUP_YES=1, ... Parameters win over the environment.
 
-Build the command for your choices at https://ajmyers.net/tm1/
+Build the command for your choices at https://skipcheck.io/tm1/
 '@ | Write-Host
 }
 

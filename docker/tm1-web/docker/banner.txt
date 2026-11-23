@@ -1,8 +1,8 @@
   ------------------------------------------------------------------
    tm1-web: a local IBM Planning Analytics TM1 Web in Docker
-   Free and open source, made by Andrew Myers
+   Free and open source, made by Andrew Myers (https://ajmyers.net)
 
-     Website  https://ajmyers.net
+     Website  https://skipcheck.io
      GitHub   https://github.com/ajmyers
      Issues   https://github.com/ajmyers/tm1-pa-developer-tools/issues
 
