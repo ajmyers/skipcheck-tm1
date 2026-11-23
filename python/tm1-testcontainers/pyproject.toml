@@ -28,16 +28,12 @@ skipcheck_tm1_testcontainers = "skipcheck_tm1_testcontainers.plugin"
 [tool.hatch.build.targets.wheel]
 packages = ["src/skipcheck_tm1_testcontainers"]
 
-# PawContainer runs docker/paw/paw-local.sh in its runner container, so ship it, as the Java
-# build puts it in the jar. An editable install reads it from the repository instead.
-[tool.hatch.build.targets.wheel.force-include]
-"../../docker/paw/paw-local.sh" = "skipcheck_tm1_testcontainers/paw-local.sh"
+[tool.hatch.build.hooks.custom]
+# hatch_build.py ships docker/paw/paw-local.sh in the package: PawContainer runs it in its runner
+# container, as the Java build puts it in the jar. An editable install reads it from the repository.
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "README.md"]
-
-[tool.hatch.build.targets.sdist.force-include]
-"../../docker/paw/paw-local.sh" = "src/skipcheck_tm1_testcontainers/paw-local.sh"
+include = ["src", "tests", "README.md", "hatch_build.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
