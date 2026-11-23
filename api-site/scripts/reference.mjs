@@ -24,7 +24,7 @@
 
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { CANONICAL_ORIGIN, copyAssets, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir } from './site.mjs';
+import { CANONICAL_ORIGIN, copyAssets, dedent, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir } from './site.mjs';
 
 const allowMissing = process.argv.includes('--allow-missing');
 
@@ -149,10 +149,22 @@ function javadocHtml(doc, page) {
 		html += doc.slice(at, open);
 		const [, tag, rest = ''] = /^\{@(\w+)\s*([\s\S]*)$/.exec(doc.slice(open, close));
 		const body = rest.trim();
+		const block = tag === 'code' && /<pre[^>]*>\s*$/.test(html);
 		if (tag === 'snippet') {
 			const cls = /class\s*=\s*"?examples\.(\w+)"?/.exec(body);
 			const region = /region\s*=\s*"?([\w-]+)"?/.exec(body);
-			html += cls && region ? '</p>' + page.example(cls[1], region[1]) + '<p>' : '';
+			// An inline snippet ({@snippet : code}) is Java written into the comment
+			const inline = /^[^:]*:\s*\n?([\s\S]*)$/.exec(rest);
+			if (cls && region) html += '</p>' + page.example(cls[1], region[1]) + '<p>';
+			else if (inline) html += '</p>' + page.javaCode(inline[1]) + '<p>';
+		} else if (block) {
+			// <pre>{@code ...}</pre>: a block of Java written into the comment
+			html = html.replace(/<pre[^>]*>\s*$/, '') + '</p>' + page.javaCode(rest) + '<p>';
+			const after = /^\s*<\/pre>/.exec(doc.slice(close + 1));
+			if (after) {
+				at = close + 1 + after[0].length;
+				continue;
+			}
 		} else if (tag === 'code' || tag === 'literal') {
 			html += tag === 'code' ? '<code>' + escape(body) + '</code>' : escape(body);
 		} else if (tag === 'link' || tag === 'linkplain') {
@@ -310,6 +322,9 @@ const packageNames = {
 
 const missing = new Set();
 const gaps = new Map();
+// Pages showing Java code in another language, and overviews with fewer examples than Java's
+const foreign = [];
+const fewer = [];
 const site = { projects: PROJECTS.map((p) => ({ id: p.id, landing: p.landing, docs: true })), guide: {} };
 let pageCount = 0;
 
@@ -375,8 +390,17 @@ for (const project of PROJECTS) {
 					exampleBlocks.set(cls + '#' + region, text === undefined ? '' : code(text, highlight, 'x-' + cls + '-' + region));
 				}
 			}
+			// Java written into a comment (not an example region) is shown on Java's page only; on another
+			// language's page it would be Java in the wrong place, so the build counts it as a fault
+			let fallback = false;
 			const render = {
 				example: (cls, region) => exampleBlocks.get(cls + '#' + region) ?? '',
+				javaCode(text) {
+					if (language === 'java') return code(dedent(text.split('\n')).replace(/\}\s*$/, '').trimEnd(), 'java');
+					if (fallback) return '';
+					foreign.push(project.id + ' ' + language + ' ' + javaType.name);
+					return code(dedent(text.split('\n')), 'java');
+				},
 				link(target, linkLabel, asCode) {
 					const [typePart, memberPart] = target.split('#');
 					const simple = typePart.replace(/^.*\.(?=[A-Z])/, '');
@@ -414,7 +438,17 @@ for (const project of PROJECTS) {
 					return word;
 				});
 
-			const overview = javadocHtml(javadocParts(javaType.doc).description, render);
+			// The overview is Java's, with its examples in this language, unless it has Java written
+			// into it: then it's this language's own comment, whose examples are its own
+			const javaDescription = javadocParts(javaType.doc).description;
+			const inlineJava = /<pre[^>]*>\s*\{@code|\{@snippet\s*:/.test(javaDescription);
+			const ownDoc = language === 'java' || !type.doc ? null : language === 'dotnet' ? xmlDocParts(type.doc).description : language === 'typescript' ? tsDocParts(type.doc).description : docstringHtml(type.doc);
+			const overview = inlineJava && ownDoc ? ownDoc : javadocHtml(javaDescription, render);
+			const blocks = (html) => (html.match(/<pre[ >]/g) ?? []).length;
+			if (language !== 'java') {
+				const javaBlocks = (javaDescription.match(/\{@snippet|<pre[^>]*>\s*\{@code/g) ?? []).length;
+				if (blocks(overview) < javaBlocks) fewer.push(project.id + ' ' + language + ' ' + javaType.name + ' (' + blocks(overview) + ' of ' + javaBlocks + ')');
+			}
 
 			// Members: this language's own, each with Java's examples where Java's has them
 			const javaFor = new Map();
@@ -441,9 +475,18 @@ for (const project of PROJECTS) {
 				else parts = { description: docstringHtml(member.doc), params: {}, returns: '', throws: [] };
 				let doc = parts.description;
 				if (language !== 'java' && java) {
-					if (!member.doc && java.doc) doc = javadocHtml(javadocParts(java.doc).description, render);
+					if (!member.doc && java.doc) {
+						// Java's words where this language has none, without the Java code in them
+						fallback = true;
+						doc = javadocHtml(javadocParts(java.doc).description, render);
+						fallback = false;
+					}
 					// Java's examples for the same member, in this language
 					doc += [...java.doc.matchAll(/\{@snippet[^}]*class\s*=\s*"?examples\.(\w+)"?[^}]*region\s*=\s*"?([\w-]+)"?[^}]*\}/g)].map(([, cls, region]) => exampleBlocks.get(cls + '#' + region) ?? '').join('');
+				}
+				if (language !== 'java' && java) {
+					const javaBlocks = (javadocParts(java.doc).description.match(/\{@snippet|<pre[^>]*>\s*\{@code/g) ?? []).length;
+					if (blocks(doc) < javaBlocks) fewer.push(project.id + ' ' + language + ' ' + javaType.name + '.' + java.name + ' (' + blocks(doc) + ' of ' + javaBlocks + ')');
 				}
 				const kindLabel = member.kind === 'property' ? 'property' : member.kind === 'constructor' ? 'constructor' : member.static ? 'static' : '';
 				rows.push('<tr><td><a href="#' + escape(id) + '"><code>' + escape(member.name) + '</code></a>' + (kindLabel ? ' <span class="tag">' + kindLabel + '</span>' : '') + '</td><td>' + escape(summary(doc)) + '</td></tr>');
@@ -497,7 +540,7 @@ for (const project of PROJECTS) {
 		// The docs home, in this language
 		const grouped = groupByArea(here);
 		const start = (project.start ?? []).map((n) => here.find((t) => t.name === n)).filter(Boolean);
-		const summaries = new Map(here.map((t) => [t.name, summary(javadocHtml(javadocParts(t.doc).description, { example: () => '', link: (target, l) => escape(l || target.replace(/^.*[.#]/, '')) }))]));
+		const summaries = new Map(here.map((t) => [t.name, summary(javadocHtml(javadocParts(t.doc).description, { example: () => '', javaCode: () => '', link: (target, l) => escape(l || target.replace(/^.*[.#]/, '')) }))]));
 		let home =
 			(project.landing ? '<p class="crumbs"><a href="../../">' + escape(project.title) + '</a> · Docs</p>' : '') +
 			'<h1>' + escape(project.title) + ' docs <span class="lang">' + escape(label) + '</span></h1>' +
@@ -628,5 +671,16 @@ if (missing.size > 0) {
 
 await mkdir(generatedDir, { recursive: true });
 await writeFile(path.join(generatedDir, 'site.json'), JSON.stringify(site, null, 2) + '\n');
+if (fewer.length > 0) {
+	const line = fewer.length + " page(s) have fewer examples than Java's: quote each example from an examples region, which every language has";
+	if (!allowMissing) throw new Error(line + ':\n  ' + fewer.join('\n  '));
+	console.warn(line + ':\n  ' + fewer.join('\n  '));
+}
+if (foreign.length > 0) {
+	const list = [...new Set(foreign)].sort();
+	const line = list.length + ' page(s) show Java code in another language: give the type an examples region in each language, or a doc comment of its own with its own examples';
+	if (!allowMissing) throw new Error(line + ':\n  ' + list.join('\n  '));
+	console.warn(line + ':\n  ' + list.join('\n  '));
+}
 for (const [key, list] of gaps) console.warn('Not found in ' + key + ' (' + list.length + '): ' + list.slice(0, 12).join(', ') + (list.length > 12 ? ', ...' : ''));
 console.log('Docs: ' + pageCount + ' type pages, in ' + DOC_LANGUAGES.join(', '));
