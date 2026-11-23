@@ -203,13 +203,7 @@ export class PlanningAnalyticsEnvironment implements Startable {
   /** Starts building the environment a `pa-environment.yaml` describes, the file `pa-setup` reads
    * (`docker/pa-setup`), so tests run what developers run. The file is checked as `pa-setup`
    * checks it, with its defaults. The builder comes back configured; change it further, or call
-   * {@link PlanningAnalyticsEnvironment.Builder.build}:
-   *
-   * ```ts
-   * await using env = PlanningAnalyticsEnvironment.fromConfig("pa-environment.yaml").build();
-   * await env.start();
-   * env.tm1("planning").getRestUrl();
-   * ```
+   * {@link PlanningAnalyticsEnvironment.Builder.build}.
    *
    * How each setting maps:
    * - `tm1.servers.<name>`: {@link PlanningAnalyticsEnvironment.Builder.tm1}, with `seed` as

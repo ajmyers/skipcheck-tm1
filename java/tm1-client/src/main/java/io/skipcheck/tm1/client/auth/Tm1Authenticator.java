@@ -22,12 +22,7 @@ import reactor.core.publisher.Mono;
  * fresh each time. Only the login carries credentials; every other request carries the
  * session cookie.
  *
- * <pre class="code">
- * Tm1Authenticator.basic("admin", "apple");                       // TM1's own security
- * Tm1Authenticator.camNamespace("alice", "secret", "LDAP");       // CAM, with a user and password
- * Tm1Authenticator.camPassport(() -&gt; passports.current());       // CAM, with a passport
- * Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "alice", "secret"); // a passport from Cognos
- * </pre>
+ * {@snippet class = examples.Tm1AuthenticatorExamples region = kinds}
  *
  * <p>
  * Implementations must not log or otherwise reveal the credentials; {@link #describe()}

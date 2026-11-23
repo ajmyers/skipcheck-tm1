@@ -11,19 +11,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * The {@code tm1.servers.<name>.*} properties: several TM1 servers, each by a name of
  * your choosing, with the same properties as {@link Tm1Properties tm1.*}.
  *
- * <pre class="code">
- * tm1:
- *   servers:
- *     planning:
- *       address: http://planning:8010
- *       user: admin
- *       password: ${PLANNING_PASSWORD}
- *     reporting:
- *       address: http://reporting:8010
- *       user: reporter
- *       pool:
- *         enabled: true
- * </pre>
+ * {@snippet file = examples/application-servers.yml}
  *
  * <p>
  * Each name gets its own beans (see {@link Tm1AutoConfiguration}), qualified by the name.

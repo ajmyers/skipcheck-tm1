@@ -22,7 +22,7 @@ Javadoc; everything else is read from the repository when the pages are built:
 
 | On a page | Where it comes from |
 |---|---|
-| An example | A region of an examples file, with the same name in each language: `java/<project>/src/examples`, `python/<project>/examples`, `dotnet/examples/<Project>.Examples`, `typescript/<project>/examples`. Each language compiles or type-checks its examples with its own tests, and has a gate that its files and regions match Java's. |
+| An example | A region of an examples file, with the same name in each language: `java/<project>/src/examples`, `python/<project>/examples`, `dotnet/examples/<Project>.Examples`, `typescript/<project>/examples`. Each language compiles or type-checks its examples with its own tests, and has a gate that its files and regions match Java's. A Javadoc can also quote a whole file of the Java examples that a test reads, such as the starter's `application.yml` (`{@snippet file = examples/application.yml}`). |
 | How to install | Each language's own build files: the package's name, the version of the language it needs (`scripts/packages.mjs`). |
 | The version | `DOCS_VERSION`, which the workflow sets from a release tag, or else `gradle.properties`. Before a release the install steps ask for the latest pre-release, and the page says it is one. |
 | A type's members, signatures and doc comments | Each language's sources, read by an extractor into one JSON shape (`scripts/extract.mjs`): Java by the doclet in `java/tools/docs-doclet` (`./gradlew docsModel`), Python by `extract/python_api.py` (with `ast`), .NET and TypeScript by `extract/dotnet_api.mjs` and `extract/typescript_api.mjs` (reading the formatted sources). No build or install of the clients is needed. |
@@ -39,7 +39,8 @@ the Java documentation quotes, when a language lacks a Java member that its
 `coverage/members-excluded.txt` doesn't list (or lists one it has, or one Java no longer has), or
 when an overview on another language's page names something only Java has (`Mono`, `JsonNode`, a
 Java member name that the language's API and code don't have: `javaIsms` in `scripts/members.mjs`), or
-when a link on a generated page goes nowhere (`scripts/check-links.mjs`). So a new Java example
+when a link on a generated page goes nowhere (`scripts/check-links.mjs`), or when a doc comment the
+reference reads has code typed into it rather than quoted from a region (`scripts/doc-code.mjs`). So a new Java example
 needs its three counterparts before the build passes, and so does a new Java member.
 
 ## Walkthroughs, and what the examples print
@@ -81,6 +82,7 @@ has one, and isn't required.
 | `scripts/extract.mjs` | Each project's API per language, into `.generated/api/`. |
 | `scripts/reference.mjs` | The reference pages and `.generated/site.json` for the Worker: the projects, and which one documents each type. |
 | `scripts/members.mjs` | Which member is which across languages, and the gate that each language has every Java member or lists it with the reason. |
+| `scripts/doc-code.mjs` | The gate that no doc comment the reference reads has code typed into it: a Javadoc `<pre>` or inline `{@snippet}`, a .NET `<code>`, a TypeScript fence or `@example`, a Python `::` block or doctest. |
 | `scripts/search.mjs` | The search index of each docs language, `search.json` beside its pages: every type and member, a short summary, and where it is. `reference.mjs` writes it from the data it renders the pages with. |
 | `scripts/pages.mjs` | The landing pages and the walkthroughs. |
 | `scripts/sitemap.mjs` | `/docs/sitemap.xml`: every generated page but the Javadoc, for search engines. skipcheck.io's `robots.txt` names it. |

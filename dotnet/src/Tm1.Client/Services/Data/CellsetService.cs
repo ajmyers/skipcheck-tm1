@@ -250,14 +250,7 @@ public sealed class CellsetService : Tm1Service
     /// <para>One round trip brings the axes (hierarchies by name, tuples with their members' names and
     /// unique names) and the first <paramref name="pageSize"/> cells; the rest come in pages of
     /// <c>GetPartition</c>, a few at a time and in ordinal order, so memory stays bounded on both sides
-    /// however large the cellset.</para>
-    /// <code>
-    /// await foreach (var row in tm1.Cellsets.StreamAsync(mdx, ODataQuery.None().Select("Ordinal", "Value"), 1000,
-    ///     (cellset, cells) => cells.Select(c => (c.Ordinal, c.Value))))
-    /// {
-    ///     …
-    /// }
-    /// </code></summary>
+    /// however large the cellset.</para></summary>
     /// <param name="mdx">The query.</param>
     /// <param name="cellQuery">What to select of each cell; include <c>Ordinal</c> to place them.</param>
     /// <param name="pageSize">How many cells to fetch per request.</param>

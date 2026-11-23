@@ -225,12 +225,6 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// <para>Refused, because the environment can't run them yet: <c>cognos</c> without <c>tm1.servers</c>, and
     /// <c>seed: 24retail</c>.</para>
     /// </remarks>
-    /// <example><code>
-    /// // The environment pa-setup runs from the same file, with random host ports
-    /// await using var env = PlanningAnalyticsEnvironment.FromConfig("pa-environment.yaml").Build();
-    /// await env.StartAsync();
-    /// var url = env.Tm1("planning").RestUrl;
-    /// </code></example>
     /// <param name="path">The file, usually <c>pa-environment.yaml</c>.</param>
     /// <returns>A builder configured from the file.</returns>
     /// <exception cref="ArgumentException">The file can't be read, isn't valid, or asks for what the environment can't run; the

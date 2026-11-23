@@ -33,14 +33,7 @@ import reactor.core.scheduler.Schedulers;
  * behalf of many users. In TM1 identity is the session, so the number of sessions grows
  * with the number of users; the pool keeps that bounded.
  *
- * <pre class="code">
- * Tm1SessionPool pool = Tm1SessionPool.builder(Tm1Session.builder()
- *         .baseUrl("http://tm1:8010/api/v1/")
- *         .basicAuth("service", secret))
- *     .idleTimeout(Duration.ofMinutes(10))
- *     .build();
- * pool.session(Tm1Identity.impersonating(user)).execute(request);   // each time it's needed
- * </pre>
+ * {@snippet class = examples.Tm1SessionPoolExamples region = per-user}
  *
  * <ul>
  * <li><b>Get a session for each piece of work</b> and don't keep it: the pool may evict

@@ -12,7 +12,7 @@ using Skipcheck.Tm1.Client.Session;
 namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Drillthrough: from a cell to the detail behind it, through a drillthrough process
-/// (<code>}Drill_…</code>). A cube drillthrough returns a cellset, of a view the process returns; a
+/// (<c>}Drill_…</c>). A cube drillthrough returns a cellset, of a view the process returns; a
 /// relational one returns rows from an ODBC source, directly or kept as a <c>Rowset</c>.
 /// <para>A cell's drillthroughs come from the cube's <c>DrillthroughRules</c>, which name the process;
 /// <see cref="ScriptsAsync"/> lists them for a cell of a cellset. TM1 (11.8) passes such a process the
@@ -113,7 +113,7 @@ public sealed class DrillthroughService : Tm1Service
     /// <summary><c>ExecuteCubeDrillthrough</c>: runs a cube drillthrough process directly, with its
     /// parameters, and returns the cellset of the view it returns, left on the server until deleted.
     /// Needs schema 11.2.0.</summary>
-    /// <param name="process">The drillthrough process's name, such as <code>}Drill_Sales</code>.</param>
+    /// <param name="process">The drillthrough process's name, such as <c>}Drill_Sales</c>.</param>
     /// <param name="parameters">The process's parameters, by name and value.</param>
     /// <param name="query">What to expand of the cellset.</param>
     /// <param name="cancellationToken">Cancels the request.</param>

@@ -197,6 +197,13 @@ Flux<String> list(Tm1Client tm1) {
   language), `::file` (a file a test loads) or `::install` (generated from the build files).
   A fenced code block in a content file fails the site's build, so code on the site is always
   compiled and tested.
+- **Never type code into a doc comment either.** A Javadoc quotes a region with `{@snippet}`, or
+  a file a test reads with `{@snippet file = examples/application.yml}`. The other languages'
+  pages show the same region in their language, so their member comments need no copy. The site's
+  build fails on a `<pre>` or inline `{@snippet}` in a Javadoc, a `<code>` block in a .NET member's
+  comment (use `<c>` for a name), a fenced block or `@example` in a TypeScript member's, and a `::`
+  block or doctest in a Python member's. The other languages' type comments are left alone: the
+  site shows Java's overview, so they never reach a page.
 
 **Document TM1's surprises where they bite.** When TM1 behaves differently from its
 `$metadata`, or from what a reader would expect, say so in the Javadoc of the method or type it

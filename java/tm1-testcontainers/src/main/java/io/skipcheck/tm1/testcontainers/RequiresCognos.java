@@ -21,16 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * vary by test, so there's no shared Cognos: build a {@link CognosContainer} with the
  * users the test needs.
  *
- * <pre class="code">
- * &#64;RequiresCognos
- * class CamSecurityTest {
- *
- *     &#64;Test
- *     void readersCanOnlyRead(CognosSource cognosSource) {
- *         try (var cognos = new CognosContainer(cognosSource).withUser("viewer", "pw", "Readers") ...
- *     }
- * }
- * </pre>
+ * {@snippet class = examples.RequiresTm1Examples region = cognos}
  */
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)

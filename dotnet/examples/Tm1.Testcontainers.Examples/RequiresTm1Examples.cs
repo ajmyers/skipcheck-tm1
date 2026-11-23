@@ -5,12 +5,13 @@ using System.Threading.Tasks;
 using Skipcheck.Tm1.Client.Errors;
 using Skipcheck.Tm1.Client.Model;
 using Skipcheck.Tm1.Client.Version;
+using Skipcheck.Tm1.Testcontainers;
 using Skipcheck.Tm1.Testcontainers.Xunit;
 using Xunit;
 
 namespace Examples;
 
-/// <summary>Examples for <c>[RequiresTm1Fact]</c>, shown in the guide.</summary>
+/// <summary>Examples for <c>[RequiresTm1Fact]</c> and the other <c>[Requires…Fact]</c>s, shown in the guide.</summary>
 public static class RequiresTm1Examples
 {
     // @start region = test-class
@@ -72,6 +73,49 @@ public static class RequiresTm1Examples
             {
                 return;
             }
+            // ...
+        }
+    }
+
+    // @end
+
+    // @start region = tm1-web
+    public sealed class WebsheetTests(Tm1WebFixture web) : IClassFixture<Tm1WebFixture>
+    {
+        [RequiresTm1WebFact]
+        public void OpensAWebsheet()
+        {
+            // http://localhost:54321/tm1web/, which lists the shared TM1 server
+            Assert.EndsWith("/tm1web/", web.Tm1Web.Url);
+            // ...
+        }
+    }
+
+    // @end
+
+    // @start region = paw
+    public sealed class WorkspaceTests(PawFixture paw) : IClassFixture<PawFixture>
+    {
+        [RequiresPawFact]
+        public void OpensPaw()
+        {
+            // http://localhost:54321/, which logs on to the shared TM1 server
+            Assert.StartsWith("http://", paw.Paw.Url);
+            // ...
+        }
+    }
+
+    // @end
+
+    // @start region = cognos
+    public sealed class CamSecurityTests(CognosFixture cognos) : IClassFixture<CognosFixture>
+    {
+        [RequiresCognosFact]
+        public async Task ReadersCanOnlyRead()
+        {
+            // No shared Cognos: each test starts its own, with the users it needs
+            await using var container = new CognosContainer(cognos.Source).WithUser("viewer", "viewerpw", "Readers");
+            await container.StartAsync();
             // ...
         }
     }

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Examples for requiresTm1 (Java's @RequiresTm1), quoted in its documentation: vitest tests,
-// type-checked but never run.
+// Examples for requiresTm1, requiresTm1Web, requiresPaw and requiresCognos (Java's @RequiresTm1 and the
+// others), quoted in their documentation: vitest tests, type-checked but never run.
 import { randomUUID } from "node:crypto";
 import { DimensionPatch, ElementPatch, ElementType, HierarchyPatch, Tm1Client, Tm1Version } from "@skipcheck/tm1-client";
-import { Tm1ServerContainer } from "@skipcheck/tm1-testcontainers";
-import { RequiresTm1, requiresTm1 } from "@skipcheck/tm1-testcontainers/vitest";
+import { CognosContainer, Tm1ServerContainer } from "@skipcheck/tm1-testcontainers";
+import { RequiresTm1, requiresCognos, requiresPaw, requiresTm1, requiresTm1Web } from "@skipcheck/tm1-testcontainers/vitest";
 import { afterAll, afterEach, beforeAll, describe, expect } from "vitest";
 
 // @start region = test-class
@@ -46,6 +46,31 @@ requiresTm1("needs a recent server", async ({ tm1, skip }) => {
   // Skips, rather than fails, on servers older than the feature
   const introducedIn = Tm1Version.parse("11.8.03000");
   if (!tm1.getTm1Version().isAtLeast(introducedIn)) skip(`needs TM1 ${introducedIn.toString()} or newer`);
+  // ...
+});
+// @end
+
+// @start region = tm1-web
+requiresTm1Web("opens a websheet", ({ tm1Web }) => {
+  // http://localhost:54321/tm1web/, which lists the shared TM1 server
+  expect(tm1Web.getUrl()).toMatch(/\/tm1web\/$/);
+  // ...
+});
+// @end
+
+// @start region = paw
+requiresPaw("opens PAW", ({ paw }) => {
+  // http://localhost:54321/, which logs on to the shared TM1 server
+  expect(paw.getUrl()).toMatch(/^http:\/\//);
+  // ...
+});
+// @end
+
+// @start region = cognos
+requiresCognos("readers can only read", async ({ cognosSource }) => {
+  // No shared Cognos: each test starts its own, with the users it needs
+  await using cognos = new CognosContainer(cognosSource).withUser("viewer", "viewerpw", "Readers");
+  await cognos.start();
   // ...
 });
 // @end
