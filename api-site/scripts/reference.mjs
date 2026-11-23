@@ -594,6 +594,21 @@ function switchHtml(project, language, javaName, languages, counterparts) {
 		'</div>'
 	);
 }
+/** The search box (assets/search.js), hidden until its script shows it. */
+function searchHtml(project, language) {
+	const label = LANGUAGES.find((l) => l.id === language).label;
+	return (
+		'<div class="search" role="search" hidden>' +
+		'<label class="visually-hidden" for="docs-search">Search the ' + escape(project.title) + ' docs in ' + escape(label) + '</label>' +
+		'<input id="docs-search" type="search" role="combobox" aria-expanded="false" aria-controls="docs-search-results" aria-autocomplete="list" aria-keyshortcuts="/" autocomplete="off" spellcheck="false" placeholder="Search ' + escape(label) + '" data-index="search.json">' +
+		'<kbd aria-hidden="true">/</kbd>' +
+		'<ul id="docs-search-results" role="listbox" aria-label="Results" hidden></ul>' +
+		'<p class="none" aria-hidden="true" hidden></p>' +
+		'<p class="visually-hidden" role="status" aria-live="polite"></p>' +
+		'</div>'
+	);
+}
+
 async function writePage(project, language, file, title, body, nav, javaName, languages, counterparts) {
 	// The breadcrumbs share the language bar, on its left
 	const crumbs = /^<p class="crumbs">[\s\S]*?<\/p>/.exec(body)?.[0] ?? null;
@@ -606,8 +621,9 @@ async function writePage(project, language, file, title, body, nav, javaName, la
 			canonical: CANONICAL_ORIGIN + '/' + project.id + '/docs/' + language + '/' + (file === 'index.html' ? '' : file),
 			styles: ['../../assets/docs.css'],
 			scripts: ['../../assets/docs.js', '/highlight.js'],
+			modules: ['../../assets/search.js'],
 		}) +
-		'<body data-lang="' + language + '"><div class="docs">' + nav + '<main class="guide"><div class="toolbar">' + (crumbs ?? '<span></span>') + switchHtml(project, language, javaName, languages, counterparts) + '</div>' + rest + '</main></div></body></html>\n';
+		'<body data-lang="' + language + '"><div class="docs">' + nav + '<main class="guide"><div class="toolbar">' + (crumbs ?? '<span></span>') + searchHtml(project, language) + switchHtml(project, language, javaName, languages, counterparts) + '</div>' + rest + '</main></div></body></html>\n';
 	await writeFile(path.join(dir, file), html);
 }
 
