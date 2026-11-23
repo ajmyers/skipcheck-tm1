@@ -10,6 +10,8 @@ import org.jspecify.annotations.Nullable;
 import io.micrometer.core.instrument.FunctionCounter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.binder.MeterBinder;
 import io.skipcheck.tm1.client.session.Tm1SessionPool;
 
@@ -27,17 +29,36 @@ import io.skipcheck.tm1.client.session.Tm1SessionPool;
  * {@code age}, {@code size}): sessions evicted</li>
  * <li>{@code tm1.session.pool.closed} (counter): sessions closed on TM1</li>
  * </ul>
+ *
+ * <p>
+ * Each meter also carries the tags given to the constructor. The auto-configured ones are
+ * tagged {@code server} with the pool's server name, {@code default} for {@code tm1.*},
+ * so every pool's meters have the same tag keys and a query or a dashboard can group them
+ * by server.
  */
 public final class Tm1SessionPoolMetrics implements MeterBinder {
 
 	private final Tm1SessionPool pool;
+
+	private final Tags tags;
 
 	/**
 	 * Metrics for {@code pool}.
 	 * @param pool the pool to report on
 	 */
 	public Tm1SessionPoolMetrics(Tm1SessionPool pool) {
+		this(pool, Tags.empty());
+	}
+
+	/**
+	 * Metrics for {@code pool}, with {@code tags} on every meter, such as the server's
+	 * name when there are several.
+	 * @param pool the pool to report on
+	 * @param tags the tags to add
+	 */
+	public Tm1SessionPoolMetrics(Tm1SessionPool pool, Iterable<Tag> tags) {
 		this.pool = Objects.requireNonNull(pool, "pool");
+		this.tags = Tags.of(Objects.requireNonNull(tags, "tags"));
 	}
 
 	@Override
@@ -56,13 +77,14 @@ public final class Tm1SessionPoolMetrics implements MeterBinder {
 
 	private void gauge(MeterRegistry registry, String name, String description,
 			ToDoubleFunction<Tm1SessionPool> value) {
-		Gauge.builder(name, pool, value).description(description).register(registry);
+		Gauge.builder(name, pool, value).description(description).tags(tags).register(registry);
 	}
 
 	private void counter(MeterRegistry registry, String name, String description,
 			ToDoubleFunction<Tm1SessionPool> value, @Nullable String reason) {
 		FunctionCounter.Builder<Tm1SessionPool> counter = FunctionCounter.builder(name, pool, value)
-			.description(description);
+			.description(description)
+			.tags(tags);
 		if (reason != null) {
 			counter.tag("reason", reason);
 		}

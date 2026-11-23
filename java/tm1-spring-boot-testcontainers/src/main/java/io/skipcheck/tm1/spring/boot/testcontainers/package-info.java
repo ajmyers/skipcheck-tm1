@@ -16,6 +16,11 @@
  * {@snippet class = examples.ServiceConnectionExamples region = dev-app}
  *
  * <p>
+ * The TM1 servers of a {@code PlanningAnalyticsEnvironment}, each by its name, come in
+ * through {@link io.skipcheck.tm1.spring.boot.testcontainers.Tm1EnvironmentServers} as
+ * {@code tm1.servers.<name>} instead.
+ *
+ * <p>
  * Everything here is non-null unless marked {@link org.jspecify.annotations.Nullable}.
  */
 @NullMarked

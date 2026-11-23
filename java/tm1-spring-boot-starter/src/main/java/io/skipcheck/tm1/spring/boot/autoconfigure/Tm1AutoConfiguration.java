@@ -5,19 +5,12 @@ package io.skipcheck.tm1.spring.boot.autoconfigure;
 import java.time.Duration;
 
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.boot.http.client.reactive.ClientHttpConnectorBuilder;
 import org.springframework.boot.ssl.SslBundle;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.http.client.reactive.ClientHttpConnector;
@@ -30,17 +23,16 @@ import io.skipcheck.tm1.client.session.Tm1SessionPool;
 import io.skipcheck.tm1.client.session.Tm1Timeouts;
 
 /**
- * Auto-configures the TM1 client: given {@link Tm1ConnectionDetails} (see
- * {@link Tm1ConnectionDetailsAutoConfiguration}), a {@link Tm1Session}, a
- * {@link Tm1Client} and, with {@code tm1.pool.enabled=true}, a {@link Tm1SessionPool}.
- * Each bean backs off if you define your own. Sessions are closed on shutdown.
+ * Auto-configures the TM1 client for each TM1 server the application names: a
+ * {@link Tm1ConnectionDetails}, a {@link Tm1Session}, a {@link Tm1Client} and, with the
+ * server's {@code pool.enabled=true}, a {@link Tm1SessionPool}. Sessions and pools are
+ * closed on shutdown.
  *
  * <p>
  * Sessions are built on Boot's {@code WebClient.Builder} when there is one (so its
  * customizers, codecs and observations apply) and report to the application's
  * {@link ObservationRegistry}. The connector is Reactor Netty, built with Boot's
- * connector builder so {@code tm1.ssl.bundle} works like any other Boot client's SSL
- * bundle.
+ * connector builder so {@code ssl.bundle} works like any other Boot client's SSL bundle.
  *
  * <p>
  * Set the {@link Tm1Properties tm1.* properties} and inject the client:
@@ -51,66 +43,55 @@ import io.skipcheck.tm1.client.session.Tm1Timeouts;
  * An application acting for many users gets each user's session from the pool:
  *
  * {@snippet class = examples.Tm1AutoConfigurationExamples region = pool}
+ *
+ * <h2>Servers by name</h2>
+ *
+ * <p>
+ * Every server has a name. Each {@link Tm1ServersProperties tm1.servers.&lt;name&gt;.*}
+ * is one, with the same properties as {@code tm1.*}; and {@code tm1.*} is the server
+ * named {@code default}, the same as {@code tm1.servers.default.*}. Setting both
+ * {@code tm1.*} and {@code tm1.servers.default.*} is an error. Each server's beans are
+ * named after it, {@code <name>Tm1ConnectionDetails}, {@code <name>Tm1Session},
+ * {@code <name>Tm1Client} and {@code <name>Tm1SessionPool}, and qualified by the name:
+ *
+ * {@snippet class = examples.Tm1AutoConfigurationExamples region = servers}
+ *
+ * <p>
+ * The default server's beans are the default candidates, so a plain {@code Tm1Client}
+ * gets its client. Every other server's are not ({@code defaultCandidate = false}):
+ * Spring injects them only where a {@code @Qualifier} names the server. So with only
+ * named servers there's no plain {@code Tm1Client}, even when there's one; name it
+ * {@code default} for that. Spring Boot's bean conditions skip beans that aren't default
+ * candidates, too: a {@code @ConditionalOnBean(Tm1Client.class)} of your own matches the
+ * default server's client only.
+ *
+ * <h2>Beans of your own</h2>
+ *
+ * <p>
+ * A bean of yours under one of a server's bean names takes the place of the starter's,
+ * for any server: {@code planningTm1ConnectionDetails}, say, for a login the properties
+ * can't describe. The starter gives it the server's qualifier and, for a server other
+ * than {@code default}, makes it no default candidate, as its own are. A bean named
+ * {@code defaultTm1ConnectionDetails} makes a default server even without {@code tm1.*}.
+ *
+ * <p>
+ * For the default server, a bean of one of these types under any other name also takes
+ * the place of the starter's, as long as it's a default candidate, since the default
+ * server's beans are the default candidates. That is how Spring Boot's connection details
+ * work: {@code @ServiceConnection} registers a {@link Tm1ConnectionDetails} under a name
+ * of its own, and it becomes the default server, {@code tm1.*} or not.
  */
-@AutoConfiguration(after = Tm1ConnectionDetailsAutoConfiguration.class,
-		afterName = "org.springframework.boot.webclient.autoconfigure.WebClientAutoConfiguration")
+@AutoConfiguration(afterName = { "org.springframework.boot.webclient.autoconfigure.WebClientAutoConfiguration",
+		"org.springframework.boot.testcontainers.service.connection.ServiceConnectionAutoConfiguration" })
 @ConditionalOnClass(Tm1Session.class)
-@EnableConfigurationProperties(Tm1Properties.class)
-@Import(Tm1AutoConfiguration.SessionConfiguration.class)
+@Import(Tm1ServersRegistrar.class)
 public final class Tm1AutoConfiguration {
 
 	/** How long shutdown waits for a session to close, a login in progress included. */
-	private static final Duration SHUTDOWN_WAIT = Duration.ofMinutes(1);
+	static final Duration SHUTDOWN_WAIT = Duration.ofMinutes(1);
 
 	/** Not instantiated by applications; Spring creates it. */
 	Tm1AutoConfiguration() {
-	}
-
-	/** The session, client and pool, once there are connection details. */
-	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnBean(Tm1ConnectionDetails.class)
-	static class SessionConfiguration {
-
-		@Bean(destroyMethod = "")
-		@ConditionalOnMissingBean
-		Tm1Session tm1Session(Tm1ConnectionDetails connection, Tm1Properties properties, Environment environment,
-				ObjectProvider<WebClient.Builder> webClient, ObjectProvider<ObservationRegistry> observations) {
-			return sessionSettings(connection, properties, environment, webClient, observations).build();
-		}
-
-		@Bean
-		DisposableBean tm1SessionShutdown(Tm1Session session) {
-			return () -> session.close().block(SHUTDOWN_WAIT);
-		}
-
-		@Bean
-		@ConditionalOnMissingBean
-		Tm1Client tm1Client(Tm1Session session) {
-			return Tm1Client.of(session);
-		}
-
-		@Bean(destroyMethod = "")
-		@ConditionalOnMissingBean
-		@ConditionalOnProperty(prefix = "tm1.pool", name = "enabled", havingValue = "true")
-		Tm1SessionPool tm1SessionPool(Tm1ConnectionDetails connection, Tm1Properties properties,
-				Environment environment, ObjectProvider<WebClient.Builder> webClient,
-				ObjectProvider<ObservationRegistry> observations) {
-			Tm1Properties.Pool pool = properties.pool();
-			return Tm1SessionPool.builder(sessionSettings(connection, properties, environment, webClient, observations))
-				.idleTimeout(pool.idleTimeout())
-				.maxAge(pool.maxAge())
-				.maxSize(pool.maxSize())
-				.closeGrace(pool.closeGrace())
-				.sweepInterval(pool.sweepInterval())
-				.build();
-		}
-
-		@Bean
-		@ConditionalOnBean(Tm1SessionPool.class)
-		DisposableBean tm1SessionPoolShutdown(Tm1SessionPool pool) {
-			return () -> pool.close().block(SHUTDOWN_WAIT);
-		}
-
 	}
 
 	/** The session settings the connection details and properties describe. */
@@ -131,6 +112,17 @@ public final class Tm1AutoConfiguration {
 		webClient.ifAvailable(settings::webClient);
 		observations.ifAvailable(settings::observationRegistry);
 		return settings;
+	}
+
+	/** The pool of sessions with {@code settings}, as {@code pool} configures it. */
+	static Tm1SessionPool pool(Tm1Session.Builder settings, Tm1Properties.Pool pool) {
+		return Tm1SessionPool.builder(settings)
+			.idleTimeout(pool.idleTimeout())
+			.maxAge(pool.maxAge())
+			.maxSize(pool.maxSize())
+			.closeGrace(pool.closeGrace())
+			.sweepInterval(pool.sweepInterval())
+			.build();
 	}
 
 	private static Tm1Timeouts timeouts(Tm1Properties.Timeouts configured) {

@@ -19,6 +19,8 @@ dependencies {
 	api(project(":tm1-spring-boot-starter"))
 	api(project(":tm1-testcontainers"))
 	api(libs.spring.boot.testcontainers)
+	// Tm1EnvironmentServers takes a @DynamicPropertySource's registry; a test that calls it has spring-test already
+	compileOnly(libs.spring.test)
 
 	// The examples show a @SpringBootTest and a @TestConfiguration
 	"examplesImplementation"(libs.spring.boot.test)
