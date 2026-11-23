@@ -1,5 +1,9 @@
 Skipcheck TM1
 Copyright 2026 Andrew Myers (https://ajmyers.net)
 
+The generated model and API (the names, types and descriptions of TM1's entities, properties and
+operations) are derived from the OData $metadata that IBM Planning Analytics (TM1) publishes
+for its REST API.
+
 Not affiliated with or endorsed by IBM. IBM, TM1 and Planning Analytics are trademarks of
 International Business Machines Corporation.
