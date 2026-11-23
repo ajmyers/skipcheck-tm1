@@ -28,6 +28,11 @@ jobs:
           java-version: '27'
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew build
+      # How many tests ran, passed and were skipped, in the job's summary: the live tests are
+      # skipped here, and this is where that shows as a number. It fails if nothing was tested
+      - name: Test counts
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test-summary.py >> "$GITHUB_STEP_SUMMARY"
 
   # Every source file starts with its license line; scripts/license-headers.py says which files
   # those are. The clients' own builds check their languages; this covers the rest too.
@@ -61,6 +66,9 @@ jobs:
       # runs pytest, which also checks layout and lint (tests/test_format.py, python/ruff.toml),
       # as the Java build's checkFormat and Error Prone
       - run: ./gradlew checkPython
+      - name: Test counts
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test-summary.py >> "$GITHUB_STEP_SUMMARY"
 
   # The .NET client, generated from spec/tm1-api.json at build time
   dotnet:
@@ -78,6 +86,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       # dotnet test, as on a developer's machine (build.gradle.kts)
       - run: ./gradlew checkDotnet
+      - name: Test counts
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test-summary.py >> "$GITHUB_STEP_SUMMARY"
 
   typescript:
     runs-on: ubuntu-latest
@@ -102,6 +113,9 @@ jobs:
       # eslint, tsc, then vitest) and the build, for the client and, as an npm workspace,
       # tm1-testcontainers. The live and container tests are skipped here, with no TM1 source
       - run: ./gradlew checkTypescript
+      - name: Test counts
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test-summary.py >> "$GITHUB_STEP_SUMMARY"
 
   # The repository's own tooling (scripts/tests): the commit message rules, the license line and
   # live traffic scripts, the git hooks run in repositories made for the test, and ShellCheck over
@@ -120,6 +134,9 @@ jobs:
           java-version: '27'
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew checkScripts
+      - name: Test counts
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test-summary.py >> "$GITHUB_STEP_SUMMARY"
       # The workflows themselves: expressions, job and step references, action inputs. Its
       # ShellCheck and pyflakes passes over the run steps are off: they can't see into expressions
       - name: actionlint

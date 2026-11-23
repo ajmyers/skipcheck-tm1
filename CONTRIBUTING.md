@@ -15,7 +15,8 @@ agreement to sign.
    parity tests. CI runs the same tasks, and a PR merges only when all of them pass. Every commit
    must build on its own: the pre-push hook builds each commit you push that the remote doesn't
    have yet, in a temporary worktree, and refuses the push if one fails. It skips TM1 tests (as CI
-   does), so run those by hand: `./gradlew liveTest --continue`.
+   does), so run those by hand: `./gradlew liveTest --continue`. `scripts/test-summary.py` prints
+   how many tests each suite ran, passed and skipped; CI puts it in each job's summary.
 
 ## Commit and PR messages
 
