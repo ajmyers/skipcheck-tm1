@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Generates the .NET client's model from the language-neutral API spec (spec/tm1-api.json),
 // as tm1-codegen does for Java and tm1_pygen for Python: run by the build (Tm1.Client.csproj's
 // GenerateTm1Model target) into obj/, never committed.

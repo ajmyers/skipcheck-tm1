@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Who sees a subset, and so which of a hierarchy's collections holds it, as the Java

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Who sees a view, and so which of a cube's collections holds it.</summary>

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 using Skipcheck.Tm1.Client.Tests.Live;
 using Skipcheck.Tm1.Testcontainers.Xunit;
 using LiveTm1 = Skipcheck.Tm1.Client.Tests.Live.Live;
