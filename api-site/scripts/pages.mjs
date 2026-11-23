@@ -177,4 +177,10 @@ for (const { project, content } of landings) {
 		'</main></body></html>\n';
 	await writeFile(path.join(out, 'index.html'), page);
 }
+// Each project's release, for pages built elsewhere that show it (the site's home page reads
+// /<project>/release.json): the version these pages describe, and whether it is a release
+for (const project of PROJECTS) {
+	await mkdir(path.join(distDir, project.id), { recursive: true });
+	await writeFile(path.join(distDir, project.id, 'release.json'), JSON.stringify(version) + '\n');
+}
 console.log('Landing pages: ' + landings.map(({ project }) => project.id).join(', ') + ' (version ' + version.version + (version.release ? '' : ', pre-release') + ')');
