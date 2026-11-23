@@ -1,0 +1,24 @@
+{
+  "example": "ConnectWalkthrough",
+  "language": "dotnet",
+  "regions": {
+    "list-cubes": {
+      "source": "7f6b22ab3ecd03be2ba2fb46301a9b8561690089f79fc0396a5b830079a8c895",
+      "output": [
+        "PNLCube",
+        "PriceCube",
+        "SalesByQuarterCube",
+        "SalesByQuarterCube-TotalModel",
+        "SalesCube",
+        "SalesCube_metrics",
+        "SalesPriorCube"
+      ]
+    },
+    "version": {
+      "source": "0210c6a9779544632ef32cacb6c3726d9cdc1b61f12acd338b69aa366c43e00f",
+      "output": [
+        "Connected to TM1 11.8.03500.6"
+      ]
+    }
+  }
+}

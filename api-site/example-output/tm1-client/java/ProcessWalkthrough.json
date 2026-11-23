@@ -1,0 +1,26 @@
+{
+  "example" : "ProcessWalkthrough",
+  "language" : "java",
+  "regions" : {
+    "check" : {
+      "source" : "8113ce966cad9ff0f3c82eb02d43695633e56d595de361a4982fedb75b827a17",
+      "output" : [ "Actual: 1526", "Budget: 1679" ]
+    },
+    "create" : {
+      "source" : "44b3ceafa4ffcbad8c1197eabf5cc90d1c62edfa19ce239d4f412d1b7ef7ac5e",
+      "output" : [ ]
+    },
+    "delete" : {
+      "source" : "71ec66c87c9abbc4f87fd608b824169a1fac2274108e77f80774bd716f204783",
+      "output" : [ ]
+    },
+    "fail" : {
+      "source" : "0d6d16a0f08f5260a25715487cadd08bcbf548e0139f83778ca22a15a280f440",
+      "output" : [ "Status: HasMinorErrors", "Error: Prolog procedure line (1): Invalid key: Dimension Name: \"month\", Element Name (Key): \"Febr\"", "Error: Prolog procedure line (1):     error repeats 1 times" ]
+    },
+    "run" : {
+      "source" : "8bf87c7200495e7aee9eacc9f9abf0813dde540f8124c24dcfc6fb41bd306def",
+      "output" : [ "Status: CompletedSuccessfully" ]
+    }
+  }
+}

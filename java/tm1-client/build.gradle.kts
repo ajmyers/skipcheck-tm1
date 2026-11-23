@@ -91,6 +91,14 @@ afterEvaluate {
 	}
 }
 
+// The tests run the walkthroughs' examples (src/examples) against TM1, and record what they print
+// for the docs (WalkthroughExamplesTm1Test), so the examples are on the tests' classpath
+sourceSets.test {
+	val examples = sourceSets["examples"].output
+	compileClasspath += examples
+	runtimeClasspath += examples
+}
+
 // The language-neutral API spec, which ApiSpecInventoryTest holds to this client's coverage gate
 tasks.withType<Test>().configureEach {
 	val spec = rootDir.resolve("spec/tm1-api.json")
