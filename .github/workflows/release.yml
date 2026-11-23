@@ -1,21 +1,38 @@
 # Release: the Java libraries to Maven Central, the Python packages to PyPI, the .NET packages to
-# NuGet and the TypeScript packages to npm.
+# NuGet and the TypeScript packages to npm, then the Docker images and the API docs.
 #
 #   Real release: push a tag like v0.1.0. Publishes that version everywhere, permanently.
 #   Dry run:      run this workflow manually (Actions tab, or `gh workflow run release.yml`).
 #                 Maven: uploads 0.0.0-dryrun.<run number> to the Central Portal for validation but
 #                 does NOT release it. Check it under Deployments, then Drop it.
-#                 Python, .NET and TypeScript: builds and checks the packages, and uploads nothing.
+#                 Python, .NET and TypeScript: builds and tests the packages, and uploads nothing.
 #   Pre-release:  a manual run with python_version (0.1.0.dev1, 0.1.0rc1), dotnet_version or
 #                 npm_version (0.1.0-dev.1, 0.1.0-rc.1) set publishes that version to PyPI, NuGet
 #                 or npm. A version can never be reused on any of them, even after deleting it.
 #
+# Nothing is published anywhere until everything has passed on the commit being released:
+#
+#   plan       the versions, and what this run publishes
+#   on-master  a tag must be a commit of master
+#   ci         the whole of CI (ci.yml): every client's tests, the scripts, the package tests
+#   package-*  each ecosystem's packages built with the release's version, installed somewhere
+#              clean and run (package-tests/README.md); the files are kept for the publish jobs
+#   gate       passes only when all of the above did
+#   publish-*  after the gate. PyPI, NuGet and npm get the very files that were tested. Maven
+#              Central gets a build of the same commit: its plugin builds what it uploads
+#   images, docs  the Docker images and the API docs of a tag, after the gate too
+#
+# A version can't be taken back from a registry, so a failure after the gate (a registry that's
+# down, say) leaves the others published: run the workflow again by hand for what's missing.
+#
 # Repo secrets needed:
 #   MAVEN_CENTRAL_USERNAME / MAVEN_CENTRAL_PASSWORD  - Central Portal user token
 #   SIGNING_KEY / SIGNING_KEY_PASSWORD               - ASCII-armored GPG private key
+#   CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID     - the API docs (api-docs.yml)
 # PyPI, NuGet and npm need none: each trusts this workflow by name (PyPI: each project's Publishing
 # settings; NuGet: the account's Trusted Publishing policy for Skipcheck.*; npm: each package's
-# Trusted Publisher setting), so renaming this file breaks publishing. NuGet also needs the repository variable NUGET_USER, the nuget.org user name.
+# Trusted Publisher setting), so renaming this file, or moving a publish step out of it, breaks
+# publishing. NuGet also needs the repository variable NUGET_USER, the nuget.org user name.
 name: Release
 
 on:
@@ -24,7 +41,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: Which registries to run
+        description: Which registries a manual run uploads to. Every package is built and tested whatever this says.
         type: choice
         options: [all, maven, python, dotnet, typescript]
         default: all
@@ -41,10 +58,109 @@ on:
         type: string
         default: ''
 
+permissions:
+  contents: read
+
 jobs:
-  publish:
-    if: github.event_name == 'push' || inputs.only == 'all' || inputs.only == 'maven'
+  plan:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      maven_version: ${{ steps.plan.outputs.maven_version }}
+      maven_task: ${{ steps.plan.outputs.maven_task }}
+      maven_upload: ${{ steps.plan.outputs.maven_upload }}
+      python_version: ${{ steps.plan.outputs.python_version }}
+      python_publish: ${{ steps.plan.outputs.python_publish }}
+      dotnet_version: ${{ steps.plan.outputs.dotnet_version }}
+      dotnet_publish: ${{ steps.plan.outputs.dotnet_publish }}
+      npm_version: ${{ steps.plan.outputs.npm_version }}
+      npm_publish: ${{ steps.plan.outputs.npm_publish }}
+      npm_tag: ${{ steps.plan.outputs.npm_tag }}
+    steps:
+      - name: Choose versions and what to publish
+        id: plan
+        # Passed via env, never interpolated into the script, so an input can't inject shell
+        env:
+          ONLY: ${{ inputs.only }}
+          PYTHON_VERSION: ${{ inputs.python_version }}
+          DOTNET_VERSION: ${{ inputs.dotnet_version }}
+          NPM_VERSION: ${{ inputs.npm_version }}
+        run: |
+          out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; echo "$1=$2"; }
+          # Whether a manual run includes this registry
+          chosen() { [ "$ONLY" = all ] || [ "$ONLY" = "$1" ]; }
+          # Only a pre-release by hand: a final version comes from a tag, with the other languages
+          semver='^[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*$'
+          pep440='^[0-9]+(\.[0-9]+)*(\.dev|a|b|rc)[0-9]+$'
+          prerelease() {  # prerelease NAME VALUE PATTERN EXAMPLES
+            if ! printf '%s' "$2" | grep -Eq "$3"; then
+              echo "$1 must be a pre-release such as $4, not '$2'" >&2
+              exit 1
+            fi
+          }
+
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            out maven_version "$version"; out maven_task publishAndReleaseToMavenCentral; out maven_upload true
+            out python_version "$version"; out python_publish true
+            out dotnet_version "$version"; out dotnet_publish true
+            out npm_version "$version"; out npm_publish true
+            npm_version="$version"; npm_prerelease_tag=next
+          else
+            # Uploaded to the Central Portal for validation, never released
+            out maven_version "0.0.0-dryrun.$GITHUB_RUN_NUMBER"; out maven_task publishToMavenCentral
+            if chosen maven; then out maven_upload true; else out maven_upload false; fi
+
+            if [ -n "$PYTHON_VERSION" ] && chosen python; then
+              prerelease python_version "$PYTHON_VERSION" "$pep440" "0.1.0.dev1 or 0.1.0rc1"
+              out python_version "$PYTHON_VERSION"; out python_publish true
+            else
+              out python_version "0.0.0.dev$GITHUB_RUN_NUMBER"; out python_publish false
+            fi
+
+            if [ -n "$DOTNET_VERSION" ] && chosen dotnet; then
+              prerelease dotnet_version "$DOTNET_VERSION" "$semver" "0.1.0-dev.1 or 0.1.0-rc.1"
+              out dotnet_version "$DOTNET_VERSION"; out dotnet_publish true
+            else
+              out dotnet_version "0.0.0-dryrun.$GITHUB_RUN_NUMBER"; out dotnet_publish false
+            fi
+
+            if [ -n "$NPM_VERSION" ] && chosen typescript; then
+              prerelease npm_version "$NPM_VERSION" "$semver" "0.1.0-dev.1 or 0.1.0-rc.1"
+              npm_version="$NPM_VERSION"; out npm_publish true
+            else
+              npm_version="0.0.0-dryrun.$GITHUB_RUN_NUMBER"; out npm_publish false
+            fi
+            out npm_version "$npm_version"; npm_prerelease_tag=dev
+          fi
+          # npm install takes "latest" by default, so only a final version gets it
+          case "$npm_version" in *-*) out npm_tag "$npm_prerelease_tag" ;; *) out npm_tag latest ;; esac
+
+  # A tag anywhere else would publish code that master's checks never saw
+  on-master:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: The tag is a commit of master
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) isn't a commit of master: nothing is published" >&2
+            exit 1
+          fi
+
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  # The Java libraries with the release's version: built, published to a Maven repository in the
+  # build folder, and used from there by an application
+  package-java:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -52,86 +168,208 @@ jobs:
           distribution: temurin
           java-version: '27'
       - uses: gradle/actions/setup-gradle@v6
-
-      - name: Choose version and publish task
-        id: plan
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-            echo "task=publishAndReleaseToMavenCentral" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=0.0.0-dryrun.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
-            echo "task=publishToMavenCentral" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish ${{ steps.plan.outputs.version }}
-        run: ./gradlew build ${{ steps.plan.outputs.task }} -Pversion=${{ steps.plan.outputs.version }} --no-configuration-cache
+      - name: Build and test ${{ needs.plan.outputs.maven_version }}
         env:
-          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          VERSION: ${{ needs.plan.outputs.maven_version }}
+        run: ./gradlew build packageTestJava "-Pversion=$VERSION" --no-configuration-cache
 
-  # One job per package, so one can be run again without the other
-  python:
-    if: github.event_name == 'push' || inputs.only == 'all' || inputs.only == 'python'
+  package-python:
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        package: [tm1-client, tm1-testcontainers]
-    permissions:
-      contents: read
-      # PyPI takes this job's identity token instead of a password (trusted publishing)
-      id-token: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-
-      - name: Choose version
-        id: plan
-        # Passed via env, never interpolated into the script, so the input can't inject shell
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '27'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Set version ${{ needs.plan.outputs.python_version }}
         env:
-          PYTHON_VERSION: ${{ inputs.python_version }}
+          VERSION: ${{ needs.plan.outputs.python_version }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          elif [ -n "$PYTHON_VERSION" ]; then
-            # Only a pre-release by hand: a final version comes from a tag, with the other languages
-            if ! printf '%s' "$PYTHON_VERSION" | grep -Eq '^[0-9]+(\.[0-9]+)*(\.dev|a|b|rc)[0-9]+$'; then
-              echo "python_version must be a pre-release such as 0.1.0.dev1 or 0.1.0rc1, not '$PYTHON_VERSION'" >&2
-              exit 1
-            fi
-            echo "version=$PYTHON_VERSION" >> "$GITHUB_OUTPUT"
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=0.0.0.dev$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          fi
+          for package in tm1-client tm1-testcontainers; do
+            sed -i -E "s/^version = \".*\"/version = \"$VERSION\"/" "python/$package/pyproject.toml"
+            grep -q "^version = \"$VERSION\"" "python/$package/pyproject.toml"
+          done
+      # Builds the wheels and sdists into build/packages/python, installs each kind into an empty
+      # environment and runs it
+      - name: Build and test the packages
+        run: ./gradlew packageTestPython
+      # A wheel and an sdist of each package. Not counted by version: the file names carry it as
+      # Python writes it (1.2.3rc1 for the tag v1.2.3-rc.1)
+      - name: Check the packages' metadata
+        run: |
+          ls build/packages/python
+          test "$(ls build/packages/python | wc -l)" -eq 4
+          python -m pip install --quiet twine
+          python -m twine check --strict build/packages/python/*
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-packages
+          path: build/packages/python
+          if-no-files-found: error
 
-      - name: Build ${{ steps.plan.outputs.version }}
-        working-directory: python/${{ matrix.package }}
+  package-dotnet:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '27'
+      - uses: gradle/actions/setup-gradle@v6
+      # The client and its testcontainers: the only packable projects of the solution
+      - name: Pack ${{ needs.plan.outputs.dotnet_version }}
         env:
-          VERSION: ${{ steps.plan.outputs.version }}
+          VERSION: ${{ needs.plan.outputs.dotnet_version }}
         run: |
-          sed -i -E "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
-          grep -q "^version = \"$VERSION\"" pyproject.toml
-          python -m pip install --quiet build twine
-          python -m build --outdir "$GITHUB_WORKSPACE/dist"
-          python -m twine check --strict "$GITHUB_WORKSPACE"/dist/*
+          dotnet pack dotnet/Tm1.slnx -c Release -o build/packages/dotnet "-p:Version=$VERSION"
+          ls build/packages/dotnet
+          test "$(ls build/packages/dotnet/*."$VERSION".nupkg | wc -l)" -eq 2
+      # Builds an application against the files just packed, and runs it
+      - name: Test the packages
+        run: ./gradlew packageTestDotnet -PprebuiltPackages
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dotnet-packages
+          path: build/packages/dotnet/*.nupkg
+          if-no-files-found: error
 
-      - name: Publish ${{ steps.plan.outputs.version }} to PyPI
-        if: steps.plan.outputs.publish == 'true'
+  package-typescript:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '27'
+      - uses: gradle/actions/setup-gradle@v6
+      - run: npm ci
+        working-directory: typescript
+      - name: Set version ${{ needs.plan.outputs.npm_version }}
+        working-directory: typescript
+        env:
+          VERSION: ${{ needs.plan.outputs.npm_version }}
+        run: |
+          npm version "$VERSION" --no-git-tag-version --allow-same-version -w tm1-client -w tm1-testcontainers
+          # The testcontainers work with the client they were released with. Written out, because
+          # the "*" the workspace uses never matches a pre-release
+          npm pkg set "peerDependencies.@skipcheck/tm1-client=^$VERSION" -w tm1-testcontainers
+      # Packs both into build/packages/npm (each builds as it's packed), installs the tarballs
+      # into an empty project and runs them
+      - name: Pack and test the packages
+        run: ./gradlew packageTestTypescript
+      - name: Check the tarballs
+        env:
+          VERSION: ${{ needs.plan.outputs.npm_version }}
+        run: |
+          ls build/packages/npm
+          test "$(ls build/packages/npm/*-"$VERSION".tgz | wc -l)" -eq 2
+      - uses: actions/upload-artifact@v7
+        with:
+          name: npm-packages
+          path: build/packages/npm/*.tgz
+          if-no-files-found: error
+
+  # What every publish job waits for: it passes only when CI and every package job did, and the
+  # tag is on master. It always runs: a job skipped because one it needs failed would let the
+  # jobs after it start. on-master is skipped for a manual run, which has no tag.
+  gate:
+    if: always()
+    needs: [plan, on-master, ci, package-java, package-python, package-dotnet, package-typescript]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Everything passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          MANUAL: ${{ github.event_name != 'push' }}
+        run: |
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$RESULTS" | jq -e --argjson manual "$MANUAL" \
+            'to_entries | all(.value.result == "success" or (.key == "on-master" and $manual and .value.result == "skipped"))' > /dev/null
+
+  # Each publish job names the gate's result. Without a status check of its own in "if", a job is
+  # skipped when any job before it was, however far back, and a manual run skips on-master
+  publish-maven:
+    needs: [plan, gate]
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.plan.outputs.maven_upload == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '27'
+      - uses: gradle/actions/setup-gradle@v6
+      # Builds again what package-java built and tested, from the same commit: the plugin uploads
+      # what it builds, and can't be handed jars
+      - name: Publish ${{ needs.plan.outputs.maven_version }}
+        env:
+          VERSION: ${{ needs.plan.outputs.maven_version }}
+          TASK: ${{ needs.plan.outputs.maven_task }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: ./gradlew "$TASK" "-Pversion=$VERSION" --no-configuration-cache
+
+  # One job per package, so one can be run again without the other
+  publish-python:
+    needs: [plan, gate]
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.plan.outputs.python_publish == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: tm1-client
+            files: 'skipcheck_tm1-[0-9]*'
+          - package: tm1-testcontainers
+            files: 'skipcheck_tm1_testcontainers-[0-9]*'
+    permissions:
+      contents: read
+      # PyPI takes this job's identity token instead of a password (trusted publishing)
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-packages
+          path: packages
+      - name: The files of ${{ matrix.package }}
+        env:
+          FILES: ${{ matrix.files }}
+        run: |
+          mkdir dist
+          cp packages/$FILES dist/
+          ls dist
+          test "$(ls dist | wc -l)" -eq 2
+      - name: Publish ${{ needs.plan.outputs.python_version }} to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist
 
-  dotnet:
-    if: github.event_name == 'push' || inputs.only == 'all' || inputs.only == 'dotnet'
+  publish-dotnet:
+    needs: [plan, gate]
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.plan.outputs.dotnet_publish == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -139,56 +377,26 @@ jobs:
       # NuGet takes this job's identity token instead of a stored API key (trusted publishing)
       id-token: write
     steps:
-      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
-
-      - name: Choose version
-        id: plan
-        env:
-          DOTNET_VERSION: ${{ inputs.dotnet_version }}
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          elif [ -n "$DOTNET_VERSION" ]; then
-            # Only a pre-release by hand: a final version comes from a tag, with the other languages
-            if ! printf '%s' "$DOTNET_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*$'; then
-              echo "dotnet_version must be a pre-release such as 0.1.0-dev.1 or 0.1.0-rc.1, not '$DOTNET_VERSION'" >&2
-              exit 1
-            fi
-            echo "version=$DOTNET_VERSION" >> "$GITHUB_OUTPUT"
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=0.0.0-dryrun.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # The client and its testcontainers: the only packable projects of the solution
-      - name: Pack ${{ steps.plan.outputs.version }}
-        env:
-          VERSION: ${{ steps.plan.outputs.version }}
-        run: |
-          dotnet pack dotnet/Tm1.slnx -c Release -o nupkg "-p:Version=$VERSION"
-          ls nupkg
-          test "$(ls nupkg/*.nupkg | wc -l)" -eq 2
-
+      - uses: actions/download-artifact@v8
+        with:
+          name: dotnet-packages
+          path: nupkg
       - name: Log in to NuGet
-        if: steps.plan.outputs.publish == 'true'
         id: nuget
         uses: NuGet/login@v1
         with:
           user: ${{ vars.NUGET_USER }}
-
-      - name: Publish ${{ steps.plan.outputs.version }} to NuGet
-        if: steps.plan.outputs.publish == 'true'
+      - name: Publish ${{ needs.plan.outputs.dotnet_version }} to NuGet
         env:
           NUGET_API_KEY: ${{ steps.nuget.outputs.NUGET_API_KEY }}
         run: dotnet nuget push 'nupkg/*.nupkg' --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
 
-  typescript:
-    if: github.event_name == 'push' || inputs.only == 'all' || inputs.only == 'typescript'
+  publish-typescript:
+    needs: [plan, gate]
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.plan.outputs.npm_publish == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -196,61 +404,37 @@ jobs:
       # npm takes this job's identity token instead of a stored token (trusted publishing), and
       # records the commit and workflow that built each package (provenance)
       id-token: write
-    defaults:
-      run:
-        working-directory: typescript
     steps:
-      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           # Trusted publishing needs npm 11.5.1 or later, which Node 24 brings
           node-version: '24'
           registry-url: https://registry.npmjs.org
-          cache: npm
-          cache-dependency-path: typescript/package-lock.json
-      - run: npm ci
-
-      - name: Choose version
-        id: plan
+      - uses: actions/download-artifact@v8
+        with:
+          name: npm-packages
+          path: packages
+      # The client first: the testcontainers name it as a peer
+      - name: Publish ${{ needs.plan.outputs.npm_version }} to npm
         env:
-          NPM_VERSION: ${{ inputs.npm_version }}
+          TAG: ${{ needs.plan.outputs.npm_tag }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            version="${GITHUB_REF_NAME#v}"
-            publish=true
-            prerelease_tag=next
-          elif [ -n "$NPM_VERSION" ]; then
-            # Only a pre-release by hand: a final version comes from a tag, with the other languages
-            if ! printf '%s' "$NPM_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*$'; then
-              echo "npm_version must be a pre-release such as 0.1.0-dev.1 or 0.1.0-rc.1, not '$NPM_VERSION'" >&2
-              exit 1
-            fi
-            version="$NPM_VERSION"
-            publish=true
-            prerelease_tag=dev
-          else
-            version="0.0.0-dryrun.$GITHUB_RUN_NUMBER"
-            publish=false
-            prerelease_tag=dev
-          fi
-          # npm install takes "latest" by default, so only a final version gets it
-          case "$version" in *-*) tag="$prerelease_tag" ;; *) tag=latest ;; esac
-          { echo "version=$version"; echo "publish=$publish"; echo "tag=$tag"; } >> "$GITHUB_OUTPUT"
+          ls packages
+          npm publish packages/skipcheck-tm1-client-*.tgz --provenance --tag "$TAG"
+          npm publish packages/skipcheck-tm1-testcontainers-*.tgz --provenance --tag "$TAG"
 
-      - name: Set version ${{ steps.plan.outputs.version }}
-        env:
-          VERSION: ${{ steps.plan.outputs.version }}
-        run: |
-          npm version "$VERSION" --no-git-tag-version --allow-same-version -w tm1-client -w tm1-testcontainers
-          # The testcontainers work with the client they were released with. Written out, because
-          # the "*" the workspace uses never matches a pre-release
-          npm pkg set "peerDependencies.@skipcheck/tm1-client=^$VERSION" -w tm1-testcontainers
+  # The Docker images of a tag (:1.2.3, :1.2, :latest), after the same gate
+  images:
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.result == 'success' && github.event_name == 'push' }}
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/docker.yml
 
-      # The client first: the testcontainers build against it. Each package builds as it's packed
-      - name: Pack without publishing
-        if: steps.plan.outputs.publish != 'true'
-        run: npm publish --dry-run --tag "${{ steps.plan.outputs.tag }}" -w tm1-client -w tm1-testcontainers
-
-      - name: Publish ${{ steps.plan.outputs.version }} to npm
-        if: steps.plan.outputs.publish == 'true'
-        run: npm publish --provenance --tag "${{ steps.plan.outputs.tag }}" -w tm1-client -w tm1-testcontainers
+  # The API docs of a tag, after the same gate
+  docs:
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.result == 'success' && github.event_name == 'push' }}
+    uses: ./.github/workflows/api-docs.yml
+    secrets: inherit
