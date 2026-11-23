@@ -91,7 +91,7 @@ def compare(original: Any, written: Any, path: str, differences: list[str], unkn
 
 
 @pytest.mark.parametrize("payload", sorted(ROUND_TRIPS))
-def test_reads_and_writes_back_what_tm1_sent(payload: str) -> None:
+def test_decodes_and_encodes_back_to_the_same_json(payload: str) -> None:
     cls = ROUND_TRIPS[payload]
     original = json.loads((PAYLOADS / "11.8.35" / f"{payload}.json").read_text(encoding="utf-8"))
     items = original["value"] if isinstance(original.get("value"), list) else [original]
