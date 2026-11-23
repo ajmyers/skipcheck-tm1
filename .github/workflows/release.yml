@@ -199,12 +199,12 @@ jobs:
       # environment and runs it
       - name: Build and test the packages
         run: ./gradlew packageTestPython
+      # A wheel and an sdist of each package. Not counted by version: the file names carry it as
+      # Python writes it (1.2.3rc1 for the tag v1.2.3-rc.1)
       - name: Check the packages' metadata
-        env:
-          VERSION: ${{ needs.plan.outputs.python_version }}
         run: |
           ls build/packages/python
-          test "$(ls build/packages/python/*"$VERSION"* | wc -l)" -eq 4
+          test "$(ls build/packages/python | wc -l)" -eq 4
           python -m pip install --quiet twine
           python -m twine check --strict build/packages/python/*
       - uses: actions/upload-artifact@v7
@@ -305,9 +305,11 @@ jobs:
           echo "$RESULTS" | jq -e --argjson manual "$MANUAL" \
             'to_entries | all(.value.result == "success" or (.key == "on-master" and $manual and .value.result == "skipped"))' > /dev/null
 
+  # Each publish job names the gate's result. Without a status check of its own in "if", a job is
+  # skipped when any job before it was, however far back, and a manual run skips on-master
   publish-maven:
     needs: [plan, gate]
-    if: needs.plan.outputs.maven_upload == 'true'
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.plan.outputs.maven_upload == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -332,7 +334,7 @@ jobs:
   # One job per package, so one can be run again without the other
   publish-python:
     needs: [plan, gate]
-    if: needs.plan.outputs.python_publish == 'true'
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.plan.outputs.python_publish == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -367,7 +369,7 @@ jobs:
 
   publish-dotnet:
     needs: [plan, gate]
-    if: needs.plan.outputs.dotnet_publish == 'true'
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.plan.outputs.dotnet_publish == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -394,7 +396,7 @@ jobs:
 
   publish-typescript:
     needs: [plan, gate]
-    if: needs.plan.outputs.npm_publish == 'true'
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.plan.outputs.npm_publish == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -424,7 +426,7 @@ jobs:
   # The Docker images of a tag (:1.2.3, :1.2, :latest), after the same gate
   images:
     needs: gate
-    if: github.event_name == 'push'
+    if: ${{ !cancelled() && needs.gate.result == 'success' && github.event_name == 'push' }}
     permissions:
       contents: read
       packages: write
@@ -433,6 +435,6 @@ jobs:
   # The API docs of a tag, after the same gate
   docs:
     needs: gate
-    if: github.event_name == 'push'
+    if: ${{ !cancelled() && needs.gate.result == 'success' && github.event_name == 'push' }}
     uses: ./.github/workflows/api-docs.yml
     secrets: inherit
