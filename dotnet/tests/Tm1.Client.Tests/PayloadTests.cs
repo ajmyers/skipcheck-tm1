@@ -37,7 +37,7 @@ public class PayloadTests
 
     [Theory]
     [MemberData(nameof(Payloads))]
-    public void ReadsAndWritesBackWhatTm1Sent(string payload, Type type)
+    public void DecodesAndEncodesBackToTheSameJson(string payload, Type type)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(Repo.Payloads, payload + ".json")));
         var items = doc.RootElement.TryGetProperty("value", out var v) && v.ValueKind == JsonValueKind.Array ? v.EnumerateArray().ToList() : [doc.RootElement];
