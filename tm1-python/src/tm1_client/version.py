@@ -142,10 +142,7 @@ class Tm1Capability:
     def __eq__(self, other: object) -> bool:
         # Equal whatever version it was added in, as in Java (the record compares all four,
         # but tests compare capabilities made with and without since(); keep it strict)
-        return (
-            isinstance(other, Tm1Capability)
-            and (self.kind, self.type, self.name, self.added_in) == (other.kind, other.type, other.name, other.added_in)
-        )
+        return isinstance(other, Tm1Capability) and (self.kind, self.type, self.name, self.added_in) == (other.kind, other.type, other.name, other.added_in)
 
     def __hash__(self) -> int:
         return hash((self.kind, self.type, self.name, self.added_in))
@@ -238,16 +235,19 @@ class Tm1Capabilities:
                         info.members.add(nav.get("Name", ""))
                         endpoints.add(f"Navigation {t.get('Name')}/{nav.get('Name')}")
             for c in schema.findall(f"{_EDM}EntityContainer"):
-                for tag, kind in (("EntitySet", "EntitySet"), ("Singleton", "Singleton"), ("ActionImport", "ActionImport"), ("FunctionImport", "FunctionImport")):
+                for tag, kind in (
+                    ("EntitySet", "EntitySet"),
+                    ("Singleton", "Singleton"),
+                    ("ActionImport", "ActionImport"),
+                    ("FunctionImport", "FunctionImport"),
+                ):
                     for item in c.findall(f"{_EDM}{tag}"):
                         endpoints.add(f"{kind} {item.get('Name')}")
                         container["Import" if "Import" in kind else kind].add(item.get("Name", ""))
         return Tm1Capabilities(version, product_version, frozenset(endpoints), types, bound, container, aliases)
 
     def with_product_version(self, product_version: Tm1Version | None) -> Tm1Capabilities:
-        return Tm1Capabilities(
-            self._schema_version, product_version, self.endpoints, self._types, self._bound, self._container, self._aliases
-        )
+        return Tm1Capabilities(self._schema_version, product_version, self.endpoints, self._types, self._bound, self._container, self._aliases)
 
     @property
     def schema_version(self) -> str | None:
@@ -297,9 +297,7 @@ class Tm1Capabilities:
             message += f": it was added in schema {added}, and "
         else:
             message += " ("
-        message += (
-            f"the server reports schema {self._schema_version}" if self._schema_version else "the server reports no schema version"
-        )
+        message += f"the server reports schema {self._schema_version}" if self._schema_version else "the server reports no schema version"
         if self._product_version is not None:
             message += f", product version {self._product_version}"
         if not added:

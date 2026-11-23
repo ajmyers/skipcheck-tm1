@@ -94,9 +94,7 @@ def test_reads_and_classifies_plain_text_errors() -> None:
 def test_classifies_captured_responses() -> None:
     nope = api(404, msg("'NoSuchCube' can not be found in collection of type 'Cube'."))
     assert isinstance(nope, Tm1NotFoundError) and nope.kind is Tm1ErrorKind.NOT_FOUND
-    assert str(nope) == (
-        "TM1 returned 404: 'NoSuchCube' can not be found in collection of type 'Cube'. [code 278] (GET Cubes('NoSuchCube'))"
-    )
+    assert str(nope) == ("TM1 returned 404: 'NoSuchCube' can not be found in collection of type 'Cube'. [code 278] (GET Cubes('NoSuchCube'))")
     assert isinstance(api(501, msg("$search not implemented.")), Tm1NotImplementedError)
     assert isinstance(api(412, msg("")), Tm1PreconditionFailedError)
     multipart = api(400, msg("The content type specified is not supported. Please use JSON (application/json) as the content type."))
@@ -108,7 +106,9 @@ def test_classifies_known_messages() -> None:
     assert api(400, msg("The user specified in the impersonation request does not exist")).kind is Tm1ErrorKind.UNKNOWN_USER
     assert api(400, msg("TM1UserException: Cancel")).kind is Tm1ErrorKind.CANCELLED
     assert api(400, msg("DataSpreadFailed")).kind is Tm1ErrorKind.DATA_SPREAD_FAILED
-    assert api(400, {"error": {"code": "248", "message": "Invalid element unique name specified in dimensional context"}}).kind is Tm1ErrorKind.INVALID_UNIQUE_NAME
+    assert (
+        api(400, {"error": {"code": "248", "message": "Invalid element unique name specified in dimensional context"}}).kind is Tm1ErrorKind.INVALID_UNIQUE_NAME
+    )
     assert isinstance(api(400, msg("Dimension 'Region' already exists")), Tm1ConflictError)
     assert isinstance(api(400, msg("ObjectNotFound")), Tm1NotFoundError)
     assert api(400, msg("Object is locked by another user")).kind is Tm1ErrorKind.LOCKED
@@ -170,7 +170,9 @@ def test_writes_options_in_a_fixed_order() -> None:
 
 
 def test_nests_expand_options_with_semicolons() -> None:
-    query = ODataQuery.none().select("Name").expand("Hierarchies", lambda h: h.select("Name").expand("Elements", lambda e: e.select("Name").top(1))).expand("Cube")
+    query = (
+        ODataQuery.none().select("Name").expand("Hierarchies", lambda h: h.select("Name").expand("Elements", lambda e: e.select("Name").top(1))).expand("Cube")
+    )
     assert str(query) == "$select=Name&$expand=Hierarchies($select=Name;$expand=Elements($select=Name;$top=1)),Cube"
     # '=' inside a nested option is encoded; TM1 accepts it
     assert query.to_query_string() == "$select=Name&$expand=Hierarchies($select%3DName;$expand%3DElements($select%3DName;$top%3D1)),Cube"

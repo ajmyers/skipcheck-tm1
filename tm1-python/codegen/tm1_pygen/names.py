@@ -22,7 +22,6 @@ _MODEL_RESERVED = {
     "update_forward_refs",
     "validate",
     "fields",
-
     "odata_type",
     "odata_name",
     "odata_subtypes",

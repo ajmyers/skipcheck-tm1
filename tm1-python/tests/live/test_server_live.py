@@ -30,9 +30,7 @@ def test_reads_the_server_and_its_configurations(tm1: Tm1Client) -> None:
     tm1.server.update_static_configuration(ServerSettingsPatch.builder().server_name(fixed.server_name).build())
     with pytest.raises(Tm1BadRequestError):
         # The active configuration is read only
-        tm1.session.execute(
-            Tm1Request.patch(ODataPath.of("ActiveConfiguration"), ServerSettingsPatch.builder().server_name(active.server_name).build())
-        )
+        tm1.session.execute(Tm1Request.patch(ODataPath.of("ActiveConfiguration"), ServerSettingsPatch.builder().server_name(active.server_name).build()))
     # A duration here, though declared Int32
     assert isinstance(active.access.cam.client_ping_cam_passport, str)
 

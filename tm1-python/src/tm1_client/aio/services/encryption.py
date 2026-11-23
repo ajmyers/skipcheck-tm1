@@ -136,9 +136,7 @@ def _file(source: str, destination: str, type: EncryptionFileType) -> dict[str, 
 def _shutdown(time_until_shutdown: float | timedelta | None) -> dict[str, Any]:
     if time_until_shutdown is None:
         return {}
-    value = (
-        time_until_shutdown if isinstance(time_until_shutdown, timedelta) else timedelta(seconds=time_until_shutdown)
-    )
+    value = time_until_shutdown if isinstance(time_until_shutdown, timedelta) else timedelta(seconds=time_until_shutdown)
     return {"TimeUntilShutdown": duration(value)}
 
 

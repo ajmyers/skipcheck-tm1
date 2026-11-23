@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import datetime as _dt
-from typing import Any, Callable, Mapping
+from collections.abc import Callable, Mapping
+from typing import Any
 
 from ..._calls import endpoint
 from ..._generated.model import (
@@ -315,9 +316,7 @@ class ProcessDebugService(Service):
     """How many times :meth:`finish` resumes a run that keeps pausing before giving up."""
 
     @endpoint("Action Process/Debug")
-    async def debug(
-        self, process: str, parameters: Mapping[str, Any] | None = None, query: ODataQuery | None = None, **options: Any
-    ) -> ProcessDebugContext:
+    async def debug(self, process: str, parameters: Mapping[str, Any] | None = None, query: ODataQuery | None = None, **options: Any) -> ProcessDebugContext:
         """``tm1.Debug``: starts debugging a process, with its parameters by name, in order;
         returns the debug context, with its ``ID``."""
         operation = Tm1Operations.PROCESS_DEBUG
@@ -326,9 +325,7 @@ class ProcessDebugService(Service):
         return await self._session.execute(request.with_query(ODataQuery.of(query, **options)).requires(operation.capability()))
 
     @endpoint("Action Process/Debug", "EntitySet ProcessDebugContexts")
-    async def debugging(
-        self, process: str, parameters: Mapping[str, Any] | None, work: Callable[[ProcessDebugContext], Any]
-    ) -> Any:
+    async def debugging(self, process: str, parameters: Mapping[str, Any] | None, work: Callable[[ProcessDebugContext], Any]) -> Any:
         """Debugs a process for the length of ``work`` (given the context: set breakpoints,
         step, read variables; a coroutine function in the asyncio flavor), then finishes the run, however the work ends. TM1 (11.8) refuses
         to delete a debug context, so finishing it is how the run ends. Returns what the work
@@ -404,9 +401,7 @@ class ProcessDebugService(Service):
         body = body_of(_require(breakpoint, "breakpoint"))
         number = body.get("ID") if isinstance(body, dict) else None
         if isinstance(number, bool) or not isinstance(number, int) or number < 0:
-            raise ValueError(
-                "A breakpoint needs an ID of 0 or more: TM1 stores one without as -1, which can't be changed or removed"
-            )
+            raise ValueError("A breakpoint needs an ID of 0 or more: TM1 stores one without as -1, which can't be changed or removed")
         request = Tm1Request.post(_context(id).nav("Breakpoints"), breakpoint, ProcessDebugContextBreakpoint)
         return await self._session.execute(request)
 
@@ -421,14 +416,10 @@ class ProcessDebugService(Service):
         await self._session.execute(Tm1Request.delete(_context(id).nav("Breakpoints").key(breakpoint)))
 
     @endpoint("Navigation ProcessDebugContext/CurrentBreakpoint")
-    async def current_breakpoint(
-        self, id: str, query: ODataQuery | None = None, **options: Any
-    ) -> ProcessDebugContextBreakpoint | None:
+    async def current_breakpoint(self, id: str, query: ODataQuery | None = None, **options: Any) -> ProcessDebugContextBreakpoint | None:
         """``GET …/CurrentBreakpoint``: the breakpoint the run is paused at, or None if it
         isn't paused at one."""
-        request = Tm1Request.get(
-            _context(id).nav("CurrentBreakpoint"), ODataQuery.of(query, **options), ProcessDebugContextBreakpoint | None
-        )
+        request = Tm1Request.get(_context(id).nav("CurrentBreakpoint"), ODataQuery.of(query, **options), ProcessDebugContextBreakpoint | None)
         return await self._session.execute(request)
 
     @endpoint("Navigation ProcessDebugContext/CallStack")
@@ -438,9 +429,7 @@ class ProcessDebugService(Service):
         return await self._session.collect(request)
 
     @endpoint("Navigation ProcessDebugContextStackFrame/Variables")
-    async def variables(
-        self, id: str, frame: str, query: ODataQuery | None = None, **options: Any
-    ) -> list[ProcessDebugContextVariable]:
+    async def variables(self, id: str, frame: str, query: ODataQuery | None = None, **options: Any) -> list[ProcessDebugContextVariable]:
         """``GET …/CallStack('frame')/Variables``: the frame's variables and their values.
         TM1 (11.8) lists TurboIntegrator's own variables (``NVALUE``, ``DATASOURCE…``), not the
         process's local ones."""

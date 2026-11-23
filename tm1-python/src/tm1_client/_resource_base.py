@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any, ClassVar
 
 from .base import Tm1Model
 from .errors import Tm1UnsupportedOperationError
@@ -60,5 +61,3 @@ class _CollectionBase(_Base):
             raise ValueError(f"{self.model.__name__} has a compound key: {self.key_names}")
         entity_forbid = {k: v for k, v in self._forbidden.items() if k in ("delete", "update")}
         return self.entity(self._session, self._path.key(key), entity_forbid)
-
-

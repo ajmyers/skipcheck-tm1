@@ -30,6 +30,7 @@ from pydantic import (
     ConfigDict,
     TypeAdapter,
     ValidationError,
+    ValidationInfo,
     field_serializer,
     field_validator,
     model_validator,

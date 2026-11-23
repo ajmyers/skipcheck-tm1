@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import enum
 import functools
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from typing import Any, Generic, Mapping, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import TypeAdapter
 
@@ -28,7 +29,7 @@ __all__ = ["Tm1Request"]
 T = TypeVar("T")
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _adapter(tp: Any) -> TypeAdapter[Any]:
     return TypeAdapter(tp)
 
@@ -184,7 +185,19 @@ class Tm1Request(Generic[T]):
         raw = self.response is r.BYTES or isinstance(self.body, (bytes, bytearray))
         if isinstance(self.body, (bytes, bytearray)):
             headers = {**self.headers, "Content-Type": self.content_type or "application/octet-stream"}
-            return Call(self.method, str(self.path), self.query, None, bytes(self.body), headers, _accept(self.response), self.read, raw=True, requires=self.capability, timeout=self.timeout)
+            return Call(
+                self.method,
+                str(self.path),
+                self.query,
+                None,
+                bytes(self.body),
+                headers,
+                _accept(self.response),
+                self.read,
+                raw=True,
+                requires=self.capability,
+                timeout=self.timeout,
+            )
         return Call(
             self.method,
             str(self.path),

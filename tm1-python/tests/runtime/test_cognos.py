@@ -41,7 +41,9 @@ FLAVORS = {
 def test_logs_on_for_a_fresh_passport_each_time(flavor: str) -> None:
     passports_of, _, client = FLAVORS[flavor]
     cognos = Cognos()
-    passports = passports_of.password("http://cognos:9300/bi/", "LDAP", "alice", "secret", http_client=lambda: client(transport=httpx.MockTransport(cognos.handler)))
+    passports = passports_of.password(
+        "http://cognos:9300/bi/", "LDAP", "alice", "secret", http_client=lambda: client(transport=httpx.MockTransport(cognos.handler))
+    )
     assert run(passports()) == "passport-1"
     assert run(passports()) == "passport-2"
     assert cognos.bodies[0] == {
@@ -57,7 +59,9 @@ def test_logs_on_for_a_fresh_passport_each_time(flavor: str) -> None:
 def test_sends_an_id_token_rather_than_a_password(flavor: str) -> None:
     passports_of, _, client = FLAVORS[flavor]
     cognos = Cognos()
-    passports = passports_of.id_token("http://cognos:9300", "OIDC", lambda: "eyJ.token", http_client=lambda: client(transport=httpx.MockTransport(cognos.handler)))
+    passports = passports_of.id_token(
+        "http://cognos:9300", "OIDC", lambda: "eyJ.token", http_client=lambda: client(transport=httpx.MockTransport(cognos.handler))
+    )
     assert run(passports()) == "passport-1"
     assert {"name": "CAMOIDCIdToken", "value": "eyJ.token"} in cognos.bodies[0]["parameters"]
 

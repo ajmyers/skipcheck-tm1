@@ -258,9 +258,7 @@ class Tm1ApiError(Tm1Error):
         self.error = error
 
     @staticmethod
-    def of(
-        status: int, error: ODataError | None, method: str, url: str, classifier: Tm1ErrorClassifier | None = None
-    ) -> Tm1ApiError:
+    def of(status: int, error: ODataError | None, method: str, url: str, classifier: Tm1ErrorClassifier | None = None) -> Tm1ApiError:
         """The exception for a refusal, of the class its kind (by ``classifier``) calls for."""
         kind = (classifier or _DEFAULTS).classify(status, error)
         return Tm1ApiError.of_kind(status, kind, error, method, url)
@@ -389,8 +387,6 @@ class Tm1SessionClosedError(RuntimeError):
         self.service_root = service_root
 
 
-def api_error(
-    method: str, url: str, status: int, body: bytes | None, classifier: Tm1ErrorClassifier | None = None
-) -> Tm1ApiError:
+def api_error(method: str, url: str, status: int, body: bytes | None, classifier: Tm1ErrorClassifier | None = None) -> Tm1ApiError:
     """The exception for a refused request, from its body (OData JSON or plain text)."""
     return Tm1ApiError.of(status, ODataError.parse(body), method, url, classifier)

@@ -5,7 +5,8 @@ depend only on the services they're about."""
 
 from __future__ import annotations
 
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 
@@ -160,9 +161,7 @@ def test_checks_saved_and_proposed_rules(tm1: Tm1Client, ruled: tuple[str, str, 
 
 def test_traces_a_calculation_and_feeders(tm1: Tm1Client, ruled: tuple[str, str, str]) -> None:
     name, region, measure = ruled
-    calculation = tm1.cubes.trace_cell_calculation(
-        name, {region: "North", measure: "Double"}, ODataQuery.none().expand("Tuple").expand("Cube")
-    )
+    calculation = tm1.cubes.trace_cell_calculation(name, {region: "North", measure: "Double"}, ODataQuery.none().expand("Tuple").expand("Cube"))
     assert any("['Amount'] * 2" in s for s in calculation.statements or [])
     assert calculation.cube.name == name
     assert [e.name for e in calculation.tuple] == ["North", "Double"]
@@ -217,14 +216,7 @@ def _native(view: str, region: str, measure: str, year: str) -> Any:
         .name(view)
         .columns([ViewAxisSelectionPatch.builder().bind_subset(_subset(measure)).build()])
         .rows([ViewAxisSelectionPatch.builder().bind_subset(_subset(region)).build()])
-        .titles(
-            [
-                ViewTitlePatch.builder()
-                .bind_subset(_subset(year))
-                .bind_selected(dim(year).nav("Hierarchies").key(year).nav("Elements").key("2026"))
-                .build()
-            ]
-        )
+        .titles([ViewTitlePatch.builder().bind_subset(_subset(year)).bind_selected(dim(year).nav("Hierarchies").key(year).nav("Elements").key("2026")).build()])
         .build()
     )
 

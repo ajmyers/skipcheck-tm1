@@ -171,8 +171,7 @@ def _model(spec: Spec, t: dict[str, Any]) -> list[str]:
     if t["derivedTypes"]:
         kinds = ", ".join(f":class:`{d['name']}`" for d in spec.derived(t))
         head += f"\n\nReads as one of {kinds} by ``@odata.type``" + (
-            "; as this class itself when the type is one this client doesn't know." if t["abstract"] else
-            ", or as this class itself."
+            "; as this class itself when the type is one this client doesn't know." if t["abstract"] else ", or as this class itself."
         )
     out.extend(docstring(head + revisions(t), "    "))
     if t["open"] and not (t.get("baseType") and spec.type_by_name[t["baseType"]]["open"]):
@@ -259,7 +258,7 @@ def emit_patches(spec: Spec) -> str:
         out += ["", "", f"class {name}({base}):"]
         out.append(f'    """A write of ``{t["name"]}``: only the properties set are sent."""')
         out.append("")
-        out.append(f'    odata_type = {("#" + t["qualifiedName"])!r}' if t.get("baseType") else "    odata_type = None")
+        out.append(f"    odata_type = {('#' + t['qualifiedName'])!r}" if t.get("baseType") else "    odata_type = None")
         out.append("")
         out.append("    @classmethod")
         out.append(f"    def builder(cls) -> {name}.Builder:")
@@ -273,25 +272,27 @@ def emit_patches(spec: Spec) -> str:
         for p in t["properties"]:
             if p["type"] == "Edm.Stream":
                 continue
-            m = names.unique(names.field_name(p["name"]).rstrip("_") if names.field_name(p["name"]).rstrip("_") not in taken else names.field_name(p["name"]), taken)
+            m = names.unique(
+                names.field_name(p["name"]).rstrip("_") if names.field_name(p["name"]).rstrip("_") not in taken else names.field_name(p["name"]), taken
+            )
             out.append("")
             out.append(f"        def {m}(self, value: Any) -> {name}.Builder:")
-            out.append(f'            return self._set({p["name"]!r}, value)  # type: ignore[return-value]')
+            out.append(f"            return self._set({p['name']!r}, value)  # type: ignore[return-value]")
             methods += 1
         for n in t["navigationProperties"]:
             m = names.unique(names.field_name(n["name"]).rstrip("_"), taken)
             out.append("")
             out.append(f"        def {m}(self, value: Any) -> {name}.Builder:")
-            out.append(f'            return self._set({n["name"]!r}, value)  # type: ignore[return-value]')
+            out.append(f"            return self._set({n['name']!r}, value)  # type: ignore[return-value]")
             if spec.is_entity(n["type"]):
                 bind = names.unique("bind_" + names.field_name(n["name"]).rstrip("_"), taken)
                 out.append("")
                 if n["collection"]:
                     out.append(f"        def {bind}(self, *targets: ODataPath | str) -> {name}.Builder:")
-                    out.append(f'            return self._bind_all({n["name"]!r}, targets)  # type: ignore[return-value]')
+                    out.append(f"            return self._bind_all({n['name']!r}, targets)  # type: ignore[return-value]")
                 else:
                     out.append(f"        def {bind}(self, target: ODataPath | str) -> {name}.Builder:")
-                    out.append(f'            return self._bind({n["name"]!r}, target)  # type: ignore[return-value]')
+                    out.append(f"            return self._bind({n['name']!r}, target)  # type: ignore[return-value]")
             methods += 1
         if not methods:
             out.append("        pass")

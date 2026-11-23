@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 
@@ -67,6 +68,7 @@ class GitDaemon:
             return self
         from testcontainers.core.container import DockerContainer
         from testcontainers.core.waiting_utils import wait_for_logs
+
         from tm1_testcontainers import Tm1ServerContainer
 
         tm1 = Tm1ServerContainer.shared()

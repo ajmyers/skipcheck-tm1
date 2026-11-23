@@ -11,8 +11,7 @@ from TM1's ``$metadata``), so it covers every endpoint the spec lists::
 Not affiliated with or endorsed by IBM.
 """
 
-from . import auth
-from . import model
+from . import auth, model
 from .base import Tm1Enum, Tm1Model
 from .client import Tm1Batch, Tm1Client, Tm1ClientBuilder
 from .errors import (
@@ -21,6 +20,7 @@ from .errors import (
     Tm1BadRequestError,
     Tm1ConflictError,
     Tm1Error,
+    Tm1ErrorClassifier,
     Tm1ErrorKind,
     Tm1ForbiddenError,
     Tm1NotFoundError,
@@ -28,17 +28,16 @@ from .errors import (
     Tm1PreconditionFailedError,
     Tm1ProtocolError,
     Tm1ServerError,
+    Tm1SessionClosedError,
     Tm1TransportError,
     Tm1UnsupportedOperationError,
-    Tm1ErrorClassifier,
-    Tm1SessionClosedError,
 )
+from .identity import Tm1Identity
 from .odata import Bind, Filter, ODataPath, ODataProperty, ODataQuery, Raw
+from .operation import Tm1Operation
+from .request import Tm1Request
 from .resources import UNSET
 from .session import Tm1PoolStats, Tm1Session, Tm1SessionBatch, Tm1SessionBuilder, Tm1SessionPool, Tm1SessionPoolBuilder
-from .identity import Tm1Identity
-from .request import Tm1Request
-from .operation import Tm1Operation
 from .timeouts import Tm1Timeouts
 from .version import Tm1Capabilities, Tm1Capability, Tm1Dialect, Tm1Version
 

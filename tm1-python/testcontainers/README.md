@@ -22,8 +22,8 @@ Installing the package adds a pytest plugin, so a test needs only the fixture:
 
 ```python
 def test_lists_cubes(tm1_server):
-    url = tm1_server.rest_url      # http://localhost:54321/api/v1/
-    user = tm1_server.username     # admin, with no password
+    url = tm1_server.rest_url  # http://localhost:54321/api/v1/
+    user = tm1_server.username  # admin, with no password
     ...
 ```
 
@@ -46,9 +46,7 @@ For a container of your own:
 from tm1_client import Tm1Version
 from tm1_testcontainers import Tm1Seed, Tm1ServerContainer, Tm1Source
 
-with Tm1ServerContainer(Tm1Source.InstallDir("/opt/ibm/tm1_64")) \
-        .with_seed(Tm1Seed.SDATA) \
-        .with_expected_version(Tm1Version.parse("11.8.03500.6")) as tm1:
+with Tm1ServerContainer(Tm1Source.InstallDir("/opt/ibm/tm1_64")).with_seed(Tm1Seed.SDATA).with_expected_version(Tm1Version.parse("11.8.03500.6")) as tm1:
     ...
 ```
 
@@ -73,12 +71,7 @@ settings too.
 ## More than one server
 
 ```python
-env = (PlanningAnalyticsEnvironment.builder()
-       .tm1("planning")
-       .tm1("reporting")
-       .tm1_web()
-       .cognos(lambda c: c.with_user("admin", "adminpw", "Admins"))
-       .build())
+env = PlanningAnalyticsEnvironment.builder().tm1("planning").tm1("reporting").tm1_web().cognos(lambda c: c.with_user("admin", "adminpw", "Admins")).build()
 with env:
     env.tm1("planning").rest_url
 ```

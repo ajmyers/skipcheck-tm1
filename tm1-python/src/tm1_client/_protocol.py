@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import gzip
 import json
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
-from typing import Any, Callable, Generic, Iterable, Mapping, TypeVar
+from typing import Any, Generic, TypeVar
 
 from .errors import Tm1ProtocolError, api_error
 from .odata import ODataQuery, query_value

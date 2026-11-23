@@ -46,9 +46,7 @@ def test_reads_the_tree(api: Api, fake: FakeTm1) -> None:
     roots = api.run(api.client.contents.roots())
     assert isinstance(roots[0], Folder) and target(fake.last) == "GET Contents"
     fake.respond = lambda r: {"value": [{"@odata.type": "#ibm.tm1.api.v1.CubeReference", "Name": "Sales", "Cube": {"Name": "Sales"}}]}
-    entries = api.run(
-        api.client.contents.contents(PLANNING, ContentScope.PUBLIC, ODataQuery.none().expand("tm1.CubeReference/Cube($select=Name)"))
-    )
+    entries = api.run(api.client.contents.contents(PLANNING, ContentScope.PUBLIC, ODataQuery.none().expand("tm1.CubeReference/Cube($select=Name)")))
     assert isinstance(entries[0], CubeReference) and entries[0].cube.name == "Sales"
     assert target(fake.last) == "GET Contents('Applications')/Contents('Planning')/Contents?$expand=tm1.CubeReference/Cube($select%3DName)"
     api.run(api.client.contents.contents(PLANNING, ContentScope.PRIVATE))

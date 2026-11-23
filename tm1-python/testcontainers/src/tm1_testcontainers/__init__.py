@@ -35,6 +35,7 @@ __all__ = [
     "Tm1Source",
     "Tm1WebContainer",
     "Tm1WebSource",
+    "User",
     "docker_available",
     "reuse_enabled",
 ]

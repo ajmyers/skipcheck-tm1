@@ -296,9 +296,7 @@ def check_operation(request: httpx.Request, op: dict[str, Any], path: str, expec
     else:
         required = [p for p in op["parameters"] if not p["nullable"]]
         structured = [p for p in required if p["type"] in TYPES]
-        arguments = ",".join(
-            f"{p['name']}=@{p['name']}" if p in structured else f"{p['name']}={path_text(arg_text(p))}" for p in required
-        )
+        arguments = ",".join(f"{p['name']}=@{p['name']}" if p in structured else f"{p['name']}={path_text(arg_text(p))}" for p in required)
         sent = target(request)
         assert sent.split("?")[0] == f"GET {path}({arguments})"
         for p in structured:

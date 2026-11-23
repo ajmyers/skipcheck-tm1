@@ -8,12 +8,12 @@ the attribute and dimension services."""
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
-from typing import Iterator
 
 import pytest
 
-from tm1_client import ODataPath, ODataQuery, Tm1BadRequestError, Tm1Client, Tm1Request
+from tm1_client import ODataPath, Tm1BadRequestError, Tm1Client, Tm1Request
 from tm1_client._sync.services.attribute import AttributeOwner, AttributeSet
 from tm1_client._sync.services.cube import ViewScope
 from tm1_client._sync.services.dimension import SubsetScope
@@ -61,12 +61,24 @@ def value(tm1: Tm1Client, owner: AttributeOwner, attribute: str) -> object:
 @pytest.fixture
 def d(tm1: Tm1Client, name: str) -> Iterator[str]:
     """A dimension with North and South, and a public subset S."""
-    tm1.dimensions.create(DimensionPatch.builder().name(name).hierarchies([
-        HierarchyPatch.builder().name(name).elements([
-            ElementPatch.builder().name("North").type(ElementType.NUMERIC).build(),
-            ElementPatch.builder().name("South").type(ElementType.NUMERIC).build(),
-        ]).build()
-    ]).build())
+    tm1.dimensions.create(
+        DimensionPatch.builder()
+        .name(name)
+        .hierarchies(
+            [
+                HierarchyPatch.builder()
+                .name(name)
+                .elements(
+                    [
+                        ElementPatch.builder().name("North").type(ElementType.NUMERIC).build(),
+                        ElementPatch.builder().name("South").type(ElementType.NUMERIC).build(),
+                    ]
+                )
+                .build()
+            ]
+        )
+        .build()
+    )
     try:
         tm1.subsets.create(name, name, SubsetScope.PUBLIC, SubsetPatch.builder().name("S").expression(f"{{[{name}].[{name}].[North]}}").build())
         yield name
@@ -151,9 +163,12 @@ def cube(tm1: Tm1Client, name: str) -> Iterator[str]:
     view attribute needs a public native view)."""
     dims = [name + "-a", name + "-b"]
     for dim in dims:
-        tm1.dimensions.create(DimensionPatch.builder().name(dim).hierarchies([
-            HierarchyPatch.builder().name(dim).elements([ElementPatch.builder().name("X").type(ElementType.NUMERIC).build()]).build()
-        ]).build())
+        tm1.dimensions.create(
+            DimensionPatch.builder()
+            .name(dim)
+            .hierarchies([HierarchyPatch.builder().name(dim).elements([ElementPatch.builder().name("X").type(ElementType.NUMERIC).build()]).build()])
+            .build()
+        )
         tm1.subsets.create(dim, dim, SubsetScope.PUBLIC, SubsetPatch.builder().name("All").expression(f"{{TM1SUBSETALL([{dim}].[{dim}])}}").build())
     try:
         dimensions = ODataPath.of("Dimensions")

@@ -10,10 +10,11 @@ import enum
 import math
 import re
 import uuid
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any
 
 __all__ = [
     "Alias",
@@ -252,9 +253,7 @@ class Alias:
 
 
 def _call(function: str, parameters: Mapping[str, Any]) -> str:
-    args = ",".join(
-        f"{_identifier(k)}={v.name if isinstance(v, Alias) else path_value(literal(v))}" for k, v in parameters.items()
-    )
+    args = ",".join(f"{_identifier(k)}={v.name if isinstance(v, Alias) else path_value(literal(v))}" for k, v in parameters.items())
     return f"{function}({args})"
 
 

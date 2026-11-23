@@ -3,7 +3,6 @@ client's ``net.ajmyers.tm1.client.service.git``)."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from ..._calls import endpoint
@@ -12,8 +11,8 @@ from ..._generated.operations import Tm1Operations
 from ...odata import ODataPath, ODataQuery
 from ...operation import Tm1Operation
 from ...request import Tm1Request
+from ...values import GitCommitDetails, GitCredentials
 from ._base import Service, _require
-from ...values import GitCommitDetails, _Password, GitCredentials
 
 __all__ = ["GitCommitDetails", "GitCredentials", "GitService"]
 

@@ -1,0 +1,24 @@
+# Layout and lint for the Python client and tm1-testcontainers (testcontainers/ is inside this
+# folder, so it follows these too). The counterpart of the Java build's Spring Java Format and
+# Error Prone checks: CI fails on a file `ruff format` would change or `ruff check` reports.
+#
+#   ruff format tm1-python      # fix the layout
+#   ruff check --fix tm1-python # fix what can be fixed, such as import order
+line-length = 160
+target-version = "py310"
+# Generated at build time, never committed: the model and API from the spec, and the sync flavor
+extend-exclude = ["src/tm1_client/_generated", "src/tm1_client/_sync", "build"]
+
+# Where the packages are, and that they're ours whether or not the generated modules exist yet:
+# import order mustn't depend on having built
+src = ["src", "testcontainers/src"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+isort.known-first-party = ["tm1_client", "tm1_testcontainers"]
+ignore = [
+    # The formatter lays code out; what it leaves long is a string or a comment it won't break
+    "E501",
+    # zip() without strict=: where lengths could differ, the code checks them and says which
+    "B905",
+]

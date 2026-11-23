@@ -18,14 +18,13 @@ import time
 from http.cookies import SimpleCookie
 from importlib import resources
 from pathlib import Path
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar
 from urllib.parse import quote, quote_plus
 
 import httpx
-from typing_extensions import Self
-
 from testcontainers.core.config import testcontainers_config as tc_config
 from testcontainers.core.docker_client import DockerClient
+from typing_extensions import Self
 
 from .sources import PawSource, setting
 from .tm1 import Tm1AdminServerContainer, Tm1ServerContainer
@@ -82,8 +81,8 @@ class PawContainer:
     PAW_NETWORK: ClassVar[str] = "paw_default"
     ADMIN_PORT: ClassVar[int] = 5895
 
-    _shared: ClassVar[Optional[PawContainer]] = None
-    _shared_failure: ClassVar[Optional[str]] = None
+    _shared: ClassVar[PawContainer | None] = None
+    _shared_failure: ClassVar[str | None] = None
     _shared_lock: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(self, source: PawSource) -> None:
@@ -91,8 +90,8 @@ class PawContainer:
             raise ValueError("source must not be None")
         self._source = source
         self._settings: dict[str, str] = {}
-        self._tm1: Optional[Tm1ServerContainer] = None
-        self._admin_server: Optional[Tm1AdminServerContainer] = None
+        self._tm1: Tm1ServerContainer | None = None
+        self._admin_server: Tm1AdminServerContainer | None = None
         self._license_accepted = PawContainer.license_accepted_by_setting()
         self._startup_timeout = _DEFAULT_STARTUP_TIMEOUT
         self._http_port = 0
@@ -156,7 +155,7 @@ class PawContainer:
         return self._source
 
     @property
-    def tm1_server(self) -> Optional[Tm1ServerContainer]:
+    def tm1_server(self) -> Tm1ServerContainer | None:
         return self._tm1
 
     @property
@@ -314,10 +313,7 @@ def _runner_image(docker: Any) -> str:
     except errors.ImageNotFound:
         pass
     dockerfile = (
-        f"FROM {_RUNNER_BASE}\n"
-        "RUN apk add --no-cache bash curl\n"
-        "COPY paw-local.sh /usr/local/bin/paw-local.sh\n"
-        "RUN chmod 755 /usr/local/bin/paw-local.sh\n"
+        f"FROM {_RUNNER_BASE}\nRUN apk add --no-cache bash curl\nCOPY paw-local.sh /usr/local/bin/paw-local.sh\nRUN chmod 755 /usr/local/bin/paw-local.sh\n"
     ).encode()
     context = io.BytesIO()
     with tarfile.open(fileobj=context, mode="w") as tar:

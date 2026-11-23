@@ -32,9 +32,9 @@ from __future__ import annotations
 import logging
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Callable
 
 from .._compat import AsyncIO as runtime
 from ..errors import Tm1SessionClosedError

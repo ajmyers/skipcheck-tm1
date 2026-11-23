@@ -72,9 +72,7 @@ def test_compiles_saved_and_unsaved_processes(api: Api, fake: FakeTm1) -> None:
 def test_runs_with_return_saved_and_unsaved(api: Api, fake: FakeTm1) -> None:
     fake.respond = lambda r: {"ProcessExecuteStatusCode": "Aborted", "ErrorLogFile": {"Filename": "tm1processerror_x.log"}}
     parameters = {"pVersion": "Forecast", "pYear": 2026}
-    result = api.run(
-        api.client.processes.execute_with_return("Load", parameters, ODataQuery.none().expand(ProcessExecuteResult.ERROR_LOG_FILE))
-    )
+    result = api.run(api.client.processes.execute_with_return("Load", parameters, ODataQuery.none().expand(ProcessExecuteResult.ERROR_LOG_FILE)))
     assert target(fake.last) == "POST Processes('Load')/tm1.ExecuteWithReturn?$expand=ErrorLogFile"
     assert body(fake.last) == {"Parameters": [{"Name": "pVersion", "Value": "Forecast"}, {"Name": "pYear", "Value": 2026}]}
     assert result.error_log_file.filename == "tm1processerror_x.log"
@@ -142,15 +140,7 @@ def test_debugs_and_steps(api: Api, fake: FakeTm1) -> None:
 
 def test_breakpoints_need_an_id(api: Api, fake: FakeTm1) -> None:
     debug = api.client.process_debugging
-    line3 = (
-        ProcessDebugContextLineBreakpointPatch.builder()
-        .id(1)
-        .process_name("Load")
-        .procedure(ProcessProcedure.PROLOG)
-        .line_number(3)
-        .enabled(True)
-        .build()
-    )
+    line3 = ProcessDebugContextLineBreakpointPatch.builder().id(1).process_name("Load").procedure(ProcessProcedure.PROLOG).line_number(3).enabled(True).build()
     fake.respond = lambda r: {"@odata.type": "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint", "ID": 1}
     api.run(debug.add_breakpoint("c1", line3))
     assert target(fake.last) == "POST ProcessDebugContexts('c1')/Breakpoints"

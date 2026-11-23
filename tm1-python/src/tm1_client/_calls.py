@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import functools
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, ClassVar, Mapping
+from typing import Any, ClassVar
 
 from pydantic import TypeAdapter
 
@@ -63,8 +64,8 @@ def implemented_endpoints(flavor: str | None = None) -> dict[str, list[str]]:
     flavor's if given."""
     # Importing them registers what they implement
     from . import aio, client  # noqa: F401
-    from ._sync import client as _sync_client  # noqa: F401
     from ._generated import aio_api, api, model  # noqa: F401
+    from ._sync import client as _sync_client  # noqa: F401
 
     prefixes = None if flavor is None else FLAVORS[flavor]
     out: dict[str, list[str]] = {}
@@ -103,7 +104,7 @@ def query_of(query: ODataQuery | None, options: Mapping[str, Any]) -> ODataQuery
     return ODataQuery.of(query, **options)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _adapter(tp: Any) -> TypeAdapter[Any]:
     return TypeAdapter(tp)
 
@@ -173,9 +174,7 @@ def _body(parameters: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _structured(value: Any) -> bool:
-    return isinstance(value, (Tm1Model, Mapping)) or (
-        isinstance(value, (list, tuple)) and any(isinstance(v, (Tm1Model, Mapping)) for v in value)
-    )
+    return isinstance(value, (Tm1Model, Mapping)) or (isinstance(value, (list, tuple)) and any(isinstance(v, (Tm1Model, Mapping)) for v in value))
 
 
 # The calls
@@ -187,7 +186,6 @@ def _write(value: Any) -> Any:
     from .request import body_of
 
     return body_of(value)
-
 
 
 def action(

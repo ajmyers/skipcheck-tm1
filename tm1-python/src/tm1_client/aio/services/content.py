@@ -3,7 +3,6 @@ Java client's ``net.ajmyers.tm1.client.service.content``)."""
 
 from __future__ import annotations
 
-import enum
 from typing import Any
 
 from ..._calls import endpoint
@@ -12,8 +11,8 @@ from ..._generated.operations import Tm1Operations
 from ...odata import ODataPath, ODataQuery
 from ...operation import Tm1Operation
 from ...request import Tm1Request
+from ...values import ContentPath, ContentScope
 from ._base import Service, _require
-from ...values import ContentScope, ContentPath
 
 __all__ = ["ContentPath", "ContentScope", "ContentService"]
 
@@ -113,25 +112,19 @@ class ContentService(Service):
         return await self._session.execute(request)
 
     @endpoint("Navigation Entry/LocalizedAttributes")
-    async def localized_attributes(
-        self, entry: ContentPath, query: ODataQuery | None = None, **options: Any
-    ) -> list[LocalizedAttributes]:
+    async def localized_attributes(self, entry: ContentPath, query: ODataQuery | None = None, **options: Any) -> list[LocalizedAttributes]:
         """``LocalizedAttributes``: an entry's attributes in each locale."""
         path = _path(entry).nav("LocalizedAttributes")
         return await self._session.collect(Tm1Request.list(path, ODataQuery.of(query, **options), LocalizedAttributes))
 
     @endpoint("Action Entry/Copy")
-    async def copy(
-        self, entry: ContentPath, target: ContentPath, scope: ContentScope, name: str | None = None
-    ) -> Entry:
+    async def copy(self, entry: ContentPath, target: ContentPath, scope: ContentScope, name: str | None = None) -> Entry:
         """``tm1.Copy``: copies an entry into the folder ``target``, public or private, named
         ``name`` or as the entry is. A copied document reference refers to the same document."""
         return await self._relocate(Tm1Operations.ENTRY_COPY, entry, target, scope, name)
 
     @endpoint("Action Entry/Move")
-    async def move(
-        self, entry: ContentPath, target: ContentPath, scope: ContentScope, name: str | None = None
-    ) -> Entry:
+    async def move(self, entry: ContentPath, target: ContentPath, scope: ContentScope, name: str | None = None) -> Entry:
         """``tm1.Move``: moves an entry into the folder ``target``, public or private there,
         renamed ``name`` if given; returns the entry where it is now."""
         return await self._relocate(Tm1Operations.ENTRY_MOVE, entry, target, scope, name)
@@ -156,9 +149,7 @@ class ContentService(Service):
         path = _document(document).nav("Content")
         await self._session.execute(Tm1Request.put(path, bytes(_require(content, "content"))))
 
-    async def _relocate(
-        self, operation: Tm1Operation, entry: ContentPath, target: ContentPath, scope: ContentScope, name: str | None
-    ) -> Entry:
+    async def _relocate(self, operation: Tm1Operation, entry: ContentPath, target: ContentPath, scope: ContentScope, name: str | None) -> Entry:
         body: dict[str, Any] = {
             "Target@odata.bind": str(_path(target)),
             "Private": _scope(_require(scope, "scope")) is ContentScope.PRIVATE,
@@ -180,8 +171,4 @@ def _path(entry: ContentPath) -> ODataPath:
 
 
 def _document(entry: ContentPath) -> ODataPath:
-    return (
-        _path(entry).cast("tm1.Document")
-        if entry.in_blobs()
-        else _path(entry).cast("tm1.DocumentReference").nav("Document")
-    )
+    return _path(entry).cast("tm1.Document") if entry.in_blobs() else _path(entry).cast("tm1.DocumentReference").nav("Document")

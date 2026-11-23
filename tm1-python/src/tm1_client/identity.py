@@ -21,10 +21,7 @@ def check_impersonated(user: str) -> str:
         raise ValueError("The user to impersonate is blank, which TM1 would take as no impersonation at all")
     for c in user:
         if ord(c) < 0x20 or ord(c) > 0x7E:
-            raise ValueError(
-                f"TM1 can't impersonate {user!r}: it doesn't match user names with characters other than "
-                "printable ASCII through TM1-Impersonate"
-            )
+            raise ValueError(f"TM1 can't impersonate {user!r}: it doesn't match user names with characters other than printable ASCII through TM1-Impersonate")
     return user
 
 
@@ -94,9 +91,7 @@ class Tm1Identity:
         return out
 
     def __eq__(self, other: object) -> bool:
-        return self is other or (
-            isinstance(other, Tm1Identity) and self._kind is other._kind and self._comparable == other._comparable
-        )
+        return self is other or (isinstance(other, Tm1Identity) and self._kind is other._kind and self._comparable == other._comparable)
 
     def __hash__(self) -> int:
         return hash((self._kind, self._comparable))

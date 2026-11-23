@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import enum
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from ..._calls import endpoint
 from ..._generated.model import (
@@ -21,8 +21,8 @@ from ..._generated.operations import Tm1Operations
 from ...odata import ODataPath, ODataQuery
 from ...operation import Tm1Operation
 from ...request import Tm1Request
-from ._base import Service, _require
 from ...values import ViewScope
+from ._base import Service, _require
 
 __all__ = ["CubeService", "ViewScope", "ViewService"]
 
@@ -32,10 +32,7 @@ _CUBES = ODataPath.of("Cubes")
 def _bindings(tuple_: Mapping[str, str]) -> list[str]:
     """A cell's coordinates, dimension → element, as element paths in each dimension's own
     hierarchy, in the order given."""
-    return [
-        str(ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Elements").key(e))
-        for d, e in tuple_.items()
-    ]
+    return [str(ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Elements").key(e)) for d, e in tuple_.items()]
 
 
 class CubeService(Service):
@@ -128,9 +125,7 @@ class CubeService(Service):
         """``tm1.ReorderDimensions``: changes the order TM1 stores the cube's cells in, and returns
         the change in memory use, as a percentage."""
         bindings = [str(ODataPath.of("Dimensions").key(d)) for d in dimensions]
-        result = await self._session.execute(
-            _action(Tm1Operations.CUBE_REORDER_DIMENSIONS, name, {"Dimensions@odata.bind": bindings}, dict)
-        )
+        result = await self._session.execute(_action(Tm1Operations.CUBE_REORDER_DIMENSIONS, name, {"Dimensions@odata.bind": bindings}, dict))
         # A primitive result comes wrapped, as {"@odata.context": ..., "value": 12.5}
         return float((result or {}).get("value", 0.0))
 
@@ -173,24 +168,16 @@ class CubeService(Service):
         request = Tm1Request.post_list(_cube(name).action(operation.name), body, RuleSyntaxError)
         return await self._session.collect(request.requires(operation.capability()))
 
-    @endpoint(
-        "Action Cube/TraceCellCalculation", "Navigation CalculationComponent/Cube", "Navigation CalculationComponent/Tuple"
-    )
-    async def trace_cell_calculation(
-        self, name: str, tuple: Mapping[str, str], query: ODataQuery | None = None, **options: Any
-    ) -> CalculationComponent:
+    @endpoint("Action Cube/TraceCellCalculation", "Navigation CalculationComponent/Cube", "Navigation CalculationComponent/Tuple")
+    async def trace_cell_calculation(self, name: str, tuple: Mapping[str, str], query: ODataQuery | None = None, **options: Any) -> CalculationComponent:
         """``tm1.TraceCellCalculation``: how a cell's value is calculated, component by
         component; ``tuple`` maps each dimension to an element. Expand ``Components`` (and
         ``Components/Tuple``) to see them."""
-        request = _action(
-            Tm1Operations.CUBE_TRACE_CELL_CALCULATION, name, {"Tuple@odata.bind": _bindings(tuple)}, CalculationComponent
-        )
+        request = _action(Tm1Operations.CUBE_TRACE_CELL_CALCULATION, name, {"Tuple@odata.bind": _bindings(tuple)}, CalculationComponent)
         return await self._session.execute(request.with_query(ODataQuery.of(query, **options)))
 
     @endpoint("Action Cube/TraceFeeders", "Navigation FedCellDescriptor/Cube", "Navigation FedCellDescriptor/Tuple")
-    async def trace_feeders(
-        self, name: str, tuple: Mapping[str, str], query: ODataQuery | None = None, **options: Any
-    ) -> FeederTrace:
+    async def trace_feeders(self, name: str, tuple: Mapping[str, str], query: ODataQuery | None = None, **options: Any) -> FeederTrace:
         """``tm1.TraceFeeders``: what a cell feeds. TM1 (11.8) needs a path to expand into a
         complex property (``FedCells/Tuple``); nested options (``FedCells($expand=Tuple)``) get 400."""
         request = _action(Tm1Operations.CUBE_TRACE_FEEDERS, name, {"Tuple@odata.bind": _bindings(tuple)}, FeederTrace)
@@ -283,9 +270,7 @@ class ViewService(Service):
         return await self._session.collect(Tm1Request.list(_views(cube, scope), ODataQuery.of(query, **options), View))
 
     @endpoint("Navigation Cube/Views", "Navigation Cube/PrivateViews")
-    async def get(
-        self, cube: str, scope: ViewScope, view: str, query: ODataQuery | None = None, **options: Any
-    ) -> View:
+    async def get(self, cube: str, scope: ViewScope, view: str, query: ODataQuery | None = None, **options: Any) -> View:
         """``GET Cubes('c')/Views('v')``: the view as its own type, or a ``Tm1NotFoundError``."""
         return await self._session.execute(Tm1Request.get(_view(cube, scope, view), ODataQuery.of(query, **options), View))
 
@@ -296,9 +281,7 @@ class ViewService(Service):
         "Navigation ViewTitle/Subset",
         "Navigation ViewTitle/Selected",
     )
-    async def get_native(
-        self, cube: str, scope: ViewScope, view: str, query: ODataQuery | None = None, **options: Any
-    ) -> NativeView:
+    async def get_native(self, cube: str, scope: ViewScope, view: str, query: ODataQuery | None = None, **options: Any) -> NativeView:
         """``GET Cubes('c')/Views('v')/tm1.NativeView``: reads a native view through its type,
         so its axes can be expanded: ``Columns/Subset``, ``Rows/Subset``, ``Titles/Subset``,
         ``Titles/Selected``. They're complex properties, so TM1 wants paths, not nested

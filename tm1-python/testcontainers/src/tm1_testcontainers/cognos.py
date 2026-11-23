@@ -8,7 +8,7 @@ import enum
 import json
 import re
 from dataclasses import dataclass, field
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 import httpx
 from typing_extensions import Self
@@ -84,7 +84,7 @@ class CognosContainer(GenericContainer):
         super().__init__(image or default_image(source, self.DEFAULT_IMAGE, self.SERVER_IMAGE))
         self._source = source
         self._users: dict[str, User] = {}
-        self._keycloak: Optional[KeycloakContainer] = None
+        self._keycloak: KeycloakContainer | None = None
         self.with_exposed_ports(self.DISPATCHER_PORT)
         self.with_network_aliases(self.NETWORK_ALIAS)
         self.with_env("COGNOS_HOST", self.NETWORK_ALIAS)
@@ -129,7 +129,7 @@ class CognosContainer(GenericContainer):
         return self
 
     @property
-    def keycloak(self) -> Optional[KeycloakContainer]:
+    def keycloak(self) -> KeycloakContainer | None:
         return self._keycloak
 
     @property
@@ -188,9 +188,7 @@ class CognosContainer(GenericContainer):
             self.with_env("COGNOS_USERS", self.users_spec())
 
     def container_is_started(self) -> None:
-        self.logger.info(
-            "Cognos is up at %s (%s), with %d test user(s) in namespace %s", self.url, self._source.describe(), len(self._users), self.NAMESPACE
-        )
+        self.logger.info("Cognos is up at %s (%s), with %d test user(s) in namespace %s", self.url, self._source.describe(), len(self._users), self.NAMESPACE)
 
 
 class KeycloakContainer(GenericContainer):

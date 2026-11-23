@@ -7,8 +7,9 @@ from __future__ import annotations
 import inspect
 import json
 import uuid
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import httpx
 
@@ -39,11 +40,13 @@ class Traffic:
         request = response.request
         url = str(request.url.raw_path.decode())
         prefix = httpx.URL(self.root).raw_path.decode()
-        target = url[len(prefix):] if url.startswith(prefix) else url
+        target = url[len(prefix) :] if url.startswith(prefix) else url
         if target.startswith(_SESSION):
             return
         headers = {k.lower(): v for k, v in request.headers.items()}
-        self.exchanges.append({"step": self.step, "request": codec.request_of(request.method, target, headers, request.content), "status": response.status_code})
+        self.exchanges.append(
+            {"step": self.step, "request": codec.request_of(request.method, target, headers, request.content), "status": response.status_code}
+        )
 
     async def arecord(self, response: httpx.Response) -> None:
         self.record(response)

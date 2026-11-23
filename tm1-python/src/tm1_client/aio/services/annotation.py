@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from ..._calls import endpoint
 from ..._generated.model import (
@@ -103,9 +104,7 @@ class AnnotationService(Service):
         await self._session.execute(Tm1Request.delete(_annotation(id)))
 
     @endpoint("Navigation Annotation/ApplicationContext")
-    async def application_context(
-        self, id: str, query: ODataQuery | None = None, **options: Any
-    ) -> list[ApplicationContextFacetValue]:
+    async def application_context(self, id: str, query: ODataQuery | None = None, **options: Any) -> list[ApplicationContextFacetValue]:
         """``ApplicationContext``; expand ``Facet``. TM1 (11.8) returns none."""
         path = _annotation(id).nav("ApplicationContext")
         request = Tm1Request.list(path, ODataQuery.of(query, **options), ApplicationContextFacetValue)
@@ -130,9 +129,7 @@ class AnnotationService(Service):
         return await self._session.collect(Tm1Request.list(path, ODataQuery.of(query, **options), Annotation))
 
     @endpoint("Navigation CellsetCell/Annotations")
-    async def cell_annotations(
-        self, cellset: str, ordinal: int, query: ODataQuery | None = None, **options: Any
-    ) -> list[Annotation]:
+    async def cell_annotations(self, cellset: str, ordinal: int, query: ODataQuery | None = None, **options: Any) -> list[Annotation]:
         """``Cellsets('id')/Cells(n)/Annotations``: one cellset cell's annotations. They also
         come with the cells by ``expand="Annotations"``."""
         cells = ODataPath.of("Cellsets").key(_require(cellset, "cellset")).nav("Cells")
@@ -146,18 +143,14 @@ class AnnotationService(Service):
         return await self._session.collect(request)
 
     @endpoint("Navigation ApplicationContextFacet/Values")
-    async def facet_values(
-        self, facet: str, query: ODataQuery | None = None, **options: Any
-    ) -> list[ApplicationContextFacetValue]:
+    async def facet_values(self, facet: str, query: ODataQuery | None = None, **options: Any) -> list[ApplicationContextFacetValue]:
         """A facet's ``Values``: for ``}Cubes``, the cubes with annotations."""
         path = _FACETS.key(_require(facet, "facet")).nav("Values")
         request = Tm1Request.list(path, ODataQuery.of(query, **options), ApplicationContextFacetValue)
         return await self._session.collect(request)
 
     @endpoint("Navigation ApplicationContextFacetValue/Facet")
-    async def facet(
-        self, facet: str, value: str, query: ODataQuery | None = None, **options: Any
-    ) -> ApplicationContextFacet:
+    async def facet(self, facet: str, value: str, query: ODataQuery | None = None, **options: Any) -> ApplicationContextFacet:
         """A facet value's ``Facet``."""
         path = _FACETS.key(_require(facet, "facet")).nav("Values").key(_require(value, "value")).nav("Facet")
         request = Tm1Request.get(path, ODataQuery.of(query, **options), ApplicationContextFacet)
@@ -177,9 +170,7 @@ def _annotation(id: str) -> ODataPath:
 
 
 def _cell_annotation(cube: str, elements: Mapping[str, str], text: str) -> Any:
-    members = [
-        ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Members").key(e) for d, e in elements.items()
-    ]
+    members = [ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Members").key(e) for d, e in elements.items()]
     facet = ApplicationContextFacetValuePatch.builder().bind_facet(_FACETS.key("}Cubes")).value(cube).build()
     return (
         AnnotationPatch.builder()

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Callable, Optional, TypeVar, Union
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from typing_extensions import Self
 
@@ -21,7 +22,7 @@ from .web import Tm1WebContainer
 __all__ = ["PlanningAnalyticsEnvironment"]
 
 T = TypeVar("T")
-Part = Union[KeycloakContainer, CognosContainer, Tm1AdminServerContainer, Tm1ServerContainer, Tm1WebContainer, PawContainer]
+Part = KeycloakContainer | CognosContainer | Tm1AdminServerContainer | Tm1ServerContainer | Tm1WebContainer | PawContainer
 
 
 def _nothing(_: Any) -> None:
@@ -36,7 +37,7 @@ class PlanningAnalyticsEnvironment:
         self._network = network
         self._owns_network = b._network is None
         self._keycloak = KeycloakContainer().with_network(network) if b._keycloak is not None else None
-        cognos: Optional[CognosContainer] = None
+        cognos: CognosContainer | None = None
         if b._cognos is not None:
             cognos = CognosContainer(b._get(b._cognos_source, CognosSource.discover, NO_COGNOS_MESSAGE)).with_network(network)
             if self._keycloak is not None:
@@ -45,9 +46,7 @@ class PlanningAnalyticsEnvironment:
             b._cognos(cognos)
         self._cognos = cognos
         tm1_source = b._get(b._tm1_source, Tm1Source.discover, NO_TM1_MESSAGE)
-        self._admin_server = (
-            Tm1AdminServerContainer(tm1_source).with_network(network) if b._admin_server is not None or len(b._tm1) > 1 else None
-        )
+        self._admin_server = Tm1AdminServerContainer(tm1_source).with_network(network) if b._admin_server is not None or len(b._tm1) > 1 else None
         servers: dict[str, Tm1ServerContainer] = {}
         for name in b._tm1:
             server = Tm1ServerContainer(tm1_source).with_network(network).with_network_aliases(name).with_env("TM1_SERVER_NAME", name)
@@ -58,7 +57,7 @@ class PlanningAnalyticsEnvironment:
             servers[name] = server
         self._tm1_servers = servers
         first = next(iter(servers.values()))
-        web: Optional[Tm1WebContainer] = None
+        web: Tm1WebContainer | None = None
         if b._tm1_web is not None:
             web = Tm1WebContainer(b._get(b._tm1_web_source, Tm1WebSource.discover, NO_TM1_WEB_MESSAGE)).with_tm1_server(first)
             if self._admin_server is not None:
@@ -66,7 +65,7 @@ class PlanningAnalyticsEnvironment:
             # List every server: start them all before TM1 Web
             web.depends_on(*servers.values())
         self._tm1_web = web
-        paw: Optional[PawContainer] = None
+        paw: PawContainer | None = None
         if b._paw is not None:
             paw = PawContainer(b._get(b._paw_source, PawSource.discover, NO_PAW_MESSAGE)).with_tm1_server(first)
             if self._admin_server is not None:
@@ -117,7 +116,7 @@ class PlanningAnalyticsEnvironment:
     def tm1_servers(self) -> dict[str, Tm1ServerContainer]:
         return dict(self._tm1_servers)
 
-    def admin_server(self) -> Optional[Tm1AdminServerContainer]:
+    def admin_server(self) -> Tm1AdminServerContainer | None:
         return self._admin_server
 
     def tm1_web(self) -> Tm1WebContainer:
@@ -154,17 +153,17 @@ class PlanningAnalyticsEnvironment:
     class Builder:
         def __init__(self) -> None:
             self._tm1: dict[str, Callable[[Tm1ServerContainer], Any]] = {}
-            self._admin_server: Optional[Callable[[Tm1AdminServerContainer], Any]] = None
-            self._tm1_web: Optional[Callable[[Tm1WebContainer], Any]] = None
-            self._paw: Optional[Callable[[PawContainer], Any]] = None
-            self._cognos: Optional[Callable[[CognosContainer], Any]] = None
-            self._keycloak: Optional[Callable[[KeycloakContainer], Any]] = None
+            self._admin_server: Callable[[Tm1AdminServerContainer], Any] | None = None
+            self._tm1_web: Callable[[Tm1WebContainer], Any] | None = None
+            self._paw: Callable[[PawContainer], Any] | None = None
+            self._cognos: Callable[[CognosContainer], Any] | None = None
+            self._keycloak: Callable[[KeycloakContainer], Any] | None = None
             self._cam_namespace = Namespace.LDAP
             self._cam_admins: list[str] = []
-            self._tm1_source: Optional[Tm1Source] = None
-            self._tm1_web_source: Optional[Tm1WebSource] = None
-            self._paw_source: Optional[PawSource] = None
-            self._cognos_source: Optional[CognosSource] = None
+            self._tm1_source: Tm1Source | None = None
+            self._tm1_web_source: Tm1WebSource | None = None
+            self._paw_source: PawSource | None = None
+            self._cognos_source: CognosSource | None = None
             self._network: Any = None
 
         def tm1(self, name: str, customizer: Callable[[Tm1ServerContainer], Any] = _nothing) -> Self:
@@ -247,7 +246,7 @@ class PlanningAnalyticsEnvironment:
             return [users[0].name]
 
         @staticmethod
-        def _get(configured: Optional[T], discover: Callable[[], Optional[T]], message: str) -> T:
+        def _get(configured: T | None, discover: Callable[[], T | None], message: str) -> T:
             if configured is not None:
                 return configured
             found = discover()
@@ -262,12 +261,12 @@ def _required(value: T) -> T:
     return value
 
 
-def _apply(customizer: Optional[Callable[[T], Any]], part: Optional[T]) -> None:
+def _apply(customizer: Callable[[T], Any] | None, part: T | None) -> None:
     if customizer is not None and part is not None:
         customizer(part)
 
 
-def _require(part: Optional[T], what: str, how: str) -> T:
+def _require(part: T | None, what: str, how: str) -> T:
     if part is None:
         raise RuntimeError(f"This environment has no {what}; add it with {how}")
     return part

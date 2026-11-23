@@ -14,7 +14,8 @@ from tm1_client._generated import index
 from tm1_client.model import Cube, CubeUpdate, Dimension, Edge, Element, ElementType, Hierarchy
 
 from ..conftest import SPEC
-from .conftest import CONFIGURED, REASON, async_client as _async_client
+from .conftest import CONFIGURED, REASON
+from .conftest import async_client as _async_client
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
@@ -62,8 +63,7 @@ def test_a_dimension_a_cube_and_a_cell(tm1: Tm1Client, name: str) -> None:
                 hierarchies=[
                     Hierarchy(
                         name=dim,
-                        elements=[Element(name=e, type=ElementType.NUMERIC) for e in elements]
-                        + [Element(name="Total", type=ElementType.CONSOLIDATED)],
+                        elements=[Element(name=e, type=ElementType.NUMERIC) for e in elements] + [Element(name="Total", type=ElementType.CONSOLIDATED)],
                         edges=[Edge(parent_name="Total", component_name=e, weight=1.0) for e in elements],
                     )
                 ],
@@ -86,7 +86,6 @@ def test_a_dimension_a_cube_and_a_cell(tm1: Tm1Client, name: str) -> None:
 
             # The same through the asyncio client
             async def read() -> Any:
-                from tm1_client.aio import AsyncTm1Client
 
                 async with _async_client() as aio:
                     return _values(await aio.api.execute_mdx(mdx=mdx, query=ODataQuery(expand="Cells($select=Ordinal,Value)")))

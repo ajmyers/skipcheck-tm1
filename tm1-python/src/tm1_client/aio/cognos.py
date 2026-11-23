@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import inspect
 import re
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import httpx
 
@@ -54,14 +55,10 @@ class _Logon:
             except httpx.HTTPError as e:
                 raise Tm1ProtocolError(f"Logging on to Cognos failed: {e}", None, "PUT", self._url) from e
         if response.status_code in (401, 403):
-            raise Tm1ApiError.of_kind(
-                response.status_code, Tm1ErrorKind.CREDENTIAL_REJECTED, ODataError(None, "Cognos refused the logon"), "PUT", self._url
-            )
+            raise Tm1ApiError.of_kind(response.status_code, Tm1ErrorKind.CREDENTIAL_REJECTED, ODataError(None, "Cognos refused the logon"), "PUT", self._url)
         passport = response.cookies.get("cam_passport")
         if response.status_code >= 300 or not passport:
-            raise Tm1ProtocolError(
-                f"Cognos answered the logon with {response.status_code} and no cam_passport cookie", None, "PUT", self._url
-            )
+            raise Tm1ProtocolError(f"Cognos answered the logon with {response.status_code} and no cam_passport cookie", None, "PUT", self._url)
         return passport
 
     def __repr__(self) -> str:
@@ -73,9 +70,7 @@ class CognosPassports:
     """Passport suppliers for ``cam_passport``: each call logs on to Cognos for a fresh one."""
 
     @staticmethod
-    def password(
-        dispatcher: str, namespace: str, user: str, password: str, *, http_client: Callable[[], Any] | None = None
-    ) -> Callable[[], Awaitable[str]]:
+    def password(dispatcher: str, namespace: str, user: str, password: str, *, http_client: Callable[[], Any] | None = None) -> Callable[[], Awaitable[str]]:
         """By user name and password (``CAMUsername``, ``CAMPassword``). ``http_client`` makes the
         HTTP client to reach Cognos with (for TLS settings, proxies, tests)."""
         if user is None or password is None:
@@ -84,9 +79,7 @@ class CognosPassports:
         return _Logon(dispatcher, namespace, lambda: params, "password", http_client)
 
     @staticmethod
-    def id_token(
-        dispatcher: str, namespace: str, id_token: Callable[[], Any], *, http_client: Callable[[], Any] | None = None
-    ) -> Callable[[], Awaitable[str]]:
+    def id_token(dispatcher: str, namespace: str, id_token: Callable[[], Any], *, http_client: Callable[[], Any] | None = None) -> Callable[[], Awaitable[str]]:
         """By an OpenID Connect ID token (``CAMOIDCIdToken``) the caller already holds; asked
         for at each logon."""
         if id_token is None:
@@ -101,18 +94,14 @@ class CognosPassports:
         return _Logon(dispatcher, namespace, parameters, "ID token", http_client)
 
 
-def cognos_logon(
-    dispatcher: str, namespace: str, user: str, password: str, *, http_client: Callable[[], Any] | None = None
-) -> Authenticator:
+def cognos_logon(dispatcher: str, namespace: str, user: str, password: str, *, http_client: Callable[[], Any] | None = None) -> Authenticator:
     """CAM security with a passport from Cognos, logging on with a user name and password:
     a fresh passport for each login (Java's ``Tm1Authenticator.cognosLogon``)."""
     passports = CognosPassports.password(dispatcher, namespace, user, password, http_client=http_client)
     return _Passport(passports, f"CAMPassport from Cognos {namespace}/{user}")
 
 
-def cognos_id_token(
-    dispatcher: str, namespace: str, id_token: Callable[[], Any], *, http_client: Callable[[], Any] | None = None
-) -> Authenticator:
+def cognos_id_token(dispatcher: str, namespace: str, id_token: Callable[[], Any], *, http_client: Callable[[], Any] | None = None) -> Authenticator:
     """CAM security with a passport from Cognos for an OpenID Connect ID token (Java's
     ``Tm1Authenticator.cognosIdToken``)."""
     passports = CognosPassports.id_token(dispatcher, namespace, id_token, http_client=http_client)

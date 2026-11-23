@@ -178,15 +178,12 @@ def test_streams_two_axes_in_whole_rows_then_deletes_the_cellset(api: Api, fake:
     # Two columns, three rows; the first page (3 cells) ends mid-row, so its last cell is
     # fetched again with the next row
     fake.respond = _cellset_server([2, 3], inline=3)
-    cellset, cells = api.run(
-        api.client.cellsets.stream("SELECT", ODataQuery.none().select(CellsetCell.ORDINAL, CellsetCell.VALUE), 3, handler(api))
-    )
+    cellset, cells = api.run(api.client.cellsets.stream("SELECT", ODataQuery.none().select(CellsetCell.ORDINAL, CellsetCell.VALUE), 3, handler(api)))
     assert cellset.id == "cs1"
     assert [c.ordinal for c in cells] == [0, 1, 2, 3, 4, 5]
     first = fake.requests[0]
     assert first.url.params["$expand"] == (
-        "Axes($expand=Hierarchies($select=Name),Tuples($expand=Members($select=Name,UniqueName))),"
-        "Cells($select=Ordinal,Value;$top=3)"
+        "Axes($expand=Hierarchies($select=Name),Tuples($expand=Members($select=Name,UniqueName))),Cells($select=Ordinal,Value;$top=3)"
     )
     assert [target(r).split("?")[0] for r in fake.requests[1:]] == [
         "GET Cellsets('cs1')/tm1.GetPartition(Begin=2,End=3)",

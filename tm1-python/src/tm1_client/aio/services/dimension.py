@@ -3,8 +3,8 @@ client's ``net.ajmyers.tm1.client.service.dimension``)."""
 
 from __future__ import annotations
 
-import enum
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from ..._calls import endpoint
 from ..._generated.model import Dimension, Edge, Element, Hierarchy, Level, Member, Subset
@@ -13,8 +13,8 @@ from ..._generated.patches import HierarchyPatch
 from ...odata import ODataPath, ODataQuery
 from ...operation import Tm1Operation
 from ...request import Tm1Request, body_of
-from ._base import Service, _require
 from ...values import SubsetScope
+from ._base import Service, _require
 
 __all__ = [
     "DimensionService",
@@ -149,9 +149,7 @@ class DimensionService(Service):
         await self._session.execute(Tm1Request.delete(_dimension(name)))
 
     @endpoint("Action Dimension/SaveAs")
-    async def save_as(
-        self, name: str, new_name: str, overwrite: bool | None = None, keep_existing_attributes: bool | None = None
-    ) -> Dimension:
+    async def save_as(self, name: str, new_name: str, overwrite: bool | None = None, keep_existing_attributes: bool | None = None) -> Dimension:
         """``tm1.SaveAs``: copies a dimension under a new name, failing if one exists, unless
         ``overwrite``. When overwriting, ``keep_existing_attributes`` keeps the attributes of
         what's replaced; when not, true creates no attributes for the copy. Returns the copy."""
@@ -162,9 +160,7 @@ class DimensionService(Service):
         return await self._session.execute(_post(_dimension(name), Tm1Operations.DIMENSION_SAVE_AS, body, Dimension))
 
     @endpoint("Action Dimension/AddAllLeavesHierarchy")
-    async def add_all_leaves_hierarchy(
-        self, name: str, hierarchy_name: str | None = None, visible: bool | None = None
-    ) -> Hierarchy:
+    async def add_all_leaves_hierarchy(self, name: str, hierarchy_name: str | None = None, visible: bool | None = None) -> Hierarchy:
         """``tm1.AddAllLeavesHierarchy``: adds a hierarchy of all the dimension's leaves, which
         makes it a multi-hierarchy dimension. Without a name, TM1 names it ``Leaves`` and makes
         it not visible. Returns the new hierarchy."""
@@ -201,9 +197,7 @@ class DimensionService(Service):
 def _without_structure(patch: Any) -> Any:
     # Bindings to the collections (Elements@odata.bind) are structure changes too
     if any(k in ("Elements", "Edges") or k.startswith(("Elements@", "Edges@")) for k in _keys(patch)):
-        raise ValueError(
-            "A hierarchy PATCH with Elements or Edges replaces them, deleting what it doesn't list: use replace_structure"
-        )
+        raise ValueError("A hierarchy PATCH with Elements or Edges replaces them, deleting what it doesn't list: use replace_structure")
     return patch
 
 
@@ -251,24 +245,18 @@ class HierarchyService(Service):
     @endpoint("Navigation Dimension/Hierarchies")
     async def list(self, dimension: str, query: ODataQuery | None = None, **options: Any) -> list[Hierarchy]:
         """``GET Dimensions('d')/Hierarchies``: the dimension's hierarchies."""
-        return await self._session.collect(
-            Tm1Request.list(_hierarchies(dimension), ODataQuery.of(query, **options), Hierarchy)
-        )
+        return await self._session.collect(Tm1Request.list(_hierarchies(dimension), ODataQuery.of(query, **options), Hierarchy))
 
     @endpoint("Navigation Dimension/Hierarchies")
     async def get(self, dimension: str, hierarchy: str, query: ODataQuery | None = None, **options: Any) -> Hierarchy:
         """``GET Dimensions('d')/Hierarchies('h')``: the hierarchy, or a ``Tm1NotFoundError``."""
-        return await self._session.execute(
-            Tm1Request.get(_hierarchy(dimension, hierarchy), ODataQuery.of(query, **options), Hierarchy)
-        )
+        return await self._session.execute(Tm1Request.get(_hierarchy(dimension, hierarchy), ODataQuery.of(query, **options), Hierarchy))
 
     @endpoint("Navigation Dimension/Hierarchies")
     async def create(self, dimension: str, hierarchy: Any) -> Hierarchy:
         """``POST Dimensions('d')/Hierarchies``: adds a hierarchy, with its elements and edges if
         the patch has them. It needs a name; returns the hierarchy as created."""
-        return await self._session.execute(
-            Tm1Request.post(_hierarchies(dimension), _require(hierarchy, "hierarchy"), Hierarchy)
-        )
+        return await self._session.execute(Tm1Request.post(_hierarchies(dimension), _require(hierarchy, "hierarchy"), Hierarchy))
 
     @endpoint("Navigation Dimension/Hierarchies")
     async def update(self, dimension: str, hierarchy: str, patch: Any, etag: str | None = None) -> None:
@@ -282,9 +270,7 @@ class HierarchyService(Service):
         await self._session.execute(request if etag is None else request.if_match(etag))
 
     @endpoint("Navigation Dimension/Hierarchies")
-    async def replace_structure(
-        self, dimension: str, hierarchy: str, elements: Sequence[Any], edges: Sequence[Any]
-    ) -> None:
+    async def replace_structure(self, dimension: str, hierarchy: str, elements: Sequence[Any], edges: Sequence[Any]) -> None:
         """``PATCH Dimensions('d')/Hierarchies('h')`` with ``Elements`` and ``Edges``: makes them
         exactly these. TM1 deletes every element not listed, with its data."""
         patch = HierarchyPatch.builder().elements(list(elements)).edges(list(edges)).build()
@@ -308,9 +294,7 @@ class HierarchyService(Service):
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Dimension))
 
     @endpoint("Navigation Hierarchy/AllMember")
-    async def all_member(
-        self, dimension: str, hierarchy: str, query: ODataQuery | None = None, **options: Any
-    ) -> Member | None:
+    async def all_member(self, dimension: str, hierarchy: str, query: ODataQuery | None = None, **options: Any) -> Member | None:
         """``GET Dimensions('d')/Hierarchies('h')/AllMember``: the member that stands for the
         whole hierarchy. TM1 (11.8) has one only when the hierarchy has a single root, which is
         then that root; with several roots it sends no content, and this returns None."""
@@ -318,17 +302,13 @@ class HierarchyService(Service):
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Member | None))
 
     @endpoint("Navigation Hierarchy/DefaultMember")
-    async def default_member(
-        self, dimension: str, hierarchy: str, query: ODataQuery | None = None, **options: Any
-    ) -> Member:
+    async def default_member(self, dimension: str, hierarchy: str, query: ODataQuery | None = None, **options: Any) -> Member:
         """``GET Dimensions('d')/Hierarchies('h')/DefaultMember``."""
         path = _hierarchy(dimension, hierarchy).nav("DefaultMember")
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Member))
 
     @endpoint("Function Hierarchy/RootMembers")
-    async def root_members(
-        self, dimension: str, hierarchy: str, query: ODataQuery | None = None, **options: Any
-    ) -> list[Member]:
+    async def root_members(self, dimension: str, hierarchy: str, query: ODataQuery | None = None, **options: Any) -> list[Member]:
         """``tm1.RootMembers()``: the members with no parent. Needs schema 11.4.7."""
         operation = Tm1Operations.HIERARCHY_ROOT_MEMBERS
         path = _hierarchy(dimension, hierarchy).function(operation.name, {})
@@ -372,9 +352,7 @@ def _checked_element(patch: Any) -> Any:
     if "Name" in keys:
         raise ValueError("TM1 ignores Name in an element PATCH: elements can't be renamed")
     if "Attributes" in keys:
-        raise ValueError(
-            "TM1 rejects Attributes in an element PATCH: attribute values are cells of }ElementAttributes_<dimension>"
-        )
+        raise ValueError("TM1 rejects Attributes in an element PATCH: attribute values are cells of }ElementAttributes_<dimension>")
     return patch
 
 
@@ -407,25 +385,17 @@ class ElementService(Service):
     @endpoint("Navigation Hierarchy/Elements")
     async def list(self, dimension: str, hierarchy: str, query: ODataQuery | None = None, **options: Any) -> list[Element]:
         """``GET …/Hierarchies('h')/Elements``."""
-        return await self._session.collect(
-            Tm1Request.list(_elements(dimension, hierarchy), ODataQuery.of(query, **options), Element)
-        )
+        return await self._session.collect(Tm1Request.list(_elements(dimension, hierarchy), ODataQuery.of(query, **options), Element))
 
     @endpoint("Navigation Hierarchy/Elements")
-    async def get(
-        self, dimension: str, hierarchy: str, element: str, query: ODataQuery | None = None, **options: Any
-    ) -> Element:
+    async def get(self, dimension: str, hierarchy: str, element: str, query: ODataQuery | None = None, **options: Any) -> Element:
         """``GET …/Elements('e')``: the element, or a ``Tm1NotFoundError``."""
-        return await self._session.execute(
-            Tm1Request.get(_element(dimension, hierarchy, element), ODataQuery.of(query, **options), Element)
-        )
+        return await self._session.execute(Tm1Request.get(_element(dimension, hierarchy, element), ODataQuery.of(query, **options), Element))
 
     @endpoint("Navigation Hierarchy/Elements")
     async def create(self, dimension: str, hierarchy: str, element: Any) -> Element:
         """``POST …/Elements``: adds an element, as a root of the hierarchy."""
-        return await self._session.execute(
-            Tm1Request.post(_elements(dimension, hierarchy), _require(element, "element"), Element)
-        )
+        return await self._session.execute(Tm1Request.post(_elements(dimension, hierarchy), _require(element, "element"), Element))
 
     @endpoint("Navigation Hierarchy/Elements")
     async def update(self, dimension: str, hierarchy: str, element: str, patch: Any, etag: str | None = None) -> None:
@@ -443,33 +413,25 @@ class ElementService(Service):
         await self._session.execute(Tm1Request.delete(_element(dimension, hierarchy, element)))
 
     @endpoint("Navigation Element/Parents")
-    async def parents(
-        self, dimension: str, hierarchy: str, element: str, query: ODataQuery | None = None, **options: Any
-    ) -> list[Element]:
+    async def parents(self, dimension: str, hierarchy: str, element: str, query: ODataQuery | None = None, **options: Any) -> list[Element]:
         """``GET …/Elements('e')/Parents``."""
         path = _element(dimension, hierarchy, element).nav("Parents")
         return await self._session.collect(Tm1Request.list(path, ODataQuery.of(query, **options), Element))
 
     @endpoint("Navigation Element/Components")
-    async def components(
-        self, dimension: str, hierarchy: str, element: str, query: ODataQuery | None = None, **options: Any
-    ) -> list[Element]:
+    async def components(self, dimension: str, hierarchy: str, element: str, query: ODataQuery | None = None, **options: Any) -> list[Element]:
         """``GET …/Elements('e')/Components``: a consolidation's children, in order."""
         path = _element(dimension, hierarchy, element).nav("Components")
         return await self._session.collect(Tm1Request.list(path, ODataQuery.of(query, **options), Element))
 
     @endpoint("Navigation Element/Edges")
-    async def edges(
-        self, dimension: str, hierarchy: str, element: str, query: ODataQuery | None = None, **options: Any
-    ) -> list[Edge]:
+    async def edges(self, dimension: str, hierarchy: str, element: str, query: ODataQuery | None = None, **options: Any) -> list[Edge]:
         """``GET …/Elements('e')/Edges``."""
         path = _element(dimension, hierarchy, element).nav("Edges")
         return await self._session.collect(Tm1Request.list(path, ODataQuery.of(query, **options), Edge))
 
     @endpoint("Navigation Element/Hierarchy")
-    async def hierarchy(
-        self, dimension: str, hierarchy: str, element: str, query: ODataQuery | None = None, **options: Any
-    ) -> Hierarchy:
+    async def hierarchy(self, dimension: str, hierarchy: str, element: str, query: ODataQuery | None = None, **options: Any) -> Hierarchy:
         """``GET …/Elements('e')/Hierarchy``."""
         path = _element(dimension, hierarchy, element).nav("Hierarchy")
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Hierarchy))
@@ -505,24 +467,18 @@ class ElementService(Service):
     @endpoint("Action Element/Unlock")
     async def unlock(self, dimension: str, hierarchy: str, element: str) -> None:
         """``tm1.Unlock``. Needs schema 11.8.23."""
-        await self._session.execute(
-            _post(_element(dimension, hierarchy, element), Tm1Operations.ELEMENT_UNLOCK, {}, None)
-        )
+        await self._session.execute(_post(_element(dimension, hierarchy, element), Tm1Operations.ELEMENT_UNLOCK, {}, None))
 
     @endpoint("Action Element/Reserve")
     async def reserve(self, dimension: str, hierarchy: str, element: str) -> None:
         """``tm1.Reserve``: stops everyone else changing the element's data until it's released.
         Needs schema 11.8.34."""
-        await self._session.execute(
-            _post(_element(dimension, hierarchy, element), Tm1Operations.ELEMENT_RESERVE, {}, None)
-        )
+        await self._session.execute(_post(_element(dimension, hierarchy, element), Tm1Operations.ELEMENT_RESERVE, {}, None))
 
     @endpoint("Action Element/Release")
     async def release(self, dimension: str, hierarchy: str, element: str) -> None:
         """``tm1.Release``. Needs schema 11.8.34."""
-        await self._session.execute(
-            _post(_element(dimension, hierarchy, element), Tm1Operations.ELEMENT_RELEASE, {}, None)
-        )
+        await self._session.execute(_post(_element(dimension, hierarchy, element), Tm1Operations.ELEMENT_RELEASE, {}, None))
 
 
 def _edge(dimension: str, hierarchy: str, parent: str, component: str) -> ODataPath:
@@ -579,9 +535,7 @@ class EdgeService(Service):
     @endpoint("Navigation Hierarchy/Edges")
     async def update(self, dimension: str, hierarchy: str, parent: str, component: str, patch: Any) -> None:
         """``PATCH …/Edges(ParentName='p',ComponentName='c')``: changes the edge's weight."""
-        await self._session.execute(
-            Tm1Request.patch(_edge(dimension, hierarchy, parent, component), _require(patch, "patch"))
-        )
+        await self._session.execute(Tm1Request.patch(_edge(dimension, hierarchy, parent, component), _require(patch, "patch")))
 
     @endpoint("Navigation Hierarchy/Edges")
     async def delete(self, dimension: str, hierarchy: str, parent: str, component: str) -> None:
@@ -660,17 +614,13 @@ class LevelService(Service):
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Level))
 
     @endpoint("Navigation Level/Members")
-    async def members(
-        self, dimension: str, hierarchy: str, number: int, query: ODataQuery | None = None, **options: Any
-    ) -> list[Member]:
+    async def members(self, dimension: str, hierarchy: str, number: int, query: ODataQuery | None = None, **options: Any) -> list[Member]:
         """``GET …/Levels(n)/Members``."""
         path = _hierarchy(dimension, hierarchy).nav("Levels").key(int(number)).nav("Members")
         return await self._session.collect(Tm1Request.list(path, ODataQuery.of(query, **options), Member))
 
     @endpoint("Navigation Level/Hierarchy")
-    async def hierarchy(
-        self, dimension: str, hierarchy: str, number: int, query: ODataQuery | None = None, **options: Any
-    ) -> Hierarchy:
+    async def hierarchy(self, dimension: str, hierarchy: str, number: int, query: ODataQuery | None = None, **options: Any) -> Hierarchy:
         """``GET …/Levels(n)/Hierarchy``."""
         path = _hierarchy(dimension, hierarchy).nav("Levels").key(int(number)).nav("Hierarchy")
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Hierarchy))
@@ -707,50 +657,38 @@ class MemberService(Service):
         return await self._session.collect(Tm1Request.list(path, ODataQuery.of(query, **options), Member))
 
     @endpoint("Navigation Hierarchy/Members")
-    async def get(
-        self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any
-    ) -> Member:
+    async def get(self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any) -> Member:
         """``GET …/Members('m')``."""
         path = _member(dimension, hierarchy, member)
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Member))
 
     @endpoint("Navigation Member/Parent")
-    async def parent(
-        self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any
-    ) -> Member | None:
+    async def parent(self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any) -> Member | None:
         """``GET …/Members('m')/Parent``. A member with several parents has the first; a root
         has none, and this returns None."""
         path = _member(dimension, hierarchy, member).nav("Parent")
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Member | None))
 
     @endpoint("Navigation Member/Children")
-    async def children(
-        self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any
-    ) -> list[Member]:
+    async def children(self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any) -> list[Member]:
         """``GET …/Members('m')/Children``."""
         path = _member(dimension, hierarchy, member).nav("Children")
         return await self._session.collect(Tm1Request.list(path, ODataQuery.of(query, **options), Member))
 
     @endpoint("Navigation Member/Element")
-    async def element(
-        self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any
-    ) -> Element:
+    async def element(self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any) -> Element:
         """``GET …/Members('m')/Element``."""
         path = _member(dimension, hierarchy, member).nav("Element")
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Element))
 
     @endpoint("Navigation Member/Level")
-    async def level(
-        self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any
-    ) -> Level:
+    async def level(self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any) -> Level:
         """``GET …/Members('m')/Level``."""
         path = _member(dimension, hierarchy, member).nav("Level")
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Level))
 
     @endpoint("Navigation Member/Hierarchy")
-    async def hierarchy(
-        self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any
-    ) -> Hierarchy:
+    async def hierarchy(self, dimension: str, hierarchy: str, member: str, query: ODataQuery | None = None, **options: Any) -> Hierarchy:
         """``GET …/Members('m')/Hierarchy``."""
         path = _member(dimension, hierarchy, member).nav("Hierarchy")
         return await self._session.execute(Tm1Request.get(path, ODataQuery.of(query, **options), Hierarchy))
@@ -809,9 +747,7 @@ class SubsetService(Service):
     """
 
     @endpoint(*_SUBSET_SETS)
-    async def list(
-        self, dimension: str, hierarchy: str, scope: SubsetScope, query: ODataQuery | None = None, **options: Any
-    ) -> list[Subset]:
+    async def list(self, dimension: str, hierarchy: str, scope: SubsetScope, query: ODataQuery | None = None, **options: Any) -> list[Subset]:
         """``GET …/Hierarchies('h')/Subsets`` (or the private or session ones). TM1 (11.8) lists
         no session subsets, though each reads by the name :meth:`create_session_subset` returned."""
         path = _subsets(dimension, hierarchy, scope)
@@ -839,9 +775,7 @@ class SubsetService(Service):
         return await self._session.execute(Tm1Request.post(path, _require(subset, "subset"), Subset))
 
     @endpoint(*_SUBSET_SETS)
-    async def update(
-        self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str, patch: Any, etag: str | None = None
-    ) -> None:
+    async def update(self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str, patch: Any, etag: str | None = None) -> None:
         """``PATCH …/Subsets('s')``: changes the properties the patch sets, such as a dynamic
         subset's expression; with ``etag``, only if it hasn't changed since it was read.
 
@@ -851,23 +785,17 @@ class SubsetService(Service):
         await self._session.execute(request if etag is None else request.if_match(etag))
 
     @endpoint(*_SUBSET_SETS)
-    async def add_elements(
-        self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str, elements: Sequence[str]
-    ) -> None:
+    async def add_elements(self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str, elements: Sequence[str]) -> None:
         """``PATCH …/Subsets('s')`` binding ``Elements``: appends elements to a static subset, in
         order."""
         bindings = [str(_element(dimension, hierarchy, e)) for e in elements]
-        await self._session.execute(
-            Tm1Request.patch(_subset(dimension, hierarchy, scope, subset), {"Elements@odata.bind": bindings})
-        )
+        await self._session.execute(Tm1Request.patch(_subset(dimension, hierarchy, scope, subset), {"Elements@odata.bind": bindings}))
 
     @endpoint("Navigation Subset/Elements")
     async def clear_elements(self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str) -> None:
         """``DELETE …/Subsets('s')/Elements/$ref``: removes every element from a static subset;
         the elements stay in the hierarchy."""
-        await self._session.execute(
-            Tm1Request.delete(_subset(dimension, hierarchy, scope, subset).nav("Elements").ref())
-        )
+        await self._session.execute(Tm1Request.delete(_subset(dimension, hierarchy, scope, subset).nav("Elements").ref()))
 
     @endpoint(*_SUBSET_SETS)
     async def delete(self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str) -> None:
@@ -931,16 +859,12 @@ class SubsetService(Service):
         await self._set_element(dimension, hierarchy, scope, subset, element, None, None)
 
     @endpoint("Action Subset/SetElement")
-    async def set_element_before(
-        self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str, element: str, before: str
-    ) -> None:
+    async def set_element_before(self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str, element: str, before: str) -> None:
         """``tm1.SetElement`` with ``Before``: places an element just before another in a static subset."""
         await self._set_element(dimension, hierarchy, scope, subset, element, "Before@odata.bind", _require(before, "before"))
 
     @endpoint("Action Subset/SetElement")
-    async def set_element_after(
-        self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str, element: str, after: str
-    ) -> None:
+    async def set_element_after(self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str, element: str, after: str) -> None:
         """``tm1.SetElement`` with ``After``: places an element just after another in a static subset."""
         await self._set_element(dimension, hierarchy, scope, subset, element, "After@odata.bind", _require(after, "after"))
 
@@ -954,9 +878,7 @@ class SubsetService(Service):
         return await self._session.execute(_post(target, Tm1Operations.HIERARCHY_CREATE_SESSION_SUBSET, body, Subset))
 
     @endpoint("Action Hierarchy/CreateSessionSubset")
-    async def create_session_subset_from(
-        self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str
-    ) -> Subset:
+    async def create_session_subset_from(self, dimension: str, hierarchy: str, scope: SubsetScope, subset: str) -> Subset:
         """``tm1.CreateSessionSubset`` with a reference: copies a subset into one visible only to
         this session."""
         body = {"Subset@odata.bind": str(_subset(dimension, hierarchy, scope, subset))}

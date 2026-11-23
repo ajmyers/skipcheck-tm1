@@ -98,7 +98,7 @@ def test_error_logs(api: Api, fake: FakeTm1) -> None:
     api.run(api.client.logs.error_log_file("a.log"))
     assert target(fake.last) == "GET ErrorLogFiles('a.log')"
     # TM1 (11.8) starts the content with a byte order mark, which is dropped
-    fake.respond = lambda r: httpx.Response(200, content="﻿Line 1".encode("utf-8"))
+    fake.respond = lambda r: httpx.Response(200, content="﻿Line 1".encode())
     assert api.run(api.client.logs.error_log_content("a.log")) == "Line 1"
     assert target(fake.last) == "GET ErrorLogFiles('a.log')/Content"
 

@@ -44,11 +44,7 @@ def test_lists_and_gets_each_view_as_its_own_type(api: Api, fake: FakeTm1) -> No
 
 def test_reads_a_native_view_through_its_type(api: Api, fake: FakeTm1) -> None:
     fake.respond = lambda r: {"Name": "n", "Columns": [{"Subset": {"UniqueName": "[Month].[Quarters]"}}]}
-    view = api.run(
-        api.client.views.get_native(
-            "Sales", ViewScope.PUBLIC, "n", ODataQuery.none().expand("Columns/Subset").expand("Rows/Subset")
-        )
-    )
+    view = api.run(api.client.views.get_native("Sales", ViewScope.PUBLIC, "n", ODataQuery.none().expand("Columns/Subset").expand("Rows/Subset")))
     assert isinstance(view, NativeView)
     assert view.columns[0].subset.unique_name == "[Month].[Quarters]"
     assert target(fake.last) == "GET Cubes('Sales')/Views('n')/ibm.tm1.api.v1.NativeView?$expand=Columns/Subset,Rows/Subset"
@@ -62,14 +58,7 @@ def test_creates_updates_and_deletes(api: Api, fake: FakeTm1) -> None:
         NativeViewPatch.builder()
         .name("Revenue")
         .columns([ViewAxisSelectionPatch.builder().bind_subset(months).build()])
-        .titles(
-            [
-                ViewTitlePatch.builder()
-                .bind_subset(versions.nav("Subsets").key("All"))
-                .bind_selected(versions.nav("Elements").key("Actual"))
-                .build()
-            ]
-        )
+        .titles([ViewTitlePatch.builder().bind_subset(versions.nav("Subsets").key("All")).bind_selected(versions.nav("Elements").key("Actual")).build()])
         .suppress_empty_rows(True)
         .build()
     )

@@ -76,9 +76,7 @@ def test_logs_in_once_for_concurrent_first_requests_and_sends_only_the_cookie_af
 
 
 def test_finds_the_session_cookie_by_name_among_others(rt: Runtime) -> None:
-    rt.fake.on_login = lambda r: json_response(
-        200, {"ID": 3}, "other=1; Path=/", "TM1SessionId=right; Path=/api/; HttpOnly", "more=2"
-    )
+    rt.fake.on_login = lambda r: json_response(200, {"ID": 3}, "other=1; Path=/", "TM1SessionId=right; Path=/api/; HttpOnly", "more=2")
     server(rt)
     rt.run(rt.session().execute(SERVER))
     assert cookie(requests_to(rt, "GET Server?$select=Name")[0]) == "right"
@@ -99,12 +97,8 @@ def test_reports_refused_credentials_and_can_try_again_on_the_next_request(rt: R
 
 
 def test_maps_error_responses_through_the_classifier(rt: Runtime) -> None:
-    rt.fake.respond = lambda r: json_response(
-        404, {"error": {"code": "278", "message": "'Nope' can not be found in collection of type 'Cube'."}}
-    )
-    error = rt.raises(
-        Tm1NotFoundError, lambda: rt.session().execute(Tm1Request.get(ODataPath.of("Cubes").key("Nope"), ODataQuery.none(), dict))
-    )
+    rt.fake.respond = lambda r: json_response(404, {"error": {"code": "278", "message": "'Nope' can not be found in collection of type 'Cube'."}})
+    error = rt.raises(Tm1NotFoundError, lambda: rt.session().execute(Tm1Request.get(ODataPath.of("Cubes").key("Nope"), ODataQuery.none(), dict)))
     assert error.status == 404 and error.error.code == "278"
     assert error.url == BASE + "Cubes('Nope')"
 
@@ -347,9 +341,7 @@ def test_refuses_names_tm1_would_misread(rt: Runtime, name: str) -> None:
 
 
 def test_reports_an_unknown_user(rt: Runtime) -> None:
-    rt.fake.on_login = lambda r: text_response(
-        400, "Error: Bad Request\r\nThe user specified in the impersonation request does not exist.\r\n"
-    )
+    rt.fake.on_login = lambda r: text_response(400, "Error: Bad Request\r\nThe user specified in the impersonation request does not exist.\r\n")
     error = rt.raises(Tm1BadRequestError, lambda: rt.session(rt.builder().impersonate("nobody")).execute(SERVER))
     assert error.kind is Tm1ErrorKind.UNKNOWN_USER
 
@@ -535,17 +527,15 @@ def test_fetches_metadata_once_per_server_version_for_every_session(rt: Runtime)
 
 
 def test_sends_a_request_whose_requirement_the_server_meets(rt: Runtime) -> None:
-    order = Tm1Request.get(
-        ODataPath.of("Cubes").key("Sales").function("tm1.DimensionsStorageOrder", {}), ODataQuery.none(), dict
-    ).requires(Tm1Capability.bound_operation("tm1.Cube", "tm1.DimensionsStorageOrder").since("11.4.0"))
+    order = Tm1Request.get(ODataPath.of("Cubes").key("Sales").function("tm1.DimensionsStorageOrder", {}), ODataQuery.none(), dict).requires(
+        Tm1Capability.bound_operation("tm1.Cube", "tm1.DimensionsStorageOrder").since("11.4.0")
+    )
     rt.run(rt.session().execute(order))
     assert target(rt.fake.last) == "GET Cubes('Sales')/tm1.DimensionsStorageOrder()"
 
 
 def test_refuses_a_request_the_server_cant_serve_without_sending_it(rt: Runtime) -> None:
-    bananas = Tm1Request.list(ODataPath.of("Bananas"), ODataQuery.none(), dict).requires(
-        Tm1Capability.entity_set("Bananas").since("99.0")
-    )
+    bananas = Tm1Request.list(ODataPath.of("Bananas"), ODataQuery.none(), dict).requires(Tm1Capability.entity_set("Bananas").since("99.0"))
     error = rt.raises(Tm1UnsupportedOperationError, lambda: rt.session().collect(bananas))
     assert error.missing == "entity set Bananas"
     assert "added in schema 99.0" in str(error) and "reports schema 11.8.35" in str(error)

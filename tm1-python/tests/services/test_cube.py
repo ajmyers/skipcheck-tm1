@@ -54,7 +54,7 @@ def test_gets_creates_updates_and_deletes(api: Api, fake: FakeTm1) -> None:
 def test_a_stale_etag_is_refused(api: Api, fake: FakeTm1) -> None:
     fake.respond = lambda r: httpx.Response(412, json={"error": {"code": "278", "message": "stale"}})
     with pytest.raises(Tm1PreconditionFailedError):
-        api.run(api.client.cubes.update("Sales", Cube(rules="x"), "W/\"0\""))
+        api.run(api.client.cubes.update("Sales", Cube(rules="x"), 'W/"0"'))
 
 
 def test_operations(api: Api, fake: FakeTm1) -> None:

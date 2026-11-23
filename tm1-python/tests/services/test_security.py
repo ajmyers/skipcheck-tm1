@@ -134,13 +134,7 @@ def test_sessions(api: Api, fake: FakeTm1) -> None:
 def test_threads(api: Api, fake: FakeTm1) -> None:
     threads = api.client.threads
     fake.respond = lambda r: {"value": [{"ID": 5, "Function": "POST /api/v1/Processes('Sales.Load')/tm1.ExecuteWithReturn"}]}
-    found = api.run(
-        threads.list(
-            ODataQuery.none()
-            .select(Thread.ID)
-            .filter(Filter.contains(Thread.FUNCTION, "Processes('Sales.Load')/tm1.ExecuteWithReturn"))
-        )
-    )
+    found = api.run(threads.list(ODataQuery.none().select(Thread.ID).filter(Filter.contains(Thread.FUNCTION, "Processes('Sales.Load')/tm1.ExecuteWithReturn"))))
     assert found[0].id == 5
     assert target(fake.last).startswith("GET Threads?$select=ID&$filter=contains(Function,")
     fake.respond = lambda r: {"ID": 5}

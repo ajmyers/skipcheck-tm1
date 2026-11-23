@@ -67,11 +67,13 @@ def java_methods(path: Path) -> dict[str, JavaMethod]:
     cls = path.stem
     # Only the top-level class's own members: drop nested types' bodies
     out: dict[str, JavaMethod] = {}
-    for m in re.finditer(r"((?:\s*@Tm1Endpoint\(\"[^\"]+\"\)\s*)*)(\s+public\s+(?:static\s+)?(?:<[^>]+>\s+)?[\w.<>\[\]?, ]+?\s+(\w+)\s*\(([^)]*)\)\s*(?:throws [\w., ]+)?\{)", source):
+    for m in re.finditer(
+        r"((?:\s*@Tm1Endpoint\(\"[^\"]+\"\)\s*)*)(\s+public\s+(?:static\s+)?(?:<[^>]+>\s+)?[\w.<>\[\]?, ]+?\s+(\w+)\s*\(([^)]*)\)\s*(?:throws [\w., ]+)?\{)",
+        source,
+    ):
         name = m.group(3)
         if name == cls:
             continue
-        indent = len(m.group(2)) - len(m.group(2).lstrip("\n").lstrip())
         line = m.group(2).lstrip("\n")
         if not line.startswith("\tpublic"):  # a nested type's member
             continue
@@ -156,7 +158,9 @@ def test_the_client_has_every_service() -> None:
     from tm1_client.aio import AsyncTm1Client
 
     methods = java_methods(JAVA / "Tm1Client.java")
-    services = [n for n, m in methods.items() if m.overloads == [[]] and n not in ("builder", "session", "batch", "connect", "close", "withoutAsync", "toString")]
+    services = [
+        n for n, m in methods.items() if m.overloads == [[]] and n not in ("builder", "session", "batch", "connect", "close", "withoutAsync", "toString")
+    ]
     for name in services:
         assert isinstance(inspect.getattr_static(AsyncTm1Client, snake(name), None), property), name
     for name in ("batch", "with_async", "without_async", "with_sandbox", "with_change_set", "connect", "close", "builder", "of"):

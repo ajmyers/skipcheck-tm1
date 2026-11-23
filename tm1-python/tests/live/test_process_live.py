@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import contextlib
 import time as clock
+from collections.abc import Iterator
 from datetime import date, datetime, time, timedelta, timezone
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
 
@@ -276,9 +277,7 @@ def parameter(name: str, value: Any) -> Any:
 @pytest.fixture
 def chores(tm1: Tm1Client, name: str) -> Iterator[Chores]:
     c = Chores(tm1, name)
-    tm1.processes.create(
-        definition(c.process, "If(DimensionExists(pName) = 0);\n  DimensionCreate(pName);\nEndIf;\n")
-    )
+    tm1.processes.create(definition(c.process, "If(DimensionExists(pName) = 0);\n  DimensionCreate(pName);\nEndIf;\n"))
     tm1.chores.create(
         ChorePatch.builder()
         .name(c.chore)
@@ -314,9 +313,7 @@ def test_creates_reads_updates_and_deletes_a_chore_and_its_tasks(tm1: Tm1Client,
 
     assert service.add_task(chore, chores.task("second_" + chores.id)).step == 1
     assert [t.step for t in service.tasks(chore)] == [0, 1]
-    service.update_task(
-        chore, 1, ChoreTaskPatch.builder().parameters([parameter("pName", "third_" + chores.id), parameter("pCount", 2)]).build()
-    )
+    service.update_task(chore, 1, ChoreTaskPatch.builder().parameters([parameter("pName", "third_" + chores.id), parameter("pCount", 2)]).build())
     assert any(p.value == "third_" + chores.id for p in service.tasks(chore)[1].parameters)
     service.delete_task(chore, 0)
     assert [t.step for t in service.tasks(chore)] == [0], "renumbered from 0"
@@ -333,10 +330,7 @@ def test_needs_every_process_parameter_in_a_task(tm1: Tm1Client, chores: Chores)
     with pytest.raises(Tm1Error):
         tm1.chores.add_task(
             chores.chore,
-            ChoreTaskPatch.builder()
-            .bind_process(ODataPath.of("Processes").key(chores.process))
-            .parameters([parameter("pName", "x")])
-            .build(),
+            ChoreTaskPatch.builder().bind_process(ODataPath.of("Processes").key(chores.process)).parameters([parameter("pName", "x")]).build(),
         )
 
 

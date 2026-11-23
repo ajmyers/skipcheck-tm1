@@ -3,10 +3,11 @@ capability refusal, a batch's queue and how its answers are handed out."""
 
 from __future__ import annotations
 
+import functools
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import timedelta
-import functools
-from typing import Any, Iterator
+from typing import Any
 
 from . import _protocol as p
 from .errors import Tm1ProtocolError
@@ -51,9 +52,7 @@ def items_only(call: p.Call) -> p.Call:
     def read(reply: p.Reply) -> Any:
         page = call.read(reply)
         if page.next_link is not None:
-            raise Tm1ProtocolError(
-                f"{call.path}: TM1 sent more than one page, which a batch can't follow; ask for fewer with top="
-            )
+            raise Tm1ProtocolError(f"{call.path}: TM1 sent more than one page, which a batch can't follow; ask for fewer with top=")
         return page.items
 
     return replace(call, read=read)
@@ -88,5 +87,3 @@ def settle(chunk: list[tuple[p.Call, p.Context, p.Deferred[Any]]], reply: p.Repl
     replies = p.batch_replies(reply.json(), len(chunk))
     for (call, context, deferred), item in zip(chunk, replies):
         deferred._settle(url(p.target(call, context)), item, classifier)
-
-

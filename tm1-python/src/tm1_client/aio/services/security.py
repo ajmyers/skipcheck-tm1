@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from ..._calls import endpoint
 from ..._generated.model import Group, Session, Thread, User

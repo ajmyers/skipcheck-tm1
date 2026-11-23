@@ -17,7 +17,8 @@ The shared containers are removed when the session ends, unless reuse is enabled
 from __future__ import annotations
 
 import functools
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 
@@ -42,12 +43,12 @@ _MARKERS = {
 }
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _docker() -> bool:
     return docker_available()
 
 
-def tm1_skip_reason() -> Optional[str]:
+def tm1_skip_reason() -> str | None:
     """Why a TM1 test is skipped, or None when it runs; raises when a source is set but wrong."""
     if not _docker():
         return NO_DOCKER_MESSAGE
@@ -55,15 +56,15 @@ def tm1_skip_reason() -> Optional[str]:
     return None if Tm1Source.discover() is not None else NO_TM1_MESSAGE
 
 
-def cognos_skip_reason() -> Optional[str]:
+def cognos_skip_reason() -> str | None:
     return tm1_skip_reason() or (None if CognosSource.discover() is not None else NO_COGNOS_MESSAGE)
 
 
-def tm1_web_skip_reason() -> Optional[str]:
+def tm1_web_skip_reason() -> str | None:
     return tm1_skip_reason() or (None if Tm1WebSource.discover() is not None else NO_TM1_WEB_MESSAGE)
 
 
-def paw_skip_reason() -> Optional[str]:
+def paw_skip_reason() -> str | None:
     reason = tm1_skip_reason()
     if reason is not None:
         return reason
@@ -74,7 +75,7 @@ def paw_skip_reason() -> Optional[str]:
     return None
 
 
-_CONDITIONS: dict[str, Callable[[], Optional[str]]] = {
+_CONDITIONS: dict[str, Callable[[], str | None]] = {
     "requires_tm1": tm1_skip_reason,
     "requires_cognos": cognos_skip_reason,
     "requires_tm1_web": tm1_web_skip_reason,
@@ -105,7 +106,7 @@ def pytest_unconfigure(config: Any) -> None:
             shared.stop()
 
 
-def _require(condition: Callable[[], Optional[str]]) -> None:
+def _require(condition: Callable[[], str | None]) -> None:
     reason = condition()
     if reason is not None:
         pytest.skip(reason)

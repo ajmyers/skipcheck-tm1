@@ -4,8 +4,9 @@ Java client's ``net.ajmyers.tm1.client.service.data``)."""
 from __future__ import annotations
 
 import math
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Awaitable, Callable, Mapping, Sequence
+from typing import Any
 
 from ..._calls import endpoint
 from ..._generated.model import (
@@ -28,9 +29,9 @@ from ..._generated.operations import Tm1Operations
 from ...odata import ODataPath, ODataQuery
 from ...operation import Tm1Operation
 from ...request import Tm1Request
+from ...values import Tuples
 from ..session import AsyncTm1Session
 from ._base import Service, _require
-from ...values import Tuples
 from .cube import ViewScope
 
 __all__ = [
@@ -184,9 +185,7 @@ class CellsetService(Service):
         in the same round trip. The cellset has its ``ID``."""
         operation = Tm1Operations.EXECUTE_MDX
         request = Tm1Request.post(_import(operation), {"MDX": _require(mdx, "mdx")}, Cellset)
-        return await self._session.execute(
-            request.with_query(ODataQuery.of(query, **options)).requires(operation.capability())
-        )
+        return await self._session.execute(request.with_query(ODataQuery.of(query, **options)).requires(operation.capability()))
 
     @endpoint("ActionImport ExecuteMDXStatement")
     async def execute_statement(self, mdx: str) -> None:
@@ -198,9 +197,7 @@ class CellsetService(Service):
         await self._session.execute(request.requires(operation.capability()))
 
     @endpoint("Action NativeView/Execute", "Action MDXView/Execute")
-    async def execute_view(
-        self, cube: str, scope: ViewScope, view: str, query: ODataQuery | None = None, **options: Any
-    ) -> Cellset:
+    async def execute_view(self, cube: str, scope: ViewScope, view: str, query: ODataQuery | None = None, **options: Any) -> Cellset:
         """``tm1.Execute`` on a native or MDX view: its cellset, with its ``ID``, left on the
         server until :meth:`delete`."""
         path = (
@@ -251,9 +248,7 @@ class CellsetService(Service):
         return await self._session.collect(request)
 
     @endpoint("Navigation CellsetAxisTuple/Members")
-    async def tuple_members(
-        self, id: str, axis: int, tuple: int, query: ODataQuery | None = None, **options: Any
-    ) -> list[Member]:
+    async def tuple_members(self, id: str, axis: int, tuple: int, query: ODataQuery | None = None, **options: Any) -> list[Member]:
         """``GET Cellsets('id')/Axes(n)/Tuples(t)/Members``: one member per hierarchy on the axis."""
         path = _axis(id, axis).nav("Tuples").key(tuple).nav("Members")
         return await self._session.collect(Tm1Request.list(path, ODataQuery.of(query, **options), Member))
@@ -279,9 +274,7 @@ class CellsetService(Service):
         return await self._session.execute(Tm1Request.get(_cellset(id).nav("Cube"), ODataQuery.of(query, **options), Cube))
 
     @endpoint("Function Cellset/GetPartition")
-    async def partition(
-        self, id: str, begin: int, end: int, query: ODataQuery | None = None, **options: Any
-    ) -> list[CellsetCell]:
+    async def partition(self, id: str, begin: int, end: int, query: ODataQuery | None = None, **options: Any) -> list[CellsetCell]:
         """``tm1.GetPartition(Begin=b,End=e)``: a rectangle of cells. Needs schema 10.2.2.3.
 
         TM1 (11.8) reads ``Begin`` and ``End`` as the top-left and bottom-right cells of a
@@ -311,9 +304,7 @@ class CellsetService(Service):
         await self._session.execute(_cellset_action(Tm1Operations.CELLSET_UPDATE_CELLS, id, body, None))
 
     @endpoint("Action Cellset/SaveViewAs")
-    async def save_view_as(
-        self, id: str, name: str, overwrite: bool | None = None, make_private: bool | None = None
-    ) -> View:
+    async def save_view_as(self, id: str, name: str, overwrite: bool | None = None, make_private: bool | None = None) -> View:
         """``tm1.SaveViewAs``: saves the cellset's query as a view of its cube. Needs schema
         11.0.0. With only a name, a public view, failing if one has the name; with
         ``overwrite`` and ``make_private``, whether to replace one that has it, and whether the
@@ -449,9 +440,7 @@ class MemberSetService(Service):
         Needs schema 11.1.0."""
         operation = Tm1Operations.EXECUTE_MDX_SET_EXPRESSION
         request = Tm1Request.post(_import(operation), {"MDX": _require(mdx, "mdx")}, CellsetAxis)
-        return await self._session.execute(
-            request.with_query(ODataQuery.of(query, **options)).requires(operation.capability())
-        )
+        return await self._session.execute(request.with_query(ODataQuery.of(query, **options)).requires(operation.capability()))
 
     @endpoint("EntitySet MemberSets")
     async def list(self, query: ODataQuery | None = None, **options: Any) -> list[CellsetAxis]:
@@ -553,9 +542,7 @@ class SandboxService(Service):
         options are sent too: what to do with cells changed in base data since the sandbox's
         changes, whether to wait for a lock rather than fail (``allow_queueing``), and whether
         to empty the sandbox once published (``clean_after``)."""
-        await self._session.execute(
-            _sandbox_action(Tm1Operations.SANDBOX_PUBLISH, name, _options(conflicts, allow_queueing, clean_after))
-        )
+        await self._session.execute(_sandbox_action(Tm1Operations.SANDBOX_PUBLISH, name, _options(conflicts, allow_queueing, clean_after)))
 
     @endpoint("Action Sandbox/Merge")
     async def merge(
@@ -632,9 +619,7 @@ class ChangeSetService(Service):
     async def end(self, id: str) -> int:
         """``EndChangeSet``: stops recording into a change set; it can still be undone. Returns
         TM1's return code. Needs schema 10.2.2.6."""
-        result = await self._session.execute(
-            _change_set_request(Tm1Operations.END_CHANGE_SET, {"ChangeSetID": _require(id, "id")})
-        )
+        result = await self._session.execute(_change_set_request(Tm1Operations.END_CHANGE_SET, {"ChangeSetID": _require(id, "id")}))
         return int((result or {}).get("value", 0))
 
     @endpoint("ActionImport UndoChangeSet")
@@ -729,9 +714,7 @@ class DrillthroughService(Service):
         return await self._session.collect(request)
 
     @endpoint("Action CubeDrillthrough/Execute")
-    async def execute(
-        self, cellset: str, ordinal: int, drillthrough: str, query: ODataQuery | None = None, **options: Any
-    ) -> Cellset:
+    async def execute(self, cellset: str, ordinal: int, drillthrough: str, query: ODataQuery | None = None, **options: Any) -> Cellset:
         """``tm1.Execute`` on a cell's cube drillthrough (named as by :meth:`scripts`): the cellset
         of the view its process returns, left on the server until deleted. Needs schema
         10.2.2.6. The process must take the cube's name and one parameter per dimension (see
@@ -758,18 +741,14 @@ class DrillthroughService(Service):
         return await self._session.execute(Tm1Request.post(path, {}, Rowset).requires(operation.capability()))
 
     @endpoint("ActionImport ExecuteCubeDrillthrough")
-    async def execute_process(
-        self, process: str, parameters: Sequence[Any], query: ODataQuery | None = None, **options: Any
-    ) -> Cellset:
+    async def execute_process(self, process: str, parameters: Sequence[Any], query: ODataQuery | None = None, **options: Any) -> Cellset:
         """``ExecuteCubeDrillthrough``: runs a cube drillthrough process (such as
         ``}Drill_Sales``) directly, with its parameters (``ProcessParameterPatch``, by name and
         value), and returns the cellset of the view it returns, left on the server until
         deleted. Needs schema 11.2.0."""
         operation = Tm1Operations.EXECUTE_CUBE_DRILLTHROUGH
         request = Tm1Request.post(_import(operation), _process_body(process, parameters), Cellset)
-        return await self._session.execute(
-            request.with_query(ODataQuery.of(query, **options)).requires(operation.capability())
-        )
+        return await self._session.execute(request.with_query(ODataQuery.of(query, **options)).requires(operation.capability()))
 
     @endpoint("ActionImport ExecuteRelationalDrillthrough")
     async def execute_relational_process(self, process: str, parameters: Sequence[Any]) -> list[Any]:

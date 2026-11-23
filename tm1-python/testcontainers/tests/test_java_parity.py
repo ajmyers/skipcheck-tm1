@@ -31,7 +31,10 @@ ROOT = Path(__file__).resolve().parents[3]
 JAVA = ROOT / "tm1-testcontainers" / "src" / "main" / "java" / "net" / "ajmyers" / "tm1" / "testcontainers"
 
 JAVA_ONLY: dict[tuple[str, str], str] = {
-    ("CognosContainer", "camAuthorization/3"): "Java's static overload; Python can't overload an instance method with a static one, so it's cam_authorization_for",
+    (
+        "CognosContainer",
+        "camAuthorization/3",
+    ): "Java's static overload; Python can't overload an instance method with a static one, so it's cam_authorization_for",
 }
 """(type, member or member/parameter count) → why Python doesn't have it."""
 
@@ -114,7 +117,7 @@ def java_types() -> dict[str, JavaType]:
                         java_type.components = [p.split()[-1] for p in _split(m["components"])]
                 stack.append((depth + 1, java_type))
             elif owner is not None:
-                public = lambda mods: "public" in mods.split() or (in_interface and "private" not in mods.split())  # noqa: E731
+                public = lambda mods: "public" in mods.split() or (in_interface and "private" not in mods.split())  # noqa: E731, B023 (called within this iteration)
                 if owner.kind == "enum" and (e := _ENUM_CONSTANT.match(line)) is not None and not _METHOD.match(line):
                     owner.constants.add(e["name"])
                 elif (f := _FIELD.match(line)) is not None and public(f["mods"]) and ("static" in f["mods"] or in_interface):

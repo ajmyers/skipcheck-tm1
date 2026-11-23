@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from datetime import timedelta
-from typing import Any, AsyncIterator
+from typing import Any
 
 from ..._calls import endpoint
 from ..._compat import AsyncIO as runtime
@@ -162,20 +163,14 @@ class LogService(Service):
         return await self._session.collect(request.requires(operation.capability()))
 
     @endpoint("EntitySet TransactionLogEntries")
-    async def transaction_log_entries(
-        self, query: ODataQuery | None = None, **options: Any
-    ) -> list[TransactionLogEntry]:
+    async def transaction_log_entries(self, query: ODataQuery | None = None, **options: Any) -> list[TransactionLogEntry]:
         """``GET TransactionLogEntries``. Besides cell changes, the log holds status lines (such
         as ``CubeSerialized: …``) with only ``StatusMessage`` set."""
-        request = Tm1Request.list(
-            ODataPath.of("TransactionLogEntries"), ODataQuery.of(query, **options), TransactionLogEntry
-        )
+        request = Tm1Request.list(ODataPath.of("TransactionLogEntries"), ODataQuery.of(query, **options), TransactionLogEntry)
         return await self._session.collect(request)
 
     @endpoint("FunctionImport TransactionLog")
-    async def transaction_log(
-        self, reverse: bool, ignore_status_messages: bool, query: ODataQuery | None = None, **options: Any
-    ) -> list[TransactionLogEntry]:
+    async def transaction_log(self, reverse: bool, ignore_status_messages: bool, query: ODataQuery | None = None, **options: Any) -> list[TransactionLogEntry]:
         """``TransactionLog(Reverse=…,IgnoreStatusMessages=…)``: the transaction log, newest
         first if ``reverse``, without status lines if ``ignore_status_messages``."""
         operation = Tm1Operations.TRANSACTION_LOG
@@ -218,9 +213,7 @@ class LogService(Service):
     async def error_log_files(self, query: ODataQuery | None = None, **options: Any) -> list[ErrorLogFile]:
         """``GET ErrorLogFiles``: the error logs processes have written, such as
         ``tm1processerror_<time>_<process>.log``."""
-        return await self._session.collect(
-            Tm1Request.list(_ERROR_LOG_FILES, ODataQuery.of(query, **options), ErrorLogFile)
-        )
+        return await self._session.collect(Tm1Request.list(_ERROR_LOG_FILES, ODataQuery.of(query, **options), ErrorLogFile))
 
     @endpoint("EntitySet ErrorLogFiles")
     async def error_log_file(self, filename: str, query: ODataQuery | None = None, **options: Any) -> ErrorLogFile:

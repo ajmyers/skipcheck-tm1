@@ -97,9 +97,7 @@ def test_mounts_each_source_as_the_image_takes_it(tmp_path: Path, monkeypatch: p
     assert tm1.image.startswith(Tm1ServerContainer.DEFAULT_IMAGE + ":")
     assert tm1.volumes == {str(install): {"bind": "/opt/ibm/cognos/tm1_64", "mode": "ro"}}
 
-    assert Tm1ServerContainer(Tm1Source.InstallVolume("tm1_tm1-install")).volumes == {
-        "tm1_tm1-install": {"bind": "/opt/ibm/cognos/tm1_64", "mode": "rw"}
-    }
+    assert Tm1ServerContainer(Tm1Source.InstallVolume("tm1_tm1-install")).volumes == {"tm1_tm1-install": {"bind": "/opt/ibm/cognos/tm1_64", "mode": "rw"}}
 
     (tmp_path / "b.tar.gz").touch()
     monkeypatch.setenv(Tm1ServerContainer.SERVER_IMAGE, " local/tm1-server ")
@@ -126,4 +124,4 @@ def test_logs_in_as_the_seeds_user() -> None:
     with pytest.raises(ValueError, match="Not a folder"):
         tm1.with_data("/no/such/folder")
     with pytest.raises(RuntimeError, match="isn't started"):
-        tm1.tm1_version
+        _ = tm1.tm1_version

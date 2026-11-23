@@ -16,10 +16,9 @@ import shlex
 import tarfile
 import threading
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
-
-from typing_extensions import Self
+from typing import Any
 
 from testcontainers.core.config import testcontainers_config as tc_config
 from testcontainers.core.container import DockerContainer, Reaper
@@ -28,6 +27,7 @@ from testcontainers.core.labels import LABEL_SESSION_ID, create_labels
 from testcontainers.core.network import Network as _TcNetwork
 from testcontainers.core.transferable import Transferable, build_transfer_tar
 from testcontainers.core.wait_strategies import HttpWaitStrategy
+from typing_extensions import Self
 
 __all__ = ["GenericContainer", "Network", "docker_available", "reuse_enabled"]
 
@@ -39,11 +39,11 @@ class Network(_TcNetwork):
     ``Network.newNetwork()``; testcontainers-python's own :class:`~testcontainers.core.network.Network`
     works too."""
 
-    def __init__(self, docker_client_kw: Optional[dict[str, Any]] = None, docker_network_kw: Optional[dict[str, Any]] = None) -> None:
+    def __init__(self, docker_client_kw: dict[str, Any] | None = None, docker_network_kw: dict[str, Any] | None = None) -> None:
         # testcontainers-python's connects to Docker here; Java's waits until it's used
         self.name = str(uuid.uuid4())
         self._docker_client_kw = docker_client_kw or {}
-        self._lazy_docker: Optional[DockerClient] = None
+        self._lazy_docker: DockerClient | None = None
         self._docker_network_kw = docker_network_kw or {}
         self._network = None
 
@@ -125,21 +125,21 @@ class GenericContainer(DockerContainer):
 
     _log = logging.getLogger("tm1_testcontainers")
 
-    def __init__(self, image: str, docker_client_kw: Optional[dict[str, Any]] = None) -> None:
+    def __init__(self, image: str, docker_client_kw: dict[str, Any] | None = None) -> None:
         # DockerContainer's attributes, without its connecting to Docker: Java's containers are
         # set up before anything talks to Docker
         self.env: dict[str, str] = {}
-        self.ports: dict[str, Optional[int]] = {}
+        self.ports: dict[str, int | None] = {}
         self.volumes: dict[str, Any] = {}
         self.tmpfs: dict[str, str] = {}
         self.image = tc_config.hub_image_name_prefix + image
         self._docker_client_kw = docker_client_kw or {}
-        self._lazy_docker: Optional[DockerClient] = None
+        self._lazy_docker: DockerClient | None = None
         self._container: Any = None
-        self._command: Optional[Union[str, list[str]]] = None
-        self._name: Optional[str] = None
-        self._network: Optional[_TcNetwork] = None
-        self._network_aliases: Optional[list[str]] = None
+        self._command: str | list[str] | None = None
+        self._name: str | None = None
+        self._network: _TcNetwork | None = None
+        self._network_aliases: list[str] | None = None
         self._kwargs: dict[str, Any] = {}
         self._wait_strategy: Any = None
         self._cached_container_info: Any = None
@@ -198,7 +198,7 @@ class GenericContainer(DockerContainer):
         return list(self._dependencies)
 
     @property
-    def network(self) -> Optional[_TcNetwork]:
+    def network(self) -> _TcNetwork | None:
         return self._network
 
     @property
@@ -390,4 +390,3 @@ def share_network(a: GenericContainer, b: GenericContainer) -> None:
             raise RuntimeError(
                 f"Containers that work together must share one Network, but {type(container).__name__} is on another. Give them the same Network."
             )
-

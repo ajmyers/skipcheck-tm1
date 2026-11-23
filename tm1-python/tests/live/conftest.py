@@ -17,7 +17,8 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 

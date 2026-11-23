@@ -4,7 +4,8 @@ CellsetServiceTm1Test, MemberSetServiceTm1Test, MdxAndModelTm1Test, SandboxAndCh
 
 from __future__ import annotations
 
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 
@@ -146,9 +147,7 @@ def test_writes_through_a_cellset_and_saves_it_as_a_view(tm1: Tm1Client, cells_c
         assert c.number("North", "Amount") == 4.0
         tm1.cellsets.update(id, 1, 6)
         assert c.number("Total", "Amount") == 10.0
-        tm1.session.execute(
-            Tm1Request.post(ODataPath.of("Cellsets").key(id).action("tm1.Update"), {"BeginOrdinal": 0, "EndOrdinal": 1, "Value": 9}, None)
-        )
+        tm1.session.execute(Tm1Request.post(ODataPath.of("Cellsets").key(id).action("tm1.Update"), {"BeginOrdinal": 0, "EndOrdinal": 1, "Value": 9}, None))
         assert c.number("Total", "Amount") == 15.0, "a range writes only its first cell"
         tm1.cellsets.update_cells(id, [CellsetUpdatePatch.builder().ordinal(0).value(1).build(), CellsetUpdatePatch.builder().ordinal(1).value(2).build()])
         assert c.number("Total", "Amount") == 3.0
@@ -381,13 +380,7 @@ def drill(tm1: Tm1Client, name: str) -> Iterator[Any]:
     a, b = name + "-a", name + "-b"
     for d in (a, b):
         dimension(tm1, d, [element("X"), element("Y")], subset=True)
-    tm1.cubes.create(
-        CubePatch.builder()
-        .name(name)
-        .bind_dimensions(dim(a), dim(b))
-        .drillthrough_rules(f"[] = S: '{process[len('}Drill_'):]}';\n")
-        .build()
-    )
+    tm1.cubes.create(CubePatch.builder().name(name).bind_dimensions(dim(a), dim(b)).drillthrough_rules(f"[] = S: '{process[len('}Drill_') :]}';\n").build())
 
     def axis(d: str) -> Any:
         return ViewAxisSelectionPatch.builder().bind_subset(dim(d).nav("Hierarchies").key(d).nav("Subsets").key("All")).build()

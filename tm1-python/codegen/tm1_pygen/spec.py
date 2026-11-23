@@ -89,11 +89,7 @@ class Spec:
         return out
 
     def bound_to(self, qualified_name: str, collection: bool = False) -> list[dict[str, Any]]:
-        return [
-            o
-            for o in self.operations
-            if o["bound"] and o["binding"]["type"] == qualified_name and o["binding"]["collection"] == collection
-        ]
+        return [o for o in self.operations if o["bound"] and o["binding"]["type"] == qualified_name and o["binding"]["collection"] == collection]
 
     def is_structured(self, type_name: str) -> bool:
         return type_name in self.type_by_name

@@ -169,7 +169,12 @@ def _entity_class(spec: Spec, t: dict[str, Any], index: _Index) -> list[str]:
     index.entity_classes[t["qualifiedName"]] = cls
     members = _member_names(spec, t)
     out = ["", "", f"class {cls}({base}):"]
-    out.extend(docstring(f"An entity of type :class:`~tm1_client._generated.model.{t['name']}`: ``get``, ``update``, ``delete``, its navigation properties and bound operations.", "    "))
+    out.extend(
+        docstring(
+            f"An entity of type :class:`~tm1_client._generated.model.{t['name']}`: ``get``, ``update``, ``delete``, its navigation properties and bound operations.",
+            "    ",
+        )
+    )
     out.append("")
     out.append(f"    model = m.{t['name']}")
     for n in t["navigationProperties"]:
@@ -196,7 +201,18 @@ def _entity_class(spec: Spec, t: dict[str, Any], index: _Index) -> list[str]:
         out.append("    @property")
         out.append(f"    @endpoint({endpoint_id!r})")
         out.append(f"    def {name}(self) -> {rtype}:")
-        out.extend(docstring(_endpoint_doc(spec, endpoint_id, f"``…/{n['name']}``: {what}" + (" (contained)." if n["containsTarget"] else " (a reference: read through here, change through its own collection)."), n), "        "))
+        out.extend(
+            docstring(
+                _endpoint_doc(
+                    spec,
+                    endpoint_id,
+                    f"``…/{n['name']}``: {what}"
+                    + (" (contained)." if n["containsTarget"] else " (a reference: read through here, change through its own collection)."),
+                    n,
+                ),
+                "        ",
+            )
+        )
         out.append(f"        return {ctor}")
     for op in spec.bound_to(t["qualifiedName"]):
         name = members[f"op:{op['endpoint']}"]
@@ -208,7 +224,12 @@ def _entity_class(spec: Spec, t: dict[str, Any], index: _Index) -> list[str]:
         alias = spec.alias_name(d["qualifiedName"])
         out.append("")
         out.append(f"    def {name}(self) -> {names.entity_class(d['name'])}:")
-        out.extend(docstring(f"``…/{alias}``: this entity as a :class:`~tm1_client._generated.model.{d['name']}`, for its own properties, navigation and operations.", "        "))
+        out.extend(
+            docstring(
+                f"``…/{alias}``: this entity as a :class:`~tm1_client._generated.model.{d['name']}`, for its own properties, navigation and operations.",
+                "        ",
+            )
+        )
         out.append(f"        return {names.entity_class(d['name'])}(self._session, self._path.cast({alias!r}), self._forbidden)")
     if t.get("hasStream"):
         out.append("")
@@ -216,7 +237,7 @@ def _entity_class(spec: Spec, t: dict[str, Any], index: _Index) -> list[str]:
         out.extend(docstring("``GET …/$value``: the entity's media content.", "        "))
         out.append(f"        return {_await()}self._read_stream(None)")
         out.append("")
-        out.append(f"    {_def()} {members['media:write']}(self, data: bytes, content_type: str = \"application/octet-stream\") -> None:")
+        out.append(f'    {_def()} {members["media:write"]}(self, data: bytes, content_type: str = "application/octet-stream") -> None:')
         out.extend(docstring("``PUT …/$value``: replaces the entity's media content.", "        "))
         out.append(f"        {_await()}self._write_stream(None, data, content_type)")
     for p in t["properties"]:
@@ -226,7 +247,7 @@ def _entity_class(spec: Spec, t: dict[str, Any], index: _Index) -> list[str]:
             out.extend(docstring(f"``GET …/{p['name']}/$value``" + (": " + p["description"] if p.get("description") else "."), "        "))
             out.append(f"        return {_await()}self._read_stream({p['name']!r})")
             out.append("")
-            out.append(f"    {_def()} {members['stream-write:' + p['name']]}(self, data: bytes, content_type: str = \"application/octet-stream\") -> None:")
+            out.append(f'    {_def()} {members["stream-write:" + p["name"]]}(self, data: bytes, content_type: str = "application/octet-stream") -> None:')
             out.extend(docstring(f"``PUT …/{p['name']}/$value``: replaces it.", "        "))
             out.append(f"        {_await()}self._write_stream({p['name']!r}, data, content_type)")
     return out
@@ -237,7 +258,11 @@ def _collection_class(spec: Spec, t: dict[str, Any], index: _Index) -> list[str]
     index.collection_classes[t["qualifiedName"]] = cls
     root = spec.root(t)
     out = ["", "", f"class {cls}(_r.CollectionResource[m.{t['name']}, {names.entity_class(t['name'])}]):"]
-    out.extend(docstring(f"A collection of :class:`~tm1_client._generated.model.{t['name']}`: ``list``, ``iter``, ``count``, ``create``, and ``[key]`` for one.", "    "))
+    out.extend(
+        docstring(
+            f"A collection of :class:`~tm1_client._generated.model.{t['name']}`: ``list``, ``iter``, ``count``, ``create``, and ``[key]`` for one.", "    "
+        )
+    )
     out.append("")
     out.append(f"    model = m.{t['name']}")
     out.append(f"    entity = {names.entity_class(t['name'])}")

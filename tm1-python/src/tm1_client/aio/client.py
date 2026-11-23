@@ -20,7 +20,6 @@ it (``tm1_pygen.unasync``).
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
 
 from .._generated.aio_api import Tm1Api
 from .services import (

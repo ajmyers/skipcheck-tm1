@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import httpx
 import pytest
+from tm1_web_session import Tm1WebSession
 
 from tm1_testcontainers import PawContainer, PawSession, Tm1ServerContainer, Tm1WebContainer
-from tm1_web_session import Tm1WebSession
 
 
 def server_name(tm1: Tm1ServerContainer) -> str:

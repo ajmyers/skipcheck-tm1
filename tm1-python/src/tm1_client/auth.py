@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import base64
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
-__all__ = ["Authenticator", "CognosPassports", "basic", "cam_namespace", "cam_passport", "cognos_id_token", "cognos_logon"]
+# CognosPassports is the sync flavor's, generated at build time: __getattr__ below imports it
+__all__ = ["Authenticator", "CognosPassports", "basic", "cam_namespace", "cam_passport", "cognos_id_token", "cognos_logon"]  # noqa: F822
 
 
 class Authenticator(Protocol):

@@ -25,12 +25,15 @@ from __future__ import annotations
 import inspect
 import logging
 import time
+from collections.abc import AsyncIterator, Callable
 from datetime import timedelta
-from typing import Any, AsyncIterator, Callable
+from typing import Any
 
 import httpx
 
 from .. import _protocol as p
+from .._compat import AsyncIO as runtime
+from .._views import CAPABILITIES, Queue, as_call, capability_of, items_only, poll_interval, settle
 from ..auth import Authenticator, basic
 from ..errors import (
     ODataError,
@@ -43,13 +46,10 @@ from ..errors import (
     api_error,
 )
 from ..identity import check_impersonated
-from ..timeouts import Tm1Timeouts
-from ..version import Tm1Dialect
 from ..odata import ODataPath, ODataQuery
-from .._compat import AsyncIO as runtime
-from .._views import CAPABILITIES, Queue, as_call, capability_of, items_only, poll_interval, settle
 from ..request import Tm1Request
-from ..version import Tm1Capabilities, Tm1Version
+from ..timeouts import Tm1Timeouts
+from ..version import Tm1Capabilities, Tm1Dialect, Tm1Version
 
 __all__ = ["AsyncTm1Session", "AsyncTm1SessionBatch", "AsyncTm1SessionBuilder"]
 
@@ -189,9 +189,7 @@ class _AsyncConnection:
                 raise
             self.cookie, self.session_id = cookie, session_id
             self.generation += 1
-            log.info(
-                "Logged in to TM1 at %s as %s (session %s, %s)", self.base_url, self.authenticator.describe(), session_id, reason
-            )
+            log.info("Logged in to TM1 at %s as %s (session %s, %s)", self.base_url, self.authenticator.describe(), session_id, reason)
             return cookie
 
     async def _login(self, seed: str | None) -> tuple[str, int]:
@@ -210,9 +208,7 @@ class _AsyncConnection:
             # Log in the session TM1 opened for a 401, rather than opening another
             extra["Cookie"] = f"{p.COOKIE}={seed}"
         try:
-            response = await self.http.get(
-                url, headers=p.headers(self.session_context, p.JSON, extra), timeout=self._timeout(self.timeouts.login)
-            )
+            response = await self.http.get(url, headers=p.headers(self.session_context, p.JSON, extra), timeout=self._timeout(self.timeouts.login))
         except httpx.HTTPError as e:
             raise _transport(e, "GET", url) from e
         self.http.cookies.clear()
@@ -222,9 +218,7 @@ class _AsyncConnection:
             why = (
                 None
                 if self.impersonate is None
-                else ODataError(
-                    "", f"The credentials were refused, or the user being impersonated ({self.impersonate}) is disabled"
-                )
+                else ODataError("", f"The credentials were refused, or the user being impersonated ({self.impersonate}) is disabled")
             )
             raise Tm1ApiError.of_kind(401, Tm1ErrorKind.CREDENTIAL_REJECTED, why, "GET", url)
         if status >= 400:
@@ -352,9 +346,7 @@ class _AsyncConnection:
                 },
             )
             try:
-                response = await self.http.post(
-                    url, content=b"{}", headers=headers, timeout=self._timeout(self.timeouts.close)
-                )
+                response = await self.http.post(url, content=b"{}", headers=headers, timeout=self._timeout(self.timeouts.close))
             except httpx.HTTPError as e:
                 log.warning("Couldn't close TM1 session %s at %s: %s", self.session_id, self.base_url, e)
                 raise _transport(e, "POST", url) from e
@@ -369,8 +361,8 @@ class _AsyncConnection:
 class AsyncTm1Session:
     """A session with the TM1 REST API at ``base_url`` (``https://host:port/api/v1/``)::
 
-        async with AsyncTm1Session("https://tm1:8010/api/v1", auth.basic("admin", "apple")) as session:
-            client = AsyncTm1Client(session)
+    async with AsyncTm1Session("https://tm1:8010/api/v1", auth.basic("admin", "apple")) as session:
+        client = AsyncTm1Client(session)
     """
 
     def __init__(
@@ -598,9 +590,7 @@ class AsyncTm1Session:
                 return
             page = await self.execute(p.Call("GET", page.next_link, read=call.read, contextual=False))
 
-    async def _send_async(
-        self, method: str, url: str, content: bytes | None, headers: dict[str, str], accept: str
-    ) -> p.Reply:
+    async def _send_async(self, method: str, url: str, content: bytes | None, headers: dict[str, str], accept: str) -> p.Reply:
         assert self._async_every is not None
         connection = self._connection
         reply = await connection.send(method, url, content, {**headers, "Prefer": "respond-async"}, accept)
@@ -637,9 +627,7 @@ class AsyncTm1Session:
         headers: dict[str, str] | None = None,
         accept: str = p.JSON,
     ) -> p.Reply:
-        return await self.execute(
-            p.Call(method, str(path), query, json_body, content, headers or {}, accept, read=lambda r: r)
-        )
+        return await self.execute(p.Call(method, str(path), query, json_body, content, headers or {}, accept, read=lambda r: r))
 
     async def get_json(self, path: ODataPath | str, query: ODataQuery | None = None) -> Any:
         return (await self.request("GET", path, query=query)).json()

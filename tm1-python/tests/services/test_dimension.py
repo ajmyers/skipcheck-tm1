@@ -60,14 +60,27 @@ def test_dimensions_list_get_create_update_delete(api: Api, fake: FakeTm1) -> No
     total = ElementPatch.builder().name("Total").type(ElementType.CONSOLIDATED).build()
     north = ElementPatch.builder().name("North").type(ElementType.NUMERIC).build()
     edge = EdgePatch.builder().parent_name("Total").component_name("North").weight(1.0).build()
-    api.run(dims.create(DimensionPatch.builder().name("Region").hierarchies([
-        HierarchyPatch.builder().name("Region").elements([total, north]).edges([edge]).build()
-    ]).build()))
-    assert sent(fake) == ("POST Dimensions", {"Name": "Region", "Hierarchies": [{
-        "Name": "Region",
-        "Elements": [{"Name": "Total", "Type": "Consolidated"}, {"Name": "North", "Type": "Numeric"}],
-        "Edges": [{"ParentName": "Total", "ComponentName": "North", "Weight": 1.0}],
-    }]})
+    api.run(
+        dims.create(
+            DimensionPatch.builder()
+            .name("Region")
+            .hierarchies([HierarchyPatch.builder().name("Region").elements([total, north]).edges([edge]).build()])
+            .build()
+        )
+    )
+    assert sent(fake) == (
+        "POST Dimensions",
+        {
+            "Name": "Region",
+            "Hierarchies": [
+                {
+                    "Name": "Region",
+                    "Elements": [{"Name": "Total", "Type": "Consolidated"}, {"Name": "North", "Type": "Numeric"}],
+                    "Edges": [{"ParentName": "Total", "ComponentName": "North", "Weight": 1.0}],
+                }
+            ],
+        },
+    )
 
     fake.respond = lambda r: None
     api.run(dims.update("Region", DimensionPatch.builder().unique_name("[Region]").build()))
@@ -147,10 +160,13 @@ def test_replace_structure(api: Api, fake: FakeTm1) -> None:
     actual = ElementPatch.builder().name("Actual").type(ElementType.NUMERIC).build()
     edge = EdgePatch.builder().parent_name("All Versions").component_name("Actual").weight(1.0).build()
     api.run(api.client.hierarchies.replace_structure("Version", "Version", [all_, actual], [edge]))
-    assert sent(fake) == ("PATCH Dimensions('Version')/Hierarchies('Version')", {
-        "Elements": [{"Name": "All Versions", "Type": "Consolidated"}, {"Name": "Actual", "Type": "Numeric"}],
-        "Edges": [{"ParentName": "All Versions", "ComponentName": "Actual", "Weight": 1.0}],
-    })
+    assert sent(fake) == (
+        "PATCH Dimensions('Version')/Hierarchies('Version')",
+        {
+            "Elements": [{"Name": "All Versions", "Type": "Consolidated"}, {"Name": "Actual", "Type": "Numeric"}],
+            "Edges": [{"ParentName": "All Versions", "ComponentName": "Actual", "Weight": 1.0}],
+        },
+    )
 
 
 def test_all_member_is_none_with_several_roots(api: Api, fake: FakeTm1) -> None:
@@ -355,7 +371,9 @@ def test_subset_operations(api: Api, fake: FakeTm1) -> None:
 
     # TM1 names a session subset itself, ignoring the name sent
     fake.respond = lambda r: {"Name": "yExesF4AAIABAAAQ"}
-    made = api.run(ss.create_session_subset("Region", "Region", SubsetPatch.builder().name("Regions").expression("{[Region].[Region].[Total].Children}").build()))
+    made = api.run(
+        ss.create_session_subset("Region", "Region", SubsetPatch.builder().name("Regions").expression("{[Region].[Region].[Total].Children}").build())
+    )
     assert made.name == "yExesF4AAIABAAAQ"
     assert sent(fake) == (f"POST {H}/tm1.CreateSessionSubset", {"Subset": {"Name": "Regions", "Expression": "{[Region].[Region].[Total].Children}"}})
     api.run(ss.create_session_subset_from("Region", "Region", SubsetScope.PRIVATE, "Mine"))

@@ -11,9 +11,8 @@ from ..._calls import endpoint
 from ..._generated.model import AttributeDefinition, LocalizedAttributes
 from ...odata import ODataPath, ODataQuery
 from ...request import Tm1Request
-from ._base import Service, _require
 from ...values import AttributeOwner, AttributeSet
-from .dimension import SubsetScope
+from ._base import Service, _require
 
 __all__ = ["AttributeOwner", "AttributeService", "AttributeSet", "LocalizedAttributeService"]
 
@@ -25,12 +24,7 @@ def _navigation(scope: Any) -> str:
 
 
 def _hierarchy(dimension: str, hierarchy: str) -> ODataPath:
-    return (
-        ODataPath.of("Dimensions")
-        .key(_require(dimension, "dimension"))
-        .nav("Hierarchies")
-        .key(_require(hierarchy, "hierarchy"))
-    )
+    return ODataPath.of("Dimensions").key(_require(dimension, "dimension")).nav("Hierarchies").key(_require(hierarchy, "hierarchy"))
 
 
 _ATTRIBUTE_SETS = (
@@ -133,14 +127,10 @@ class LocalizedAttributeService(Service):
     @endpoint(*_LOCALIZED)
     async def list(self, owner: AttributeOwner, query: ODataQuery | None = None, **options: Any) -> list[LocalizedAttributes]:
         """``GET …/LocalizedAttributes``: the owner's translations, one per locale."""
-        return await self._session.collect(
-            Tm1Request.list(_localized(owner), ODataQuery.of(query, **options), LocalizedAttributes)
-        )
+        return await self._session.collect(Tm1Request.list(_localized(owner), ODataQuery.of(query, **options), LocalizedAttributes))
 
     @endpoint(*_LOCALIZED)
-    async def get(
-        self, owner: AttributeOwner, locale: str, query: ODataQuery | None = None, **options: Any
-    ) -> LocalizedAttributes:
+    async def get(self, owner: AttributeOwner, locale: str, query: ODataQuery | None = None, **options: Any) -> LocalizedAttributes:
         """``GET …/LocalizedAttributes('locale')``: the translations for a locale, or a
         ``Tm1NotFoundError`` if there are none."""
         path = _localized(owner).key(_require(locale, "locale"))
@@ -149,6 +139,4 @@ class LocalizedAttributeService(Service):
     @endpoint(*_LOCALIZED)
     async def create(self, owner: AttributeOwner, translations: Any) -> LocalizedAttributes:
         """``POST …/LocalizedAttributes``: adds translations for a locale."""
-        return await self._session.execute(
-            Tm1Request.post(_localized(owner), _require(translations, "translations"), LocalizedAttributes)
-        )
+        return await self._session.execute(Tm1Request.post(_localized(owner), _require(translations, "translations"), LocalizedAttributes))

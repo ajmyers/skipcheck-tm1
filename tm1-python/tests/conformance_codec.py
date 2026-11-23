@@ -16,9 +16,9 @@ import pydantic
 import tm1_client
 from tm1_client import Filter, ODataPath, ODataQuery
 from tm1_client import errors as e
-from tm1_client.base import Tm1Enum
 from tm1_client._generated import model as m
 from tm1_client._generated import patches as p
+from tm1_client.base import Tm1Enum
 
 SPEC_VERSION = 1
 
@@ -275,6 +275,4 @@ def request_of(method: str, target: str, headers: dict[str, str], body: bytes) -
 
 
 def same_request(expected: dict[str, Any], got: dict[str, Any]) -> bool:
-    return {k: (ordered(v) if k == "json" else v) for k, v in expected.items()} == {
-        k: (ordered(v) if k == "json" else v) for k, v in got.items()
-    }
+    return {k: (ordered(v) if k == "json" else v) for k, v in expected.items()} == {k: (ordered(v) if k == "json" else v) for k, v in got.items()}

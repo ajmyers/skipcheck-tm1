@@ -18,8 +18,7 @@ from tm1_client import Tm1Client, Tm1Session, auth
 from tm1_client.aio import AsyncTm1Client, AsyncTm1Session
 
 from . import conformance_codec as codec
-from .conformance_codec import Unknown
-from .conformance_codec import snake
+from .conformance_codec import Unknown, snake
 from .conftest import BASE, CONFORMANCE, FakeTm1
 
 CALLS = CONFORMANCE / "calls"
@@ -194,7 +193,7 @@ def test_replays_the_java_call(session: dict[str, Any], case: dict[str, Any], fl
     for i, (want, got) in enumerate(zip(expected, sent)):
         assert codec.same_request(want, got), f"request {i + 1} differs from Java's:\n  Java:   {want}\n  Python: {got}"
     recorded = [x["request"] for x in _flat(case["exchanges"])]
-    assert len(sent) == len(recorded), f"sent {len(sent)} requests, Java sent {len(recorded)}: {sent[len(recorded):] or recorded[len(sent):]}"
+    assert len(sent) == len(recorded), f"sent {len(sent)} requests, Java sent {len(recorded)}: {sent[len(recorded) :] or recorded[len(sent) :]}"
 
     if "error" in case:
         assert "error" in outcome, f"Java failed with {case['error']}, Python gave {outcome.get('result')!r}"

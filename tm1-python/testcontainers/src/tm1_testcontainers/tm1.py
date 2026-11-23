@@ -9,7 +9,7 @@ import enum
 import threading
 from importlib import metadata
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Optional
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import httpx
 from typing_extensions import Self
@@ -112,7 +112,7 @@ class Tm1ServerContainer(GenericContainer):
     REST_PORT: ClassVar[int] = 8010
     CACHE_VOLUME: ClassVar[str] = "tm1-testcontainers-cache"
 
-    _shared: ClassVar[Optional[Tm1ServerContainer]] = None
+    _shared: ClassVar[Tm1ServerContainer | None] = None
     _shared_lock: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(self, source: Tm1Source, image: str | None = None) -> None:
@@ -122,12 +122,12 @@ class Tm1ServerContainer(GenericContainer):
         self._source = source
         self._username = Tm1Seed.EMPTY.username
         self._password = Tm1Seed.EMPTY.password
-        self._expected_version: Optional[Tm1Version] = None
-        self._version: Optional[Tm1Version] = None
-        self._cognos: Optional[CognosContainer] = None
+        self._expected_version: Tm1Version | None = None
+        self._version: Tm1Version | None = None
+        self._cognos: CognosContainer | None = None
         self._cam_admins: list[str] = []
-        self._cam_namespace: Optional[Namespace] = None
-        self._admin_server: Optional[Tm1AdminServerContainer] = None
+        self._cam_namespace: Namespace | None = None
+        self._admin_server: Tm1AdminServerContainer | None = None
         self.with_exposed_ports(self.REST_PORT)
         self.with_env("TM1_SEED", Tm1Seed.EMPTY.value)
         # TM1 Server only exists for x86-64. On Apple Silicon this runs under Rosetta.
@@ -223,15 +223,15 @@ class Tm1ServerContainer(GenericContainer):
         return self
 
     @property
-    def admin_server(self) -> Optional[Tm1AdminServerContainer]:
+    def admin_server(self) -> Tm1AdminServerContainer | None:
         return self._admin_server
 
     @property
-    def cognos(self) -> Optional[CognosContainer]:
+    def cognos(self) -> CognosContainer | None:
         return self._cognos
 
     @property
-    def cam_namespace(self) -> Optional[Namespace]:
+    def cam_namespace(self) -> Namespace | None:
         return None if self._cognos is None else self._cam_namespace
 
     @property

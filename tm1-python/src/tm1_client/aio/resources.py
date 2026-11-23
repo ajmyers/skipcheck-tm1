@@ -19,13 +19,14 @@ The requests are built in :mod:`tm1_client._calls`; these classes only send them
 
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, ClassVar, Generic, Mapping, TypeVar
+from collections.abc import AsyncIterator, Mapping
+from typing import Any, ClassVar, Generic, TypeVar
 
 from .. import _calls as c
 from .._calls import UNSET, Returns, Unset, endpoint, query_of
+from .._resource_base import _Base, _CollectionBase
 from ..base import Tm1Model
 from ..odata import ODataQuery
-from .._resource_base import _Base, _CollectionBase
 from .session import AsyncTm1Session
 
 __all__ = ["UNSET", "CollectionResource", "EntityResource", "Resource", "Returns", "Unset", "endpoint", "query_of"]

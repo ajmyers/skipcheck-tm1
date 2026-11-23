@@ -31,6 +31,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
       # tm1-testcontainers too: the live tests start TM1 with it (skipped here, with no TM1 source)
       - run: pip install -e './tm1-python[test]' -e './tm1-python/testcontainers[test]'
+      # Layout and lint, as the Java build's checkFormat and Error Prone (tm1-python/ruff.toml)
+      - run: pip install ruff==0.17.6
+      - run: ruff format --check tm1-python
+      - run: ruff check tm1-python
       - run: pytest tm1-python
 
   # The .NET client, generated from spec/tm1-api.json at build time

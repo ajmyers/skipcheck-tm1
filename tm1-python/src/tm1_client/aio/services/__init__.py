@@ -13,7 +13,6 @@ from ...values import (
     Tuples,
     ViewScope,
 )
-
 from .annotation import AnnotationService
 from .attribute import AttributeService, LocalizedAttributeService
 from .content import ContentService

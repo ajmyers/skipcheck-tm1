@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 import pytest
@@ -53,9 +54,7 @@ class FakeTm1:
                 answer = self.on_login(request)
                 if answer is not None:
                     return answer
-            return httpx.Response(
-                200, json={"ID": self.logins}, headers={"Set-Cookie": f"TM1SessionId=s{self.logins}; Path=/api/; HttpOnly"}
-            )
+            return httpx.Response(200, json={"ID": self.logins}, headers={"Set-Cookie": f"TM1SessionId=s{self.logins}; Path=/api/; HttpOnly"})
         if path == "/api/v1/Server?$select=ProductVersion":
             return httpx.Response(200, json={"ProductVersion": self.product_version})
         if path == "/api/v1/$metadata":

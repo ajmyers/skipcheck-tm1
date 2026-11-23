@@ -40,8 +40,11 @@ def _get(name: str, etag: str | None = None) -> dict[str, Any]:
 
 
 def test_names_become_placeholders_longest_first(tool: ModuleType) -> None:
-    head, *rest = _log("java", {"cube": "tm1conf_ab_cube", "cube2": "tm1conf_ab_cube2"},
-                       {"method": "POST", "target": "Cubes", "headers": {}, "json": {"Name": "tm1conf_ab_cube2", "x": ["tm1conf_ab_cube"]}})
+    head, *rest = _log(
+        "java",
+        {"cube": "tm1conf_ab_cube", "cube2": "tm1conf_ab_cube2"},
+        {"method": "POST", "target": "Cubes", "headers": {}, "json": {"Name": "tm1conf_ab_cube2", "x": ["tm1conf_ab_cube"]}},
+    )
     normal = tool.normalize(head, rest)
     assert normal[0]["request"]["json"] == {"Name": "${cube2}", "x": ["${cube}"]}
 

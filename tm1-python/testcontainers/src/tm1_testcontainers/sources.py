@@ -12,14 +12,15 @@ being skipped.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, ClassVar, Mapping, Optional, Union
+from typing import ClassVar
 from urllib.parse import urlsplit
 
 __all__ = ["CognosSource", "Lookup", "PawSource", "Tm1Source", "Tm1WebSource", "setting"]
 
-Lookup = Union[Callable[[str], Optional[str]], Mapping[str, str]]
+Lookup = Callable[[str], str | None] | Mapping[str, str]
 """How ``discover`` reads a setting: a function from its name to its value (``dict.get``), or a
 mapping."""
 
@@ -60,9 +61,7 @@ def _folder_and_file(self: object, dir_setting: str, file_setting: str, what: st
     folder = _absolute(self.dir)  # type: ignore[attr-defined]
     object.__setattr__(self, "dir", folder)
     if not folder.is_dir():
-        raise ValueError(
-            f"{dir_setting} is not a folder: {folder}. Point it at the folder holding the {what}; name the file itself with {file_setting}."
-        )
+        raise ValueError(f"{dir_setting} is not a folder: {folder}. Point it at the folder holding the {what}; name the file itself with {file_setting}.")
     file = self.file  # type: ignore[attr-defined]
     if file is not None and not file.strip():
         object.__setattr__(self, "file", None)
@@ -186,7 +185,7 @@ class _Tm1Bundle(Tm1Source):
     """A folder holding IBM's TM1 bundle: the newest, or ``file`` within it."""
 
     dir: Path
-    file: Optional[str] = None
+    file: str | None = None
 
     def __post_init__(self) -> None:
         _folder_and_file(self, Tm1Source.BUNDLE_DIR, Tm1Source.BUNDLE, "bundle")
@@ -200,7 +199,7 @@ class _Tm1BundleUrl(Tm1Source):
     """A link to IBM's TM1 bundle, downloaded into the cache volume once."""
 
     url: str
-    sha256: Optional[str] = None
+    sha256: str | None = None
 
     def __post_init__(self) -> None:
         _require_text(self.url, "url")
@@ -262,8 +261,7 @@ class CognosSource:
         # that folder is TM1's setting, and is valid without Cognos in it.
         tm1_dir = get(Tm1Source.BUNDLE_DIR)
         if tm1_dir is not None and (
-            get(CognosSource.ZIP) is not None
-            or _has_file(Path(tm1_dir), lambda n: n.startswith("casrv-") and n.endswith("-linuxi38664h.zip"))
+            get(CognosSource.ZIP) is not None or _has_file(Path(tm1_dir), lambda n: n.startswith("casrv-") and n.endswith("-linuxi38664h.zip"))
         ):
             return CognosSource.Zip(Path(tm1_dir), get(CognosSource.ZIP))
         return None
@@ -294,7 +292,7 @@ class _CognosInstallVolume(CognosSource):
 @dataclass(frozen=True)
 class _CognosZip(CognosSource):
     dir: Path
-    file: Optional[str] = None
+    file: str | None = None
 
     def __post_init__(self) -> None:
         _folder_and_file(self, CognosSource.ZIP_DIR, CognosSource.ZIP, "zip")
@@ -306,7 +304,7 @@ class _CognosZip(CognosSource):
 @dataclass(frozen=True)
 class _CognosZipUrl(CognosSource):
     url: str
-    sha256: Optional[str] = None
+    sha256: str | None = None
 
     def __post_init__(self) -> None:
         _require_text(self.url, "url")
@@ -419,7 +417,7 @@ class _WebInstallVolume(Tm1WebSource):
 @dataclass(frozen=True)
 class _WebBundle(Tm1WebSource):
     dir: Path
-    file: Optional[str] = None
+    file: str | None = None
 
     def __post_init__(self) -> None:
         _folder_and_file(self, Tm1WebSource.BUNDLE_DIR, Tm1WebSource.BUNDLE, "bundle")
@@ -431,7 +429,7 @@ class _WebBundle(Tm1WebSource):
 @dataclass(frozen=True)
 class _WebBundleUrl(Tm1WebSource):
     url: str
-    sha256: Optional[str] = None
+    sha256: str | None = None
 
     def __post_init__(self) -> None:
         _require_text(self.url, "url")

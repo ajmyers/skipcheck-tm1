@@ -6,29 +6,29 @@ is the same type in both): the Java client's ``ViewScope``, ``SubsetScope``, ``C
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any
 
 from ._generated.model import Entry
 from .odata import ODataPath
+
 
 def _navigation(scope: Any) -> str:
     """A scope's navigation property: a ``SubsetScope`` or ``ViewScope``, or its name."""
     navigation = getattr(scope, "navigation", None)
     return navigation() if callable(navigation) else str(_require(scope, "scope"))
 
+
 def _hierarchy(dimension: str, hierarchy: str) -> ODataPath:
-    return (
-        ODataPath.of("Dimensions")
-        .key(_require(dimension, "dimension"))
-        .nav("Hierarchies")
-        .key(_require(hierarchy, "hierarchy"))
-    )
+    return ODataPath.of("Dimensions").key(_require(dimension, "dimension")).nav("Hierarchies").key(_require(hierarchy, "hierarchy"))
+
 
 def _scope(scope: Any) -> ContentScope:
     """A scope of either flavor (the sync ``ContentScope`` is generated from this one), as this
     module's: compared by value."""
     return ContentScope(scope.value)
+
 
 def _put(parameters: dict[str, Any], name: str, value: Any) -> None:
     if value is not None:
@@ -402,9 +402,7 @@ class GitCredentials:
     @staticmethod
     def ssh_key(public_key: str, private_key: str, passphrase: str | None = None) -> GitCredentials:
         """An SSH key pair, for an SSH remote, with its passphrase if any."""
-        return GitCredentials(
-            None, None, _require(public_key, "public_key"), _require(private_key, "private_key"), passphrase
-        )
+        return GitCredentials(None, None, _require(public_key, "public_key"), _require(private_key, "private_key"), passphrase)
 
     def _add_to(self, parameters: dict[str, Any]) -> None:
         _put(parameters, "Username", self.username)
@@ -414,9 +412,7 @@ class GitCredentials:
         _put(parameters, "Passphrase", self.passphrase)
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, GitCredentials) and all(
-            getattr(self, s) == getattr(other, s) for s in GitCredentials.__slots__
-        )
+        return isinstance(other, GitCredentials) and all(getattr(self, s) == getattr(other, s) for s in GitCredentials.__slots__)
 
     def __hash__(self) -> int:
         return hash(tuple(getattr(self, s) for s in GitCredentials.__slots__))

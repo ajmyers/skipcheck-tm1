@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import atexit
 import threading
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar
 
 from typing_extensions import Self
 
@@ -34,7 +34,7 @@ class Tm1WebContainer(GenericContainer):
     WEB_IMAGE: ClassVar[str] = "TM1_WEB_IMAGE"
     HTTP_PORT: ClassVar[int] = 9510
 
-    _shared: ClassVar[Optional[Tm1WebContainer]] = None
+    _shared: ClassVar[Tm1WebContainer | None] = None
     _shared_lock: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(self, source: Tm1WebSource, image: str | None = None) -> None:
@@ -42,8 +42,8 @@ class Tm1WebContainer(GenericContainer):
             raise ValueError("source must not be None")
         super().__init__(image or default_image(source, self.DEFAULT_IMAGE, self.WEB_IMAGE))
         self._source = source
-        self._tm1: Optional[Tm1ServerContainer] = None
-        self._admin_server: Optional[Tm1AdminServerContainer] = None
+        self._tm1: Tm1ServerContainer | None = None
+        self._admin_server: Tm1AdminServerContainer | None = None
         self.with_exposed_ports(self.HTTP_PORT)
         # TM1 Web's bundled Java only exists for x86-64. On Apple Silicon this runs under Rosetta.
         self.with_platform("linux/amd64")
@@ -100,7 +100,7 @@ class Tm1WebContainer(GenericContainer):
         return self
 
     @property
-    def admin_server(self) -> Optional[Tm1AdminServerContainer]:
+    def admin_server(self) -> Tm1AdminServerContainer | None:
         return self._admin_server
 
     @property
@@ -108,7 +108,7 @@ class Tm1WebContainer(GenericContainer):
         return self._source
 
     @property
-    def tm1_server(self) -> Optional[Tm1ServerContainer]:
+    def tm1_server(self) -> Tm1ServerContainer | None:
         return self._tm1
 
     @property

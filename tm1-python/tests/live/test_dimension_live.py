@@ -5,8 +5,8 @@ SubsetServiceTm1Test. Skipped unless TM1_URL is set."""
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 import pytest
 
@@ -105,10 +105,13 @@ def test_updates_a_dimension_only_when_the_etag_is_current(tm1: Tm1Client, name:
 
 def test_ignores_hierarchies_and_the_all_leaves_name_in_a_patch(tm1: Tm1Client, name: str) -> None:
     with made(tm1, name, dimension_of(name, [numeric("North"), numeric("South")])) as d:
-        tm1.dimensions.update(d, DimensionPatch.builder()
+        tm1.dimensions.update(
+            d,
+            DimensionPatch.builder()
             .all_leaves_hierarchy_name("AllLeaves")
             .hierarchies([HierarchyPatch.builder().name(d).elements([numeric("North"), numeric("South"), numeric("East")]).build()])
-            .build())
+            .build(),
+        )
         read = tm1.dimensions.get(d, ODataQuery.none().expand(Dimension.HIERARCHIES, lambda h: h.expand(Hierarchy.ELEMENTS)))
         assert not read.all_leaves_hierarchy_name, "TM1 accepts the PATCH and ignores it"
         assert len(read.hierarchies) == 1 and len(read.hierarchies[0].elements) == 2
@@ -138,11 +141,15 @@ def test_locks_and_reserves_a_dimension(tm1: Tm1Client, name: str) -> None:
 @pytest.fixture
 def region(tm1: Tm1Client, name: str) -> Iterator[str]:
     """A dimension: Total = North + South, and East, a second root."""
-    with made(tm1, name, dimension_of(
+    with made(
+        tm1,
         name,
-        [consolidated("Total"), numeric("North"), numeric("South"), numeric("East")],
-        [edge("Total", "North"), edge("Total", "South")],
-    )) as d:
+        dimension_of(
+            name,
+            [consolidated("Total"), numeric("North"), numeric("South"), numeric("East")],
+            [edge("Total", "North"), edge("Total", "South")],
+        ),
+    ) as d:
         yield d
 
 
@@ -229,11 +236,15 @@ def test_places_a_root_before_another_or_last_without_before(tm1: Tm1Client, reg
 
 @pytest.fixture
 def elements_dim(tm1: Tm1Client, name: str) -> Iterator[str]:
-    with made(tm1, name, dimension_of(
+    with made(
+        tm1,
         name,
-        [consolidated("Total"), numeric("North"), numeric("South"), numeric("East"), string("Label")],
-        [edge("Total", "North"), edge("Total", "South")],
-    )) as d:
+        dimension_of(
+            name,
+            [consolidated("Total"), numeric("North"), numeric("South"), numeric("East"), string("Label")],
+            [edge("Total", "North"), edge("Total", "South")],
+        ),
+    ) as d:
         yield d
 
 
@@ -244,9 +255,7 @@ def components(tm1: Tm1Client, d: str, parent: str) -> list[str]:
 def test_creates_reads_updates_and_deletes_an_element(tm1: Tm1Client, elements_dim: str) -> None:
     d, elements = elements_dim, tm1.elements
     assert elements.create(d, d, numeric("West")).name == "West"
-    assert sorted(names(elements.list(d, d, ODataQuery.none().select(Element.NAME)))) == sorted(
-        ["Total", "North", "South", "East", "Label", "West"]
-    )
+    assert sorted(names(elements.list(d, d, ODataQuery.none().select(Element.NAME)))) == sorted(["Total", "North", "South", "East", "Label", "West"])
     etag = elements.get(d, d, "West").etag
     elements.update(d, d, "West", ElementPatch.builder().type(ElementType.STRING).build(), etag)
     assert elements.get(d, d, "West").type is ElementType.STRING
@@ -322,11 +331,15 @@ def test_creates_reads_reweights_and_deletes_edges(tm1: Tm1Client, elements_dim:
 
 @pytest.fixture
 def world(tm1: Tm1Client, name: str) -> Iterator[str]:
-    with made(tm1, name, dimension_of(
+    with made(
+        tm1,
         name,
-        [consolidated("World"), consolidated("Europe"), consolidated("Asia"), numeric("France"), numeric("Spain"), numeric("Japan")],
-        [edge("World", "Europe"), edge("World", "Asia"), edge("Europe", "France"), edge("Europe", "Spain"), edge("Asia", "Japan")],
-    )) as d:
+        dimension_of(
+            name,
+            [consolidated("World"), consolidated("Europe"), consolidated("Asia"), numeric("France"), numeric("Spain"), numeric("Japan")],
+            [edge("World", "Europe"), edge("World", "Asia"), edge("Europe", "France"), edge("Europe", "Spain"), edge("Asia", "Japan")],
+        ),
+    ) as d:
         yield d
 
 
