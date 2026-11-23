@@ -96,11 +96,18 @@ val checkScripts = tasks.register<PythonTask>("checkScripts") {
 	commands = listOf(listOf("python", "-m", "pytest", "scripts/tests", "--junitxml=" + testResults.file("scripts/pytest.xml").asFile.path))
 }
 
+// The page builders need their dependencies (marked, for the Docker pages)
+val apiSiteNpmInstall = tasks.register<NpmInstall>("apiSiteNpmInstall") {
+	description = "Installs the docs site's dependencies (npm ci), when they're missing or the lock file changed."
+	directory = root.dir("api-site")
+}
+
 val checkApiSite = tasks.register<ToolTask>("checkApiSite") {
 	group = "verification"
 	description = "Tests the docs site's Worker and page builders (api-site/test)."
+	dependsOn(apiSiteNpmInstall)
 	directory = root.dir("api-site")
-	commands = listOf(listOf("node", "--test", "test/worker.test.mjs", "test/site.test.mjs"))
+	commands = listOf(listOf("npm", "test"))
 }
 
 tasks.register("checkAll") {

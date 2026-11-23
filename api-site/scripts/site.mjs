@@ -103,6 +103,34 @@ export const PROJECTS = [
 	},
 ];
 
+// The Docker images and their setup tool (docker/ in this repository), at /pa-docker/: a landing
+// page (content/pa-docker.md) and a page per README, built by docker.mjs. Not a library: it has no
+// languages, Javadoc or reference. path is the page's address under /pa-docker/; a README links to
+// another one's page wherever it links to its file. A page's title is its README's heading; label,
+// if given, is its shorter name in the pages' list. A page under another's path is listed under it.
+export const PA_DOCKER = {
+	id: 'pa-docker',
+	title: 'Planning Analytics in Docker',
+	pages: [
+		{ path: 'pa-setup', source: 'docker/pa-setup/README.md' },
+		{ path: 'tm1-server', source: 'docker/tm1-server/README.md' },
+		{ path: 'tm1-server/getting-started', source: 'docker/tm1-server/GETTING-STARTED.md', label: 'Getting started' },
+		{ path: 'tm1-web', source: 'docker/tm1-web/README.md' },
+		{ path: 'paw', source: 'docker/paw/README.md' },
+		{ path: 'cognos-server', source: 'docker/cognos-server/README.md' },
+	],
+};
+
+// Every first path segment the Worker serves, and what's there: the libraries, the Docker pages
+// and the docs landing page. reference.mjs writes it into .generated/site.json for the Worker;
+// wrangler.jsonc has a route for each (test/site.test.mjs checks), and check-links.mjs looks for
+// their links in dist/. landing: /<id>/ is a page; without one it opens the project's docs.
+export const SECTIONS = [
+	...PROJECTS.map((project) => ({ id: project.id, landing: project.landing, docs: true })),
+	{ id: PA_DOCKER.id, landing: true, docs: false },
+	{ id: 'docs', landing: true, docs: false },
+];
+
 export const languagesOf = (project) => LANGUAGES.filter((language) => project.languages.includes(language.id));
 
 export const escape = (text) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');

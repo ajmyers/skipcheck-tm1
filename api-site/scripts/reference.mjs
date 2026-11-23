@@ -24,7 +24,7 @@
 
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { CANONICAL_ORIGIN, copyAssets, dedent, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir } from './site.mjs';
+import { CANONICAL_ORIGIN, copyAssets, dedent, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, SECTIONS } from './site.mjs';
 
 const allowMissing = process.argv.includes('--allow-missing');
 
@@ -325,8 +325,8 @@ const gaps = new Map();
 // Pages showing Java code in another language, and overviews with fewer examples than Java's
 const foreign = [];
 const fewer = [];
-// The docs landing page (/docs/, pages.mjs) is served like a project's pages
-const site = { projects: [...PROJECTS.map((p) => ({ id: p.id, landing: p.landing, docs: true })), { id: 'docs', landing: true, docs: false }], guide: {} };
+// Every path the Worker serves: the projects, the Docker pages and the docs landing page
+const site = { projects: SECTIONS, guide: {} };
 let pageCount = 0;
 
 for (const project of PROJECTS) {

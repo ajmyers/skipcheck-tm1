@@ -1,0 +1,26 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* What the Docker pages (/pa-docker/, from the READMEs under docker/) add to the docs layout
+   (docs.css, which they load first): the parts of GitHub's Markdown the reference doesn't use. */
+.readme h2 { margin-top: 2.5rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rule, #d8d8d8); }
+.readme h3 { margin-top: 1.75rem; font-size: 1.05rem; }
+.readme h4 { margin-top: 1.25rem; font-size: 0.95rem; }
+/* Anchors land below the sticky masthead */
+.readme :is(h2, h3, h4)[id] { scroll-margin-top: calc(var(--bar, 3.75rem) + 1rem); }
+.readme .crumbs { margin-top: 0.75rem; }
+
+/* Tables of settings and commands: wide ones scroll on their own, not the page */
+.readme table { display: block; max-width: 100%; overflow-x: auto; margin: 0.75rem 0 1.25rem; border-collapse: collapse; font-size: 0.88rem; }
+.readme th, .readme td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--rule, #d8d8d8); vertical-align: top; text-align: left; }
+.readme th { color: var(--muted, #677285); font-weight: 500; font-size: 0.8rem; }
+
+/* Notes, as GitHub draws a > quote */
+.readme blockquote { margin: 1rem 0; padding: 0.1rem 1rem; border-left: 3px solid var(--accent, #0b5fff); background: var(--surface, #fafafa); border-radius: 0 6px 6px 0; color: var(--ink-soft, #555); }
+
+/* The per-platform steps, folded as on GitHub */
+.readme details { margin: 0.75rem 0; padding: 0.5rem 1rem; border: 1px solid var(--rule, #d8d8d8); border-radius: 8px; }
+.readme summary { cursor: pointer; }
+.readme details[open] summary { margin-bottom: 0.5rem; }
+
+.readme li > pre { margin: 0.5rem 0; }
+.readme hr { border: 0; border-top: 1px solid var(--rule, #d8d8d8); margin: 2rem 0; }
