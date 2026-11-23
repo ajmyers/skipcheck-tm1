@@ -420,7 +420,7 @@ CREATE = "POST Dimensions"
 CREATE_KEY = Tm1Request.post(ODataPath.of("Dimensions"), {"Name": "d"}, dict)
 
 
-def test_logs_in_again_with_the_cookie_from_the_401_and_replays_the_post_once(rt: Runtime) -> None:
+def test_logs_in_again_with_the_cookie_from_the401_and_replays_the_post_once(rt: Runtime) -> None:
     rt.fake.respond = each(json_response(401, None, "TM1SessionId=fresh; Path=/api/; HttpOnly"), json_response(201, {"Name": "d"}))
     rt.fake.on_login = each(
         json_response(200, {"ID": 1}, "TM1SessionId=c1; Path=/api/"),
@@ -435,6 +435,19 @@ def test_logs_in_again_with_the_cookie_from_the_401_and_replays_the_post_once(rt
     creates = requests_to(rt, CREATE)
     assert [cookie(c) for c in creates] == ["c1", "fresh"]
     assert "authorization" not in creates[1].headers
+    assert rt.run(session.session_id()) == 2
+
+
+def test_observes_the_relogin_with_its_reason(rt: Runtime, caplog: pytest.LogCaptureFixture) -> None:
+    # Java observes logins with Micrometer; this client logs them to ``skipcheck_tm1`` with their reason
+    caplog.set_level(logging.INFO, logger="skipcheck_tm1")
+    rt.fake.respond = each(json_response(401, None, "TM1SessionId=fresh; Path=/api/"), json_response(201, {}))
+    session = rt.session()
+    rt.run(session.connect())
+    rt.run(session.execute(CREATE_KEY))
+    logins = [r.getMessage() for r in caplog.records if r.name == "skipcheck_tm1" and r.getMessage().startswith("Logged in")]
+    assert len(logins) == 2
+    assert logins[0].endswith(", initial)") and logins[1].endswith(", relogin)")
 
 
 def test_shares_one_relogin_between_requests_that_saw_the_same_expiry(rt: Runtime) -> None:
