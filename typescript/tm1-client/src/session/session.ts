@@ -73,6 +73,11 @@ export class Tm1Session implements AsyncDisposable {
     return this.connection.isClosed;
   }
 
+  /** @internal Whether a request is running on the session, through any view of it. */
+  isBusy(): boolean {
+    return this.connection.isBusy;
+  }
+
   // Views
 
   /** A view of this session whose requests run in sandbox `name`: each gets TM1's `!sandbox` query
@@ -170,46 +175,61 @@ export class Tm1Session implements AsyncDisposable {
   async execute<T>(request: Tm1Request<T>, options?: Tm1CallOptions): Promise<T> {
     if (!(request instanceof Tm1Request)) throw new TypeError("execute() takes a Tm1Request");
     if (request.response === "Collection") throw new TypeError("Collection requests are streamed: use stream() for " + request.toString());
-    // A batched request joins the batch as it is, as Java's: TM1 answers for it in the batch
+    // A batched request joins the batch as it is, as Java's: TM1 answers for it in the batch. What it
+    // requires is checked when the batch runs.
     if (this.queue) return (await this.queue.add(this, request, (r) => this.read(request, r))) as T;
     await this.check(request.requirement(), options);
     const reply = await this.send(request, this.target(request.relativeUri()), options?.signal);
     return this.read(request, reply);
   }
 
-  /** The items of a collection, fetching pages as they're needed (Java's `stream`). In a batch, its
-   * first page, once the batch has run: the request joins the batch at once. */
+  /** The items of a collection, fetching pages as they're needed (Java's `stream`). In a batch, the
+   * request joins the batch at once, and its items are there once the batch has run.
+   *
+   * A next link is followed with ordinary requests on the same session, in every view: the pages
+   * after the first aren't part of an async request or of a batch. (TM1 11.8 doesn't page, so that
+   * is untested against a server.) */
   stream<T>(request: Tm1Request<T>, options?: Tm1CallOptions): Tm1Stream<T> {
     if (!(request instanceof Tm1Request)) throw new TypeError("stream() takes a Tm1Request");
     if (request.response !== "Collection") throw new TypeError("Only collection requests are streamed: use execute() for " + request.toString());
     const signal = options?.signal;
+    const self = this;
     if (this.queue) {
       const page = this.queue.add(this, request, (r) => readPage(request, r)) as Promise<Page<T>>;
       return Tm1Stream.from(async function* () {
-        const p = await page;
-        if (p.nextLink !== undefined)
-          throw new Tm1ProtocolException(`${request.toString()}: TM1 sent more than one page, which a batch can't follow; ask for fewer with top()`);
-        yield* p.items;
+        yield* self.items(request, await page, signal);
       });
     }
-    const self = this;
     return Tm1Stream.from(async function* () {
       await self.check(request.requirement(), options);
-      let url = self.target(request.relativeUri());
-      let current: Tm1Request<T> = request;
-      for (;;) {
-        const reply = await self.send(current, url, signal);
-        const page = readPage(current, reply);
-        yield* page.items;
-        if (page.nextLink === undefined) return;
-        // The link carries the query and TM1's options already
-        url = self.connection.url(page.nextLink);
-        current = current.withQuery(ODataQuery.none());
-      }
+      const reply = await self.send(request, self.target(request.relativeUri()), signal);
+      yield* self.items(request, readPage(request, reply), signal);
     });
   }
 
-  private async check(requirement: Tm1Capability | undefined, options: Tm1CallOptions | undefined): Promise<void> {
+  /** The items of one page, then those of the pages after it, if it has a next link. The pages after
+   * it are fetched with ordinary requests, as Java's: the rest of the collection isn't part of the
+   * async result or the batch the first page came in. */
+  private async *items<T>(request: Tm1Request<T>, first: Page<T>, signal: AbortSignal | undefined): AsyncGenerator<T> {
+    // The link carries the query and TM1's options already
+    const later = request.withQuery(ODataQuery.none());
+    // A stream is a request still running until it is finished or stopped, however long the caller
+    // takes over a page: a pool keeps its session open meanwhile
+    const release = this.connection.hold();
+    try {
+      for (let page = first; ;) {
+        yield* page.items;
+        if (page.nextLink === undefined) return;
+        // Next links are opaque: resolved against the service root, never changed
+        page = readPage(later, await this.send(later, this.connection.url(page.nextLink), signal, true));
+      }
+    } finally {
+      release();
+    }
+  }
+
+  /** @internal Fails if the server doesn't define what a request requires, unless the session was told not to check. */
+  async check(requirement: Tm1Capability | undefined, options: Tm1CallOptions | undefined): Promise<void> {
     if (!requirement || !this.connection.checkCapabilities) return;
     const refused = (await this.connection.capabilities(options?.signal)).check(requirement, this.connection.root);
     if (refused) throw refused;
@@ -229,21 +249,16 @@ export class Tm1Session implements AsyncDisposable {
     return options.length === 0 ? relative : relative + (relative.includes("?") ? "&" : "?") + options.join("&");
   }
 
-  private async send<T>(request: Tm1Request<T>, url: string, signal: AbortSignal | undefined): Promise<Reply> {
+  /** Sends a request and checks its answer's status: async in an async view, unless `ordinary`. */
+  private async send<T>(request: Tm1Request<T>, url: string, signal: AbortSignal | undefined, ordinary = false): Promise<Reply> {
     const [content, contentType] = encode(request);
     let reply: Reply;
     // Raw bytes (document content) aren't sent async
-    if (this.asyncEvery !== undefined && request.response !== "Bytes" && !(request.body instanceof Uint8Array)) {
-      reply = await this.sendRespondAsync(
-        request.method,
-        url,
-        content,
-        contentType,
-        request.headers,
-        request.accept(),
-        request.timeout,
-        this.asyncEvery,
-        signal,
+    if (!ordinary && this.asyncEvery !== undefined && request.response !== "Bytes" && !(request.body instanceof Uint8Array)) {
+      // Running until its result is read, the waits between polls included
+      const every = this.asyncEvery;
+      reply = await this.connection.busy(() =>
+        this.sendRespondAsync(request.method, url, content, contentType, request.headers, request.accept(), request.timeout, every, signal),
       );
     } else {
       reply = await this.connection.send(request.method, url, content, contentType, request.headers, request.accept(), request.timeout, signal);
@@ -357,7 +372,16 @@ function readPage<T>(request: Tm1Request<T>, reply: Reply): Page<T> {
 /** A JSON `$batch`, as the Java client's `Tm1SessionBatch`: requests through {@link session} are
  * queued, and `run()` sends them together. TM1 (11.8) runs them in order (a later one sees an
  * earlier one's writes) and carries on past failed ones: each request's promise gets its own result
- * or error. */
+ * or error.
+ *
+ * A request's body is written as JSON when the call is made, so a body that can't be written fails
+ * that call at once (a `TypeError`) and it never joins the batch, and a body changed afterwards is
+ * sent as it was. If TM1 answers a `$batch` with no body, every call in it fails with a
+ * {@link Tm1ProtocolException}.
+ *
+ * A request that {@link Tm1Request.requires | requires} something the server doesn't define is
+ * checked when the batch runs: its call fails with a `Tm1UnsupportedOperationException` and it
+ * isn't sent, and the others still are. */
 export class Tm1SessionBatch {
   /** How many requests {@link run} sends in each `$batch`. */
   static readonly DEFAULT_PER_REQUEST = 500;
@@ -390,7 +414,10 @@ interface Entry {
   url: string;
   accept: string;
   headers: Readonly<Record<string, string>>;
+  /** The body as JSON, written when the call was queued; undefined for none. */
   body: unknown;
+  /** What the server must define for the request, checked when the batch runs. */
+  requirement: Tm1Capability | undefined;
   read: (reply: Reply) => unknown;
   resolve: (value: unknown) => void;
   reject: (error: unknown) => void;
@@ -409,13 +436,18 @@ export class BatchQueue {
     return this.entries.length;
   }
 
-  /** Queues a request, and returns its result, there once the batch has run. */
+  /** Queues a request, and returns its result, there once the batch has run. A request whose body
+   * can't be written as JSON is refused here, and never joins the batch. */
   add<T>(view: Tm1Session, request: Tm1Request<T>, read: (reply: Reply) => unknown): Promise<unknown> {
     if (request.response === "Bytes" || request.body instanceof Uint8Array) throw new TypeError("Raw bytes can't go in a JSON batch: " + request.toString());
     if (this.ran)
       throw new Error(
         "The batch has already run, so this call can't join it: a call whose request depends on another's result can't be batched. " + request.toString(),
       );
+    // Written now, so a body that can't be written fails its own call, where it was made, rather
+    // than the run and every other call with it. The body is what it was when the call was queued.
+    const written = request.body === undefined ? undefined : writeJson(request.body);
+    const body: unknown = written === undefined ? undefined : JSON.parse(written);
     let resolve!: (v: unknown) => void;
     let reject!: (e: unknown) => void;
     const result = new Promise<unknown>((res, rej) => {
@@ -430,7 +462,8 @@ export class BatchQueue {
       url: view.contextual(request.relativeUri()),
       accept: request.accept(),
       headers: request.headers,
-      body: request.body,
+      body,
+      requirement: request.requirement(),
       read,
       resolve,
       reject,
@@ -442,8 +475,20 @@ export class BatchQueue {
   async run(perRequest: number, signal: AbortSignal | undefined): Promise<void> {
     if (this.ran) throw new Error("The batch has already run");
     this.ran = true;
-    const all = [...this.entries];
     const connection = this.sender.connection;
+    // Checked now and not when the call was queued: it may need the server's $metadata, and
+    // queueing sends nothing. A request the server can't serve (or whose requirement can't be
+    // checked, if the capabilities can't be read) fails its own call and isn't sent, as outside a
+    // batch; the rest are.
+    const all: Entry[] = [];
+    for (const e of this.entries) {
+      try {
+        await this.sender.check(e.requirement, { signal });
+        all.push(e);
+      } catch (error) {
+        e.reject(error);
+      }
+    }
     for (let start = 0; start < all.length; start += perRequest) {
       const chunk = all.slice(start, start + perRequest);
       const requests = chunk.map((e) => {

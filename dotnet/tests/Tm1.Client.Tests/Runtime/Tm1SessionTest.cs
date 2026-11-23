@@ -25,6 +25,30 @@ public class Tm1SessionTest
     private readonly ScriptedTm1 _tm1 = new ScriptedTm1().On("GET Server?$select=Name", _ => ScriptedTm1.Json(200, "{\"Name\":\"tm1\"}"));
 
     [Fact]
+    public async Task GivesUpOnAnAuthenticatorThatNeverAnswers()
+    {
+        var session = _tm1.SessionWithOwnCredentials(b =>
+            b.Authenticator(new Never()).Timeouts(Tm1Timeouts.Builder().Login(TimeSpan.FromMilliseconds(100)).Build())
+        );
+
+        var e = await Assert.ThrowsAsync<Tm1TransportException>(() => session.ExecuteAsync(Server).WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(Tm1TransportException.Phase.Connect, e.TransportPhase);
+        Assert.True(e.IsRetryable()); // nothing was sent to TM1
+        Assert.False(e.MayHaveApplied());
+        await session.CloseAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Empty(_tm1.Requests(ScriptedTm1.Login));
+    }
+
+    /// <summary>An authenticator that never supplies credentials, and doesn't stop when told to.</summary>
+    private sealed class Never : Tm1Authenticator
+    {
+        public override async ValueTask<string> AuthorizationAsync(CancellationToken cancellationToken = default) =>
+            await new TaskCompletionSource<string>().Task;
+
+        public override string Describe() => "Never";
+    }
+
+    [Fact]
     public async Task LogsInOnceForConcurrentFirstRequestsAndSendsOnlyTheCookieAfterwards()
     {
         var login = new ScriptedTm1.Pending();
@@ -123,6 +147,98 @@ public class Tm1SessionTest
             .Select(d => d.GetProperty("Name").GetString())
             .ToListAsync();
         Assert.Equal(["a", "b", "c"], names);
+    }
+
+    /// <summary>Java's <c>releasesBuffersItHasntReadWhenCancelled</c>, for what .NET holds instead of
+    /// pooled buffers: the response, and with it the connection, of a body that was still arriving.</summary>
+    [Fact]
+    public async Task ReleasesAResponseItHasntReadWhenCancelled()
+    {
+        var arriving = new Tracked("{\"value\":[{\"Name\":\"a\"},", stalls: true);
+        _tm1.On("GET Cubes", _ => arriving.Response());
+        using var cancel = new CancellationTokenSource();
+        var cubes = _tm1.Session().StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes")), cancel.Token).ToListAsync(cancel.Token).AsTask();
+        await arriving.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(arriving.Released);
+
+        cancel.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cubes.WaitAsync(TimeSpan.FromSeconds(5)));
+        await ScriptedTm1.Eventually(() => arriving.Released, "for the response to be released");
+    }
+
+    [Fact]
+    public async Task ReleasesTheResponseOfAStreamThatFails()
+    {
+        var broken = new Tracked("{\"value\":[{\"Name\":\"a\"},");
+        _tm1.On("GET Cubes", _ => broken.Response());
+        await Assert.ThrowsAsync<Tm1ProtocolException>(async () =>
+            await _tm1.Session().StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"))).ToListAsync()
+        );
+        Assert.True(broken.Released);
+    }
+
+    /// <summary>Java's <c>asksForBuffersOnlyAsItemsAreTaken</c>, for .NET's unit of reading, the page:
+    /// it reads a page whole and releases its response, and asks for the next only when its items
+    /// have been taken.</summary>
+    [Fact]
+    public async Task AsksForPagesOnlyAsItemsAreTaken()
+    {
+        var first = new Tracked("{\"value\":[{\"Name\":\"a\"},{\"Name\":\"b\"}],\"@odata.nextLink\":\"Cubes?$skiptoken=2\"}");
+        _tm1.On("GET Cubes", _ => first.Response()).On("GET Cubes?$skiptoken=2", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"c\"}]}"));
+        var taken = new List<string?>();
+        await foreach (var cube in _tm1.Session().StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"))))
+        {
+            taken.Add(cube.GetProperty("Name").GetString());
+            Assert.True(first.Released); // nothing is held while the caller works
+            Assert.Empty(_tm1.Requests("GET Cubes?$skiptoken=2")); // no more than the items taken need
+            if (taken.Count == 2)
+            {
+                break;
+            }
+        }
+        Assert.Equal(["a", "b"], taken);
+        Assert.Empty(_tm1.Requests("GET Cubes?$skiptoken=2")); // stopped early: the next page was never asked for
+    }
+
+    /// <summary>A response body that says when it's released, and can stall part-way like a slow connection.</summary>
+    private sealed class Tracked(string start, bool stalls = false) : HttpContent
+    {
+        private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Started => _started.Task;
+
+        public bool Released { get; private set; }
+
+        public HttpResponseMessage Response()
+        {
+            Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = this };
+        }
+
+        protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context) =>
+            SerializeToStreamAsync(stream, context, CancellationToken.None);
+
+        protected override async Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context, CancellationToken cancellationToken)
+        {
+            await stream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(start), cancellationToken);
+            _started.TrySetResult();
+            if (stalls)
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            Released = true;
+            base.Dispose(disposing);
+        }
     }
 
     [Fact]
@@ -691,6 +807,66 @@ public class Tm1SessionBatchTest
     }
 
     [Fact]
+    public async Task RefusesACallWhoseBodyCantBeWrittenAndStillRunsTheRest()
+    {
+        var tm1 = new ScriptedTm1().On(BatchKey, _ => ScriptedTm1.Json(200, "{\"responses\":[{\"id\":\"1\",\"status\":204}]}"));
+        var batch = tm1.Session().Batch();
+        var deleted = batch.Session.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Cubes").Key("Old")));
+        var unwritable = batch.Session.ExecuteAsync(Tm1Request.Post<JsonElement>(ODataPath.Of("Cubes"), new Unwritable()));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => unwritable.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(1, batch.Size()); // never queued
+        await batch.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await deleted.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, Assert.Single(tm1.Requests(BatchKey)).Json.GetProperty("requests").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task FailsEveryCallWhenTm1AnswersTheBatchWithNoBody()
+    {
+        var tm1 = new ScriptedTm1().On(BatchKey, _ => ScriptedTm1.Status(200));
+        var batch = tm1.Session().Batch();
+        var first = batch.Session.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Cubes").Key("a")));
+        var second = batch.Session.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Cubes").Key("b")));
+
+        await batch.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAsync<Tm1ProtocolException>(() => first.WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAsync<Tm1ProtocolException>(() => second.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    /// <summary>A body that can't be written as JSON: reading its property fails.</summary>
+    private sealed class Unwritable
+    {
+        public string Name => throw new NotSupportedException("not readable");
+    }
+
+    [Fact]
+    public async Task FollowsANextLinkInAnAnswer()
+    {
+        var tm1 = new ScriptedTm1()
+            .On(BatchKey, _ =>
+                ScriptedTm1.Json(
+                    200,
+                    """
+                    {"responses":[
+                     {"id":"1","status":200,"body":{"value":[{"Name":"a"}],"@odata.nextLink":"Cubes?$skiptoken=2"}}
+                    ]}
+                    """
+                )
+            )
+            .On("GET Cubes?$skiptoken=2", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"b\"}]}"));
+        var batch = tm1.Session().Batch();
+        var names = batch
+            .Session.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes")))
+            .Select(cube => cube.GetProperty("Name").GetString())
+            .ToListAsync()
+            .AsTask();
+
+        await batch.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(["a", "b"], await names.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
     public async Task SplitsABigQueue()
     {
         var tm1 = new ScriptedTm1().On(BatchKey, _ => ScriptedTm1.Json(200, "{\"responses\":[]}"));
@@ -788,6 +964,50 @@ public class Tm1SessionAsyncTest
         Assert.Single(tm1.Requests("DELETE _async('a1')"));
     }
 
+    /// <summary>Java's codecs refused to buffer more than 256 KB; .NET reads a body whole, whatever its size, which this pins.</summary>
+    [Fact]
+    public async Task ReadsAResultBiggerThanTheCodecsBufferLimit()
+    {
+        var big = new string('x', 300_000);
+        var tm1 = new ScriptedTm1().On(Run, _ => Accepted()).On(Monitor, _ => Done("200 OK", "{\"Text\":\"" + big + "\"}"));
+        var result = await tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10)).ExecuteAsync(Request);
+        Assert.Equal(300_000, result.GetProperty("Text").GetString()!.Length);
+    }
+
+    [Fact]
+    public async Task ReadsABigCollectionTm1GaveAtOnce()
+    {
+        var big = new string('x', 300_000);
+        var tm1 = new ScriptedTm1().On("GET Cubes", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"" + big + "\"}]}"));
+        var cubes = await tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10)).StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"))).ToListAsync();
+        Assert.Equal(300_000, Assert.Single(cubes).GetProperty("Name").GetString()!.Length);
+    }
+
+    [Fact]
+    public async Task FollowsANextLinkInAResult()
+    {
+        var tm1 = new ScriptedTm1()
+            .On("GET Cubes", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"a\"}],\"@odata.nextLink\":\"Cubes?$skiptoken=2\"}"))
+            .On("GET Cubes?$skiptoken=2", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"b\"}]}"));
+        var names = await tm1.Session()
+            .WithAsync(TimeSpan.FromMilliseconds(10))
+            .StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes")))
+            .Select(cube => cube.GetProperty("Name").GetString())
+            .ToListAsync();
+        Assert.Equal(["a", "b"], names);
+        Assert.Equal("respond-async", Assert.Single(tm1.Requests("GET Cubes")).Header("Prefer"));
+        Assert.Null(Assert.Single(tm1.Requests("GET Cubes?$skiptoken=2")).Header("Prefer")); // the rest with ordinary requests
+    }
+
+    [Fact]
+    public async Task ReadsABigErrorBody()
+    {
+        var big = new string('x', 300_000);
+        var tm1 = new ScriptedTm1().On(Run, _ => ScriptedTm1.Json(500, "{\"error\":{\"code\":\"174\",\"message\":\"" + big + "\"}}"));
+        var e = await Assert.ThrowsAsync<Tm1ServerException>(() => tm1.Session().ExecuteAsync(Request));
+        Assert.Contains(big, e.Message);
+    }
+
     [Fact]
     public void UnwrapsAnApplicationHttpMessage()
     {
@@ -864,6 +1084,40 @@ public class Tm1SessionCapabilitiesTest
         Assert.Contains("added in schema 99.0", u.Message);
         Assert.Contains("reports schema 11.8.35", u.Message);
         Assert.Empty(_tm1.Requests("GET Bananas"));
+    }
+
+    [Fact]
+    public async Task RefusesARequestTheServerCantServeInABatchAndStillSendsTheRest()
+    {
+        // Answers each request it's sent, under the ID it came with
+        _tm1.On("POST $batch", r =>
+            ScriptedTm1.Json(
+                200,
+                "{\"responses\":["
+                    + string.Join(
+                        ",",
+                        r.Json.GetProperty("requests")
+                            .EnumerateArray()
+                            .Select(q => $"{{\"id\":\"{q.GetProperty("id").GetString()}\",\"status\":200,\"body\":{{}}}}")
+                    )
+                    + "]}"
+            )
+        );
+        var batch = _tm1.Session().Batch();
+        var bananas = batch
+            .Session.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Bananas")).Requires(Version.Tm1Capability.EntitySet("Bananas").Since("99.0")))
+            .ToListAsync()
+            .AsTask();
+        var server = batch.Session.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Server")));
+        Assert.Equal(2, batch.Size()); // checked at the run, not when queued
+        Assert.Empty(_tm1.Requests()); // so queueing sends nothing
+
+        await batch.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(() => bananas.WaitAsync(TimeSpan.FromSeconds(5)));
+        await server.WaitAsync(TimeSpan.FromSeconds(5));
+        var sent = Assert.Single(_tm1.Requests("POST $batch")).Text;
+        Assert.Contains("Server", sent);
+        Assert.DoesNotContain("Bananas", sent);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,7 +10,15 @@ namespace Skipcheck.Tm1.Client.Auth;
 
 /// <summary>How a session logs in: the <c>Authorization</c> header of its first request, as the
 /// Java client's <c>Tm1Authenticator</c>. TM1 answers with a <c>TM1SessionId</c> cookie, which
-/// later requests send instead.</summary>
+/// later requests send instead.
+///
+/// <para>A <c>Tm1SessionPool</c> keeps one session for each set of a user's own credentials, and
+/// tells them apart with <see cref="object.Equals(object)"/>. The authenticators here that hold
+/// their credentials (<see cref="Basic"/>, <see cref="CamNamespace"/>,
+/// <see cref="CamPassport(string)"/>, <see cref="CognosLogon"/>) are equal when the credentials are.
+/// One that asks a supplier (<see cref="CamPassport(Func{CancellationToken, ValueTask{string}})"/>,
+/// <see cref="CognosIdToken"/>) is only equal to itself, so keep it and pass the same one each
+/// time; so is your own, unless it defines <c>Equals</c>.</para></summary>
 public abstract class Tm1Authenticator
 {
     /// <summary>The header to log in with; asked for at each login.</summary>
@@ -34,6 +43,13 @@ public abstract class Tm1Authenticator
         return new Fixed("CAMNamespace " + Base64($"{user}:{password}:{@namespace}"), $"CAMNamespace {@namespace}/{user}");
     }
 
+    /// <summary>CAM security with one CAM passport the application already holds, such as the one a
+    /// signed-in user's request carries: <c>CAMPassport &lt;passport&gt;</c>. The passport isn't
+    /// renewed: once it expires, a login with it is refused. Two of these are equal when their
+    /// passports are, so a <c>Tm1SessionPool</c> gives a user's renewed passport a session of its own.</summary>
+    public static Tm1Authenticator CamPassport(string passport) =>
+        new Fixed("CAMPassport " + (passport ?? throw new ArgumentNullException(nameof(passport))), "CAMPassport");
+
     /// <summary>CAM security with a passport, fetched at each login (a passport expires).</summary>
     public static Tm1Authenticator CamPassport(Func<CancellationToken, ValueTask<string>> passport) =>
         new Passport(passport ?? throw new ArgumentNullException(nameof(passport)));
@@ -52,7 +68,12 @@ public abstract class Tm1Authenticator
         string user,
         string password,
         System.Net.Http.HttpMessageHandler? handler = null
-    ) => new Described(CamPassport(CognosPassports.Password(dispatcher, @namespace, user, password, handler)), $"CAMPassport from Cognos {@namespace}/{user}");
+    ) =>
+        new Described(
+            CamPassport(CognosPassports.Password(dispatcher, @namespace, user, password, handler)),
+            $"CAMPassport from Cognos {@namespace}/{user}",
+            [dispatcher, @namespace, user, password, handler]
+        );
 
     /// <summary>CAM security with a passport the client gets from Cognos for an OpenID Connect ID
     /// token it already holds (<see cref="CognosPassports.IdToken"/>): a fresh passport for each login.</summary>
@@ -65,22 +86,51 @@ public abstract class Tm1Authenticator
         string @namespace,
         Func<CancellationToken, ValueTask<string>> idToken,
         System.Net.Http.HttpMessageHandler? handler = null
-    ) => new Described(CamPassport(CognosPassports.IdToken(dispatcher, @namespace, idToken, handler)), $"CAMPassport from Cognos {@namespace} (ID token)");
+    ) =>
+        new Described(
+            CamPassport(CognosPassports.IdToken(dispatcher, @namespace, idToken, handler)),
+            $"CAMPassport from Cognos {@namespace} (ID token)",
+            [dispatcher, @namespace, idToken, handler]
+        );
 
     private static string Base64(string text) => Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
 
+    /// <summary>Credentials the authenticator holds. Equal when the credentials are.</summary>
     private sealed class Fixed(string value, string description) : Tm1Authenticator
     {
-        public override ValueTask<string> AuthorizationAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(value);
+        private readonly string _value = value;
+
+        public override ValueTask<string> AuthorizationAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(_value);
 
         public override string Describe() => description;
+
+        public override bool Equals(object? obj) => ReferenceEquals(this, obj) || (obj is Fixed other && _value == other._value);
+
+        public override int GetHashCode() => _value.GetHashCode(StringComparison.Ordinal);
     }
 
-    private sealed class Described(Tm1Authenticator inner, string description) : Tm1Authenticator
+    /// <summary>Another authenticator under its own description: the ones that ask Cognos. Equal when
+    /// they were made from the same address, namespace and credentials (and handler, if one was
+    /// given), which is <paramref name="madeFrom"/>.</summary>
+    private sealed class Described(Tm1Authenticator inner, string description, object?[] madeFrom) : Tm1Authenticator
     {
+        private readonly object?[] _madeFrom = madeFrom;
+
         public override ValueTask<string> AuthorizationAsync(CancellationToken cancellationToken = default) => inner.AuthorizationAsync(cancellationToken);
 
         public override string Describe() => description;
+
+        public override bool Equals(object? obj) => ReferenceEquals(this, obj) || (obj is Described other && _madeFrom.SequenceEqual(other._madeFrom));
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            foreach (var part in _madeFrom)
+            {
+                hash.Add(part);
+            }
+            return hash.ToHashCode();
+        }
     }
 
     private sealed class Passport(Func<CancellationToken, ValueTask<string>> passport) : Tm1Authenticator

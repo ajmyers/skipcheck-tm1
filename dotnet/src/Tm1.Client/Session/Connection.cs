@@ -53,6 +53,9 @@ internal sealed class Connection
     private bool _closed;
     private Task? _closing;
 
+    /// <summary>Requests running now: see <see cref="IsBusy"/>.</summary>
+    private int _running;
+
     public Connection(
         string root,
         Tm1Authenticator authenticator,
@@ -114,6 +117,33 @@ internal sealed class Connection
             lock (_gate)
             {
                 return _closed;
+            }
+        }
+    }
+
+    /// <summary>Whether a request is running: sent, or waiting for the login, and not yet answered,
+    /// failed or cancelled. An async request counts until its result is read, and a collection
+    /// until its stream ends or is disposed.</summary>
+    public bool IsBusy => Volatile.Read(ref _running) > 0;
+
+    /// <summary>Counts a request as running until the result is disposed.</summary>
+    public IDisposable Running() => new RunningRequest(this);
+
+    private sealed class RunningRequest : IDisposable
+    {
+        private Connection? _connection;
+
+        public RunningRequest(Connection connection)
+        {
+            _connection = connection;
+            Interlocked.Increment(ref connection._running);
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _connection, null) is { } connection)
+            {
+                Interlocked.Decrement(ref connection._running);
             }
         }
     }
@@ -236,9 +266,7 @@ internal sealed class Connection
     private async Task<(string, long)> SendLoginAsync(string? seedCookie)
     {
         var url = Root + LoginPath;
-        // The authenticator's own failures (say, a passport it couldn't get) reach the caller unchanged
-        var authorization = await Authenticator.AuthorizationAsync(CancellationToken.None).ConfigureAwait(false)
-            ?? throw new InvalidOperationException($"The authenticator {Authenticator.Describe()} supplied no credentials");
+        var authorization = await AuthorizationAsync(url).ConfigureAwait(false);
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         Headers(request, Json);
         request.Headers.TryAddWithoutValidation("Authorization", authorization);
@@ -298,6 +326,33 @@ internal sealed class Connection
         }
     }
 
+    /// <summary>The authenticator's header. Its own failures (say, a passport it couldn't get) reach
+    /// the caller unchanged. It gets the login's timeout too: it may ask another server (Cognos, for
+    /// a passport), and one that never answers would otherwise hold every request, and the close,
+    /// for ever. Then it's told to stop, and the login fails in the connect phase: nothing has been
+    /// sent to TM1, so it's safe to retry.</summary>
+    private async Task<string> AuthorizationAsync(string url)
+    {
+        using var deadline = new CancellationTokenSource();
+        var asked = Authenticator.AuthorizationAsync(deadline.Token).AsTask();
+        var first = await Task.WhenAny(asked, Task.Delay(Timeouts.Login, deadline.Token)).ConfigureAwait(false);
+        await deadline.CancelAsync().ConfigureAwait(false);
+        if (first != asked)
+        {
+            // Whatever it ends with later has nowhere to go
+            _ = asked.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+            throw new Tm1TransportException(
+                Tm1TransportException.Phase.Connect,
+                true,
+                "GET",
+                url,
+                new TimeoutException($"The authenticator {Authenticator.Describe()} supplied no credentials within {Timeouts.Login}")
+            );
+        }
+        return await asked.ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"The authenticator {Authenticator.Describe()} supplied no credentials");
+    }
+
     private static bool TryLong(JsonElement e, out long value)
     {
         value = 0;
@@ -317,6 +372,7 @@ internal sealed class Connection
         CancellationToken ct
     )
     {
+        using var running = Running();
         var used = Current();
         var session = await used.Login.WaitAsync(ct).ConfigureAwait(false);
         for (int attempt = 1; ; attempt++)

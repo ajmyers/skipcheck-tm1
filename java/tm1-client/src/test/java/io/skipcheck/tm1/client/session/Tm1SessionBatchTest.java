@@ -5,6 +5,8 @@ package io.skipcheck.tm1.client.session;
 import static io.skipcheck.tm1.client.session.FakeTm1.json;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,8 +14,10 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
+import io.skipcheck.tm1.client.error.Tm1ProtocolException;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tools.jackson.databind.JsonNode;
@@ -66,6 +70,50 @@ class Tm1SessionBatchTest {
 			.expectError(IllegalStateException.class)
 			.verify();
 		StepVerifier.create(batch.run()).expectError(IllegalStateException.class).verify();
+	}
+
+	@Test
+	void refusesACallWhoseBodyCantBeWrittenAndStillRunsTheRest() {
+		FakeTm1 tm1 = new FakeTm1().on(BATCH,
+				request -> Mono.just(json(200, "{\"responses\":[{\"id\":\"1\",\"status\":204}]}")));
+		Tm1SessionBatch batch = tm1.session().batch();
+		Mono<Void> deleted = batch.session().execute(Tm1Request.delete(ODataPath.of("Cubes").key("Old")));
+		Mono<JsonNode> unwritable = batch.session()
+			.execute(Tm1Request.post(ODataPath.of("Cubes"), "not json".getBytes(StandardCharsets.UTF_8),
+					JsonNode.class));
+
+		StepVerifier.create(unwritable).expectError(IllegalArgumentException.class).verify(Duration.ofSeconds(5));
+		assertThat(batch.size()).as("never queued").isEqualTo(1);
+		StepVerifier.create(batch.run()).expectComplete().verify(Duration.ofSeconds(5));
+		StepVerifier.create(deleted).expectComplete().verify(Duration.ofSeconds(5));
+	}
+
+	@Test
+	void failsEveryCallWhenTm1AnswersTheBatchWithNoBody() {
+		FakeTm1 tm1 = new FakeTm1().on(BATCH, request -> Mono.just(FakeTm1.status(200)));
+		Tm1SessionBatch batch = tm1.session().batch();
+		Mono<Void> first = batch.session().execute(Tm1Request.delete(ODataPath.of("Cubes").key("a")));
+		Mono<Void> second = batch.session().execute(Tm1Request.delete(ODataPath.of("Cubes").key("b")));
+
+		StepVerifier.create(batch.run()).expectComplete().verify(Duration.ofSeconds(5));
+		StepVerifier.create(first).expectError(Tm1ProtocolException.class).verify(Duration.ofSeconds(5));
+		StepVerifier.create(second).expectError(Tm1ProtocolException.class).verify(Duration.ofSeconds(5));
+	}
+
+	@Test
+	void followsANextLinkInAnAnswer() {
+		FakeTm1 tm1 = new FakeTm1().on(BATCH, request -> Mono.just(json(200, """
+				{"responses":[
+				 {"id":"1","status":200,"body":{"value":[{"Name":"a"}],"@odata.nextLink":"Cubes?$skiptoken=2"}}
+				]}""")))
+			.on("GET Cubes?$skiptoken=2", request -> Mono.just(json(200, "{\"value\":[{\"Name\":\"b\"}]}")));
+		Tm1SessionBatch batch = tm1.session().batch();
+		Flux<String> names = batch.session()
+			.stream(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), JsonNode.class))
+			.map(cube -> cube.path("Name").asString());
+
+		StepVerifier.create(batch.run()).expectComplete().verify(Duration.ofSeconds(5));
+		StepVerifier.create(names).expectNext("a", "b").expectComplete().verify(Duration.ofSeconds(5));
 	}
 
 	@Test

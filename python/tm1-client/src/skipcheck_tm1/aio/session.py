@@ -24,10 +24,11 @@ from it (``tm1_pygen.unasync``).
 
 from __future__ import annotations
 
-import inspect
+import contextlib
 import logging
+import threading
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterator
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -35,7 +36,8 @@ import httpx
 
 from .. import _protocol as p
 from .._compat import AsyncIO as runtime
-from .._views import CAPABILITIES, Queue, as_call, capability_of, items_only, poll_interval, settle
+from .._compat import Expired
+from .._views import CAPABILITIES, Queue, as_call, capability_of, poll_interval, settle
 from ..auth import Authenticator, basic
 from ..errors import (
     ODataError,
@@ -136,6 +138,22 @@ class _AsyncConnection:
         self.lock = runtime.Lock()
         self.version: Tm1Version | None = None
         self.version_for = -1
+        self.running = 0
+        """Requests running now: see :meth:`busy`."""
+        self._counting = threading.Lock()
+
+    @contextlib.contextmanager
+    def busy(self) -> Iterator[None]:
+        """Counts a request as running until the block ends: answered in full, failed or cancelled.
+        The pool reads the count, so as not to close a session under a request. The lock is for
+        the sync flavor, whose requests run on the caller's threads."""
+        with self._counting:
+            self.running += 1
+        try:
+            yield
+        finally:
+            with self._counting:
+                self.running -= 1
 
     def url(self, relative: str) -> str:
         return str(httpx.URL(self.base_url).join(relative))
@@ -200,10 +218,15 @@ class _AsyncConnection:
 
     async def _login(self, seed: str | None) -> tuple[str, int]:
         url = self.base_url + p.LOGIN
-        # The authenticator's own failures (say, a passport it couldn't get) reach the caller unchanged
-        authorization = self.authenticator.authorization()
-        if inspect.isawaitable(authorization):
-            authorization = await authorization
+        # The authenticator's own failures (say, a passport it couldn't get) reach the caller unchanged.
+        # It gets the login's timeout too: it may ask another server (Cognos, for a passport), and one
+        # that never answers would otherwise hold every request, and close(), for ever.
+        try:
+            authorization = await runtime.within(self.timeouts.login, self.authenticator.authorization)
+        except Expired:
+            waited = TimeoutError(f"The authenticator {self.authenticator.describe()} supplied no credentials within {self.timeouts.login} s")
+            # Nothing has been sent to TM1, so it's safe to try again
+            raise Tm1TransportError(Tm1TransportError.Phase.CONNECT, True, "GET", url, waited) from None
         if not authorization:
             raise RuntimeError(f"The authenticator {self.authenticator.describe()} supplied no credentials")
         extra = {"Authorization": authorization}
@@ -289,17 +312,19 @@ class _AsyncConnection:
         accept: str,
         timeout: float | None = None,
     ) -> p.Reply:
-        """Sends a request on the logged-in session, logging in again and replaying it once on a 401."""
-        cookie = await self.logged_in()
-        response = await self._send_once(method, url, content, headers, accept, timeout, cookie)
-        if response.status_code == 401:
-            seed = p.session_cookie(response.headers.get_list("set-cookie"))
-            log.info("TM1 session at %s expired or was closed on the server; logging in again", self.base_url)
-            cookie = await self.logged_in(expired=cookie, seed=seed)
+        """Sends a request on the logged-in session, logging in again and replaying it once on a 401.
+        It counts as running from here, the wait for a login included, until its answer is read."""
+        with self.busy():
+            cookie = await self.logged_in()
             response = await self._send_once(method, url, content, headers, accept, timeout, cookie)
             if response.status_code == 401:
-                raise Tm1ApiError.of_kind(401, Tm1ErrorKind.UNAUTHENTICATED, None, method, url)
-        return p.Reply(response.status_code, {k.lower(): v for k, v in response.headers.items()}, response.content)
+                seed = p.session_cookie(response.headers.get_list("set-cookie"))
+                log.info("TM1 session at %s expired or was closed on the server; logging in again", self.base_url)
+                cookie = await self.logged_in(expired=cookie, seed=seed)
+                response = await self._send_once(method, url, content, headers, accept, timeout, cookie)
+                if response.status_code == 401:
+                    raise Tm1ApiError.of_kind(401, Tm1ErrorKind.UNAUTHENTICATED, None, method, url)
+            return p.Reply(response.status_code, {k.lower(): v for k, v in response.headers.items()}, response.content)
 
     async def product_version(self) -> Tm1Version:
         """The server's version, read from ``Server`` inside the session (an anonymous read
@@ -561,6 +586,13 @@ class AsyncTm1Session:
         refuses requests with ``Tm1SessionClosedError``."""
         await self._connection.close()
 
+    def _is_busy(self) -> bool:
+        """Whether a request is running on the session, through any view of it: sent, or waiting
+        for the login, and not yet answered in full, failed or cancelled. An async request counts
+        until its result is read, and a collection until its last item is taken or its iterator
+        is closed. For the pool."""
+        return self._connection.running > 0
+
     def __repr__(self) -> str:
         sandbox = "" if self._context.sandbox is None else f", sandbox={self._context.sandbox}"
         change_set = "" if self._context.change_set is None else f", changeSet={self._context.change_set}"
@@ -593,42 +625,59 @@ class AsyncTm1Session:
         if isinstance(request, Tm1Request) and request.response is Tm1Request.Response.COLLECTION:
             raise ValueError(f"Collection requests are streamed: use stream() or collect() for {request}")
         call = as_call(request)
-        await self._check(call)
         if self._queue is not None:
+            # What the call requires is checked when the batch runs: the check may read the
+            # server's $metadata, and queueing sends nothing
             return self._queue.add(call, self._context)
-        url = self._connection.url(p.target(call, self._context))
-        content, headers = call.body()
-        if self._async_every is not None and not call.raw:
-            reply = await self._send_async(call.method, url, content, headers, call.accept)
-        else:
-            reply = await self._connection.send(call.method, url, content, headers, call.accept, call.timeout)
-        return call.read(self._connection.check(call.method, url, reply))
+        # Running for the whole of it, so an async request counts while it's polled
+        with self._connection.busy():
+            await self._check(call)
+            url = self._connection.url(p.target(call, self._context))
+            content, headers = call.body()
+            if self._async_every is not None and not call.raw:
+                reply = await self._send_async(call.method, url, content, headers, call.accept)
+            else:
+                reply = await self._connection.send(call.method, url, content, headers, call.accept, call.timeout)
+            return call.read(self._connection.check(call.method, url, reply))
 
     def stream(self, request: Tm1Request[Any] | p.Call) -> AsyncIterator[Any]:
-        """The items of a collection, fetching pages as they're needed (Java's ``stream``)."""
+        """The items of a collection, fetching pages as they're needed (Java's ``stream``). A page
+        is asked for only once the items before it have been taken, and each response is read whole
+        and closed before its items are given, so a stream that is stopped early, or fails, leaves
+        no response open."""
         if isinstance(request, Tm1Request) and request.response is not Tm1Request.Response.COLLECTION:
             raise ValueError(f"Only collection requests are streamed: use execute() for {request}")
         return self.iterate(as_call(request))
 
     async def collect(self, request: Tm1Request[Any] | p.Call) -> Any:
-        """Every item of a collection, as a list; in a batch, the first page's (a ``Deferred``)."""
+        """Every item of a collection, as a list, following TM1's next links. In a batch, a
+        ``Deferred`` of that list: the first page comes in the batch's answer, and the pages after
+        it, if TM1 sent a next link, are fetched with ordinary requests on the same session when
+        the batch runs. TM1 (11.8) doesn't page, so that is untested against a server."""
         call = as_call(request)
         if self._queue is not None:
-            return await self.execute(items_only(call))
+            return self._queue.add(call, self._context, paged=True)
         return [item async for item in self.iterate(call)]
 
     async def iterate(self, call: p.Call) -> AsyncIterator[Any]:
         """The items of a collection, page by page, following TM1's next links: what :meth:`stream`
-        iterates, for a call rather than a request. Can't join a batch."""
+        iterates, for a call rather than a request. On an async view, the first page may come as
+        an async result, and each page after it is asked for with an ordinary request, as the other
+        clients do: a next link names a page TM1 has ready, not more work to wait for. Can't join a
+        batch."""
         if self._queue is not None:
-            raise RuntimeError("A collection can't be iterated in a batch: use collect(), which returns its first page")
-        page = await self.execute(call)
-        while True:
-            for item in page.items:
-                yield item
-            if page.next_link is None:
-                return
-            page = await self.execute(p.Call("GET", page.next_link, read=call.read, contextual=False))
+            raise RuntimeError("A collection can't be iterated in a batch: use collect(), whose result is every item once the batch has run")
+        # Running until the last item is taken or the iterator is closed, not only while a page is
+        # fetched: a pool mustn't close the session between two pages
+        with self._connection.busy():
+            page = await self.execute(call)
+            pages = self.without_async()
+            while True:
+                for item in page.items:
+                    yield item
+                if page.next_link is None:
+                    return
+                page = await pages.execute(p.Call("GET", page.next_link, read=call.read, contextual=False))
 
     async def _send_async(self, method: str, url: str, content: bytes | None, headers: dict[str, str], accept: str) -> p.Reply:
         assert self._async_every is not None
@@ -687,9 +736,24 @@ class AsyncTm1SessionBatch:
         print(a.result().name)
 
     TM1 (11.8) runs a batch's requests in order (a later one sees an earlier one's writes), and
-    carries on past failed ones: each result holds its own value or error. Multipart batches,
+    carries on past failed ones: each result holds its own value or error. A collection's result
+    is every item: if TM1 answers with a next link, :meth:`run` fetches the pages after the first
+    with ordinary requests, outside the batch. Multipart batches,
     ``atomicityGroup`` and ``dependsOn`` are refused, so none are used; 1000 requests in one
     batch work, and :meth:`run` splits a bigger queue.
+
+    A body that can't be written as JSON fails its call with a ``ValueError`` when the call is
+    made, and the call never joins the batch; the others still run. The body is written then, so a
+    change made to the object afterwards isn't sent. If TM1 answers a ``$batch`` with no body, or
+    with something that isn't a batch response, every call of that request fails with
+    :class:`~skipcheck_tm1.errors.Tm1ProtocolError`.
+
+    A request that requires something the server doesn't define (``Tm1Request.requires``, or an
+    operation of the generated API) is checked when the batch runs, not when the call is made, so
+    that making a call sends nothing: its call fails with
+    :class:`~skipcheck_tm1.errors.Tm1UnsupportedOperationError` and it isn't sent, and the others
+    still are. If the server's capabilities can't be read at all, each call that needs them fails
+    with that error.
     """
 
     DEFAULT_PER_REQUEST = 500
@@ -730,15 +794,52 @@ class AsyncTm1SessionBatch:
         request's result (or error) is in its ``Deferred``. Runs once."""
         if per_request < 1:
             raise ValueError(f"A batch needs room for at least one request: {per_request}")
-        for chunk in self._queue.chunks(per_request):
+        sendable = []
+        for entry in self._queue.take():
+            if await self._supported(entry[0], entry[2]):
+                sendable.append(entry)
+        paged = {id(deferred) for deferred in self._queue.paged}
+        for start in range(0, len(sendable), per_request):
+            chunk = sendable[start : start + per_request]
             body = p.batch_body([(call, context) for call, context, _ in chunk])
             try:
                 reply = await self._sender.execute(p.Call("POST", "$batch", json_body=body, read=lambda r: r, contextual=False))
+                settle(chunk, reply, self._sender._connection.url, self._sender._connection.classifier)
             except Exception as e:  # noqa: BLE001
+                # Every call is told, whatever went wrong: none is left without a result. That includes
+                # a response with no body, or one that isn't a batch response.
                 for _, _, deferred in chunk:
                     deferred._fail(e)
-                continue
-            settle(chunk, reply, self._sender._connection.url, self._sender._connection.classifier)
+            for call, _, deferred in chunk:
+                if id(deferred) in paged:
+                    await self._rest(call, deferred)
+
+    async def _rest(self, call: p.Call, deferred: p.Deferred[Any]) -> None:
+        """Makes a collection's result its every item. Its first page came in the batch; a next
+        link is followed with ordinary requests, as ``stream()`` does: the rest of the collection
+        isn't part of the batch. A page that fails fails the call."""
+        if deferred._error is not None:
+            return
+        page = deferred._value
+        items = list(page.items)
+        try:
+            while page.next_link is not None:
+                page = await self._sender.execute(p.Call("GET", page.next_link, read=call.read, contextual=False))
+                items.extend(page.items)
+        except Exception as e:  # noqa: BLE001
+            deferred._fail(e)
+            return
+        deferred._value = items
+
+    async def _supported(self, call: p.Call, deferred: p.Deferred[Any]) -> bool:
+        """Whether the server defines what the call requires. If it doesn't (or that can't be found
+        out), the call fails and isn't sent, as outside a batch."""
+        try:
+            await self._sender._check(call)
+        except Exception as e:  # noqa: BLE001
+            deferred._fail(e)
+            return False
+        return True
 
 
 class AsyncTm1SessionBuilder:
@@ -782,7 +883,7 @@ class AsyncTm1SessionBuilder:
 
     def authenticator(self, authenticator: Authenticator) -> Self:
         """How to log in: TM1's own security, CAM, or credentials of your own. Asked for credentials
-        on every login."""
+        on every login, and given the login timeout to supply them (see :class:`Tm1Timeouts`)."""
         return self._set(authenticator=authenticator)
 
     def impersonate(self, user: str) -> Self:

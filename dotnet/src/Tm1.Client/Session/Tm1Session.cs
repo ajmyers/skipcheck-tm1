@@ -75,6 +75,9 @@ public sealed class Tm1Session : IAsyncDisposable
 
     internal Connection Connection => _connection;
 
+    /// <summary>Whether a request is running on the session, through any view of it.</summary>
+    internal bool IsBusy => _connection.IsBusy;
+
     // Views
 
     /// <summary>A view of this session whose requests run in sandbox <paramref name="name"/>: each
@@ -185,18 +188,21 @@ public sealed class Tm1Session : IAsyncDisposable
         {
             throw new ArgumentException("Collection requests are streamed: use StreamAsync() for " + request);
         }
-        await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
         if (_batch is not null)
         {
+            // The queue checks what the request requires when the batch runs: queueing sends nothing.
             // Null only when TM1 answers a JSON null, which is then what T has to allow
             return (T)(await _batch.Add(this, request, r => Read(request, r)).ConfigureAwait(false))!;
         }
-        var reply = await SendAsync(request, Target(request.RelativeUri()), cancellationToken).ConfigureAwait(false);
+        await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
+        var reply = await SendAsync(request, Target(request.RelativeUri()), _async, cancellationToken).ConfigureAwait(false);
         return Read(request, reply);
     }
 
     /// <summary>The items of a collection, fetching pages as they're needed (Java's <c>stream</c>).
-    /// In a batch, its first page, once the batch has run.</summary>
+    /// In a batch, the items come once the batch has run. If TM1 pages (<c>@odata.nextLink</c>), the
+    /// pages after the first are fetched with ordinary requests on this session, also through an
+    /// async view or a batch: they aren't part of the async result or the batch.</summary>
     public async IAsyncEnumerable<T> StreamAsync<T>(Tm1Request<T> request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -204,40 +210,50 @@ public sealed class Tm1Session : IAsyncDisposable
         {
             throw new ArgumentException("Only collection requests are streamed: use ExecuteAsync() for " + request);
         }
-        await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
-        if (_batch is not null)
+        // Running until the stream ends or is disposed, between its pages too. In a batch, only once
+        // the batch has run: a call that is still queued has sent nothing
+        IDisposable? running = null;
+        try
         {
-            var page = (Page<T>)(await _batch.Add(this, request, r => ReadPage(request, r)).ConfigureAwait(false))!; // ReadPage never returns null
-            if (page.NextLink is not null)
+            Page<T> page;
+            if (_batch is not null)
             {
-                throw new Tm1ProtocolException($"{request}: TM1 sent more than one page, which a batch can't follow; ask for fewer with Top()");
+                // Checked by the queue when the batch runs, as in ExecuteAsync
+                page = (Page<T>)(await _batch.Add(this, request, r => ReadPage(request, r)).ConfigureAwait(false))!; // ReadPage never returns null
+                running = _connection.Running();
             }
-            foreach (var item in page.Items)
+            else
             {
-                yield return item;
+                running = _connection.Running();
+                await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
+                page = ReadPage(request, await SendAsync(request, Target(request.RelativeUri()), _async, cancellationToken).ConfigureAwait(false));
             }
-            yield break;
+            while (true)
+            {
+                foreach (var item in page.Items)
+                {
+                    yield return item;
+                }
+                if (page.NextLink is null)
+                {
+                    yield break;
+                }
+                // The link carries the query and TM1's options already. It's followed with an ordinary
+                // request, whatever the view: the rest of the collection isn't part of the async result or
+                // the batch
+                request = request with { Query = ODataQuery.None() };
+                page = ReadPage(request, await SendAsync(request, _connection.Url(page.NextLink), null, cancellationToken).ConfigureAwait(false));
+            }
         }
-        var url = Target(request.RelativeUri());
-        while (true)
+        finally
         {
-            var reply = await SendAsync(request, url, cancellationToken).ConfigureAwait(false);
-            var page = ReadPage(request, reply);
-            foreach (var item in page.Items)
-            {
-                yield return item;
-            }
-            if (page.NextLink is null)
-            {
-                yield break;
-            }
-            // The link carries the query and TM1's options already
-            url = _connection.Url(page.NextLink);
-            request = request with { Query = ODataQuery.None() };
+            running?.Dispose();
         }
     }
 
-    private async Task CheckAsync(Tm1Capability? requirement, CancellationToken ct)
+    /// <summary>Fails with <see cref="Tm1UnsupportedOperationException"/> if the server doesn't define
+    /// <paramref name="requirement"/>, reading its <c>$metadata</c> if that hasn't been read yet.</summary>
+    internal async Task CheckAsync(Tm1Capability? requirement, CancellationToken ct)
     {
         if (requirement is null || !_connection.CheckCapabilities)
         {
@@ -268,12 +284,14 @@ public sealed class Tm1Session : IAsyncDisposable
         return options.Count == 0 ? relative : relative + (relative.Contains('?') ? "&" : "?") + string.Join("&", options);
     }
 
-    private async Task<Reply> SendAsync<T>(Tm1Request<T> request, string url, CancellationToken ct)
+    /// <summary>Sends <paramref name="request"/> to <paramref name="url"/>: asynchronously, polling
+    /// every <paramref name="async"/>, if that's given.</summary>
+    private async Task<Reply> SendAsync<T>(Tm1Request<T> request, string url, TimeSpan? async, CancellationToken ct)
     {
         var (content, contentType) = request.Encode();
         Reply reply;
         // Raw bytes (document content) aren't sent async
-        if (_async is { } every && request.Response != Tm1Response.Bytes && request.Body is not byte[])
+        if (async is { } every && request.Response != Tm1Response.Bytes && request.Body is not byte[])
         {
             reply = await SendRespondAsync(request.Method, url, content, contentType, request.Headers, request.Accept, request.Timeout, every, ct)
                 .ConfigureAwait(false);
@@ -299,6 +317,8 @@ public sealed class Tm1Session : IAsyncDisposable
         CancellationToken ct
     )
     {
+        // Running until the result is read, between the polls too
+        using var running = _connection.Running();
         var withPrefer = new Dictionary<string, string>(headers) { ["Prefer"] = "respond-async" };
         var reply = await _connection.SendAsync(method, url, content, contentType, withPrefer, accept, timeout, ct).ConfigureAwait(false);
         if (reply.Status != 202)
@@ -377,16 +397,44 @@ public sealed class Tm1Session : IAsyncDisposable
         }
     }
 
+    /// <summary>A page of a collection, read whole. A response that isn't one fails as Java's
+    /// <c>ODataCollectionDecoder</c> does, saying what was wrong: empty, cut short, malformed, more after
+    /// the collection, or an error TM1 reported in place of the collection (with that error).</summary>
     internal static Page<T> ReadPage<T>(Tm1Request<T> request, Reply reply)
     {
+        var body = Utf8Repair.Whole(reply.Body);
+        if (body.AsSpan().Trim(" \t\r\n"u8).IsEmpty)
+        {
+            throw new Tm1ProtocolException($"{request}: The response was empty");
+        }
+        JsonDocument parsed;
         try
         {
-            using var doc = JsonDocument.Parse(Utf8Repair.Whole(reply.Body));
-            if (
-                doc.RootElement.ValueKind != JsonValueKind.Object
-                || !doc.RootElement.TryGetProperty("value", out var items)
-                || items.ValueKind != JsonValueKind.Array
-            )
+            parsed = JsonDocument.Parse(body);
+        }
+        catch (JsonException e)
+        {
+            throw new Tm1ProtocolException($"{request}: {WhatIsWrongWith(body)}", e);
+        }
+        try
+        {
+            using var doc = parsed;
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new Tm1ProtocolException($"{request}: Expected a JSON object with a 'value' array, got {doc.RootElement.ValueKind}");
+            }
+            if (doc.RootElement.TryGetProperty("error", out _))
+            {
+                var error = ODataError.From(doc.RootElement);
+                throw new Tm1ProtocolException(
+                    $"{request}: TM1 reported an error in the response" + (error is null ? "" : ": " + error.Message),
+                    error,
+                    null,
+                    null,
+                    null
+                );
+            }
+            if (!doc.RootElement.TryGetProperty("value", out var items) || items.ValueKind != JsonValueKind.Array)
             {
                 throw new Tm1ProtocolException($"{request}: expected a collection");
             }
@@ -400,6 +448,28 @@ public sealed class Tm1Session : IAsyncDisposable
         }
     }
 
+    /// <summary>Why a body that isn't JSON isn't: it ended before its value did (a dropped
+    /// connection), it has more after its value, or it's malformed.</summary>
+    private static string WhatIsWrongWith(byte[] body)
+    {
+        var reader = new Utf8JsonReader(body, isFinalBlock: false, state: default);
+        try
+        {
+            while (reader.Read())
+            {
+                if (reader.CurrentDepth == 0 && reader.TokenType is not (JsonTokenType.StartObject or JsonTokenType.StartArray))
+                {
+                    return "Unexpected content after the collection";
+                }
+            }
+            return "The response ended before the collection was complete";
+        }
+        catch (JsonException e)
+        {
+            return "TM1 sent malformed JSON: " + e.Message;
+        }
+    }
+
     /// <inheritdoc/>
     public override string ToString() =>
         $"Tm1Session[{_connection.Root}{(_sandbox is null ? "" : ", sandbox=" + _sandbox)}{(_changeSet is null ? "" : ", changeSet=" + _changeSet)}]";
@@ -410,7 +480,14 @@ public sealed class Tm1Session : IAsyncDisposable
 /// <summary>A JSON <c>$batch</c>, as the Java client's <c>Tm1SessionBatch</c>: requests through
 /// <see cref="Session"/> are queued, and <c>RunAsync</c> sends them together. TM1 (11.8)
 /// runs them in order (a later one sees an earlier one's writes) and carries on past failed ones:
-/// each request's task gets its own result or error.</summary>
+/// each request's task gets its own result or error. A request's body is written as JSON when the
+/// call is made, not at the run: one that can't be written fails its own call at once and never
+/// joins the batch, and a change to the body object afterwards isn't sent. If TM1 answers a
+/// <c>$batch</c> with no body, every call in it fails with <see cref="Tm1ProtocolException"/>.
+///
+/// <para>A request that requires (<see cref="Tm1Request{T}.Requires"/>) something the server
+/// doesn't define is checked when the batch runs: its call fails with
+/// <see cref="Tm1UnsupportedOperationException"/> and it isn't sent, and the others still are.</para></summary>
 public sealed class Tm1SessionBatch
 {
     /// <summary>The most requests <see cref="RunAsync(CancellationToken)"/> sends in one
@@ -464,7 +541,15 @@ internal sealed class BatchQueue
         {
             throw new ArgumentException("Raw bytes can't go in a JSON batch: " + request);
         }
-        var entry = new Entry(request.Method, view.Contextual(request.RelativeUri()), request.Headers, request.Body, request.Accept, read);
+        // Written now, so a body that can't be written fails its own call, where it was made, rather
+        // than the run and every other call with it (Encode throws an ArgumentException)
+        JsonElement? body = null;
+        if (request.Encode().Content is { } written)
+        {
+            using var doc = JsonDocument.Parse(written);
+            body = doc.RootElement.Clone();
+        }
+        var entry = new Entry(request.Method, view.Contextual(request.RelativeUri()), request.Headers, body, request.Accept, request.Requirement, read);
         lock (_entries)
         {
             if (_ran)
@@ -491,6 +576,23 @@ internal sealed class BatchQueue
             all = _entries.ToList();
         }
         var connection = _sender.Connection;
+        // Checked now and not when the call was queued: the check may need the server's $metadata, and
+        // queueing sends nothing. A request the server can't serve (or whose requirement can't be
+        // checked) fails its own call and isn't sent, as outside a batch; the rest are.
+        var sendable = new List<Entry>();
+        foreach (var e in all)
+        {
+            try
+            {
+                await _sender.CheckAsync(e.Requirement, ct).ConfigureAwait(false);
+                sendable.Add(e);
+            }
+            catch (Exception error)
+            {
+                e.Result.TrySetException(error);
+            }
+        }
+        all = sendable;
         for (int start = 0; start < all.Count; start += perRequest)
         {
             var chunk = all.Skip(start).Take(perRequest).ToList();
@@ -512,10 +614,10 @@ internal sealed class BatchQueue
                         {
                             headers[header.Key] = header.Value;
                         }
-                        if (e.Body is not null)
+                        if (e.Body is { } body)
                         {
                             headers["content-type"] = "application/json";
-                            item["body"] = e.Body;
+                            item["body"] = body;
                         }
                         item["headers"] = headers;
                         return item;
@@ -527,6 +629,19 @@ internal sealed class BatchQueue
                 var reply = await _sender
                     .ExecuteAsync(Tm1Request.Post<JsonElement>(ODataPath.Batch(), new Dictionary<string, object?> { ["requests"] = requests }), ct)
                     .ConfigureAwait(false);
+                if (reply.ValueKind != JsonValueKind.Object)
+                {
+                    // No body is no answers: every call of this request fails, below, rather than wait for ever
+                    throw new Tm1ProtocolException(
+                        reply.ValueKind == JsonValueKind.Undefined
+                            ? "TM1 answered the batch with no body"
+                            : "TM1 answered the batch with something that isn't an object",
+                        null,
+                        "POST",
+                        connection.Url(ODataPath.Batch().ToString()),
+                        null
+                    );
+                }
                 var byId = reply.TryGetProperty("responses", out var responses)
                     ? responses.EnumerateArray().ToDictionary(r => r.GetProperty("id").ToString())
                     : new Dictionary<string, JsonElement>();
@@ -568,7 +683,16 @@ internal sealed class BatchQueue
         }
     }
 
-    private sealed record Entry(string Method, string Url, IReadOnlyDictionary<string, string> Headers, object? Body, string Accept, Func<Reply, object?> Read)
+    /// <summary>A queued call. Its body is the JSON it was when queued: a change to the caller's object afterwards isn't sent.</summary>
+    private sealed record Entry(
+        string Method,
+        string Url,
+        IReadOnlyDictionary<string, string> Headers,
+        JsonElement? Body,
+        string Accept,
+        Tm1Capability? Requirement,
+        Func<Reply, object?> Read
+    )
     {
         public TaskCompletionSource<object?> Result { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }

@@ -18,6 +18,7 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1ServerException;
 import io.skipcheck.tm1.client.odata.ODataPath;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -101,6 +102,58 @@ class Tm1SessionAsyncTest {
 
 		assertThat(tm1.requests(MONITOR)).isNotEmpty();
 		assertThat(tm1.requests("DELETE _async('a1')")).hasSize(1);
+	}
+
+	@Test
+	void readsAResultBiggerThanTheCodecsBufferLimit() {
+		// Spring's codecs refuse to buffer more than 256 KB unless told otherwise
+		String big = "x".repeat(300_000);
+		FakeTm1 tm1 = new FakeTm1().on(RUN, request -> Mono.just(accepted()))
+			.on(MONITOR, request -> Mono.just(done("200 OK", "{\"Text\":\"" + big + "\"}")));
+
+		StepVerifier.create(tm1.session().withAsync(Duration.ofMillis(10)).execute(REQUEST))
+			.assertNext(result -> assertThat(result.path("Text").asString()).hasSize(300_000))
+			.verifyComplete();
+	}
+
+	@Test
+	void readsABigCollectionTm1GaveAtOnce() {
+		String big = "x".repeat(300_000);
+		FakeTm1 tm1 = new FakeTm1().on("GET Cubes",
+				request -> Mono.just(json(200, "{\"value\":[{\"Name\":\"" + big + "\"}]}")));
+
+		StepVerifier
+			.create(tm1.session()
+				.withAsync(Duration.ofMillis(10))
+				.stream(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), JsonNode.class)))
+			.assertNext(cube -> assertThat(cube.path("Name").asString()).hasSize(300_000))
+			.verifyComplete();
+	}
+
+	@Test
+	void followsANextLinkInAResult() {
+		FakeTm1 tm1 = new FakeTm1()
+			.on("GET Cubes",
+					request -> Mono
+						.just(json(200, "{\"value\":[{\"Name\":\"a\"}],\"@odata.nextLink\":\"Cubes?$skiptoken=2\"}")))
+			.on("GET Cubes?$skiptoken=2", request -> Mono.just(json(200, "{\"value\":[{\"Name\":\"b\"}]}")));
+
+		StepVerifier
+			.create(tm1.session()
+				.withAsync(Duration.ofMillis(10))
+				.stream(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), JsonNode.class))
+				.map(cube -> cube.path("Name").asString()))
+			.expectNext("a", "b")
+			.verifyComplete();
+	}
+
+	@Test
+	void readsABigErrorBody() {
+		String big = "x".repeat(300_000);
+		FakeTm1 tm1 = new FakeTm1().on(RUN,
+				request -> Mono.just(json(500, "{\"error\":{\"code\":\"174\",\"message\":\"" + big + "\"}}")));
+
+		StepVerifier.create(tm1.session().execute(REQUEST)).expectError(Tm1ServerException.class).verify();
 	}
 
 	@Test

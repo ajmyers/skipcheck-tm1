@@ -2,7 +2,20 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ODataPath, ODataQuery, Tm1Capabilities, Tm1Capability, Tm1Dialect, Tm1Operation, Tm1Request, Tm1Session, Tm1Version } from "../../src/index.js";
+import {
+  allOperations,
+  ODataPath,
+  ODataQuery,
+  Tm1Capabilities,
+  Tm1Capability,
+  Tm1Dialect,
+  Tm1Operation,
+  Tm1Operations,
+  Tm1ProtocolException,
+  Tm1Request,
+  Tm1Session,
+  Tm1Version,
+} from "../../src/index.js";
 import { Repo } from "../support/repo.js";
 
 const SNAPSHOT = readFileSync(Repo.snapshot, "utf8");
@@ -116,7 +129,7 @@ describe("Tm1Version", () => {
     expect(v.isBefore(v)).toBe(false);
   });
 
-  it.each(["", "11.", ".8", "11..8", "v11.8", "11.8-beta", "99999999999"])("rejects %j, which isn't a version", (text) => {
+  it.each(["", "11.", ".8", "11..8", "v11.8", "11.8-beta", "99999999999"])("rejects non-versions: %j", (text) => {
     expect(() => Tm1Version.parse(text)).toThrow(/Not a TM1 version/);
   });
 });
@@ -189,12 +202,108 @@ describe("Tm1Capabilities", () => {
     );
   });
 
-  it("approximates an older schema without what came later, never a binding parameter", () => {
+  /** A CSDL document whose one schema holds `body`. */
+  const csdl = (body: string): string =>
+    `<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"><edmx:DataServices>` +
+    `<Schema Namespace="ibm.tm1.api.v1" Alias="tm1" xmlns="http://docs.oasis-open.org/odata/ns/edm">${body}</Schema></edmx:DataServices></edmx:Edmx>`;
+
+  it("refuses doctypes so entities can't be expanded", () => {
+    const xxe = `<?xml version="1.0"?>
+<!DOCTYPE edmx:Edmx [<!ENTITY x SYSTEM "file:///etc/passwd">]>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">&x;</edmx:Edmx>
+`;
+    expect(() => Tm1Capabilities.parse(xxe)).toThrow(Tm1ProtocolException);
+    expect(() => Tm1Capabilities.parse(xxe)).toThrow(/DOCTYPE/);
+    // Only a declaration: the word in a comment or in text is nothing to refuse
+    expect(Tm1Capabilities.parse(csdl('<!-- <!DOCTYPE x> --><EntityType Name="Cube"/>')).schemaVersion).toBeUndefined();
+  });
+
+  it("reports an operation it can't model as a parse error", () => {
+    // Bound to nothing: an operation is bound to its first parameter
+    const boundToNothing = csdl('<Action Name="Reserve" IsBound="true"/>');
+    expect(() => Tm1Capabilities.parse(boundToNothing)).toThrow(Tm1ProtocolException);
+    expect(() => Tm1Capabilities.parse(boundToNothing)).toThrow(/Reserve/);
+  });
+
+  it.each([
+    ["a binding parameter with no type", csdl('<Action Name="Reserve" IsBound="true"><Parameter Name="Cube"/></Action>')],
+    ["a character reference that is no character", csdl('<EntityType Name="Cu&#x110000;be"/>')],
+    ["text that isn't XML", "{}"],
+    ["XML that isn't CSDL", "<html>Not metadata</html>"],
+    ["nothing", ""],
+    ["an element left open", '<edmx:Edmx Version="4.0"><edmx:DataServices>'],
+  ])("reports %s as a parse error, never a raw exception", (_, metadata) => {
+    expect(() => Tm1Capabilities.parse(metadata)).toThrow(Tm1ProtocolException);
+  });
+
+  // The Java client's ApproximateSchemasTest, on this file's asOf: the approximate older servers
+  // the tests above (and Java's) are checked against are what they claim to be
+
+  it("the snapshot's own version changes nothing", () => {
     expect(asOf(SNAPSHOT, "11.8.35")).toBe(SNAPSHOT.replace(/(<Annotation Term="Core\.SchemaVersion">\s*<String>)[^<]*(<\/String>)/, "$111.8.35$2"));
-    const old = Tm1Capabilities.parse(asOf(SNAPSHOT, "11.0"));
-    expect(old.endpoints.size).toBeLessThan(current.endpoints.size);
-    for (const e of old.endpoints) expect(current.endpoints.has(e), e).toBe(true);
-    expect(old.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.Reserve"))).toBe(false);
+    expect(Tm1Capabilities.parse(asOf(SNAPSHOT, "11.8.35")).endpoints).toEqual(current.endpoints);
+  });
+
+  it("an older server lacks what came later", () => {
+    expect(older.schemaVersion).toBe("11.8.20");
+    // Cube.Reserve and Release arrived in 11.8.34; Load in 11.6.0
+    expect(older.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.Load"))).toBe(true);
+    expect(older.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.CheckRules"))).toBe(true);
+    expect(older.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.Reserve"))).toBe(false);
+    expect(older.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.Release"))).toBe(false);
+    // Encryption-at-rest configuration arrived in 11.8.35; data file encryption in 11.3.0
+    expect(older.supports(Tm1Capability.unboundOperation("DecryptDataFile"))).toBe(true);
+    expect(older.supports(Tm1Capability.unboundOperation("ConfigureEncryptionAtRest"))).toBe(false);
+  });
+
+  it("an old server lacks whole areas", () => {
+    const v10 = Tm1Capabilities.parse(asOf(SNAPSHOT, "10.2.2.0"));
+    // Git support arrived in 11.5.0
+    expect(v10.supports(Tm1Capability.entitySet("Cubes"))).toBe(true);
+    expect(v10.supports(Tm1Capability.entitySet("Dimensions"))).toBe(true);
+    expect(v10.supports(Tm1Capability.entitySet("GitPlans"))).toBe(false);
+    expect(v10.endpoints.size).toBeLessThan(current.endpoints.size);
+    for (const e of v10.endpoints) expect(current.endpoints.has(e), e).toBe(true);
+  });
+
+  it("never drops a binding parameter", () => {
+    const v10 = asOf(SNAPSHOT, "10.2.2.0");
+    const bound = [...v10.matchAll(/<(Action|Function) Name="(\w+)" IsBound="true">([\s\S]*?)<\/\1>/g)];
+    expect(bound.length).toBeGreaterThan(0);
+    for (const [, , name, body] of bound) expect(body, name).toMatch(/<Parameter Name="\w+" Type="[^"]+"/);
+    // And so it parses: a bound operation without one is refused (see "reports an operation it
+    // can't model as a parse error")
+    expect(() => Tm1Capabilities.parse(v10)).not.toThrow();
+  });
+});
+
+/** The Java client's `OperationCatalogTest`: the generated operation catalog matches the inventory
+ * the coverage gate counts, and the snapshot. */
+describe("Tm1Operations", () => {
+  const spec = JSON.parse(readFileSync(Repo.spec, "utf8")) as { endpoints: { id: string }[] };
+
+  it("has one descriptor per operation endpoint of the coverage gate", () => {
+    const operations = spec.endpoints.map((e) => e.id).filter((e) => /^(Action|Function|ActionImport|FunctionImport) /.test(e));
+    const catalog = allOperations.map((op) => op.endpoint());
+    expect(new Set(catalog).size, "no duplicates").toBe(catalog.length);
+    expect([...catalog].sort()).toEqual([...operations].sort());
+    expect(catalog).toHaveLength(105);
+  });
+
+  it("every capability is one the snapshot has", () => {
+    const snapshot = Tm1Capabilities.parse(SNAPSHOT);
+    for (const op of allOperations) expect(snapshot.supports(op.capability()), op.endpoint()).toBe(true);
+  });
+
+  it("carries revisions, parameters and return types", () => {
+    expect(Tm1Operations.ChoreActivate.deprecatedIn).toBe("11.8.3");
+    const mdx = Tm1Operations.ExecuteMdx;
+    expect(mdx.kind).toBe("Action");
+    expect(mdx.importName).toBe("ExecuteMDX");
+    expect(mdx.parameters).toEqual([{ name: "MDX", type: "Edm.String", nullable: false }]);
+    expect(mdx.returnType).toBe("tm1.Cellset");
+    expect(mdx.addedIn).toBe("10.2.2.1");
+    expect(allOperations.filter((op) => op.deprecated())).not.toHaveLength(0);
   });
 });
 

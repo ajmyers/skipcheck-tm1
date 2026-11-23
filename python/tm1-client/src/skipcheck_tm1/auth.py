@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import inspect
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
@@ -26,10 +26,19 @@ class Authenticator(Protocol):
     TM1 reports it expired, and credentials that expire themselves (a CAM passport) can be fresh
     each time. Only the login carries credentials; every other request carries the session cookie.
     Implementations must not log or otherwise reveal the credentials; :meth:`describe` is what logs
-    show."""
+    show.
+
+    A session pool keeps one session for each set of a user's own credentials, and tells them
+    apart with ``==``. The authenticators here that hold their credentials (:func:`basic`,
+    :func:`cam_namespace`, :func:`cam_passport` given a passport, :func:`cognos_logon`) are
+    equal when the credentials are. One that asks a function (:func:`cam_passport` given one,
+    :func:`cognos_id_token`) is only equal to itself, so keep it and pass the same one each time;
+    so is your own, unless it defines ``__eq__``."""
 
     def authorization(self) -> str:
-        """The ``Authorization`` header to log in with; called at each login."""
+        """The ``Authorization`` header to log in with; called at each login. An asyncio session
+        awaits it no longer than its login timeout (``Tm1Timeouts.login``); a sync session waits
+        until it returns, so give anything it asks a timeout of its own."""
         ...
 
     def describe(self) -> str:
@@ -43,8 +52,10 @@ def _b64(text: str) -> str:
 
 @dataclass(frozen=True, repr=False)
 class _Fixed:
+    """Credentials it holds. Equal to another when the credentials are, whatever the description."""
+
     value: str
-    description: str
+    description: str = field(compare=False)
 
     def authorization(self) -> str:
         return self.value
@@ -58,11 +69,19 @@ class _Fixed:
 
 class _Passport:
     """``CAMPassport <passport>``, the passport asked for at each login: from a function, or a
-    coroutine function in the asyncio flavor."""
+    coroutine function in the asyncio flavor. Equal only to itself, unless it says what it was
+    made from (the ones that ask Cognos do): then to another made from the same."""
 
-    def __init__(self, passport: Callable[[], Any], description: str = "CAMPassport"):
+    def __init__(self, passport: Callable[[], Any], description: str = "CAMPassport", made_from: tuple[Any, ...] | None = None):
         self.passport = passport
         self.description = description
+        self.made_from = made_from
+
+    def __eq__(self, other: object) -> bool:
+        return self is other or (isinstance(other, _Passport) and self.made_from is not None and self.made_from == other.made_from)
+
+    def __hash__(self) -> int:
+        return object.__hash__(self) if self.made_from is None else hash(self.made_from)
 
     def authorization(self) -> Any:
         value = self.passport()
@@ -91,8 +110,21 @@ def cam_namespace(user: str, password: str, namespace: str) -> Authenticator:
     return _Fixed("CAMNamespace " + _b64(f"{user}:{password}:{namespace}"), f"CAMNamespace {namespace}/{user}")
 
 
-def cam_passport(passport: Callable[[], Any]) -> Authenticator:
-    """CAM security with a passport, fetched at each login (a passport expires)."""
+def cam_passport(passport: str | Callable[[], Any]) -> Authenticator:
+    """CAM security with a passport: ``CAMPassport <passport>``. Java's two ``camPassport``
+    overloads, told apart by what's given.
+
+    Given a function, the passport is fetched from it at each login (a passport expires), so a
+    session that logs in again uses a fresh one. Such an authenticator is equal only to itself.
+
+    Given the passport itself, one the application already holds, such as the one a signed-in
+    user's request carries, it isn't renewed: once it expires, a login with it is refused. Two of
+    these are equal when their passports are, so a session pool gives a user's renewed passport a
+    session of its own."""
+    if passport is None:
+        raise TypeError("passport")
+    if isinstance(passport, str):
+        return _Fixed("CAMPassport " + passport, "CAMPassport")
     return _Passport(passport)
 
 

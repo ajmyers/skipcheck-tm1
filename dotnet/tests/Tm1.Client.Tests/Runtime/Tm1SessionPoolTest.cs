@@ -79,6 +79,129 @@ public sealed class Tm1SessionPoolTest : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GivesDifferentCredentialsForTheSameNameTheirOwnSession()
+    {
+        var carol = _pool.Session(Tm1Identity.WithCredentials("carol", Tm1Authenticator.Basic("carol", "c")));
+        Assert.Same(carol, _pool.Session(Tm1Identity.WithCredentials("Carol", Tm1Authenticator.Basic("carol", "c")))); // the same credentials, made again
+        await carol.ExecuteAsync(Server);
+
+        var other = _pool.Session(Tm1Identity.WithCredentials("carol", Tm1Authenticator.Basic("carol", "wrong")));
+        Assert.NotSame(carol, other); // never the session someone else's credentials opened
+        await other.ExecuteAsync(Server);
+        // Each logs in with what it was given
+        Assert.Equal(["Basic Y2Fyb2w6Yw==", "Basic Y2Fyb2w6d3Jvbmc="], _tm1.Requests(ScriptedTm1.Login).Select(r => r.Authorization));
+    }
+
+    [Fact]
+    public void SharesASessionForTheSameAuthenticatorWhenItsCredentialsCantBeCompared()
+    {
+        var passport = Tm1Authenticator.CamPassport(_ => ValueTask.FromResult("p1"));
+        var dave = _pool.Session(Tm1Identity.WithCredentials("dave", passport));
+        Assert.Same(dave, _pool.Session(Tm1Identity.WithCredentials("dave", passport)));
+        Assert.NotSame(dave, _pool.Session(Tm1Identity.WithCredentials("dave", Tm1Authenticator.CamPassport(_ => ValueTask.FromResult("p1")))));
+        Assert.Equal(Tm1Authenticator.CamPassport("p1"), Tm1Authenticator.CamPassport("p1"));
+        Assert.NotEqual(Tm1Authenticator.CamPassport("p1"), Tm1Authenticator.CamPassport("p2"));
+        Assert.Equal(
+            Tm1Authenticator.CognosLogon("http://cognos:9300", "LDAP", "dave", "d"),
+            Tm1Authenticator.CognosLogon("http://cognos:9300", "LDAP", "dave", "d")
+        );
+        Assert.NotEqual(
+            Tm1Authenticator.CognosLogon("http://cognos:9300", "LDAP", "dave", "d"),
+            Tm1Authenticator.CognosLogon("http://cognos:9300", "LDAP", "dave", "other")
+        );
+    }
+
+    /// <summary>.NET only: what the fixed authenticators send and show, and that equal ones hash alike.</summary>
+    [Fact]
+    public async Task LogsInWithAPassportItWasHandedAndNeverShowsIt()
+    {
+        var passport = Tm1Authenticator.CamPassport("p1");
+        Assert.Equal("CAMPassport p1", await passport.AuthorizationAsync());
+        Assert.Equal("CAMPassport", passport.Describe());
+        Assert.DoesNotContain("p1", passport.ToString());
+        Assert.Equal(passport.GetHashCode(), Tm1Authenticator.CamPassport("p1").GetHashCode());
+        Assert.Equal(Tm1Authenticator.Basic("carol", "c"), Tm1Authenticator.Basic("carol", "c"));
+        Assert.NotEqual(Tm1Authenticator.Basic("carol", "c"), Tm1Authenticator.CamNamespace("carol", "c", "LDAP"));
+        Assert.Equal(Tm1Authenticator.CamNamespace("carol", "c", "LDAP"), Tm1Authenticator.CamNamespace("carol", "c", "LDAP"));
+        Assert.Equal(
+            Tm1Identity.WithCredentials("carol", Tm1Authenticator.Basic("carol", "c")).GetHashCode(),
+            Tm1Identity.WithCredentials("Carol", Tm1Authenticator.Basic("carol", "c")).GetHashCode()
+        );
+        Assert.Throws<ArgumentNullException>(() => Tm1Authenticator.CamPassport((string)null!));
+    }
+
+    [Fact]
+    public async Task KeepsASessionWhileARequestIsRunningOnIt()
+    {
+        var answer = new ScriptedTm1.Pending();
+        _tm1.On("GET Server", _ => answer.Task);
+        var alice = _pool.Session(Tm1Identity.Impersonating("alice"));
+        var result = alice.ExecuteAsync(Server);
+        await ScriptedTm1.Eventually(() => _tm1.Requests("GET Server").Count == 1, "for the request");
+
+        _time.Advance(TimeSpan.FromMinutes(25));
+        Assert.Equal(0, _pool.Stats().EvictedIdle); // a running request is use
+        Assert.False(alice.IsClosed());
+
+        answer.Answer(ScriptedTm1.Json(200, "{}"));
+        await result.WaitAsync(TimeSpan.FromSeconds(5));
+        _time.Advance(TimeSpan.FromMinutes(12));
+        Assert.Equal(1, _pool.Stats().EvictedIdle); // idle once it has finished
+        await ScriptedTm1.Eventually(() => alice.IsClosed(), "for the close");
+    }
+
+    /// <summary>.NET only: a collection counts as running until its stream ends or is disposed, as
+    /// Java's does while its body is read, though this client reads a page whole.</summary>
+    [Fact]
+    public async Task KeepsASessionWhileACollectionIsBeingRead()
+    {
+        _tm1.On("GET Cubes", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"a\"},{\"Name\":\"b\"}]}"));
+        var alice = _pool.Session(Tm1Identity.Impersonating("alice"));
+        await using (var cubes = alice.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"))).GetAsyncEnumerator())
+        {
+            Assert.True(await cubes.MoveNextAsync());
+            _time.Advance(TimeSpan.FromMinutes(25));
+            Assert.Equal(0, _pool.Stats().EvictedIdle); // the caller is still reading
+        }
+        _time.Advance(TimeSpan.FromMinutes(12));
+        Assert.Equal(1, _pool.Stats().EvictedIdle); // idle once the stream is disposed
+    }
+
+    [Fact]
+    public async Task ClosesAnEvictedSessionOnlyOnceItsRequestsHaveFinished()
+    {
+        await _pool.CloseAsync();
+        _pool = Pool(b => b.MaxAge(TimeSpan.FromMinutes(30)));
+        var answer = new ScriptedTm1.Pending();
+        _tm1.On("GET Server", _ => answer.Task);
+        var alice = _pool.Session(Tm1Identity.Impersonating("alice"));
+        var result = alice.ExecuteAsync(Server);
+        await ScriptedTm1.Eventually(() => _tm1.Requests("GET Server").Count == 1, "for the request");
+
+        _time.Advance(TimeSpan.FromMinutes(40));
+        Assert.Equal(1, _pool.Stats().EvictedAge); // out of the pool at its age
+        for (int i = 0; i < 5; i++)
+        {
+            // The pool looks again every second; its timers are set as the ones before them fire
+            await Task.Delay(20);
+            _time.Advance(TimeSpan.FromSeconds(1));
+            Assert.False(alice.IsClosed()); // but open for the request still running
+        }
+
+        answer.Answer(ScriptedTm1.Json(200, "{}"));
+        await result.WaitAsync(TimeSpan.FromSeconds(5));
+        await ScriptedTm1.Eventually(
+            () =>
+            {
+                _time.Advance(TimeSpan.FromSeconds(1));
+                return alice.IsClosed();
+            },
+            "for the close"
+        );
+        await ScriptedTm1.Eventually(() => _tm1.Requests(ScriptedTm1.Close).Count == 1, "for TM1 to be told");
+    }
+
+    [Fact]
     public async Task EvictsASessionPastItsMaximumAgeEvenIfInUse()
     {
         await _pool.CloseAsync();

@@ -99,7 +99,12 @@ public final class ODataCollectionDecoder {
 		Objects.requireNonNull(itemType, "itemType");
 		return Flux.defer(() -> {
 			State<T> state = new State<>(mapper.readerFor(itemType), method, url);
-			return body.concatMapIterable(state::feed).concatWith(Flux.defer(() -> Flux.fromIterable(state.end())));
+			// One buffer at a time, so the body is read no faster than the items are
+			// taken. A buffer that arrived and wasn't read (a cancel, or an error) is
+			// discarded by Reactor, and released here: feed releases the ones it reads.
+			return body.concatMapIterable(state::feed, 1)
+				.doOnDiscard(DataBuffer.class, DataBufferUtils::release)
+				.concatWith(Flux.defer(() -> Flux.fromIterable(state.end())));
 		});
 	}
 

@@ -34,6 +34,56 @@ describe("Tm1Authenticator", () => {
     expect(cam.describe()).toBe("CAMPassport");
   });
 
+  it("writes a passport it was handed, and doesn't renew it", async () => {
+    const cam = Tm1Authenticator.camPassport("p1");
+    expect(await cam.authorization()).toBe("CAMPassport p1");
+    expect(await cam.authorization()).toBe("CAMPassport p1");
+    expect(cam.describe()).toBe("CAMPassport");
+    expect(cam.toString()).not.toContain("p1");
+    expect(inspect(cam, { showHidden: true, depth: 5 })).not.toContain("p1");
+  });
+
+  it("is equal to another that holds the same credentials", () => {
+    expect(Tm1Authenticator.basic("carol", "c").equals(Tm1Authenticator.basic("carol", "c"))).toBe(true);
+    expect(Tm1Authenticator.basic("carol", "c").equals(Tm1Authenticator.basic("carol", "wrong"))).toBe(false);
+    expect(Tm1Authenticator.basic("carol", "c").equals(undefined)).toBe(false);
+    expect(Tm1Authenticator.camNamespace("alice", "secret", "LDAP").equals(Tm1Authenticator.camNamespace("alice", "secret", "LDAP"))).toBe(true);
+    expect(Tm1Authenticator.camNamespace("alice", "secret", "LDAP").equals(Tm1Authenticator.camNamespace("alice", "secret", "AD"))).toBe(false);
+    expect(Tm1Authenticator.camPassport("p1").equals(Tm1Authenticator.camPassport("p1"))).toBe(true);
+    expect(Tm1Authenticator.camPassport("p1").equals(Tm1Authenticator.camPassport("p2"))).toBe(false);
+    const logon = Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "d");
+    expect(logon.equals(Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "d"))).toBe(true);
+    expect(logon.equals(Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "other"))).toBe(false);
+    expect(logon.equals(Tm1Authenticator.cognosLogon("http://other:9300", "LDAP", "dave", "d"))).toBe(false);
+    expect(inspect(logon, { showHidden: true, depth: 5 }), "what it was made from stays hidden").not.toContain("'d'");
+  });
+
+  it("is equal only to itself when it asks a supplier", () => {
+    const supplier = (): string => "p1";
+    const passport = Tm1Authenticator.camPassport(supplier);
+    expect(passport.equals(passport)).toBe(true);
+    expect(passport.equals(Tm1Authenticator.camPassport(supplier))).toBe(false);
+    expect(passport.equals(Tm1Authenticator.camPassport("p1"))).toBe(false);
+    // As Java's: made from the same address, namespace and supplier, they're equal
+    const idToken = Tm1Authenticator.cognosIdToken("http://cognos:9300", "OIDC", supplier);
+    expect(idToken.equals(idToken)).toBe(true);
+    expect(idToken.equals(Tm1Authenticator.cognosIdToken("http://cognos:9300", "OIDC", supplier))).toBe(true);
+    expect(idToken.equals(Tm1Authenticator.cognosIdToken("http://cognos:9300", "OIDC", () => "p1"))).toBe(false);
+    const own = (): Tm1Authenticator =>
+      new (class extends Tm1Authenticator {
+        authorization(): Promise<string> {
+          return Promise.resolve("Basic x");
+        }
+
+        describe(): string {
+          return "Own";
+        }
+      })();
+    const mine = own();
+    expect(mine.equals(mine)).toBe(true);
+    expect(mine.equals(own()), "unless it defines equals").toBe(false);
+  });
+
   it("never shows credentials in toString", () => {
     expect(Tm1Authenticator.basic("admin", "apple").toString()).not.toContain("apple");
     expect(Tm1Authenticator.basic("admin", "apple").toString()).not.toContain(base64("admin:apple"));

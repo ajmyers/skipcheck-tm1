@@ -73,12 +73,17 @@ export class ODataProperty {
  * precedence never depends on how a filter was composed. TM1 compares names in `$filter` case- and
  * space-sensitively, while keyed access ignores both: to find one object by name, use its key. */
 export class Filter {
-  private constructor(private readonly expression: string) {}
+  private constructor(
+    private readonly expression: string,
+    private readonly isRaw = false,
+  ) {}
 
-  /** An expression written by hand, used as is. */
+  /** An expression written by hand, used as is. Combined with others by {@link Filter.and} or
+   * {@link Filter.or}, it's put in parentheses, so it keeps its meaning whatever operators it
+   * uses. */
   static raw(expression: string): Filter {
     if (typeof expression !== "string") throw new TypeError("a filter expression is a string");
-    return new Filter(expression);
+    return new Filter(expression, true);
   }
 
   /** All of the given filters, at least one: joined with `and`, or the filter itself if there's
@@ -165,7 +170,13 @@ export class Filter {
 
   private static join(op: string, filters: Filter[]): Filter {
     if (filters.length === 0) throw new RangeError(`${op}() needs at least one filter`);
-    return filters.length === 1 ? filters[0]! : new Filter("(" + filters.map((f) => f.expression).join(` ${op} `) + ")");
+    return filters.length === 1 ? filters[0]! : new Filter("(" + filters.map((f) => f.operand()).join(` ${op} `) + ")");
+  }
+
+  /** The expression as an operand of `and` or `or`: a raw one might not stand on its own, so it
+   * gets parentheses. */
+  private operand(): string {
+    return this.isRaw ? `(${this.expression})` : this.expression;
   }
 
   private static fn(name: string, property: ODataProperty, argument: string): Filter {

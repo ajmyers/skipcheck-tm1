@@ -2,13 +2,14 @@
 
 """Ported from the Java client's error/Tm1ErrorsTest, odata/ODataQueryTest, FilterTest and
 ODataPathTest, version/Tm1VersionTest and Tm1DialectTest, session/Tm1TimeoutsTest,
-auth/Tm1AuthenticatorTest, Tm1RequestTest and Tm1OperationTest."""
+auth/Tm1AuthenticatorTest, Tm1RequestTest and Tm1OperationTest, and metadata/OperationCatalogTest."""
 
 from __future__ import annotations
 
 import base64
 import math
 import random
+import re
 from decimal import Decimal
 from urllib.parse import unquote
 
@@ -46,6 +47,9 @@ from skipcheck_tm1.errors import (
 )
 from skipcheck_tm1.model import Tm1Operations
 from skipcheck_tm1.odata import Alias, ODataLiterals, Raw
+from skipcheck_tm1.version import Tm1Capabilities
+
+from ..conftest import SNAPSHOT
 
 # Tm1ErrorsTest
 
@@ -281,6 +285,15 @@ def test_parenthesizes_every_combination() -> None:
     assert (NAME.eq("a") & LEVEL.eq(0)) | ~NAME.eq("b") == Filter.or_(Filter.and_(NAME.eq("a"), LEVEL.eq(0)), Filter.not_(NAME.eq("b")))
 
 
+def test_keeps_a_raw_expressions_meaning_when_combined() -> None:
+    either = Filter.raw("A eq 1 or B eq 2")
+    assert str(either) == "A eq 1 or B eq 2"
+    assert str(Filter.and_(either, NAME.eq("x"))) == "((A eq 1 or B eq 2) and (Name eq 'x'))"
+    assert str(NAME.eq("x") | Filter.raw("A eq 1 and B eq 2")) == "((Name eq 'x') or (A eq 1 and B eq 2))"
+    assert str(Filter.and_(either)) == "A eq 1 or B eq 2"
+    assert str(~either) == "not(A eq 1 or B eq 2)"
+
+
 def test_uses_canonical_functions() -> None:
     assert str(Filter.contains(NAME, "Q1")) == "contains(Name,'Q1')"
     assert str(Filter.ends_with(NAME, "'s")) == "endswith(Name,'''s')"
@@ -354,8 +367,60 @@ def test_is_a_value_type() -> None:
     assert hash(ODataPath.of("Cubes").key("a")) == hash(ODataPath.of("Cubes").key("a"))
 
 
-def test_calls_functions_with_aliases() -> None:
+def test_builds_nested_paths() -> None:
+    assert (
+        str(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements")) == "Dimensions('Region')/Hierarchies('Region')/Elements"
+    )
+    assert str(ODataPath.of("Cubes").key("Sales").action("tm1.Reserve")) == "Cubes('Sales')/tm1.Reserve"
+    assert str(ODataPath.of("Cubes").key("Sales").nav("Views").cast("tm1.NativeView")) == "Cubes('Sales')/Views/tm1.NativeView"
+    assert str(ODataPath.of("Configuration").nav("ProductVersion").value()) == "Configuration/ProductVersion/$value"
+    assert str(ODataPath.of("Dimensions").count()) == "Dimensions/$count"
+    assert str(ODataPath.of("Cubes").key("Sales").nav("Dimensions").ref()) == "Cubes('Sales')/Dimensions/$ref"
+    assert str(ODataPath.of("Threads").key(42)) == "Threads(42)"
+
+
+def test_writes_compound_keys_in_order() -> None:
+    key = {"ParentName": "Total", "ComponentName": "Q1 '26"}
+    assert str(ODataPath.of("Edges").key(key)) == "Edges(ParentName='Total',ComponentName='Q1%20''26')"
+
+
+def test_calls_functions_with_literals_or_aliases() -> None:
+    assert str(ODataPath.of("Cellsets").key("abc").function("tm1.GetPartition", {"Begin": 0, "End": 99})) == "Cellsets('abc')/tm1.GetPartition(Begin=0,End=99)"
     assert str(ODataPath.of("Hierarchies").function("tm1.Fn", {"p": Alias("@p")})) == "Hierarchies/tm1.Fn(p=@p)"
+
+
+def test_encodes_slashes_so_they_cant_split_the_path() -> None:
+    assert str(ODataPath.of("Dimensions").key("a/b")) == "Dimensions('a%2Fb')"
+    assert str(ODataPath.of("Dimensions").key("O'Neil")) == "Dimensions('O''Neil')"
+    assert str(ODataPath.of("Dimensions").key("}Clients")) == "Dimensions('%7DClients')"
+    assert str(ODataPath.of("Dimensions").key("a b")) == "Dimensions('a%20b')"
+
+
+# What RFC 3986 allows in a path: Java's URI.create refuses anything else
+_URI_PATH = re.compile(r"(?:[A-Za-z0-9\-._~!$&'()*+,;=:@/]|%[0-9A-Fa-f]{2})*")
+
+
+def _key_of(path: ODataPath) -> str:
+    """The name in the first segment's key literal, decoded as a server would."""
+    segment = unquote(str(path).split("/")[0])
+    literal = segment[segment.index("(") + 1 : segment.rindex(")")]
+    assert literal.startswith("'") and literal.endswith("'")
+    return literal[1:-1].replace("''", "'")
+
+
+def test_survives_fuzzed_names() -> None:
+    rng = random.Random(20261121)
+    alphabet = "aZ09 '\"/\\%{}[]()&=+#?!$@:;,.*~_-^|<>`\tÉé日😀"
+    for _ in range(5000):
+        name = "".join(rng.choice(alphabet) for _ in range(1 + rng.randrange(12)))
+        path = ODataPath.of("Cubes").key(name).nav("Views").key(name)
+        assert _URI_PATH.fullmatch(str(path)), name
+        assert _key_of(ODataPath.of("Cubes").key(name)) == name
+
+
+def test_calls_a_function_import_from_the_service_root() -> None:
+    assert str(ODataPath.function_import("ModelCubes", {})) == "ModelCubes()"
+    assert str(ODataPath.function_import("TailMessageLog", {"Top": 10})) == "TailMessageLog(Top=10)"
 
 
 # Tm1VersionTest and Tm1DialectTest
@@ -393,7 +458,7 @@ def test_rejects_non_versions(text: str) -> None:
         Tm1Version.parse(text)
 
 
-def test_finds_the_tm1_11_service_root_from_an_address() -> None:
+def test_finds_the_tm111_service_root_from_an_address() -> None:
     assert Tm1Dialect.V11.service_root("http://tm1:8010") == "http://tm1:8010/api/v1/"
     assert Tm1Dialect.V11.service_root("https://tm1.example.com:12354/") == "https://tm1.example.com:12354/api/v1/"
     assert Tm1Dialect.V11.service_root("http://tm1:8010/api/v1") == "http://tm1:8010/api/v1/", "already a root"
@@ -452,7 +517,39 @@ def test_asks_for_a_fresh_passport_on_every_login() -> None:
     assert cam.describe() == "CAMPassport"
 
 
-def test_never_shows_credentials_in_its_repr() -> None:
+def test_writes_a_passport_it_was_given() -> None:
+    cam = auth.cam_passport("p1")
+    assert cam.authorization() == "CAMPassport p1"
+    assert cam.authorization() == "CAMPassport p1", "the same one at each login: it isn't renewed"
+    assert cam.describe() == "CAMPassport"
+    assert "p1" not in repr(cam)
+
+
+def test_authenticators_that_hold_their_credentials_are_equal_when_the_credentials_are() -> None:
+    assert auth.basic("admin", "apple") == auth.basic("admin", "apple")
+    assert hash(auth.basic("admin", "apple")) == hash(auth.basic("admin", "apple"))
+    assert auth.basic("admin", "apple") != auth.basic("admin", "pear")
+    assert auth.cam_namespace("alice", "secret", "LDAP") == auth.cam_namespace("alice", "secret", "LDAP")
+    assert auth.cam_namespace("alice", "secret", "LDAP") != auth.cam_namespace("alice", "other", "LDAP")
+    assert auth.cam_passport("p1") == auth.cam_passport("p1") and hash(auth.cam_passport("p1")) == hash(auth.cam_passport("p1"))
+    assert auth.cam_passport("p1") != auth.cam_passport("p2")
+    supplier = auth.cam_passport(lambda: "p1")
+    assert supplier == supplier and supplier != auth.cam_passport(lambda: "p1"), "one that asks a supplier is equal only to itself"
+    assert auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d") == auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d")
+    assert hash(auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d")) == hash(auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d"))
+    assert auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d") != auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "other")
+    assert auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d") != auth.cognos_logon("http://other:9300", "LDAP", "dave", "d")
+
+    def token() -> str:
+        return "t"
+
+    assert auth.cognos_id_token("http://cognos:9300", "LDAP", token) == auth.cognos_id_token("http://cognos:9300", "LDAP", token)
+    assert auth.cognos_id_token("http://cognos:9300", "LDAP", token) != auth.cognos_id_token("http://cognos:9300", "LDAP", lambda: "t")
+    assert "secret" not in repr(auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "secret"))
+
+
+def test_never_shows_credentials_in_to_string() -> None:
+    # Java's toString is repr here
     assert "apple" not in repr(auth.basic("admin", "apple")) and b64("admin:apple") not in repr(auth.basic("admin", "apple"))
     assert "secret" not in repr(auth.cam_namespace("alice", "secret", "LDAP"))
     assert "passport-value" not in repr(auth.cam_passport(lambda: "passport-value"))
@@ -520,20 +617,18 @@ def test_describes_raw_bytes_both_ways() -> None:
 # Tm1OperationTest
 
 
-def test_describes_a_bound_operation() -> None:
-    activate = Tm1Operations.CHORE_ACTIVATE
+def test_a_bound_operation_needs_its_binding_and_operation() -> None:
+    activate = Tm1Operation(Tm1Operation.Kind.ACTION, "tm1.Activate", "tm1.Chore", None, (), None, "10.2.2.1", "11.8.3")
     assert activate.bound() and activate.deprecated()
     assert activate.endpoint() == "Action Chore/Activate"
     assert activate.capability() == Tm1Capability.bound_operation("tm1.Chore", "tm1.Activate").since("10.2.2.1")
 
 
-def test_describes_an_unbound_operation() -> None:
-    mdx = Tm1Operations.EXECUTE_MDX
+def test_an_unbound_operation_needs_its_import() -> None:
+    mdx = Tm1Operation(Tm1Operation.Kind.ACTION, "tm1.ExecuteMDX", None, "ExecuteMDX", (Tm1Operation.Parameter("MDX", "Edm.String", False),), "tm1.Cellset")
     assert not mdx.bound()
     assert mdx.endpoint() == "ActionImport ExecuteMDX"
-    assert mdx.capability() == Tm1Capability.unbound_operation("ExecuteMDX").since("10.2.2.1")
-    assert mdx.parameters == (Tm1Operation.Parameter("MDX", "Edm.String", False),)
-    assert mdx.return_type == "tm1.Cellset" and mdx.import_name == "ExecuteMDX"
+    assert mdx.capability() == Tm1Capability.unbound_operation("ExecuteMDX")
 
 
 def test_needs_exactly_one_of_a_binding_and_an_import() -> None:
@@ -543,7 +638,26 @@ def test_needs_exactly_one_of_a_binding_and_an_import() -> None:
         Tm1Operation(Tm1Operation.Kind.FUNCTION, "tm1.F", None, None)
 
 
-def test_has_one_descriptor_per_operation_endpoint(spec: dict[str, object]) -> None:
+# OperationCatalogTest
+
+
+def test_has_one_descriptor_per_operation_endpoint_of_the_coverage_gate(spec: dict[str, object]) -> None:
     operations = {e["id"] for e in spec["endpoints"] if e["kind"] in ("Action", "Function", "ActionImport", "FunctionImport")}  # type: ignore[index]
     assert sorted(op.endpoint() for op in Tm1Operations.ALL) == sorted(operations)
-    assert len(Tm1Operations.ALL) == 105
+    assert len({op.endpoint() for op in Tm1Operations.ALL}) == len(Tm1Operations.ALL) == 105
+
+
+def test_every_capability_is_one_the_snapshot_has() -> None:
+    snapshot = Tm1Capabilities.parse(SNAPSHOT.read_bytes())
+    assert [op.endpoint() for op in Tm1Operations.ALL if not snapshot.supports(op.capability())] == []
+
+
+def test_carries_revisions_parameters_and_return_types() -> None:
+    assert Tm1Operations.CHORE_ACTIVATE.deprecated_in == "11.8.3"
+    mdx = Tm1Operations.EXECUTE_MDX
+    assert mdx.kind is Tm1Operation.Kind.ACTION
+    assert mdx.import_name == "ExecuteMDX"
+    assert mdx.parameters == (Tm1Operation.Parameter("MDX", "Edm.String", False),)
+    assert mdx.return_type == "tm1.Cellset"
+    assert mdx.added_in == "10.2.2.1"
+    assert any(op.deprecated() for op in Tm1Operations.ALL)

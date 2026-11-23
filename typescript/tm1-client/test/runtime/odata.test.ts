@@ -165,6 +165,15 @@ describe("Filter", () => {
     expect(NAME.eq("a").and(LEVEL.eq(0)).or(LEVEL.eq(1)).toString()).toBe("(((Name eq 'a') and (Level eq 0)) or (Level eq 1))");
   });
 
+  it("keeps a raw expression's meaning when combined", () => {
+    const either = Filter.raw("A eq 1 or B eq 2");
+    expect(either.toString()).toBe("A eq 1 or B eq 2");
+    expect(Filter.and(either, NAME.eq("x")).toString()).toBe("((A eq 1 or B eq 2) and (Name eq 'x'))");
+    expect(NAME.eq("x").or(Filter.raw("A eq 1 and B eq 2")).toString()).toBe("((Name eq 'x') or (A eq 1 and B eq 2))");
+    expect(Filter.and(either).toString()).toBe("A eq 1 or B eq 2");
+    expect(Filter.not(either).toString()).toBe("not(A eq 1 or B eq 2)");
+  });
+
   it("uses canonical functions", () => {
     expect(Filter.contains(NAME, "Q1").toString()).toBe("contains(Name,'Q1')");
     expect(Filter.endsWith(NAME, "'s").toString()).toBe("endswith(Name,'''s')");
@@ -248,7 +257,7 @@ describe("ODataPath", () => {
   });
 
   it.each(["}Clients", "Year 2026", "O'Neil", "a/b", "50%", "{x}", "a&b=c+d#e", "Région", "日本", "😀", "''", "%2F", "?", "\\", "a\tb"])(
-    "keeps the awkward name %j intact",
+    "keeps awkward names intact: %j",
     (name) => {
       expect(keyOf(ODataPath.of("Dimensions").key(name).nav("Hierarchies"))).toBe(name);
     },
@@ -271,7 +280,7 @@ describe("ODataPath", () => {
     }
   });
 
-  it.each(["", "Cubes('x')", "a/b", "1abc", "$metadata", "Cubes Sales"])("refuses the name %j, which isn't an identifier", (name) => {
+  it.each(["", "Cubes('x')", "a/b", "1abc", "$metadata", "Cubes Sales"])("refuses names that aren't identifiers: %j", (name) => {
     expect(() => ODataPath.of(name)).toThrow(RangeError);
     expect(() => ODataPath.of("Cubes").nav(name)).toThrow(RangeError);
   });

@@ -33,6 +33,9 @@ export const Tm1Clock = {
 
 type Reason = "idle" | "age" | "size";
 
+/** How often an evicted session with a request still running is looked at again, in milliseconds. */
+const BUSY_RECHECK = 1_000;
+
 interface Entry {
   readonly identity: Tm1Identity;
   readonly session: Tm1Session;
@@ -53,17 +56,29 @@ interface Entry {
  *   sends nothing; the session logs in on its first request.
  * - **Eviction** happens when a session has been idle for `idleTimeout`, is older than `maxAge`, or
  *   the pool is over `maxSize` (least recently used first). It's checked on each {@link session}
- *   call and every `sweepInterval`.
- * - **An evicted session is closed after `closeGrace`**, so requests already running on it can
- *   finish. The next request for that identity gets a new session.
+ *   call and every `sweepInterval`. A session with a request running isn't idle, however long ago
+ *   it was asked for.
+ * - **An evicted session is closed after `closeGrace`**, or when the requests running on it have
+ *   finished, if that's later: closing it would end them on TM1. The next request for that identity
+ *   gets a new session.
+ * - **A request is running** from when it's sent (or waits for the login) until it's answered in
+ *   full, fails or is cancelled: an async request while it's polled, and a stream until it's
+ *   finished or stopped. A stream that is never finished or stopped (an iterator dropped half way,
+ *   without `return()`) keeps its session open until the pool closes.
  * - **{@link close}** closes every session at once, and the pool refuses new ones.
  * - **Nothing falls back:** a refused identity fails, and the pool never uses another identity in
  *   its place.
+ * - **A user's own credentials** ({@link Tm1Identity.withCredentials}) get the session opened with
+ *   equal credentials, never one that only has the same name: different credentials for a name get a
+ *   session of their own, and TM1 accepts or refuses them.
  *
  * {@link stats} reports what the pool holds and has done, for metrics. */
 export class Tm1SessionPool implements AsyncDisposable {
-  /** Sessions in least-recently-used order, by identity key. */
-  private readonly entries = new Map<string, Entry>();
+  /** Sessions in least-recently-used order. */
+  private readonly entries = new Set<Entry>();
+  /** The same sessions by their identity's key (its kind and name): one for a key, unless a name has
+   * come with different credentials. */
+  private readonly byKey = new Map<string, Entry[]>();
   /** Evicted sessions waiting out their grace period: the pending close's timer, or the close once
    * it has started. */
   private readonly closing = new Map<Tm1Session, { timer: unknown; started?: Promise<void> }>();
@@ -107,8 +122,7 @@ export class Tm1SessionPool implements AsyncDisposable {
     if (!(identity instanceof Tm1Identity)) throw new TypeError("identity is a Tm1Identity");
     const now = this.clock.now();
     if (this.closed) throw new Tm1SessionClosedException(this.serviceRoot());
-    const key = identity.key();
-    let entry = this.entries.get(key);
+    let entry = this.find(identity);
     if (entry) {
       const reason = this.expiry(entry, now);
       if (reason) {
@@ -118,13 +132,15 @@ export class Tm1SessionPool implements AsyncDisposable {
     }
     if (!entry) {
       entry = { identity, session: identity.applyTo(this.sessions.copy()).build(), createdAt: now, lastUsed: now };
-      this.entries.set(key, entry);
+      this.entries.add(entry);
+      const key = identity.key();
+      this.byKey.set(key, [...(this.byKey.get(key) ?? []), entry]);
       this.created++;
-      this.evictOverSize(key);
+      this.evictOverSize(entry);
     } else {
       // Most recently used last
-      this.entries.delete(key);
-      this.entries.set(key, entry);
+      this.entries.delete(entry);
+      this.entries.add(entry);
     }
     entry.lastUsed = now;
     return entry.session;
@@ -134,7 +150,7 @@ export class Tm1SessionPool implements AsyncDisposable {
    * its own; call it to evict now. */
   evictExpired(): void {
     const now = this.clock.now();
-    for (const entry of [...this.entries.values()]) {
+    for (const entry of [...this.entries]) {
       const reason = this.expiry(entry, now);
       if (reason) this.evict(entry, reason);
     }
@@ -160,8 +176,9 @@ export class Tm1SessionPool implements AsyncDisposable {
       this.closed = true;
       if (this.sweepTimer !== undefined) this.clock.clearTimeout(this.sweepTimer);
       this.sweepTimer = undefined;
-      const all = [...this.entries.values()].map((e) => e.session);
+      const all = [...this.entries].map((e) => e.session);
       this.entries.clear();
+      this.byKey.clear();
       // An evicted session whose close has started is counted by that close
       const started: Promise<void>[] = [];
       for (const [session, pending] of this.closing) {
@@ -205,28 +222,49 @@ export class Tm1SessionPool implements AsyncDisposable {
   /** Why `entry` has expired at `now`, or undefined if it hasn't. */
   private expiry(entry: Entry, now: number): Reason | undefined {
     if (now - entry.createdAt >= this.maxAge) return "age";
+    if (entry.session.isBusy()) {
+      // A request running on it is use, however long ago the session was asked for
+      entry.lastUsed = now;
+      return undefined;
+    }
     if (now - entry.lastUsed >= this.idleTimeout) return "idle";
     return undefined;
   }
 
+  /** The pool's session for `identity`, if it has one: for a user's own credentials, the one opened
+   * with equal credentials, never one that merely has the same name. */
+  private find(identity: Tm1Identity): Entry | undefined {
+    return this.byKey.get(identity.key())?.find((e) => e.identity.equals(identity));
+  }
+
   /** Evicts least recently used sessions until the pool is within its size, never `keep`. */
-  private evictOverSize(keep: string): void {
+  private evictOverSize(keep: Entry): void {
     while (this.entries.size > this.maxSize) {
-      const [key, eldest] = this.entries.entries().next().value as [string, Entry];
-      if (key === keep) return;
+      const eldest = this.entries.values().next().value as Entry;
+      if (eldest === keep) return;
       this.evict(eldest, "size");
     }
   }
 
-  /** Removes a session and closes it after the grace period. */
+  /** Removes a session and closes it after the grace period, or once no request is running on it if
+   * that's later, looking again every {@link BUSY_RECHECK}: closing it sooner would end those
+   * requests on TM1. */
   private evict(entry: Entry, reason: Reason): void {
-    this.entries.delete(entry.identity.key());
+    this.entries.delete(entry);
+    const key = entry.identity.key();
+    const others = (this.byKey.get(key) ?? []).filter((e) => e !== entry);
+    if (others.length) this.byKey.set(key, others);
+    else this.byKey.delete(key);
     if (reason === "idle") this.evictedIdle++;
     else if (reason === "age") this.evictedAge++;
     else this.evictedSize++;
     const session = entry.session;
     const pending: { timer: unknown; started?: Promise<void> } = { timer: undefined };
     const close = (): void => {
+      if (session.isBusy()) {
+        pending.timer = this.clock.setTimeout(close, BUSY_RECHECK);
+        return;
+      }
       // Detached on purpose: a failure to close is the session's own, and isn't the caller's
       pending.started = session.close().then(
         () => {
@@ -317,8 +355,9 @@ export class Tm1SessionPoolBuilder {
     return this;
   }
 
-  /** How long an evicted session stays open before it's closed, so requests already running on it
-   * can finish. Default 30 s; zero closes at once. */
+  /** How long an evicted session stays open before it's closed, for a caller that got it just before
+   * and hasn't sent its request yet. A session with a request running stays open until that
+   * finishes, however long the grace period. Default 30 s; zero closes at once. */
   closeGrace(ms: number): this {
     if (typeof ms !== "number" || !(ms >= 0)) throw new RangeError("closeGrace must not be negative: " + ms);
     this.closeGraceMs = ms;

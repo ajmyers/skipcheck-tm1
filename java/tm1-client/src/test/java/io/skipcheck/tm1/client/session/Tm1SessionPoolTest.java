@@ -8,11 +8,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.ClientRequest;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import io.micrometer.observation.tck.TestObservationRegistry;
@@ -22,6 +24,7 @@ import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.test.scheduler.VirtualTimeScheduler;
 import tools.jackson.databind.JsonNode;
 
@@ -96,6 +99,76 @@ class Tm1SessionPoolTest {
 			time.advanceTimeBy(Duration.ofMinutes(9));
 			assertThat(pool.session(Tm1Identity.impersonating("alice"))).isSameAs(alice);
 		}
+	}
+
+	@Test
+	void givesDifferentCredentialsForTheSameNameTheirOwnSession() {
+		Tm1Session carol = pool.session(Tm1Identity.withCredentials("carol", Tm1Authenticator.basic("carol", "c")));
+		assertThat(pool.session(Tm1Identity.withCredentials("Carol", Tm1Authenticator.basic("carol", "c"))))
+			.as("the same credentials, made again")
+			.isSameAs(carol);
+		carol.execute(SERVER).block();
+
+		Tm1Session other = pool.session(Tm1Identity.withCredentials("carol", Tm1Authenticator.basic("carol", "wrong")));
+		assertThat(other).as("never the session someone else's credentials opened").isNotSameAs(carol);
+		other.execute(SERVER).block();
+		assertThat(tm1.requests(FakeTm1.LOGIN)).extracting(FakeTm1::authorization)
+			.as("each logs in with what it was given")
+			.containsExactly("Basic Y2Fyb2w6Yw==", "Basic Y2Fyb2w6d3Jvbmc=");
+	}
+
+	@Test
+	void sharesASessionForTheSameAuthenticatorWhenItsCredentialsCantBeCompared() {
+		Tm1Authenticator passport = Tm1Authenticator.camPassport(() -> Mono.just("p1"));
+		Tm1Session dave = pool.session(Tm1Identity.withCredentials("dave", passport));
+		assertThat(pool.session(Tm1Identity.withCredentials("dave", passport))).isSameAs(dave);
+		assertThat(
+				pool.session(Tm1Identity.withCredentials("dave", Tm1Authenticator.camPassport(() -> Mono.just("p1")))))
+			.isNotSameAs(dave);
+		assertThat(Tm1Authenticator.camPassport("p1")).isEqualTo(Tm1Authenticator.camPassport("p1"))
+			.isNotEqualTo(Tm1Authenticator.camPassport("p2"));
+		assertThat(Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "d"))
+			.isEqualTo(Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "d"))
+			.isNotEqualTo(Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "other"));
+	}
+
+	@Test
+	void keepsASessionWhileARequestIsRunningOnIt() {
+		Sinks.One<ClientResponse> answer = Sinks.one();
+		tm1.on("GET Server", r -> answer.asMono());
+		Tm1Session alice = pool.session(Tm1Identity.impersonating("alice"));
+		AtomicReference<JsonNode> result = new AtomicReference<>();
+		alice.execute(SERVER).subscribe(result::set);
+
+		time.advanceTimeBy(Duration.ofMinutes(25));
+		assertThat(pool.stats().evictedIdle()).as("a running request is use").isZero();
+		assertThat(alice.isClosed()).isFalse();
+
+		answer.tryEmitValue(FakeTm1.json(200, "{}"));
+		assertThat(result.get()).isNotNull();
+		time.advanceTimeBy(Duration.ofMinutes(12));
+		assertThat(pool.stats().evictedIdle()).as("idle once it has finished").isEqualTo(1);
+		assertThat(alice.isClosed()).isTrue();
+	}
+
+	@Test
+	void closesAnEvictedSessionOnlyOnceItsRequestsHaveFinished() {
+		pool.close().block();
+		pool = pool(b -> b.maxAge(Duration.ofMinutes(30)));
+		Sinks.One<ClientResponse> answer = Sinks.one();
+		tm1.on("GET Server", r -> answer.asMono());
+		Tm1Session alice = pool.session(Tm1Identity.impersonating("alice"));
+		AtomicReference<JsonNode> result = new AtomicReference<>();
+		alice.execute(SERVER).subscribe(result::set);
+
+		time.advanceTimeBy(Duration.ofMinutes(40));
+		assertThat(pool.stats().evictedAge()).as("out of the pool at its age").isEqualTo(1);
+		assertThat(alice.isClosed()).as("but open for the request still running").isFalse();
+
+		answer.tryEmitValue(FakeTm1.json(200, "{}"));
+		assertThat(result.get()).isNotNull();
+		time.advanceTimeBy(Duration.ofSeconds(31));
+		assertThat(alice.isClosed()).isTrue();
 	}
 
 	@Test

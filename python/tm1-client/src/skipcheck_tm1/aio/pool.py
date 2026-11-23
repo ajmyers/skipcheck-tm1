@@ -14,9 +14,11 @@ pool keeps that bounded::
   one never blocks and sends nothing; the session logs in on its first request.
 * **Eviction** happens when a session has been idle for ``idle_timeout``, is older than
   ``max_age``, or the pool is over ``max_size`` (least recently used first). It's checked on
-  each :meth:`session` call and by :meth:`evict_expired`.
-* **An evicted session is closed after** ``close_grace``, so requests already running on it
-  can finish. The next request for that identity gets a new session.
+  each :meth:`session` call and by :meth:`evict_expired`. A session with a request running
+  isn't idle, however long ago it was asked for.
+* **An evicted session is closed after** ``close_grace``, or when the requests running on it
+  have finished, if that's later: closing it would end them on TM1. The next request for that
+  identity gets a new session.
 * :meth:`close` closes every session at once, and the pool refuses new ones.
 * **Nothing falls back:** a refused identity fails, and the pool never uses another
   identity in its place.
@@ -24,6 +26,14 @@ pool keeps that bounded::
 Unlike the Java pool, which closes evicted sessions on its own scheduler, this one closes
 them when :meth:`evict_expired` (or :meth:`close`) runs: call it now and then, or run
 :meth:`sweep_forever` alongside (every ``sweep_interval``). Getting a session stays free of I/O.
+So an evicted session that still had a request running is looked at again at the next
+:meth:`evict_expired`, where the Java pool looks every second.
+
+A request is running from when it's sent, or waits for the login, until it's answered in full,
+fails or is cancelled; an async request until its result is read; a collection until its last
+item is taken or its iterator is closed. An iterator that is neither finished nor closed keeps
+its session open: that is a leak in the caller, and :meth:`close` still closes every session at
+once.
 
 This module is the source of truth for both flavors: the sync ``Tm1SessionPool`` is
 generated from it (``tm1_pygen.unasync``).
@@ -132,14 +142,18 @@ class AsyncTm1SessionPool:
 
     async def evict_expired(self) -> None:
         """Evicts every session that has been idle too long or is too old, and closes the
-        evicted ones whose grace period is over."""
+        evicted ones whose grace period is over and that have no request running."""
         now = self._clock()
         for identity, entry in list(self._entries.items()):
             reason = self._expiry(entry, now)
             if reason is not None:
                 self._evict(identity, entry, reason, now)
-        due = [(s, at) for s, at in self._closing if at <= now]
-        self._closing = [(s, at) for s, at in self._closing if at > now]
+        due, waiting = [], []
+        for session, at in self._closing:
+            # One with a request still running is looked at again next time: closing it now would
+            # end that request on TM1
+            (due if at <= now and not session._is_busy() else waiting).append((session, at))
+        self._closing = waiting
         for session, _ in due:
             await self._close_session(session)
 
@@ -208,6 +222,10 @@ class AsyncTm1SessionPool:
     def _expiry(self, entry: _Entry, now: float) -> str | None:
         if now - entry.created_at >= self._max_age:
             return "age"
+        if entry.session._is_busy():
+            # A request running on it is use, however long ago the session was asked for
+            entry.last_used = now
+            return None
         if now - entry.last_used >= self._idle_timeout:
             return "idle"
         return None
@@ -257,16 +275,19 @@ class AsyncTm1SessionPoolBuilder:
         return self
 
     def max_size(self, max_size: int) -> AsyncTm1SessionPoolBuilder:
-        """The most sessions the pool holds (default 100); beyond it, the least recently used
-        is evicted. Evicted sessions in their grace period don't count."""
+        """The most sessions the pool holds (default 100); beyond it, the least recently asked
+        for is evicted, with a request running or not: it leaves the pool, and is closed when its
+        work is done. Evicted sessions in their grace period don't count."""
         if max_size < 1:
             raise ValueError(f"max_size must be at least 1: {max_size}")
         self._max_size = max_size
         return self
 
     def close_grace(self, close_grace: float | timedelta) -> AsyncTm1SessionPoolBuilder:
-        """How long an evicted session stays open before it's closed. Default 30 s; 0 closes
-        at the next sweep."""
+        """How long an evicted session stays open before it's closed, for a caller that got it
+        just before and hasn't sent its request yet. A session with a request running stays open
+        until that finishes, however long the grace period. Default 30 s; 0 closes at the next
+        sweep."""
         value = _seconds(close_grace)
         if value < 0:
             raise ValueError(f"close_grace must not be negative: {value}")

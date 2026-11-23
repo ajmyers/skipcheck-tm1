@@ -30,7 +30,7 @@ import {
 } from "../../src/index.js";
 import { asyncResult } from "../../src/session/connection.js";
 import { Repo } from "../support/repo.js";
-import { eventually, Pending, ScriptedTm1, settle } from "../support/scripted-tm1.js";
+import { eventually, Pending, ScriptedTm1, seeded, settle } from "../support/scripted-tm1.js";
 
 const { LOGIN, CLOSE, ROOT } = ScriptedTm1;
 const SNAPSHOT = readFileSync(Repo.snapshot, "utf8");
@@ -52,6 +52,35 @@ function systemError(code: string, message: string): Error {
 describe("Tm1Session", () => {
   const SERVER = Tm1Request.get(ODataPath.of("Server"), ODataQuery.none().select("Name"));
   const scripted = (): ScriptedTm1 => new ScriptedTm1().on("GET Server?$select=Name", () => ScriptedTm1.json(200, '{"Name":"tm1"}'));
+
+  it("gives up on an authenticator that never answers", async () => {
+    const tm1 = scripted();
+    let cancelled: AbortSignal | undefined;
+    const never = new (class extends Tm1Authenticator {
+      authorization(signal?: AbortSignal): Promise<string> {
+        cancelled = signal;
+        return new Promise<string>(() => undefined);
+      }
+
+      describe(): string {
+        return "Never";
+      }
+    })();
+    const session = tm1.sessionWithOwnCredentials((b) => b.authenticator(never).timeouts(Tm1Timeouts.builder().login(100).build()));
+    const within = <T>(promise: Promise<T>): Promise<T | string> =>
+      Promise.race([promise, new Promise<string>((r) => setTimeout(() => r("still waiting"), 3_000))]);
+
+    const e = await within(failure(session.execute(SERVER)));
+    expect(e).toBeInstanceOf(Tm1TransportException);
+    const t = e as Tm1TransportException;
+    expect(t.phase).toBe("Connect");
+    expect(t.isRetryable(), "nothing was sent to TM1").toBe(true);
+    expect(t.mayHaveApplied()).toBe(false);
+    expect(t.message).toContain("Never");
+    expect(cancelled?.aborted, "the authenticator is told to stop").toBe(true);
+    expect(await within(session.close())).toBeUndefined();
+    expect(tm1.requests(LOGIN)).toHaveLength(0);
+  });
 
   it("logs in once for concurrent first requests and sends only the cookie afterwards", async () => {
     const tm1 = scripted();
@@ -711,6 +740,63 @@ describe("Tm1Session batches", () => {
     expect((e as Error).message).toContain("no answer for request 1");
   });
 
+  it("refuses a call whose body can't be written and still runs the rest", async () => {
+    const tm1 = new ScriptedTm1().on(BATCH, () => ScriptedTm1.json(200, '{"responses":[{"id":"1","status":204}]}'));
+    const batch = tm1.session().batch();
+    const deleted = batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("Old")));
+    const body = {
+      get Name(): string {
+        throw new Error("not readable");
+      },
+    };
+    const unwritable = batch.session.execute(Tm1Request.post(ODataPath.of("Cubes"), body, Json));
+
+    // Before the batch runs: the call fails where it was made
+    const e = await Promise.race([failure(unwritable), settle().then(() => "still waiting")]);
+    expect(e).toBeInstanceOf(TypeError);
+    expect(batch.size(), "never queued").toBe(1);
+    await batch.run();
+    expect(await deleted).toBeUndefined();
+    expect(tm1.requests(BATCH)).toHaveLength(1);
+  });
+
+  it("sends a body as it was when the call was queued", async () => {
+    const tm1 = new ScriptedTm1().on(BATCH, () => ScriptedTm1.json(200, '{"responses":[{"id":"1","status":204}]}'));
+    const batch = tm1.session().batch();
+    const body = { Name: "before" };
+    const created = batch.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), body));
+    body.Name = "after";
+    await batch.run();
+    await created;
+    expect(tm1.requests(BATCH)[0]!.json.requests[0].body).toEqual({ Name: "before" });
+  });
+
+  it("fails every call when TM1 answers the batch with no body", async () => {
+    const tm1 = new ScriptedTm1().on(BATCH, () => ScriptedTm1.status(200));
+    const batch = tm1.session().batch();
+    const first = batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("a")));
+    const second = batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("b")));
+
+    await batch.run();
+    expect(await Promise.race([failure(first), settle().then(() => "still waiting")])).toBeInstanceOf(Tm1ProtocolException);
+    expect(await Promise.race([failure(second), settle().then(() => "still waiting")])).toBeInstanceOf(Tm1ProtocolException);
+  });
+
+  it("follows a next link in an answer", async () => {
+    const tm1 = new ScriptedTm1()
+      .on(BATCH, () => ScriptedTm1.json(200, '{"responses":[{"id":"1","status":200,"body":{"value":[{"Name":"a"}],"@odata.nextLink":"Cubes?$skiptoken=2"}}]}'))
+      .on("GET Cubes?$skiptoken=2", () => ScriptedTm1.json(200, '{"value":[{"Name":"b"}]}'));
+    const batch = tm1.session().batch();
+    const names = batch.session
+      .stream(Tm1Request.list<{ Name: string }>(ODataPath.of("Cubes"), ODataQuery.none()))
+      .map((cube) => cube.Name)
+      .toArray();
+
+    await batch.run();
+    expect(await names).toEqual(["a", "b"]);
+    expect(tm1.requests(BATCH), "the pages after it aren't part of the batch").toHaveLength(1);
+  });
+
   it("splits a big queue", async () => {
     const tm1 = new ScriptedTm1().on(BATCH, () => ScriptedTm1.json(200, '{"responses":[]}'));
     const batch = tm1.session().batch();
@@ -792,6 +878,81 @@ describe("Tm1Session async", () => {
     const result = await tm1.session().withAsync(10).execute(REQUEST);
     expect(result.ProcessExecuteStatusCode).toBe("Aborted");
     expect(tm1.requests(RUN), "sent once").toHaveLength(1);
+  });
+
+  it("reads a result bigger than the codec's buffer limit", async () => {
+    // The Java client's codecs refused to buffer more than 256 KB; nothing here has such a limit
+    const big = "x".repeat(300_000);
+    const tm1 = new ScriptedTm1().on(RUN, accepted).on(MONITOR, () => done("200 OK", `{"Text":"${big}"}`));
+    const result = await tm1
+      .session()
+      .withAsync(10)
+      .execute(REQUEST as Tm1Request<unknown>);
+    expect((result as { Text: string }).Text).toHaveLength(300_000);
+  });
+
+  it("reads a big collection TM1 gave at once", async () => {
+    const big = "x".repeat(300_000);
+    const tm1 = new ScriptedTm1().on("GET Cubes", () => ScriptedTm1.json(200, `{"value":[{"Name":"${big}"}]}`));
+    const cubes = await tm1
+      .session()
+      .withAsync(10)
+      .stream(Tm1Request.list<{ Name: string }>(ODataPath.of("Cubes"), ODataQuery.none()))
+      .toArray();
+    expect(cubes).toHaveLength(1);
+    expect(cubes[0]!.Name).toHaveLength(300_000);
+  });
+
+  it("follows a next link in a result", async () => {
+    const tm1 = new ScriptedTm1()
+      .on("GET Cubes", () => ScriptedTm1.json(200, '{"value":[{"Name":"a"}],"@odata.nextLink":"Cubes?$skiptoken=2"}'))
+      .on("GET Cubes?$skiptoken=2", () => ScriptedTm1.json(200, '{"value":[{"Name":"b"}]}'));
+    const names = await tm1
+      .session()
+      .withAsync(10)
+      .stream(Tm1Request.list<{ Name: string }>(ODataPath.of("Cubes"), ODataQuery.none()))
+      .map((cube) => cube.Name)
+      .toArray();
+    expect(names).toEqual(["a", "b"]);
+    expect(tm1.requests("GET Cubes")[0]!.header("Prefer")).toBe("respond-async");
+    expect(tm1.requests("GET Cubes?$skiptoken=2")[0]!.header("Prefer"), "the pages after it are ordinary requests").toBeUndefined();
+  });
+
+  it("reads a big error body", async () => {
+    const big = "x".repeat(300_000);
+    const tm1 = new ScriptedTm1().on(RUN, () => ScriptedTm1.json(500, `{"error":{"code":"174","message":"${big}"}}`));
+    const e = await failure(tm1.session().execute(REQUEST));
+    expect(e).toBeInstanceOf(Tm1ServerException);
+    expect((e as Tm1ServerException).error!.message).toHaveLength(300_000);
+  });
+
+  it("reads a big result and a big error body with Node's fetch", async () => {
+    // A real server, so the bodies come through fetchTransport, the default, in several chunks
+    const big = "x".repeat(300_000);
+    const server = createServer((request, response) => {
+      request.resume();
+      const path = request.url ?? "";
+      if (path.includes("ActiveSession?"))
+        response.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": "TM1SessionId=c1; Path=/api/; HttpOnly" }).end('{"ID":1}');
+      else if (path.includes("tm1.ExecuteWithReturn")) response.writeHead(202, { Location: "../_async('a1')" }).end();
+      else if (path.includes("_async"))
+        response.writeHead(200, { "Content-Type": "application/http" }).end(`HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{"Text":"${big}"}`);
+      else if (path.includes("Broken")) response.writeHead(500, { "Content-Type": "application/json" }).end(`{"error":{"code":"174","message":"${big}"}}`);
+      else response.writeHead(204).end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const root = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1/`;
+      const session = Tm1Session.builder().baseUrl(root).basicAuth("admin", "").build();
+      const result = await session.withAsync(10).execute(REQUEST as Tm1Request<unknown>);
+      expect((result as { Text: string }).Text).toHaveLength(300_000);
+      const e = await failure(session.execute(Tm1Request.get(ODataPath.of("Broken"), ODataQuery.none())));
+      expect(e).toBeInstanceOf(Tm1ServerException);
+      expect((e as Tm1ServerException).error!.message).toHaveLength(300_000);
+      await session.close();
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 
   it("deletes the monitor when cancelled", async () => {
@@ -880,6 +1041,50 @@ describe("Tm1Session capabilities", () => {
     expect(tm1.requests("GET Bananas")).toHaveLength(0);
   });
 
+  it("refuses a request the server can't serve in a batch and still sends the rest", async () => {
+    const tm1 = scripted().on("POST $batch", () => ScriptedTm1.json(200, '{"responses":[{"id":"2","status":200,"body":{}}]}'));
+    const batch = tm1.session().batch();
+    const bananas = batch.session
+      .stream(Tm1Request.list(ODataPath.of("Bananas"), ODataQuery.none()).requires(Tm1Capability.entitySet("Bananas").since("99.0")))
+      .toArray();
+    const server = batch.session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), Json));
+
+    await batch.run();
+    expect(await Promise.race([failure(bananas), settle().then(() => "still waiting")])).toBeInstanceOf(Tm1UnsupportedOperationException);
+    expect(await server).toEqual({});
+    const sent = tm1.requests("POST $batch");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.text).toContain("Server");
+    expect(sent[0]!.text).not.toContain("Bananas");
+  });
+
+  it("fails the calls that need the capabilities when they can't be read, and sends the rest", async () => {
+    const tm1 = scripted()
+      .on(METADATA, () => ScriptedTm1.json(503, '{"error":{"code":"1","message":"busy"}}'))
+      .on("POST $batch", () => ScriptedTm1.json(200, '{"responses":[{"id":"2","status":200,"body":{}}]}'));
+    const batch = tm1.session().batch();
+    const bananas = batch.session.execute(
+      Tm1Request.get(ODataPath.of("Bananas"), ODataQuery.none(), Json).requires(Tm1Capability.entitySet("Bananas").since("99.0")),
+    );
+    const server = batch.session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), Json));
+
+    await batch.run();
+    expect(await Promise.race([failure(bananas), settle().then(() => "still waiting")])).toBeInstanceOf(Tm1ServerException);
+    expect(await server).toEqual({});
+    expect(tm1.requests("POST $batch")[0]!.text).not.toContain("Bananas");
+  });
+
+  it("doesn't check in a batch what a session told not to check needs", async () => {
+    const tm1 = scripted().on("POST $batch", () => ScriptedTm1.json(200, '{"responses":[{"id":"1","status":200,"body":{}}]}'));
+    const batch = tm1.session((b) => b.checkCapabilities(false)).batch();
+    const bananas = batch.session.execute(
+      Tm1Request.get(ODataPath.of("Bananas"), ODataQuery.none(), Json).requires(Tm1Capability.entitySet("Bananas").since("99.0")),
+    );
+    await batch.run();
+    expect(await bananas).toEqual({});
+    expect(tm1.requests(METADATA)).toHaveLength(0);
+  });
+
   it("doesn't check what a session told not to check needs", async () => {
     const bananas = Tm1Request.get(ODataPath.of("Bananas"), ODataQuery.none()).requires(Tm1Capability.entitySet("Bananas").since("99.0"));
     const tm1 = scripted().on("GET Bananas", () => ScriptedTm1.json(200, "{}"));
@@ -903,6 +1108,20 @@ describe("Tm1Session capabilities", () => {
   it("reports $metadata that isn't CSDL", async () => {
     const tm1 = scripted().on(METADATA, () => ScriptedTm1.xml("<html>Not metadata</html>"));
     await expect(tm1.session().capabilities()).rejects.toBeInstanceOf(Tm1ProtocolException);
+  });
+
+  it("reports $metadata it can't model", async () => {
+    // A bound operation with no binding parameter, which the model refuses
+    const tm1 = scripted().on(METADATA, () =>
+      ScriptedTm1.xml(
+        '<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"><edmx:DataServices>' +
+          '<Schema Namespace="ibm.tm1.api.v1" xmlns="http://docs.oasis-open.org/odata/ns/edm"><Action Name="Reserve" IsBound="true"/></Schema>' +
+          "</edmx:DataServices></edmx:Edmx>",
+      ),
+    );
+    const e = await failure(tm1.session().capabilities());
+    expect(e).toBeInstanceOf(Tm1ProtocolException);
+    expect((e as Tm1ProtocolException).url).toBe(ROOT + "$metadata");
   });
 
   it("doesn't keep a failed read", async () => {
@@ -932,7 +1151,7 @@ describe("Tm1Session reading collections", () => {
       .stream(Tm1Request.list(ODataPath.of("Elements"), ODataQuery.none()))
       .toArray();
 
-  it("reads the items and follows next links as given", async () => {
+  it("follows next links as given", async () => {
     const tm1 = new ScriptedTm1()
       .on("GET Elements", () => ScriptedTm1.json(200, BODY))
       .on("GET Elements?$skiptoken=3", () => ScriptedTm1.json(200, `{"value":[{"Name":"p2"}],"@odata.nextLink":"Elements?$skiptoken=4&x='a b'"}`))
@@ -948,15 +1167,166 @@ describe("Tm1Session reading collections", () => {
     ).toEqual(["GET Elements?$skiptoken=3", "GET Elements?$skiptoken=4&x='a b'"]);
   });
 
-  it("reads multibyte characters", async () => {
-    expect(await read('{"value":[{"Name":"Région 日本 😀","Type":"String"}]}')).toEqual([{ Name: "Région 日本 😀", Type: "String" }]);
+  it("asks for buffers only as items are taken", async () => {
+    // Java's decoder reads a page buffer by buffer; here a page is read whole, so what's read no
+    // faster than the items are taken is the pages
+    const tm1 = new ScriptedTm1()
+      .on("GET Elements", () => ScriptedTm1.json(200, BODY))
+      .on("GET Elements?$skiptoken=3", () => ScriptedTm1.json(200, '{"value":[{"Name":"p2"}]}'));
+    const session = tm1.session();
+
+    expect((await session.stream(ELEMENTS).first())!.Name).toBe("Q1");
+    let taken = 0;
+    for await (const element of session.stream(ELEMENTS)) {
+      expect(element.Name).toBeDefined();
+      if (++taken === 3) break;
+    }
+    await settle();
+    expect(tm1.requests("GET Elements"), "one request for each time it was iterated").toHaveLength(2);
+    expect(tm1.requests("GET Elements?$skiptoken=3"), "no more than the items taken need").toHaveLength(0);
   });
 
-  it("reads collections of primitives, dropping nulls", async () => {
+  /** A real server whose `Elements` sends the start of a collection and then nothing more, and which
+   * records when the connection carrying it has gone. */
+  async function stalling(use: (root: string, state: { asked: number; released: number }) => Promise<void>): Promise<void> {
+    const state = { asked: 0, released: 0 };
+    const server = createServer((request, response) => {
+      request.resume();
+      const path = request.url ?? "";
+      if (path.includes("ActiveSession?"))
+        response.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": "TM1SessionId=c1; Path=/api/; HttpOnly" }).end('{"ID":1}');
+      else if (path.includes("Elements")) {
+        state.asked++;
+        response.on("close", () => {
+          if (!response.writableEnded) state.released++;
+        });
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.write(BODY.slice(0, BODY.indexOf("Total")));
+      } else response.writeHead(204).end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      await use(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1/`, state);
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  }
+
+  it("releases buffers it hasn't read when cancelled", async () => {
+    // What's held here isn't Java's pooled buffers but the response and its connection, which
+    // Node's fetch gives up when aborted
+    await stalling(async (root, state) => {
+      const session = Tm1Session.builder().baseUrl(root).basicAuth("admin", "").build();
+      const cancel = new AbortController();
+      const reading = session.stream(ELEMENTS, { signal: cancel.signal }).toArray();
+      await eventually(() => state.asked === 1, "for the request");
+      await settle();
+      cancel.abort();
+      await expect(reading).rejects.toBeDefined();
+      await eventually(() => state.released === 1, "for the response to be released");
+      await session.close();
+    });
+  });
+
+  it("releases a response it hasn't read when the request fails", async () => {
+    await stalling(async (root, state) => {
+      const session = Tm1Session.builder().baseUrl(root).basicAuth("admin", "").build();
+      const e = await failure(session.stream(ELEMENTS.withTimeout(200)).toArray());
+      expect(e).toBeInstanceOf(Tm1TransportException);
+      expect((e as Tm1TransportException).phase).toBe("Response");
+      await eventually(() => state.released === 1, "for the response to be released");
+      await session.close();
+    });
+  });
+
+  /** A real server whose `Elements` sends `parts` one after the other, each in a chunk of its own,
+   * as the network may split a body: Node's fetch puts them together. A next link reads as empty. */
+  async function splitting(use: (read: (...parts: Uint8Array[]) => Promise<unknown[]>) => Promise<void>): Promise<void> {
+    let parts: Uint8Array[] = [];
+    const server = createServer((request, response) => {
+      request.resume();
+      const path = request.url ?? "";
+      if (path.includes("ActiveSession?"))
+        response.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": "TM1SessionId=c1; Path=/api/; HttpOnly" }).end('{"ID":1}');
+      else if (path.includes("skiptoken")) response.writeHead(200, { "Content-Type": "application/json" }).end('{"value":[]}');
+      else if (path.includes("Elements")) {
+        response.writeHead(200, { "Content-Type": "application/json" });
+        const send = async (): Promise<void> => {
+          for (const part of parts) {
+            response.write(part);
+            await new Promise((resolve) => setImmediate(resolve));
+          }
+          response.end();
+        };
+        void send();
+      } else response.writeHead(204).end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const session = Tm1Session.builder()
+      .baseUrl(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1/`)
+      .basicAuth("admin", "")
+      .build();
+    try {
+      await use((...p) => {
+        parts = p;
+        return session.stream(ELEMENTS).toArray();
+      });
+    } finally {
+      await session.close();
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  }
+
+  /** `bytes` cut in two at `at`. */
+  const cut = (bytes: Uint8Array, at: number): Uint8Array[] => [bytes.subarray(0, at), bytes.subarray(at)];
+
+  it("gives the same result however the bytes are split", async () => {
+    const bytes = new TextEncoder().encode(BODY);
+    const expected = (JSON.parse(BODY) as { value: unknown[] }).value;
+    await splitting(async (read) => {
+      for (let at = 1; at < bytes.length; at++) expect(await read(...cut(bytes, at)), `split at ${at}`).toEqual(expected);
+      const random = seeded(7);
+      for (let i = 0; i < 200; i++) {
+        const parts: Uint8Array[] = [];
+        for (let from = 0; from < bytes.length;) {
+          const to = Math.min(bytes.length, from + 1 + random(40));
+          parts.push(bytes.subarray(from, to));
+          from = to;
+        }
+        expect(await read(...parts)).toEqual(expected);
+      }
+    });
+  });
+
+  it("handles multibyte characters split across buffers", async () => {
+    const bytes = new TextEncoder().encode('{"value":[{"Name":"Région 日本 😀","Type":"String"}]}');
+    await splitting(async (read) => {
+      for (let at = 1; at < bytes.length; at++) expect(await read(...cut(bytes, at)), `split at ${at}`).toEqual([{ Name: "Région 日本 😀", Type: "String" }]);
+    });
+  });
+
+  it("reads bytes that aren't UTF-8 as the replacement character, however they are split", async () => {
+    // As TM1's transaction log gives a password's hash, with "é" (two bytes) beside it. Java's test
+    // goes on to its Utf8Repair, which mends a character cut between buffers; Node's fetch reads the
+    // body whole before it's decoded, so there's none here
+    const utf8 = new TextEncoder();
+    const bytes = Uint8Array.from([...utf8.encode('{"value":[{"Name":"é'), 0xe0, 0xec, 0x72, 0xff, 0xff, ...utf8.encode('","Type":"é"}]}')]);
+    const replacement = String.fromCharCode(0xfffd);
+    await splitting(async (read) => {
+      for (let at = 1; at < bytes.length; at++) {
+        expect(await read(...cut(bytes, at)), `split at ${at}`).toEqual([{ Name: "é" + replacement.repeat(2) + "r" + replacement.repeat(2), Type: "é" }]);
+      }
+    });
+  });
+
+  it("decodes collections of primitives", async () => {
+    // Nulls dropped, as Java's items(); its decode(), which shows them, is the decoder's own
     expect(await read('{"value":["a",null,"b"]}')).toEqual(["a", "b"]);
   });
 
-  it("reads an empty collection", async () => {
+  it("decodes an empty collection", async () => {
     expect(await read('{"@odata.context":"x","value":[]}')).toEqual([]);
   });
 

@@ -49,7 +49,8 @@ def traffic_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
-def test_runs_the_cubes_scenario_in_both_flavors_and_the_traffic_compares_equal(traffic_dir: Path) -> None:
+def test_runs_the_cubes_scenario_and_records_its_traffic(traffic_dir: Path) -> None:
+    # In both flavors, and the traffic they record compares equal
     scenario = json.loads((live.SCENARIOS / "cubes.json").read_text(encoding="utf-8"))
 
     names = live.names_for(scenario)
@@ -83,7 +84,7 @@ def test_runs_the_cubes_scenario_in_both_flavors_and_the_traffic_compares_equal(
     assert compare.main(["x", str(traffic_dir)]) == 0
 
 
-def test_a_step_that_misses_its_expectation_fails_and_still_cleans_up(traffic_dir: Path) -> None:
+def test_stops_at_a_step_that_misses_its_expectation_and_still_cleans_up(traffic_dir: Path) -> None:
     scenario = json.loads((live.SCENARIOS / "cubes.json").read_text(encoding="utf-8"))
     names = live.names_for(scenario)
     fake = _tm1(names)
@@ -138,7 +139,8 @@ def _answering_as_expected(scenario: dict[str, Any], names: dict[str, str]) -> F
     "name",
     ["subsets", "members", "edges", "member-sets", "content", "encryption", "git", "users", "sessions", "attributes", "annotations", "processes", "chores"],
 )
-def test_runs_a_scenario_in_both_flavors_sending_one_request_per_step(traffic_dir: Path, name: str) -> None:
+def test_runs_a_scenario_sending_one_request_per_step(traffic_dir: Path, name: str) -> None:
+    # In both flavors
     scenario = json.loads((live.SCENARIOS / f"{name}.json").read_text(encoding="utf-8"))
     expected = len([s for s in scenario["steps"] if _sends(s)]) + len(scenario.get("finally", []))
 
@@ -212,7 +214,8 @@ def _data_tm1(names: dict[str, str]) -> FakeTm1:
 
 
 @pytest.mark.parametrize("name", ["cellsets", "views", "sandboxes"])
-def test_runs_the_data_scenarios_in_both_flavors_and_the_traffic_compares_equal(traffic_dir: Path, name: str) -> None:
+def test_runs_the_data_scenarios(traffic_dir: Path, name: str) -> None:
+    # In both flavors, and the traffic they record compares equal
     scenario = json.loads((live.SCENARIOS / f"{name}.json").read_text(encoding="utf-8"))
 
     names = live.names_for(scenario)

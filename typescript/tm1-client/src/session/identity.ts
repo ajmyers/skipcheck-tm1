@@ -18,8 +18,14 @@ function comparable(user: string): string {
  *
  * Two identities are equal ({@link equals}) when they're the same kind and their names match as TM1
  * matches user names, ignoring case and spaces, so `impersonating("Alice")` and
- * `impersonating("alice")` share a session. The authenticator isn't part of equality: an identity's
- * name says who it is. */
+ * `impersonating("alice")` share a session.
+ *
+ * For a user's own credentials, the credentials must be equal too. A name is only what the caller
+ * says, and it's TM1 that checks credentials, at login: if the name alone found the session, anyone
+ * giving a logged-in user's name would get that user's session without TM1 ever seeing what they
+ * offered, and a corrected password or a renewed passport would never be used. So different
+ * credentials for the same name get a session of their own, and TM1 accepts or refuses them. See
+ * {@link Tm1Authenticator} for which authenticators are equal to one another. */
 export class Tm1Identity {
   private static readonly SERVICE_ACCOUNT = new Tm1Identity("ServiceAccount", "", undefined);
 
@@ -48,7 +54,8 @@ export class Tm1Identity {
 
   /** A user logging in with their own credentials.
    * @param name who the credentials belong to, for the pool's key and for logs, such as the user name
-   * @param authenticator their credentials */
+   * @param authenticator their credentials. Pass one that is equal each time, or the same object:
+   * an authenticator the pool hasn't seen for this name gets a new session */
   static withCredentials(name: string, authenticator: Tm1Authenticator): Tm1Identity {
     if (typeof name !== "string") throw new TypeError("name is required");
     if (!name.trim()) throw new RangeError("An identity's name must not be blank");
@@ -71,7 +78,9 @@ export class Tm1Identity {
     return this.authenticatorValue;
   }
 
-  /** @internal What the pool keys its sessions by: the kind and the comparable name. */
+  /** @internal What the pool finds its sessions by: the kind and the comparable name. Identities with
+   * the same key are the same one only if they're {@link equals}: a name may come with different
+   * credentials. */
   key(): string {
     return this.kindValue + "\u0000" + this.comparableName;
   }
@@ -88,10 +97,14 @@ export class Tm1Identity {
     }
   }
 
-  /** Whether `other` is the same identity: the same kind and name. Credentials don't count, so a
-   * pool finds a user's session whatever passport they come with. */
+  /** Whether `other` is the same identity: the same kind and name and, for a user's own
+   * credentials, equal credentials ({@link Tm1Authenticator.equals}). */
   equals(other: unknown): boolean {
-    return this === other || (other instanceof Tm1Identity && other.key() === this.key());
+    if (this === other) return true;
+    if (!(other instanceof Tm1Identity) || other.key() !== this.key()) return false;
+    const mine = this.authenticatorValue;
+    const theirs = other.authenticatorValue;
+    return mine === theirs || (mine !== undefined && theirs !== undefined && mine.equals(theirs));
   }
 
   /** The identity, for logs: its kind and name, never credentials. */

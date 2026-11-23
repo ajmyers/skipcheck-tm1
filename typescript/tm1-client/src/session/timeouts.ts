@@ -7,17 +7,21 @@ function positive(value: number, name: string): void {
 /** How long a session waits, in milliseconds, as the Java client's `Tm1Timeouts`: to connect, for a
  * login, for a request's answer, for the close at the end, and how long a refused login is
  * remembered (requests meanwhile fail at once rather than trying the same credentials again; zero
- * to try every time). `fetch` has no connect timeout of its own: `connect` goes to the transport
- * (`Tm1HttpRequest.connectTimeout`) for one that can use it. */
+ * to try every time). The authenticator gets as long as a login again to supply the credentials
+ * first, since it may ask another server, such as Cognos for a passport; if it doesn't, the request
+ * fails with a `Tm1TransportException` in the connect phase, which is safe to retry. `fetch` has no
+ * connect timeout of its own: `connect` goes to the transport (`Tm1HttpRequest.connectTimeout`) for
+ * one that can use it. */
 export class Tm1Timeouts {
   /** The defaults: 10 s to connect, 30 s for a login, 10 minutes for a request, 5 s for the close,
    * and a refused login remembered for 30 s. */
   static readonly DEFAULTS = new Tm1Timeouts(10_000, 30_000, 600_000, 5_000, 30_000);
 
   /** Timeouts in milliseconds. `connect`: for a connection, including TLS. `login`: for a login
-   * response; short, because a login does no work. `request`: for a request's answer; long,
-   * because TM1 answers a process or a big view only when it's done. `close`: for the logout at
-   * the end. `refusedLogin`: how long a refused login is remembered; zero to try every time.
+   * response; short, because a login does no work. The authenticator gets as long again to supply
+   * the credentials first. `request`: for a request's answer; long, because TM1 answers a process
+   * or a big view only when it's done. `close`: for the logout at the end. `refusedLogin`: how long
+   * a refused login is remembered; zero to try every time.
    * @throws RangeError if one isn't positive, or `refusedLogin` is negative */
   constructor(
     readonly connect: number,

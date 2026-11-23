@@ -54,7 +54,7 @@ function fake(names: Record<string, string>): FakeTm1 {
 
 describe("the live conformance runner, for the processes, chores and server scenarios", () => {
   for (const name of ["server"]) {
-    it(`runs the ${name} scenario`, async () => {
+    it(`runs the scenario and records its traffic: ${name}`, async () => {
       live.trafficTo(mkdtempSync(join(tmpdir(), "conformance-")));
       const scenario = live.scenarios().find((s) => s.name === name)!;
       const names = live.namesFor(scenario);

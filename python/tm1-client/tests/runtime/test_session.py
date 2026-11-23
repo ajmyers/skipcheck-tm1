@@ -6,9 +6,15 @@ Tm1SessionCapabilitiesTest: the same behaviour, in both flavors."""
 
 from __future__ import annotations
 
+import asyncio
 import base64
+import gzip
 import json
+import logging
+import random
+import threading
 import time
+from typing import Any
 
 import httpx
 import pytest
@@ -25,6 +31,7 @@ from skipcheck_tm1 import (
     Tm1NotFoundError,
     Tm1ProtocolError,
     Tm1Request,
+    Tm1ServerError,
     Tm1SessionClosedError,
     Tm1Timeouts,
     Tm1TransportError,
@@ -32,8 +39,10 @@ from skipcheck_tm1 import (
     Tm1Version,
     auth,
 )
+from skipcheck_tm1._protocol import Call, async_result
+from skipcheck_tm1.aio import cognos as aio_cognos
 
-from ..conftest import BASE, target
+from ..conftest import BASE, SNAPSHOT, target
 from .conftest import SERVER, Clock, Runtime, each, json_response, text_response
 
 LOGIN = "GET ActiveSession?$select=ID"
@@ -55,6 +64,81 @@ def server(rt: Runtime, answer: object = None) -> None:
 
 
 # Tm1SessionTest
+
+
+def outcome(rt: Runtime, call: Any, seconds: float = 5.0) -> BaseException | None:
+    """What a call fails with, or None if it succeeds; fails the test if it's still running after
+    ``seconds`` (Java's ``verify(Duration)``), so a call that hangs can't hang the tests."""
+    if rt.flavor == "sync":
+        ended: list[BaseException | None] = []
+
+        def go() -> None:
+            try:
+                call()
+                ended.append(None)
+            except BaseException as e:  # noqa: BLE001
+                ended.append(e)
+
+        thread = threading.Thread(target=go, daemon=True)
+        thread.start()
+        thread.join(seconds)
+        assert ended, f"still running after {seconds} s"
+        return ended[0]
+
+    async def bounded() -> BaseException | None:
+        task = asyncio.ensure_future(call())
+        done, _ = await asyncio.wait({task}, timeout=seconds)
+        if not done:
+            task.cancel()
+            pytest.fail(f"still running after {seconds} s")
+        return task.exception()
+
+    return rt.run(bounded())
+
+
+def test_gives_up_on_an_authenticator_that_never_answers(rt: Runtime) -> None:
+    if rt.flavor == "sync":
+        pytest.skip("the sync session can't give up on a call that blocks without a thread of its own, which the library never starts")
+
+    class Never:
+        def authorization(self) -> Any:
+            return asyncio.Event().wait()
+
+        def describe(self) -> str:
+            return "Never"
+
+    session = rt.session(rt.builder().authenticator(Never()).timeouts(Tm1Timeouts.builder().login(0.1).build()))
+    error = outcome(rt, lambda: session.execute(SERVER))
+    assert isinstance(error, Tm1TransportError), error
+    assert error.phase is Tm1TransportError.Phase.CONNECT and error.is_retryable(), "nothing was sent to TM1"
+    assert "Never" in str(error) and "0.1" in str(error)
+    assert outcome(rt, lambda: session.close()) is None
+    assert rt.fake.login_requests == []
+
+
+def test_gives_up_on_a_cognos_that_never_answers(rt: Runtime) -> None:
+    # In both flavors, the authenticators that ask Cognos are bounded by their HTTP client's timeouts
+    def silent(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    client = httpx.Client if rt.flavor == "sync" else httpx.AsyncClient
+    logon = auth.cognos_logon if rt.flavor == "sync" else aio_cognos.cognos_logon
+    authenticator = logon("http://cognos:9300", "LDAP", "alice", "secret", http_client=lambda: client(transport=httpx.MockTransport(silent)))
+    session = rt.session(rt.builder().authenticator(authenticator))
+    error = outcome(rt, lambda: session.execute(SERVER))
+    assert isinstance(error, Tm1ProtocolError) and "Cognos" in str(error), error
+    assert outcome(rt, lambda: session.close()) is None
+    assert rt.fake.login_requests == []
+
+
+def test_passes_an_authenticators_own_timeout_through_unchanged(rt: Runtime) -> None:
+    # Only the session's own timeout becomes a transport error: what the authenticator raises is the caller's to read
+    def no_passport() -> str:
+        raise TimeoutError("Cognos took too long")
+
+    session = rt.session(rt.builder().authenticator(auth.cam_passport(no_passport)))
+    error = rt.raises(TimeoutError, lambda: session.connect())
+    assert str(error) == "Cognos took too long"
 
 
 def test_logs_in_once_for_concurrent_first_requests_and_sends_only_the_cookie_afterwards(rt: Runtime) -> None:
@@ -167,11 +251,13 @@ def test_streams_collections_across_next_links(rt: Runtime) -> None:
         assert rt.run(streamed()) == ["a", "b", "c"]
 
 
-def test_refuses_to_stream_a_single_response_and_to_execute_a_collection_without_sending_it(rt: Runtime) -> None:
-    session = rt.session()
+def test_refuses_to_stream_a_single_response(rt: Runtime) -> None:
     with pytest.raises(ValueError):
-        session.stream(SERVER)
-    rt.raises(ValueError, lambda: session.execute(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), dict)))
+        rt.session().stream(SERVER)
+
+
+def test_refuses_to_execute_a_collection_without_sending_it(rt: Runtime) -> None:
+    rt.raises(ValueError, lambda: rt.session().execute(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), dict)))
     assert rt.fake.requests == [] and rt.fake.login_requests == []
 
 
@@ -229,11 +315,104 @@ def test_closes_the_session_once_with_a_json_body_and_refuses_requests_afterward
     assert len(rt.fake.login_requests) == 1, "a closed session doesn't log in again"
 
 
-def test_treats_a_401_on_close_as_already_closed(rt: Runtime) -> None:
+def test_treats_a401_on_close_as_already_closed(rt: Runtime) -> None:
     rt.fake.respond = lambda r: json_response(401) if target(r) == CLOSE else {}
     session = rt.session()
     rt.run(session.connect())
     rt.run(session.close())
+
+
+class HeldLogin:
+    """A login TM1 doesn't answer until it's told to, with the given cookie: Java's ``Sinks.One``
+    of the login response."""
+
+    def __init__(self, rt: Runtime, cookie: str, session_id: int) -> None:
+        answer = json_response(200, {"ID": session_id}, f"TM1SessionId={cookie}; Path=/api/")
+        self.arrived: Any
+        self.release: Any
+        if rt.flavor == "sync":
+            self.arrived, self.release = threading.Event(), threading.Event()
+
+            def held(request: httpx.Request) -> httpx.Response:
+                self.arrived.set()
+                assert self.release.wait(10)
+                return answer
+
+            rt.fake.on_login = held
+        else:
+            self.arrived, self.release = asyncio.Event(), asyncio.Event()
+
+            async def waiting() -> httpx.Response:
+                self.arrived.set()
+                await self.release.wait()
+                return answer
+
+            # The transport awaits what the fake answers with
+            rt.fake.on_login = lambda request: waiting()
+
+
+def test_waits_for_a_login_in_progress_and_closes_it(rt: Runtime) -> None:
+    login = HeldLogin(rt, "late", 5)
+    session = rt.session()
+    if rt.flavor == "sync":
+        first = threading.Thread(target=lambda: session.execute(SERVER), daemon=True)
+        first.start()
+        assert login.arrived.wait(5)
+        closing = threading.Thread(target=session.close, daemon=True)
+        closing.start()
+        closing.join(0.1)
+        assert requests_to(rt, CLOSE) == [], "not before the login has finished"
+        login.release.set()
+        closing.join(5)
+        first.join(5)
+        assert not closing.is_alive()
+    else:
+
+        async def scenario() -> None:
+            first = asyncio.ensure_future(session.execute(SERVER))
+            await asyncio.wait_for(login.arrived.wait(), 5)
+            closing = asyncio.ensure_future(session.close())
+            await asyncio.sleep(0.05)
+            assert requests_to(rt, CLOSE) == [], "not before the login has finished"
+            login.release.set()
+            await asyncio.wait_for(closing, 5)
+            await asyncio.gather(first, return_exceptions=True)
+
+        rt.run(scenario())
+    closes = requests_to(rt, CLOSE)
+    assert len(closes) == 1
+    assert cookie(closes[0]) == "late"
+
+
+def test_finishes_a_login_whose_request_was_cancelled_so_close_can_end_it(rt: Runtime) -> None:
+    if rt.flavor == "sync":
+        pytest.skip("a blocking call can't be cancelled, so the sync session never abandons a login")
+    login = HeldLogin(rt, "orphan", 6)
+    session = rt.session()
+
+    async def scenario() -> None:
+        first = asyncio.ensure_future(session.execute(SERVER))
+        await asyncio.wait_for(login.arrived.wait(), 5)
+        first.cancel()
+        await asyncio.gather(first, return_exceptions=True)
+        login.release.set()
+        await asyncio.wait_for(session.close(), 5)
+
+    rt.run(scenario())
+    closes = requests_to(rt, CLOSE)
+    assert len(closes) == 1
+    assert cookie(closes[0]) == "orphan"
+
+
+def test_observes_login_and_close(rt: Runtime, caplog: pytest.LogCaptureFixture) -> None:
+    # Java observes them with Micrometer; this client logs them to ``skipcheck_tm1``, the login with its reason
+    caplog.set_level(logging.INFO, logger="skipcheck_tm1")
+    session = rt.session()
+    rt.run(session.connect())
+    rt.run(session.close())
+    messages = [r.getMessage() for r in caplog.records if r.name == "skipcheck_tm1"]
+    assert [m for m in messages if m.startswith("Logged in")] == [f"Logged in to TM1 at {BASE} as Basic admin (session 1, initial)"]
+    assert [m for m in messages if m.startswith("Closed")] == [f"Closed TM1 session 1 at {BASE}"]
 
 
 # Tm1SessionReloginTest
@@ -243,7 +422,7 @@ CREATE = "POST Dimensions"
 CREATE_KEY = Tm1Request.post(ODataPath.of("Dimensions"), {"Name": "d"}, dict)
 
 
-def test_logs_in_again_with_the_cookie_from_the_401_and_replays_the_post_once(rt: Runtime) -> None:
+def test_logs_in_again_with_the_cookie_from_the401_and_replays_the_post_once(rt: Runtime) -> None:
     rt.fake.respond = each(json_response(401, None, "TM1SessionId=fresh; Path=/api/; HttpOnly"), json_response(201, {"Name": "d"}))
     rt.fake.on_login = each(
         json_response(200, {"ID": 1}, "TM1SessionId=c1; Path=/api/"),
@@ -258,6 +437,19 @@ def test_logs_in_again_with_the_cookie_from_the_401_and_replays_the_post_once(rt
     creates = requests_to(rt, CREATE)
     assert [cookie(c) for c in creates] == ["c1", "fresh"]
     assert "authorization" not in creates[1].headers
+    assert rt.run(session.session_id()) == 2
+
+
+def test_observes_the_relogin_with_its_reason(rt: Runtime, caplog: pytest.LogCaptureFixture) -> None:
+    # Java observes logins with Micrometer; this client logs them to ``skipcheck_tm1`` with their reason
+    caplog.set_level(logging.INFO, logger="skipcheck_tm1")
+    rt.fake.respond = each(json_response(401, None, "TM1SessionId=fresh; Path=/api/"), json_response(201, {}))
+    session = rt.session()
+    rt.run(session.connect())
+    rt.run(session.execute(CREATE_KEY))
+    logins = [r.getMessage() for r in caplog.records if r.name == "skipcheck_tm1" and r.getMessage().startswith("Logged in")]
+    assert len(logins) == 2
+    assert logins[0].endswith(", initial)") and logins[1].endswith(", relogin)")
 
 
 def test_shares_one_relogin_between_requests_that_saw_the_same_expiry(rt: Runtime) -> None:
@@ -369,7 +561,7 @@ def test_reports_a_refused_impersonation_whatever_the_wording(rt: Runtime) -> No
     assert error.kind is Tm1ErrorKind.IMPERSONATION_REFUSED
 
 
-def test_names_both_causes_of_a_401_when_impersonating(rt: Runtime) -> None:
+def test_names_both_causes_of_a401_when_impersonating(rt: Runtime) -> None:
     rt.fake.on_login = lambda r: json_response(401)
     error = rt.raises(Tm1AuthenticationError, lambda: rt.session(rt.builder().impersonate("bob")).execute(SERVER))
     assert error.kind is Tm1ErrorKind.CREDENTIAL_REJECTED
@@ -501,6 +693,90 @@ def test_refuses_calls_after_it_ran(rt: Runtime) -> None:
     rt.raises(RuntimeError, lambda: batch.run())
 
 
+def test_refuses_a_call_whose_body_cant_be_written_and_still_runs_the_rest(rt: Runtime) -> None:
+    rt.fake.respond = lambda r: {"responses": [{"id": "1", "status": 204}]}
+    batch = rt.session().batch()
+    deleted = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("Old"))))
+    unwritable = Tm1Request.post(ODataPath.of("Cubes"), {"name": object()}, dict)
+    error = rt.raises((TypeError, ValueError), lambda: batch.session.execute(unwritable))
+    assert not isinstance(error, Tm1TransportError)
+    # A call made without a Tm1Request, as the generated API's are, is written when it's queued
+    rt.raises(ValueError, lambda: batch.session.execute(Call("POST", "Cubes", json_body={"name": object()})))
+    assert batch.size() == 1, "never queued"
+    rt.run(batch.run())
+    assert deleted.result() is None
+
+
+def test_sends_a_body_as_it_was_when_the_call_was_queued(rt: Runtime) -> None:
+    rt.fake.respond = lambda r: {"responses": [{"id": "1", "status": 201, "body": {}}]}
+    batch = rt.session().batch()
+    body = {"Name": "before"}
+    rt.run(batch.session.execute(Tm1Request.post(ODataPath.of("Cubes"), body, dict)))
+    body["Name"] = "after"
+    rt.run(batch.run())
+    assert json.loads(rt.fake.last.content)["requests"][0]["body"] == {"Name": "before"}
+
+
+def test_fails_every_call_when_tm1_answers_the_batch_with_no_body(rt: Runtime) -> None:
+    rt.fake.respond = lambda r: httpx.Response(200)
+    batch = rt.session().batch()
+    first = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("a"))))
+    second = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("b"))))
+    rt.run(batch.run())
+    for deferred in (first, second):
+        with pytest.raises(Tm1ProtocolError, match="no body"):
+            deferred.result()
+
+
+def test_fails_every_call_when_the_batchs_answer_cant_be_read(rt: Runtime) -> None:
+    # Not in the Java tests: there, a response that isn't JSON fails the $batch request, and so every call
+    rt.fake.respond = lambda r: text_response(200, "not a batch response")
+    batch = rt.session().batch()
+    first = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("a"))))
+    second = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("b"))))
+    rt.run(batch.run())
+    for deferred in (first, second):
+        with pytest.raises(Tm1ProtocolError):
+            deferred.result()
+
+
+def test_follows_a_next_link_in_an_answer(rt: Runtime) -> None:
+    answers(
+        rt,
+        {
+            "POST $batch": {"responses": [{"id": "1", "status": 200, "body": {"value": [{"Name": "a"}], "@odata.nextLink": "Cubes?$skiptoken=2"}}]},
+            "GET Cubes?$skiptoken=2": {"value": [{"Name": "b"}]},
+        },
+    )
+    batch = rt.session().with_sandbox("s").batch()
+    names = rt.run(batch.session.collect(CUBES))
+    rt.run(batch.run())
+    assert [cube["Name"] for cube in names.result()] == ["a", "b"]
+    assert [target(r) for r in rt.fake.requests] == ["POST $batch", "GET Cubes?$skiptoken=2"], "the link is followed as TM1 gave it"
+
+
+def test_fails_a_call_whose_later_page_fails(rt: Runtime) -> None:
+    answers(
+        rt,
+        {
+            "POST $batch": {
+                "responses": [
+                    {"id": "1", "status": 200, "body": {"value": [{"Name": "a"}], "@odata.nextLink": "Cubes?$skiptoken=2"}},
+                    {"id": "2", "status": 204},
+                ]
+            },
+            "GET Cubes?$skiptoken=2": json_response(500, {"error": {"code": "1", "message": "no more"}}),
+        },
+    )
+    batch = rt.session().batch()
+    names = rt.run(batch.session.collect(CUBES))
+    deleted = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("Old"))))
+    rt.run(batch.run())
+    with pytest.raises(Tm1ServerError):
+        names.result()
+    assert deleted.result() is None
+
+
 def test_splits_a_big_queue(rt: Runtime) -> None:
     rt.fake.respond = lambda r: {"responses": []}
     batch = rt.session().batch()
@@ -534,13 +810,24 @@ def test_reads_the_version_once_inside_the_session(rt: Runtime) -> None:
     assert cookie(seen[0]) is not None, "never an anonymous read"
 
 
-def test_fetches_metadata_once_per_server_version_for_every_session(rt: Runtime) -> None:
-    first, second = rt.session(), rt.session()
+def test_fetches_metadata_once_per_server_version_for_every_session_with_the_same_settings(rt: Runtime) -> None:
+    seen: list[httpx.Request] = []
+    handler = rt.fake.handler
+
+    def spy(request: httpx.Request) -> httpx.Response:
+        if target(request) == "GET $metadata":
+            seen.append(request)
+        return handler(request)
+
+    rt.fake.handler = spy  # type: ignore[method-assign]
+    settings = rt.builder()
+    first, second = rt.session(settings), rt.session(settings)
     caps = rt.run(first.capabilities())
     assert caps.schema_version == "11.8.35"
     assert caps.product_version == Tm1Version.parse("11.8.03500.6")
     rt.run(second.capabilities())
     assert rt.fake.metadata_reads == 1
+    assert [r.headers["accept"] for r in seen] == ["application/xml"]
 
 
 def test_sends_a_request_whose_requirement_the_server_meets(rt: Runtime) -> None:
@@ -557,6 +844,36 @@ def test_refuses_a_request_the_server_cant_serve_without_sending_it(rt: Runtime)
     assert error.missing == "entity set Bananas"
     assert "added in schema 99.0" in str(error) and "reports schema 11.8.35" in str(error)
     assert rt.fake.requests == []
+
+
+def test_refuses_a_request_the_server_cant_serve_in_a_batch_and_still_sends_the_rest(rt: Runtime) -> None:
+    rt.fake.respond = lambda r: {"responses": [{"id": "1", "status": 200, "body": {}}]}
+    batch = rt.session().batch()
+    bananas = rt.run(
+        batch.session.collect(Tm1Request.list(ODataPath.of("Bananas"), ODataQuery.none(), dict).requires(Tm1Capability.entity_set("Bananas").since("99.0")))
+    )
+    server = rt.run(batch.session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), dict)))
+    assert rt.fake.metadata_reads == 0 and rt.fake.login_requests == [], "queueing sends nothing: the check waits for the run"
+    rt.run(batch.run())
+    with pytest.raises(Tm1UnsupportedOperationError):
+        bananas.result()
+    assert server.result() == {}
+    (sent,) = requests_to(rt, "POST $batch")
+    assert "Server" in sent.content.decode() and "Bananas" not in sent.content.decode()
+
+
+def test_fails_only_the_calls_that_need_them_in_a_batch_when_the_capabilities_cant_be_read(rt: Runtime) -> None:
+    rt.fake.metadata = b"<html>Not metadata</html>"
+    rt.fake.respond = lambda r: {"responses": [{"id": "1", "status": 200, "body": {}}]}
+    batch = rt.session().batch()
+    bananas = rt.run(
+        batch.session.collect(Tm1Request.list(ODataPath.of("Bananas"), ODataQuery.none(), dict).requires(Tm1Capability.entity_set("Bananas").since("99.0")))
+    )
+    server = rt.run(batch.session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), dict)))
+    rt.run(batch.run())
+    with pytest.raises(Tm1ProtocolError):
+        bananas.result()
+    assert server.result() == {}
 
 
 def test_reads_the_version_again_after_logging_in_again(rt: Runtime) -> None:
@@ -582,6 +899,60 @@ def test_reports_metadata_that_isnt_csdl(rt: Runtime) -> None:
     rt.raises(Tm1ProtocolError, lambda: rt.session().capabilities())
 
 
+@pytest.mark.parametrize(
+    "metadata",
+    [b"", b"not XML at all", b"\x00\x00\x00", b"<html>Not metadata</html>", b'<?xml version="1.0" encoding="bogus-8"?><edmx/>'],
+    ids=["empty", "text", "bytes", "another document", "an encoding nobody knows"],
+)
+def test_reports_metadata_it_cant_read_as_a_protocol_error_not_a_raw_one(rt: Runtime, metadata: bytes) -> None:
+    rt.fake.metadata = metadata
+    session = rt.session()
+    rt.raises(Tm1ProtocolError, lambda: session.capabilities())
+    bananas = Tm1Request.list(ODataPath.of("Bananas"), ODataQuery.none(), dict).requires(Tm1Capability.entity_set("Bananas").since("99.0"))
+    rt.raises(Tm1ProtocolError, lambda: session.collect(bananas))
+    assert rt.fake.requests == []
+
+
+def test_reports_whatever_stops_metadata_being_read_as_a_protocol_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from skipcheck_tm1 import Tm1Capabilities, version
+
+    def refuse(name: str) -> str:
+        raise ValueError(f"can't model {name}")
+
+    monkeypatch.setattr(version, "_simple", refuse)
+    with pytest.raises(Tm1ProtocolError, match="can't model"):
+        Tm1Capabilities.parse(SNAPSHOT.read_bytes())
+
+
+def test_refuses_doctypes_so_entities_cant_be_expanded(rt: Runtime) -> None:
+    rt.fake.metadata = b"""<?xml version="1.0"?>
+        <!DOCTYPE edmx:Edmx [<!ENTITY x SYSTEM "file:///etc/passwd">]>
+        <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">&x;</edmx:Edmx>"""
+    error = rt.raises(Tm1ProtocolError, lambda: rt.session().capabilities())
+    assert "DOCTYPE" in str(error)
+    # One that only defines an entity of its own, which a parser would expand, is refused as well
+    rt.fake.metadata = b"""<!DOCTYPE edmx:Edmx [<!ENTITY x "expanded">]>
+        <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+          <edmx:DataServices><Schema Namespace="&x;" xmlns="http://docs.oasis-open.org/odata/ns/edm"/></edmx:DataServices>
+        </edmx:Edmx>"""
+    error = rt.raises(Tm1ProtocolError, lambda: rt.session().capabilities())
+    assert "DOCTYPE" in str(error)
+
+
+def test_reports_an_operation_it_cant_model_as_a_parse_error(rt: Runtime) -> None:
+    rt.fake.metadata = b"""
+        <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+          <edmx:DataServices>
+            <Schema Namespace="ibm.tm1.api.v1" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+              <Action Name="Reserve" IsBound="true"/>
+              <EntityContainer Name="API"><EntitySet Name="Cubes" EntityType="ibm.tm1.api.v1.Cube"/></EntityContainer>
+            </Schema>
+          </edmx:DataServices>
+        </edmx:Edmx>"""
+    error = rt.raises(Tm1ProtocolError, lambda: rt.session().capabilities())
+    assert "Reserve" in str(error)
+
+
 def test_doesnt_keep_a_failed_read(rt: Runtime) -> None:
     versions = each(json_response(503, {"error": {"code": "1", "message": "busy"}}), None)
     handler = rt.fake.handler
@@ -597,6 +968,369 @@ def test_doesnt_keep_a_failed_read(rt: Runtime) -> None:
     session = rt.session()
     rt.raises(Tm1ApiError, lambda: session.version())
     assert rt.run(session.version()) == Tm1Version.parse("11.8.03500.6")
+
+
+# Tm1SessionAsyncTest
+
+
+RUN = "POST Processes('p')/tm1.ExecuteWithReturn"
+MONITOR = "GET _async('a1')"
+REQUEST = Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.ExecuteWithReturn"), None, dict)
+CUBES = Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), dict)
+
+
+def accepted() -> httpx.Response:
+    return httpx.Response(202, headers={"Location": "../_async('a1')"})
+
+
+def done(status_line: str, body: str) -> httpx.Response:
+    """A finished monitor's answer: the result as an ``application/http`` message."""
+    message = f"HTTP/1.1 {status_line}\r\nContent-Type: application/json\r\nOData-Version: 4.0\r\n\r\n{body}"
+    return httpx.Response(200, content=message.encode(), headers={"Content-Type": "application/http"})
+
+
+def answers(rt: Runtime, routes: dict[str, Any]) -> None:
+    """Answers each request by its ``METHOD path`` (Java's ``FakeTm1.on``)."""
+
+    def respond(request: httpx.Request) -> Any:
+        answer = routes[target(request)]
+        return answer(request) if callable(answer) else answer
+
+    rt.fake.respond = respond
+
+
+def streamed(rt: Runtime, session: Any, request: Any) -> list[Any]:
+    """What ``stream`` gives, to its end."""
+    if rt.flavor == "sync":
+        return list(session.stream(request))
+
+    async def items() -> list[Any]:
+        return [item async for item in session.stream(request)]
+
+    return rt.run(items())
+
+
+def test_reads_a_result_bigger_than_the_codecs_buffer_limit(rt: Runtime) -> None:
+    # The Java client's codecs refused to buffer more than 256 KB. Nothing limits a body here: this pins that
+    big = "x" * 300_000
+    answers(rt, {RUN: accepted(), MONITOR: done("200 OK", json.dumps({"Text": big}))})
+    result = rt.run(rt.session().with_async(0.01).execute(REQUEST))
+    assert len(result["Text"]) == 300_000
+
+
+def test_reads_a_big_collection_tm1_gave_at_once(rt: Runtime) -> None:
+    big = "x" * 300_000
+    answers(rt, {"GET Cubes": {"value": [{"Name": big}]}})
+    cubes = streamed(rt, rt.session().with_async(0.01), CUBES)
+    assert [len(cube["Name"]) for cube in cubes] == [300_000]
+
+
+def test_follows_a_next_link_in_a_result(rt: Runtime) -> None:
+    answers(
+        rt,
+        {
+            "GET Cubes": {"value": [{"Name": "a"}], "@odata.nextLink": "Cubes?$skiptoken=2"},
+            "GET Cubes?$skiptoken=2": {"value": [{"Name": "b"}]},
+        },
+    )
+    session = rt.session().with_async(0.01)
+    assert [cube["Name"] for cube in streamed(rt, session, CUBES)] == ["a", "b"]
+    assert [cube["Name"] for cube in rt.run(session.collect(CUBES))] == ["a", "b"]
+    assert [r.headers.get("Prefer") for r in requests_to(rt, "GET Cubes")] == ["respond-async", "respond-async"]
+    # The pages after it are ordinary requests
+    assert [r.headers.get("Prefer") for r in requests_to(rt, "GET Cubes?$skiptoken=2")] == [None, None]
+
+
+def test_follows_a_next_link_in_a_result_it_polled_for(rt: Runtime) -> None:
+    # Not in the Java tests, where one decoder reads a result whether TM1 gave it at once or through the monitor
+    answers(
+        rt,
+        {
+            "GET Cubes": httpx.Response(202, headers={"Location": "_async('a1')"}),
+            MONITOR: done("200 OK", json.dumps({"value": [{"Name": "a"}], "@odata.nextLink": "Cubes?$skiptoken=2"})),
+            "GET Cubes?$skiptoken=2": {"value": [{"Name": "b"}]},
+        },
+    )
+    assert [cube["Name"] for cube in rt.run(rt.session().with_async(0.01).collect(CUBES))] == ["a", "b"]
+
+
+def test_polls_the_monitor_until_the_result_is_there(rt: Runtime) -> None:
+    answers(
+        rt,
+        {
+            RUN: accepted(),
+            MONITOR: each(httpx.Response(202), httpx.Response(202), done("201 Created", json.dumps({"ProcessExecuteStatusCode": "CompletedSuccessfully"}))),
+            "DELETE _async('a1')": None,
+        },
+    )
+    result = rt.run(rt.session().with_async(0.01).execute(REQUEST))
+    assert result["ProcessExecuteStatusCode"] == "CompletedSuccessfully"
+    assert [r.headers.get("Prefer") for r in requests_to(rt, RUN)] == ["respond-async"]
+    assert len(requests_to(rt, MONITOR)) == 3
+    assert requests_to(rt, "DELETE _async('a1')") == [], "not deleted once done"
+
+
+def test_raises_the_error_the_work_ended_with(rt: Runtime) -> None:
+    answers(rt, {RUN: accepted(), MONITOR: done("500 Internal Server Error", json.dumps({"error": {"code": "174", "message": "TM1UserException: Cancel"}}))})
+    error = rt.raises(Tm1ServerError, lambda: rt.session().with_async(0.01).execute(REQUEST))
+    assert "Cancel" in str(error)
+
+
+def test_reads_an_answer_tm1_gave_at_once(rt: Runtime) -> None:
+    answers(rt, {RUN: json_response(201, {"ProcessExecuteStatusCode": "Aborted"})})
+    assert rt.run(rt.session().with_async(0.01).execute(REQUEST))["ProcessExecuteStatusCode"] == "Aborted"
+    assert len(requests_to(rt, RUN)) == 1, "sent once"
+
+
+def test_deletes_the_monitor_when_cancelled(rt: Runtime) -> None:
+    if rt.flavor == "sync":
+        # A blocking call can't be cancelled: giving up is an exception while it waits, as Ctrl-C raises
+        def poll(request: httpx.Request) -> httpx.Response:
+            if len(requests_to(rt, MONITOR)) > 2:
+                raise KeyboardInterrupt
+            return httpx.Response(202)
+
+        answers(rt, {RUN: accepted(), MONITOR: poll, "DELETE _async('a1')": httpx.Response(204)})
+        with pytest.raises(KeyboardInterrupt):
+            rt.session().with_async(0.01).execute(REQUEST)
+    else:
+        answers(rt, {RUN: accepted(), MONITOR: httpx.Response(202), "DELETE _async('a1')": httpx.Response(204)})
+
+        async def cancelled() -> None:
+            running = asyncio.ensure_future(rt.session().with_async(0.01).execute(REQUEST))
+            await asyncio.sleep(0.2)
+            running.cancel()
+            await asyncio.gather(running, return_exceptions=True)
+
+        rt.run(cancelled())
+    assert requests_to(rt, MONITOR) != []
+    assert len(requests_to(rt, "DELETE _async('a1')")) == 1
+
+
+def test_unwraps_an_application_http_message() -> None:
+    result = async_result(b"HTTP/1.1 201 Created\r\nContent-Length: 2\r\n\r\n{}")
+    assert result.status == 201
+    assert result.content == b"{}"
+
+
+def test_decompresses_a_gzipped_inner_body() -> None:
+    head = b"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Type: application/json\r\n\r\n"
+    assert async_result(head + gzip.compress(b'{"Name":"tm1"}')).content == b'{"Name":"tm1"}'
+
+
+def test_reads_a_big_error_body(rt: Runtime) -> None:
+    big = "x" * 300_000
+    answers(rt, {RUN: json_response(500, {"error": {"code": "174", "message": big}})})
+    error = rt.raises(Tm1ServerError, lambda: rt.session().execute(REQUEST))
+    assert len(error.error.message) == 300_000
+
+
+# ODataCollectionDecoderTest, for what this client holds while a collection is read: an HTTP response
+
+
+class Body(httpx.SyncByteStream, httpx.AsyncByteStream):
+    """A response body, as from the network, that records whether the client closed it."""
+
+    def __init__(self, content: bytes, opened: list[Body]) -> None:
+        self.content = content
+        self.closed = False
+        opened.append(self)
+
+    def __iter__(self) -> Any:
+        yield self.content
+
+    async def __aiter__(self) -> Any:
+        yield self.content
+
+    def close(self) -> None:
+        self.closed = True
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+ELEMENTS = Tm1Request.list(ODataPath.of("Elements"), ODataQuery.none(), dict)
+
+
+def from_the_network(rt: Runtime, routes: dict[str, Any]) -> list[Body]:
+    """Answers each request with a body the client has to close, and returns those it was given."""
+    opened: list[Body] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        status, content = routes[target(request)]
+        return httpx.Response(status, stream=Body(content, opened), headers={"Content-Type": "application/json"})
+
+    rt.fake.respond = respond
+    return opened
+
+
+def first_then_stop(rt: Runtime, session: Any, request: Any) -> Any:
+    """The first item of a stream, which is then closed: Java's ``thenCancel``."""
+    if rt.flavor == "sync":
+        items = session.stream(request)
+        first = next(items)
+        items.close()
+        return first
+
+    async def take() -> Any:
+        items = session.stream(request)
+        first = await items.__anext__()
+        await items.aclose()
+        return first
+
+    return rt.run(take())
+
+
+TWO_PAGES = {
+    "GET Elements": (200, json.dumps({"value": [{"Name": "Q1"}, {"Name": "Q2"}], "@odata.nextLink": "Elements?$skiptoken=2"}).encode()),
+    "GET Elements?$skiptoken=2": (200, json.dumps({"value": [{"Name": "Q3"}]}).encode()),
+}
+
+
+def test_releases_buffers_it_hasnt_read_when_cancelled(rt: Runtime) -> None:
+    # Java held pooled buffers it hadn't read; what this client could hold is a response left open
+    opened = from_the_network(rt, TWO_PAGES)
+    assert first_then_stop(rt, rt.session(), ELEMENTS) == {"Name": "Q1"}
+    assert len(opened) == 1 and all(body.closed for body in opened), "closed, whether or not its items were all taken"
+
+
+def test_asks_for_pages_only_as_items_are_taken(rt: Runtime) -> None:
+    from_the_network(rt, TWO_PAGES)
+    session = rt.session()
+    first_then_stop(rt, session, ELEMENTS)
+    assert [target(r) for r in rt.fake.requests] == ["GET Elements"], "no more than the first item needs"
+    assert [e["Name"] for e in streamed(rt, session, ELEMENTS)] == ["Q1", "Q2", "Q3"]
+
+
+@pytest.mark.parametrize(
+    "status,content,error", [(200, b'{"value":[{"Name":"Q1"},', Tm1ProtocolError), (500, b'{"error":{"code":"1","message":"no"}}', Tm1ServerError)]
+)
+def test_releases_the_response_when_a_stream_fails(rt: Runtime, status: int, content: bytes, error: type[Exception]) -> None:
+    opened = from_the_network(rt, {"GET Elements": (status, content)})
+    rt.raises(error, lambda: rt.session().collect(ELEMENTS))
+    assert len(opened) == 1 and all(body.closed for body in opened)
+
+
+# ODataCollectionDecoderTest, for what a page holds: this client reads each page whole, however its
+# bytes arrive, and then gives its items
+
+BODY = (
+    b'{"@odata.context":"$metadata#Elements","@odata.count":3,"value":[\n'
+    b'{"@odata.etag":"W/\\"1\\"","Name":"Q1","Type":"Numeric"},\n'
+    b'{"Name":"Q\'2 {x}","Type":"Numeric","Extra":{"nested":[1,[2,{"a":null}]]}},\n'
+    b'{"Name":"Total","Type":"Consolidated"}],"@odata.nextLink":"Elements?$skiptoken=3"}'
+)
+EXPECTED = [("Q1", "Numeric"), ("Q'2 {x}", "Numeric"), ("Total", "Consolidated")]
+
+
+class Chunks(httpx.SyncByteStream, httpx.AsyncByteStream):
+    """A response body that arrives in the given pieces, as from the network."""
+
+    def __init__(self, chunks: list[bytes]) -> None:
+        self.chunks = chunks
+
+    def __iter__(self) -> Any:
+        yield from self.chunks
+
+    async def __aiter__(self) -> Any:
+        for chunk in self.chunks:
+            yield chunk
+
+
+def in_pieces(*chunks: bytes, status: int = 200) -> httpx.Response:
+    return httpx.Response(status, stream=Chunks(list(chunks)), headers={"Content-Type": "application/json"})
+
+
+def read(rt: Runtime, session: Any, response: httpx.Response, request: Any = ELEMENTS) -> list[Any]:
+    """Every item of a collection TM1 answers with ``response`` (and an empty page after it, if it links one)."""
+    rt.fake.respond = lambda r: response if target(r) == "GET Elements" else {"value": []}
+    return rt.run(session.collect(request))
+
+
+def names_and_types(items: list[Any]) -> list[tuple[str, str]]:
+    return [(item["Name"], item["Type"]) for item in items]
+
+
+def test_decodes_items_and_control_information(rt: Runtime) -> None:
+    session = rt.session()
+    items = read(rt, session, in_pieces(BODY[:7], BODY[7:]))
+    assert names_and_types(items) == EXPECTED
+    assert items[0]["@odata.etag"] == 'W/"1"', "an item's own control information is kept"
+    assert [target(r) for r in rt.fake.requests] == ["GET Elements", "GET Elements?$skiptoken=3"], "the collection's next link is followed"
+
+
+def test_gives_the_same_result_however_the_bytes_are_split(rt: Runtime) -> None:
+    session = rt.session()
+    for split in range(1, len(BODY)):
+        assert names_and_types(read(rt, session, in_pieces(BODY[:split], BODY[split:]))) == EXPECTED, f"split at {split}"
+    rng = random.Random(7)
+    for _ in range(200):
+        cuts = sorted(rng.sample(range(1, len(BODY)), rng.randint(1, 20)))
+        pieces = [BODY[a:b] for a, b in zip([0, *cuts], [*cuts, len(BODY)], strict=True)]
+        assert names_and_types(read(rt, session, in_pieces(*pieces))) == EXPECTED
+
+
+def test_handles_multibyte_characters_split_across_buffers(rt: Runtime) -> None:
+    body = '{"value":[{"Name":"Région 日本 😀","Type":"String"}]}'.encode()
+    session = rt.session()
+    for split in range(1, len(body)):
+        assert read(rt, session, in_pieces(body[:split], body[split:]))[0]["Name"] == "Région 日本 😀"
+
+
+def test_reads_bytes_that_arent_utf8_as_the_replacement_character_however_they_are_split(rt: Runtime) -> None:
+    # As TM1's transaction log gives a password's hash, with "é" (two bytes) beside it
+    body = '{"value":[{"Name":"é'.encode() + bytes([0xE0, 0xEC]) + b"r" + bytes([0xFF, 0xFF]) + '","Type":"é"}]}'.encode()
+    session = rt.session()
+    for split in range(1, len(body)):
+        assert names_and_types(read(rt, session, in_pieces(body[:split], body[split:]))) == [("é\ufffd\ufffdr\ufffd\ufffd", "é")], f"split at {split}"
+
+
+def test_decodes_collections_of_primitives(rt: Runtime) -> None:
+    strings = Tm1Request.list(ODataPath.of("Elements"), ODataQuery.none(), str)
+    assert read(rt, rt.session(), in_pieces(b'{"value":["a",null,"b"]}'), strings) == ["a", "b"]
+
+
+def test_decodes_an_empty_collection(rt: Runtime) -> None:
+    assert read(rt, rt.session(), in_pieces(b'{"@odata.context":"x","value":[]}')) == []
+
+
+def test_fails_on_an_error_instead_of_a_collection(rt: Runtime) -> None:
+    rt.fake.respond = lambda r: in_pieces(b'{"error":{"code":"278","message":"Boom"}}')
+    error = rt.raises(Tm1ProtocolError, lambda: rt.session().collect(ELEMENTS))
+    assert "Boom" in str(error)
+    assert error.error is not None and error.error.code == "278"
+
+
+def test_fails_when_the_response_is_cut_short_after_some_items(rt: Runtime) -> None:
+    # Java gives the two items it read before failing; this client reads a page whole first, so gives none
+    rt.fake.respond = lambda r: in_pieces(BODY[: BODY.index(b"Total")])
+    error = rt.raises(Tm1ProtocolError, lambda: rt.session().collect(ELEMENTS))
+    assert "ended before the collection was complete" in str(error)
+
+
+def test_fails_on_malformed_or_unexpected_bodies(rt: Runtime) -> None:
+    session = rt.session()
+
+    def failure(content: bytes) -> Tm1ProtocolError:
+        rt.fake.respond = lambda r: in_pieces(content)
+        return rt.raises(Tm1ProtocolError, lambda: session.collect(ELEMENTS))
+
+    assert "malformed JSON" in str(failure(b'{"value":[{"Name":}]}'))
+    failure(b"[1,2]")
+    assert "empty" in str(failure(b""))
+    assert "after the collection" in str(failure(b'{"value":[]} {}'))
+
+
+def test_follows_next_links_as_given(rt: Runtime) -> None:
+    pages = {
+        "GET Elements": in_pieces(BODY[:11], BODY[11:]),
+        "GET Elements?$skiptoken=3": {"value": [{"Name": "p2"}], "@odata.nextLink": "Elements?$skiptoken=4&x='a b'"},
+        "GET Elements?$skiptoken=4&x='a%20b'": {"value": [{"Name": "p3"}]},
+    }
+    rt.fake.respond = lambda r: pages[target(r)]
+    assert [e["Name"] for e in rt.run(rt.session().collect(ELEMENTS))] == ["Q1", "Q'2 {x}", "Total", "p2", "p3"]
+    # As TM1 gave them: only the space is percent-encoded, which a URL on the wire needs
+    assert [target(r) for r in rt.fake.requests][1:] == ["GET Elements?$skiptoken=3", "GET Elements?$skiptoken=4&x='a%20b'"]
 
 
 # Tm1Dialect, through a session

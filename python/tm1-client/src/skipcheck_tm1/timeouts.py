@@ -19,7 +19,16 @@ def _seconds(value: float | timedelta) -> float:
 class Tm1Timeouts:
     """Seconds to wait: to connect, for a login, for a request's answer, for the close at the
     end, and how long a refused login is remembered (requests meanwhile fail at once rather
-    than trying the same credentials again; 0 to try every time)."""
+    than trying the same credentials again; 0 to try every time).
+
+    ``login`` is how long to wait for a login response. The authenticator gets as long again to
+    supply the credentials first, since it may ask another server, such as Cognos for a passport:
+    one that doesn't in that time fails the request with a
+    :class:`~skipcheck_tm1.errors.Tm1TransportError` in the ``CONNECT`` phase, which is safe to
+    retry, as nothing was sent to TM1. That holds for the asyncio session and an authenticator it
+    awaits. The sync session can't give up on an authenticator, which is a call that blocks, so one
+    of your own must set its own timeout there; the ones that ask Cognos are bounded by their HTTP
+    client's timeouts in both flavors."""
 
     connect: float = 10.0
     login: float = 30.0
@@ -61,7 +70,8 @@ class Tm1Timeouts:
             return self
 
         def login(self, value: float | timedelta) -> Tm1Timeouts.Builder:
-            """Sets the login timeout: how long to wait for a login response."""
+            """Sets the login timeout: how long to wait for a login response, and, before that, for
+            the authenticator to supply the credentials."""
             self._values["login"] = value
             return self
 

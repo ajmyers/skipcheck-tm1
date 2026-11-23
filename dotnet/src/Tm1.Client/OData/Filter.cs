@@ -15,10 +15,18 @@ public sealed partial class Filter : IEquatable<Filter>
 {
     private readonly string _expression;
 
-    private Filter(string expression) => _expression = expression;
+    private readonly bool _raw;
 
-    /// <summary>An expression written by hand, used as is.</summary>
-    public static Filter Raw(string expression) => new(expression ?? throw new ArgumentNullException(nameof(expression)));
+    private Filter(string expression, bool raw = false)
+    {
+        _expression = expression;
+        _raw = raw;
+    }
+
+    /// <summary>An expression written by hand, used as is. Combined with others by
+    /// <see cref="And"/> or <see cref="Or"/>, it's put in parentheses, so it keeps its meaning
+    /// whatever operators it uses.</summary>
+    public static Filter Raw(string expression) => new(expression ?? throw new ArgumentNullException(nameof(expression)), raw: true);
 
     /// <summary>All of the given filters, joined with <c>and</c>; the filter itself if there's only
     /// one.</summary>
@@ -112,8 +120,12 @@ public sealed partial class Filter : IEquatable<Filter>
         {
             throw new ArgumentException($"{op}() needs at least one filter");
         }
-        return filters.Length == 1 ? filters[0] : new("(" + string.Join($" {op} ", filters.Select(f => f._expression)) + ")");
+        return filters.Length == 1 ? filters[0] : new("(" + string.Join($" {op} ", filters.Select(f => f.Operand())) + ")");
     }
+
+    /// <summary>The expression as an operand of <c>and</c> or <c>or</c>: a raw one might not stand
+    /// on its own, so it gets parentheses.</summary>
+    private string Operand() => _raw ? $"({_expression})" : _expression;
 
     private static Filter Function(string name, ODataProperty property, string argument) => new($"{name}({property.Path},{ODataLiterals.String(argument)})");
 

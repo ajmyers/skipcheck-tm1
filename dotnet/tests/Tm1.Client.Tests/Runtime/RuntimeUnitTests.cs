@@ -21,7 +21,7 @@ namespace Skipcheck.Tm1.Client.Tests.Runtime;
 public class Tm1ErrorsTest
 {
     [Fact]
-    public void ReadsTheODataErrorBody()
+    public void ReadsTheOdataErrorBody()
     {
         var e = Error("{\"error\":{\"code\":\"278\",\"message\":\"Boom\",\"target\":\"Name\",\"details\":[{\"code\":\"1\",\"message\":\"inner\"}]}}")!;
         Assert.Equal("278", e.Code);
@@ -433,6 +433,17 @@ public class FilterTest
     }
 
     [Fact]
+    public void KeepsARawExpressionsMeaningWhenCombined()
+    {
+        var either = Filter.Raw("A eq 1 or B eq 2");
+        Assert.Equal("A eq 1 or B eq 2", either.ToString());
+        Assert.Equal("((A eq 1 or B eq 2) and (Name eq 'x'))", Filter.And(either, Name.Eq("x")).ToString());
+        Assert.Equal("((Name eq 'x') or (A eq 1 and B eq 2))", (Name.Eq("x") | Filter.Raw("A eq 1 and B eq 2")).ToString());
+        Assert.Equal("A eq 1 or B eq 2", Filter.And(either).ToString());
+        Assert.Equal("not(A eq 1 or B eq 2)", Filter.Not(either).ToString());
+    }
+
+    [Fact]
     public void UsesCanonicalFunctions()
     {
         Assert.Equal("contains(Name,'Q1')", Filter.Contains(Name, "Q1").ToString());
@@ -658,6 +669,47 @@ public class Tm1VersionTest
             + "<Schema xmlns=\"http://docs.oasis-open.org/odata/ns/edm\" Namespace=\"ibm.tm1.api.v1\"><EntityType/></Schema>"
             + "</edmx:DataServices></edmx:Edmx>";
         Assert.Contains("EntityType has no Name", Assert.Throws<Tm1ProtocolException>(() => Tm1Capabilities.Parse(csdl)).Message);
+    }
+
+    /// <summary>Java's <c>reportsAnOperationItCantModelAsAParseError</c>: a bound operation needs the parameter it's bound to.</summary>
+    [Fact]
+    public void ReportsAnOperationItCantModelAsAParseError()
+    {
+        const string boundToNothing = """
+            <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+              <edmx:DataServices>
+                <Schema Namespace="ibm.tm1.api.v1" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+                  <Action Name="Reserve" IsBound="true"/>
+                </Schema>
+              </edmx:DataServices>
+            </edmx:Edmx>
+            """;
+        Assert.Contains("Reserve", Assert.Throws<Tm1ProtocolException>(() => Tm1Capabilities.Parse(boundToNothing)).Message);
+    }
+
+    /// <summary>.NET only, for the same rule: whatever the reader can't make a model of is a document
+    /// the client can't read, never .NET's own exception. (Java's
+    /// <c>usesTheJdksParserWhateverTheApplicationHasInstalled</c> has no counterpart: an application
+    /// can't replace .NET's XML parser.)</summary>
+    [Theory]
+    [InlineData("<Schema Namespace=\"a\" Alias=\"x\"/><Schema Namespace=\"b\" Alias=\"x\"/>")]
+    [InlineData("<Schema Namespace=\"a\"><Action Name=\"Reserve\" IsBound=\"true\"><Parameter Name=\"it\" Type=\"Collection(\"/></Action></Schema>")]
+    public void ReportsMetadataItCantModelAsAParseError(string schemas)
+    {
+        var csdl =
+            "<edmx:Edmx xmlns:edmx=\"http://docs.oasis-open.org/odata/ns/edmx\" Version=\"4.0\"><edmx:DataServices>"
+            + schemas.Replace("<Schema ", "<Schema xmlns=\"http://docs.oasis-open.org/odata/ns/edm\" ", StringComparison.Ordinal)
+            + "</edmx:DataServices></edmx:Edmx>";
+        Assert.Contains("$metadata", Assert.Throws<Tm1ProtocolException>(() => Tm1Capabilities.Parse(csdl)).Message);
+    }
+
+    /// <summary>As Java's parser: refusing a DOCTYPE rules out external entities and entity expansion entirely.</summary>
+    [Fact]
+    public void RefusesADoctypeAsAParseError()
+    {
+        const string csdl =
+            "<!DOCTYPE x [<!ENTITY e SYSTEM \"file:///etc/passwd\">]><edmx:Edmx xmlns:edmx=\"http://docs.oasis-open.org/odata/ns/edmx\">&e;</edmx:Edmx>";
+        Assert.Contains("DTD", Assert.Throws<Tm1ProtocolException>(() => Tm1Capabilities.Parse(csdl)).Message);
     }
 
     [Fact]

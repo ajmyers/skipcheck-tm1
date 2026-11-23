@@ -32,7 +32,7 @@ function answer(expectation: Record<string, any> | undefined): unknown {
 
 describe("the dimension scenarios, offline", () => {
   for (const name of ["dimensions", "hierarchies", "elements", "levels"]) {
-    it(`runs each step of ${name} once`, async () => {
+    it(`runs each step once: ${name}`, async () => {
       const scenario = live.scenarios().find((s) => s.name === name)!;
       const names = live.namesFor(scenario);
       const tm1 = new FakeTm1();

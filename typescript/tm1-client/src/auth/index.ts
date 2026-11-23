@@ -12,9 +12,17 @@ function base64(text: string): string {
 export type Tm1Supplier = (signal?: AbortSignal) => string | Promise<string>;
 
 /** How a session logs in: the `Authorization` header of its first request, as the Java client's
- * `Tm1Authenticator`. TM1 answers with a `TM1SessionId` cookie, which later requests send instead. */
+ * `Tm1Authenticator`. TM1 answers with a `TM1SessionId` cookie, which later requests send instead.
+ *
+ * A `Tm1SessionPool` keeps one session for each set of a user's own credentials, and tells them
+ * apart with {@link equals}. The authenticators here that hold their credentials ({@link basic},
+ * {@link camNamespace}, {@link camPassport} given a passport, {@link cognosLogon}) are equal when the
+ * credentials are. One that asks a supplier ({@link camPassport} given a supplier,
+ * {@link cognosIdToken}) is only equal to itself, so keep it and pass the same one each time; so is
+ * your own, unless it defines `equals`. */
 export abstract class Tm1Authenticator {
-  /** The header to log in with; asked for at each login. */
+  /** The header to log in with; asked for at each login. A session waits for it no longer than its
+   * login timeout, and aborts `signal` when it gives up. */
   abstract authorization(signal?: AbortSignal): Promise<string>;
 
   /** Who logs in, without secrets, for logs and errors. */
@@ -23,6 +31,13 @@ export abstract class Tm1Authenticator {
   /** The description only: never the credentials. */
   toString(): string {
     return `Tm1Authenticator[${this.describe()}]`;
+  }
+
+  /** Whether `other` logs in with the same credentials (Java's `equals`), which is how a
+   * `Tm1SessionPool` tells one user's sessions apart. Only itself, unless a subclass says otherwise:
+   * the ones made here that hold their credentials do. */
+  equals(other: unknown): boolean {
+    return this === other;
   }
 
   /** TM1's own security (modes 1 and 2). */
@@ -43,28 +58,50 @@ export abstract class Tm1Authenticator {
     return new Fixed("CAMNamespace " + base64(`${user}:${password}:${namespace}`), `CAMNamespace ${namespace}/${user}`);
   }
 
-  /** CAM security with a passport, fetched at each login (a passport expires). */
-  static camPassport(passport: Tm1Supplier): Tm1Authenticator {
+  /** CAM security with one CAM passport the application already holds, such as the one a signed-in
+   * user's request carries: `CAMPassport <passport>` (Java's `camPassport(String)`). The passport
+   * isn't renewed: once it expires, a login with it is refused. Two of these are equal when their
+   * passports are, so a `Tm1SessionPool` gives a user's renewed passport a session of its own. */
+  static camPassport(passport: string): Tm1Authenticator;
+  /** CAM security with a passport, fetched at each login (a passport expires). Equal only to itself:
+   * keep it, and give a `Tm1SessionPool` the same one each time. */
+  static camPassport(passport: Tm1Supplier): Tm1Authenticator;
+  static camPassport(passport: string | Tm1Supplier): Tm1Authenticator {
+    if (typeof passport === "string") return new Fixed("CAMPassport " + passport, "CAMPassport");
     if (typeof passport !== "function") throw new TypeError("passport is required");
     return new Passport(passport, "CAMPassport");
   }
 
   /** CAM security with a passport the client gets from Cognos itself, logging on with a user name
    * and password: a fresh passport for each login. Unlike {@link camNamespace}, TM1 never sees the
-   * password, only Cognos does. */
+   * password, only Cognos does. Two of these are equal when they were made from the same address,
+   * namespace, credentials and `fetch`. */
   static cognosLogon(dispatcher: string, namespace: string, user: string, password: string, fetch?: typeof globalThis.fetch): Tm1Authenticator {
-    return new Passport(CognosPassports.password(dispatcher, namespace, user, password, fetch), `CAMPassport from Cognos ${namespace}/${user}`);
+    return new Passport(CognosPassports.password(dispatcher, namespace, user, password, fetch), `CAMPassport from Cognos ${namespace}/${user}`, [
+      dispatcher,
+      namespace,
+      user,
+      password,
+      fetch,
+    ]);
   }
 
   /** CAM security with a passport the client gets from Cognos for an OpenID Connect ID token it
-   * already holds: a fresh passport for each login. */
+   * already holds: a fresh passport for each login. The token can't be compared, so two of these
+   * are equal only when they were made with the same `idToken` supplier (and address, namespace and
+   * `fetch`): keep the authenticator, or the supplier. */
   static cognosIdToken(dispatcher: string, namespace: string, idToken: Tm1Supplier, fetch?: typeof globalThis.fetch): Tm1Authenticator {
-    return new Passport(CognosPassports.idToken(dispatcher, namespace, idToken, fetch), `CAMPassport from Cognos ${namespace} (ID token)`);
+    return new Passport(CognosPassports.idToken(dispatcher, namespace, idToken, fetch), `CAMPassport from Cognos ${namespace} (ID token)`, [
+      dispatcher,
+      namespace,
+      idToken,
+      fetch,
+    ]);
   }
 }
 
-/** Credentials that don't change: Basic and CAMNamespace. The value is a private field, so neither
- * `JSON.stringify` nor `console.log` shows it. */
+/** Credentials that don't change: Basic, CAMNamespace and a passport the application holds. The
+ * value is a private field, so neither `JSON.stringify` nor `console.log` shows it. */
 class Fixed extends Tm1Authenticator {
   readonly #value: string;
 
@@ -83,14 +120,35 @@ class Fixed extends Tm1Authenticator {
   describe(): string {
     return this.description;
   }
+
+  /** Equal when the credentials are. */
+  override equals(other: unknown): boolean {
+    return this === other || (other instanceof Fixed && other.#value === this.#value);
+  }
 }
 
+/** A passport from a supplier, asked at each login. */
 class Passport extends Tm1Authenticator {
+  /** What it was made from, which is what makes two of them equal; undefined for a supplier of the
+   * caller's own, which is equal only to itself. Private, as it holds a password. */
+  readonly #madeFrom: readonly unknown[] | undefined;
+
   constructor(
     private readonly passport: Tm1Supplier,
     private readonly description: string,
+    madeFrom?: readonly unknown[],
   ) {
     super();
+    this.#madeFrom = madeFrom;
+  }
+
+  /** Equal when they were made from the same address, namespace and credentials. */
+  override equals(other: unknown): boolean {
+    if (this === other) return true;
+    if (!(other instanceof Passport)) return false;
+    const mine = this.#madeFrom;
+    const theirs = other.#madeFrom;
+    return mine !== undefined && theirs !== undefined && mine.length === theirs.length && mine.every((part, i) => part === theirs[i]);
   }
 
   async authorization(signal?: AbortSignal): Promise<string> {

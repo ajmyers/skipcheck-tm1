@@ -9,7 +9,15 @@ namespace Skipcheck.Tm1.Client.Session;
 /// account itself, the service account impersonating a user (<c>TM1-Impersonate</c>), or a user
 /// logging in with their own credentials. Two identities are equal when they're of the same kind
 /// and name TM1's way: case and spaces don't count, so <c>Jane Doe</c> and <c>janedoe</c> share a
-/// session.</summary>
+/// session.
+///
+/// <para>For a user's own credentials, the credentials must be equal too. A name is only what the
+/// caller says, and it's TM1 that checks credentials, at login: if the name alone found the
+/// session, anyone giving a logged-in user's name would get that user's session without TM1 ever
+/// seeing what they offered, and a corrected password or a renewed passport would never be used.
+/// So different credentials for the same name get a session of their own, and TM1 accepts or
+/// refuses them. See <see cref="Tm1Authenticator"/> for which authenticators are equal to one
+/// another.</para></summary>
 public sealed class Tm1Identity : IEquatable<Tm1Identity>
 {
     private static readonly Tm1Identity ServiceAccountIdentity = new(IdentityKind.ServiceAccount, "", null);
@@ -46,7 +54,11 @@ public sealed class Tm1Identity : IEquatable<Tm1Identity>
     /// <exception cref="ArgumentException"><paramref name="user"/> is blank or has a control character.</exception>
     public static Tm1Identity Impersonating(string user) => new(IdentityKind.Impersonating, UserNames.CheckImpersonated(user), null);
 
-    /// <summary>A user with their own credentials; <paramref name="name"/> tells identities apart.</summary>
+    /// <summary>A user with their own credentials; <paramref name="name"/> says who they belong to,
+    /// for the pool's key and for logs.</summary>
+    /// <param name="name">Who the credentials belong to, such as the user name.</param>
+    /// <param name="authenticator">Their credentials. Pass one that is equal each time, or the same
+    /// object: an authenticator the pool hasn't seen for this name gets a new session.</param>
     public static Tm1Identity WithCredentials(string name, Tm1Authenticator authenticator)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -77,13 +89,14 @@ public sealed class Tm1Identity : IEquatable<Tm1Identity>
 
     /// <inheritdoc/>
     public bool Equals(Tm1Identity? other) =>
-        ReferenceEquals(this, other) || (other is not null && Kind == other.Kind && _comparableName == other._comparableName);
+        ReferenceEquals(this, other)
+        || (other is not null && Kind == other.Kind && _comparableName == other._comparableName && Equals(Authenticator, other.Authenticator));
 
     /// <inheritdoc/>
     public override bool Equals(object? obj) => Equals(obj as Tm1Identity);
 
     /// <inheritdoc/>
-    public override int GetHashCode() => HashCode.Combine(Kind, _comparableName);
+    public override int GetHashCode() => HashCode.Combine(Kind, _comparableName, Authenticator);
 
     /// <inheritdoc/>
     public override string ToString() =>

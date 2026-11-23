@@ -16,7 +16,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any, Generic, TypeVar
 
-from .errors import Tm1ProtocolError, api_error
+from .errors import ODataError, Tm1ProtocolError, api_error
 from .odata import ODataQuery, query_value
 
 COOKIE = "TM1SessionId"
@@ -56,6 +56,36 @@ class Reply:
     @property
     def text(self) -> str:
         return self.content.decode("utf-8", "replace")
+
+
+def collection(reply: Reply, method: str | None = None, url: str | None = None) -> tuple[list[Any], str | None]:
+    """The items and next link of one page of a collection. A null item is left out, as the other
+    clients leave it out. A body that isn't a page fails with the protocol error the Java client's
+    collection decoder gives, in its words."""
+    content = reply.content
+    if reply.status == 204 or not content.strip():
+        raise Tm1ProtocolError("The response was empty", None, method, url)
+    try:
+        try:
+            doc = json.loads(content)
+        except UnicodeDecodeError:
+            # As Reply.json: bytes that aren't UTF-8 read as U+FFFD
+            doc = json.loads(content.decode("utf-8", "replace"))
+    except json.JSONDecodeError as e:
+        if e.msg == "Extra data":
+            message = "Unexpected content after the collection"
+        elif e.msg.startswith("Unterminated") or e.pos >= len(e.doc.rstrip()):
+            message = f"The response ended before the collection was complete ({e.msg})"
+        else:
+            message = f"TM1 sent malformed JSON: {e}"
+        raise Tm1ProtocolError(message, None, method, url) from e
+    if isinstance(doc, dict) and "error" in doc and "value" not in doc:
+        error = ODataError.from_json(doc)
+        raise Tm1ProtocolError("TM1 reported an error in the response" + ("" if error is None else f": {error.message}"), error, method, url)
+    if not isinstance(doc, dict) or not isinstance(doc.get("value"), list):
+        raise Tm1ProtocolError(f"Expected a JSON object with a 'value' array, got {str(doc)[:200]}", None, method, url)
+    next_link = doc.get("@odata.nextLink")
+    return [item for item in doc["value"] if item is not None], next_link if isinstance(next_link, str) else None
 
 
 def _ignore(reply: Reply) -> None:
@@ -230,8 +260,10 @@ def batch_body(calls: list[tuple[Call, Context]]) -> dict[str, Any]:
 
 def batch_replies(doc: Any, count: int) -> list[Reply | None]:
     """The answers of a ``$batch`` response, in the order of its requests."""
+    if not isinstance(doc, dict):
+        raise Tm1ProtocolError(f"TM1's batch response isn't a JSON object: {str(doc)[:100]}")
     by_id: dict[str, Any] = {}
-    for item in (doc or {}).get("responses", []):
+    for item in doc.get("responses") or []:
         by_id[str(item.get("id"))] = item
     out: list[Reply | None] = []
     for i in range(1, count + 1):

@@ -4,6 +4,8 @@ package io.skipcheck.tm1.client.session;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -12,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientResponse;
 
 import io.skipcheck.tm1.client.Tm1Request;
+import io.skipcheck.tm1.client.conformance.ConformanceTm1;
 import io.skipcheck.tm1.client.error.Tm1ProtocolException;
 import io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException;
 import io.skipcheck.tm1.client.metadata.MetadataSnapshot;
@@ -19,6 +22,7 @@ import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.version.Tm1Capability;
 import io.skipcheck.tm1.client.version.Tm1Version;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tools.jackson.databind.JsonNode;
@@ -79,6 +83,26 @@ class Tm1SessionCapabilitiesTest {
 					}))
 			.verify();
 		assertThat(tm1.requests("GET Bananas")).isEmpty();
+	}
+
+	@Test
+	void refusesARequestTheServerCantServeInABatchAndStillSendsTheRest() {
+		tm1.on("POST $batch",
+				r -> Mono.just(FakeTm1.json(200, "{\"responses\":[{\"id\":\"2\",\"status\":200,\"body\":{}}]}")));
+		Tm1SessionBatch batch = tm1.session().batch();
+		Flux<JsonNode> bananas = batch.session()
+			.stream(Tm1Request.list(ODataPath.of("Bananas"), ODataQuery.none(), JsonNode.class)
+				.requires(Tm1Capability.entitySet("Bananas").since("99.0")));
+		Mono<JsonNode> server = batch.session()
+			.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), JsonNode.class));
+
+		StepVerifier.create(batch.run()).expectComplete().verify(Duration.ofSeconds(5));
+		StepVerifier.create(bananas).expectError(Tm1UnsupportedOperationException.class).verify(Duration.ofSeconds(5));
+		StepVerifier.create(server).expectNextCount(1).expectComplete().verify(Duration.ofSeconds(5));
+		assertThat(tm1.requests("POST $batch")).singleElement()
+			.satisfies(sent -> assertThat(new String(ConformanceTm1.body(sent).block(), StandardCharsets.UTF_8))
+				.contains("Server")
+				.doesNotContain("Bananas"));
 	}
 
 	@Test

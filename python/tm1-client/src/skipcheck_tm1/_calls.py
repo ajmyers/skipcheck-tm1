@@ -13,7 +13,7 @@ from typing import Any, ClassVar
 
 from pydantic import TypeAdapter
 
-from ._protocol import TEXT, Call, Reply
+from ._protocol import TEXT, Call, Reply, collection
 from .base import Tm1Model, to_odata
 from .errors import Tm1ProtocolError
 from .odata import Alias, Bind, ODataPath, ODataQuery
@@ -120,10 +120,8 @@ class Page:
 
 
 def page_of(tp: Any, reply: Reply) -> Page:
-    doc = reply.json()
-    if not isinstance(doc, dict) or "value" not in doc:
-        raise Tm1ProtocolError(f"Expected a collection, got {str(doc)[:200]}")
-    return Page(_adapter(list[tp]).validate_python(doc["value"]), doc.get("@odata.nextLink"))
+    items, next_link = collection(reply)
+    return Page(_adapter(list[tp]).validate_python(items), next_link)
 
 
 class Returns:

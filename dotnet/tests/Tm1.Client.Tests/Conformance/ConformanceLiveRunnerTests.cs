@@ -41,7 +41,7 @@ public class ConformanceLiveRunnerTests
         };
 
     [Fact]
-    public async Task RunsTheCubesScenarioAndWritesItsTraffic()
+    public async Task RunsTheCubesScenarioAndRecordsItsTraffic()
     {
         ConformanceLive.TrafficDirectory = Directory.CreateTempSubdirectory("conformance-").FullName;
         var scenario = ConformanceLive.Load("cubes");

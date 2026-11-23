@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
  * Every binary expression is parenthesized, so precedence never depends on how a filter
  * was composed. Values are written as OData literals ({@link ODataLiterals#of}); the
  * whole expression is percent-encoded once, when the query is rendered. {@link #raw}
- * takes any expression as is.
+ * takes any expression as is, and is parenthesized when it's combined with others.
  *
  * <p>
  * Note that TM1 compares names in {@code $filter} case- and space-sensitively, while
@@ -30,18 +30,30 @@ public final class Filter {
 
 	private final String expression;
 
+	/**
+	 * Whether the expression is {@link #raw}: text that may need parentheses around it.
+	 */
+	private final boolean raw;
+
 	private Filter(String expression) {
+		this(expression, false);
+	}
+
+	private Filter(String expression, boolean raw) {
 		this.expression = expression;
+		this.raw = raw;
 	}
 
 	/**
-	 * An expression written by hand, used as is.
+	 * An expression written by hand, used as is. Combined with others by {@link #and} or
+	 * {@link #or}, it's put in parentheses, so it keeps its meaning whatever operators it
+	 * uses.
 	 * @param expression the expression, unencoded
 	 * @return the filter
 	 */
 	public static Filter raw(String expression) {
 		Objects.requireNonNull(expression, "expression");
-		return new Filter(expression);
+		return new Filter(expression, true);
 	}
 
 	/**
@@ -200,9 +212,16 @@ public final class Filter {
 		if (filters.length == 1) {
 			return filters[0];
 		}
-		return new Filter(
-				"(" + Arrays.stream(filters).map(f -> f.expression).collect(Collectors.joining(" " + operator + " "))
-						+ ")");
+		return new Filter("("
+				+ Arrays.stream(filters).map(Filter::operand).collect(Collectors.joining(" " + operator + " ")) + ")");
+	}
+
+	/**
+	 * The expression as an operand of {@code and} or {@code or}. Every expression this
+	 * class builds stands on its own; a raw one might not, so it gets parentheses.
+	 */
+	private String operand() {
+		return raw ? "(" + expression + ")" : expression;
 	}
 
 	private static Filter function(String name, ODataProperty property, String argument) {

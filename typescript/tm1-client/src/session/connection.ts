@@ -115,6 +115,8 @@ export class Connection {
   private version: { read: Promise<Tm1Version>; for: Attempt } | undefined;
   private closed = false;
   private closing: Promise<void> | undefined;
+  /** Requests running now: see {@link isBusy}. */
+  private running = 0;
 
   /** @internal A connection to the service root `root`, logging in with `authenticator`. */
   constructor(
@@ -135,6 +137,33 @@ export class Connection {
   /** Whether the session was closed. */
   get isClosed(): boolean {
     return this.closed;
+  }
+
+  /** Whether a request is running: sent, or waiting for the login, and not yet answered in full,
+   * failed or cancelled. An async request counts until its result is read, and a stream from its
+   * first page until it is finished or stopped. */
+  get isBusy(): boolean {
+    return this.running > 0;
+  }
+
+  /** @internal Counts one more request as running, until the function it returns is called. */
+  hold(): () => void {
+    this.running++;
+    let held = true;
+    return () => {
+      if (held) this.running--;
+      held = false;
+    };
+  }
+
+  /** @internal Runs `work`, counted as a running request until it settles. */
+  async busy<T>(work: () => Promise<T>): Promise<T> {
+    const release = this.hold();
+    try {
+      return await work();
+    } finally {
+      release();
+    }
   }
 
   /** The URL of a path relative to the service root (or of a link TM1 sent), as sent: not
@@ -190,7 +219,7 @@ export class Connection {
   async sendLogin(seedCookie: string | undefined): Promise<Login> {
     const url = this.root + LOGIN_PATH;
     // The authenticator's own failures (say, a passport it couldn't get) reach the caller unchanged
-    const authorization = await this.authenticator.authorization();
+    const authorization = await this.credentials(url);
     if (!authorization) throw new Error(`The authenticator ${this.authenticator.describe()} supplied no credentials`);
     const headers: Record<string, string> = { ...this.baseHeaders(JSON_ACCEPT), Authorization: authorization };
     // At login only: TM1 decides the identity then and ignores the header later
@@ -231,9 +260,46 @@ export class Connection {
     return { cookie, id: n };
   }
 
+  /** The authenticator's credentials, given up on after the login timeout. The authenticator may ask
+   * another server (Cognos, for a passport), and one that never answers would otherwise hold every
+   * request on the session, and `close()`, for ever. The failure is a transport one in the connect
+   * phase: nothing has been sent to TM1, so it is safe to retry. The authenticator's signal is
+   * aborted then, so it can stop what it was doing. */
+  private async credentials(url: string): Promise<string> {
+    const within = this.timeouts.login;
+    const deadline = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const why = new Error(`The authenticator ${this.authenticator.describe()} supplied no credentials within ${within} ms`);
+        reject(new Tm1TransportException("Connect", true, "GET", url, why));
+        deadline.abort(why);
+      }, within);
+    });
+    try {
+      return await Promise.race([this.authenticator.authorization(deadline.signal), timedOut]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** Sends a request with the session cookie, logging in again once on 401; a second 401 is a
-   * `Tm1AuthenticationException` of kind `Unauthenticated`. */
-  async send(
+   * `Tm1AuthenticationException` of kind `Unauthenticated`. The session is busy ({@link isBusy})
+   * until it has its answer. */
+  send(
+    method: string,
+    url: string,
+    body: Uint8Array | undefined,
+    contentType: string | undefined,
+    headers: Readonly<Record<string, string>>,
+    accept: string,
+    timeout: number | undefined,
+    signal: AbortSignal | undefined,
+  ): Promise<Reply> {
+    return this.busy(() => this.exchange(method, url, body, contentType, headers, accept, timeout, signal));
+  }
+
+  private async exchange(
     method: string,
     url: string,
     body: Uint8Array | undefined,

@@ -9,7 +9,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
@@ -33,6 +35,7 @@ import io.skipcheck.tm1.client.error.Tm1ApiException;
 import io.skipcheck.tm1.client.error.Tm1ErrorClassifier;
 import io.skipcheck.tm1.client.error.Tm1ErrorKind;
 import io.skipcheck.tm1.client.error.Tm1ProtocolException;
+import io.skipcheck.tm1.client.error.Tm1TransportException;
 import io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException;
 import io.skipcheck.tm1.client.odata.ODataCollectionDecoder;
 import io.skipcheck.tm1.client.odata.ODataJson;
@@ -120,6 +123,9 @@ final class Connection {
 
 	private final CapabilitiesCache capabilitiesCache;
 
+	/** Requests running now: see {@link #isBusy()}. */
+	private final AtomicInteger running = new AtomicInteger();
+
 	/** Set once by {@link #close()}. Guarded by this. */
 	private boolean closed;
 
@@ -144,6 +150,14 @@ final class Connection {
 
 	String root() {
 		return root;
+	}
+
+	/**
+	 * Whether a request is running: sent, or waiting for the login, and not yet answered
+	 * in full, failed or cancelled. An async request counts until its result is read.
+	 */
+	boolean isBusy() {
+		return running.get() > 0;
 	}
 
 	synchronized boolean isClosed() {
@@ -336,11 +350,18 @@ final class Connection {
 	}
 
 	private <T> Flux<T> page(Tm1Request<T> request, URI uri) {
+		return items(request,
+				exchange(request, uri, response -> ODataCollectionDecoder.decode(response.bodyToFlux(DataBuffer.class),
+						mapper, request.type(), request.method().name(), uri.toString())));
+	}
+
+	/**
+	 * The items of one decoded page, then those of the pages after it, if it has a next
+	 * link.
+	 */
+	private <T> Flux<T> items(Tm1Request<T> request, Flux<ODataCollectionDecoder.Event<T>> events) {
 		return Flux.defer(() -> {
 			String[] next = new String[1];
-			Flux<ODataCollectionDecoder.Event<T>> events = exchange(request, uri,
-					response -> ODataCollectionDecoder.decode(response.bodyToFlux(DataBuffer.class), mapper,
-							request.type(), request.method().name(), uri.toString()));
 			Flux<T> items = events.handle((event, sink) -> {
 				if (event instanceof ODataCollectionDecoder.Event.Item<T> item && item.value() != null) {
 					sink.next(item.value());
@@ -369,12 +390,16 @@ final class Connection {
 	 * replay is final, so a server that keeps refusing can't cause a loop of logins.
 	 */
 	private <T, R> Flux<R> exchange(Tm1Request<T> request, URI uri, Function<ClientResponse, Flux<R>> onSuccess) {
-		return Flux.defer(() -> {
+		Flux<R> exchange = Flux.defer(() -> {
 			Attempt used = current();
 			return used.login.flatMapMany(session -> send(request, uri, session, onSuccess))
 				.onErrorResume(Expired.class, expired -> relogin(used, expired.cookie).login
 					.flatMapMany(session -> send(request, uri, session, onSuccess)));
 		}).onErrorMap(Expired.class, expired -> unauthenticated(request, uri));
+		return Flux.defer(() -> {
+			running.incrementAndGet();
+			return exchange.doFinally(signal -> running.decrementAndGet());
+		});
 	}
 
 	private <T, R> Flux<R> send(Tm1Request<T> request, URI uri, LoggedIn session,
@@ -460,9 +485,24 @@ final class Connection {
 	 */
 	private Mono<Throwable> errorOf(ClientResponse response, String method, URI uri) {
 		int status = response.statusCode().value();
-		return response.bodyToMono(byte[].class)
-			.defaultIfEmpty(new byte[0])
-			.map(body -> errorFrom(status, body, method, uri));
+		return bytes(response).map(body -> errorFrom(status, body, method, uri));
+	}
+
+	/**
+	 * A response's whole body, empty if it has none. Joined from its buffers rather than
+	 * read with {@code bodyToMono(byte[].class)}, whose codec refuses bodies over 256 KB.
+	 */
+	private static Mono<byte[]> bytes(ClientResponse response) {
+		return DataBufferUtils.join(response.bodyToFlux(DataBuffer.class)).map(buffer -> {
+			try {
+				byte[] bytes = new byte[buffer.readableByteCount()];
+				buffer.read(bytes);
+				return bytes;
+			}
+			finally {
+				DataBufferUtils.release(buffer);
+			}
+		}).defaultIfEmpty(new byte[0]);
 	}
 
 	/** The exception for an error status and its body, wherever the body came from. */
@@ -509,15 +549,11 @@ final class Connection {
 							method, uri.toString(), e));
 				}
 			}
-			case COLLECTION ->
-				ODataCollectionDecoder
-					.decode(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(body)), mapper, request.type(),
-							method, uri.toString())
-					.handle((event, sink) -> {
-						if (event instanceof ODataCollectionDecoder.Event.Item<T> item && item.value() != null) {
-							sink.next(item.value());
-						}
-					});
+			// A next link is followed with ordinary requests, as stream() does: the rest
+			// of the collection isn't part of the async result or the batch
+			case COLLECTION -> items(request,
+					ODataCollectionDecoder.decode(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(body)), mapper,
+							request.type(), method, uri.toString()));
 		};
 	}
 
@@ -534,9 +570,7 @@ final class Connection {
 			if (response.statusCode().value() != 202) {
 				// TM1 answered at once: read it as an ordinary response
 				return request.response() == Tm1Request.Response.COLLECTION
-						? response.bodyToMono(byte[].class)
-							.defaultIfEmpty(new byte[0])
-							.flatMapMany(body -> decode(request, uri, response.statusCode().value(), body))
+						? bytes(response).flatMapMany(body -> decode(request, uri, response.statusCode().value(), body))
 						: read(request, uri, response).flux();
 			}
 			String location = response.headers().asHttpHeaders().getFirst(HttpHeaders.LOCATION);
@@ -557,7 +591,7 @@ final class Connection {
 			if (response.statusCode().value() == 202) {
 				return response.releaseBody().thenMany(Flux.<byte[]>empty());
 			}
-			return response.bodyToMono(byte[].class).defaultIfEmpty(new byte[0]).flux();
+			return bytes(response).flux();
 		}).next();
 		Flux<T> result = Mono.defer(() -> once)
 			.repeatWhenEmpty(Integer.MAX_VALUE, polls -> polls.concatMap(n -> Mono.delay(every)))
@@ -587,11 +621,17 @@ final class Connection {
 	private Mono<LoggedIn> login(@Nullable String seedCookie, String reason) {
 		URI uri = uri(LOGIN_PATH);
 		// The authenticator's own failures (say, a passport it couldn't get) reach the
-		// caller
-		// unchanged; only the login request's are mapped
+		// caller unchanged; only the login request's are mapped. It gets the login's
+		// timeout too: it may ask another server (Cognos, for a passport), and one that
+		// never answers would otherwise hold every request, and close(), for ever.
 		Mono<LoggedIn> login = authenticator.authorization()
 			.switchIfEmpty(Mono.error(() -> new IllegalStateException(
 					"The authenticator " + authenticator.describe() + " supplied no credentials")))
+			.timeout(timeouts.login(),
+					Mono.error(() -> new Tm1TransportException(Tm1TransportException.Phase.CONNECT, true, "GET",
+							uri.toString(),
+							new TimeoutException("The authenticator " + authenticator.describe()
+									+ " supplied no credentials within " + timeouts.login()))))
 			.flatMap(authorization -> sendLogin(uri, authorization, seedCookie));
 		return observe("tm1.session.login", "tm1 login", reason, login)
 			.doOnNext(session -> log.info("Logged in to TM1 at {} as {} (session {}, {})", root,

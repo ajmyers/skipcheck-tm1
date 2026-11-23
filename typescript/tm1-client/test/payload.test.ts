@@ -119,7 +119,7 @@ describe("payloads", () => {
     ["cellset", model.Cellset],
   ];
 
-  it.each(payloads)("reads %s as TM1 sent it, its date-times and durations as Java reads them", (payload, type) => {
+  it.each(payloads)("decodes and encodes back to the same JSON: %s", (payload, type) => {
     const text = readFileSync(join(Repo.payloads, payload + ".json"), "utf8");
     const doc = JSON.parse(text) as Record<string, unknown>;
     const items = Array.isArray(doc["value"]) ? (doc["value"] as unknown[]) : [doc];

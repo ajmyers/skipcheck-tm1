@@ -134,7 +134,7 @@ public class ProcessAndServerScenariosTests
 
     [Theory]
     [InlineData("server")]
-    public async Task RunsTheScenarioAndWritesItsTraffic(string name)
+    public async Task RunsTheScenarioAndRecordsItsTraffic(string name)
     {
         ConformanceLive.TrafficDirectory = Directory.CreateTempSubdirectory("conformance-").FullName;
         var scenario = ConformanceLive.Load(name);

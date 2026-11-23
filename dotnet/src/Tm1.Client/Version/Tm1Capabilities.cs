@@ -2,7 +2,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Xml;
 using System.Xml.Linq;
 using Skipcheck.Tm1.Client.Errors;
 
@@ -57,18 +59,40 @@ public sealed class Tm1Capabilities
     /// <summary>The endpoints, as coverage-gate IDs.</summary>
     public IReadOnlySet<string> Endpoints { get; }
 
-    /// <summary>Reads a <c>$metadata</c> document.</summary>
+    /// <summary>Reads a <c>$metadata</c> document. One with a DOCTYPE is refused, which rules out
+    /// external entities and entity expansion entirely.</summary>
+    /// <exception cref="Tm1ProtocolException">The document isn't XML, isn't CSDL, or is CSDL this
+    /// client can't make a model of, such as a bound operation with no parameter to bind. Every
+    /// failure to read it is this exception, never one of .NET's own.</exception>
     public static Tm1Capabilities Parse(string metadata, Tm1Version? productVersion = null)
     {
+        ArgumentNullException.ThrowIfNull(metadata);
         XDocument doc;
         try
         {
-            doc = XDocument.Parse(metadata);
+            using var reader = XmlReader.Create(
+                new StringReader(metadata),
+                new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null }
+            );
+            doc = XDocument.Load(reader);
         }
-        catch (System.Xml.XmlException e)
+        catch (XmlException e)
         {
             throw new Tm1ProtocolException("TM1's $metadata isn't XML: " + e.Message, e);
         }
+        try
+        {
+            return Read(doc, productVersion);
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or FormatException)
+        {
+            // What building the model refuses, such as two schemas with one alias
+            throw new Tm1ProtocolException("TM1's $metadata isn't valid CSDL: " + e.Message, e);
+        }
+    }
+
+    private static Tm1Capabilities Read(XDocument doc, Tm1Version? productVersion)
+    {
         if (doc.Root?.Name.LocalName != "Edmx")
         {
             throw new Tm1ProtocolException("TM1's $metadata isn't CSDL: its root is " + doc.Root?.Name.LocalName);
@@ -110,7 +134,7 @@ public sealed class Tm1Capabilities
                     var first = op.Elements(Edm + "Parameter").FirstOrDefault();
                     if (first is null)
                     {
-                        continue;
+                        throw new Tm1ProtocolException($"TM1's $metadata isn't CSDL: the bound {kind} {Required(op, "Name")} has no parameter to bind");
                     }
                     var binding = Required(first, "Type");
                     var collection = binding.StartsWith("Collection(", StringComparison.Ordinal);

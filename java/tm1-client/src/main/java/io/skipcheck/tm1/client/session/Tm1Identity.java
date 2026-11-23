@@ -25,8 +25,16 @@ import io.skipcheck.tm1.client.auth.Tm1Authenticator;
  * <p>
  * Two identities are equal when they're the same kind and their names match as TM1
  * matches user names, ignoring case and spaces, so {@code impersonating("Alice")} and
- * {@code impersonating("alice")} share a session. The authenticator isn't part of
- * equality: an identity's name says who it is.
+ * {@code impersonating("alice")} share a session.
+ *
+ * <p>
+ * For a user's own credentials, the credentials must be equal too. A name is only what
+ * the caller says, and it's TM1 that checks credentials, at login: if the name alone
+ * found the session, anyone giving a logged-in user's name would get that user's session
+ * without TM1 ever seeing what they offered, and a corrected password or a renewed
+ * passport would never be used. So different credentials for the same name get a session
+ * of their own, and TM1 accepts or refuses them. See {@link Tm1Authenticator} for which
+ * authenticators are equal to one another.
  */
 public final class Tm1Identity {
 
@@ -86,7 +94,8 @@ public final class Tm1Identity {
 	 * A user logging in with their own credentials.
 	 * @param name who the credentials belong to, for the pool's key and for logs, such as
 	 * the user name
-	 * @param authenticator their credentials
+	 * @param authenticator their credentials. Pass one that is equal each time, or the
+	 * same object: an authenticator the pool hasn't seen for this name gets a new session
 	 * @return the identity
 	 */
 	public static Tm1Identity withCredentials(String name, Tm1Authenticator authenticator) {
@@ -134,12 +143,13 @@ public final class Tm1Identity {
 	@Override
 	public boolean equals(@Nullable Object other) {
 		return this == other || (other instanceof Tm1Identity identity && kind == identity.kind
-				&& comparableName.equals(identity.comparableName));
+				&& comparableName.equals(identity.comparableName)
+				&& Objects.equals(authenticator, identity.authenticator));
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(kind, comparableName);
+		return Objects.hash(kind, comparableName, authenticator);
 	}
 
 	@Override

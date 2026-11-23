@@ -16,8 +16,8 @@ Run the Gradle task for what you changed before you push. They're what CI runs.
 
 | You changed | Run |
 |---|---|
-| Java only | `./gradlew build` |
-| The Java client's API or services, or `spec/` | `./gradlew checkAll` (the other clients' parity tests read them) |
+| Java only, and no test or behaviour of the Java client | `./gradlew build` |
+| The Java client's API, services, behaviour or tests, or `spec/` | `./gradlew checkAll` (the other clients' parity tests read them) |
 | The Python, .NET or TypeScript client | `./gradlew checkPython`, `checkDotnet`, `checkTypescript` |
 | What a package contains or depends on | `./gradlew packageTest` |
 | `scripts/`, `.githooks/`, shell scripts | `./gradlew checkScripts` |
@@ -26,8 +26,15 @@ Run the Gradle task for what you changed before you push. They're what CI runs.
 | How a client talks to TM1 | `./gradlew liveTest --continue`, if a TM1 is configured. CI can't run these: say in the PR whether you ran them |
 | Not sure | `./gradlew checkAll packageTest` |
 
-- A change to one client usually belongs in all four: the parity gates fail when the Java client
-  has a class, method or test the others lack.
+- **The four clients change together.** A change to how a client behaves (a fix, a new option, a
+  different error) lands in Java, Python, .NET and TypeScript in the same pull request, each with a
+  test. Java goes first: write the Java test, then the same test under the same name in the other
+  three. A fix found in another client goes into Java too, with its test.
+- The parity gates hold you to it. They read the Java sources, and a client's checks fail when Java
+  has a public method, a service call, a live test or a runtime unit test it lacks. A test with no
+  meaning in a client gets a line saying why in its `coverage/unit-excluded.txt` (or
+  `live-excluded.txt`); "not ported yet" is not a reason.
+- The gates can't see a behaviour change that comes with no new Java test, so don't make one.
 - New code comes with tests that CI runs, scripts and hooks included.
 - A test that needs TM1 is marked with the language's `RequiresTm1`, so it's skipped without a TM1
   rather than left out. Never delete, disable or loosen a test to get a check through.

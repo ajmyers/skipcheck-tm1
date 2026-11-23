@@ -319,6 +319,11 @@ public final class Tm1Session {
 		return connection.close();
 	}
 
+	/** Whether a request is running on the session, through any view of it. */
+	boolean isBusy() {
+		return connection.isBusy();
+	}
+
 	/**
 	 * Whether {@link #close()} has been called.
 	 * @return {@code true} once closed

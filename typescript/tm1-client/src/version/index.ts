@@ -178,6 +178,9 @@ function parseXml(text: string): XmlElement {
     if (m.index !== last) throw new SyntaxError("Not XML near offset " + last);
     last = tag.lastIndex;
     const top = stack[stack.length - 1]!;
+    // Refused, as the Java and .NET clients refuse it: with no DOCTYPE there are no entities of the
+    // document's own to expand, and nothing outside it to fetch
+    if (m[0].startsWith("<!DOCTYPE")) throw new Tm1ProtocolException("TM1's $metadata has a DOCTYPE, which this client refuses to read");
     if (m[1] !== undefined) top.text += m[1];
     else if (m[6] !== undefined) top.text += decodeEntities(m[6]);
     else if (m[3] !== undefined) {
@@ -233,16 +236,30 @@ export class Tm1Capabilities {
     private readonly aliases: Map<string, string>,
   ) {}
 
-  /** Reads a `$metadata` document. */
+  /** Reads a `$metadata` document.
+   * @throws Tm1ProtocolException if it isn't XML, has a DOCTYPE, isn't CSDL, or defines something this
+   * client can't model, such as a bound operation with no binding parameter: never any other error */
   static parse(metadata: string, productVersion?: Tm1Version): Tm1Capabilities {
     let doc: XmlElement;
     try {
       doc = parseXml(metadata.replace(/^\uFEFF/, ""));
     } catch (e) {
+      if (e instanceof Tm1ProtocolException) throw e;
       throw new Tm1ProtocolException("TM1's $metadata isn't XML: " + (e as Error).message);
     }
     const top = doc.children[0];
     if (top?.name !== "Edmx") throw new Tm1ProtocolException("TM1's $metadata isn't CSDL: its root is " + top?.name);
+    try {
+      return Tm1Capabilities.model(top, productVersion);
+    } catch (e) {
+      if (e instanceof Tm1ProtocolException) throw e;
+      // Whatever else reading the model trips over: the document's fault, not a bug to pass on
+      throw new Tm1ProtocolException("TM1's $metadata isn't valid CSDL: " + (e as Error).message, undefined, undefined, undefined, e);
+    }
+  }
+
+  /** What the CSDL document under `top` defines. */
+  private static model(top: XmlElement, productVersion: Tm1Version | undefined): Tm1Capabilities {
     const schemas = descendants(top, "Schema");
     const aliases = new Map<string, string>();
     for (const s of schemas) if (s.attributes["Alias"]) aliases.set(s.attributes["Alias"], s.attributes["Namespace"]!);
@@ -267,9 +284,14 @@ export class Tm1Capabilities {
       for (const kind of ["Action", "Function"]) {
         for (const op of childrenOf(schema, kind)) {
           if (op.attributes["IsBound"] !== "true") continue;
-          const first = childrenOf(op, "Parameter")[0];
-          if (!first) continue;
-          const binding = first.attributes["Type"]!;
+          // An operation is bound to its first parameter: one without it, or without that
+          // parameter's type, is bound to nothing
+          const binding = childrenOf(op, "Parameter")[0]?.attributes["Type"];
+          if (binding === undefined) {
+            throw new Tm1ProtocolException(
+              `TM1's $metadata isn't valid CSDL: the bound ${kind.toLowerCase()} ${op.attributes["Name"]} has no binding parameter`,
+            );
+          }
           const collection = binding.startsWith("Collection(");
           const inner = collection ? binding.slice("Collection(".length, -1) : binding;
           const s = inner.slice(inner.lastIndexOf(".") + 1);
