@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 import skipcheck_tm1
@@ -23,23 +23,23 @@ from ..conftest import BASE, FakeTm1
 SERVER = skipcheck_tm1.Tm1Request.get(skipcheck_tm1.ODataPath.of("Server"), skipcheck_tm1.ODataQuery.none().select("Name"), dict)
 
 
-def json_response(status: int, body: Any = None, *cookies: str) -> httpx.Response:
+def json_response(status: int, body: Any = None, *cookies: str) -> httpx2.Response:
     """A response with a JSON body (or none) and ``Set-Cookie`` headers, as FakeTm1.json."""
     headers = [("Set-Cookie", c) for c in cookies]
     if body is None:
-        return httpx.Response(status, headers=headers)
-    return httpx.Response(status, json=body, headers=headers)
+        return httpx2.Response(status, headers=headers)
+    return httpx2.Response(status, json=body, headers=headers)
 
 
-def text_response(status: int, text: str) -> httpx.Response:
-    return httpx.Response(status, text=text, headers={"Content-Type": "text/plain"})
+def text_response(status: int, text: str) -> httpx2.Response:
+    return httpx2.Response(status, text=text, headers={"Content-Type": "text/plain"})
 
 
-def each(*answers: Any) -> Callable[[httpx.Request], Any]:
+def each(*answers: Any) -> Callable[[httpx2.Request], Any]:
     """Answers in turn, then the last one again (Java's ``FakeTm1.onEach``)."""
     queue = list(answers)
 
-    def answer(request: httpx.Request) -> Any:
+    def answer(request: httpx2.Request) -> Any:
         a = queue.pop(0) if len(queue) > 1 else queue[0]
         return a(request) if callable(a) else a
 
@@ -86,8 +86,8 @@ class Runtime:
         return skipcheck_tm1.Tm1Client if self.flavor == "sync" else skipcheck_tm1.aio.AsyncTm1Client
 
     def http(self) -> Any:
-        transport = httpx.MockTransport(self.fake.handler)
-        client = httpx.Client(transport=transport) if self.flavor == "sync" else httpx.AsyncClient(transport=transport)
+        transport = httpx2.MockTransport(self.fake.handler)
+        client = httpx2.Client(transport=transport) if self.flavor == "sync" else httpx2.AsyncClient(transport=transport)
         self.clients.append(client)
         return client
 

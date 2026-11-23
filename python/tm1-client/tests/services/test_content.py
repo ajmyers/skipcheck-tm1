@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery
@@ -17,7 +17,7 @@ from skipcheck_tm1.model import CubeReference, CubeReferencePatch, DocumentRefer
 from ..conftest import Api, FakeTm1, target
 
 
-def body(request: httpx.Request) -> object:
+def body(request: httpx2.Request) -> object:
     return json.loads(request.content) if request.content else None
 
 
@@ -99,7 +99,7 @@ def test_document_content_goes_through_the_reference(api: Api, fake: FakeTm1) ->
     fake.respond = lambda r: {"Name": "notes_1.txt", "Size": 3}
     assert api.run(api.client.contents.document(notes)).size == 3
     assert target(fake.last) == "GET Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')/tm1.DocumentReference/Document"
-    fake.respond = lambda r: httpx.Response(200, content=b"\x00abc")
+    fake.respond = lambda r: httpx2.Response(200, content=b"\x00abc")
     assert api.run(api.client.contents.content(notes)) == b"\x00abc"
     assert target(fake.last).endswith("/tm1.DocumentReference/Document/Content")
     # In Blobs, the path is the document itself

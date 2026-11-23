@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import Bind
@@ -285,7 +285,7 @@ def test_unbound_operation(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
     check_operation(fake.last, op, e["name"], expected)
 
 
-def check_operation(request: httpx.Request, op: dict[str, Any], path: str, expected: dict[str, Any]) -> None:
+def check_operation(request: httpx2.Request, op: dict[str, Any], path: str, expected: dict[str, Any]) -> None:
     if op["kind"] == "action":
         assert target(request) == f"POST {path}"
         body = json.loads(request.content) if request.content else {}

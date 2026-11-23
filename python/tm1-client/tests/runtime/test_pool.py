@@ -12,7 +12,7 @@ import threading
 import time
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Identity, Tm1Request, Tm1SessionClosedError, auth
@@ -52,23 +52,23 @@ class Held:
         if rt.flavor == "sync":
             self.started, self.release = threading.Event(), threading.Event()
 
-            def handler(request: httpx.Request) -> httpx.Response:
+            def handler(request: httpx2.Request) -> httpx2.Response:
                 if target(request) == "GET Server?$select=Name":
                     self.started.set()
                     assert self.release.wait(10)
                 return rt.fake.handler(request)
 
-            self.http: Any = httpx.Client(transport=httpx.MockTransport(handler))
+            self.http: Any = httpx2.Client(transport=httpx2.MockTransport(handler))
         else:
             self.started, self.release = asyncio.Event(), asyncio.Event()
 
-            async def waiting(request: httpx.Request) -> httpx.Response:
+            async def waiting(request: httpx2.Request) -> httpx2.Response:
                 if target(request) == "GET Server?$select=Name":
                     self.started.set()
                     await self.release.wait()
                 return rt.fake.handler(request)
 
-            self.http = httpx.AsyncClient(transport=httpx.MockTransport(waiting))
+            self.http = httpx2.AsyncClient(transport=httpx2.MockTransport(waiting))
         rt.clients.append(self.http)
 
     def sessions(self) -> Any:

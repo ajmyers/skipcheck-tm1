@@ -19,7 +19,7 @@ import time
 from collections.abc import Callable, Iterator
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import (
@@ -52,12 +52,12 @@ LOGIN = "GET ActiveSession?$select=ID"
 CLOSE = "POST ActiveSession/tm1.Close"
 
 
-def cookie(request: httpx.Request) -> str | None:
+def cookie(request: httpx2.Request) -> str | None:
     value = request.headers.get("cookie")
     return None if value is None else value.split("=", 1)[1]
 
 
-def requests_to(rt: Runtime, line: str) -> list[httpx.Request]:
+def requests_to(rt: Runtime, line: str) -> list[httpx2.Request]:
     return [r for r in rt.fake.requests if target(r) == line]
 
 
@@ -121,12 +121,12 @@ def test_gives_up_on_an_authenticator_that_never_answers(rt: Runtime) -> None:
 
 def test_gives_up_on_a_cognos_that_never_answers(rt: Runtime) -> None:
     # In both flavors, the authenticators that ask Cognos are bounded by their HTTP client's timeouts
-    def silent(request: httpx.Request) -> httpx.Response:
-        raise httpx.ReadTimeout("timed out", request=request)
+    def silent(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ReadTimeout("timed out", request=request)
 
-    client = httpx.Client if rt.flavor == "sync" else httpx.AsyncClient
+    client = httpx2.Client if rt.flavor == "sync" else httpx2.AsyncClient
     logon = auth.cognos_logon if rt.flavor == "sync" else aio_cognos.cognos_logon
-    authenticator = logon("http://cognos:9300", "LDAP", "alice", "secret", http_client=lambda: client(transport=httpx.MockTransport(silent)))
+    authenticator = logon("http://cognos:9300", "LDAP", "alice", "secret", http_client=lambda: client(transport=httpx2.MockTransport(silent)))
     session = rt.session(rt.builder().authenticator(authenticator))
     error = outcome(rt, lambda: session.execute(SERVER))
     assert isinstance(error, Tm1ProtocolError) and "Cognos" in str(error), error
@@ -145,7 +145,7 @@ def test_passes_an_authenticators_own_timeout_through_unchanged(rt: Runtime) -> 
 
 
 def test_logs_in_once_for_concurrent_first_requests_and_sends_only_the_cookie_afterwards(rt: Runtime) -> None:
-    def login(request: httpx.Request) -> httpx.Response:
+    def login(request: httpx2.Request) -> httpx2.Response:
         time.sleep(0.05)  # widen the window for the threads
         return json_response(200, {"ID": 7}, "TM1SessionId=abc; Path=/api/; HttpOnly")
 
@@ -224,7 +224,7 @@ def test_reads_bytes_that_arent_utf8_as_the_replacement_character(rt: Runtime) -
     # As TM1's transaction log gives a password's hash, with "é" (two bytes) beside it
     hash = b"\xe0\xecr\xff\xff"
     body = '{"value":[{"Name":"é'.encode() + hash + '","Type":"é"}]}'.encode()
-    rt.fake.respond = lambda r: httpx.Response(200, content=body, headers={"Content-Type": "application/json"})
+    rt.fake.respond = lambda r: httpx2.Response(200, content=body, headers={"Content-Type": "application/json"})
     replaced = "é" + chr(0xFFFD) * 2 + "r" + chr(0xFFFD) * 2
     listed = rt.run(rt.session().collect(Tm1Request.list(ODataPath.of("Elements"), ODataQuery.none(), dict)))
     assert listed == [{"Name": replaced, "Type": "é"}]
@@ -271,7 +271,7 @@ def test_reports_a_body_that_isnt_json_as_the_callers_mistake_not_a_transport_fa
 
 
 def test_passes_other_failures_through_unwrapped(rt: Runtime) -> None:
-    def bug(request: httpx.Request) -> None:
+    def bug(request: httpx2.Request) -> None:
         raise RuntimeError("a bug, not the network")
 
     rt.fake.respond = bug
@@ -279,10 +279,10 @@ def test_passes_other_failures_through_unwrapped(rt: Runtime) -> None:
 
 
 def test_maps_connect_failures_and_other_transport_failures(rt: Runtime) -> None:
-    def fail(request: httpx.Request) -> None:
+    def fail(request: httpx2.Request) -> None:
         if request.method == "GET":
-            raise httpx.ConnectError("refused", request=request)
-        raise httpx.ReadError("Connection reset", request=request)
+            raise httpx2.ConnectError("refused", request=request)
+        raise httpx2.ReadError("Connection reset", request=request)
 
     rt.fake.respond = fail
     session = rt.session()
@@ -336,7 +336,7 @@ class HeldLogin:
         if rt.flavor == "sync":
             self.arrived, self.release = threading.Event(), threading.Event()
 
-            def held(request: httpx.Request) -> httpx.Response:
+            def held(request: httpx2.Request) -> httpx2.Response:
                 self.arrived.set()
                 assert self.release.wait(10)
                 return answer
@@ -345,7 +345,7 @@ class HeldLogin:
         else:
             self.arrived, self.release = asyncio.Event(), asyncio.Event()
 
-            async def waiting() -> httpx.Response:
+            async def waiting() -> httpx2.Response:
                 self.arrived.set()
                 await self.release.wait()
                 return answer
@@ -546,7 +546,7 @@ def test_sends_a_name_outside_ascii_as_its_utf8_bytes(rt: Runtime) -> None:
     session = rt.session(rt.builder().impersonate("zoë").session_context("café"))
     rt.run(session.execute(SERVER))
 
-    # The bytes httpx puts on the wire, not its reading of them
+    # The bytes httpx2 puts on the wire, not its reading of them
     login = dict(rt.fake.login_requests[0].headers.raw)
     assert login[b"TM1-Impersonate"] == "zoë".encode()
     assert login[b"TM1-SessionContext"] == "café".encode()
@@ -589,8 +589,8 @@ def test_remembers_a_refused_login_and_fails_fast_until_the_back_off_ends(rt: Ru
 
 
 def test_retries_at_once_after_a_failure_that_isnt_a_refusal(rt: Runtime) -> None:
-    def reset(request: httpx.Request) -> httpx.Response:
-        raise httpx.ReadError("Connection reset", request=request)
+    def reset(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ReadError("Connection reset", request=request)
 
     rt.fake.on_login = each(reset, json_response(200, {"ID": 9}, "TM1SessionId=ok; Path=/api/"))
     server(rt)
@@ -721,7 +721,7 @@ def test_sends_a_body_as_it_was_when_the_call_was_queued(rt: Runtime) -> None:
 
 
 def test_fails_every_call_when_tm1_answers_the_batch_with_no_body(rt: Runtime) -> None:
-    rt.fake.respond = lambda r: httpx.Response(200)
+    rt.fake.respond = lambda r: httpx2.Response(200)
     batch = rt.session().batch()
     first = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("a"))))
     second = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("b"))))
@@ -797,10 +797,10 @@ VERSION = "GET Server?$select=ProductVersion"
 
 
 def test_reads_the_version_once_inside_the_session(rt: Runtime) -> None:
-    seen: list[httpx.Request] = []
+    seen: list[httpx2.Request] = []
     handler = rt.fake.handler
 
-    def spy(request: httpx.Request) -> httpx.Response:
+    def spy(request: httpx2.Request) -> httpx2.Response:
         if target(request) == VERSION:
             seen.append(request)
         return handler(request)
@@ -814,10 +814,10 @@ def test_reads_the_version_once_inside_the_session(rt: Runtime) -> None:
 
 
 def test_fetches_metadata_once_per_server_version_for_every_session_with_the_same_settings(rt: Runtime) -> None:
-    seen: list[httpx.Request] = []
+    seen: list[httpx2.Request] = []
     handler = rt.fake.handler
 
-    def spy(request: httpx.Request) -> httpx.Response:
+    def spy(request: httpx2.Request) -> httpx2.Response:
         if target(request) == "GET $metadata":
             seen.append(request)
         return handler(request)
@@ -883,7 +883,7 @@ def test_reads_the_version_again_after_logging_in_again(rt: Runtime) -> None:
     reads: list[str] = []
     handler = rt.fake.handler
 
-    def spy(request: httpx.Request) -> httpx.Response:
+    def spy(request: httpx2.Request) -> httpx2.Response:
         if target(request) == VERSION:
             reads.append(cookie(request) or "")
         return handler(request)
@@ -960,7 +960,7 @@ def test_doesnt_keep_a_failed_read(rt: Runtime) -> None:
     versions = each(json_response(503, {"error": {"code": "1", "message": "busy"}}), None)
     handler = rt.fake.handler
 
-    def flaky(request: httpx.Request) -> httpx.Response:
+    def flaky(request: httpx2.Request) -> httpx2.Response:
         if target(request) == VERSION:
             answer = versions(request)
             if answer is not None:
@@ -982,20 +982,20 @@ REQUEST = Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.Execute
 CUBES = Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), dict)
 
 
-def accepted() -> httpx.Response:
-    return httpx.Response(202, headers={"Location": "../_async('a1')"})
+def accepted() -> httpx2.Response:
+    return httpx2.Response(202, headers={"Location": "../_async('a1')"})
 
 
-def done(status_line: str, body: str) -> httpx.Response:
+def done(status_line: str, body: str) -> httpx2.Response:
     """A finished monitor's answer: the result as an ``application/http`` message."""
     message = f"HTTP/1.1 {status_line}\r\nContent-Type: application/json\r\nOData-Version: 4.0\r\n\r\n{body}"
-    return httpx.Response(200, content=message.encode(), headers={"Content-Type": "application/http"})
+    return httpx2.Response(200, content=message.encode(), headers={"Content-Type": "application/http"})
 
 
 def answers(rt: Runtime, routes: dict[str, Any]) -> None:
     """Answers each request by its ``METHOD path`` (Java's ``FakeTm1.on``)."""
 
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         answer = routes[target(request)]
         return answer(request) if callable(answer) else answer
 
@@ -1049,7 +1049,7 @@ def test_follows_a_next_link_in_a_result_it_polled_for(rt: Runtime) -> None:
     answers(
         rt,
         {
-            "GET Cubes": httpx.Response(202, headers={"Location": "_async('a1')"}),
+            "GET Cubes": httpx2.Response(202, headers={"Location": "_async('a1')"}),
             MONITOR: done("200 OK", json.dumps({"value": [{"Name": "a"}], "@odata.nextLink": "Cubes?$skiptoken=2"})),
             "GET Cubes?$skiptoken=2": {"value": [{"Name": "b"}]},
         },
@@ -1062,7 +1062,7 @@ def test_polls_the_monitor_until_the_result_is_there(rt: Runtime) -> None:
         rt,
         {
             RUN: accepted(),
-            MONITOR: each(httpx.Response(202), httpx.Response(202), done("201 Created", json.dumps({"ProcessExecuteStatusCode": "CompletedSuccessfully"}))),
+            MONITOR: each(httpx2.Response(202), httpx2.Response(202), done("201 Created", json.dumps({"ProcessExecuteStatusCode": "CompletedSuccessfully"}))),
             "DELETE _async('a1')": None,
         },
     )
@@ -1088,16 +1088,16 @@ def test_reads_an_answer_tm1_gave_at_once(rt: Runtime) -> None:
 def test_deletes_the_monitor_when_cancelled(rt: Runtime) -> None:
     if rt.flavor == "sync":
         # A blocking call can't be cancelled: giving up is an exception while it waits, as Ctrl-C raises
-        def poll(request: httpx.Request) -> httpx.Response:
+        def poll(request: httpx2.Request) -> httpx2.Response:
             if len(requests_to(rt, MONITOR)) > 2:
                 raise KeyboardInterrupt
-            return httpx.Response(202)
+            return httpx2.Response(202)
 
-        answers(rt, {RUN: accepted(), MONITOR: poll, "DELETE _async('a1')": httpx.Response(204)})
+        answers(rt, {RUN: accepted(), MONITOR: poll, "DELETE _async('a1')": httpx2.Response(204)})
         with pytest.raises(KeyboardInterrupt):
             rt.session().with_async(0.01).execute(REQUEST)
     else:
-        answers(rt, {RUN: accepted(), MONITOR: httpx.Response(202), "DELETE _async('a1')": httpx.Response(204)})
+        answers(rt, {RUN: accepted(), MONITOR: httpx2.Response(202), "DELETE _async('a1')": httpx2.Response(204)})
 
         async def cancelled() -> None:
             running = asyncio.ensure_future(rt.session().with_async(0.01).execute(REQUEST))
@@ -1131,7 +1131,7 @@ def test_reads_a_big_error_body(rt: Runtime) -> None:
 # ODataCollectionDecoderTest, for what this client holds while a collection is read: an HTTP response
 
 
-class Body(httpx.SyncByteStream, httpx.AsyncByteStream):
+class Body(httpx2.SyncByteStream, httpx2.AsyncByteStream):
     """A response body, as from the network, that records whether the client closed it."""
 
     def __init__(self, content: bytes, opened: list[Body]) -> None:
@@ -1159,9 +1159,9 @@ def from_the_network(rt: Runtime, routes: dict[str, Any]) -> list[Body]:
     """Answers each request with a body the client has to close, and returns those it was given."""
     opened: list[Body] = []
 
-    def respond(request: httpx.Request) -> httpx.Response:
+    def respond(request: httpx2.Request) -> httpx2.Response:
         status, content = routes[target(request)]
-        return httpx.Response(status, stream=Body(content, opened), headers={"Content-Type": "application/json"})
+        return httpx2.Response(status, stream=Body(content, opened), headers={"Content-Type": "application/json"})
 
     rt.fake.respond = respond
     return opened
@@ -1226,7 +1226,7 @@ BODY = (
 EXPECTED = [("Q1", "Numeric"), ("Q'2 {x}", "Numeric"), ("Total", "Consolidated")]
 
 
-class Chunks(httpx.SyncByteStream, httpx.AsyncByteStream):
+class Chunks(httpx2.SyncByteStream, httpx2.AsyncByteStream):
     """A response body that arrives in the given pieces, as from the network."""
 
     def __init__(self, chunks: list[bytes]) -> None:
@@ -1240,11 +1240,11 @@ class Chunks(httpx.SyncByteStream, httpx.AsyncByteStream):
             yield chunk
 
 
-def in_pieces(*chunks: bytes, status: int = 200) -> httpx.Response:
-    return httpx.Response(status, stream=Chunks(list(chunks)), headers={"Content-Type": "application/json"})
+def in_pieces(*chunks: bytes, status: int = 200) -> httpx2.Response:
+    return httpx2.Response(status, stream=Chunks(list(chunks)), headers={"Content-Type": "application/json"})
 
 
-def read(rt: Runtime, session: Any, response: httpx.Response, request: Any = ELEMENTS) -> list[Any]:
+def read(rt: Runtime, session: Any, response: httpx2.Response, request: Any = ELEMENTS) -> list[Any]:
     """Every item of a collection TM1 answers with ``response`` (and an empty page after it, if it links one)."""
     rt.fake.respond = lambda r: response if target(r) == "GET Elements" else {"value": []}
     return rt.run(session.collect(request))

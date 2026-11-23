@@ -15,7 +15,7 @@ dependencies = [
     # Tm1Version is part of this package's API (Tm1ServerContainer.with_expected_version)
     "skipcheck-tm1",
     "testcontainers>=4.15",
-    "httpx>=0.27,<1",
+    "httpx2>=2.16",
     # PlanningAnalyticsEnvironment.from_config reads pa-setup's pa-environment.yaml, as pa_setup.py does
     "PyYAML>=6.0,<7",
     # The markers and fixtures are a pytest plugin, as Java's are JUnit extensions

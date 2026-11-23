@@ -166,7 +166,7 @@ def relative_url(path: str, query: ODataQuery | None, context: Context) -> str:
 HEADER_ENCODING = "utf-8"
 """How the text of a login's headers is encoded. TM1 (11.8) reads a user name in
 ``TM1-Impersonate`` and a label in ``TM1-SessionContext`` as UTF-8 and nothing else: a name sent
-as ISO 8859-1 bytes, percent-encoded or as an RFC 2047 encoded word isn't found. httpx refuses
+as ISO 8859-1 bytes, percent-encoded or as an RFC 2047 encoded word isn't found. httpx2 refuses
 a header value outside ASCII unless its ``Headers`` are given the encoding."""
 
 

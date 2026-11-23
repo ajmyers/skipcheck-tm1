@@ -18,7 +18,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from http.cookiejar import CookieJar, DefaultCookiePolicy
 from typing import Any
 
-import httpx
+import httpx2
 
 from .conftest import target
 
@@ -33,9 +33,9 @@ class RawTm1:
         self.password = password
         self._basic = RawTm1.basic(user, password)
         verify = os.environ.get("TM1_VERIFY", "true").lower() != "false"
-        # A jar that takes no cookie: httpx would otherwise send back what TM1 sets
+        # A jar that takes no cookie: httpx2 would otherwise send back what TM1 sets
         nothing = CookieJar(DefaultCookiePolicy(allowed_domains=[]))
-        self._http = httpx.Client(cookies=nothing, verify=verify, timeout=120)
+        self._http = httpx2.Client(cookies=nothing, verify=verify, timeout=120)
         self._threads = ThreadPoolExecutor(max_workers=8)
 
     def shutdown(self) -> None:
@@ -121,7 +121,7 @@ class RawTm1:
         cookie: str | None = None,
         headers: dict[str, Any] | None = None,
         body: Any = None,
-    ) -> httpx.Response:
+    ) -> httpx2.Response:
         """Sends one request: a method, a path relative to the service root, and optionally the
         Basic credentials, a cookie (``name=value``), headers, and a JSON body (text, or a value to
         encode). A GET or DELETE whose reused connection turns out to be closed, with no response
@@ -134,22 +134,22 @@ class RawTm1:
         sent.update(headers or {})
         content = None
         if body is not None:
-            content = body.encode("utf-8") if isinstance(body, str) else httpx.Request("POST", self.root, json=body).content
+            content = body.encode("utf-8") if isinstance(body, str) else httpx2.Request("POST", self.root, json=body).content
             sent["Content-Type"] = "application/json"
         request = self._http.build_request(method, self.root + path, headers=sent, content=content)
         try:
             return self._http.send(request)
-        except httpx.RemoteProtocolError:
+        except httpx2.RemoteProtocolError:
             if method in ("GET", "DELETE"):
                 return self._http.send(self._http.build_request(method, self.root + path, headers=sent, content=content))
             raise
 
-    def send_async(self, method: str, path: str, **settings: Any) -> Future[httpx.Response]:
+    def send_async(self, method: str, path: str, **settings: Any) -> Future[httpx2.Response]:
         """Sends a request on another thread, for requests that run at the same time."""
         return self._threads.submit(self.send, method, path, **settings)
 
     @staticmethod
-    def cookie(response: httpx.Response) -> str | None:
+    def cookie(response: httpx2.Response) -> str | None:
         """The ``TM1SessionId`` cookie a response sets, as ``name=value``."""
         for value in response.headers.get_list("set-cookie"):
             if value.startswith(COOKIE + "="):

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1PreconditionFailedError
@@ -16,7 +16,7 @@ from skipcheck_tm1.model import MDXView, MDXViewPatch, NativeView, NativeViewPat
 from ..conftest import Api, FakeTm1, target
 
 
-def body(request: httpx.Request) -> object:
+def body(request: httpx2.Request) -> object:
     return json.loads(request.content) if request.content else None
 
 
@@ -95,7 +95,7 @@ def test_creates_updates_and_deletes(api: Api, fake: FakeTm1) -> None:
 
 
 def test_a_stale_etag_is_refused(api: Api, fake: FakeTm1) -> None:
-    fake.respond = lambda r: httpx.Response(412, json={"error": {"code": "278", "message": "stale"}})
+    fake.respond = lambda r: httpx2.Response(412, json={"error": {"code": "278", "message": "stale"}})
     with pytest.raises(Tm1PreconditionFailedError):
         api.run(api.client.views.update("Sales", ViewScope.PUBLIC, "v", MDXViewPatch.builder().mdx("x").build(), "e"))
 

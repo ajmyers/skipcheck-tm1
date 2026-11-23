@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from datetime import timedelta
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import Tm1BadRequestError
@@ -16,7 +16,7 @@ from skipcheck_tm1.model import EncryptionFileType, KeyProtectSettingsPatch
 from ..conftest import Api, FakeTm1, target
 
 
-def body(request: httpx.Request) -> object:
+def body(request: httpx2.Request) -> object:
     return json.loads(request.content) if request.content else None
 
 
@@ -73,6 +73,6 @@ def test_the_actions(api: Api, fake: FakeTm1) -> None:
 
 def test_an_unencrypted_server_refuses_with_a_bare_400(api: Api, fake: FakeTm1) -> None:
     # TM1 (11.8): the message is an error code's name
-    fake.respond = lambda r: httpx.Response(400, json={"error": {"code": "", "message": "DataModelConversion"}})
+    fake.respond = lambda r: httpx2.Response(400, json={"error": {"code": "", "message": "DataModelConversion"}})
     with pytest.raises(Tm1BadRequestError, match="DataModelConversion"):
         api.run(api.client.encryption.disable())

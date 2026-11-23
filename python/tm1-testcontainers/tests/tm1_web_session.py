@@ -9,7 +9,7 @@ import re
 import uuid
 from urllib.parse import urljoin, urlsplit
 
-import httpx
+import httpx2
 
 from skipcheck_tm1_testcontainers import Tm1WebContainer
 
@@ -24,7 +24,7 @@ class Tm1WebSession:
     def __init__(self, web: Tm1WebContainer) -> None:
         self._base = web.url
         self._path = urlsplit(self._base).path
-        self._http = httpx.Client(timeout=30)
+        self._http = httpx2.Client(timeout=30)
         self._batch = 0
         self._script_session_id = ""
         self._http.get(self._base)

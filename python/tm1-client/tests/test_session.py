@@ -7,7 +7,7 @@ from __future__ import annotations
 import base64
 import json
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import (
@@ -49,13 +49,13 @@ def test_sends_the_java_clients_headers(session: Tm1Session, fake: FakeTm1) -> N
     session.execute(Tm1Request.post(cubes, {"Name": "c"}, m.Cube))
     last = fake.requests[-1].headers
     assert (last["accept"], last["content-type"]) == ("application/json", "application/json")
-    fake.respond = lambda r: httpx.Response(200, text="SKIPCHECK;")
+    fake.respond = lambda r: httpx2.Response(200, text="SKIPCHECK;")
     session.execute(Tm1Request.text(cubes.key("c").nav("Rules")))
     assert fake.requests[-1].headers["accept"] == "text/plain, application/json"
 
 
 def test_logs_in_again_when_the_session_expired(client: Tm1Client, fake: FakeTm1) -> None:
-    answers = iter([httpx.Response(401), {"value": [{"Name": "c"}]}])
+    answers = iter([httpx2.Response(401), {"value": [{"Name": "c"}]}])
     fake.respond = lambda r: next(answers)
     assert [c.name for c in client.cubes.list()] == ["c"]
     assert fake.logins == 2
@@ -97,7 +97,7 @@ def test_sends_query_options_encoded(client: Tm1Client, fake: FakeTm1) -> None:
 
 
 def test_runs_in_a_sandbox(fake: FakeTm1) -> None:
-    http = httpx.Client(transport=httpx.MockTransport(fake.handler))
+    http = httpx2.Client(transport=httpx2.MockTransport(fake.handler))
     client = Tm1Client(Tm1Session(BASE, auth.basic("a"), sandbox="What if", client=http))
     fake.respond = lambda r: {}
     client.api.cubes["c"].get()
@@ -105,7 +105,7 @@ def test_runs_in_a_sandbox(fake: FakeTm1) -> None:
 
 
 def test_updates_with_if_match_and_classifies_refusals(client: Tm1Client, fake: FakeTm1) -> None:
-    fake.respond = lambda r: httpx.Response(412, json={"error": {"code": "278", "message": "stale"}})
+    fake.respond = lambda r: httpx2.Response(412, json={"error": {"code": "278", "message": "stale"}})
     with pytest.raises(Tm1PreconditionFailedError) as refused:
         client.api.cubes["c"].update(m.Cube(rules="SKIPCHECK;"), if_match='W/"1"')
     assert fake.last.headers["if-match"] == 'W/"1"'
@@ -115,7 +115,7 @@ def test_updates_with_if_match_and_classifies_refusals(client: Tm1Client, fake: 
 
 def test_reads_a_400_that_means_not_found_as_not_found(client: Tm1Client, fake: FakeTm1) -> None:
     # TM1 (11.8) answers a missing annotation with 400
-    fake.respond = lambda r: httpx.Response(400, json={"error": {"message": "Annotation 'x' can not be found"}})
+    fake.respond = lambda r: httpx2.Response(400, json={"error": {"message": "Annotation 'x' can not be found"}})
     with pytest.raises(Tm1NotFoundError) as refused:
         client.api.annotations["x"].get()
     assert refused.value.status == 400 and refused.value.kind is Tm1ErrorKind.NOT_FOUND

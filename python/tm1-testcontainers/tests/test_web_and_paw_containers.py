@@ -5,7 +5,7 @@ without their sources."""
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 import pytest
 from tm1_web_session import Tm1WebSession
 
@@ -13,7 +13,7 @@ from skipcheck_tm1_testcontainers import PawContainer, PawSession, Tm1ServerCont
 
 
 def server_name(tm1: Tm1ServerContainer) -> str:
-    response = httpx.get(tm1.rest_url + "Configuration/ServerName/$value", auth=(tm1.username, tm1.password), timeout=30)
+    response = httpx2.get(tm1.rest_url + "Configuration/ServerName/$value", auth=(tm1.username, tm1.password), timeout=30)
     assert response.status_code == 200
     return response.text
 

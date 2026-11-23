@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import ODataQuery, Tm1NotFoundError
@@ -33,7 +33,7 @@ JAN = "Dimensions('Month')/Hierarchies('Month')/Elements('Jan')"
 CELL = {"Region": "North", "Month": "Jan"}
 
 
-def body(request: httpx.Request) -> Any:
+def body(request: httpx2.Request) -> Any:
     return json.loads(request.content) if request.content else None
 
 
@@ -156,7 +156,7 @@ def _cellset_server(cardinalities: list[int], inline: int) -> Any:
     def cells(begin: int, end: int) -> list[dict[str, Any]]:
         return [{"Ordinal": n, "Value": n * 10} for n in range(begin, end + 1)]
 
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         if request.method == "POST":
             return {
                 "ID": "cs1",
@@ -314,7 +314,7 @@ def test_writes_in_a_sandbox_through_a_view(api: Api, fake: FakeTm1) -> None:
 
 
 def _change_set_server(fake: FakeTm1) -> None:
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         if target(request) == "POST BeginChangeSet":
             return {"@odata.context": "$metadata#Edm.String", "value": "3"}  # TM1 wraps the ID
         if target(request) == "POST EndChangeSet":
@@ -372,7 +372,7 @@ def test_within_does_no_work_if_the_change_set_cant_begin(api: Api, fake: FakeTm
     # Java: doesNoWorkIfTheChangeSetCantBegin
     from skipcheck_tm1 import Tm1ServerError
 
-    fake.respond = lambda request: httpx.Response(500, json={"error": {"code": "1", "message": "down"}})
+    fake.respond = lambda request: httpx2.Response(500, json={"error": {"code": "1", "message": "down"}})
     ran = []
 
     def work(session: Any) -> Any:
@@ -452,7 +452,7 @@ def test_reads_rowsets(api: Api, fake: FakeTm1) -> None:
     rows = api.run(drillthrough.rows("rs", top=10))
     assert rows[0].model_extra["OrderNumber"] == "A1"
     assert target(fake.last) == "GET Rowsets('rs')/Rows?$top=10"
-    fake.respond = lambda r: httpx.Response(404, json={"error": {"message": "gone"}})
+    fake.respond = lambda r: httpx2.Response(404, json={"error": {"message": "gone"}})
     with pytest.raises(Tm1NotFoundError):
         api.run(drillthrough.delete_rowset("rs"))
 

@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import Tm1Client, Tm1Session, auth
@@ -78,7 +78,7 @@ class Replay:
         self.expected: list[dict[str, Any]] = []
         self.fake.respond = self._answer
 
-    def _next(self, request: httpx.Request) -> dict[str, Any] | None:
+    def _next(self, request: httpx2.Request) -> dict[str, Any] | None:
         while self.entries and not self.entries[0]:
             self.entries.pop(0)
         if not self.entries:
@@ -89,32 +89,32 @@ class Replay:
         group.remove(match)
         return match
 
-    def _answer(self, request: httpx.Request) -> httpx.Response:
+    def _answer(self, request: httpx2.Request) -> httpx2.Response:
         exchange = self._next(request)
         if exchange is None:
-            return httpx.Response(599, text=f"unscripted request {request.method} {request.url}")
+            return httpx2.Response(599, text=f"unscripted request {request.method} {request.url}")
         self.expected.append(exchange["request"])
         r = exchange["response"]
         headers = dict(r.get("headers", {}))
         if "json" in r:
-            return httpx.Response(r["status"], content=json.dumps(r["json"]).encode(), headers=headers)
+            return httpx2.Response(r["status"], content=json.dumps(r["json"]).encode(), headers=headers)
         if "text" in r:
-            return httpx.Response(r["status"], content=r["text"].encode("utf-8"), headers=headers)
+            return httpx2.Response(r["status"], content=r["text"].encode("utf-8"), headers=headers)
         if "bytes" in r:
             import base64
 
-            return httpx.Response(r["status"], content=base64.b64decode(r["bytes"]), headers=headers)
-        return httpx.Response(r["status"], headers=headers)
+            return httpx2.Response(r["status"], content=base64.b64decode(r["bytes"]), headers=headers)
+        return httpx2.Response(r["status"], headers=headers)
 
     def sent(self) -> list[dict[str, Any]]:
         return [codec.request_of(r.method, _target(r), _headers(r), r.content) for r in self.fake.requests]
 
 
-def _target(request: httpx.Request) -> str:
+def _target(request: httpx2.Request) -> str:
     return request.url.raw_path.decode().removeprefix("/api/v1/")
 
 
-def _headers(request: httpx.Request) -> dict[str, str]:
+def _headers(request: httpx2.Request) -> dict[str, str]:
     return {k.lower(): v for k, v in request.headers.items()}
 
 
@@ -166,7 +166,7 @@ def test_replays_the_java_call(session: dict[str, Any], case: dict[str, Any], fl
     replay = Replay(session, case)
     outcome: dict[str, Any]
     if flavor == "sync":
-        client = Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=httpx.Client(transport=httpx.MockTransport(replay.fake.handler))))
+        client = Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=httpx2.Client(transport=httpx2.MockTransport(replay.fake.handler))))
         service = getattr(client, snake(case["service"]))
         try:
             outcome = {"result": codec.result(_sync_drain(_call(service, case), case.get("take")))}
@@ -176,7 +176,7 @@ def test_replays_the_java_call(session: dict[str, Any], case: dict[str, Any], fl
             outcome = {"error": codec.error(exc)}
     else:
         loop = asyncio.new_event_loop()
-        http = httpx.AsyncClient(transport=httpx.MockTransport(replay.fake.handler))
+        http = httpx2.AsyncClient(transport=httpx2.MockTransport(replay.fake.handler))
         client = AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http))
         service = getattr(client, snake(case["service"]))
         try:

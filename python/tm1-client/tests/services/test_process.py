@@ -9,7 +9,7 @@ import json
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery
@@ -29,7 +29,7 @@ from skipcheck_tm1.model import (
 from ..conftest import Api, FakeTm1, target
 
 
-def body(request: httpx.Request) -> Any:
+def body(request: httpx2.Request) -> Any:
     return json.loads(request.content) if request.content else None
 
 
@@ -200,7 +200,7 @@ def _finishing(fake: FakeTm1, pauses: int) -> None:
     """A fake debug run with one breakpoint (and one TM1 stored as -1), paused ``pauses`` times."""
     left = [pauses]
 
-    def respond(request: httpx.Request) -> Any:
+    def respond(request: httpx2.Request) -> Any:
         t = target(request)
         if t.endswith("/Breakpoints"):
             return {"value": [{"ID": 1}, {"ID": -1}]}

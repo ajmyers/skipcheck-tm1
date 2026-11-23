@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import Filter, ODataPath, ODataQuery, Tm1NotFoundError
@@ -17,7 +17,7 @@ from skipcheck_tm1.model import Group, Session, Thread, User, UserPatch
 from ..conftest import Api, FakeTm1, target
 
 
-def body(request: httpx.Request) -> Any:
+def body(request: httpx2.Request) -> Any:
     return json.loads(request.content) if request.content else None
 
 
@@ -167,6 +167,6 @@ def test_oidc_keys(api: Api, fake: FakeTm1) -> None:
 
 def test_a_key_tm1_hasnt_cached_reads_as_not_found(api: Api, fake: FakeTm1) -> None:
     # TM1 answers 400 with ObjectNotFound (code 55)
-    fake.respond = lambda r: httpx.Response(400, json={"error": {"code": "55", "message": "ObjectNotFound"}})
+    fake.respond = lambda r: httpx2.Response(400, json={"error": {"code": "55", "message": "ObjectNotFound"}})
     with pytest.raises(Tm1NotFoundError):
         api.run(api.client.oidc_keys.remove(["nope"]))

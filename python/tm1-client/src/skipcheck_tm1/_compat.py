@@ -16,7 +16,7 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
 
-import httpx
+import httpx2
 
 T = TypeVar("T")
 
@@ -28,7 +28,7 @@ class Expired(Exception):
 
 class AsyncIO:
     Lock = asyncio.Lock
-    HttpClient = httpx.AsyncClient
+    HttpClient = httpx2.AsyncClient
     sleep = staticmethod(asyncio.sleep)
 
     @staticmethod
@@ -87,7 +87,7 @@ class _SyncLock:
 
 class SyncIO:
     Lock = _SyncLock
-    HttpClient = httpx.Client
+    HttpClient = httpx2.Client
     sleep = staticmethod(time.sleep)
 
     @staticmethod

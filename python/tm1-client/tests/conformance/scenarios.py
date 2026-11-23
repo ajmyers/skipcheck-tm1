@@ -13,7 +13,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
-import httpx
+import httpx2
 
 from . import codec
 from .codec import snake
@@ -31,17 +31,17 @@ def scenarios() -> list[Path]:
 
 
 class Traffic:
-    """The requests a client sends, recorded by httpx event hooks, labelled with the step."""
+    """The requests a client sends, recorded by httpx2 event hooks, labelled with the step."""
 
     def __init__(self, root: str):
         self.root = root.rstrip("/") + "/"
         self.step = ""
         self.exchanges: list[dict[str, Any]] = []
 
-    def record(self, response: httpx.Response) -> None:
+    def record(self, response: httpx2.Response) -> None:
         request = response.request
         url = str(request.url.raw_path.decode())
-        prefix = httpx.URL(self.root).raw_path.decode()
+        prefix = httpx2.URL(self.root).raw_path.decode()
         target = url[len(prefix) :] if url.startswith(prefix) else url
         if target.startswith(_SESSION):
             return
@@ -50,7 +50,7 @@ class Traffic:
             {"step": self.step, "request": codec.request_of(request.method, target, headers, request.content), "status": response.status_code}
         )
 
-    async def arecord(self, response: httpx.Response) -> None:
+    async def arecord(self, response: httpx2.Response) -> None:
         self.record(response)
 
     def write(self, scenario: str, language: str, names: dict[str, str]) -> Path:

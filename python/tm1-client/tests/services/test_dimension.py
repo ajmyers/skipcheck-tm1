@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1UnsupportedOperationError
@@ -33,7 +33,7 @@ H = "Dimensions('Region')/Hierarchies('Region')"
 E = H + "/Elements"
 
 
-def body(request: httpx.Request) -> Any:
+def body(request: httpx2.Request) -> Any:
     return json.loads(request.content) if request.content else None
 
 
@@ -386,7 +386,7 @@ def test_an_operation_the_server_lacks_is_refused(fake: FakeTm1) -> None:
     from skipcheck_tm1 import Tm1Client, Tm1Session, auth
 
     fake.metadata = fake.metadata.replace(b'Name="Reserve"', b'Name="NoReserve"')
-    client = Tm1Client(Tm1Session("http://tm1:8010/api/v1/", auth.basic("a"), client=httpx.Client(transport=httpx.MockTransport(fake.handler))))
+    client = Tm1Client(Tm1Session("http://tm1:8010/api/v1/", auth.basic("a"), client=httpx2.Client(transport=httpx2.MockTransport(fake.handler))))
     with pytest.raises(Tm1UnsupportedOperationError, match="Element.Reserve"):
         client.elements.reserve("Region", "Region", "West")
     assert fake.requests == []

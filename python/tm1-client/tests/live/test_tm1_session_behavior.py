@@ -17,7 +17,7 @@ import time
 import uuid
 from urllib.parse import urlsplit
 
-import httpx
+import httpx2
 import pytest
 
 from .conftest import CONFIGURED, REASON, target
@@ -200,7 +200,7 @@ def test_drops_the_etag_but_not_the_context_with_metadata_none(raw: RawTm1) -> N
 def test_closes_a_connection_idle_for_ninety_seconds() -> None:
     """TM1 closes a kept-alive connection that's idle for about 90 seconds, though
     ``IdleConnectionTimeOut`` is 0, and a request sent on it as it closes gets no response at
-    all. The client sends through httpx's own connection pool, which closes idle connections after
+    all. The client sends through httpx2's own connection pool, which closes idle connections after
     5 seconds, so that never happens."""
     url, user, password = target()
     root = urlsplit(url.rstrip("/") + "/")
@@ -228,7 +228,7 @@ def test_closes_a_connection_idle_for_ninety_seconds() -> None:
             pass
         idle = int(time.monotonic() - used)
         assert 80 <= idle <= 100, "seconds idle before TM1 closed it"
-        with httpx.Client() as default:
+        with httpx2.Client() as default:
             assert default._transport._pool._keepalive_expiry < 80  # type: ignore[attr-defined]
     finally:
         connection.close()
