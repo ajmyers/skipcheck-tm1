@@ -1,0 +1,10 @@
+{
+  "example" : "HelloTm1Application",
+  "language" : "java",
+  "regions" : {
+    "hello-app" : {
+      "source" : "dccac7fa1bda5de12b32cf4e93019a22257877dc469bd45b95606f2ac475bdee",
+      "output" : [ "Hello from TM1 11.8.03500.6" ]
+    }
+  }
+}
