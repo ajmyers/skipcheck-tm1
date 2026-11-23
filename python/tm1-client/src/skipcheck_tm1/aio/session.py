@@ -24,7 +24,6 @@ from it (``tm1_pygen.unasync``).
 
 from __future__ import annotations
 
-import inspect
 import logging
 import time
 from collections.abc import AsyncIterator, Callable
@@ -35,6 +34,7 @@ import httpx
 
 from .. import _protocol as p
 from .._compat import AsyncIO as runtime
+from .._compat import Expired
 from .._views import CAPABILITIES, Queue, as_call, capability_of, poll_interval, settle
 from ..auth import Authenticator, basic
 from ..errors import (
@@ -200,10 +200,15 @@ class _AsyncConnection:
 
     async def _login(self, seed: str | None) -> tuple[str, int]:
         url = self.base_url + p.LOGIN
-        # The authenticator's own failures (say, a passport it couldn't get) reach the caller unchanged
-        authorization = self.authenticator.authorization()
-        if inspect.isawaitable(authorization):
-            authorization = await authorization
+        # The authenticator's own failures (say, a passport it couldn't get) reach the caller unchanged.
+        # It gets the login's timeout too: it may ask another server (Cognos, for a passport), and one
+        # that never answers would otherwise hold every request, and close(), for ever.
+        try:
+            authorization = await runtime.within(self.timeouts.login, self.authenticator.authorization)
+        except Expired:
+            waited = TimeoutError(f"The authenticator {self.authenticator.describe()} supplied no credentials within {self.timeouts.login} s")
+            # Nothing has been sent to TM1, so it's safe to try again
+            raise Tm1TransportError(Tm1TransportError.Phase.CONNECT, True, "GET", url, waited) from None
         if not authorization:
             raise RuntimeError(f"The authenticator {self.authenticator.describe()} supplied no credentials")
         extra = {"Authorization": authorization}
@@ -840,7 +845,7 @@ class AsyncTm1SessionBuilder:
 
     def authenticator(self, authenticator: Authenticator) -> Self:
         """How to log in: TM1's own security, CAM, or credentials of your own. Asked for credentials
-        on every login."""
+        on every login, and given the login timeout to supply them (see :class:`Tm1Timeouts`)."""
         return self._set(authenticator=authenticator)
 
     def impersonate(self, user: str) -> Self:

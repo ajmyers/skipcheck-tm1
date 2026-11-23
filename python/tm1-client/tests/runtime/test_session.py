@@ -6,8 +6,10 @@ Tm1SessionCapabilitiesTest: the same behaviour, in both flavors."""
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
+import threading
 import time
 from typing import Any
 
@@ -35,6 +37,7 @@ from skipcheck_tm1 import (
     auth,
 )
 from skipcheck_tm1._protocol import Call
+from skipcheck_tm1.aio import cognos as aio_cognos
 
 from ..conftest import BASE, target
 from .conftest import SERVER, Clock, Runtime, each, json_response, text_response
@@ -58,6 +61,81 @@ def server(rt: Runtime, answer: object = None) -> None:
 
 
 # Tm1SessionTest
+
+
+def outcome(rt: Runtime, call: Any, seconds: float = 5.0) -> BaseException | None:
+    """What a call fails with, or None if it succeeds; fails the test if it's still running after
+    ``seconds`` (Java's ``verify(Duration)``), so a call that hangs can't hang the tests."""
+    if rt.flavor == "sync":
+        ended: list[BaseException | None] = []
+
+        def go() -> None:
+            try:
+                call()
+                ended.append(None)
+            except BaseException as e:  # noqa: BLE001
+                ended.append(e)
+
+        thread = threading.Thread(target=go, daemon=True)
+        thread.start()
+        thread.join(seconds)
+        assert ended, f"still running after {seconds} s"
+        return ended[0]
+
+    async def bounded() -> BaseException | None:
+        task = asyncio.ensure_future(call())
+        done, _ = await asyncio.wait({task}, timeout=seconds)
+        if not done:
+            task.cancel()
+            pytest.fail(f"still running after {seconds} s")
+        return task.exception()
+
+    return rt.run(bounded())
+
+
+def test_gives_up_on_an_authenticator_that_never_answers(rt: Runtime) -> None:
+    if rt.flavor == "sync":
+        pytest.skip("the sync session can't give up on a call that blocks without a thread of its own, which the library never starts")
+
+    class Never:
+        def authorization(self) -> Any:
+            return asyncio.Event().wait()
+
+        def describe(self) -> str:
+            return "Never"
+
+    session = rt.session(rt.builder().authenticator(Never()).timeouts(Tm1Timeouts.builder().login(0.1).build()))
+    error = outcome(rt, lambda: session.execute(SERVER))
+    assert isinstance(error, Tm1TransportError), error
+    assert error.phase is Tm1TransportError.Phase.CONNECT and error.is_retryable(), "nothing was sent to TM1"
+    assert "Never" in str(error) and "0.1" in str(error)
+    assert outcome(rt, lambda: session.close()) is None
+    assert rt.fake.login_requests == []
+
+
+def test_gives_up_on_a_cognos_that_never_answers(rt: Runtime) -> None:
+    # In both flavors, the authenticators that ask Cognos are bounded by their HTTP client's timeouts
+    def silent(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    client = httpx.Client if rt.flavor == "sync" else httpx.AsyncClient
+    logon = auth.cognos_logon if rt.flavor == "sync" else aio_cognos.cognos_logon
+    authenticator = logon("http://cognos:9300", "LDAP", "alice", "secret", http_client=lambda: client(transport=httpx.MockTransport(silent)))
+    session = rt.session(rt.builder().authenticator(authenticator))
+    error = outcome(rt, lambda: session.execute(SERVER))
+    assert isinstance(error, Tm1ProtocolError) and "Cognos" in str(error), error
+    assert outcome(rt, lambda: session.close()) is None
+    assert rt.fake.login_requests == []
+
+
+def test_passes_an_authenticators_own_timeout_through_unchanged(rt: Runtime) -> None:
+    # Only the session's own timeout becomes a transport error: what the authenticator raises is the caller's to read
+    def no_passport() -> str:
+        raise TimeoutError("Cognos took too long")
+
+    session = rt.session(rt.builder().authenticator(auth.cam_passport(no_passport)))
+    error = rt.raises(TimeoutError, lambda: session.connect())
+    assert str(error) == "Cognos took too long"
 
 
 def test_logs_in_once_for_concurrent_first_requests_and_sends_only_the_cookie_afterwards(rt: Runtime) -> None:

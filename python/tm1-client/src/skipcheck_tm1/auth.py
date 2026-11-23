@@ -29,7 +29,9 @@ class Authenticator(Protocol):
     show."""
 
     def authorization(self) -> str:
-        """The ``Authorization`` header to log in with; called at each login."""
+        """The ``Authorization`` header to log in with; called at each login. An asyncio session
+        awaits it no longer than its login timeout (``Tm1Timeouts.login``); a sync session waits
+        until it returns, so give anything it asks a timeout of its own."""
         ...
 
     def describe(self) -> str:
