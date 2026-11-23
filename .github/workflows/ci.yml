@@ -57,7 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: ['20', '22']
+        # The oldest Node the packages support, and the current LTS
+        node: ['22', '24']
     defaults:
       run:
         working-directory: typescript
@@ -72,10 +73,5 @@ jobs:
       # runs both. The live and container tests are skipped here, with no TM1 source
       - run: npm ci
       - run: npm test
-        if: matrix.node != '20'
-      # On Node 20, the client's tests only: it supports Node 20, and tm1-testcontainers needs
-      # Node 22.22, as the Testcontainers for Node it's built on does
-      - run: npm run generate && npm run format:check && npm run lint && npm test -w tm1-client
-        if: matrix.node == '20'
       - run: npm run typecheck
       - run: npm run build
