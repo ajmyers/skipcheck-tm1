@@ -15,6 +15,11 @@ on:
   pull_request:
     paths:
       - 'api-site/**'
+      # The guide's prose is the Java types' Javadoc, and its examples are each language's
+      - 'java/**'
+      - 'python/**/examples/**'
+      - 'dotnet/examples/**'
+      - 'typescript/**/examples/**'
       - 'build-logic/**'
       - 'gradle.properties'
       - '.github/workflows/api-docs.yml'

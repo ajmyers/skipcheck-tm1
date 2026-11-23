@@ -1,9 +1,10 @@
 {
   "name": "ajmyers-net-api-docs",
   "private": true,
-  "description": "Serves the Java API docs at ajmyers.net/projects/<module>/api/",
+  "description": "Serves the Java API docs at ajmyers.net/projects/<module>/api/ and the guide at ajmyers.net/projects/tm1/guide/",
   "scripts": {
-    "assemble": "node scripts/assemble.mjs",
+    "assemble": "node scripts/assemble.mjs && node scripts/guide.mjs",
+    "guide": "node scripts/guide.mjs",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },
