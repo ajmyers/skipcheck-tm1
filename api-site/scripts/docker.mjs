@@ -20,11 +20,13 @@
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { Marked } from 'marked';
 import { inline, parse } from './markdown.mjs';
 import { docsVersion } from './packages.mjs';
 import { promptHtml, promptText } from './prompts.mjs';
-import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, escape, head, PA_DOCKER, PROJECTS, repoDir, siteDir } from './site.mjs';
+import { headingIndex } from './search.mjs';
+import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, escape, head, PA_DOCKER, PROJECTS, repoDir, searchBox, siteDir } from './site.mjs';
 
 const version = await docsVersion();
 const github = 'https://github.com/' + /^githubRepo=(.+)$/m.exec(await readFile(path.join(repoDir, 'gradle.properties'), 'utf8'))[1].trim();
@@ -65,11 +67,12 @@ export function linkTarget(href, source, { pages = pageBySource, exists = (file)
 	return github + '/' + (isDirectory(resolved) ? 'tree' : 'blob') + '/' + ref + '/' + encodeURI(resolved) + (hash ?? '');
 }
 
-/** A README as { title, summary, html }: its heading, its first paragraph (inline HTML), and the
- * rest of it, without the heading. */
+/** A README as { title, summary, html, headings }: its heading, its first paragraph (inline HTML),
+ * the rest of it, without the heading, and the headings in that, as { text, id }, for the search. */
 export function render(markdown, source, options) {
 	const id = slugger();
 	let title = null;
+	const headings = [];
 	const marked = new Marked({ gfm: true });
 	marked.use({
 		renderer: {
@@ -81,6 +84,7 @@ export function render(markdown, source, options) {
 					title = decode(plain);
 					return '';
 				}
+				headings.push({ text: decode(plain), id: anchor });
 				return '<h' + depth + ' id="' + escape(anchor) + '">' + text + '</h' + depth + '>\n';
 			},
 			link({ href, title: linkTitle, tokens }) {
@@ -98,7 +102,7 @@ export function render(markdown, source, options) {
 	if (title === null) throw new Error(source + ' has no # heading');
 	const first = tokens.find((token) => token.type === 'paragraph');
 	const summary = first ? marked.parser([first]).replace(/^<p>|<\/p>\s*$/g, '') : '';
-	return { title, summary, html };
+	return { title, summary, html, headings };
 }
 
 const decode = (text) => text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&#39;', "'").replaceAll('&amp;', '&');
@@ -129,8 +133,10 @@ async function build() {
 	for (const page of pages) {
 		const parent = pages.find((other) => other.path === path.posix.dirname(page.path));
 		const crumbs = '<p class="crumbs"><a href="' + root + '">' + escape(PA_DOCKER.title) + '</a> · ' + (parent ? '<a href="' + addressOf(parent) + '">' + escape(parent.title) + '</a> · ' : '') + escape(page.label ?? page.title) + '</p>';
+		// The crumbs share a bar with the search, as on the docs pages
+		const toolbar = '<div class="toolbar">' + crumbs + searchBox({ label: 'Search the ' + PA_DOCKER.title + ' pages', placeholder: 'Search the Docker pages', index: root + 'search.json' }) + '</div>';
 		const body =
-			crumbs +
+			toolbar +
 			'<h1>' + escape(page.title) + '</h1>' +
 			page.html +
 			'<p class="note">This page is <a href="' + github + '/blob/' + ref + '/' + page.source + '"><code>' + escape(page.source) + '</code></a> on GitHub.</p>';
@@ -144,10 +150,15 @@ async function build() {
 				canonical: CANONICAL_ORIGIN + addressOf(page),
 				styles: [root + 'assets/docs.css', root + 'assets/readme.css'],
 				scripts: ['/highlight.js'],
+				modules: [root + 'assets/search.js'],
 			}) +
 				'<body><div class="docs">' + nav(page) + '<main class="guide readme">' + body + '</main></div></body></html>\n',
 		);
 	}
+
+	// The search over the pages' titles and headings
+	const index = JSON.stringify(headingIndex(pages.map((page) => ({ title: page.title, address: addressOf(page), summary: plainText(page.summary), headings: page.headings }))));
+	await writeFile(path.join(distDir, PA_DOCKER.id, 'search.json'), index + '\n');
 
 	// The landing page, in the site's classes as the libraries' are (pages.mjs): the words from the
 	// content file, then a card per image or tool, from its README's first paragraph
@@ -198,5 +209,5 @@ async function build() {
 			'<body><main id="main" class="project">' + body + '</main></body></html>\n',
 	);
 	await writeFile(path.join(distDir, PA_DOCKER.id, 'release.json'), JSON.stringify(version) + '\n');
-	console.log('Docker pages: ' + PA_DOCKER.id + '/ and ' + pages.map((page) => page.path).join(', '));
+	console.log('Docker pages: ' + PA_DOCKER.id + '/ and ' + pages.map((page) => page.path).join(', ') + '; search ' + (Buffer.byteLength(index) / 1024).toFixed(1) + ' KB (' + (gzipSync(index).length / 1024).toFixed(1) + ' KB gzipped)');
 }

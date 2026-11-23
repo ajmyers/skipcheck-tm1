@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { matchName, prepare, search, words } from '../assets/search-rank.js';
-import { searchIndex, shorten, SUMMARY_LENGTH } from '../scripts/search.mjs';
+import { headingIndex, searchIndex, shorten, SUMMARY_LENGTH } from '../scripts/search.mjs';
 
 test('the index lists each type, then its members, by the index of their type', () => {
 	const index = searchIndex([
@@ -131,6 +131,28 @@ test("a project's walkthroughs are in its index, after the types, and only when 
 	assert.equal('walkthroughs' in searchIndex([]), false);
 });
 
+test("TM1's own types are in every language's index, after the walkthroughs, and only when the pages link some", () => {
+	const model = [{ name: 'Cube', page: '../model/Cube.html', summary: 'A cube.' }];
+	assert.deepEqual(searchIndex([], [], model).model, [['Cube', '../model/Cube.html', 'A cube.']]);
+	assert.equal('model' in searchIndex([]), false);
+});
+
+test("a TM1 type is found as a type is, after the library's when they match as well", () => {
+	const index = prepare(
+		searchIndex(
+			[page('CubeService', ['model_cubes']), page('Tm1Client', ['cubes'])],
+			[],
+			['Cube', 'CubeRule', 'Dimension'].map((name) => ({ name, page: '../model/' + name + '.html', summary: name + '.' })),
+		),
+	);
+	const [cube] = search(index, 'Cube');
+	assert.equal(cube.kind, 'model');
+	assert.equal(cube.href, '../model/Cube.html');
+	assert.deepEqual(names(search(index, 'cube')).slice(0, 3), ['Cube', 'CubeService', 'CubeRule'], 'the whole name, then the library type over the TM1 type');
+	assert.deepEqual(names(search(index, 'dim')), ['Dimension']);
+	assert.deepEqual(search(index, 'Tm1Client.cube').filter((r) => r.kind === 'model'), [], 'not for a member of a type');
+});
+
 test('a walkthrough is found by the words of its title, or less well by those of its summary', () => {
 	const index = prepare(
 		searchIndex(
@@ -148,4 +170,51 @@ test('a walkthrough is found by the words of its title, or less well by those of
 	assert.ok(names(search(index, 'mdx')).includes('Read and write cells'), 'by a word of its summary');
 	assert.ok(names(search(index, 'process')).indexOf('ProcessService') < names(search(index, 'process')).indexOf('Run a process and read its result'), 'a type first');
 	assert.deepEqual(search(index, 'ProcessService.run').filter((r) => r.kind === 'walkthrough'), [], 'not for a member of a type');
+});
+
+// The Docker pages, as docker.mjs indexes them
+const dockerPages = [
+	{ title: 'tm1-server', address: '/pa-docker/tm1-server/', summary: 'A thin Docker runtime for TM1 Server.', headings: [{ text: 'Ports', id: 'ports' }, { text: 'Environment variables', id: 'environment-variables' }] },
+	{
+		title: 'Getting started with tm1-server',
+		address: '/pa-docker/tm1-server/getting-started/',
+		summary: 'From nothing to a running TM1 server on your own computer.',
+		headings: [{ text: 'Step 1: Install Docker', id: 'step-1-install-docker' }, { text: 'R. Use the published image (recommended)', id: 'r-use-the-published-image-recommended' }],
+	},
+	{ title: 'paw', address: '/pa-docker/paw/', summary: 'Runs Planning Analytics Workspace.', headings: [{ text: 'Ports', id: 'ports' }] },
+];
+
+test("the Docker pages' index lists each page, then its headings, by the index of their page", () => {
+	const index = headingIndex(dockerPages);
+	assert.deepEqual(index.pages[0], ['tm1-server', '/pa-docker/tm1-server/', 'A thin Docker runtime for TM1 Server.']);
+	assert.deepEqual(index.headings.slice(0, 2), [
+		['Ports', 0, 'ports'],
+		['Environment variables', 0, 'environment-variables'],
+	]);
+	assert.deepEqual(index.headings.at(-1), ['Ports', 2, 'ports']);
+});
+
+test('a Docker heading is found by its words, in any order, and links to its anchor on its page', () => {
+	const index = prepare(headingIndex(dockerPages));
+	const [install] = search(index, 'install docker');
+	assert.equal(install.kind, 'heading');
+	assert.equal(install.href, '/pa-docker/tm1-server/getting-started/#step-1-install-docker');
+	assert.equal(install.page.name, 'Getting started with tm1-server');
+	assert.equal(search(index, 'docker install')[0], install, 'in any order');
+	assert.deepEqual(
+		search(index, 'ports').map((r) => r.href),
+		['/pa-docker/tm1-server/#ports', '/pa-docker/paw/#ports'],
+		'each page that has it',
+	);
+	assert.equal(search(index, 'env')[0].name, 'Environment variables');
+	assert.equal(search(index, 'R. published')[0].name, 'R. Use the published image (recommended)', 'a dot is part of a heading');
+});
+
+test('a Docker page is found by its title, before its headings, or by words of its summary', () => {
+	const index = prepare(headingIndex(dockerPages));
+	const [paw] = search(index, 'paw');
+	assert.equal(paw.kind, 'page');
+	assert.equal(paw.href, '/pa-docker/paw/');
+	assert.ok(names(search(index, 'workspace')).includes('paw'), 'by a word of its summary');
+	assert.deepEqual(names(search(index, 'getting started')).slice(0, 1), ['Getting started with tm1-server']);
 });

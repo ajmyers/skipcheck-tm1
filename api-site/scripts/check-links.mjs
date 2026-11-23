@@ -11,7 +11,8 @@
 // one to a file of this repository on GitHub must be a file here, and any other is left alone.
 //
 // Each docs language's search index (search.json, search.mjs) is checked the same way: every type
-// and member it lists must be on a page there.
+// and member it lists must be on a page there, and every TM1 type a page of its own. The Docker
+// pages' index too: every page it lists, and every heading at its anchor.
 //
 // The Javadoc is left out: its links are javadoc's own, and there are thousands of them.
 //
@@ -20,7 +21,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { allPrompts, commandProblems } from './prompts.mjs';
-import { CANONICAL_ORIGIN, distDir, PROJECTS, repoDir, SECTIONS } from './site.mjs';
+import { CANONICAL_ORIGIN, distDir, PA_DOCKER, PROJECTS, repoDir, SECTIONS } from './site.mjs';
 
 const repository = /^githubRepo=(.+)$/m.exec(await readFile(path.join(repoDir, 'gradle.properties'), 'utf8'))[1].trim();
 
@@ -135,10 +136,33 @@ for (const project of PROJECTS) {
 			checked++;
 			if (!(await idsOf(page))) broken.push(where + ': ' + name + ' is on ' + page + ', which is not there');
 		}
+		for (const [name, page] of index.model ?? []) {
+			checked++;
+			if (!(await idsOf(page))) broken.push(where + ': the TM1 type ' + name + ' is on ' + page + ', which is not there');
+		}
 		for (const [name, type, , anchor = name] of index.members) {
 			checked++;
 			const page = index.types[type][1];
 			if (!(await idsOf(page))?.has(anchor)) broken.push(where + ': ' + name + ' is at ' + page + '#' + anchor + ', which is not there');
+		}
+	}
+}
+// The Docker pages' index (headingIndex in search.mjs): every page there, every heading on it
+{
+	const where = '/' + PA_DOCKER.id + '/search.json';
+	const index = JSON.parse(await readFile(path.join(distDir, PA_DOCKER.id, 'search.json'), 'utf8').catch(() => 'null'));
+	if (!index) broken.push(where + ' is not in dist: run scripts/docker.mjs');
+	else {
+		const ids = [];
+		for (const [title, address] of index.pages) {
+			checked++;
+			const html = address.startsWith(path.posix.join('/', PA_DOCKER.id, '/')) ? await readFile(path.join(distDir, ...address.split('/'), 'index.html'), 'utf8').catch(() => null) : null;
+			if (html === null) broken.push(where + ': ' + title + ' is at ' + address + ', which is not a Docker page');
+			ids.push(new Set([...(html ?? '').matchAll(/\sid="([^"]+)"/g)].map((match) => match[1])));
+		}
+		for (const [text, page, id] of index.headings) {
+			checked++;
+			if (!ids[page]?.has(id)) broken.push(where + ': ' + text + ' is at ' + index.pages[page]?.[1] + '#' + id + ', which is not there');
 		}
 	}
 }

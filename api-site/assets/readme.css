@@ -5,9 +5,8 @@
 .readme h2 { margin-top: 2.5rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rule, #d8d8d8); }
 .readme h3 { margin-top: 1.75rem; font-size: 1.05rem; }
 .readme h4 { margin-top: 1.25rem; font-size: 0.95rem; }
-/* Anchors land below the sticky masthead */
-.readme :is(h2, h3, h4)[id] { scroll-margin-top: calc(var(--bar, 3.75rem) + 1rem); }
-.readme .crumbs { margin-top: 0.75rem; }
+/* Anchors land below the sticky masthead and the bar of crumbs and search, not under them */
+.readme :is(h2, h3, h4)[id] { scroll-margin-top: calc(var(--bar, 3.75rem) + 3.5rem); }
 
 /* Tables of settings and commands: wide ones scroll on their own, not the page */
 .readme table { display: block; max-width: 100%; overflow-x: auto; margin: 0.75rem 0 1.25rem; border-collapse: collapse; font-size: 0.88rem; }
