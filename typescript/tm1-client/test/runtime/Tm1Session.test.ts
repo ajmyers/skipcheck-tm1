@@ -30,7 +30,7 @@ import {
 } from "../../src/index.js";
 import { asyncResult } from "../../src/session/connection.js";
 import { Repo } from "../support/repo.js";
-import { eventually, Pending, ScriptedTm1, settle } from "../support/scripted-tm1.js";
+import { eventually, Pending, ScriptedTm1, seeded, settle } from "../support/scripted-tm1.js";
 
 const { LOGIN, CLOSE, ROOT } = ScriptedTm1;
 const SNAPSHOT = readFileSync(Repo.snapshot, "utf8");
@@ -1151,7 +1151,7 @@ describe("Tm1Session reading collections", () => {
       .stream(Tm1Request.list(ODataPath.of("Elements"), ODataQuery.none()))
       .toArray();
 
-  it("reads the items and follows next links as given", async () => {
+  it("follows next links as given", async () => {
     const tm1 = new ScriptedTm1()
       .on("GET Elements", () => ScriptedTm1.json(200, BODY))
       .on("GET Elements?$skiptoken=3", () => ScriptedTm1.json(200, `{"value":[{"Name":"p2"}],"@odata.nextLink":"Elements?$skiptoken=4&x='a b'"}`))
@@ -1167,9 +1167,9 @@ describe("Tm1Session reading collections", () => {
     ).toEqual(["GET Elements?$skiptoken=3", "GET Elements?$skiptoken=4&x='a b'"]);
   });
 
-  it("asks for pages only as items are taken", async () => {
-    // The Java decoder's asksForBuffersOnlyAsItemsAreTaken: here a page is read whole, so what's
-    // read no faster than the items are taken is the pages
+  it("asks for buffers only as items are taken", async () => {
+    // Java's decoder reads a page buffer by buffer; here a page is read whole, so what's read no
+    // faster than the items are taken is the pages
     const tm1 = new ScriptedTm1()
       .on("GET Elements", () => ScriptedTm1.json(200, BODY))
       .on("GET Elements?$skiptoken=3", () => ScriptedTm1.json(200, '{"value":[{"Name":"p2"}]}'));
@@ -1213,9 +1213,9 @@ describe("Tm1Session reading collections", () => {
     }
   }
 
-  it("releases a response it hasn't read when cancelled", async () => {
-    // The Java decoder's releasesBuffersItHasntReadWhenCancelled: what's held here isn't pooled
-    // buffers but the response and its connection, which Node's fetch gives up when aborted
+  it("releases buffers it hasn't read when cancelled", async () => {
+    // What's held here isn't Java's pooled buffers but the response and its connection, which
+    // Node's fetch gives up when aborted
     await stalling(async (root, state) => {
       const session = Tm1Session.builder().baseUrl(root).basicAuth("admin", "").build();
       const cancel = new AbortController();
@@ -1240,15 +1240,93 @@ describe("Tm1Session reading collections", () => {
     });
   });
 
-  it("reads multibyte characters", async () => {
-    expect(await read('{"value":[{"Name":"Région 日本 😀","Type":"String"}]}')).toEqual([{ Name: "Région 日本 😀", Type: "String" }]);
+  /** A real server whose `Elements` sends `parts` one after the other, each in a chunk of its own,
+   * as the network may split a body: Node's fetch puts them together. A next link reads as empty. */
+  async function splitting(use: (read: (...parts: Uint8Array[]) => Promise<unknown[]>) => Promise<void>): Promise<void> {
+    let parts: Uint8Array[] = [];
+    const server = createServer((request, response) => {
+      request.resume();
+      const path = request.url ?? "";
+      if (path.includes("ActiveSession?"))
+        response.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": "TM1SessionId=c1; Path=/api/; HttpOnly" }).end('{"ID":1}');
+      else if (path.includes("skiptoken")) response.writeHead(200, { "Content-Type": "application/json" }).end('{"value":[]}');
+      else if (path.includes("Elements")) {
+        response.writeHead(200, { "Content-Type": "application/json" });
+        const send = async (): Promise<void> => {
+          for (const part of parts) {
+            response.write(part);
+            await new Promise((resolve) => setImmediate(resolve));
+          }
+          response.end();
+        };
+        void send();
+      } else response.writeHead(204).end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const session = Tm1Session.builder()
+      .baseUrl(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1/`)
+      .basicAuth("admin", "")
+      .build();
+    try {
+      await use((...p) => {
+        parts = p;
+        return session.stream(ELEMENTS).toArray();
+      });
+    } finally {
+      await session.close();
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  }
+
+  /** `bytes` cut in two at `at`. */
+  const cut = (bytes: Uint8Array, at: number): Uint8Array[] => [bytes.subarray(0, at), bytes.subarray(at)];
+
+  it("gives the same result however the bytes are split", async () => {
+    const bytes = new TextEncoder().encode(BODY);
+    const expected = (JSON.parse(BODY) as { value: unknown[] }).value;
+    await splitting(async (read) => {
+      for (let at = 1; at < bytes.length; at++) expect(await read(...cut(bytes, at)), `split at ${at}`).toEqual(expected);
+      const random = seeded(7);
+      for (let i = 0; i < 200; i++) {
+        const parts: Uint8Array[] = [];
+        for (let from = 0; from < bytes.length;) {
+          const to = Math.min(bytes.length, from + 1 + random(40));
+          parts.push(bytes.subarray(from, to));
+          from = to;
+        }
+        expect(await read(...parts)).toEqual(expected);
+      }
+    });
   });
 
-  it("reads collections of primitives, dropping nulls", async () => {
+  it("handles multibyte characters split across buffers", async () => {
+    const bytes = new TextEncoder().encode('{"value":[{"Name":"Région 日本 😀","Type":"String"}]}');
+    await splitting(async (read) => {
+      for (let at = 1; at < bytes.length; at++) expect(await read(...cut(bytes, at)), `split at ${at}`).toEqual([{ Name: "Région 日本 😀", Type: "String" }]);
+    });
+  });
+
+  it("reads bytes that aren't UTF-8 as the replacement character, however they are split", async () => {
+    // As TM1's transaction log gives a password's hash, with "é" (two bytes) beside it. Java's test
+    // goes on to its Utf8Repair, which mends a character cut between buffers; Node's fetch reads the
+    // body whole before it's decoded, so there's none here
+    const utf8 = new TextEncoder();
+    const bytes = Uint8Array.from([...utf8.encode('{"value":[{"Name":"é'), 0xe0, 0xec, 0x72, 0xff, 0xff, ...utf8.encode('","Type":"é"}]}')]);
+    const replacement = String.fromCharCode(0xfffd);
+    await splitting(async (read) => {
+      for (let at = 1; at < bytes.length; at++) {
+        expect(await read(...cut(bytes, at)), `split at ${at}`).toEqual([{ Name: "é" + replacement.repeat(2) + "r" + replacement.repeat(2), Type: "é" }]);
+      }
+    });
+  });
+
+  it("decodes collections of primitives", async () => {
+    // Nulls dropped, as Java's items(); its decode(), which shows them, is the decoder's own
     expect(await read('{"value":["a",null,"b"]}')).toEqual(["a", "b"]);
   });
 
-  it("reads an empty collection", async () => {
+  it("decodes an empty collection", async () => {
     expect(await read('{"@odata.context":"x","value":[]}')).toEqual([]);
   });
 
