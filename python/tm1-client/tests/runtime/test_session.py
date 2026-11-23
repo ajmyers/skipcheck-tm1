@@ -808,13 +808,24 @@ def test_reads_the_version_once_inside_the_session(rt: Runtime) -> None:
     assert cookie(seen[0]) is not None, "never an anonymous read"
 
 
-def test_fetches_metadata_once_per_server_version_for_every_session(rt: Runtime) -> None:
-    first, second = rt.session(), rt.session()
+def test_fetches_metadata_once_per_server_version_for_every_session_with_the_same_settings(rt: Runtime) -> None:
+    seen: list[httpx.Request] = []
+    handler = rt.fake.handler
+
+    def spy(request: httpx.Request) -> httpx.Response:
+        if target(request) == "GET $metadata":
+            seen.append(request)
+        return handler(request)
+
+    rt.fake.handler = spy  # type: ignore[method-assign]
+    settings = rt.builder()
+    first, second = rt.session(settings), rt.session(settings)
     caps = rt.run(first.capabilities())
     assert caps.schema_version == "11.8.35"
     assert caps.product_version == Tm1Version.parse("11.8.03500.6")
     rt.run(second.capabilities())
     assert rt.fake.metadata_reads == 1
+    assert [r.headers["accept"] for r in seen] == ["application/xml"]
 
 
 def test_sends_a_request_whose_requirement_the_server_meets(rt: Runtime) -> None:
