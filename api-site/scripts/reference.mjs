@@ -325,7 +325,8 @@ const gaps = new Map();
 // Pages showing Java code in another language, and overviews with fewer examples than Java's
 const foreign = [];
 const fewer = [];
-const site = { projects: PROJECTS.map((p) => ({ id: p.id, landing: p.landing, docs: true })), guide: {} };
+// The docs landing page (/docs/, pages.mjs) is served like a project's pages
+const site = { projects: [...PROJECTS.map((p) => ({ id: p.id, landing: p.landing, docs: true })), { id: 'docs', landing: true, docs: false }], guide: {} };
 let pageCount = 0;
 
 for (const project of PROJECTS) {

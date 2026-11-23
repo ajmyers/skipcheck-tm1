@@ -61,7 +61,8 @@ export const DOC_LANGUAGES = ['java', 'python', 'dotnet', 'typescript'];
 // languages: the ones the project exists in. python: its package's source folder, for the API
 // extractor. landing: it has a landing page (content/<id>.md); one without is reached through
 // another project's page, and /<id>/ opens its docs. test: it's a test dependency, which changes
-// how it's installed. start: the types its docs home suggests first, in order.
+// how it's installed. start: the types its docs home suggests first, in order. summary: for a
+// project without a landing page, its line on the docs landing page (/docs/).
 export const PROJECTS = [
 	{
 		id: 'tm1-client',
@@ -84,8 +85,22 @@ export const PROJECTS = [
 		start: ['RequiresTm1', 'Tm1Source', 'Tm1ServerContainer', 'PlanningAnalyticsEnvironment'],
 	},
 	{ id: 'tm1-spring-boot-starter', title: 'TM1 Spring Boot starter', languages: ['java'], landing: true, test: false, start: ['Tm1Properties', 'Tm1AutoConfiguration', 'Tm1ConnectionDetails'] },
-	{ id: 'tm1-spring-boot-testcontainers', title: 'TM1 Spring Boot Testcontainers', languages: ['java'], landing: false, test: true },
-	{ id: 'tm1-csdl', title: 'TM1 CSDL', languages: ['java'], landing: false, test: false },
+	{
+		id: 'tm1-spring-boot-testcontainers',
+		title: 'TM1 Spring Boot Testcontainers',
+		languages: ['java'],
+		landing: false,
+		test: true,
+		summary: "A TM1 container in your Spring Boot tests, wired to the starter's client with @ServiceConnection.",
+	},
+	{
+		id: 'tm1-csdl',
+		title: 'TM1 CSDL',
+		languages: ['java'],
+		landing: false,
+		test: false,
+		summary: "Reads TM1's $metadata (OData CSDL), which the clients' models are generated from.",
+	},
 ];
 
 export const languagesOf = (project) => LANGUAGES.filter((language) => project.languages.includes(language.id));

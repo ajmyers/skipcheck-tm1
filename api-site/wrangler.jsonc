@@ -35,6 +35,8 @@
     { "pattern": "*skipcheck.io/tm1-spring-boot-starter*", "zone_name": "skipcheck.io" },
     { "pattern": "*skipcheck.io/tm1-spring-boot-testcontainers*", "zone_name": "skipcheck.io" },
     { "pattern": "*skipcheck.io/tm1-csdl*", "zone_name": "skipcheck.io" },
+    // The docs landing page, which lists every project
+    { "pattern": "*skipcheck.io/docs*", "zone_name": "skipcheck.io" },
     // Where these pages were before: /projects/<project>/..., and the guide at /projects/tm1/guide/.
     // The Worker sends them to the addresses above. /projects/pa-docker/ is the site's, and
     // doesn't match.
@@ -46,6 +48,7 @@
     { "pattern": "*skipcheck.dev/tm1-spring-boot-starter*", "zone_name": "skipcheck.dev" },
     { "pattern": "*skipcheck.dev/tm1-spring-boot-testcontainers*", "zone_name": "skipcheck.dev" },
     { "pattern": "*skipcheck.dev/tm1-csdl*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/docs*", "zone_name": "skipcheck.dev" },
     { "pattern": "*skipcheck.dev/projects/tm1*", "zone_name": "skipcheck.dev" }
   ],
   "workers_dev": false,
