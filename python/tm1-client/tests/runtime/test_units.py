@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import math
 import random
+import re
 from decimal import Decimal
 from urllib.parse import unquote
 
@@ -366,8 +367,60 @@ def test_is_a_value_type() -> None:
     assert hash(ODataPath.of("Cubes").key("a")) == hash(ODataPath.of("Cubes").key("a"))
 
 
-def test_calls_functions_with_aliases() -> None:
+def test_builds_nested_paths() -> None:
+    assert (
+        str(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements")) == "Dimensions('Region')/Hierarchies('Region')/Elements"
+    )
+    assert str(ODataPath.of("Cubes").key("Sales").action("tm1.Reserve")) == "Cubes('Sales')/tm1.Reserve"
+    assert str(ODataPath.of("Cubes").key("Sales").nav("Views").cast("tm1.NativeView")) == "Cubes('Sales')/Views/tm1.NativeView"
+    assert str(ODataPath.of("Configuration").nav("ProductVersion").value()) == "Configuration/ProductVersion/$value"
+    assert str(ODataPath.of("Dimensions").count()) == "Dimensions/$count"
+    assert str(ODataPath.of("Cubes").key("Sales").nav("Dimensions").ref()) == "Cubes('Sales')/Dimensions/$ref"
+    assert str(ODataPath.of("Threads").key(42)) == "Threads(42)"
+
+
+def test_writes_compound_keys_in_order() -> None:
+    key = {"ParentName": "Total", "ComponentName": "Q1 '26"}
+    assert str(ODataPath.of("Edges").key(key)) == "Edges(ParentName='Total',ComponentName='Q1%20''26')"
+
+
+def test_calls_functions_with_literals_or_aliases() -> None:
+    assert str(ODataPath.of("Cellsets").key("abc").function("tm1.GetPartition", {"Begin": 0, "End": 99})) == "Cellsets('abc')/tm1.GetPartition(Begin=0,End=99)"
     assert str(ODataPath.of("Hierarchies").function("tm1.Fn", {"p": Alias("@p")})) == "Hierarchies/tm1.Fn(p=@p)"
+
+
+def test_encodes_slashes_so_they_cant_split_the_path() -> None:
+    assert str(ODataPath.of("Dimensions").key("a/b")) == "Dimensions('a%2Fb')"
+    assert str(ODataPath.of("Dimensions").key("O'Neil")) == "Dimensions('O''Neil')"
+    assert str(ODataPath.of("Dimensions").key("}Clients")) == "Dimensions('%7DClients')"
+    assert str(ODataPath.of("Dimensions").key("a b")) == "Dimensions('a%20b')"
+
+
+# What RFC 3986 allows in a path: Java's URI.create refuses anything else
+_URI_PATH = re.compile(r"(?:[A-Za-z0-9\-._~!$&'()*+,;=:@/]|%[0-9A-Fa-f]{2})*")
+
+
+def _key_of(path: ODataPath) -> str:
+    """The name in the first segment's key literal, decoded as a server would."""
+    segment = unquote(str(path).split("/")[0])
+    literal = segment[segment.index("(") + 1 : segment.rindex(")")]
+    assert literal.startswith("'") and literal.endswith("'")
+    return literal[1:-1].replace("''", "'")
+
+
+def test_survives_fuzzed_names() -> None:
+    rng = random.Random(20261121)
+    alphabet = "aZ09 '\"/\\%{}[]()&=+#?!$@:;,.*~_-^|<>`\tÉé日😀"
+    for _ in range(5000):
+        name = "".join(rng.choice(alphabet) for _ in range(1 + rng.randrange(12)))
+        path = ODataPath.of("Cubes").key(name).nav("Views").key(name)
+        assert _URI_PATH.fullmatch(str(path)), name
+        assert _key_of(ODataPath.of("Cubes").key(name)) == name
+
+
+def test_calls_a_function_import_from_the_service_root() -> None:
+    assert str(ODataPath.function_import("ModelCubes", {})) == "ModelCubes()"
+    assert str(ODataPath.function_import("TailMessageLog", {"Top": 10})) == "TailMessageLog(Top=10)"
 
 
 # Tm1VersionTest and Tm1DialectTest
