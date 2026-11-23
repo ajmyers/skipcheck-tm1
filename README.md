@@ -32,11 +32,12 @@ The Java libraries require Java 17+, the Python client Python 3.10+, the .NET cl
 ./gradlew :tools:example:bootRun
 ./gradlew publishToMavenLocal            # try the libraries from another project
 ./gradlew :tm1-codegen:exportSpec        # refresh spec/tm1-api.json after changing the snapshot or overlay
-pip install -e './python/tm1-client[test]' && pytest python
-dotnet test dotnet/Tm1.slnx
-(cd typescript && npm ci && npm test)
-scripts/live-tests.sh                    # every client's tests against a real TM1 (bring your own: see the script)
+./gradlew checkAll                       # the above, and the Python, .NET and TypeScript clients' checks
+./gradlew checkPython                    # one client: checkPython, checkDotnet, checkTypescript
+./gradlew liveTest --continue            # every client's tests against a real TM1 (bring your own: see scripts/live-tests.sh)
 ```
+
+The `check` and `liveTest` tasks run each client's own tool, the same on macOS, Linux and Windows, and are what CI runs: `pytest python` in a virtual environment Gradle makes (`build/python-venv`), `dotnet test dotnet/Tm1.slnx`, and `npm ci`, `npm test` and `npm run build` in `typescript`. Those commands work on their own too. They need Python 3.10+, the .NET 10 SDK and Node 22+ installed; `./gradlew build` needs only a JDK.
 
 Builds use JDK 27 via Gradle toolchains; published libraries target Java 17 bytecode.
 

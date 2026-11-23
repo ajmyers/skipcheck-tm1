@@ -10,9 +10,12 @@ agreement to sign.
 
 1. Every change starts with a GitHub issue that records the what, the why, the how, and any context.
 2. Work on a branch named after the issue, e.g. `gh issue develop 12 --checkout`.
-3. Before opening a PR, run `./gradlew build`. Every commit must build on its own: the pre-push
-   hook builds each commit you push that the remote doesn't have yet, in a temporary worktree, and
-   refuses the push if one fails. It skips TM1 tests (as CI does), so run those by hand.
+3. Before opening a PR, run `./gradlew build`, or `./gradlew checkAll` to check the Python, .NET
+   and TypeScript clients too: a change to the Java client's API or to `spec/` can break their
+   parity tests. CI runs the same tasks, and a PR merges only when all of them pass. Every commit
+   must build on its own: the pre-push hook builds each commit you push that the remote doesn't
+   have yet, in a temporary worktree, and refuses the push if one fails. It skips TM1 tests (as CI
+   does), so run those by hand: `./gradlew liveTest --continue`.
 
 ## Commit and PR messages
 
