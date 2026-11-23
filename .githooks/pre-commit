@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+
 #
 # Formats the files a commit stages, each with its language's formatter, and stages them again:
 #
@@ -6,6 +8,9 @@
 #   python/**/*.py         ruff format, and ruff's import order
 #   typescript/**          prettier (*.ts, *.mts, *.mjs, *.json)
 #   dotnet/**/*.cs         dotnet csharpier
+#
+# It also adds the license line (SPDX-License-Identifier) to a staged source file that lacks it, in
+# any language: scripts/license-headers.py says which files get one.
 #
 # Then it checks them, and refuses the commit if a file still isn't formatted or a formatter
 # couldn't run: unformatted code shouldn't get into a commit. The message says what to install.
@@ -32,7 +37,7 @@ for state in rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD; do
 	[[ -e "$(git rev-parse --git-path "$state")" ]] && exit 0
 done
 
-java=() python=() typescript=() dotnet=()
+staged=() java=() python=() typescript=() dotnet=()
 while IFS= read -r -d '' file; do
 	case "$file" in
 		*.java) kind=java ;;
@@ -40,12 +45,13 @@ while IFS= read -r -d '' file; do
 		typescript/package-lock.json) continue ;;
 		typescript/*.ts | typescript/*.mts | typescript/*.mjs | typescript/*.json) kind=typescript ;;
 		dotnet/*.cs) kind=dotnet ;;
-		*) continue ;;
+		*) kind= ;;
 	esac
 	if [[ -n "$(git diff --name-only -- "$file")" ]]; then
-		warn "not formatting $file: it has unstaged changes too"
+		warn "leaving $file as staged: it has unstaged changes too"
 		continue
 	fi
+	staged+=("$file")
 	case "$kind" in
 		java) java+=("$file") ;;
 		python) python+=("$file") ;;
@@ -53,15 +59,14 @@ while IFS= read -r -d '' file; do
 		dotnet) dotnet+=("$file") ;;
 	esac
 done < <(git diff --cached --name-only -z --diff-filter=ACMR)
-all=("${java[@]}" "${python[@]}" "${typescript[@]}" "${dotnet[@]}")
-[[ ${#all[@]} -eq 0 ]] && exit 0
+[[ ${#staged[@]} -eq 0 ]] && exit 0
 
 # The files are fully staged, so the index alone records them as they were
 tree="$(git write-tree)" || { warn "couldn't snapshot the index"; exit 1; }
 parent=()
 git rev-parse -q --verify HEAD > /dev/null && parent=(-p HEAD)
 backup="$(git commit-tree "$tree" "${parent[@]}" -m "format hook: staged files before formatting")" \
-	&& git update-ref --create-reflog -m "before formatting ${#all[@]} file(s)" refs/format-hook/backup "$backup" \
+	&& git update-ref --create-reflog -m "before formatting ${#staged[@]} file(s)" refs/format-hook/backup "$backup" \
 	|| { warn "couldn't save a backup"; exit 1; }
 
 failed=()
@@ -78,6 +83,11 @@ within() {
 	local file
 	for file in "$@"; do printf '%s\0' "${file#"$prefix"}"; done
 }
+
+# The license line first, so the formatters lay out the file with it
+if ! output="$(printf '%s\0' "${staged[@]}" | xargs -0 python3 scripts/license-headers.py --fix 2>&1)"; then
+	refuse License "scripts/license-headers.py couldn't run (it needs python3)" "$output"
+fi
 
 if [[ ${#java[@]} -gt 0 ]]; then
 	if ! output="$(./gradlew -q format -PformatFiles="$(IFS=,; echo "${java[*]}")" 2>&1)"; then
@@ -123,7 +133,7 @@ if [[ ${#dotnet[@]} -gt 0 ]]; then
 	fi
 fi
 
-git add -- "${all[@]}" || { warn "couldn't stage the formatted files"; exit 1; }
+git add -- "${staged[@]}" || { warn "couldn't stage the formatted files"; exit 1; }
 
 if [[ ${#failed[@]} -gt 0 ]]; then
 	warn "commit refused: ${failed[*]} files couldn't be formatted or checked."

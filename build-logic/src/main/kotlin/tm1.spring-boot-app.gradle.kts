@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // A runnable Spring Boot tool (not published)
 plugins {
 	id("tm1.java-conventions")

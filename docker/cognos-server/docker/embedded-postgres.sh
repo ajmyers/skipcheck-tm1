@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+
 # cognos-postgres: the PostgreSQL content store that runs inside the container when
 # no external one is configured (COGNOS_CS_HOST unset).
 #

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Import hygiene for Java sources, checked without compiling: unused imports, imports out of
  * order, and types written with their full package name in code where an import belongs.

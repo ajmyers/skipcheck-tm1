@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1.7
+# SPDX-License-Identifier: Apache-2.0
+
 #
 # cognos-server: a runtime for IBM Cognos Analytics 12 on Linux x86-64.
 #

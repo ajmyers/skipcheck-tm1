@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+
 # tm1-web-install: installs TM1 Web from a user-supplied IBM bundle.
 #
 # Runs as `tm1-web install [SOURCE]`, and automatically from the entrypoint when

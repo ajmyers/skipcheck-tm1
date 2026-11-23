@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1.7
+# SPDX-License-Identifier: Apache-2.0
+
 #
 # pa-setup: the setup tool for a whole Planning Analytics environment. It reads
 # pa-environment.yaml, generates a compose project and runs it through the host's

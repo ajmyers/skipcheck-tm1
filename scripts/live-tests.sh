@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+
 # Runs every client's tests against a real TM1: the Java *Tm1Test classes, the Python
 # tests/live, the .NET Live tests and the TypeScript test/live. Give TM1 the way the Java tests take it, one of:
 #

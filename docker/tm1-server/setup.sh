@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 # tm1-server setup: installs and starts a local IBM Planning Analytics (TM1) server
 # with Docker, doing the steps in GETTING-STARTED.md and checking them as it goes.
 #

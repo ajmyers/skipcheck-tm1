@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Serves the Java API docs (built by scripts/assemble.mjs into dist/) at
 // ajmyers.net/projects/<module>/api/, dressed as part of the site: every HTML page gets the site's
 // masthead and footer, fetched from ajmyers.net/partials/ and cached, so a change to the site's nav

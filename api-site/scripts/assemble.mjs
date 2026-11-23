@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Collects each library's themed Javadoc (./gradlew apiSiteJavadoc) into
 // dist/projects/<module>/api/, and works out the Content-Security-Policy hashes for the inline
 // scripts, event handlers and style attributes Javadoc writes into its pages, so the Worker's CSP

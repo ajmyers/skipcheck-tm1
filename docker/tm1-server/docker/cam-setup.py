@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Give a TM1 database its Cognos (CAM) administrators and groups.
 
 Usage: cam-setup.py <TM1 REST base URL, e.g. http://localhost:18010>

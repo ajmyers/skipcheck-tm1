@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+
 """pa-setup: run a whole IBM Planning Analytics environment in Docker from one file.
 
 Runs in its own container (see setup.sh / setup.ps1), with the Docker socket and the

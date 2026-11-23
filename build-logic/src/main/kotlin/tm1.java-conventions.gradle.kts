@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Baseline for every Java subproject: toolchain, compiler flags, JUnit
 import net.ltgt.gradle.errorprone.CheckSeverity
 import net.ltgt.gradle.errorprone.errorprone

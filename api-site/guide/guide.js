@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // The guide's language tabs: choosing a language on one example chooses it on every example, on
 // this page and the next, and the choice is remembered. An example a language doesn't have keeps
 // showing the first language it does have.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Unpack the parts of selected installables from an IBM TM1 repository zip.
 
 Usage: unpack-tm1.py <extracted-repo-dir> <install-dir> <installable> [...]
