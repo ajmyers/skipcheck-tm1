@@ -49,7 +49,7 @@ that runs it.
 
 ## What gates a merge
 
-The `master` ruleset requires three checks, on a branch that is up to date with `master`:
+The `master` ruleset requires three checks:
 
 - `ci-ok` passes only when every job of [`ci.yml`](.github/workflows/ci.yml) did: each client's
   checks, the scripts, the package tests, the API docs site, the paw and setup scripts.
@@ -58,9 +58,14 @@ The `master` ruleset requires three checks, on a branch that is up to date with 
 
 So:
 
-- **Rebase onto `master` before merging,** and again if `master` moves first
-  (`git rebase origin/master`, then `git push --force-with-lease`). There's no merge queue: GitHub
-  doesn't offer one on a repository a user owns.
+- **A branch needn't be up to date with `master` to merge.** Requiring it made every merge send
+  every other open PR back for a rebase and another run of CI, and there's no merge queue to do
+  that for us: GitHub doesn't offer one on a repository a user owns. So two PRs that each pass
+  can, rarely, break `master` together. CI runs on every commit of `master` and shows it within
+  minutes, and a release checks the tagged commit again, so it can't ship. If `master` is red,
+  mending it comes before anything else merges.
+- **When a branch conflicts with `master`, rebase it** (`git rebase origin/master`, then
+  `git push --force-with-lease`) rather than merging `master` in.
 - **A new CI job goes in `ci-ok`'s `needs`,** or it gates nothing. A new image goes in
   `docker.yml`'s matrix, which `docker-ok` covers.
 - **A workflow that gates has no path filter.** A required check can't wait for a workflow that
