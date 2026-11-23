@@ -127,7 +127,7 @@ describe("Tm1Version", () => {
     expect(v.isBefore(v)).toBe(false);
   });
 
-  it.each(["", "11.", ".8", "11..8", "v11.8", "11.8-beta", "99999999999"])("rejects %j, which isn't a version", (text) => {
+  it.each(["", "11.", ".8", "11..8", "v11.8", "11.8-beta", "99999999999"])("rejects non-versions: %j", (text) => {
     expect(() => Tm1Version.parse(text)).toThrow(/Not a TM1 version/);
   });
 });
