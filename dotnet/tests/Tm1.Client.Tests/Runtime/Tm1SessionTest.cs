@@ -2,10 +2,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -1180,5 +1183,138 @@ public class Tm1TimeoutsTest
     {
         Assert.Throws<ArgumentException>(() => Tm1Timeouts.Builder().Login(TimeSpan.Zero).Build());
         Assert.Throws<ArgumentException>(() => Tm1Timeouts.Builder().Connect(TimeSpan.FromSeconds(-1)).Build());
+    }
+
+    /// <summary>The request timeout in the tests against a slow server: ten times the pause between pieces.</summary>
+    private static readonly TimeSpan Request = TimeSpan.FromSeconds(1);
+
+    private static readonly TimeSpan Pause = TimeSpan.FromMilliseconds(100);
+
+    private static readonly Tm1Request<JsonElement> Server = Tm1Request.Get<JsonElement>(ODataPath.Of("Server"), ODataQuery.None().Select("Name"));
+
+    [Fact]
+    public async Task KeepsReadingABodyThatArrivesSlowlyButSteadily()
+    {
+        // Twice the request timeout in all, never pausing for more than a tenth of it
+        await using var tm1 = new SlowTm1(Request, async (body, ct) =>
+        {
+            await SlowTm1.WriteAsync(body, "{\"Name\":\"tm1\"", ct);
+            for (var i = 0; i < 20; i++)
+            {
+                await Task.Delay(Pause, ct);
+                await SlowTm1.WriteAsync(body, " ", ct);
+            }
+            await SlowTm1.WriteAsync(body, "}", ct);
+        });
+        var started = Stopwatch.StartNew();
+        var server = await tm1.Session.ExecuteAsync(Server).WaitAsync(TimeSpan.FromSeconds(20));
+        Assert.Equal("tm1", server.GetProperty("Name").GetString());
+        Assert.True(started.Elapsed > Request, "the body took longer than the timeout");
+    }
+
+    [Fact]
+    public async Task FailsABodyThatStallsForLongerThanTheRequestTimeout()
+    {
+        await using var tm1 = new SlowTm1(Request, async (body, ct) =>
+        {
+            await SlowTm1.WriteAsync(body, "{\"Name\":", ct);
+            await Task.Delay(Timeout.Infinite, ct);
+        });
+        var e = await Assert.ThrowsAsync<Tm1TransportException>(() => tm1.Session.ExecuteAsync(Server).WaitAsync(TimeSpan.FromSeconds(20)));
+        Assert.Equal(Tm1TransportException.Phase.Response, e.TransportPhase);
+    }
+
+    /// <summary>A TM1 on a real socket: it logs in, and answers anything else with a 200 whose body a
+    /// test writes, piece by piece, ended by closing the connection. The session has a short request
+    /// timeout.</summary>
+    private sealed class SlowTm1 : IAsyncDisposable
+    {
+        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly CancellationTokenSource _done = new();
+        private readonly Func<NetworkStream, CancellationToken, Task> _body;
+        private readonly Task _accepting;
+
+        public SlowTm1(TimeSpan request, Func<NetworkStream, CancellationToken, Task> body)
+        {
+            _body = body;
+            _listener.Start();
+            _accepting = AcceptAsync();
+            Session = Tm1Session
+                .Builder()
+                .BaseUrl($"http://127.0.0.1:{((IPEndPoint)_listener.LocalEndpoint).Port}/api/v1/")
+                .BasicAuth("admin", "apple")
+                .Timeouts(Tm1Timeouts.Builder().Request(request).Build())
+                .Build();
+        }
+
+        public Tm1Session Session { get; }
+
+        public static async Task WriteAsync(NetworkStream stream, string text, CancellationToken ct)
+        {
+            await stream.WriteAsync(Encoding.UTF8.GetBytes(text), ct);
+            await stream.FlushAsync(ct);
+        }
+
+        private async Task AcceptAsync()
+        {
+            try
+            {
+                while (true)
+                {
+                    _ = AnswerAsync(await _listener.AcceptTcpClientAsync(_done.Token));
+                }
+            }
+            catch (Exception e) when (e is OperationCanceledException or SocketException or ObjectDisposedException)
+            {
+                // The test is over
+            }
+        }
+
+        private async Task AnswerAsync(TcpClient client)
+        {
+            using (client)
+            {
+                var stream = client.GetStream();
+                try
+                {
+                    var head = await ReadHeadAsync(stream);
+                    if (head.Contains("ActiveSession?", StringComparison.Ordinal))
+                    {
+                        await WriteAsync(
+                            stream,
+                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nSet-Cookie: TM1SessionId=s1; Path=/api/; HttpOnly\r\n"
+                                + "Content-Length: 8\r\nConnection: close\r\n\r\n{\"ID\":1}",
+                            _done.Token
+                        );
+                        return;
+                    }
+                    await WriteAsync(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n", _done.Token);
+                    await _body(stream, _done.Token);
+                }
+                catch (Exception e) when (e is IOException or OperationCanceledException or ObjectDisposedException)
+                {
+                    // The client gave up, or the test is over
+                }
+            }
+        }
+
+        private async Task<string> ReadHeadAsync(NetworkStream stream)
+        {
+            var head = new StringBuilder();
+            var one = new byte[1];
+            while (!head.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal) && await stream.ReadAsync(one, _done.Token) == 1)
+            {
+                head.Append((char)one[0]);
+            }
+            return head.ToString();
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _done.CancelAsync();
+            _listener.Stop();
+            await _accepting;
+            _done.Dispose();
+        }
     }
 }

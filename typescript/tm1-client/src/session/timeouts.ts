@@ -19,8 +19,10 @@ export class Tm1Timeouts {
 
   /** Timeouts in milliseconds. `connect`: for a connection, including TLS. `login`: for a login
    * response; short, because a login does no work. The authenticator gets as long again to supply
-   * the credentials first. `request`: for a request's answer; long, because TM1 answers a process
-   * or a big view only when it's done. `close`: for the logout at the end. `refusedLogin`: how long
+   * the credentials first. `request`: how long a request may go without receiving any data; long,
+   * because TM1 answers a process or a big view only when it's done. It's an idle timeout, not a
+   * limit on the whole response, so a large collection that keeps arriving isn't cut off (with a
+   * transport that calls `Tm1HttpRequest.received`, as `fetchTransport` does). `close`: for the logout at the end. `refusedLogin`: how long
    * a refused login is remembered; zero to try every time.
    * @throws RangeError if one isn't positive, or `refusedLogin` is negative */
   constructor(

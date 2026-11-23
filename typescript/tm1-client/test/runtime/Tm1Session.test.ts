@@ -1369,6 +1369,80 @@ describe("Tm1Timeouts", () => {
     Tm1Timeouts.builder().refusedLogin(0).build();
   });
 
+  /** The request timeout in the tests against a slow server: ten times the pause between pieces. */
+  const REQUEST = 1_000;
+  const PAUSE = 100;
+  const SERVER = Tm1Request.get(ODataPath.of("Server"), ODataQuery.none().select("Name"));
+
+  /** Runs `test` with a session that has a short request timeout, against a real server that logs in
+   * and answers anything else with a 200 whose body `body` writes. Ending the test ends the body. */
+  async function slowTm1(
+    body: (write: (text: string) => void, done: AbortSignal) => Promise<void>,
+    test: (session: Tm1Session) => Promise<void>,
+  ): Promise<void> {
+    const done = new AbortController();
+    const server = createServer((request, response) => {
+      request.resume();
+      if (request.url!.includes("ActiveSession?")) {
+        response.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": "TM1SessionId=s1; Path=/api/; HttpOnly" }).end('{"ID":1}');
+        return;
+      }
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.flushHeaders();
+      body((text) => response.write(text), done.signal).then(
+        () => response.end(),
+        () => response.destroy(),
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const root = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1/`;
+      await test(Tm1Session.builder().baseUrl(root).basicAuth("admin", "apple").timeouts(Tm1Timeouts.builder().request(REQUEST).build()).build());
+    } finally {
+      done.abort();
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  }
+
+  const pause = (ms: number, signal: AbortSignal): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const timer = setTimeout(resolve, ms);
+      signal.addEventListener("abort", () => {
+        clearTimeout(timer);
+        reject(new Error("the test is over"));
+      });
+    });
+
+  it("keeps reading a body that arrives slowly but steadily", async () => {
+    // Twice the request timeout in all, never pausing for more than a tenth of it
+    const body = async (write: (text: string) => void, done: AbortSignal): Promise<void> => {
+      write('{"Name":"tm1"');
+      for (let i = 0; i < 20; i++) {
+        await pause(PAUSE, done);
+        write(" ");
+      }
+      write("}");
+    };
+    await slowTm1(body, async (session) => {
+      const started = Date.now();
+      expect(await session.execute(SERVER)).toEqual({ Name: "tm1" });
+      expect(Date.now() - started, "the body took longer than the timeout").toBeGreaterThan(REQUEST);
+    });
+  });
+
+  it("fails a body that stalls for longer than the request timeout", async () => {
+    const body = async (write: (text: string) => void, done: AbortSignal): Promise<void> => {
+      write('{"Name":');
+      await pause(60_000, done);
+    };
+    await slowTm1(body, async (session) => {
+      const e = await failure(session.execute(SERVER));
+      expect(e).toBeInstanceOf(Tm1TransportException);
+      expect((e as Tm1TransportException).phase).toBe("Response");
+    });
+  });
+
   it("gives the login its own timeout", async () => {
     const tm1 = new ScriptedTm1().on(LOGIN, () => new Pending().promise);
     const e = (await failure(tm1.session((b) => b.timeouts(Tm1Timeouts.builder().login(20).build())).connect())) as Tm1Exception;
