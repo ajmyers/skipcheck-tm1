@@ -3,8 +3,8 @@
 # pa-setup: one command for a whole IBM Planning Analytics environment in Docker,
 # described by pa-environment.yaml in the current folder. Windows twin of setup.sh.
 #
-#   & ([scriptblock]::Create((irm https://ajmyers.net/pa/setup.ps1))) init
-#   & ([scriptblock]::Create((irm https://ajmyers.net/pa/setup.ps1))) up
+#   & ([scriptblock]::Create((irm https://skipcheck.io/pa/setup.ps1))) init
+#   & ([scriptblock]::Create((irm https://skipcheck.io/pa/setup.ps1))) up
 #   .\setup.ps1 urls | status | logs [service] | down | generate
 #
 # This script only checks Docker and runs the setup tool in a container, with the

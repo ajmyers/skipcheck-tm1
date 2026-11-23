@@ -12,16 +12,16 @@ it, waits until everything is healthy, and prints every address and login.
 
 ```sh
 mkdir pa && cd pa
-curl -fsSL https://ajmyers.net/pa/setup.sh | sh -s -- init    # writes pa-environment.yaml
+curl -fsSL https://skipcheck.io/pa/setup.sh | sh -s -- init    # writes pa-environment.yaml
 # edit it: point ibm at your downloads, choose the parts
-curl -fsSL https://ajmyers.net/pa/setup.sh | sh -s -- up
+curl -fsSL https://skipcheck.io/pa/setup.sh | sh -s -- up
 ```
 
 Windows (PowerShell):
 
 ```powershell
-& ([scriptblock]::Create((irm https://ajmyers.net/pa/setup.ps1))) init
-& ([scriptblock]::Create((irm https://ajmyers.net/pa/setup.ps1))) up
+& ([scriptblock]::Create((irm https://skipcheck.io/pa/setup.ps1))) init
+& ([scriptblock]::Create((irm https://skipcheck.io/pa/setup.ps1))) up
 ```
 
 Or save [`setup.sh`](setup.sh) / [`setup.ps1`](setup.ps1) next to your file and run it
