@@ -15,6 +15,9 @@ testImplementation("io.skipcheck:tm1-testcontainers:<version>")
 Tested with TM1 Server 11.8.03500.6 (Planning Analytics 2.1.19), the only version we've had
 to test with. If you run it with another version, please open an issue saying how it went.
 
+To run the same parts by hand, outside tests (to develop against, or to look at in a browser), use
+[`pa-setup`](../../docker/pa-setup/README.md). It starts the same images from one file, `pa-environment.yaml`.
+
 ## Writing a test
 
 ```java
@@ -353,5 +356,4 @@ Objects tests leave behind then survive between runs too. Stop the container (`d
 ## Not yet
 
 - Running test classes once per TM1 version, and pinning tests to a version range.
-- Several TM1 servers with a shared Admin Server (`Tm1Stack`), and PAW (#16).
 - Spring Boot `@ServiceConnection` (#15).

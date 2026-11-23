@@ -4,6 +4,8 @@ The .NET port of the Java [`tm1-testcontainers`](../../../java/tm1-testcontainer
 
 The images contain no IBM software. A source supplies it: `TM1_PRIVATE_IMAGE`, `TM1_HOME_DIR`, `TM1_INSTALL_VOLUME`, `TM1_BUNDLE_DIR` (with `TM1_BUNDLE`) or `TM1_BUNDLE_URL` (with `TM1_BUNDLE_SHA256`). You can set each one as an environment variable or as an `AppContext` switch, which is .NET's counterpart of a Java system property.
 
+To run the same parts by hand, outside tests (to develop against, or to look at in a browser), use [`pa-setup`](../../../docker/pa-setup/README.md). It starts the same images from one file, `pa-environment.yaml`.
+
 ```csharp
 public class CubeTests(Tm1ServerFixture tm1) : IClassFixture<Tm1ServerFixture>
 {

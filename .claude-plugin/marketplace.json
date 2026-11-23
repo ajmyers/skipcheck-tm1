@@ -9,7 +9,7 @@
     {
       "name": "tm1",
       "source": "./agent-plugin",
-      "description": "Set up and run a local TM1 server in Docker with tm1-server, check it, and troubleshoot it.",
+      "description": "Set up and run TM1, TM1 Web, PAW and Cognos locally in Docker with tm1-server and pa-setup, check them, and troubleshoot them.",
       "category": "development",
       "tags": [
         "tm1",

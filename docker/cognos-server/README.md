@@ -25,6 +25,11 @@ docker run -d --name cognos -p 9300:9300 --stop-timeout 180 \
 **Docker needs at least 12 GB of memory** (Docker Desktop: Settings → Resources).
 Cognos uses about 8 GB once it's running.
 
+**With TM1, TM1 Web or PAW,** use [`pa-setup`](../pa-setup/README.md): a `cognos` section in
+`pa-environment.yaml` runs this image with your test users, adds Keycloak for
+[OIDC](#oidc) if you ask, and puts every TM1 server in CAM security against it. This README
+is the reference for what it sets.
+
 ## What it needs
 
 | Container path | What | Notes |

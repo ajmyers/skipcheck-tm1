@@ -8,6 +8,11 @@ of it installing Docker.
 > <https://skipcheck.io/tm1/> asks the same questions and shows just the commands for your
 > answers, including the setup script one-liner with your choices filled in.
 
+> **Want more than one TM1 server, or TM1 Web, PAW or Cognos?** This guide sets up one
+> TM1 server, and IBM's SData sample if you like. [`pa-setup`](../pa-setup/README.md)
+> sets up any combination from one file, `pa-environment.yaml`. Install Docker as in
+> [Step 1](#step-1-install-docker) here, then follow its README.
+
 You make three choices along the way. Pick the option that fits; you can change
 any of them later:
 
@@ -329,8 +334,8 @@ tm1-files/tm1/data/                  ← your database files (*.cub, *.dim, *.pr
 ```
 Your `tm1s.cfg` is used as-is, except for the settings the container depends on:
 paths, ports and the Admin Server host. Those are adjusted automatically, and every
-change is printed in the logs. Settings that can't work in the container (such as
-Cognos/CAM security) are left alone, with a warning. The
+change is printed in the logs. Settings likely to break in a container (such as
+Cognos/CAM security with no Cognos to reach) are left alone, with a warning. The
 [README](README.md#configuration) lists exactly which settings are adjusted.
 
 ### 3. Somewhere else on your computer
@@ -488,7 +493,7 @@ Your databases in `tm1-files` are kept across version changes.
 | Stuck at `(health: starting)` or `(unhealthy)` | Look at the log: `docker compose logs tm1`. Lines starting `[tm1-entrypoint]` explain what happened, including any `WARNING`s about your `tm1s.cfg`. |
 | Very slow, or crashes immediately, on an Apple Silicon Mac | Rosetta isn't on. Redo Step 1, Mac step 4. |
 | `bash\r: not found` on Windows | Windows line endings got into the files. Run `git config --global core.autocrlf input`, delete the folder, clone again, and rebuild. |
-| Logins fail, with a warning about `IntegratedSecurityMode` | Your `tm1s.cfg` uses Cognos (CAM) security, which isn't available here. Set `IntegratedSecurityMode=1` to use TM1's own users. |
+| Logins fail, with a warning about `IntegratedSecurityMode` | Your `tm1s.cfg` uses Cognos (CAM) security, and this setup has no Cognos. Set `IntegratedSecurityMode=1` to use TM1's own users, or run TM1 with Cognos through [`pa-setup`](../pa-setup/README.md). |
 | Changes made in `tm1s.cfg` don't apply | Restart the server: `docker compose restart tm1`. |
 
 Still stuck? Open an issue with the output of `docker compose logs tm1`.
@@ -510,4 +515,4 @@ contents, if you don't need them.
 
 **Next:** the [README](README.md) covers everything in more depth: all configuration
 options, running several TM1 servers, the Admin Server, ports and the `install`
-command.
+command. To add TM1 Web, PAW or Cognos, or more servers, use [`pa-setup`](../pa-setup/README.md).
