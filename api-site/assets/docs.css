@@ -71,7 +71,16 @@ body {
 }
 
 /* The language switch, top right of every page */
-.langs { float: right; display: flex; gap: 0.15rem; margin: 0 0 1rem 1rem; padding: 0.2rem; border: 1px solid var(--rule, #d8d8d8); border-radius: 999px; font-size: 0.85rem; }
+/* The switch sits in a bar that stays under the masthead as the page scrolls, so the language can
+   change anywhere on it; docs.js keeps the reader's place across the change */
+.toolbar {
+    position: sticky; top: var(--bar, 3.75rem); z-index: 4;
+    display: flex; justify-content: flex-end;
+    margin: -1.5rem -0.5rem 0.25rem; padding: 0.6rem 0.5rem;
+    background: color-mix(in srgb, var(--paper, #fff) 88%, transparent);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.langs { display: flex; gap: 0.15rem; margin: 0; padding: 0.2rem; background: var(--paper, #fff); border: 1px solid var(--rule, #d8d8d8); border-radius: 999px; font-size: 0.85rem; }
 .langs a, .langs span { padding: 0.25rem 0.7rem; border-radius: 999px; text-decoration: none; color: var(--ink-soft, #555); }
 .langs a[aria-current="page"] { background: var(--accent, #0b5fff); color: var(--accent-ink, #fff); font-weight: 600; }
 .langs a:hover:not([aria-current]) { color: var(--ink, #1a1a1a); }
@@ -92,7 +101,7 @@ body {
 .guide table.members a { text-decoration: none; }
 .guide .tag { display: inline-block; margin-left: 0.3rem; padding: 0 0.4rem; border: 1px solid var(--rule, #d8d8d8); border-radius: 4px; font-size: 0.7rem; color: var(--muted, #677285); vertical-align: middle; }
 /* A member: one card, its name and kind on top, its signature in a band, then the text */
-.guide .member { scroll-margin-top: calc(var(--bar, 3.75rem) + 1rem); margin: 1.25rem 0; border: 1px solid var(--rule, #d8d8d8); border-radius: 10px; overflow: hidden; background: var(--paper, #fff); }
+.guide .member { scroll-margin-top: calc(var(--bar, 3.75rem) + 3.5rem); margin: 1.25rem 0; border: 1px solid var(--rule, #d8d8d8); border-radius: 10px; overflow: hidden; background: var(--paper, #fff); }
 .guide .member:target { border-color: var(--accent, #0b5fff); }
 .guide .member header { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1rem 0.2rem; }
 .guide .member h3 { margin: 0; font-family: var(--mono, ui-monospace, monospace); font-size: 0.98rem; font-weight: 600; }
@@ -126,5 +135,5 @@ body {
 .guide ul.choose a { padding: 0.5rem 1rem; border: 1px solid var(--rule, #d8d8d8); border-radius: 8px; text-decoration: none; }
 .guide.model table.members td:first-child { white-space: nowrap; }
 
-/* Anchors land below the sticky masthead, not under it */
-.guide h2[id], .guide section[id] { scroll-margin-top: calc(var(--bar, 3.75rem) + 1rem); }
+/* Anchors land below the sticky masthead and the language bar, not under them */
+.guide h2[id], .guide section[id] { scroll-margin-top: calc(var(--bar, 3.75rem) + 3.5rem); }

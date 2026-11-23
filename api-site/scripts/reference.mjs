@@ -263,7 +263,9 @@ const inlineRst = (text) =>
 		.replace(/``([^`]+)``/g, '<code>$1</code>')
 		.replace(/:(?:class|meth|func|mod|attr):`~?([^`]+)`/g, '<code>$1</code>');
 
-const code = (text, highlight) => '<pre><code class="lang-' + highlight + '">' + escape(text) + '</code></pre>';
+// at: a key the same on every language's page (an example's region, a member's Java name), which
+// docs.js uses to keep the reader's place when the language changes
+const code = (text, highlight, at) => '<pre' + (at ? ' data-at="' + escape(at) + '"' : '') + '><code class="lang-' + highlight + '">' + escape(text) + '</code></pre>';
 
 /** The first sentence of a description, as plain text, for summaries. */
 function summary(html) {
@@ -361,7 +363,7 @@ for (const project of PROJECTS) {
 					const where = LANGUAGES.find((l) => l.id === language).examples(project, cls);
 					const text = (await regions(where)).get(region);
 					if (text === undefined) missing.add(language + ': ' + where + ' region ' + region);
-					exampleBlocks.set(cls + '#' + region, text === undefined ? '' : code(text, highlight));
+					exampleBlocks.set(cls + '#' + region, text === undefined ? '' : code(text, highlight, 'x-' + cls + '-' + region));
 				}
 			}
 			const render = {
@@ -419,7 +421,8 @@ for (const project of PROJECTS) {
 				const count = (seen.get(member.name) ?? 0) + 1;
 				seen.set(member.name, count);
 				const id = count === 1 ? member.name : member.name + '-' + count;
-				const java = javaFor.get(member);
+				const java = language === 'java' ? member : javaFor.get(member);
+				const atKey = 'm-' + (java ? java.name : member.name) + (count > 1 ? '-' + count : '');
 				let parts;
 				if (language === 'java') {
 					const p = javadocParts(member.doc);
@@ -440,7 +443,7 @@ for (const project of PROJECTS) {
 				// One card per member: its name, its signature, then what it does
 				const fields = (label, items) => (items.length > 0 ? '<div class="fields"><p class="label">' + label + '</p><dl>' + items.join('') + '</dl></div>' : '');
 				details.push(
-					'<section class="member" id="' + escape(id) + '">' +
+					'<section class="member" id="' + escape(id) + '" data-at="' + escape(atKey) + '">' +
 						'<header><h3><a href="#' + escape(id) + '">' + escape(member.name) + '</a></h3>' + (kindLabel ? '<span class="tag">' + kindLabel + '</span>' : '') + '</header>' +
 						'<pre class="signature"><code class="lang-' + highlight + '">' + linkTypes(member.signature) + '</code></pre>' +
 						'<div class="member-body">' +
@@ -565,7 +568,7 @@ async function writePage(project, language, file, title, body, nav, javaName, la
 			styles: ['../../assets/docs.css'],
 			scripts: ['../../assets/docs.js', '/highlight.js'],
 		}) +
-		'<body data-lang="' + language + '"><div class="docs">' + nav + '<main class="guide">' + switchHtml(project, language, javaName, languages, counterparts) + body + '</main></div></body></html>\n';
+		'<body data-lang="' + language + '"><div class="docs">' + nav + '<main class="guide"><div class="toolbar">' + switchHtml(project, language, javaName, languages, counterparts) + '</div>' + body + '</main></div></body></html>\n';
 	await writeFile(path.join(dir, file), html);
 }
 
