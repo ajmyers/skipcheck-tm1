@@ -495,7 +495,8 @@ def test_authenticators_that_hold_their_credentials_are_equal_when_the_credentia
     assert "secret" not in repr(auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "secret"))
 
 
-def test_never_shows_credentials_in_its_repr() -> None:
+def test_never_shows_credentials_in_to_string() -> None:
+    # Java's toString is repr here
     assert "apple" not in repr(auth.basic("admin", "apple")) and b64("admin:apple") not in repr(auth.basic("admin", "apple"))
     assert "secret" not in repr(auth.cam_namespace("alice", "secret", "LDAP"))
     assert "passport-value" not in repr(auth.cam_passport(lambda: "passport-value"))
