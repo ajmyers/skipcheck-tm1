@@ -19,13 +19,7 @@ import org.jspecify.annotations.Nullable;
  * options such as TM1's {@code !sandbox}, and parameter aliases. Immutable: each method
  * returns a new query.
  *
- * <pre>{@code
- * ODataQuery.none().select("Name", "Type")
- *     .expand("Hierarchies", h -> h.select("Name").top(5))
- *     .filter(Filter.startsWith(ODataProperty.of("Name"), "Q"))
- *     .toQueryString()
- *     // $select=Name,Type&$expand=Hierarchies($select=Name;$top=5)&$filter=startswith(Name,'Q')   (then encoded)
- * }</pre>
+ * {@snippet class = examples.ODataQueryExamples region = build}
  *
  * <p>
  * Options are written in a fixed order, lowercase with {@code $} as OData 4.0 requires,
