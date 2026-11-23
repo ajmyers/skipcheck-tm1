@@ -14,7 +14,7 @@
 #   /tm1-web/logs            TM1 Web and Liberty logs
 # See README.md.
 
-FROM --platform=linux/amd64 ubuntu:24.04
+FROM --platform=linux/amd64 ubuntu:26.04
 
 LABEL org.opencontainers.image.authors="Andrew Myers (https://ajmyers.net)" \
       org.opencontainers.image.url="https://skipcheck.io" \
