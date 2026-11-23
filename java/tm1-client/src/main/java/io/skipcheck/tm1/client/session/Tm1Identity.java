@@ -73,8 +73,8 @@ public final class Tm1Identity {
 	 * impersonated; see {@link Tm1Session.Builder#impersonate(String)}.
 	 * @param user the TM1 user to act as
 	 * @return the identity
-	 * @throws IllegalArgumentException if {@code user} is blank or not printable ASCII,
-	 * which TM1 can't impersonate correctly
+	 * @throws IllegalArgumentException if {@code user} is blank or has a control
+	 * character
 	 */
 	public static Tm1Identity impersonating(String user) {
 		return new Tm1Identity(Kind.IMPERSONATING, UserNames.checkImpersonated(user), null);

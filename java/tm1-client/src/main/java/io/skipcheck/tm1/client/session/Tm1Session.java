@@ -541,11 +541,12 @@ public final class Tm1Session {
 		 * credentials, or the user is disabled: TM1 answers both alike). The client never
 		 * falls back to another identity.
 		 * @param user the TM1 user to act as; matched ignoring case and spaces, as TM1
-		 * does
+		 * does. A name with characters outside ASCII goes out as UTF-8, which is how TM1
+		 * (11.8) reads the header; that needs the default Reactor Netty connector, as the
+		 * JDK's {@code HttpClient} replaces such characters
 		 * @return this builder
 		 * @throws IllegalArgumentException if {@code user} is blank, which TM1 would take
-		 * as no impersonation at all, or has characters other than printable ASCII, which
-		 * TM1 can't match through the header
+		 * as no impersonation at all, or has a control character
 		 */
 		public Builder impersonate(String user) {
 			this.impersonate = UserNames.checkImpersonated(user);

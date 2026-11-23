@@ -14,8 +14,9 @@ final class UserNames {
 
 	/**
 	 * {@code user}, if it can be impersonated: not blank, which TM1 would take as no
-	 * impersonation and run as the logged-in user, and only printable ASCII, since TM1
-	 * can't match other characters through the header however they're encoded.
+	 * impersonation and run as the logged-in user, and without control characters, which
+	 * can't go in a header. Any other character is fine: TM1 (11.8) reads the header as
+	 * UTF-8, and {@link HeaderText} sends it so.
 	 * @param user the user name
 	 * @return the name, unchanged
 	 * @throws IllegalArgumentException if it can't be impersonated
@@ -27,10 +28,9 @@ final class UserNames {
 					"The user to impersonate is blank, which TM1 would take as no impersonation at all");
 		}
 		for (int i = 0; i < user.length(); i++) {
-			char c = user.charAt(i);
-			if (c < 0x20 || c > 0x7e) {
-				throw new IllegalArgumentException("TM1 can't impersonate '" + user
-						+ "': it doesn't match user names with characters other than printable ASCII through TM1-Impersonate");
+			if (Character.isISOControl(user.charAt(i))) {
+				throw new IllegalArgumentException(
+						"The user to impersonate has a control character in its name, which can't be sent in a header");
 			}
 		}
 		return user;

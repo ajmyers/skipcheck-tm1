@@ -2,6 +2,8 @@ package io.skipcheck.tm1.client.session;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.UUID;
@@ -60,6 +62,21 @@ class Tm1SessionImpersonationTm1Test {
 		}
 		finally {
 			session.close().block(WAIT);
+		}
+	}
+
+	@Test
+	void runsAsAUserWhoseNameIsOutsideAscii() {
+		for (String name : new String[] { alice + "_ë", alice + "_日本" }) {
+			raw.createUser(admin, name, "a");
+			Tm1Session session = session(name);
+			try {
+				assertThat(session.execute(ACTIVE_USER).block(WAIT).get("Name").asString()).isEqualTo(name);
+			}
+			finally {
+				session.close().block(WAIT);
+				raw.deleteUser(admin, URLEncoder.encode(name, StandardCharsets.UTF_8));
+			}
 		}
 	}
 

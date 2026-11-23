@@ -1,4 +1,5 @@
 import type { Tm1Authenticator } from "../auth/index.js";
+import { headerText } from "./header-text.js";
 import {
   ODataError,
   Tm1ApiException,
@@ -180,8 +181,8 @@ export class Connection {
     if (!authorization) throw new Error(`The authenticator ${this.authenticator.describe()} supplied no credentials`);
     const headers: Record<string, string> = { ...this.baseHeaders(JSON_ACCEPT), Authorization: authorization };
     // At login only: TM1 decides the identity then and ignores the header later
-    if (this.impersonateUser !== undefined) headers[IMPERSONATE] = this.impersonateUser;
-    if (this.sessionContext !== undefined) headers[SESSION_CONTEXT] = this.sessionContext;
+    if (this.impersonateUser !== undefined) headers[IMPERSONATE] = headerText(this.impersonateUser);
+    if (this.sessionContext !== undefined) headers[SESSION_CONTEXT] = headerText(this.sessionContext);
     // Log in the session TM1 opened for a 401, rather than opening another
     if (seedCookie !== undefined && !this.transport.keepsCookies) headers["Cookie"] = `${COOKIE}=${seedCookie}`;
     const reply = await this.sendRaw("GET", url, headers, undefined, this.timeouts.login, true, undefined);

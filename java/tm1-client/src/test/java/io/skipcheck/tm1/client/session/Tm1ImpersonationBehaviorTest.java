@@ -228,25 +228,37 @@ class Tm1ImpersonationBehaviorTest {
 	}
 
 	/**
-	 * A user whose name has non-ASCII characters can't be impersonated: TM1 reports them
-	 * unknown however the header is encoded (as sent, as UTF-8 bytes, percent-encoded).
-	 * The client refuses such names before sending anything.
+	 * A user whose name has characters outside ASCII is impersonated when the header
+	 * carries the name as UTF-8, and only then: as ISO 8859-1 bytes or percent-encoded,
+	 * TM1 reports the user unknown. Sent over a bare socket, as the JDK's
+	 * {@code HttpClient} writes such a character as {@code ?}. The client sends UTF-8
+	 * ({@code HeaderText}).
 	 */
 	@Test
-	void cannotImpersonateUsersWithNonAsciiNames() {
+	void impersonatesUsersWithNonAsciiNamesOnlyAsUtf8() {
 		String accented = alice + "_ë";
 		tm1.createUser(admin, accented, "p");
 		try {
-			String utf8 = new String(accented.getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1);
-			for (String written : new String[] { accented, utf8 }) {
-				HttpResponse<String> refused = impersonate("admin", "", written);
-				assertThat(refused.statusCode()).isEqualTo(400);
-				assertThat(refused.body()).contains("The user specified in the impersonation request does not exist.");
+			RawTm1.Bytes impersonated = impersonate(accented.getBytes(StandardCharsets.UTF_8));
+			impersonated.cookie().ifPresent(tm1::close);
+			assertThat(impersonated.status()).isEqualTo(200);
+			assertThat(impersonated.text()).contains("\"Name\":\"" + accented + "\"");
+
+			byte[] percentEncoded = URLEncoder.encode(accented, StandardCharsets.UTF_8)
+				.getBytes(StandardCharsets.US_ASCII);
+			for (byte[] written : new byte[][] { accented.getBytes(StandardCharsets.ISO_8859_1), percentEncoded }) {
+				RawTm1.Bytes refused = impersonate(written);
+				assertThat(refused.status()).isEqualTo(400);
+				assertThat(refused.text()).contains("The user specified in the impersonation request does not exist.");
 			}
 		}
 		finally {
 			tm1.deleteUser(admin, URLEncoder.encode(accented, StandardCharsets.UTF_8));
 		}
+	}
+
+	private RawTm1.Bytes impersonate(byte[] target) {
+		return tm1.getWithHeaderBytes("ActiveUser?$select=Name", RawTm1.basic("admin", ""), "TM1-Impersonate", target);
 	}
 
 	private HttpResponse<String> impersonate(String user, String password, String target) {

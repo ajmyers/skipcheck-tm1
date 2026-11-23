@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import {
@@ -449,9 +451,44 @@ describe("Tm1Session impersonating", () => {
   it("refuses names TM1 would misread", () => {
     expect(() => Tm1Session.builder().impersonate("")).toThrow(/no impersonation/);
     expect(() => Tm1Session.builder().impersonate("  ")).toThrow(RangeError);
-    expect(() => Tm1Session.builder().impersonate("zoë")).toThrow(/printable ASCII/);
-    expect(() => Tm1Session.builder().impersonate("a\nb")).toThrow(RangeError);
+    expect(() => Tm1Session.builder().impersonate("a\nb")).toThrow(/control character/);
     Tm1Session.builder().impersonate("carol smith");
+  });
+
+  it("sends a name outside ASCII as its UTF-8 bytes", async () => {
+    const tm1 = scripted();
+    await tm1.session((b) => b.impersonate("zoë").sessionContext("café")).execute(SERVER);
+
+    // One character for each UTF-8 byte: fetch writes a header's characters as bytes
+    const login = tm1.requests(LOGIN)[0]!;
+    expect(Buffer.from(login.header("TM1-Impersonate")!, "latin1")).toEqual(Buffer.from("zoë", "utf8"));
+    expect(Buffer.from(login.header("TM1-SessionContext")!, "latin1")).toEqual(Buffer.from("café", "utf8"));
+  });
+
+  it("puts those bytes on the wire with Node's fetch", async () => {
+    // A real server: Node reads a header's bytes as Latin-1, one character each
+    const seen: Record<string, string | undefined>[] = [];
+    const server = createServer((request, response) => {
+      seen.push({
+        impersonate: request.headers["tm1-impersonate"] as string | undefined,
+        context: request.headers["tm1-sessioncontext"] as string | undefined,
+      });
+      request.resume();
+      if (request.method === "GET")
+        response.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": "TM1SessionId=c1; Path=/api/; HttpOnly" }).end('{"ID":1}');
+      else response.writeHead(204).end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const root = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1/`;
+      const session = Tm1Session.builder().baseUrl(root).basicAuth("admin", "").impersonate("zoë_日本").sessionContext("café").build();
+      await session.connect();
+      await session.close();
+      expect(Buffer.from(seen[0]!.impersonate!, "latin1").toString("utf8")).toBe("zoë_日本");
+      expect(Buffer.from(seen[0]!.context!, "latin1").toString("utf8")).toBe("café");
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 
   it("reports an unknown user", async () => {

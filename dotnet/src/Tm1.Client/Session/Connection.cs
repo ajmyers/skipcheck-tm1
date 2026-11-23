@@ -82,6 +82,7 @@ internal sealed class Connection
                     ConnectTimeout = timeouts.Connect,
                     PooledConnectionIdleTimeout = MaxIdle,
                     AutomaticDecompression = DecompressionMethods.All,
+                    RequestHeaderEncodingSelector = Tm1Session.Utf8Headers,
                 },
             disposeHandler: handler is null
         )
@@ -241,7 +242,8 @@ internal sealed class Connection
         request.Headers.TryAddWithoutValidation("Authorization", authorization);
         if (ImpersonateUser is not null)
         {
-            // At login only: TM1 decides the identity then and ignores the header later
+            // At login only: TM1 decides the identity then and ignores the header later. The handler
+            // writes this header and the next as UTF-8 (Tm1Session.Utf8Headers), as TM1 reads them
             request.Headers.TryAddWithoutValidation(Impersonate, ImpersonateUser);
         }
         if (SessionContext is not null)

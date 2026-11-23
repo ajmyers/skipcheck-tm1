@@ -115,11 +115,12 @@ public sealed class Tm1SessionLiveTests : IDisposable
     [Tm1Fact]
     public async Task LabelsTheSessionWithItsContext()
     {
-        var session = RawTm1.Sessions().SessionContext("tm1-client test").Build();
+        // With a character outside ASCII: TM1 reads the header as UTF-8
+        var session = RawTm1.Sessions().SessionContext("tm1-client test, café").Build();
         try
         {
             var active = await session.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("ActiveSession"), ODataQuery.None().Select("Context")));
-            Assert.Equal("tm1-client test", active.GetProperty("Context").GetString());
+            Assert.Equal("tm1-client test, café", active.GetProperty("Context").GetString());
         }
         finally
         {

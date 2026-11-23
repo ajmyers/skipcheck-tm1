@@ -39,7 +39,7 @@ export class Tm1Identity {
   /** The pool's credentials, acting as TM1 user `user`. The pool's credentials must be an
    * administrator's or a data administrator's, and administrators can't be impersonated; see
    * {@link Tm1SessionBuilder.impersonate}.
-   * @throws RangeError if `user` is blank or not printable ASCII, which TM1 can't impersonate correctly */
+   * @throws RangeError if `user` is blank or has a control character */
   static impersonating(user: string): Tm1Identity {
     return new Tm1Identity("Impersonating", checkImpersonated(user), undefined);
   }

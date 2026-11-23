@@ -38,6 +38,19 @@ describe("Tm1Session impersonating on TM1" + liveReason, () => {
     }
   });
 
+  tm1Test("runs as a user whose name is outside ASCII", async () => {
+    for (const name of [alice + "_ë", alice + "_日本"]) {
+      await raw.createUser(admin, name, "a");
+      const s = await session(name);
+      try {
+        expect((await s.execute(ACTIVE_USER)).Name).toBe(name);
+      } finally {
+        await s.close();
+        await raw.deleteUser(admin, name);
+      }
+    }
+  });
+
   tm1Test("reports an unknown user", async () => {
     expect(await kindOf(await session("zz_nobody"))).toBe("UnknownUser");
   });

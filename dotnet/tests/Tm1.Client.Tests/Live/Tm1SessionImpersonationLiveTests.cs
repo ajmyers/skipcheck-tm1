@@ -53,6 +53,25 @@ public sealed class Tm1SessionImpersonationLiveTests : IDisposable
     }
 
     [Tm1Fact]
+    public async Task RunsAsAUserWhoseNameIsOutsideAscii()
+    {
+        foreach (var name in new[] { Alice + "_ë", Alice + "_日本" })
+        {
+            Raw.CreateUser(Admin, name, "a");
+            var session = Session(name);
+            try
+            {
+                Assert.Equal(name, (await session.ExecuteAsync(ActiveUser)).GetProperty("Name").GetString());
+            }
+            finally
+            {
+                await session.CloseAsync();
+                Raw.DeleteUser(Admin, name);
+            }
+        }
+    }
+
+    [Tm1Fact]
     public async Task ReportsAnUnknownUser() => Assert.Equal(Tm1ErrorKind.UnknownUser, await KindOf(Session("zz_nobody")));
 
     [Tm1Fact]

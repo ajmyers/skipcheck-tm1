@@ -506,7 +506,13 @@ export class Tm1SessionBuilder {
     return this;
   }
 
-  /** Logs in as the service account but acts as `user` (`TM1-Impersonate`). */
+  /** Logs in as the service account but acts as `user` (`TM1-Impersonate`). TM1 matches the name
+   * ignoring case and spaces. A name with characters outside ASCII goes out as UTF-8, which is how
+   * TM1 (11.8) reads the header: the value is handed to `fetch` as one character for each UTF-8
+   * byte, which Node's `fetch` and, by the Fetch standard, a browser's send as those bytes. A custom
+   * {@link Tm1Transport} must send each character of a header value as one byte, as `fetch` does.
+   * @throws RangeError if `user` is blank, which TM1 would take as no impersonation at all, or has
+   * a control character */
   impersonate(user: string): this {
     this.impersonated = checkImpersonated(user);
     return this;
@@ -519,7 +525,7 @@ export class Tm1SessionBuilder {
 
   /** A label TM1 shows for the session (`TM1-SessionContext`, sent with the login), such as the
    * application's name: in TM1's thread and session lists and its audit log. At most 250
-   * characters, which is all TM1 keeps. */
+   * characters, which is all TM1 keeps. It goes out as UTF-8, as TM1 reads it. */
   sessionContext(sessionContext: string): this {
     if (typeof sessionContext !== "string") throw new TypeError("sessionContext is required");
     if (sessionContext.length > 250) throw new RangeError("TM1 keeps at most 250 characters of session context, got " + sessionContext.length);
@@ -590,10 +596,8 @@ export class Tm1SessionBuilder {
 export function checkImpersonated(user: string): string {
   if (typeof user !== "string") throw new TypeError("user is required");
   if (!user.trim()) throw new RangeError("The user to impersonate is blank, which TM1 would take as no impersonation at all");
-  for (const c of user) {
-    const code = c.codePointAt(0)!;
-    if (code < 0x20 || code > 0x7e)
-      throw new RangeError(`TM1 can't impersonate '${user}': it doesn't match user names with characters other than printable ASCII through TM1-Impersonate`);
-  }
+  // Any other character is fine: TM1 reads the header as UTF-8, and headerText sends it so
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f-\x9f]/.test(user)) throw new RangeError("The user to impersonate has a control character in its name, which can't be sent in a header");
   return user;
 }

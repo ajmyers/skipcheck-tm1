@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from urllib.parse import quote
 
 import pytest
 
@@ -37,6 +38,16 @@ def kind_of(s: Tm1Session) -> Tm1ErrorKind:
 def test_runs_as_the_impersonated_user(alice: str) -> None:
     with session(impersonate=alice.upper()) as s:
         assert s.execute(ACTIVE_USER)["Name"] == alice
+
+
+def test_runs_as_a_user_whose_name_is_outside_ascii(raw: RawTm1, admin: str, alice: str) -> None:
+    for name in (alice + "_ë", alice + "_日本"):
+        raw.create_user(admin, name, "a")
+        try:
+            with session(impersonate=name) as s:
+                assert s.execute(ACTIVE_USER)["Name"] == name
+        finally:
+            raw.delete_user(admin, quote(name, safe=""))
 
 
 def test_reports_an_unknown_user() -> None:

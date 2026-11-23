@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -49,10 +50,22 @@ class Tm1SessionImpersonationTest {
 		assertThatIllegalArgumentException().isThrownBy(() -> Tm1Session.builder().impersonate(""))
 			.withMessageContaining("no impersonation");
 		assertThatIllegalArgumentException().isThrownBy(() -> Tm1Session.builder().impersonate("  "));
-		assertThatIllegalArgumentException().isThrownBy(() -> Tm1Session.builder().impersonate("zoë"))
-			.withMessageContaining("printable ASCII");
-		assertThatIllegalArgumentException().isThrownBy(() -> Tm1Session.builder().impersonate("a\nb"));
+		assertThatIllegalArgumentException().isThrownBy(() -> Tm1Session.builder().impersonate("a\nb"))
+			.withMessageContaining("control character");
 		Tm1Session.builder().impersonate("carol smith");
+	}
+
+	@Test
+	void sendsANameOutsideAsciiAsItsUtf8Bytes() {
+		Tm1Session session = tm1.session(Tm1Session.builder().impersonate("zoë").sessionContext("café"));
+		StepVerifier.create(session.execute(SERVER)).expectNextCount(1).verifyComplete();
+
+		// One char for each UTF-8 byte: the connector writes a header's chars as bytes
+		HttpHeaders login = tm1.requests(FakeTm1.LOGIN).get(0).headers();
+		assertThat(login.getFirst("TM1-Impersonate").getBytes(StandardCharsets.ISO_8859_1))
+			.isEqualTo("zoë".getBytes(StandardCharsets.UTF_8));
+		assertThat(login.getFirst("TM1-SessionContext").getBytes(StandardCharsets.ISO_8859_1))
+			.isEqualTo("café".getBytes(StandardCharsets.UTF_8));
 	}
 
 	@Test

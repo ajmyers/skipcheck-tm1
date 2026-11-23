@@ -214,21 +214,31 @@ public sealed class Tm1ImpersonationBehaviorLiveTests : IDisposable
         }
     }
 
-    /// <summary>A user whose name has non-ASCII characters can't be impersonated, however the header
-    /// is encoded; the client refuses such names before sending anything.</summary>
+    /// <summary>A user whose name has characters outside ASCII is impersonated when the header carries
+    /// the name as UTF-8, and only then: as ISO 8859-1 bytes or percent-encoded, TM1 reports the user
+    /// unknown. Sent over a bare socket, so the bytes are exactly these. The client sends UTF-8
+    /// (<c>Tm1Session.Utf8Headers</c>).</summary>
     [Tm1Fact]
-    public void CannotImpersonateUsersWithNonAsciiNames()
+    public void ImpersonatesUsersWithNonAsciiNamesOnlyAsUtf8()
     {
         var accented = Alice + "_ë";
         Tm1.CreateUser(Admin, accented, "p");
         try
         {
-            var utf8 = Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(accented));
-            foreach (var written in new[] { accented, utf8 })
+            var impersonated = Impersonate(Encoding.UTF8.GetBytes(accented));
+            if (impersonated.Cookie is { } cookie)
             {
-                var refused = Impersonate(Tm1.User, Tm1.Password, written);
-                Assert.Equal(HttpStatusCode.BadRequest, refused.Status);
-                Assert.Contains("The user specified in the impersonation request does not exist.", refused.Body);
+                Tm1.Close(cookie);
+            }
+            Assert.Equal(200, impersonated.Status);
+            Assert.Contains($"\"Name\":\"{accented}\"", impersonated.Text);
+
+            var percentEncoded = Encoding.ASCII.GetBytes(Uri.EscapeDataString(accented));
+            foreach (var written in new[] { Encoding.Latin1.GetBytes(accented), percentEncoded })
+            {
+                var refused = Impersonate(written);
+                Assert.Equal(400, refused.Status);
+                Assert.Contains("The user specified in the impersonation request does not exist.", refused.Text);
             }
         }
         finally
@@ -236,6 +246,9 @@ public sealed class Tm1ImpersonationBehaviorLiveTests : IDisposable
             Tm1.DeleteUser(Admin, accented);
         }
     }
+
+    private RawTm1.Bytes Impersonate(byte[] target) =>
+        Tm1.GetWithHeaderBytes("ActiveUser?$select=Name", RawTm1.Basic(Tm1.User, Tm1.Password), "TM1-Impersonate", target);
 
     private RawTm1.RawResponse Impersonate(string user, string password, string target) =>
         Tm1.Send(Tm1.Request("GET", "ActiveUser?$select=Name").WithHeader("Authorization", RawTm1.Basic(user, password)).WithHeader("TM1-Impersonate", target));

@@ -73,10 +73,11 @@ describe("Tm1Session on TM1" + liveReason, () => {
   });
 
   tm1Test("labels the session with its context", async () => {
-    const s = (await sessions()).sessionContext("tm1-client test").build();
+    // With a character outside ASCII: TM1 reads the header as UTF-8
+    const s = (await sessions()).sessionContext("tm1-client test, café").build();
     try {
       const active = await s.execute(Tm1Request.get<{ Context: string }>(ODataPath.of("ActiveSession"), ODataQuery.none().select("Context")));
-      expect(active.Context).toBe("tm1-client test");
+      expect(active.Context).toBe("tm1-client test, café");
     } finally {
       await s.close();
     }

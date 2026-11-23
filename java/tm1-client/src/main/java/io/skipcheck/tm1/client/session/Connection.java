@@ -606,10 +606,10 @@ final class Connection {
 					// At login only: TM1 decides the identity then and ignores the header
 					// on later
 					// requests (Tm1ImpersonationBehaviorTest)
-					h.set(IMPERSONATE, impersonate);
+					h.set(IMPERSONATE, HeaderText.utf8(impersonate));
 				}
 				if (sessionContext != null) {
-					h.set(SESSION_CONTEXT, sessionContext);
+					h.set(SESSION_CONTEXT, HeaderText.utf8(sessionContext));
 				}
 			}).httpRequest(r -> responseTimeout(r.getNativeRequest(), timeouts.login()));
 			if (seedCookie != null) {

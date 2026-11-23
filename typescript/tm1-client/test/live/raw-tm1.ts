@@ -1,3 +1,5 @@
+import { connect as netConnect } from "node:net";
+import { connect as tlsConnect } from "node:tls";
 import { randomUUID } from "node:crypto";
 import { expect } from "vitest";
 import { Json, ODataPath, ODataQuery, Tm1Authenticator, Tm1Request, Tm1Session, type Tm1SessionBuilder } from "../../src/index.js";
@@ -26,6 +28,14 @@ export interface RawResponse {
   headers: Headers;
   cookies: string[];
   body: string;
+}
+
+/** What `getWithHeaderBytes` got: the status, the whole response as text, and the session cookie TM1
+ * set, if it opened a session. */
+export interface RawBytes {
+  status: number;
+  text: string;
+  cookie: string | undefined;
 }
 
 /** One request: method, path relative to the service root, and optional credentials, cookie,
@@ -178,6 +188,40 @@ export class RawTm1 {
       .withBody(JSON.stringify({ Name: name, Password: password }))
       .send();
     if (created.status !== 201) throw new Error(`Couldn't create user ${name}: ${created.status} ${created.body}`);
+  }
+
+  /** A GET over a bare socket, with one header whose value goes out as exactly `value`'s bytes, as
+   * the Java tests' `getWithHeaderBytes`: the status, and the whole response as text. */
+  getWithHeaderBytes(path: string, authorization: string, header: string, value: Uint8Array): Promise<RawBytes> {
+    const url = new URL(this.root + path);
+    const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
+    const head = `GET ${url.pathname}${url.search} HTTP/1.1\r\nHost: ${url.host}\r\nAuthorization: ${authorization}\r\nAccept: application/json\r\nConnection: close\r\n${header}: `;
+    return new Promise((resolve, reject) => {
+      const socket = url.protocol === "https:" ? tlsConnect({ host: url.hostname, port, servername: url.hostname }) : netConnect({ host: url.hostname, port });
+      const chunks: Buffer[] = [];
+      const finish = (): void => {
+        socket.destroy();
+        const text = Buffer.concat(chunks).toString("utf8");
+        resolve({ status: Number(text.slice(9, 12)), text, cookie: /TM1SessionId=[^;\r\n]*/.exec(text)?.[0] });
+      };
+      socket.setTimeout(30_000, () => socket.destroy(new Error("TM1 didn't answer in 30 s")));
+      socket.on("error", reject);
+      socket.on("end", finish);
+      socket.on("data", (chunk: Buffer) => {
+        chunks.push(chunk);
+        // One response and no further: TM1 keeps the connection open whatever Connection says
+        const soFar = Buffer.concat(chunks);
+        const headEnd = soFar.indexOf("\r\n\r\n");
+        if (headEnd < 0) return;
+        const headers = soFar.subarray(0, headEnd).toString("latin1").toLowerCase();
+        const length = /content-length:\s*(\d+)/.exec(headers);
+        const done = headers.includes("transfer-encoding: chunked")
+          ? soFar.subarray(-5).toString("latin1") === "0\r\n\r\n"
+          : !length || soFar.length >= headEnd + 4 + Number(length[1]);
+        if (done) finish();
+      });
+      socket.write(Buffer.concat([Buffer.from(head, "latin1"), value, Buffer.from("\r\n\r\n", "latin1")]));
+    });
   }
 
   async deleteUser(admin: string, name: string): Promise<void> {

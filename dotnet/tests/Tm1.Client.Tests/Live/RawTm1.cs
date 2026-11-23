@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Security;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -42,14 +46,12 @@ public sealed class RawTm1 : IDisposable
     /// <summary>The handler live tests send through: no cookie jar, and no certificate check with <c>TM1_VERIFY=false</c>.</summary>
     public static SocketsHttpHandler Handler()
     {
-        // A header character that isn't ASCII goes out as "?", as Java's HttpClient writes it, so the
-        // impersonation test sends what Java's does. .NET refuses to send one otherwise. Sent as
-        // UTF-8, TM1 would accept the name: issue 184.
+        // A handler of the test's own, so told to write TM1's headers as UTF-8, as the client's own is
         var handler = new SocketsHttpHandler
         {
             UseCookies = false,
             PooledConnectionIdleTimeout = Connection.MaxIdle,
-            RequestHeaderEncodingSelector = (_, _) => Encoding.ASCII,
+            RequestHeaderEncodingSelector = Tm1Session.Utf8Headers,
         };
         if (Environment.GetEnvironmentVariable("TM1_VERIFY") == "false")
         {
@@ -141,6 +143,80 @@ public sealed class RawTm1 : IDisposable
 
     public void DeleteUser(string admin, string name) =>
         Send(Request("DELETE", $"Users('{Uri.EscapeDataString(name.Replace("'", "''", StringComparison.Ordinal))}')").WithCookie(admin));
+
+    /// <summary>A GET over a bare socket, with one header whose value goes out as exactly
+    /// <paramref name="value"/>'s bytes: an HTTP client would encode the value its own way, or refuse it.</summary>
+    public Bytes GetWithHeaderBytes(string path, string authorization, string header, byte[] value)
+    {
+        var uri = new Uri(_root + path);
+        var head =
+            $"GET {uri.PathAndQuery} HTTP/1.1\r\nHost: {uri.Host}:{uri.Port}\r\nAuthorization: {authorization}"
+            + $"\r\nAccept: application/json\r\nConnection: close\r\n{header}: ";
+        using var socket = new TcpClient(uri.Host, uri.Port) { ReceiveTimeout = 30_000 };
+        Stream stream = socket.GetStream();
+        if (uri.Scheme == "https")
+        {
+            var tls = new SslStream(stream, false, (_, _, _, errors) =>
+                errors == SslPolicyErrors.None || Environment.GetEnvironmentVariable("TM1_VERIFY") == "false"
+            );
+            tls.AuthenticateAsClient(uri.Host);
+            stream = tls;
+        }
+        using (stream)
+        {
+            stream.Write(Encoding.ASCII.GetBytes(head));
+            stream.Write(value);
+            stream.Write("\r\n\r\n"u8);
+            stream.Flush();
+            var text = Encoding.UTF8.GetString(OneResponse(stream));
+            return new Bytes(int.Parse(text.AsSpan(9, 3), CultureInfo.InvariantCulture), text);
+        }
+    }
+
+    /// <summary>Reads one response and no further: TM1 keeps the connection open whatever the request's
+    /// <c>Connection</c> header says, so reading to the end would wait forever.</summary>
+    private static byte[] OneResponse(Stream stream)
+    {
+        using var bytes = new MemoryStream();
+        var buffer = new byte[8192];
+        while (true)
+        {
+            var soFar = Encoding.Latin1.GetString(bytes.GetBuffer(), 0, (int)bytes.Length);
+            var headEnd = soFar.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+            if (headEnd >= 0)
+            {
+                var head = soFar[..headEnd].ToLowerInvariant();
+                var length = head.IndexOf("content-length:", StringComparison.Ordinal);
+                var done = head.Contains("transfer-encoding: chunked", StringComparison.Ordinal)
+                    ? soFar.EndsWith("0\r\n\r\n", StringComparison.Ordinal)
+                    : length < 0 || bytes.Length >= headEnd + 4 + int.Parse(head[(length + 15)..].Split("\r\n", 2)[0].Trim(), CultureInfo.InvariantCulture);
+                if (done)
+                {
+                    return bytes.ToArray();
+                }
+            }
+            var read = stream.Read(buffer);
+            if (read <= 0)
+            {
+                return bytes.ToArray();
+            }
+            bytes.Write(buffer, 0, read);
+        }
+    }
+
+    /// <summary>What <see cref="GetWithHeaderBytes"/> got: the status, and the whole response as text.</summary>
+    public sealed record Bytes(int Status, string Text)
+    {
+        /// <summary>The session cookie TM1 set, if it opened a session.</summary>
+        public string? Cookie
+        {
+            get
+            {
+                var at = Text.IndexOf(RawTm1.Cookie + "=", StringComparison.Ordinal);
+                return at < 0 ? null : Text[at..Text.IndexOf(';', at)];
+            }
+        }
+    }
 
     public RawRequest Request(string method, string path) => new(this, method, path);
 

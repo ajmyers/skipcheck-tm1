@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,6 +41,20 @@ public sealed class Tm1Session : IAsyncDisposable
 
     /// <summary>The settings one by one, as the Java client's <c>Tm1Session.builder()</c>.</summary>
     public static Tm1SessionBuilder Builder() => new();
+
+    /// <summary>The encoding of the request headers TM1 reads as UTF-8: a user name in
+    /// <c>TM1-Impersonate</c> and a label in <c>TM1-SessionContext</c>. TM1 (11.8) decodes them as
+    /// UTF-8 and nothing else: a name sent as ISO 8859-1 bytes, percent-encoded or as an RFC 2047
+    /// encoded word isn't found. .NET refuses a header value outside ASCII unless the handler is
+    /// told how to write it, so this is the <see cref="SocketsHttpHandler.RequestHeaderEncodingSelector"/>
+    /// of the client's own handler, and what a handler of yours needs
+    /// (<see cref="Tm1SessionBuilder.HttpHandler"/>).</summary>
+    /// <returns>UTF-8 for those two headers; null, .NET's default, for any other.</returns>
+    public static Encoding? Utf8Headers(string headerName, HttpRequestMessage request) =>
+        string.Equals(headerName, Connection.Impersonate, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(headerName, Connection.SessionContextHeader, StringComparison.OrdinalIgnoreCase)
+            ? Encoding.UTF8
+            : null;
 
     /// <summary>The REST API's root, such as <c>http://tm1:8010/api/v1/</c>.</summary>
     public string ServiceRoot() => _connection.Root;
@@ -559,7 +574,14 @@ public class Tm1SessionBuilder
         return this;
     }
 
-    /// <summary>Logs in as the service account but acts as <paramref name="user"/> (<c>TM1-Impersonate</c>).</summary>
+    /// <summary>Logs in as the service account but acts as <paramref name="user"/> (<c>TM1-Impersonate</c>).
+    /// TM1 matches the name ignoring case and spaces. A name with characters outside ASCII goes out
+    /// as UTF-8, which is how TM1 (11.8) reads the header; the client's own handler does that. With
+    /// a handler of your own (<see cref="HttpHandler"/>), such a name needs a
+    /// <see cref="SocketsHttpHandler"/> whose <c>RequestHeaderEncodingSelector</c> is
+    /// <see cref="Tm1Session.Utf8Headers"/>: .NET refuses to send the header otherwise, and the login fails.</summary>
+    /// <exception cref="ArgumentException"><paramref name="user"/> is blank, which TM1 would take as
+    /// no impersonation at all, or has a control character.</exception>
     public Tm1SessionBuilder Impersonate(string user)
     {
         _impersonate = UserNames.CheckImpersonated(user);
@@ -573,7 +595,9 @@ public class Tm1SessionBuilder
     }
 
     /// <summary>A label TM1 shows for the session (<c>TM1-SessionContext</c>, sent with the login),
-    /// such as the application's name: in TM1's thread and session lists and its audit log.</summary>
+    /// such as the application's name: in TM1's thread and session lists and its audit log. Sent as
+    /// UTF-8, as TM1 reads it; characters outside ASCII need what <see cref="Impersonate"/> says of
+    /// a handler of your own.</summary>
     /// <exception cref="ArgumentException">Longer than 250 characters, which is all TM1 keeps.</exception>
     public Tm1SessionBuilder SessionContext(string sessionContext)
     {
@@ -598,7 +622,12 @@ public class Tm1SessionBuilder
     }
 
     /// <summary>The HTTP handler to send through (Java's <c>webClient</c> and <c>connector</c>). Keep
-    /// a custom pool's idle connections under 90 s: TM1 closes them then.</summary>
+    /// a custom pool's idle connections under 90 s: TM1 closes them then. For a user to impersonate or
+    /// a session context with characters outside ASCII, the handler that writes to the socket must
+    /// be a <see cref="SocketsHttpHandler"/> with <c>RequestHeaderEncodingSelector =
+    /// Tm1Session.Utf8Headers</c>. A handler that can't be told the encoding (<c>HttpClientHandler</c>,
+    /// the browser's in WebAssembly) can't send them: the login fails with .NET's error, and nothing
+    /// reaches TM1.</summary>
     public Tm1SessionBuilder HttpHandler(HttpMessageHandler handler)
     {
         _handler = handler ?? throw new ArgumentNullException(nameof(handler));

@@ -180,25 +180,24 @@ def test_matches_user_names_ignoring_case_and_spaces(users: Users) -> None:
             users.close(login)
 
 
-def test_cannot_impersonate_users_with_non_ascii_names(raw: RawTm1, admin: str, users: Users) -> None:
-    """A user whose name has non-ASCII characters can't be impersonated by a name sent as a header
-    is read (ISO 8859-1), or percent-encoded: TM1 reports them unknown. The client refuses such
-    names before sending anything.
-
-    Sent as UTF-8 bytes, TM1 does find the user. Java's test says it doesn't, but its HTTP client
-    can't put those bytes in a header, so it never asks TM1 that."""
+def test_impersonates_users_with_non_ascii_names_only_as_utf8(raw: RawTm1, admin: str, users: Users) -> None:
+    """A user whose name has characters outside ASCII is impersonated when the header carries the
+    name as UTF-8, and only then: as ISO 8859-1 bytes or percent-encoded, TM1 reports the user
+    unknown. The header values are bytes, which httpx sends as they are. The client sends UTF-8
+    (``header_text``)."""
     accented = users.alice + "_ë"
     raw.create_user(admin, accented, "p")
     try:
-        for written in (accented.encode("iso-8859-1"), quote(accented, safe="")):
+        impersonated = users.impersonate("admin", "", accented.encode("utf-8"))
+        users.close(impersonated)
+        assert impersonated.status_code == 200
+        assert impersonated.json()["Name"] == accented
+
+        percent_encoded = quote(accented, safe="").encode("ascii")
+        for written in (accented.encode("iso-8859-1"), percent_encoded):
             refused = users.impersonate("admin", "", written)
+            assert dict(refused.request.headers.raw)[b"TM1-Impersonate"] == written, "the bytes sent"
             assert refused.status_code == 400
             assert "The user specified in the impersonation request does not exist." in refused.text
-        found = users.impersonate("admin", "", accented.encode("utf-8"))
-        try:
-            assert found.status_code == 200
-            assert found.json()["Name"] == accented
-        finally:
-            users.close(found)
     finally:
         raw.delete_user(admin, quote(accented, safe=""))

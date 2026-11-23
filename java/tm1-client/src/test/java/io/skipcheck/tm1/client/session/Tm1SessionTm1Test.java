@@ -121,14 +121,15 @@ class Tm1SessionTm1Test {
 		Tm1Session session = Tm1Session.builder()
 			.baseUrl(server.getRestUrl())
 			.basicAuth(server.getUsername(), server.getPassword())
-			.sessionContext("tm1-client test")
+			// With a character outside ASCII: TM1 reads the header as UTF-8
+			.sessionContext("tm1-client test, café")
 			.build();
 		try {
 			JsonNode active = session
 				.execute(Tm1Request.get(ODataPath.of("ActiveSession"), ODataQuery.none().select("Context"),
 						JsonNode.class))
 				.block(WAIT);
-			assertThat(active.get("Context").asString()).isEqualTo("tm1-client test");
+			assertThat(active.get("Context").asString()).isEqualTo("tm1-client test, café");
 		}
 		finally {
 			session.close().block(WAIT);

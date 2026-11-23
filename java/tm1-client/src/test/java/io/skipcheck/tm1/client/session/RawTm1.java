@@ -1,6 +1,11 @@
 package io.skipcheck.tm1.client.session;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -9,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -125,6 +131,73 @@ final class RawTm1 {
 	/** Deletes a TM1 user, if it exists. */
 	void deleteUser(String admin, String name) {
 		send(request("DELETE", "Users('" + name + "')").cookie(admin));
+	}
+
+	/**
+	 * A GET over a bare socket, with one header whose value goes out as exactly
+	 * {@code value}'s bytes. The JDK's {@code HttpClient} writes a character outside
+	 * ASCII as {@code ?}, so it can't show what TM1 does with one.
+	 * @return the status, and the whole response as text
+	 */
+	Bytes getWithHeaderBytes(String path, String authorization, String header, byte[] value) {
+		URI uri = URI.create(root + path);
+		String head = "GET " + uri.getRawPath() + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery())
+				+ " HTTP/1.1\r\nHost: " + uri.getHost() + ":" + uri.getPort() + "\r\nAuthorization: " + authorization
+				+ "\r\nAccept: application/json\r\nConnection: close\r\n" + header + ": ";
+		try (Socket socket = new Socket(uri.getHost(), uri.getPort())) {
+			socket.setSoTimeout(30_000);
+			OutputStream out = socket.getOutputStream();
+			out.write(head.getBytes(StandardCharsets.US_ASCII));
+			out.write(value);
+			out.write("\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+			out.flush();
+			String text = new String(oneResponse(socket.getInputStream()), StandardCharsets.UTF_8);
+			return new Bytes(Integer.parseInt(text.substring(9, 12)), text);
+		}
+		catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	/**
+	 * Reads one response and no further: TM1 keeps the connection open whatever the
+	 * request's {@code Connection} header says, so reading to the end would wait forever.
+	 */
+	private static byte[] oneResponse(InputStream in) throws IOException {
+		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+		byte[] buffer = new byte[8192];
+		while (true) {
+			String soFar = bytes.toString(StandardCharsets.ISO_8859_1);
+			int headEnd = soFar.indexOf("\r\n\r\n");
+			if (headEnd >= 0) {
+				String head = soFar.substring(0, headEnd).toLowerCase(Locale.ROOT);
+				int length = head.indexOf("content-length:");
+				boolean done = head.contains("transfer-encoding: chunked") ? soFar.endsWith("0\r\n\r\n")
+						: length < 0 || bytes.size() >= headEnd + 4
+								+ Integer.parseInt(head.substring(length + 15).split("\r\n", 2)[0].strip());
+				if (done) {
+					return bytes.toByteArray();
+				}
+			}
+			int read = in.read(buffer);
+			if (read < 0) {
+				return bytes.toByteArray();
+			}
+			bytes.write(buffer, 0, read);
+		}
+	}
+
+	/**
+	 * What {@link #getWithHeaderBytes} got: the status, and the whole response as text.
+	 */
+	record Bytes(int status, String text) {
+
+		/** The session cookie TM1 set, if it opened a session. */
+		Optional<String> cookie() {
+			int at = text.indexOf(COOKIE + "=");
+			return at < 0 ? Optional.empty() : Optional.of(text.substring(at, text.indexOf(';', at)));
+		}
+
 	}
 
 	/** {@code Basic} credentials for a user. */

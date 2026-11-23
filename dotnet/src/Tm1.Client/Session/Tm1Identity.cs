@@ -39,8 +39,9 @@ public sealed class Tm1Identity : IEquatable<Tm1Identity>
     public static Tm1Identity ServiceAccount() => ServiceAccountIdentity;
 
     /// <summary>The service account impersonating <paramref name="user"/>, which needs TM1 to allow
-    /// it to impersonate (an admin, or the user's <c>Impersonation</c> right). TM1 matches the name
-    /// only in printable ASCII.</summary>
+    /// it to impersonate (an admin, or the user's <c>Impersonation</c> right); see
+    /// <see cref="Tm1SessionBuilder.Impersonate"/>.</summary>
+    /// <exception cref="ArgumentException"><paramref name="user"/> is blank or has a control character.</exception>
     public static Tm1Identity Impersonating(string user) => new(IdentityKind.Impersonating, UserNames.CheckImpersonated(user), null);
 
     /// <summary>A user with their own credentials; <paramref name="name"/> tells identities apart.</summary>
@@ -87,9 +88,13 @@ public sealed class Tm1Identity : IEquatable<Tm1Identity>
         };
 }
 
-/// <summary>TM1's user names: compared without case or spaces, and impersonated only in printable ASCII.</summary>
+/// <summary>TM1's user names: compared without case or spaces.</summary>
 internal static class UserNames
 {
+    /// <summary><paramref name="user"/>, if it can be impersonated: not blank, which TM1 would take as no
+    /// impersonation and run as the logged-in user, and without control characters, which can't go
+    /// in a header. Any other character is fine: TM1 (11.8) reads the header as UTF-8, and the
+    /// client sends it so (<see cref="Tm1Session.Utf8Headers"/>).</summary>
     public static string CheckImpersonated(string user)
     {
         ArgumentNullException.ThrowIfNull(user);
@@ -99,11 +104,9 @@ internal static class UserNames
         }
         foreach (var c in user)
         {
-            if (c < 0x20 || c > 0x7e)
+            if (char.IsControl(c))
             {
-                throw new ArgumentException(
-                    $"TM1 can't impersonate '{user}': it doesn't match user names with characters other than printable ASCII through TM1-Impersonate"
-                );
+                throw new ArgumentException("The user to impersonate has a control character in its name, which can't be sent in a header");
             }
         }
         return user;

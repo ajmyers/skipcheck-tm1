@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { Tm1Identity } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
-import { basic, type RawResponse, RawRequest, RawTm1 } from "./raw-tm1.js";
+import { basic, type RawBytes, type RawResponse, RawRequest, RawTm1 } from "./raw-tm1.js";
 
 /** The Java client's `Tm1ImpersonationBehaviorTest`: how TM1 itself treats `TM1-Impersonate`, which
  * the session and pool rely on. */
@@ -173,23 +172,26 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
     }
   });
 
-  /** A user whose name has non-ASCII characters can't be impersonated, however the header is
-   * encoded; the client refuses such names before sending anything. */
-  tm1Test("cannot impersonate users with non-ASCII names", async () => {
+  /** A user whose name has characters outside ASCII is impersonated when the header carries the name
+   * as UTF-8, and only then: as ISO 8859-1 bytes or percent-encoded, TM1 reports the user unknown.
+   * Sent over a bare socket, so the bytes are exactly these. The client sends UTF-8 (`headerText`). */
+  tm1Test("impersonates users with non-ASCII names only as UTF-8", async () => {
     const accented = alice + "_ë";
+    const impersonateBytes = (target: Uint8Array): Promise<RawBytes> =>
+      tm1.getWithHeaderBytes("ActiveUser?$select=Name", basic(tm1.user, tm1.password), "TM1-Impersonate", target);
     await tm1.createUser(admin, accented, "p");
     try {
-      // A character that isn't ASCII goes out as "?", as Java's HttpClient writes it, so this sends
-      // what Java's test does. fetch would send it as a Latin-1 byte, and the UTF-8 bytes sent that
-      // way are a name TM1 accepts: issue 184.
-      const asJavaSends = (s: string): string => s.replace(/[^ -~]/g, "?");
-      const utf8AsLatin1 = Buffer.from(accented, "utf8").toString("latin1");
-      for (const written of [accented, utf8AsLatin1].map(asJavaSends)) {
-        const refused = await impersonate(tm1.user, tm1.password, written);
+      const impersonated = await impersonateBytes(Buffer.from(accented, "utf8"));
+      if (impersonated.cookie) await tm1.close(impersonated.cookie);
+      expect(impersonated.status).toBe(200);
+      expect(impersonated.text).toContain(`"Name":"${accented}"`);
+
+      const percentEncoded = Buffer.from(encodeURIComponent(accented), "latin1");
+      for (const written of [Buffer.from(accented, "latin1"), percentEncoded]) {
+        const refused = await impersonateBytes(written);
         expect(refused.status).toBe(400);
-        expect(refused.body).toContain("The user specified in the impersonation request does not exist.");
+        expect(refused.text).toContain("The user specified in the impersonation request does not exist.");
       }
-      expect(() => Tm1Identity.impersonating(accented)).toThrow(RangeError);
     } finally {
       await tm1.deleteUser(admin, accented);
     }

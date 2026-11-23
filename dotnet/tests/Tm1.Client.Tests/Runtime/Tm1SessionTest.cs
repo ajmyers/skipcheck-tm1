@@ -413,9 +413,89 @@ public class Tm1SessionImpersonationTest
     {
         Assert.Contains("no impersonation", Assert.Throws<ArgumentException>(() => Tm1Session.Builder().Impersonate("")).Message);
         Assert.Throws<ArgumentException>(() => Tm1Session.Builder().Impersonate("  "));
-        Assert.Contains("printable ASCII", Assert.Throws<ArgumentException>(() => Tm1Session.Builder().Impersonate("zoë")).Message);
-        Assert.Throws<ArgumentException>(() => Tm1Session.Builder().Impersonate("a\nb"));
+        Assert.Contains("control character", Assert.Throws<ArgumentException>(() => Tm1Session.Builder().Impersonate("a\nb")).Message);
         Tm1Session.Builder().Impersonate("carol smith");
+    }
+
+    /// <summary>.NET refuses a header value outside ASCII from a handler that isn't told its encoding,
+    /// so the login fails before anything is sent, rather than impersonating the wrong name.</summary>
+    [Fact]
+    public async Task FailsTheLoginThroughAHandlerThatIsntToldTheEncoding()
+    {
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        using var handler = new System.Net.Http.SocketsHttpHandler { UseCookies = false };
+        var session = Tm1Session.Builder().BaseUrl($"http://127.0.0.1:{port}/api/v1/").BasicAuth("admin", "").Impersonate("zoë").HttpHandler(handler).Build();
+        var e = await Assert.ThrowsAnyAsync<Exception>(() => session.ExecuteAsync(Server));
+        var causes = new List<Exception>();
+        for (Exception? c = e; c is not null; c = c.InnerException)
+        {
+            causes.Add(c);
+        }
+        Assert.Contains(causes, c => c is System.Net.Http.HttpRequestException && c.Message.Contains("ASCII", StringComparison.Ordinal));
+    }
+
+    /// <summary>Over a real socket, as the scripted TM1 is a handler and never sees the bytes: with the
+    /// client's own handler, and with one of the caller's that's told the encoding.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SendsANameOutsideAsciiAsItsUtf8Bytes(bool ownHandler)
+    {
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var heads = new System.Collections.Concurrent.ConcurrentQueue<byte[]>();
+        using var stop = new CancellationTokenSource();
+        var serving = Task.Run(async () =>
+        {
+            // Answers every request alike, as a login that opens session 1
+            var answer = System.Text.Encoding.ASCII.GetBytes(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nSet-Cookie: TM1SessionId=c1; Path=/api/\r\nContent-Length: 8\r\n\r\n{\"ID\":1}"
+            );
+            try
+            {
+                while (true)
+                {
+                    using var socket = await listener.AcceptTcpClientAsync(stop.Token);
+                    var stream = socket.GetStream();
+                    var head = new System.IO.MemoryStream();
+                    var buffer = new byte[4096];
+                    int read;
+                    while ((read = await stream.ReadAsync(buffer, stop.Token)) > 0)
+                    {
+                        head.Write(buffer, 0, read);
+                        if (System.Text.Encoding.Latin1.GetString(head.ToArray()).EndsWith("\r\n\r\n", StringComparison.Ordinal))
+                        {
+                            heads.Enqueue(head.ToArray());
+                            head.SetLength(0);
+                            await stream.WriteAsync(answer, stop.Token);
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // the test is over
+            }
+        });
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        var settings = Tm1Session
+            .Builder()
+            .BaseUrl($"http://127.0.0.1:{port}/api/v1/")
+            .BasicAuth("admin", "")
+            .CheckCapabilities(false)
+            .Impersonate("zoë")
+            .SessionContext("café");
+        using var handler = new System.Net.Http.SocketsHttpHandler { UseCookies = false, RequestHeaderEncodingSelector = Tm1Session.Utf8Headers };
+        var session = (ownHandler ? settings : settings.HttpHandler(handler)).Build();
+        await session.ExecuteAsync(Server);
+
+        Assert.True(heads.TryPeek(out var login));
+        Assert.True(login.AsSpan().IndexOf([.. "TM1-Impersonate: "u8, .. "zoë"u8, .. "\r\n"u8]) >= 0, System.Text.Encoding.Latin1.GetString(login));
+        Assert.True(login.AsSpan().IndexOf([.. "TM1-SessionContext: "u8, .. "café"u8, .. "\r\n"u8]) >= 0, System.Text.Encoding.Latin1.GetString(login));
+        await stop.CancelAsync();
+        await serving;
     }
 
     [Fact]

@@ -200,10 +200,10 @@ class _AsyncConnection:
             authorization = await authorization
         if not authorization:
             raise RuntimeError(f"The authenticator {self.authenticator.describe()} supplied no credentials")
-        extra = {"Authorization": authorization}
+        extra: dict[str, str | bytes] = {"Authorization": authorization}
         if self.impersonate is not None:
             # At login only: TM1 decides the identity then and ignores the header afterwards
-            extra[p.IMPERSONATE] = self.impersonate
+            extra[p.IMPERSONATE] = p.header_text(self.impersonate)
         if seed is not None:
             # Log in the session TM1 opened for a 401, rather than opening another
             extra["Cookie"] = f"{p.COOKIE}={seed}"
@@ -736,7 +736,9 @@ class AsyncTm1SessionBuilder:
 
     def impersonate(self, user: str) -> AsyncTm1SessionBuilder:
         """Logs in as the service account but acts as ``user`` (``TM1-Impersonate``, sent at
-        login only). Refuses a name TM1 would misread: blank, or not printable ASCII."""
+        login only). A name with characters outside ASCII goes out as UTF-8, which is how TM1
+        (11.8) reads the header. Refuses a blank name, which TM1 would take as no impersonation
+        at all, and one with a control character."""
         return self._set(impersonate=check_impersonated(user))
 
     def without_impersonation(self) -> AsyncTm1SessionBuilder:
@@ -746,7 +748,8 @@ class AsyncTm1SessionBuilder:
     def session_context(self, session_context: str) -> AsyncTm1SessionBuilder:
         """A label for the TM1 session, shown as its ``Context`` in ``Sessions`` and
         ``Threads``, such as the application's name; sent with the login. It's a setting of the
-        session, not of a view: TM1 keeps one label per session. At most 250 characters."""
+        session, not of a view: TM1 keeps one label per session. At most 250 characters; sent as
+        UTF-8, as TM1 reads it."""
         return self._set(session_context=_check_session_context(session_context))
 
     def timeouts(self, timeouts: Tm1Timeouts) -> AsyncTm1SessionBuilder:

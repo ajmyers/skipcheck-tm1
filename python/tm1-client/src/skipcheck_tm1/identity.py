@@ -13,15 +13,18 @@ __all__ = ["Tm1Identity", "check_impersonated", "comparable_user"]
 
 
 def check_impersonated(user: str) -> str:
-    """``user``, if TM1 can impersonate it through ``TM1-Impersonate``: not blank (TM1 would take
-    that as no impersonation at all), and printable ASCII only (TM1 matches nothing else)."""
+    """``user``, if it can be impersonated: not blank, which TM1 would take as no impersonation and
+    run as the logged-in user, and without control characters, which can't go in a header. Any
+    other character is fine: TM1 (11.8) reads ``TM1-Impersonate`` as UTF-8, and the session sends
+    it so."""
     if user is None:
         raise TypeError("user")
     if not user.strip():
         raise ValueError("The user to impersonate is blank, which TM1 would take as no impersonation at all")
     for c in user:
-        if ord(c) < 0x20 or ord(c) > 0x7E:
-            raise ValueError(f"TM1 can't impersonate {user!r}: it doesn't match user names with characters other than printable ASCII through TM1-Impersonate")
+        # Java's Character.isISOControl: C0, DEL and C1
+        if ord(c) < 0x20 or 0x7F <= ord(c) <= 0x9F:
+            raise ValueError("The user to impersonate has a control character in its name, which can't be sent in a header")
     return user
 
 
@@ -54,7 +57,8 @@ class Tm1Identity:
 
     @staticmethod
     def impersonating(user: str) -> Tm1Identity:
-        """The service account, acting as ``user`` (``TM1-Impersonate``)."""
+        """The service account, acting as ``user`` (``TM1-Impersonate``). Refuses a blank name and
+        one with a control character."""
         return Tm1Identity(Tm1Identity.Kind.IMPERSONATING, check_impersonated(user), None)
 
     @staticmethod

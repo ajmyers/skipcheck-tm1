@@ -96,9 +96,10 @@ def test_logs_in_again_after_its_session_is_killed_and_runs_the_post_once(raw: R
 
 
 def test_labels_the_session_with_its_context() -> None:
-    with session(session_context="tm1-client test") as s:
+    # With a character outside ASCII: TM1 reads the header as UTF-8
+    with session(session_context="tm1-client test, café") as s:
         active = s.execute(Tm1Request.get(ODataPath.of("ActiveSession"), ODataQuery.none().select("Context"), dict))
-        assert active["Context"] == "tm1-client test"
+        assert active["Context"] == "tm1-client test, café"
 
 
 def test_runs_requests_in_the_views_sandbox(context: str) -> None:

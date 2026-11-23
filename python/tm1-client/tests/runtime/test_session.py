@@ -334,10 +334,25 @@ def test_impersonates_at_login_only(rt: Runtime) -> None:
     assert session.impersonating == "alice"
 
 
-@pytest.mark.parametrize("name", ["", "  ", "zoë", "a\nb"])
-def test_refuses_names_tm1_would_misread(rt: Runtime, name: str) -> None:
+def test_refuses_names_tm1_would_misread(rt: Runtime) -> None:
+    with pytest.raises(ValueError, match="no impersonation"):
+        rt.Session.builder().impersonate("")
     with pytest.raises(ValueError):
-        rt.Session.builder().impersonate(name)
+        rt.Session.builder().impersonate("  ")
+    with pytest.raises(ValueError, match="control character"):
+        rt.Session.builder().impersonate("a\nb")
+    rt.Session.builder().impersonate("carol smith")
+
+
+def test_sends_a_name_outside_ascii_as_its_utf8_bytes(rt: Runtime) -> None:
+    server(rt)
+    session = rt.session(rt.builder().impersonate("zoë").session_context("café"))
+    rt.run(session.execute(SERVER))
+
+    # The bytes httpx puts on the wire, not its reading of them
+    login = dict(rt.fake.login_requests[0].headers.raw)
+    assert login[b"TM1-Impersonate"] == "zoë".encode()
+    assert login[b"TM1-SessionContext"] == "café".encode()
 
 
 def test_reports_an_unknown_user(rt: Runtime) -> None:
