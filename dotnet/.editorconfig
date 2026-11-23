@@ -1,6 +1,10 @@
 # Settings for .NET's analyzers (Directory.Build.props turns them on). Layout is CSharpier's
 # (.csharpierrc.json), not set here.
 [*.cs]
+# Every source file starts with its license, as scripts/license-headers.py writes it for every
+# language. A build fails on a file without it (IDE0073); "dotnet format" or the script adds it.
+file_header_template = SPDX-License-Identifier: Apache-2.0
+dotnet_diagnostic.IDE0073.severity = error
 # "Can be static" only for members callers can't see: a public one keeps the shape the Java
 # client's has, where it is an instance member
 dotnet_code_quality.CA1822.api_surface = private, internal
