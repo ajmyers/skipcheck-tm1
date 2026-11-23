@@ -281,6 +281,10 @@ jobs:
         run: |
           ls build/packages/npm
           test "$(ls build/packages/npm/*-"$VERSION".tgz | wc -l)" -eq 2
+      # The publish command, as the publish job runs it, without publishing: npm reads the
+      # tarballs and the tag the same way, so a command that can't publish fails here, before the gate
+      - name: Check the publish command
+        run: scripts/npm-publish.sh build/packages/npm "${{ needs.plan.outputs.npm_tag }}" --dry-run
       - uses: actions/upload-artifact@v7
         with:
           name: npm-packages
@@ -410,18 +414,20 @@ jobs:
           # Trusted publishing needs npm 11.5.1 or later, which Node 24 brings
           node-version: '24'
           registry-url: https://registry.npmjs.org
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/npm-publish.sh
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v8
         with:
           name: npm-packages
           path: packages
-      # The client first: the testcontainers name it as a peer
       - name: Publish ${{ needs.plan.outputs.npm_version }} to npm
         env:
           TAG: ${{ needs.plan.outputs.npm_tag }}
         run: |
           ls packages
-          npm publish packages/skipcheck-tm1-client-*.tgz --provenance --tag "$TAG"
-          npm publish packages/skipcheck-tm1-testcontainers-*.tgz --provenance --tag "$TAG"
+          scripts/npm-publish.sh packages "$TAG"
 
   # The Docker images of a tag (:1.2.3, :1.2, :latest), after the same gate
   images:
