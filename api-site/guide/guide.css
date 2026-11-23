@@ -4,6 +4,17 @@
    same origin as the Javadoc theme does (theme/javadoc-theme.css), so the guide follows the site. */
 @import url("/tokens.css");
 @import url("/chrome.css");
+/* The syntax colours for the classes the site's /highlight.js puts on the examples */
+@import url("/code.css");
+
+/* The page itself, as the site's own pages set it (styles.css there isn't loaded here): without
+   this the browser's white margin and serif font show around the guide and in the footer */
+body {
+    margin: 0;
+    background: var(--paper, #f5f7fa);
+    color: var(--ink, #1a1a1a);
+    font-family: var(--sans, system-ui, sans-serif);
+}
 
 .guide {
     max-width: 62rem;
@@ -25,8 +36,8 @@
 .guide .types { columns: 14rem; padding-left: 1.1rem; }
 .guide .types li { break-inside: avoid; }
 
-.tabs { margin: 0.75rem 0 1.5rem; border: 1px solid var(--line, #d8d8d8); border-radius: 8px; overflow: hidden; }
-.tablist { display: flex; flex-wrap: wrap; background: var(--chip, #f1f1f1); border-bottom: 1px solid var(--line, #d8d8d8); }
+.tabs { margin: 0.75rem 0 1.5rem; border: 1px solid var(--rule, #d8d8d8); border-radius: 8px; overflow: hidden; }
+.tablist { display: flex; flex-wrap: wrap; background: var(--chip, #f1f1f1); border-bottom: 1px solid var(--rule, #d8d8d8); }
 .tablist [role="tab"] {
     appearance: none;
     border: 0;

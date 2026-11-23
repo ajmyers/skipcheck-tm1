@@ -23,7 +23,9 @@ side is in ajmyers/skipcheck.io: `public/tokens.css`, `public/chrome.css` and `p
 `scripts/guide.mjs` builds a second set of pages, at `/projects/tm1/guide/`: one for each type of the
 client and of tm1-testcontainers that has examples, with every example in Java, Python, .NET and
 TypeScript behind tabs. Choosing a language on one example chooses it everywhere, and the choice is
-remembered (`guide/guide.js`).
+remembered (`guide/guide.js`). The examples are coloured by the site's own highlighter: each page loads
+`/highlight.js` and `guide.css` imports `/code.css`, both from skipcheck.io at view time, as with the
+tokens and chrome.
 
 | Piece | Where it comes from |
 |---|---|
