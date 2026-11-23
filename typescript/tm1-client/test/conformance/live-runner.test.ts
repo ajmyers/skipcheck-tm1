@@ -67,7 +67,7 @@ function dataFake(names: Record<string, string>): FakeTm1 {
 
 describe("the live conformance runner, on the data scenarios", () => {
   for (const name of ["cellsets", "views", "sandboxes"]) {
-    it(`runs the ${name} scenario`, async () => {
+    it(`runs the data scenarios: ${name}`, async () => {
       const scenario = live.scenarios().find((s) => s.name === name)!;
       const names = live.namesFor(scenario);
       const tm1 = dataFake(names);
@@ -88,7 +88,7 @@ describe("the live conformance runner, on the data scenarios", () => {
 describe("the live conformance runner", () => {
   const scenario = live.scenarios().find((s) => s.name === "cubes")!;
 
-  it("runs the cubes scenario and writes its traffic", async () => {
+  it("runs the cubes scenario and records its traffic", async () => {
     const dir = mkdtempSync(join(tmpdir(), "conformance-"));
     live.trafficTo(dir);
     const names = live.namesFor(scenario);
@@ -179,7 +179,7 @@ describe("the live conformance runner", () => {
     "annotations",
     "processes",
     "chores",
-  ])("runs the %s scenario, one request per step", async (name) => {
+  ])("runs a scenario sending one request per step: %s", async (name) => {
     const s = live.scenarios().find((x) => x.name === name)!;
     const names = live.namesFor(s);
     const tm1 = answeringAsExpected(s, names);
