@@ -284,7 +284,7 @@ export class Tm1TransportException extends Tm1Exception {
    * request's URL, without credentials @param cause the underlying failure, if any */
   constructor(
     /** Where the request failed (Java's `phase()`). */
-    readonly phase: "Connect" | "Response",
+    readonly phase: Tm1TransportException.Phase,
     private readonly idempotent: boolean,
     method: string,
     url: string,
@@ -309,6 +309,13 @@ export class Tm1TransportException extends Tm1Exception {
   mayHaveApplied(): boolean {
     return this.phase === "Response";
   }
+}
+
+/** The phase type of {@link Tm1TransportException}, nested as in Java. */
+export namespace Tm1TransportException {
+  /** How far the request got: `Connect`, before it was sent (connecting, TLS, or waiting for a
+   * pooled connection); `Response`, after it was sent, before the response was complete. */
+  export type Phase = "Connect" | "Response";
 }
 
 /** TM1 answered with something this client can't read: not JSON, a login without a cookie, an async

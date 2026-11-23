@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Which member is which across languages, and the gate that every Java member has its
-// counterpart in each language, as the clients' parity tests hold every Java method to one.
+// Which type and member is which across languages, and the gate that every Java type and member
+// has its counterpart in each language, as the clients' parity tests hold every Java method to one.
 //
 // A Java member is found in another language by the rule the parity tests enforce (modelCubes is
 // model_cubes in Python, ModelCubesAsync in .NET; a getter is a property; NOT_FOUND is NotFound
@@ -10,10 +10,13 @@
 //
 //   Tm1Session.Builder.jsonMapper | Jackson is Java's: Python reads JSON with the standard library
 //   Tm1Source.PRIVATE_IMAGE -> PrivateImageSetting | the PrivateImage record has the name
+//   Utf8Repair | a part of Java's response decoding: the other clients read text whole
+//   Tm1Timeouts.Builder -> TimeoutsBuilder | a nested type can't share its outer type's member's name
 //
-// The build fails on a Java member that is neither found nor listed, on a listed member the
-// language has after all, on a renamed member that isn't there under its new name, and on a line Java no longer
-// has a member for. A renamed member is looked for by its new name only.
+// A line for a type covers the types nested in it. The build fails on a Java type or member that
+// is neither found nor listed, on a listed one the language has after all, on a renamed one that
+// isn't there under its new name, and on a line Java no longer has a type or member for. A renamed
+// one is looked for by its new name only.
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -27,14 +30,13 @@ const pascal = (name) => name.toLowerCase().replace(/(?:^|_)([a-z0-9])/g, (m, c)
 const capital = (name) => name.charAt(0).toUpperCase() + name.slice(1);
 const PYTHON_KEYWORDS = new Set(['and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'try', 'while', 'with', 'yield']);
 
-/** The names a Java type may have in another language, most likely first: a nested Builder is
- * Tm1Client.Builder in Java and Tm1ClientBuilder elsewhere, an exception is an Error in Python.
- * renamed is the name the language's list gives it, if any. */
+/** The names a Java type may have in another language, most likely first: a nested type keeps its
+ * outer type (Tm1Timeouts.Builder), or is joined to it (Tm1ClientBuilder), or stands alone; an
+ * exception is an Error in Python. renamed is the name the language's list gives it, if any. */
 export function typeCandidates(language, javaName, renamed) {
 	if (renamed) return [javaName.split('.').slice(0, -1).concat(renamed).join('.'), renamed];
-	const last = javaName.split('.').at(-1);
-	if (language === 'python') return [last.replace(/Exception$/, 'Error'), javaName.replace('.', '').replace(/Exception$/, 'Error')];
-	return [javaName, javaName.replace('.', ''), last];
+	const names = [javaName, javaName.replaceAll('.', ''), javaName.split('.').at(-1)];
+	return language === 'python' ? names.map((name) => name.replace(/Exception(?=\.|$)/g, 'Error')) : names;
 }
 
 /** The names a Java member may have in another language, as each language's parity tests require:
@@ -42,8 +44,9 @@ export function typeCandidates(language, javaName, renamed) {
 export function memberCandidates(language, javaMember, typeName) {
 	const name = javaMember.name;
 	if (javaMember.kind === 'constructor') return language === 'python' ? ['__init__'] : [typeName];
-	// A constant (an enum's NOT_FOUND, a static final) keeps its name, but in .NET (NotFound)
-	if (/^[A-Z][A-Z0-9_]*$/.test(name) && (javaMember.kind === 'constant' || javaMember.kind === 'field')) return language === 'dotnet' ? [pascal(name)] : [name];
+	// A constant (an enum's NOT_FOUND, a static final) keeps its name, but in .NET (NotFound); in
+	// TypeScript an enum's is a string union's value, also NotFound
+	if (/^[A-Z][A-Z0-9_]*$/.test(name) && (javaMember.kind === 'constant' || javaMember.kind === 'field')) return language === 'dotnet' ? [pascal(name)] : language === 'typescript' ? [name, pascal(name)] : [name];
 	// A Python keyword (and, from) takes a trailing underscore: and_
 	if (language === 'python' && PYTHON_KEYWORDS.has(snake(name))) return [snake(name) + '_'];
 	// A Java getter (getUrl) is a property elsewhere (url, Url)
@@ -103,15 +106,48 @@ export async function readList(repoDir, file) {
 	return parseList(text, file);
 }
 
+/** The line of a list that excuses a Java type a language lacks: its own, or its outer type's (a
+ * line for ODataCollectionDecoder covers ODataCollectionDecoder.Event). Null if there's none. */
+function typeLine(list, name) {
+	const parts = name.split('.');
+	for (let n = parts.length; n > 0; n--) {
+		const entry = list.get(parts.slice(0, n).join('.'));
+		if (entry && !entry.renamed) return entry;
+	}
+	return null;
+}
+
+/** Checks one project's Java types against one language's: counterparts maps each Java type's name
+ * to its type in the language (null where there's none), list is the language's list, and used
+ * collects the list's lines that name something in Java. A type the language lacks needs a line, or
+ * its outer type's. Returns the faults, as text. */
+export function checkTypes({ javaTypes, counterparts, list, used }) {
+	const missing = [];
+	const wrong = [];
+	for (const type of javaTypes) {
+		const counterpart = counterparts.get(type.name);
+		const entry = list.get(type.name);
+		if (entry) used.add(type.name);
+		if (entry?.renamed) {
+			if (!counterpart) wrong.push(type.name + ' is listed as ' + entry.renamed + ', which the language lacks (line ' + entry.line + ')');
+		} else if (entry && counterpart) {
+			wrong.push(type.name + ' is listed as missing, but the language has ' + counterpart.name + ': take its line out (line ' + entry.line + ')');
+		} else if (!counterpart && !typeLine(list, type.name)) {
+			missing.push(type.name);
+		}
+	}
+	return { missing, wrong };
+}
+
 /** Checks one project's Java members against one language's: counterparts maps each Java type's
  * name to its type in the language (null where there's none), list is the language's list, and
- * used collects the list's lines that name something in Java. Returns the faults, as text. */
+ * used collects the list's lines that name something in Java. A type the language lacks is
+ * checkTypes's. Returns the faults, as text. */
 export function checkMembers({ language, javaTypes, counterparts, list, used }) {
 	const missing = [];
 	const wrong = [];
 	for (const type of javaTypes) {
 		const counterpart = counterparts.get(type.name);
-		if (list.has(type.name) && counterpart) used.add(type.name);
 		if (!counterpart) continue;
 		for (const member of type.members.filter(checked)) {
 			const key = type.name + '.' + member.name;
@@ -134,9 +170,9 @@ export function checkMembers({ language, javaTypes, counterparts, list, used }) 
 	return { missing, wrong };
 }
 
-/** The lines of a list that name nothing Java has (for a type the language has). */
+/** The lines of a list that name nothing Java has (a member of a type the language has, or a type). */
 export function stale(list, used) {
-	return [...list].filter(([key]) => !used.has(key)).map(([key, entry]) => key + ' (line ' + entry.line + '): Java has no such member, or the language no such type: take its line out');
+	return [...list].filter(([key]) => !used.has(key)).map(([key, entry]) => key + ' (line ' + entry.line + '): Java has no such type or member, or the language no such type: take its line out');
 }
 
 // ---- a language's names, and the Java names it lacks ---------------------------------
@@ -174,8 +210,8 @@ export function javaOnlyNames(javaTypes, names) {
 }
 
 /** A Java member's likely name in a language that has no counterpart of its type to look in: the
- * first of its candidates the language's names have, a constant's PascalCase too (TypeScript's
- * Tm1ErrorKind.CredentialRejected), or else the first candidate. */
+ * first of its candidates the language's names have, a constant's PascalCase too (whatever kind the
+ * caller took it for), or else the first candidate. */
 export function guessMember(language, javaMember, names) {
 	const candidates = memberCandidates(language, javaMember, '');
 	if (/^[A-Z][A-Z0-9_]*$/.test(javaMember.name)) candidates.push(pascal(javaMember.name));

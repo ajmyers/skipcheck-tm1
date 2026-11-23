@@ -107,6 +107,85 @@ test('the TypeScript extractor follows extends, and reads parameter properties a
 	assert.deepEqual(names(types.ODataProperty), ['DEFAULTS', 'path', 'eq']);
 });
 
+test("the TypeScript extractor reads a namespace's types and functions, string unions and exported objects", () => {
+	const types = extract(
+		{
+			'kinds.ts': [
+				'/** What went wrong. */',
+				'export type Tm1ErrorKind =',
+				'  /** The object doesn\'t exist. */',
+				'  | "NotFound"',
+				'  | "Other";',
+				'',
+				'/** As values. */',
+				'export const Tm1ErrorKind = {',
+				'  NotFound: "NotFound",',
+				'  Other: "Other",',
+				'  /** The kind for a status. */',
+				'  of(status: number): Tm1ErrorKind {',
+				'    return "Other";',
+				'  },',
+				'} as const;',
+				'',
+				'export type Alias = Tm1ErrorKind | undefined;',
+				'',
+				'export const Tuples = {',
+				'  NONE: "",',
+				'  of(tuple: Map<string, string>): string[] {',
+				'    return [];',
+				'  },',
+				'};',
+				'',
+				'export class Tm1Timeouts {',
+				'  connect(): number {',
+				'    return 1;',
+				'  }',
+				'}',
+				'',
+				'/** The builder, nested as in Java. */',
+				'export namespace Tm1Timeouts {',
+				'  export type Kind = "A" | "B";',
+				'',
+				'  /** Java\'s builder. */',
+				'  export class Builder {',
+				'    build(): Tm1Timeouts {',
+				'      return new Tm1Timeouts();',
+				'    }',
+				'  }',
+				'',
+				'  export class Child extends Builder {}',
+				'}',
+				'',
+				'/** Literals. */',
+				'export namespace ODataLiterals {',
+				'  /** Quotes a string. */',
+				'  export function string(value: string): string {',
+				'    return value;',
+				'  }',
+				'}',
+			].join('\n'),
+		},
+		(dir, out) => execFileSync(process.execPath, [path.join(siteDir, 'extract', 'typescript_api.mjs'), dir, out, 'pkg']),
+	);
+	assert.deepEqual(Object.keys(types).sort(), ['ODataLiterals', 'Tm1ErrorKind', 'Tm1Timeouts', 'Tm1Timeouts.Builder', 'Tm1Timeouts.Child', 'Tm1Timeouts.Kind', 'Tuples']);
+	assert.deepEqual(names(types.Tm1ErrorKind), ['NotFound', 'Other', 'of']);
+	assert.equal(types.Tm1ErrorKind.kind, 'enum');
+	assert.equal(types.Tm1ErrorKind.doc, 'What went wrong.');
+	assert.equal(types.Tm1ErrorKind.members[0].doc, "The object doesn't exist.");
+	assert.equal(types.Tm1ErrorKind.members[2].doc, 'The kind for a status.');
+	assert.deepEqual(names(types.Tuples), ['NONE', 'of']);
+	assert.deepEqual(types.Tuples.members.map((m) => m.kind + (m.static ? ' static' : '')), ['constant static', 'method static']);
+	assert.deepEqual(names(types.Tm1Timeouts), ['connect']);
+	assert.deepEqual(names(types['Tm1Timeouts.Kind']), ['A', 'B']);
+	assert.deepEqual(names(types['Tm1Timeouts.Builder']), ['build']);
+	assert.equal(types['Tm1Timeouts.Builder'].doc, "Java's builder.");
+	assert.deepEqual(names(types['Tm1Timeouts.Child']), ['build<Tm1Timeouts.Builder']);
+	assert.deepEqual(names(types.ODataLiterals), ['string']);
+	assert.equal(types.ODataLiterals.doc, 'Literals.');
+	assert.equal(types.ODataLiterals.members[0].doc, 'Quotes a string.');
+	assert.deepEqual(types.ODataLiterals.members[0].params, [{ name: 'value', type: 'string' }]);
+});
+
 /** A Python of 3.11 or later, as scripts/extract.mjs finds one, or null. */
 function python() {
 	for (const candidate of [process.env.PYTHON, 'python3', 'python3.14', 'python3.13', 'python3.12', 'python3.11'].filter(Boolean)) {
@@ -148,4 +227,47 @@ test('the Python extractor follows base classes, and reads what __init__ sets', 
 	assert.deepEqual(names(types.Tm1ApiError), ['path_value', '__init__', 'status', 'is_retryable<Tm1Error', 'method<Tm1Error']);
 	assert.equal(types.Tm1ApiError.members[0].static, true);
 	assert.equal(types.Tm1ApiError.members[2].returns, 'int');
+});
+
+test('the Python extractor reads nested classes, and the private classes a class names as its nested types', { skip: python() ? false : 'no Python 3.11 or later' }, () => {
+	const types = extract(
+		{
+			'__init__.py': '',
+			'sources.py': [
+				'from typing import ClassVar',
+				'',
+				'',
+				'class Tm1Source:',
+				'    PRIVATE_IMAGE: ClassVar[str] = "TM1_PRIVATE_IMAGE"',
+				'    PrivateImage: ClassVar[type[_Tm1PrivateImage]]',
+				'',
+				'    def describe(self) -> str:',
+				'        raise NotImplementedError',
+				'',
+				'    class Kind:',
+				'        """A kind."""',
+				'',
+				'        class Deeper:',
+				'            pass',
+				'',
+				'    class _Hidden:',
+				'        pass',
+				'',
+				'',
+				'class _Tm1PrivateImage(Tm1Source):',
+				'    """An image with TM1 already in it."""',
+				'',
+				'    image: str',
+				'',
+				'',
+				'Tm1Source.PrivateImage = _Tm1PrivateImage',
+			].join('\n'),
+		},
+		(dir, out) => execFileSync(python(), ['-I', path.join(siteDir, 'extract', 'python_api.py'), dir, out]),
+	);
+	assert.deepEqual(Object.keys(types).sort(), ['Tm1Source', 'Tm1Source.Kind', 'Tm1Source.Kind.Deeper', 'Tm1Source.PrivateImage']);
+	assert.deepEqual(names(types.Tm1Source), ['PRIVATE_IMAGE', 'describe']);
+	assert.equal(types['Tm1Source.Kind'].doc, 'A kind.');
+	assert.equal(types['Tm1Source.PrivateImage'].doc, 'An image with TM1 already in it.');
+	assert.deepEqual(names(types['Tm1Source.PrivateImage']), ['image', 'PRIVATE_IMAGE<Tm1Source', 'describe<Tm1Source']);
 });

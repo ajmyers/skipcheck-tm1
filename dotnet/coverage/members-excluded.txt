@@ -1,7 +1,8 @@
-# Java members the .NET libraries don't have, or name another way, as:
+# Java types and members the .NET libraries don't have, or name another way, as:
+#   <Java type> | <reason>
 #   <Java type>.<member> | <reason>
 #   <Java type>.<member or type> -> <.NET name> | <reason>
-# Read by api-site/scripts/members.mjs, which fails the docs build on a Java member that is neither
+# Read by api-site/scripts/members.mjs, which fails the docs build on a Java type or member that is neither
 # found by the parity tests' naming rule nor listed here, and on a line here that is wrong or stale.
 # The renamed lines are also the Java names that tests/Tm1.Testcontainers.Tests/JavaParityTests.cs
 # lets .NET change: a constant can't share its name with a nested type, a method or a property.
@@ -38,3 +39,20 @@ RequiresTm1 -> RequiresTm1FactAttribute | an xUnit fact, written [RequiresTm1Fac
 RequiresTm1Web -> RequiresTm1WebFactAttribute | an xUnit fact, written [RequiresTm1WebFact], where Java's is a JUnit annotation
 RequiresCognos -> RequiresCognosFactAttribute | an xUnit fact, written [RequiresCognosFact], where Java's is a JUnit annotation
 RequiresPaw -> RequiresPawFactAttribute | an xUnit fact, written [RequiresPawFact], where Java's is a JUnit annotation
+
+# Types. A line for a type covers the types nested in it. C# can't nest a type under the name of
+# a member of its outer type, so .NET's nested types take another name.
+Tm1Operation.Kind -> OperationKind | the Kind property has the name
+Tm1Identity.Kind -> IdentityKind | the Kind property has the name
+Tm1Capability.Kind -> CapabilityKind | the Kind property has the name
+Tm1Timeouts.Builder -> TimeoutsBuilder | the Builder() method has the name
+Tm1Request.Response -> Tm1Response | a type nested in the generic Tm1Request<T> would take its T
+ODataLiteral -> IODataLiteral | .NET names an interface with an I
+Tm1Endpoint -> Tm1EndpointAttribute | .NET names an attribute with Attribute, and drops it where it's used: [Tm1Endpoint(...)]
+Tm1Endpoint.List | Java's container for a repeated annotation: Tm1EndpointAttribute repeats itself (AllowMultiple)
+LenientOffsetDateTimeDeserializer -> LenientDateTimeOffsetConverter | a System.Text.Json converter, for .NET's DateTimeOffset
+LenientOffsetDateTimeDeserializer.deserialize -> Read | System.Text.Json's converters read with Read
+Tm1Request.Bytes | a body of Reactor's DataBuffers: .NET's Tm1Request.Put takes a byte[]
+Since | the annotation Java's generated models carry the schema version in: .NET's models don't record it, and a request checks what it needs with Tm1Capability
+ODataCollectionDecoder | a Java internal, public only because its session package uses it: it decodes Reactor's byte buffers as they arrive
+Utf8Repair | a Java internal, public only because its session package uses it: .NET's session repairs a body's bytes privately

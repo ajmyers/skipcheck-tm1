@@ -50,7 +50,7 @@ and fail a client's checks, or the docs build, when it lacks something Java has:
 | A service call and what it sends | The recorded calls in [`spec/conformance`](spec/conformance/README.md), which every client replays |
 | A live test | The live-parity tests, and each client's `coverage/live-excluded.txt` |
 | A unit test of the runtime (session, pool, batch, authenticators, OData, errors) | The unit-parity tests, and each client's `coverage/unit-excluded.txt` |
-| A public member of a documented type | The docs build ([`api-site/scripts/members.mjs`](api-site/scripts/members.mjs)), and each client's `coverage/members-excluded.txt` |
+| A public type, and a public member of a documented type | The docs build ([`api-site/scripts/members.mjs`](api-site/scripts/members.mjs)), and each client's `coverage/members-excluded.txt` |
 
 A test with no meaning in a client gets a line in its exclusions file saying why; a line that has
 gone stale fails the gate. "Not ported yet" is not a reason. The gates can't see a behaviour change

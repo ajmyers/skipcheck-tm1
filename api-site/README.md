@@ -26,7 +26,7 @@ Javadoc; everything else is read from the repository when the pages are built:
 | How to install | Each language's own build files: the package's name, the version of the language it needs (`scripts/packages.mjs`). |
 | The version | `DOCS_VERSION`, which the workflow sets from a release tag, or else `gradle.properties`. Before a release the install steps ask for the latest pre-release, and the page says it is one. |
 | A type's members, signatures and doc comments | Each language's sources, read by an extractor into one JSON shape (`scripts/extract.mjs`): Java by the doclet in `java/tools/docs-doclet` (`./gradlew docsModel`), Python by `extract/python_api.py` (with `ast`), .NET and TypeScript by `extract/dotnet_api.mjs` and `extract/typescript_api.mjs` (reading the formatted sources). No build or install of the clients is needed. |
-| Which member is which across languages | The rule each language's parity tests enforce: `modelCubes` is `model_cubes` in Python and `ModelCubesAsync` in .NET; a getter is a property; `NOT_FOUND` is `NotFound` in .NET. A member a type inherits counts as its own. What a language lacks by design, or names another way, is in its `coverage/members-excluded.txt` (`scripts/members.mjs`). |
+| Which member is which across languages | The rule each language's parity tests enforce: `modelCubes` is `model_cubes` in Python and `ModelCubesAsync` in .NET; a getter is a property; `NOT_FOUND` is `NotFound` in .NET (and in TypeScript, where an enum is a union of strings). A member a type inherits counts as its own. A nested type is found nested, joined to its outer type or alone (`Tm1Timeouts.Builder`, `Tm1ClientBuilder`, `User`). The extractors read a Python class's nested classes, and TypeScript's namespaces, unions of strings and exported objects (`Tuples`), as types. What a language lacks by design, or names another way, is in its `coverage/members-excluded.txt` (`scripts/members.mjs`): a line for a type covers the types nested in it. |
 | A type's overview | The Java type's Javadoc, with its examples in the page's language. There is one text, written for every language: a Java type or member it names, in a `{@link}` or a `{@code}`, is named the page's way (by the rule above, or as the language's code has it), and a Java literal or `Object` method the language's way (`null` is `None` in Python). |
 | A Docker page | Its README under `docker/`, as GitHub renders it (`marked`, with GitHub's heading ids). A link to another of those READMEs goes to its page, a link to any other file goes to it on GitHub, and a link to a file that isn't there fails the build. `PA_DOCKER` in `scripts/site.mjs` lists the pages. |
 | The text of a landing page | `content/<project>.md`: Markdown with no code in it. `::install`, `::example <Class> <region>` and `::file <path> <language>` are replaced with the above (`scripts/pages.mjs`, `scripts/markdown.mjs`); `::walkthroughs` lists the project's walkthroughs. |
@@ -35,13 +35,13 @@ Javadoc; everything else is read from the repository when the pages are built:
 | What an example printed | `example-output/<project>/<language>/<Class>.json`, written by the live tests (below). |
 
 The build fails when a page names an example that isn't there, when a language lacks an example
-the Java documentation quotes, when a language lacks a Java member that its
+the Java documentation quotes, when a language lacks a Java type or member that its
 `coverage/members-excluded.txt` doesn't list (or lists one it has, or one Java no longer has), or
 when an overview on another language's page names something only Java has (`Mono`, `JsonNode`, a
 Java member name that the language's API and code don't have: `javaIsms` in `scripts/members.mjs`), or
 when a link on a generated page goes nowhere (`scripts/check-links.mjs`), or when a doc comment the
 reference reads has code typed into it rather than quoted from a region (`scripts/doc-code.mjs`). So a new Java example
-needs its three counterparts before the build passes, and so does a new Java member.
+needs its three counterparts before the build passes, and so does a new Java type or member.
 
 ## Walkthroughs, and what the examples print
 
@@ -84,7 +84,7 @@ has one, and isn't required.
 | `scripts/extract.mjs` | Each project's API per language, into `.generated/api/`. |
 | `scripts/reference.mjs` | The reference pages and `.generated/site.json` for the Worker: the projects, and which one documents each type. |
 | `scripts/type-page.mjs` | The top of a type's page: its name, its import line, and the walkthroughs that use it, before the overview. |
-| `scripts/members.mjs` | Which member is which across languages, and the gate that each language has every Java member or lists it with the reason. |
+| `scripts/members.mjs` | Which type and member is which across languages, and the gate that each language has every Java type and member or lists it with the reason. |
 | `scripts/doc-code.mjs` | The gate that no doc comment the reference reads has code typed into it: a Javadoc `<pre>` or inline `{@snippet}`, a .NET `<code>`, a TypeScript fence or `@example`, a Python `::` block or doctest. |
 | `scripts/search.mjs` | The search index of each docs language, `search.json` beside its pages: every type and member, the walkthroughs and the TM1 types the pages link to, a short summary, and where it is. `reference.mjs` writes it from the data it renders the pages with. And `/pa-docker/search.json`, the Docker pages' titles and headings, which `docker.mjs` writes. |
 | `scripts/pages.mjs` | The landing pages and the walkthroughs. |
@@ -98,7 +98,7 @@ has one, and isn't required.
 | `assets/` | The generated pages' own styles and script, copied to `/<project>/assets/`: `docs.css` (the reference's layout), `docs.js` (the reference's language memory), `search.js` and `search-rank.js` (the search box of the reference and the Docker pages, and how it matches and ranks), `tabs.css` and `tabs.js` (the landing pages' language tabs), `readme.css` (what the Docker pages add to `docs.css`). A language chosen anywhere is remembered and followed everywhere. |
 | `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, serves the site's 404 page for missing paths, and sends the addresses these pages had under `/projects/` to the new ones. The site's own pages under these paths (`site` in `SECTIONS`: the setup page, `/pa-docker/setup/`) it passes through to the site. |
 | `wrangler.jsonc` | The Worker's config: a route per project, for `/docs/` and for `/pa-docker/` on each zone, and one per zone for the old addresses. |
-| `test/` | `npm test` here, or `./gradlew checkApiSite`: the Worker, the Markdown, the install steps against the real build files, that every project has its routes, the extractors and the member gate. |
+| `test/` | `npm test` here, or `./gradlew checkApiSite`: the Worker, the Markdown, the install steps against the real build files, that every project has its routes, the extractors and the type and member gate. |
 | `.github/workflows/api-docs.yml` | Tests the Worker and the page builders, builds the site and bundles the Worker on every change, as part of CI. Deploys when the release workflow calls it for a tag, or when run by hand. |
 
 What the pages take from the site (ajmyers/skipcheck.io, `public/`) at view time: `tokens.css`,

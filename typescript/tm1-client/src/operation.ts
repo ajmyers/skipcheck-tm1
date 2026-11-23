@@ -17,7 +17,7 @@ export class Tm1Operation {
    * @param addedIn the TM1 schema version that added it, or null @param deprecatedIn the version
    * that deprecated it, or null */
   constructor(
-    readonly kind: "Action" | "Function",
+    readonly kind: Tm1Operation.Kind,
     /** Its name in a path: `tm1.Activate`. */
     readonly name: string,
     readonly bindingType: string | null,
@@ -58,8 +58,12 @@ export class Tm1Operation {
   }
 }
 
-/** The parameter type of {@link Tm1Operation}, nested as in Java. */
+/** The types nested in {@link Tm1Operation}, as in Java: its kind and its parameters. */
 export namespace Tm1Operation {
+  /** Whether an operation is an action, invoked with `POST`, which may change the server's state,
+   * or a function, invoked with `GET`, which doesn't change anything. */
+  export type Kind = "Action" | "Function";
+
   /** A parameter of an operation, the binding parameter apart. */
   export interface Parameter {
     /** The parameter's name. */

@@ -139,30 +139,57 @@ def attributes(cls: ast.ClassDef) -> list[dict]:
     return list(found.values())
 
 
+_CLASS_VAR_TYPE = re.compile(r"ClassVar\[type\[(\w+)\]\]")
+
+
+def nested_alias(node: ast.AST, defined: dict[str, ast.ClassDef]) -> ast.ClassDef | None:
+    """The class a class attribute names as its nested type, or None: ``PrivateImage:
+    ClassVar[type[_Tm1PrivateImage]]`` in Tm1Source makes the module's private _Tm1PrivateImage
+    Tm1Source.PrivateImage, as the module then sets it."""
+    if not isinstance(node, ast.AnnAssign) or not isinstance(node.target, ast.Name) or node.target.id.startswith("_"):
+        return None
+    match = _CLASS_VAR_TYPE.fullmatch(ast.unparse(node.annotation))
+    return defined.get(match.group(1)) if match else None
+
+
+def described(node: ast.ClassDef, name: str, package: str, defined: dict[str, ast.ClassDef]) -> list[dict]:
+    """A class, and the classes nested in it, named Outer.Inner as Java names them: those its body
+    defines, and those it names with nested_alias."""
+    bases = [annotation(b) for b in node.bases]
+    kind = "enum" if any("Enum" in b for b in bases) else ("protocol" if "Protocol" in bases else "class")
+    nested: list[tuple[str, ast.ClassDef]] = []
+    members = []
+    for child in node.body:
+        if isinstance(child, ast.ClassDef):
+            if not child.name.startswith("_"):
+                nested.append((sync(child.name), child))
+        elif (alias := nested_alias(child, defined)) is not None:
+            nested.append((child.target.id, alias))  # type: ignore[union-attr]
+        elif (found := member(child)) is not None:
+            members.append(found)
+    declared = {m["name"] for m in members}
+    members += [a for a in attributes(node) if a["name"] not in declared]
+    cls = {
+        "name": name,
+        "package": package,
+        "kind": kind,
+        "signature": "class " + name + ("(" + ", ".join(bases) + ")" if bases else ""),
+        "doc": sync(ast.get_docstring(node) or ""),
+        "deprecated": False,
+        "members": members,
+        # The names of its bases, for inherit() to follow; not written out
+        "bases": [sync(b.split("[")[0].split(".")[-1]) for b in bases],
+    }
+    return [cls] + [t for inner, child in nested for t in described(child, name + "." + inner, package, defined)]
+
+
 def classes(path: Path, package: str) -> list[dict]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
+    defined = {node.name: node for node in tree.body if isinstance(node, ast.ClassDef)}
     found = []
     for node in tree.body:
-        if not isinstance(node, ast.ClassDef) or node.name.startswith("_"):
-            continue
-        bases = [annotation(b) for b in node.bases]
-        kind = "enum" if any("Enum" in b for b in bases) else ("protocol" if "Protocol" in bases else "class")
-        members = [m for m in (member(child) for child in node.body) if m is not None]
-        declared = {m["name"] for m in members}
-        members += [a for a in attributes(node) if a["name"] not in declared]
-        found.append(
-            {
-                "name": sync(node.name),
-                "package": package,
-                "kind": kind,
-                "signature": "class " + sync(node.name) + ("(" + ", ".join(bases) + ")" if bases else ""),
-                "doc": sync(ast.get_docstring(node) or ""),
-                "deprecated": False,
-                "members": members,
-                # The names of its bases, for inherit() to follow; not written out
-                "bases": [sync(b.split("[")[0].split(".")[-1]) for b in bases],
-            }
-        )
+        if isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
+            found += described(node, sync(node.name), package, defined)
     return found
 
 
@@ -219,7 +246,7 @@ def main(source: str, out: str) -> None:
         if ".services." in module + ".":
             module = module[: module.index(".services") + len(".services")]
         for cls in classes(path, module):
-            if cls["name"] in top:
+            if cls["name"].split(".")[0] in top:
                 cls["package"] = root.name
             # A class in aio/ and its sync twin are one class; aio/ is the source of truth
             types.setdefault(cls["name"], cls)
