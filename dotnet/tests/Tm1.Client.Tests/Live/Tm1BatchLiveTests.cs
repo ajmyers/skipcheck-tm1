@@ -57,6 +57,46 @@ public class Tm1BatchLiveTests
     }
 
     [Tm1Fact]
+    public async Task RunsRequestsInOrder()
+    {
+        await using var tm1 = Live.Client();
+        var dimension = "batch" + Guid.NewGuid().ToString("N")[..8];
+        await tm1.Session.ExecuteAsync(
+            Tm1Request.Post(
+                ODataPath.Of("Dimensions"),
+                new Dictionary<string, object?> { ["Name"] = dimension, ["Hierarchies"] = new[] { new Dictionary<string, object?> { ["Name"] = dimension } } }
+            )
+        );
+        try
+        {
+            var batch = tm1.Batch();
+            var queued = batch.Client.Session;
+            var elements = ODataPath.Of("Dimensions").Key(dimension).Nav("Hierarchies").Key(dimension).Nav("Elements");
+            var before = new List<Task<JsonElement>>();
+            var after = new List<Task<JsonElement>>();
+            var created = new List<Task<JsonElement>>();
+            // Ten times over, so that requests run side by side would show
+            for (var i = 0; i < 10; i++)
+            {
+                before.Add(queued.ExecuteAsync(Tm1Request.Get<JsonElement>(elements.Key("e" + i))));
+                created.Add(queued.ExecuteAsync(Tm1Request.Post<JsonElement>(elements, new Dictionary<string, object?> { ["Name"] = "e" + i })));
+                after.Add(queued.ExecuteAsync(Tm1Request.Get<JsonElement>(elements.Key("e" + i))));
+            }
+            await batch.RunAsync().WaitAsync(Wait);
+            await Task.WhenAll(created);
+            for (var i = 0; i < 10; i++)
+            {
+                await Assert.ThrowsAsync<Tm1NotFoundException>(() => before[i]); // runs before the element is made
+                Assert.Equal("e" + i, (await after[i]).GetProperty("Name").GetString()); // sees the element an earlier request made
+            }
+        }
+        finally
+        {
+            await tm1.Session.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Dimensions").Key(dimension)));
+        }
+    }
+
+    [Tm1Fact]
     public async Task TakesAThousandRequests()
     {
         await using var tm1 = Live.Client();
