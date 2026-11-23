@@ -5,12 +5,16 @@ package io.skipcheck.tm1.spring.boot.autoconfigure;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.auth.Tm1Authenticator;
@@ -66,6 +70,65 @@ class Tm1ServersTest {
 		runner
 			.withPropertyValues("tm1.home-dir=/tmp/x", "tm1.servers.default.address=http://tm1:8010",
 					"tm1.servers.default.user=admin")
+			.withUserConfiguration(DefaultServer.class)
+			.run(context -> assertThat(context.getBean(DefaultServer.class).plain.session().serviceRoot())
+				.isEqualTo("http://tm1:8010/api/v1/"));
+	}
+
+	@Test
+	void findsServersConfiguredByEnvironmentVariables() {
+		// Spring's environment-variable form, as a container sets it
+		Map<String, Object> variables = Map.of("TM1_BASEURL", "http://tm1:8010/api/v1/", "TM1_USER", "admin",
+				"TM1_PASSWORD", "apple", "TM1_SERVERS_PLANNING_ADDRESS", "http://planning:8010",
+				"TM1_SERVERS_PLANNING_USER", "planner", "TM1_SERVERS_PLANNING_POOL_ENABLED", "true",
+				"TM1_SERVERS_REPORTING_BASE_URL", "http://reporting:8010/api/v1/", "TM1_SERVERS_REPORTING_USER",
+				"reporter", "TM1_HOME_DIR", "/tmp/x");
+		runner
+			.withInitializer(context -> context.getEnvironment()
+				.getPropertySources()
+				.addFirst(new SystemEnvironmentPropertySource(
+						StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, variables)))
+			.withUserConfiguration(DefaultServer.class)
+			.run(context -> {
+				assertThat(context.getBean(DefaultServer.class).plain.session().serviceRoot())
+					.isEqualTo("http://tm1:8010/api/v1/");
+				assertThat(context.getBean("defaultTm1ConnectionDetails", Tm1ConnectionDetails.class)
+					.getAuthenticator()
+					.describe()).isEqualTo("Basic admin");
+				assertThat(context.getBean("planningTm1Client", Tm1Client.class).session().serviceRoot())
+					.isEqualTo("http://planning:8010/api/v1/");
+				assertThat(context.getBean("planningTm1ConnectionDetails", Tm1ConnectionDetails.class)
+					.getAuthenticator()
+					.describe()).isEqualTo("Basic planner");
+				assertThat(context).hasBean("planningTm1SessionPool").doesNotHaveBean("homeTm1Client");
+				// The legacy form, with an underscore for the dash in base-url, as the
+				// binder takes it
+				assertThat(context.getBean("reportingTm1Client", Tm1Client.class).session().serviceRoot())
+					.isEqualTo("http://reporting:8010/api/v1/");
+			});
+	}
+
+	@Test
+	void findsTheDefaultServerByTm1AddressInTheEnvironment() {
+		Map<String, Object> variables = Map.of("TM1_ADDRESS", "http://tm1:8010", "TM1_USER", "admin");
+		runner
+			.withInitializer(context -> context.getEnvironment()
+				.getPropertySources()
+				.addFirst(new SystemEnvironmentPropertySource(
+						StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, variables)))
+			.withUserConfiguration(DefaultServer.class)
+			.run(context -> assertThat(context.getBean(DefaultServer.class).plain.session().serviceRoot())
+				.isEqualTo("http://tm1:8010/api/v1/"));
+	}
+
+	@Test
+	void findsTheDefaultServerByTheLegacyTm1BaseUrlVariable() {
+		Map<String, Object> variables = Map.of("TM1_BASE_URL", "http://tm1:8010/api/v1/", "TM1_USER", "admin");
+		runner
+			.withInitializer(context -> context.getEnvironment()
+				.getPropertySources()
+				.addFirst(new SystemEnvironmentPropertySource(
+						StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, variables)))
 			.withUserConfiguration(DefaultServer.class)
 			.run(context -> assertThat(context.getBean(DefaultServer.class).plain.session().serviceRoot())
 				.isEqualTo("http://tm1:8010/api/v1/"));

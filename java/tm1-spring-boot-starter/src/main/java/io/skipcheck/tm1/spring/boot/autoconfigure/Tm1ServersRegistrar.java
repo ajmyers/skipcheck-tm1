@@ -31,6 +31,7 @@ import org.springframework.boot.context.properties.source.IterableConfigurationP
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.ImportBeanDefinitionRegistrar;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -71,6 +72,12 @@ final class Tm1ServersRegistrar implements ImportBeanDefinitionRegistrar {
 	private static final Set<String> PROPERTIES = Arrays.stream(Tm1Properties.class.getRecordComponents())
 		.map(component -> component.getName().toLowerCase(Locale.ROOT))
 		.collect(Collectors.toUnmodifiableSet());
+
+	/** A server's properties with dashes in their names, such as {@code base-url}. */
+	private static final List<String> DASHED = Arrays.stream(Tm1Properties.class.getRecordComponents())
+		.map(component -> component.getName().replaceAll("([A-Z])", "-$1").toLowerCase(Locale.ROOT))
+		.filter(property -> property.contains("-"))
+		.toList();
 
 	/** The properties that say where a server is, so that {@code tm1.*} makes one. */
 	private static final Set<String> ADDRESSES = Set.of("address", "baseurl");
@@ -161,15 +168,50 @@ final class Tm1ServersRegistrar implements ImportBeanDefinitionRegistrar {
 		return server + type.getSimpleName();
 	}
 
-	/** Every property name under {@code tm1}, without reading a value. */
+	/**
+	 * Every property name under {@code tm1}, without reading a value. An environment
+	 * variable's name is as {@link #canonical} makes it.
+	 */
 	private static List<ConfigurationPropertyName> names(Environment environment) {
 		List<ConfigurationPropertyName> names = new ArrayList<>();
 		for (ConfigurationPropertySource source : ConfigurationPropertySources.get(environment)) {
 			if (source instanceof IterableConfigurationPropertySource iterable) {
-				iterable.filter(TM1::isAncestorOf).stream().forEach(names::add);
+				boolean variables = source.getUnderlyingSource() instanceof SystemEnvironmentPropertySource;
+				iterable.filter(TM1::isAncestorOf)
+					.stream()
+					.map(name -> variables ? canonical(name) : name)
+					.forEach(names::add);
 			}
 		}
 		return names;
+	}
+
+	/**
+	 * The name the binder would bind an environment variable to. Spring reads
+	 * {@code TM1_BASE_URL}, the legacy form, as {@code tm1.base.url}, but binds it to
+	 * {@code base-url} as well as {@code TM1_BASEURL}; a dashed property name here is
+	 * that name with its elements rejoined.
+	 */
+	static ConfigurationPropertyName canonical(ConfigurationPropertyName name) {
+		int at = SERVERS.isAncestorOf(name) ? 3 : 1;
+		for (String property : DASHED) {
+			List<String> parts = List.of(property.split("-", -1));
+			if (name.getNumberOfElements() < at + parts.size()) {
+				continue;
+			}
+			boolean matches = true;
+			for (int i = 0; i < parts.size() && matches; i++) {
+				matches = parts.get(i).equals(name.getElement(at + i, Form.UNIFORM));
+			}
+			if (matches) {
+				ConfigurationPropertyName canonical = name.chop(at).append(property);
+				for (int i = at + parts.size(); i < name.getNumberOfElements(); i++) {
+					canonical = canonical.append(name.getElement(i, Form.ORIGINAL));
+				}
+				return canonical;
+			}
+		}
+		return name;
 	}
 
 	/**
