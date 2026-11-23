@@ -5,9 +5,18 @@ on:
     branches: [master]
   pull_request:
 
+permissions:
+  contents: read
+
+# A newer push to a pull request replaces the run before it; every push to master runs to the end
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -21,6 +30,7 @@ jobs:
   # those are. The clients' own builds check their languages; this covers the rest too.
   license:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
       - run: python3 scripts/license-headers.py
@@ -29,6 +39,7 @@ jobs:
   # spec is out of date with the $metadata snapshot (ApiSpecTest)
   python:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       matrix:
         python-version: ['3.10', '3.13']
@@ -46,6 +57,7 @@ jobs:
   # The .NET client, generated from spec/tm1-api.json at build time
   dotnet:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5
@@ -55,6 +67,7 @@ jobs:
 
   typescript:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       matrix:
         # The oldest Node the packages support, and the current LTS
@@ -75,3 +88,19 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
+
+  # The one check the master ruleset requires: it passes only when every job above did, whatever
+  # their matrices are called. It always runs: a job that's skipped because one it needs failed
+  # would count as passing. A new job goes in its needs.
+  ci-ok:
+    if: always()
+    needs: [build, license, python, dotnet, typescript]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job succeeded
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$RESULTS" | jq -e 'all(.[]; .result == "success")' > /dev/null
