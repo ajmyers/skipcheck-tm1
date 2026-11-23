@@ -4,6 +4,8 @@ The TypeScript port of the Java [`tm1-testcontainers`](../../java/tm1-testcontai
 
 The images contain no IBM software. A source supplies it, from an environment variable: `TM1_PRIVATE_IMAGE`, `TM1_HOME_DIR`, `TM1_INSTALL_VOLUME`, `TM1_BUNDLE_DIR` (with `TM1_BUNDLE`) or `TM1_BUNDLE_URL` (with `TM1_BUNDLE_SHA256`). If several are set, the first in this list wins. A bundle URL is never logged with its query string or credentials.
 
+To run the same parts by hand, outside tests (to develop against, or to look at in a browser), use [`pa-setup`](../../docker/pa-setup/README.md). It starts the same images from one file, `pa-environment.yaml`.
+
 ```ts
 import { requiresTm1 } from "@skipcheck/tm1-testcontainers/vitest";
 import { Tm1Client } from "@skipcheck/tm1-client";
