@@ -12,11 +12,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.core.io.buffer.NettyDataBuffer;
+import org.springframework.core.io.buffer.NettyDataBufferFactory;
 
+import io.netty.buffer.UnpooledByteBufAllocator;
 import io.skipcheck.tm1.client.error.Tm1ProtocolException;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
@@ -49,6 +53,43 @@ class ODataCollectionDecoderTest {
 		assertThat(items(events)).extracting(Element::Name).containsExactly("Q1", "Q'2 {x}", "Total");
 		assertThat(controls(events)).containsKeys("@odata.context", "@odata.count", "@odata.nextLink");
 		assertThat(controls(events).get("@odata.count").asInt()).isEqualTo(3);
+	}
+
+	@Test
+	void releasesBuffersItHasntReadWhenCancelled() {
+		// Pooled buffers, as from the network, arriving faster than the items are taken
+		NettyDataBufferFactory pooled = new NettyDataBufferFactory(UnpooledByteBufAllocator.DEFAULT);
+		byte[] bytes = BODY.getBytes(StandardCharsets.UTF_8);
+		List<NettyDataBuffer> buffers = new ArrayList<>();
+		for (int from = 0; from < bytes.length; from += 7) {
+			NettyDataBuffer buffer = pooled.allocateBuffer(7);
+			buffer.write(bytes, from, Math.min(7, bytes.length - from));
+			buffers.add(buffer);
+		}
+		Flux<DataBuffer> body = Flux.<DataBuffer>fromIterable(buffers).hide();
+
+		StepVerifier.create(ODataCollectionDecoder.items(body, MAPPER, ELEMENTS, "GET", "x"), 1)
+			.expectNextCount(1)
+			.thenCancel()
+			.verify();
+
+		assertThat(buffers).as("released, read or not")
+			.allSatisfy(buffer -> assertThat(buffer.getNativeBuffer().refCnt()).isZero());
+	}
+
+	@Test
+	void asksForBuffersOnlyAsItemsAreTaken() {
+		AtomicLong asked = new AtomicLong();
+		Flux<DataBuffer> body = chunks(BODY, 7).hide().doOnRequest(asked::addAndGet);
+
+		StepVerifier.create(ODataCollectionDecoder.items(body, MAPPER, ELEMENTS, "GET", "x"), 1)
+			.expectNextCount(1)
+			.thenCancel()
+			.verify();
+
+		// The buffers up to the end of the first item, and one more
+		int needed = (BODY.indexOf("\"Numeric\"}") + "\"Numeric\"}".length() + 6) / 7;
+		assertThat(asked.get()).as("no more than the first item needs").isLessThanOrEqualTo(needed + 1);
 	}
 
 	@Test
