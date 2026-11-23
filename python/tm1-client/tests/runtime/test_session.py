@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import json
 import time
+from typing import Any
 
 import httpx
 import pytest
@@ -25,6 +26,7 @@ from skipcheck_tm1 import (
     Tm1NotFoundError,
     Tm1ProtocolError,
     Tm1Request,
+    Tm1ServerError,
     Tm1SessionClosedError,
     Tm1Timeouts,
     Tm1TransportError,
@@ -597,6 +599,68 @@ def test_doesnt_keep_a_failed_read(rt: Runtime) -> None:
     session = rt.session()
     rt.raises(Tm1ApiError, lambda: session.version())
     assert rt.run(session.version()) == Tm1Version.parse("11.8.03500.6")
+
+
+# Tm1SessionAsyncTest
+
+
+RUN = "POST Processes('p')/tm1.ExecuteWithReturn"
+MONITOR = "GET _async('a1')"
+REQUEST = Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.ExecuteWithReturn"), None, dict)
+CUBES = Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), dict)
+
+
+def accepted() -> httpx.Response:
+    return httpx.Response(202, headers={"Location": "../_async('a1')"})
+
+
+def done(status_line: str, body: str) -> httpx.Response:
+    """A finished monitor's answer: the result as an ``application/http`` message."""
+    message = f"HTTP/1.1 {status_line}\r\nContent-Type: application/json\r\nOData-Version: 4.0\r\n\r\n{body}"
+    return httpx.Response(200, content=message.encode(), headers={"Content-Type": "application/http"})
+
+
+def answers(rt: Runtime, routes: dict[str, Any]) -> None:
+    """Answers each request by its ``METHOD path`` (Java's ``FakeTm1.on``)."""
+
+    def respond(request: httpx.Request) -> Any:
+        answer = routes[target(request)]
+        return answer(request) if callable(answer) else answer
+
+    rt.fake.respond = respond
+
+
+def streamed(rt: Runtime, session: Any, request: Any) -> list[Any]:
+    """What ``stream`` gives, to its end."""
+    if rt.flavor == "sync":
+        return list(session.stream(request))
+
+    async def items() -> list[Any]:
+        return [item async for item in session.stream(request)]
+
+    return rt.run(items())
+
+
+def test_reads_a_result_bigger_than_the_codecs_buffer_limit(rt: Runtime) -> None:
+    # The Java client's codecs refused to buffer more than 256 KB. Nothing limits a body here: this pins that
+    big = "x" * 300_000
+    answers(rt, {RUN: accepted(), MONITOR: done("200 OK", json.dumps({"Text": big}))})
+    result = rt.run(rt.session().with_async(0.01).execute(REQUEST))
+    assert len(result["Text"]) == 300_000
+
+
+def test_reads_a_big_collection_tm1_gave_at_once(rt: Runtime) -> None:
+    big = "x" * 300_000
+    answers(rt, {"GET Cubes": {"value": [{"Name": big}]}})
+    cubes = streamed(rt, rt.session().with_async(0.01), CUBES)
+    assert [len(cube["Name"]) for cube in cubes] == [300_000]
+
+
+def test_reads_a_big_error_body(rt: Runtime) -> None:
+    big = "x" * 300_000
+    answers(rt, {RUN: json_response(500, {"error": {"code": "174", "message": big}})})
+    error = rt.raises(Tm1ServerError, lambda: rt.session().execute(REQUEST))
+    assert len(error.error.message) == 300_000
 
 
 # Tm1Dialect, through a session
