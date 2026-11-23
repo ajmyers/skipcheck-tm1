@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 import threading
 import time
 from typing import Any
@@ -248,11 +249,13 @@ def test_streams_collections_across_next_links(rt: Runtime) -> None:
         assert rt.run(streamed()) == ["a", "b", "c"]
 
 
-def test_refuses_to_stream_a_single_response_and_to_execute_a_collection_without_sending_it(rt: Runtime) -> None:
-    session = rt.session()
+def test_refuses_to_stream_a_single_response(rt: Runtime) -> None:
     with pytest.raises(ValueError):
-        session.stream(SERVER)
-    rt.raises(ValueError, lambda: session.execute(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), dict)))
+        rt.session().stream(SERVER)
+
+
+def test_refuses_to_execute_a_collection_without_sending_it(rt: Runtime) -> None:
+    rt.raises(ValueError, lambda: rt.session().execute(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), dict)))
     assert rt.fake.requests == [] and rt.fake.login_requests == []
 
 
@@ -310,11 +313,104 @@ def test_closes_the_session_once_with_a_json_body_and_refuses_requests_afterward
     assert len(rt.fake.login_requests) == 1, "a closed session doesn't log in again"
 
 
-def test_treats_a_401_on_close_as_already_closed(rt: Runtime) -> None:
+def test_treats_a401_on_close_as_already_closed(rt: Runtime) -> None:
     rt.fake.respond = lambda r: json_response(401) if target(r) == CLOSE else {}
     session = rt.session()
     rt.run(session.connect())
     rt.run(session.close())
+
+
+class HeldLogin:
+    """A login TM1 doesn't answer until it's told to, with the given cookie: Java's ``Sinks.One``
+    of the login response."""
+
+    def __init__(self, rt: Runtime, cookie: str, session_id: int) -> None:
+        answer = json_response(200, {"ID": session_id}, f"TM1SessionId={cookie}; Path=/api/")
+        self.arrived: Any
+        self.release: Any
+        if rt.flavor == "sync":
+            self.arrived, self.release = threading.Event(), threading.Event()
+
+            def held(request: httpx.Request) -> httpx.Response:
+                self.arrived.set()
+                assert self.release.wait(10)
+                return answer
+
+            rt.fake.on_login = held
+        else:
+            self.arrived, self.release = asyncio.Event(), asyncio.Event()
+
+            async def waiting() -> httpx.Response:
+                self.arrived.set()
+                await self.release.wait()
+                return answer
+
+            # The transport awaits what the fake answers with
+            rt.fake.on_login = lambda request: waiting()
+
+
+def test_waits_for_a_login_in_progress_and_closes_it(rt: Runtime) -> None:
+    login = HeldLogin(rt, "late", 5)
+    session = rt.session()
+    if rt.flavor == "sync":
+        first = threading.Thread(target=lambda: session.execute(SERVER), daemon=True)
+        first.start()
+        assert login.arrived.wait(5)
+        closing = threading.Thread(target=session.close, daemon=True)
+        closing.start()
+        closing.join(0.1)
+        assert requests_to(rt, CLOSE) == [], "not before the login has finished"
+        login.release.set()
+        closing.join(5)
+        first.join(5)
+        assert not closing.is_alive()
+    else:
+
+        async def scenario() -> None:
+            first = asyncio.ensure_future(session.execute(SERVER))
+            await asyncio.wait_for(login.arrived.wait(), 5)
+            closing = asyncio.ensure_future(session.close())
+            await asyncio.sleep(0.05)
+            assert requests_to(rt, CLOSE) == [], "not before the login has finished"
+            login.release.set()
+            await asyncio.wait_for(closing, 5)
+            await asyncio.gather(first, return_exceptions=True)
+
+        rt.run(scenario())
+    closes = requests_to(rt, CLOSE)
+    assert len(closes) == 1
+    assert cookie(closes[0]) == "late"
+
+
+def test_finishes_a_login_whose_request_was_cancelled_so_close_can_end_it(rt: Runtime) -> None:
+    if rt.flavor == "sync":
+        pytest.skip("a blocking call can't be cancelled, so the sync session never abandons a login")
+    login = HeldLogin(rt, "orphan", 6)
+    session = rt.session()
+
+    async def scenario() -> None:
+        first = asyncio.ensure_future(session.execute(SERVER))
+        await asyncio.wait_for(login.arrived.wait(), 5)
+        first.cancel()
+        await asyncio.gather(first, return_exceptions=True)
+        login.release.set()
+        await asyncio.wait_for(session.close(), 5)
+
+    rt.run(scenario())
+    closes = requests_to(rt, CLOSE)
+    assert len(closes) == 1
+    assert cookie(closes[0]) == "orphan"
+
+
+def test_observes_login_and_close(rt: Runtime, caplog: pytest.LogCaptureFixture) -> None:
+    # Java observes them with Micrometer; this client logs them to ``skipcheck_tm1``, the login with its reason
+    caplog.set_level(logging.INFO, logger="skipcheck_tm1")
+    session = rt.session()
+    rt.run(session.connect())
+    rt.run(session.close())
+    messages = [r.getMessage() for r in caplog.records if r.name == "skipcheck_tm1"]
+    assert [m for m in messages if m.startswith("Logged in")] == [f"Logged in to TM1 at {BASE} as Basic admin (session 1, initial)"]
+    assert [m for m in messages if m.startswith("Closed")] == [f"Closed TM1 session 1 at {BASE}"]
 
 
 # Tm1SessionReloginTest
