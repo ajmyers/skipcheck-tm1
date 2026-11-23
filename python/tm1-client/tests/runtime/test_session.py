@@ -39,7 +39,7 @@ from skipcheck_tm1 import (
 from skipcheck_tm1._protocol import Call
 from skipcheck_tm1.aio import cognos as aio_cognos
 
-from ..conftest import BASE, target
+from ..conftest import BASE, SNAPSHOT, target
 from .conftest import SERVER, Clock, Runtime, each, json_response, text_response
 
 LOGIN = "GET ActiveSession?$select=ID"
@@ -775,6 +775,47 @@ def test_reads_the_version_again_after_logging_in_again(rt: Runtime) -> None:
 def test_reports_metadata_that_isnt_csdl(rt: Runtime) -> None:
     rt.fake.metadata = b"<html>Not metadata</html>"
     rt.raises(Tm1ProtocolError, lambda: rt.session().capabilities())
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [b"", b"not XML at all", b"\x00\x00\x00", b"<html>Not metadata</html>", b'<?xml version="1.0" encoding="bogus-8"?><edmx/>'],
+    ids=["empty", "text", "bytes", "another document", "an encoding nobody knows"],
+)
+def test_reports_metadata_it_cant_read_as_a_protocol_error_not_a_raw_one(rt: Runtime, metadata: bytes) -> None:
+    rt.fake.metadata = metadata
+    session = rt.session()
+    rt.raises(Tm1ProtocolError, lambda: session.capabilities())
+    bananas = Tm1Request.list(ODataPath.of("Bananas"), ODataQuery.none(), dict).requires(Tm1Capability.entity_set("Bananas").since("99.0"))
+    rt.raises(Tm1ProtocolError, lambda: session.collect(bananas))
+    assert rt.fake.requests == []
+
+
+def test_reports_whatever_stops_metadata_being_read_as_a_protocol_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from skipcheck_tm1 import Tm1Capabilities, version
+
+    def refuse(name: str) -> str:
+        raise ValueError(f"can't model {name}")
+
+    monkeypatch.setattr(version, "_simple", refuse)
+    with pytest.raises(Tm1ProtocolError, match="can't model"):
+        Tm1Capabilities.parse(SNAPSHOT.read_bytes())
+
+
+def test_reads_past_an_operation_it_cant_model(rt: Runtime) -> None:
+    # Java's reportsAnOperationItCantModelAsAParseError: its model refuses an operation bound to nothing, so the
+    # whole document is a parse error there. This client models only what it checks, and leaves the operation out.
+    rt.fake.metadata = b"""
+        <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+          <edmx:DataServices>
+            <Schema Namespace="ibm.tm1.api.v1" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+              <Action Name="Reserve" IsBound="true"/>
+              <EntityContainer Name="API"><EntitySet Name="Cubes" EntityType="ibm.tm1.api.v1.Cube"/></EntityContainer>
+            </Schema>
+          </edmx:DataServices>
+        </edmx:Edmx>"""
+    capabilities = rt.run(rt.session().capabilities())
+    assert capabilities.endpoints == {"EntitySet Cubes"}
 
 
 def test_doesnt_keep_a_failed_read(rt: Runtime) -> None:

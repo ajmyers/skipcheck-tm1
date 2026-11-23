@@ -204,10 +204,24 @@ class Tm1Capabilities:
     @staticmethod
     def parse(metadata: bytes, product_version: Tm1Version | None = None) -> Tm1Capabilities:
         """Reads a ``$metadata`` document; its endpoints are made the way the spec's inventory
-        is (``Endpoints`` in the Java client)."""
+        is (``Endpoints`` in the Java client). Whatever stops it being read is a
+        :class:`~skipcheck_tm1.errors.Tm1ProtocolError`, never the parser's own error, so a caller
+        of a session has one error to catch for a server that answers ``$metadata`` with
+        something else. An operation marked bound that has no binding parameter isn't an error
+        here, as it is in the Java client, whose model refuses it: it's left out."""
+        try:
+            return Tm1Capabilities._parse(metadata, product_version)
+        except Tm1ProtocolError:
+            raise
+        except Exception as e:  # noqa: BLE001 (whatever it is, it's a document this client can't read)
+            raise Tm1ProtocolError(f"TM1 sent $metadata that isn't valid CSDL: {e}") from e
+
+    @staticmethod
+    def _parse(metadata: bytes, product_version: Tm1Version | None) -> Tm1Capabilities:
         try:
             root = ET.fromstring(metadata)
-        except ET.ParseError as e:
+        except (ET.ParseError, LookupError, ValueError) as e:
+            # Not only ParseError: the parser raises LookupError or ValueError for an encoding it doesn't know or can't read
             raise Tm1ProtocolError(f"TM1's $metadata isn't XML: {e}") from e
         endpoints: set[str] = set()
         types: dict[str, _Type] = {}
