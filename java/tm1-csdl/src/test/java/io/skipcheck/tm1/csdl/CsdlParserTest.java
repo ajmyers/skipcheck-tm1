@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.junit.jupiter.api.Test;
 
@@ -211,6 +214,71 @@ class CsdlParserTest {
 				""";
 		assertThatThrownBy(() -> CsdlParser.parse(xxe)).isInstanceOf(CsdlParseException.class)
 			.hasMessageContaining("DOCTYPE");
+	}
+
+	@Test
+	void usesTheJdksParserWhateverTheApplicationHasInstalled() {
+		String key = "javax.xml.parsers.DocumentBuilderFactory";
+		String before = System.getProperty(key);
+		System.setProperty(key, LikeXerces.class.getName());
+		try {
+			assertThat(CsdlParser.parse(DOC).schemas()).hasSize(1);
+		}
+		finally {
+			if (before == null) {
+				System.clearProperty(key);
+			}
+			else {
+				System.setProperty(key, before);
+			}
+		}
+	}
+
+	@Test
+	void reportsAnOperationItCantModelAsAParseError() {
+		String boundToNothing = """
+				<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+				  <edmx:DataServices>
+				    <Schema Namespace="ibm.tm1.api.v1" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+				      <Action Name="Reserve" IsBound="true"/>
+				    </Schema>
+				  </edmx:DataServices>
+				</edmx:Edmx>
+				""";
+		assertThatThrownBy(() -> CsdlParser.parse(boundToNothing)).isInstanceOf(CsdlParseException.class)
+			.hasMessageContaining("Reserve");
+	}
+
+	/**
+	 * A JAXP factory an application might have on its classpath, which refuses the JDK's
+	 * own properties as Xerces does.
+	 */
+	public static final class LikeXerces extends DocumentBuilderFactory {
+
+		@Override
+		public DocumentBuilder newDocumentBuilder() throws ParserConfigurationException {
+			throw new ParserConfigurationException("Not a real parser");
+		}
+
+		@Override
+		public void setAttribute(String name, Object value) {
+			throw new IllegalArgumentException("Property '" + name + "' is not recognized.");
+		}
+
+		@Override
+		public Object getAttribute(String name) {
+			throw new IllegalArgumentException("Property '" + name + "' is not recognized.");
+		}
+
+		@Override
+		public void setFeature(String name, boolean value) {
+		}
+
+		@Override
+		public boolean getFeature(String name) {
+			return false;
+		}
+
 	}
 
 	@Test

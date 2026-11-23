@@ -77,13 +77,20 @@ public final class CsdlParser {
 			throw new CsdlParseException(
 					"Not a CSDL document: the root element is " + root.getTagName() + ", not edmx:Edmx");
 		}
-		List<CsdlSchema> schemas = new ArrayList<>();
-		for (Element dataServices : children(root, "DataServices")) {
-			for (Element schema : children(dataServices, "Schema")) {
-				schemas.add(schema(schema));
+		try {
+			List<CsdlSchema> schemas = new ArrayList<>();
+			for (Element dataServices : children(root, "DataServices")) {
+				for (Element schema : children(dataServices, "Schema")) {
+					schemas.add(schema(schema));
+				}
 			}
+			return new CsdlDocument(attr(root, "Version", "4.0"), schemas);
 		}
-		return new CsdlDocument(attr(root, "Version", "4.0"), schemas);
+		catch (IllegalArgumentException e) {
+			// What the model's own types refuse, such as a bound operation with no
+			// binding parameter
+			throw new CsdlParseException("Not a valid CSDL document: " + e.getMessage(), e);
+		}
 	}
 
 	private static CsdlSchema schema(Element e) {
@@ -307,7 +314,10 @@ public final class CsdlParser {
 
 	private static DocumentBuilder newBuilder() {
 		try {
-			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+			// The JDK's own parser, whatever the application has on its classpath:
+			// another
+			// (Xerces, say) doesn't know the properties below, and refuses them
+			DocumentBuilderFactory factory = DocumentBuilderFactory.newDefaultInstance();
 			factory.setNamespaceAware(true);
 			factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
 			// Refusing DOCTYPEs rules out external entities and entity expansion entirely
