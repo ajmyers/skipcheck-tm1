@@ -1210,6 +1210,73 @@ def test_releases_the_response_when_a_stream_fails(rt: Runtime, status: int, con
     assert len(opened) == 1 and all(body.closed for body in opened)
 
 
+# ODataCollectionDecoderTest, for what a page holds: this client reads each page whole, however its
+# bytes arrive, and then gives its items
+
+BODY = (
+    b'{"@odata.context":"$metadata#Elements","@odata.count":3,"value":[\n'
+    b'{"@odata.etag":"W/\\"1\\"","Name":"Q1","Type":"Numeric"},\n'
+    b'{"Name":"Q\'2 {x}","Type":"Numeric","Extra":{"nested":[1,[2,{"a":null}]]}},\n'
+    b'{"Name":"Total","Type":"Consolidated"}],"@odata.nextLink":"Elements?$skiptoken=3"}'
+)
+EXPECTED = [("Q1", "Numeric"), ("Q'2 {x}", "Numeric"), ("Total", "Consolidated")]
+
+
+class Chunks(httpx.SyncByteStream, httpx.AsyncByteStream):
+    """A response body that arrives in the given pieces, as from the network."""
+
+    def __init__(self, chunks: list[bytes]) -> None:
+        self.chunks = chunks
+
+    def __iter__(self) -> Any:
+        yield from self.chunks
+
+    async def __aiter__(self) -> Any:
+        for chunk in self.chunks:
+            yield chunk
+
+
+def in_pieces(*chunks: bytes, status: int = 200) -> httpx.Response:
+    return httpx.Response(status, stream=Chunks(list(chunks)), headers={"Content-Type": "application/json"})
+
+
+def read(rt: Runtime, session: Any, response: httpx.Response, request: Any = ELEMENTS) -> list[Any]:
+    """Every item of a collection TM1 answers with ``response`` (and an empty page after it, if it links one)."""
+    rt.fake.respond = lambda r: response if target(r) == "GET Elements" else {"value": []}
+    return rt.run(session.collect(request))
+
+
+def names_and_types(items: list[Any]) -> list[tuple[str, str]]:
+    return [(item["Name"], item["Type"]) for item in items]
+
+
+def test_fails_on_an_error_instead_of_a_collection(rt: Runtime) -> None:
+    rt.fake.respond = lambda r: in_pieces(b'{"error":{"code":"278","message":"Boom"}}')
+    error = rt.raises(Tm1ProtocolError, lambda: rt.session().collect(ELEMENTS))
+    assert "Boom" in str(error)
+    assert error.error is not None and error.error.code == "278"
+
+
+def test_fails_when_the_response_is_cut_short_after_some_items(rt: Runtime) -> None:
+    # Java gives the two items it read before failing; this client reads a page whole first, so gives none
+    rt.fake.respond = lambda r: in_pieces(BODY[: BODY.index(b"Total")])
+    error = rt.raises(Tm1ProtocolError, lambda: rt.session().collect(ELEMENTS))
+    assert "ended before the collection was complete" in str(error)
+
+
+def test_fails_on_malformed_or_unexpected_bodies(rt: Runtime) -> None:
+    session = rt.session()
+
+    def failure(content: bytes) -> Tm1ProtocolError:
+        rt.fake.respond = lambda r: in_pieces(content)
+        return rt.raises(Tm1ProtocolError, lambda: session.collect(ELEMENTS))
+
+    assert "malformed JSON" in str(failure(b'{"value":[{"Name":}]}'))
+    failure(b"[1,2]")
+    assert "empty" in str(failure(b""))
+    assert "after the collection" in str(failure(b'{"value":[]} {}'))
+
+
 # Tm1Dialect, through a session
 
 

@@ -20,9 +20,8 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import TypeAdapter
 
-from ._protocol import Call, Reply
+from ._protocol import Call, Reply, collection
 from .base import Tm1Model, to_odata
-from .errors import Tm1ProtocolError
 from .odata import Bind, ODataPath, ODataQuery
 from .version import Tm1Capability
 
@@ -198,14 +197,12 @@ class Tm1Request(Generic[T]):
             return reply.content
         if self.response is r.TEXT:
             return reply.text.lstrip("﻿")
-        doc = reply.json()
         if self.response is r.COLLECTION:
             from ._calls import Page
 
-            if not isinstance(doc, dict) or "value" not in doc:
-                raise Tm1ProtocolError(f"{self.method} {self.path}: expected a collection, got {str(doc)[:200]}")
-            return Page([_read(self.type, item) for item in doc["value"]], doc.get("@odata.nextLink"))
-        return _read(self.type, doc)
+            items, next_link = collection(reply, self.method, str(self.path))
+            return Page([_read(self.type, item) for item in items], next_link)
+        return _read(self.type, reply.json())
 
     def to_call(self) -> Call:
         """The request as the sessions send it."""
