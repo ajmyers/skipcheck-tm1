@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+
 # paw-local.sh: run IBM Planning Analytics Workspace (PAW) Local next to tm1-server.
 #
 # IBM ships PAW Local as Docker images plus compose files and scripts, in

@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+
 # cognos-ldap: the LDAP directory that runs inside the container when test users are
 # given (COGNOS_USERS / COGNOS_USERS_FILE). Cognos logs users on against it through
 # its LDAP namespace.

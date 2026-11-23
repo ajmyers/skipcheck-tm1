@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Maven Central publishing via the Central Portal (https://central.sonatype.com).
 // Modules set pom name/description; everything shared lives here.
 //

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // A library published to Maven Central
 plugins {
 	id("tm1.java-conventions")

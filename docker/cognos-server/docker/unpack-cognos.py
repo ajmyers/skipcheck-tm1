@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Install selected installables from an IBM Cognos Analytics repository zip.
 
 Usage: unpack-cognos.py <casrv-*.zip> <install-dir> <installable> [...]

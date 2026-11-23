@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import io.spring.javaformat.formatter.FileFormatter
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException

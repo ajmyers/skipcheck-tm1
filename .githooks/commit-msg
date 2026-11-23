@@ -1,3 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 # Enable once per clone: git config core.hooksPath .githooks
 exec python3 "$(dirname "$0")/check_message.py" commit "$1"

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Install IBM's Planning Analytics interoperability files into Cognos.
 
 Usage: bi-interop.py <folder with IBM downloads> <Cognos install> <URL> [URL ...]

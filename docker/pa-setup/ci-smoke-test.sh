@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+
 # CI smoke test for the pa-setup image (run by .github/workflows/docker.yml). It needs
 # no IBM software and starts nothing: it generates compose projects from example
 # files, checks them with docker compose config, checks the wiring, and checks that

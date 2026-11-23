@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+
 """Check a commit message or PR title/description against our conventions.
 
 Usage:

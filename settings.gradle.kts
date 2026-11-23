@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 pluginManagement {
 	// Convention plugins shared by every subproject (see build-logic/)
 	includeBuild("build-logic")

@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* The guide's own layout. Colours and fonts are the site's tokens, imported at view time from the
    same origin as the Javadoc theme does (theme/javadoc-theme.css), so the guide follows the site. */
 @import url("/tokens.css");

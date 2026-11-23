@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+
 # tm1-web entrypoint. The container is a thin runtime shell around your own TM1 Web.
 #
 # Where TM1 Web comes from (first match wins):

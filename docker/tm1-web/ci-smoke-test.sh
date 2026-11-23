@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+
 # CI smoke test for the tm1-web image (run by .github/workflows/docker.yml).
 # CI has no IBM binaries, so this can't start TM1 Web. It checks that the image
 # contains no IBM software, has the runtime libraries TM1 Web needs, and fails
