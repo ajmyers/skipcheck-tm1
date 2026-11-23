@@ -23,7 +23,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { inline, parse, slug } from './markdown.mjs';
 import { docsVersion, installHtml, packageOf } from './packages.mjs';
-import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, escape, head, languagesOf, PROJECTS, regions, repoDir, siteDir, tabGroup } from './site.mjs';
+import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, DOC_LANGUAGES, escape, head, languagesOf, PROJECTS, regions, repoDir, siteDir, tabGroup } from './site.mjs';
 
 const version = await docsVersion();
 const github = 'https://github.com/' + /^githubRepo=(.+)$/m.exec(await readFile(path.join(repoDir, 'gradle.properties'), 'utf8'))[1].trim();
@@ -66,17 +66,23 @@ async function directive(project, { name, args }) {
 	throw new Error(project.id + ': no such directive ::' + name);
 }
 
+/** Inline Markdown, with links into the docs pointed at a language: Java's, until tabs.js follows
+ * the visitor's choice (data-docs lists the languages the docs have). */
+function inlineDocs(project, text) {
+	return inline(text).replace(/href="docs\/([A-Z][\w.]*\.html(?:#[\w-]+)?)"/g, (match, file) => 'href="docs/java/' + file + '" data-docs="' + DOC_LANGUAGES.filter((l) => project.languages.includes(l)).join(' ') + '"');
+}
+
 async function blocks(project, list, { inItem = false } = {}) {
 	let html = '';
 	for (const block of list) {
-		if (block.type === 'p') html += '<p' + (inItem ? '' : ' class="more"') + '>' + inline(block.text) + '</p>';
+		if (block.type === 'p') html += '<p' + (inItem ? '' : ' class="more"') + '>' + inlineDocs(project, block.text) + '</p>';
 		else if (block.type === 'directive') html += await directive(project, block);
 		else {
 			let items = '';
 			for (const item of block.items) {
 				// A bullet that is one paragraph is just its text, as the site writes its lists
 				const single = item.length === 1 && item[0].type === 'p';
-				items += '<li>' + (single ? inline(item[0].text) : await blocks(project, item, { inItem: true })) + '</li>';
+				items += '<li>' + (single ? inlineDocs(project, item[0].text) : await blocks(project, item, { inItem: true })) + '</li>';
 			}
 			html += block.type === 'ol' ? '<ol class="numbered">' + items + '</ol>' : '<ul class="points">' + items + '</ul>';
 		}
@@ -99,8 +105,7 @@ function links(project) {
 	const several = project.languages.length > 1;
 	return [
 		{ href: '/' + project.id + '/', label: 'Overview' },
-		...(project.guide ? [{ href: '/' + project.id + '/docs/', label: several ? 'Docs, in every language' : 'Docs' }] : []),
-		{ href: '/' + project.id + '/api/java/', label: several ? 'API reference (Java)' : 'API reference' },
+		{ href: '/' + project.id + '/docs/', label: several ? 'Docs, in every language' : 'Docs' },
 	];
 }
 
@@ -121,12 +126,13 @@ for (const { project, content } of landings) {
 			.map((link, index) => '<a class="button' + (index === 0 ? ' primary' : '') + '" href="' + link.href + '">' + link.label + '</a>'),
 		'<a class="button" href="' + github + '">Source on GitHub</a>',
 	].join('');
+	// Where the release stands, under the buttons: the version a release build was made for (its tag),
+	// or that there is no stable release yet. Every release rebuilds these pages, so it's current.
 	const callout = version.release
-		? ''
-		: '<div class="callout" role="note"><p><strong>Pre-release.</strong> There is no stable release yet, and the API can still change. ' +
-			'These pages describe the latest code, version ' +
+		? '<p class="release-note"><span class="badge version">v' +
 			escape(version.version) +
-			'.</p></div>';
+			'</span><span>The latest release. The install steps below use it, in every language.</span></p>'
+		: '<p class="release-note" role="note"><span class="badge">Pre-release</span><span>No stable release yet, and the API can still change. The install steps below get the latest development build.</span></p>';
 
 	let body =
 		'<section class="hero wrap" aria-labelledby="title"><p class="kicker">' +
@@ -151,7 +157,7 @@ for (const { project, content } of landings) {
 	}
 	const related = landings.filter((other) => other.project !== project).map((other) => card(other.project, other.content.meta.card));
 	body +=
-		'<section id="related" class="section wrap" aria-labelledby="related-heading"><h2 id="related-heading" class="section-label">Related</h2><ul class="cards compact">' +
+		'<section id="related" class="section wrap" aria-labelledby="related-heading"><h2 id="related-heading" class="section-label">Related</h2><ul class="cards">' +
 		related.join('') +
 		'</ul></section>';
 
@@ -164,12 +170,18 @@ for (const { project, content } of landings) {
 			title: project.title + ' · Skipcheck',
 			description: meta.description,
 			canonical: CANONICAL_ORIGIN + '/' + project.id + '/',
-			styles: ['/styles.css', 'assets/tabs.css'],
+			styles: ['/styles.css', 'assets/tabs.css', 'assets/landing.css'],
 			scripts: ['/highlight.js', ...(several ? ['assets/tabs.js'] : [])],
 		}) +
 		'<body><main id="main" class="project">' +
 		body +
 		'</main></body></html>\n';
 	await writeFile(path.join(out, 'index.html'), page);
+}
+// Each project's release, for pages built elsewhere that show it (the site's home page reads
+// /<project>/release.json): the version these pages describe, and whether it is a release
+for (const project of PROJECTS) {
+	await mkdir(path.join(distDir, project.id), { recursive: true });
+	await writeFile(path.join(distDir, project.id, 'release.json'), JSON.stringify(version) + '\n');
 }
 console.log('Landing pages: ' + landings.map(({ project }) => project.id).join(', ') + ' (version ' + version.version + (version.release ? '' : ', pre-release') + ')');

@@ -27,10 +27,7 @@ import io.skipcheck.tm1.client.version.Tm1Capability;
  * (the service's ordinary methods do that) or added to a {@code $batch}, so anything the
  * client can do one request at a time, it can also batch. Requests are immutable.
  *
- * <pre>{@code
- * Tm1Request<JsonNode> cube = Tm1Request.get(ODataPath.of("Cubes").key("Sales"), ODataQuery.none().select("Name"), JsonNode.class);
- * Tm1Request<Void> reserve = Tm1Request.post(ODataPath.of("Cubes").key("Sales").action("tm1.Reserve"), Map.of(), Void.class);
- * }</pre>
+ * {@snippet class = examples.Tm1RequestExamples region = build}
  *
  * @param <T> the type the response is read as: an entity or value for a single response,
  * the item type for a {@linkplain Response#COLLECTION collection}, {@code String} for

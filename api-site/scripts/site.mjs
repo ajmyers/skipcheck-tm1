@@ -54,15 +54,38 @@ export const LANGUAGES = [
 ];
 const ALL = LANGUAGES.map((language) => language.id);
 
-// languages: the ones the project exists in. guide: it has docs pages (guide.mjs). landing: it has
-// a landing page (content/<id>.md); one without is reached through another project's page, and
-// /<id>/ goes to its API reference. test: it's a test dependency, which changes how it's installed.
+// The languages the docs pages are written in so far: those with an API extractor (extract.mjs).
+// The others show in the pages' language switch, not yet linked.
+export const DOC_LANGUAGES = ['java', 'python', 'dotnet', 'typescript'];
+
+// languages: the ones the project exists in. python: its package's source folder, for the API
+// extractor. landing: it has a landing page (content/<id>.md); one without is reached through
+// another project's page, and /<id>/ opens its docs. test: it's a test dependency, which changes
+// how it's installed. start: the types its docs home suggests first, in order.
 export const PROJECTS = [
-	{ id: 'tm1-client', title: 'TM1 client', languages: ALL, dotnet: 'Tm1.Client', guide: true, landing: true, test: false },
-	{ id: 'tm1-testcontainers', title: 'TM1 Testcontainers', languages: ALL, dotnet: 'Tm1.Testcontainers', guide: true, landing: true, test: true },
-	{ id: 'tm1-spring-boot-starter', title: 'TM1 Spring Boot starter', languages: ['java'], guide: false, landing: true, test: false },
-	{ id: 'tm1-spring-boot-testcontainers', title: 'TM1 Spring Boot Testcontainers', languages: ['java'], guide: false, landing: false, test: true },
-	{ id: 'tm1-csdl', title: 'TM1 CSDL', languages: ['java'], guide: false, landing: false, test: false },
+	{
+		id: 'tm1-client',
+		title: 'TM1 client',
+		languages: ALL,
+		dotnet: 'Tm1.Client',
+		python: 'python/tm1-client/src/skipcheck_tm1',
+		landing: true,
+		test: false,
+		start: ['Tm1Client', 'CubeService', 'CellsetService', 'ProcessService', 'ODataQuery'],
+	},
+	{
+		id: 'tm1-testcontainers',
+		title: 'TM1 Testcontainers',
+		languages: ALL,
+		dotnet: 'Tm1.Testcontainers',
+		python: 'python/tm1-testcontainers/src/skipcheck_tm1_testcontainers',
+		landing: true,
+		test: true,
+		start: ['RequiresTm1', 'Tm1Source', 'Tm1ServerContainer', 'PlanningAnalyticsEnvironment'],
+	},
+	{ id: 'tm1-spring-boot-starter', title: 'TM1 Spring Boot starter', languages: ['java'], landing: true, test: false, start: ['Tm1Properties', 'Tm1AutoConfiguration', 'Tm1ConnectionDetails'] },
+	{ id: 'tm1-spring-boot-testcontainers', title: 'TM1 Spring Boot Testcontainers', languages: ['java'], landing: false, test: true },
+	{ id: 'tm1-csdl', title: 'TM1 CSDL', languages: ['java'], landing: false, test: false },
 ];
 
 export const languagesOf = (project) => LANGUAGES.filter((language) => project.languages.includes(language.id));

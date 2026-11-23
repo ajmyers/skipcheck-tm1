@@ -33,13 +33,7 @@ import com.github.dockerjava.api.model.Volume;
  * {@link RequiresTm1Web}, which starts one {@linkplain #shared() shared} TM1 Web against
  * the shared TM1 server.
  *
- * <pre>{@code
- * try (var tm1 = new Tm1ServerContainer(tm1Source).withSeed(Tm1Seed.SDATA);
- *      var web = new Tm1WebContainer(webSource).withTm1Server(tm1)) {
- *     web.start();                // starts tm1 first
- *     String url = web.getUrl();  // http://localhost:54321/tm1web/
- * }
- * }</pre>
+ * {@snippet class = examples.Tm1WebContainerExamples region = start}
  *
  * <p>
  * The image contains no IBM software, so every container needs a {@link Tm1WebSource}.

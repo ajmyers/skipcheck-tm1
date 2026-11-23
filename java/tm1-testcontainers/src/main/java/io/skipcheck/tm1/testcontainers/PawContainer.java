@@ -43,13 +43,7 @@ import com.github.dockerjava.api.model.Volume;
  * IBM Planning Analytics Workspace (PAW) Local in Docker, for tests, started from the
  * user's own PAW Local zip against a {@link Tm1ServerContainer}.
  *
- * <pre>{@code
- * try (var tm1 = new Tm1ServerContainer(tm1Source);
- *      var paw = new PawContainer(pawSource).withTm1Server(tm1).acceptLicense()) {
- *     paw.start();                // starts tm1 first
- *     String url = paw.getUrl();  // http://localhost:54321/
- * }
- * }</pre>
+ * {@snippet class = examples.PawContainerExamples region = start}
  *
  * <p>
  * IBM ships PAW Local as about 30 Docker images, with compose files and a {@code paw.sh}

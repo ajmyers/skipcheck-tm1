@@ -12,9 +12,7 @@ import org.jspecify.annotations.Nullable;
  * when the work is done, so one timeout for everything is either too short for processes
  * or too long for a login.
  *
- * <pre>{@code
- * Tm1Timeouts timeouts = Tm1Timeouts.builder().request(Duration.ofHours(2)).build();
- * }</pre>
+ * {@snippet class = examples.Tm1TimeoutsExamples region = long-requests}
  *
  * <p>
  * A builder leaves unset values at the defaults below.

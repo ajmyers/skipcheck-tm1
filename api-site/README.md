@@ -5,8 +5,10 @@ Builds and serves each project's pages on skipcheck.io (and on skipcheck.dev, wh
 | Address | What | Built by |
 |---|---|---|
 | `/<project>/` | The landing page: what it is, a quick start in every language it has, what's in it. | `scripts/pages.mjs`, from `content/<project>.md` |
-| `/<project>/docs/` | A page for each documented type, with every example in Java, Python, .NET and TypeScript. | `scripts/guide.mjs`, from the Java types' Javadoc |
-| `/<project>/api/java/` | The API reference: the library's Javadoc, themed. | `./gradlew apiSiteJavadoc`, collected by `scripts/assemble.mjs` |
+| `/<project>/docs/<language>/` | The reference: a page per type in each language, where the signatures, the descriptions and the examples are all that language's, with a switch to the same page in another. `/<project>/docs/` opens the language last chosen. | `scripts/reference.mjs`, from each language's API (below) |
+| `/<project>/docs/model/` | TM1's own types (Cube, Dimension...), the same in every language. | `scripts/reference.mjs`, from `spec/tm1-api.json` |
+| `/<project>/release.json` | The version the pages describe, and whether it's a release: the site's home page reads it for each project's badge. | `scripts/pages.mjs` |
+| `/<project>/api/java/` | The Javadoc, themed, linked from each Java page. | `./gradlew apiSiteJavadoc`, collected by `scripts/assemble.mjs` |
 
 The projects are listed in `scripts/site.mjs`. The home page, the setup page and everything else on
 skipcheck.io are in ajmyers/skipcheck.io; these pages take their look from it at view time.
@@ -19,7 +21,9 @@ Javadoc; everything else is read from the repository when the pages are built:
 | An example | A region of an examples file, with the same name in each language: `java/<project>/src/examples`, `python/<project>/examples`, `dotnet/examples/<Project>.Examples`, `typescript/<project>/examples`. Each language compiles or type-checks its examples with its own tests, and has a gate that its files and regions match Java's. |
 | How to install | Each language's own build files: the package's name, the version of the language it needs (`scripts/packages.mjs`). |
 | The version | `DOCS_VERSION`, which the workflow sets from a release tag, or else `gradle.properties`. Before a release the install steps ask for the latest pre-release, and the page says it is one. |
-| The text of a docs page | The Java type's Javadoc, where it quotes its examples with `{@snippet}`. There is one text, so names in it are Java's. |
+| A type's members, signatures and doc comments | Each language's sources, read by an extractor into one JSON shape (`scripts/extract.mjs`): Java by the doclet in `java/tools/docs-doclet` (`./gradlew docsModel`), Python by `extract/python_api.py` (with `ast`), .NET and TypeScript by `extract/dotnet_api.mjs` and `extract/typescript_api.mjs` (reading the formatted sources). No build or install of the clients is needed. |
+| Which member is which across languages | The rule each language's parity tests enforce: `modelCubes` is `model_cubes` in Python and `ModelCubesAsync` in .NET; a getter is a property. The build lists the Java members it couldn't find in each language. |
+| A type's overview | The Java type's Javadoc, with its examples in the page's language. There is one text, so its prose is Java's; links in it name members the page's way. |
 | The text of a landing page | `content/<project>.md`: Markdown with no code in it. `::install`, `::example <Class> <region>` and `::file <path> <language>` are replaced with the above (`scripts/pages.mjs`, `scripts/markdown.mjs`). |
 
 The build fails when a page names an example that isn't there, when a language lacks an example
@@ -34,10 +38,11 @@ passes.
 | `apiSiteJavadoc` (Gradle, every library) | The library's Javadoc with `theme/javadoc-theme.css` added, into `<module>/build/docs/api-site`. A separate task, so the javadoc jar on Maven Central stays plain. Defined in `build-logic/.../tm1.java-library.gradle.kts`. |
 | `theme/javadoc-theme.css` | Maps Javadoc's CSS variables onto the site's design tokens, which it imports from `/tokens.css` and `/chrome.css` on skipcheck.io at view time. |
 | `scripts/assemble.mjs` | Copies each library's Javadoc into `dist/<project>/api/java/`, and hashes the inline scripts, event handlers and style attributes Javadoc writes, for the CSP. Empties `dist/` first, so it runs first. |
-| `scripts/guide.mjs` | The docs pages, and `.generated/site.json` for the Worker: the projects, and which one documents each type. |
+| `scripts/extract.mjs` | Each project's API per language, into `.generated/api/`. |
+| `scripts/reference.mjs` | The reference pages and `.generated/site.json` for the Worker: the projects, and which one documents each type. |
 | `scripts/pages.mjs` | The landing pages. |
 | `scripts/check-links.mjs` | Checks every link on the landing and docs pages. |
-| `assets/` | The generated pages' own styles and script, copied to `/<project>/assets/`: `docs.css` (the docs pages' layout), `tabs.css` and `tabs.js` (the language tabs: choosing a language on one example chooses it everywhere, and the choice is remembered). |
+| `assets/` | The generated pages' own styles and script, copied to `/<project>/assets/`: `docs.css` (the reference's layout), `docs.js` (the reference's language memory), `tabs.css` and `tabs.js` (the landing pages' language tabs). A language chosen anywhere is remembered and followed everywhere. |
 | `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, serves the site's 404 page for missing paths, and sends the addresses these pages had under `/projects/` to the new ones. |
 | `wrangler.jsonc` | The Worker's config: a route per project and zone, and one per zone for the old addresses. |
 | `test/` | `npm test` here, or `./gradlew checkApiSite`: the Worker, the Markdown, the install steps against the real build files, and that every project has its routes. |
@@ -55,7 +60,7 @@ The generated pages have no inline script or style, so they need no entry in the
 ## Preview locally
 
 ```sh
-./gradlew apiSiteJavadoc
+./gradlew apiSiteJavadoc docsModel
 cd api-site
 npm ci
 npm run assemble   # the Javadoc, the docs pages, the landing pages, then the link check

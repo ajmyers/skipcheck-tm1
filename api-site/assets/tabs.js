@@ -5,7 +5,15 @@
 // showing the first language it does have.
 const KEY = 'tm1-guide-language';
 
+// Links into the docs (data-docs="java python") follow the chosen language where the docs have it
+function follow(language) {
+	for (const link of document.querySelectorAll('a[data-docs]')) {
+		if (link.dataset.docs.split(' ').includes(language)) link.href = link.href.replace(/\/docs\/[a-z]+\//, '/docs/' + language + '/');
+	}
+}
+
 function show(language) {
+	follow(language);
 	for (const group of document.querySelectorAll('.tabs')) {
 		const tabs = [...group.querySelectorAll('[role="tab"]')];
 		const chosen = tabs.find((tab) => tab.dataset.lang === language) ?? tabs[0];

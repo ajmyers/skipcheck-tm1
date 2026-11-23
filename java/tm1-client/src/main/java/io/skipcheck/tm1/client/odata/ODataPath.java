@@ -13,12 +13,7 @@ import java.util.regex.Pattern;
  * A resource path relative to the service root, built from segments and encoded as it's
  * built:
  *
- * <pre>{@code
- * ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements").key("O'Neil")
- *     // Dimensions('Region')/Hierarchies('Region')/Elements('O''Neil')
- * ODataPath.of("Cubes").key("Sales").action("tm1.Reserve")
- *     // Cubes('Sales')/tm1.Reserve
- * }</pre>
+ * {@snippet class = examples.ODataPathExamples region = build}
  *
  * <p>
  * Names (entity sets, navigation properties, operations, type casts) must be OData

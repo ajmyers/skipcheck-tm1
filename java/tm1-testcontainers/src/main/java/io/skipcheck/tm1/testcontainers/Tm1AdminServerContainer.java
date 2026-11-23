@@ -22,15 +22,7 @@ import com.github.dockerjava.api.model.HostConfig;
  * {@link Tm1ServerContainer#withAdminServer}, and {@link Tm1WebContainer} and
  * {@link PawContainer} list them all from it.
  *
- * <pre>{@code
- * try (var admin = new Tm1AdminServerContainer(tm1Source);
- *      var planning = new Tm1ServerContainer(tm1Source).withEnv("TM1_SERVER_NAME", "planning").withAdminServer(admin);
- *      var reporting = new Tm1ServerContainer(tm1Source).withEnv("TM1_SERVER_NAME", "reporting").withAdminServer(admin)) {
- *     planning.start();
- *     reporting.start();
- *     String servers = admin.getRestUrl() + "Servers";   // lists planning and reporting
- * }
- * }</pre>
+ * {@snippet class = examples.Tm1AdminServerContainerExamples region = several-servers}
  *
  * <p>
  * The Admin Server is part of the TM1 install, so it takes the same {@link Tm1Source}.
