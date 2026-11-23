@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Serves the Java API docs and the guide (built by scripts/assemble.mjs and scripts/guide.mjs into
-// dist/) at skipcheck.io/projects/<module>/api/ and /projects/tm1/guide/, dressed as part of the
-// site: every HTML page gets the site's masthead and footer, fetched from skipcheck.io/partials/
-// and cached, so a change to the site's nav reaches the docs without a rebuild. skipcheck.dev
-// serves the same pages, each naming its skipcheck.io address as canonical. The theme stylesheet imports the site's tokens and chrome
+// Serves each project's pages (built into dist/ by scripts/assemble.mjs, guide.mjs and pages.mjs)
+// at skipcheck.io/<project>/: its landing page, its docs at /<project>/docs/ and its API reference
+// at /<project>/api/java/. They are dressed as part of the site: every HTML page gets the site's
+// masthead and footer, fetched from skipcheck.io/partials/ and cached, so a change to the site's
+// nav reaches these pages without a rebuild. skipcheck.dev serves the same pages, each naming its
+// skipcheck.io address as canonical.
+//
+// The addresses these pages had before, under /projects/, are sent to the new ones. The theme stylesheet imports the site's tokens and chrome
 // styles the same way (api-site/theme/javadoc-theme.css).
 
 import csp from '../.generated/csp.json';
+// The projects, and which one documents each type (scripts/guide.mjs)
+import site from '../.generated/site.json';
 
 // The site's CSP, plus the hashes of the inline code Javadoc writes (scripts/assemble.mjs).
 // 'unsafe-hashes' lets those hashes match event handler and style attributes; it allows nothing
@@ -35,10 +40,17 @@ export default {
 	async fetch(request, env) {
 		const url = new URL(request.url);
 
-		// In production only /projects/<module>/api* and the guide are routed here. Under `wrangler dev` everything
-		// is, so pass the rest (the site's /tokens.css, /chrome.css, links home) through to the site.
-		if (!url.pathname.startsWith('/projects/')) {
-			return fetch(new URL(url.pathname + url.search, env.SITE_ORIGIN), request);
+		const moved = formerAddress(url.pathname);
+		if (moved) return Response.redirect(url.origin + moved + url.search, 301);
+
+		// In production only the projects' paths are routed here. Under `wrangler dev` everything is,
+		// so pass the rest (the site's styles, its other pages, links home) through to the site.
+		const project = site.projects.find((p) => url.pathname === '/' + p.id || url.pathname.startsWith('/' + p.id + '/'));
+		if (!project) return fetch(new URL(url.pathname + url.search, env.SITE_ORIGIN), request);
+
+		// A project without a landing page is its API reference
+		if (!project.landing && (url.pathname === '/' + project.id || url.pathname === '/' + project.id + '/')) {
+			return Response.redirect(url.origin + '/' + project.id + '/api/java/' + url.search, 302);
 		}
 
 		// A page is the Javadoc file plus the site's partials, so the file's ETag doesn't identify it:
@@ -94,6 +106,29 @@ async function partial(env, name) {
 	} catch {
 		return null;
 	}
+}
+
+// Where a page that used to be under /projects/ is now, or null for any other path:
+//
+//   /projects/<project>/api/...         /<project>/api/java/...
+//   /projects/tm1/guide/<Type>.html     /<the project that documents Type>/docs/<Type>.html
+//   /projects/tm1/guide/                /tm1-client/docs/
+//   /projects/<project>/                /<project>/
+//
+// The site's own pages under /projects/ (pa-docker) are not projects here, and are left alone.
+function formerAddress(pathname) {
+	const match = /^\/projects\/([^/]+)(\/.*)?$/.exec(pathname);
+	if (!match) return null;
+	const [, name, rest = ''] = match;
+	if (name === 'tm1') {
+		const guide = /^\/guide(?:\/(.*))?$/.exec(rest);
+		if (!guide) return null;
+		const owner = site.guide[(guide[1] ?? '').replace(/\.html$/, '')];
+		return owner ? '/' + owner + '/docs/' + guide[1] : '/tm1-client/docs/';
+	}
+	if (!site.projects.some((project) => project.id === name)) return null;
+	const api = /^\/api(?:\/(.*))?$/.exec(rest);
+	return api ? '/' + name + '/api/java/' + (api[1] ?? '') : '/' + name + '/';
 }
 
 function unconditional(request) {

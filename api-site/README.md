@@ -1,8 +1,31 @@
 # api-site
 
-Publishes the Javadoc of each library at `https://skipcheck.io/projects/<module>/api/`, styled to
-match the rest of skipcheck.io (and the same on skipcheck.dev, which mirrors it). Only the latest version lives here; every page links to javadoc.io
-for older ones.
+Builds and serves each project's pages on skipcheck.io (and on skipcheck.dev, which mirrors it):
+
+| Address | What | Built by |
+|---|---|---|
+| `/<project>/` | The landing page: what it is, a quick start in every language it has, what's in it. | `scripts/pages.mjs`, from `content/<project>.md` |
+| `/<project>/docs/` | A page for each documented type, with every example in Java, Python, .NET and TypeScript. | `scripts/guide.mjs`, from the Java types' Javadoc |
+| `/<project>/api/java/` | The API reference: the library's Javadoc, themed. | `./gradlew apiSiteJavadoc`, collected by `scripts/assemble.mjs` |
+
+The projects are listed in `scripts/site.mjs`. The home page, the setup page and everything else on
+skipcheck.io are in ajmyers/skipcheck.io; these pages take their look from it at view time.
+
+Nothing here is copied by hand from the code. Words are written once, in a content file or in
+Javadoc; everything else is read from the repository when the pages are built:
+
+| On a page | Where it comes from |
+|---|---|
+| An example | A region of an examples file, with the same name in each language: `java/<project>/src/examples`, `python/<project>/examples`, `dotnet/examples/<Project>.Examples`, `typescript/<project>/examples`. Each language compiles or type-checks its examples with its own tests, and has a gate that its files and regions match Java's. |
+| How to install | Each language's own build files: the package's name, the version of the language it needs (`scripts/packages.mjs`). |
+| The version | `DOCS_VERSION`, which the workflow sets from a release tag, or else `gradle.properties`. Before a release the install steps ask for the latest pre-release, and the page says it is one. |
+| The text of a docs page | The Java type's Javadoc, where it quotes its examples with `{@snippet}`. There is one text, so names in it are Java's. |
+| The text of a landing page | `content/<project>.md`: Markdown with no code in it. `::install`, `::example <Class> <region>` and `::file <path> <language>` are replaced with the above (`scripts/pages.mjs`, `scripts/markdown.mjs`). |
+
+The build fails when a page names an example that isn't there, when a language lacks an example
+the Java documentation quotes, or when a link on a generated page goes nowhere
+(`scripts/check-links.mjs`). So a new Java example needs its three counterparts before the build
+passes.
 
 ## How it fits together
 
@@ -10,35 +33,24 @@ for older ones.
 |---|---|
 | `apiSiteJavadoc` (Gradle, every library) | The library's Javadoc with `theme/javadoc-theme.css` added, into `<module>/build/docs/api-site`. A separate task, so the javadoc jar on Maven Central stays plain. Defined in `build-logic/.../tm1.java-library.gradle.kts`. |
 | `theme/javadoc-theme.css` | Maps Javadoc's CSS variables onto the site's design tokens, which it imports from `/tokens.css` and `/chrome.css` on skipcheck.io at view time. |
-| `scripts/assemble.mjs` | Copies each module's output into `dist/projects/<module>/api/`, and hashes the inline scripts, event handlers and style attributes Javadoc writes, for the CSP. |
-| `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, and serves the site's 404 page for missing paths. |
-| `wrangler.jsonc` | The Worker's config. Its routes (one per module and zone) are the list of published modules. |
-| `test/` | The Worker's tests, in Node: `npm test` here, or `./gradlew checkApiSite`. |
-| `.github/workflows/api-docs.yml` | Tests the Worker, builds the site and bundles the Worker on every change, as part of CI. Deploys when the release workflow calls it for a tag, or when run by hand. |
+| `scripts/assemble.mjs` | Copies each library's Javadoc into `dist/<project>/api/java/`, and hashes the inline scripts, event handlers and style attributes Javadoc writes, for the CSP. Empties `dist/` first, so it runs first. |
+| `scripts/guide.mjs` | The docs pages, and `.generated/site.json` for the Worker: the projects, and which one documents each type. |
+| `scripts/pages.mjs` | The landing pages. |
+| `scripts/check-links.mjs` | Checks every link on the landing and docs pages. |
+| `assets/` | The generated pages' own styles and script, copied to `/<project>/assets/`: `docs.css` (the docs pages' layout), `tabs.css` and `tabs.js` (the language tabs: choosing a language on one example chooses it everywhere, and the choice is remembered). |
+| `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, serves the site's 404 page for missing paths, and sends the addresses these pages had under `/projects/` to the new ones. |
+| `wrangler.jsonc` | The Worker's config: a route per project and zone, and one per zone for the old addresses. |
+| `test/` | `npm test` here, or `./gradlew checkApiSite`: the Worker, the Markdown, the install steps against the real build files, and that every project has its routes. |
+| `.github/workflows/api-docs.yml` | Tests the Worker and the page builders, builds the site and bundles the Worker on every change, as part of CI. Deploys when the release workflow calls it for a tag, or when run by hand. |
 
-Changes to the site's palette, fonts, masthead or footer reach the docs without a rebuild. The site
-side is in ajmyers/skipcheck.io: `public/tokens.css`, `public/chrome.css` and `public/partials/`.
+What the pages take from the site (ajmyers/skipcheck.io, `public/`) at view time: `tokens.css`,
+`chrome.css` and `code.css`; `highlight.js`, which colours the examples; the masthead and footer in
+`partials/`; and, for the landing pages, `styles.css`, whose classes they are written in (`hero`,
+`section`, `steps`, `numbered`, `points`, `code`, `cards`, `callout`). A change to the site's palette,
+fonts, masthead or footer reaches these pages without a rebuild; renaming one of those classes
+there changes the landing pages too.
 
-## The guide
-
-`scripts/guide.mjs` builds a second set of pages, at `/projects/tm1/guide/`: one for each type of the
-client and of tm1-testcontainers that has examples, with every example in Java, Python, .NET and
-TypeScript behind tabs. Choosing a language on one example chooses it everywhere, and the choice is
-remembered (`guide/guide.js`). The examples are coloured by the site's own highlighter: each page loads
-`/highlight.js` and `guide.css` imports `/code.css`, both from skipcheck.io at view time, as with the
-tokens and chrome.
-
-| Piece | Where it comes from |
-|---|---|
-| The text | The Java type's Javadoc, where it quotes its examples with `{@snippet}`. There is one text, so names in it are Java's. |
-| An example | A region of an examples file, with the same name in each language: `java/<module>/src/examples`, `python/<module>/examples`, `dotnet/examples/<Module>.Examples`, `typescript/<module>/examples`. |
-
-Each language compiles or type-checks its examples with its own tests, and each has a gate that its
-examples files and regions match Java's. `guide.mjs` fails if a language lacks an example the Java
-documentation quotes, so a new Java example needs its three counterparts before the docs build
-passes. Java's Spring Boot modules exist only in Java; their Javadoc is their documentation.
-
-The pages have no inline script or style, so they need no entry in the CSP hashes.
+The generated pages have no inline script or style, so they need no entry in the CSP hashes.
 
 ## Preview locally
 
@@ -46,18 +58,21 @@ The pages have no inline script or style, so they need no entry in the CSP hashe
 ./gradlew apiSiteJavadoc
 cd api-site
 npm ci
-npm run assemble   # the Javadoc, then the guide
-npm run dev        # http://localhost:8787/projects/tm1-client/api/ and /projects/tm1/guide/
+npm run assemble   # the Javadoc, the docs pages, the landing pages, then the link check
+npm run dev        # http://localhost:8787/tm1-client/
 ```
 
-The local Worker passes any path outside `/projects/` through to skipcheck.io, so the site's styles,
-masthead and footer come from the live site. Opening `build/docs/api-site` straight from disk shows
-Javadoc's own look, since `/tokens.css` isn't there.
+`npm run pages` rebuilds the docs and landing pages alone, after a change to a content file or an
+example. The local Worker passes any path that isn't a project's through to skipcheck.io, so the
+site's styles, masthead and footer come from the live site. To see a change to the site as well,
+run it locally (`npx wrangler dev` in ajmyers/skipcheck.io) and start this one with
+`npx wrangler dev --port 8799 --var SITE_ORIGIN:http://localhost:8787`.
 
-## Publishing a new module
+## Adding a project
 
-Add a route for it on each zone to `wrangler.jsonc`. `assemble.mjs` picks it up from there, and fails if the
-module has no `apiSiteJavadoc` output.
+Add it to `PROJECTS` in `scripts/site.mjs` and give it a route on each zone in `wrangler.jsonc`
+(`npm test` fails without them). For a landing page, write `content/<project>.md`. `assemble.mjs`
+fails if the library has no `apiSiteJavadoc` output.
 
 ## Deploying
 
@@ -69,6 +84,14 @@ The workflow deploys with `wrangler deploy`. It needs two repository secrets:
 
 ## Limits and decisions
 
+- **The pages are published on a release, not on a merge.** They describe the packages people can
+  install. Until the first release they are published from `master` by a manual run, and say they
+  are a pre-release.
+- **Landing pages take the site's stylesheet; they don't copy it.** They are written in the classes
+  of the site's `styles.css`, loaded at view time, so they match the pages the site writes by hand
+  and follow its design. The cost is the coupling noted above.
+- **The old addresses redirect, permanently.** `/projects/<project>/...` and `/projects/tm1/guide/...`
+  were published and linked, so the Worker keeps a route for them and sends each to its new place.
 - **Only the latest version is published.** A Worker can serve a limited number of static files
   (about 20,000 on the free plan), and each version is around 1,000. javadoc.io serves every
   released version from Maven Central, so the docs link there instead.

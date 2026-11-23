@@ -1,11 +1,14 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
-/* The guide's own layout. Colours and fonts are the site's tokens, imported at view time from the
-   same origin as the Javadoc theme does (theme/javadoc-theme.css), so the guide follows the site. */
+/* The layout of the docs pages (/<project>/docs/). Colours and fonts are the site's tokens, imported
+   at view time from the same origin as the Javadoc theme does (theme/javadoc-theme.css), so the
+   docs follow the site. */
 @import url("/tokens.css");
 @import url("/chrome.css");
 /* The syntax colours for the classes the site's /highlight.js puts on the examples */
 @import url("/code.css");
+/* The language tabs, which the landing pages use too */
+@import url("tabs.css");
 
 /* The page itself, as the site's own pages set it (styles.css there isn't loaded here): without
    this the browser's white margin and serif font show around the guide and in the footer */
@@ -35,22 +38,3 @@ body {
 
 .guide .types { columns: 14rem; padding-left: 1.1rem; }
 .guide .types li { break-inside: avoid; }
-
-.tabs { margin: 0.75rem 0 1.5rem; border: 1px solid var(--rule, #d8d8d8); border-radius: 8px; overflow: hidden; }
-.tablist { display: flex; flex-wrap: wrap; background: var(--chip, #f1f1f1); border-bottom: 1px solid var(--rule, #d8d8d8); }
-.tablist [role="tab"] {
-    appearance: none;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    background: none;
-    padding: 0.5rem 0.9rem;
-    font: inherit;
-    font-size: 0.9rem;
-    color: var(--ink-soft, #555);
-    cursor: pointer;
-}
-.tablist [role="tab"][aria-selected="true"] { color: var(--ink, #1a1a1a); border-bottom-color: var(--accent, #0b5fff); font-weight: 600; }
-.tablist [role="tab"]:focus-visible { outline: 2px solid var(--accent, #0b5fff); outline-offset: -2px; }
-.tabs [role="tabpanel"][hidden] { display: none; }
-.tabs pre { margin: 0; padding: 0.9rem 1rem; overflow-x: auto; background: var(--surface, #fafafa); font-size: 0.88rem; line-height: 1.5; }
-.tabs pre code { background: none; padding: 0; }
