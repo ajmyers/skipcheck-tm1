@@ -1,0 +1,12 @@
+{
+  "example": "HelloWorld",
+  "language": "typescript",
+  "regions": {
+    "hello-world": {
+      "source": "0a7e468644f9f7f37ed0dcf73d2fd3e5587c6888e02203b612e64b8f946dafb1",
+      "output": [
+        "Hello from TM1 11.8.03500.6"
+      ]
+    }
+  }
+}

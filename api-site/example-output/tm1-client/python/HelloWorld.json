@@ -1,0 +1,12 @@
+{
+  "example": "HelloWorld",
+  "language": "python",
+  "regions": {
+    "hello-world": {
+      "source": "f10e595a3dd9bc37dd9a7fd2c4b2b0e2974e91feedfdb33ac5ac26e40045ccab",
+      "output": [
+        "Hello from TM1 11.8.03500.6"
+      ]
+    }
+  }
+}

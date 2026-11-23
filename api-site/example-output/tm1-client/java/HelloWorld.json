@@ -1,0 +1,10 @@
+{
+  "example" : "HelloWorld",
+  "language" : "java",
+  "regions" : {
+    "hello-world" : {
+      "source" : "2925108293633391b7f8984ab51722480fd864bac9b6212048ea611e491cc349",
+      "output" : [ "Hello from TM1 11.8.03500.6" ]
+    }
+  }
+}

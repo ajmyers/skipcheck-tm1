@@ -1,0 +1,12 @@
+{
+  "example": "HelloWorld",
+  "language": "dotnet",
+  "regions": {
+    "hello-world": {
+      "source": "34abde072b4ea9f7a657f3a9e41b512ee793afbb351e415adb19b52a78689477",
+      "output": [
+        "Hello from TM1 11.8.03500.6"
+      ]
+    }
+  }
+}

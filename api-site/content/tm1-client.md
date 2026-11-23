@@ -10,7 +10,7 @@ Every endpoint of the TM1 REST API as a typed service: cubes, dimensions, cellse
 1. **Have a TM1 server to talk to.** To run one on your own computer, follow [Run Planning Analytics on your own computer](/pa-docker/setup/). You need your own licensed copy of TM1 Server.
 2. **Add the client to your project.**
    ::install
-3. **Say hello.** This connects, prints the server's version and lists its cubes:
+3. **Say hello.** This connects, prints the server's version and lists its cubes (a new server has none yet):
    ::example HelloWorld hello-world
 
 Next: [the client](docs/Tm1Client.html), with a service for each area of TM1, such as [cubes](docs/CubeService.html) and [cellsets](docs/CellsetService.html) for reading data; and [the session](docs/Tm1Session.html), for logging in with CAM, sandboxes, and sending a request no service covers. Every page shows its examples in each language.

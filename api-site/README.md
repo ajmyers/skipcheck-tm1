@@ -57,7 +57,9 @@ code is what it printed when it ran against a real TM1. That output is never typ
 1. The live tests run each walkthrough's steps against IBM's SData sample, on a TM1 they start
    for it: `WalkthroughExamplesTm1Test` in tm1-client (and its ports, `test_walkthrough_examples.py`,
    `WalkthroughExamplesLiveTests`, `WalkthroughExamples.live.test.ts`), and
-   `HelloTm1ApplicationTm1Test` in the Spring Boot starter.
+   `HelloTm1ApplicationTm1Test` in the Spring Boot starter. The landing pages' quick starts are
+   recorded the same way, on a new server with the empty database, which their code logs in to:
+   `HelloWorldTm1Test` in tm1-client (and its ports), and the starter's test.
 2. Each language's `ExampleOutput` captures what a step prints, and writes
    `example-output/<project>/<language>/<Class>.json`: each region's output, as lines, and a hash
    of its code (each line trimmed, blank ones left out, SHA-256), worked out the same way in every
