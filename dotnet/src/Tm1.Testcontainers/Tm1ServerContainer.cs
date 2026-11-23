@@ -334,7 +334,12 @@ public class Tm1ServerContainer : GenericContainer<Tm1ServerContainer>
     internal static string ImageFor(string setting, string image) => Settings.Text(Settings.Get(setting)) ?? image + ":" + ImageTag(Settings.LibraryVersion());
 
     /// <summary>The image tag for a library version: <c>edge</c> for a snapshot (Java's
-    /// <c>-SNAPSHOT</c>, .NET's <c>-dev</c>), the version otherwise.</summary>
+    /// <c>-SNAPSHOT</c>, .NET's <c>-dev</c> and a published <c>-dev.1</c>), the version otherwise.
+    /// A development pre-release is published by hand, without the images a tagged release gets.</summary>
     internal static string ImageTag(string libraryVersion) =>
-        libraryVersion.EndsWith("-SNAPSHOT", StringComparison.Ordinal) || libraryVersion.EndsWith("-dev", StringComparison.Ordinal) ? "edge" : libraryVersion;
+        libraryVersion.EndsWith("-SNAPSHOT", StringComparison.Ordinal)
+        || libraryVersion.EndsWith("-dev", StringComparison.Ordinal)
+        || libraryVersion.Contains("-dev.", StringComparison.Ordinal)
+            ? "edge"
+            : libraryVersion;
 }

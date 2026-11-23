@@ -362,9 +362,10 @@ export class Tm1ServerContainer extends GenericContainer {
   }
 
   /** Released libraries use the image of the same version; development builds (Java's
-   * `-SNAPSHOT`, npm's `-dev`) use `edge`, built from master.
+   * `-SNAPSHOT`, npm's `-dev` and a published `-dev.1`) use `edge`, built from master: a
+   * development pre-release is published by hand, without the images a tagged release gets.
    * @internal */
   static imageTag(libraryVersion: string): string {
-    return libraryVersion.endsWith("-SNAPSHOT") || libraryVersion.endsWith("-dev") ? "edge" : libraryVersion;
+    return libraryVersion.endsWith("-SNAPSHOT") || libraryVersion.endsWith("-dev") || libraryVersion.includes("-dev.") ? "edge" : libraryVersion;
   }
 }

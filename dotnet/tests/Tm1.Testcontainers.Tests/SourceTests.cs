@@ -94,6 +94,8 @@ public class Tm1SourceTests : TempDir
     {
         Assert.Equal("edge", Tm1ServerContainer.ImageTag("0.1.0-SNAPSHOT"));
         Assert.Equal("edge", Tm1ServerContainer.ImageTag("0.1.0-dev"));
+        Assert.Equal("edge", Tm1ServerContainer.ImageTag("0.1.0-dev.1"));
+        Assert.Equal("0.1.0-rc.1", Tm1ServerContainer.ImageTag("0.1.0-rc.1"));
         Assert.Equal("0.1.0", Tm1ServerContainer.ImageTag("0.1.0"));
     }
 

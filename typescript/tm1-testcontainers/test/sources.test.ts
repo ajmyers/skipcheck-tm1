@@ -82,6 +82,8 @@ describe("Tm1Source", () => {
   it("tags snapshots with edge", () => {
     expect(Tm1ServerContainer.imageTag("0.1.0-SNAPSHOT")).toBe("edge");
     expect(Tm1ServerContainer.imageTag("0.1.0-dev")).toBe("edge");
+    expect(Tm1ServerContainer.imageTag("0.1.0-dev.1")).toBe("edge");
+    expect(Tm1ServerContainer.imageTag("0.1.0-rc.1")).toBe("0.1.0-rc.1");
     expect(Tm1ServerContainer.imageTag("0.1.0")).toBe("0.1.0");
   });
 

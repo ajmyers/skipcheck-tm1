@@ -40,7 +40,7 @@ Reuse follows the same switch as Java: set `testcontainers.reuse.enable=true` in
 
 ### Image tag
 
-The image tag is the library's version. For a development build it's `edge`: Java's `-SNAPSHOT`, .NET's `-dev`.
+The image tag is the library's version. For a development build it's `edge`: Java's `-SNAPSHOT`, .NET's `-dev` and a published `-dev.1`.
 
 ### PAW
 

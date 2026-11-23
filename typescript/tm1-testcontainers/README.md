@@ -60,7 +60,7 @@ Reuse follows the Java switch: set `testcontainers.reuse.enable=true` in `~/.tes
 
 ### Image tag
 
-The image tag is the library's version. For a development build it's `edge`: Java's `-SNAPSHOT`, npm's `-dev` (this package is `0.1.0-dev`). `TM1_SERVER_IMAGE`, `TM1_WEB_IMAGE`, `COGNOS_SERVER_IMAGE` and `KEYCLOAK_IMAGE` swap the images.
+The image tag is the library's version. For a development build it's `edge`: Java's `-SNAPSHOT`, npm's `-dev` and a published `-dev.1` (this package is `0.1.0-dev`). `TM1_SERVER_IMAGE`, `TM1_WEB_IMAGE`, `COGNOS_SERVER_IMAGE` and `KEYCLOAK_IMAGE` swap the images.
 
 ### PAW
 
