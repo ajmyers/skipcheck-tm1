@@ -190,7 +190,7 @@ export class Connection {
   async sendLogin(seedCookie: string | undefined): Promise<Login> {
     const url = this.root + LOGIN_PATH;
     // The authenticator's own failures (say, a passport it couldn't get) reach the caller unchanged
-    const authorization = await this.authenticator.authorization();
+    const authorization = await this.credentials(url);
     if (!authorization) throw new Error(`The authenticator ${this.authenticator.describe()} supplied no credentials`);
     const headers: Record<string, string> = { ...this.baseHeaders(JSON_ACCEPT), Authorization: authorization };
     // At login only: TM1 decides the identity then and ignores the header later
@@ -229,6 +229,29 @@ export class Connection {
     const n = typeof id === "number" ? id : typeof id === "string" && /^-?\d+$/.test(id) ? Number(id) : NaN;
     if (!Number.isFinite(n)) throw new Tm1ProtocolException("TM1 accepted the login but didn't return the session ID", undefined, "GET", url);
     return { cookie, id: n };
+  }
+
+  /** The authenticator's credentials, given up on after the login timeout. The authenticator may ask
+   * another server (Cognos, for a passport), and one that never answers would otherwise hold every
+   * request on the session, and `close()`, for ever. The failure is a transport one in the connect
+   * phase: nothing has been sent to TM1, so it is safe to retry. The authenticator's signal is
+   * aborted then, so it can stop what it was doing. */
+  private async credentials(url: string): Promise<string> {
+    const within = this.timeouts.login;
+    const deadline = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const why = new Error(`The authenticator ${this.authenticator.describe()} supplied no credentials within ${within} ms`);
+        reject(new Tm1TransportException("Connect", true, "GET", url, why));
+        deadline.abort(why);
+      }, within);
+    });
+    try {
+      return await Promise.race([this.authenticator.authorization(deadline.signal), timedOut]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /** Sends a request with the session cookie, logging in again once on 401; a second 401 is a

@@ -14,7 +14,8 @@ export type Tm1Supplier = (signal?: AbortSignal) => string | Promise<string>;
 /** How a session logs in: the `Authorization` header of its first request, as the Java client's
  * `Tm1Authenticator`. TM1 answers with a `TM1SessionId` cookie, which later requests send instead. */
 export abstract class Tm1Authenticator {
-  /** The header to log in with; asked for at each login. */
+  /** The header to log in with; asked for at each login. A session waits for it no longer than its
+   * login timeout, and aborts `signal` when it gives up. */
   abstract authorization(signal?: AbortSignal): Promise<string>;
 
   /** Who logs in, without secrets, for logs and errors. */

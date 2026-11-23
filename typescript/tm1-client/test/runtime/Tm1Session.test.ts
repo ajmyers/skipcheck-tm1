@@ -53,6 +53,35 @@ describe("Tm1Session", () => {
   const SERVER = Tm1Request.get(ODataPath.of("Server"), ODataQuery.none().select("Name"));
   const scripted = (): ScriptedTm1 => new ScriptedTm1().on("GET Server?$select=Name", () => ScriptedTm1.json(200, '{"Name":"tm1"}'));
 
+  it("gives up on an authenticator that never answers", async () => {
+    const tm1 = scripted();
+    let cancelled: AbortSignal | undefined;
+    const never = new (class extends Tm1Authenticator {
+      authorization(signal?: AbortSignal): Promise<string> {
+        cancelled = signal;
+        return new Promise<string>(() => undefined);
+      }
+
+      describe(): string {
+        return "Never";
+      }
+    })();
+    const session = tm1.sessionWithOwnCredentials((b) => b.authenticator(never).timeouts(Tm1Timeouts.builder().login(100).build()));
+    const within = <T>(promise: Promise<T>): Promise<T | string> =>
+      Promise.race([promise, new Promise<string>((r) => setTimeout(() => r("still waiting"), 3_000))]);
+
+    const e = await within(failure(session.execute(SERVER)));
+    expect(e).toBeInstanceOf(Tm1TransportException);
+    const t = e as Tm1TransportException;
+    expect(t.phase).toBe("Connect");
+    expect(t.isRetryable(), "nothing was sent to TM1").toBe(true);
+    expect(t.mayHaveApplied()).toBe(false);
+    expect(t.message).toContain("Never");
+    expect(cancelled?.aborted, "the authenticator is told to stop").toBe(true);
+    expect(await within(session.close())).toBeUndefined();
+    expect(tm1.requests(LOGIN)).toHaveLength(0);
+  });
+
   it("logs in once for concurrent first requests and sends only the cookie afterwards", async () => {
     const tm1 = scripted();
     const login = new Pending();
