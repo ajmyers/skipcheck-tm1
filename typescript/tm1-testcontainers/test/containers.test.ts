@@ -2,9 +2,9 @@
 
 import { Tm1Version } from "@skipcheck/tm1-client";
 import { describe, expect } from "vitest";
-import { PawContainer, Tm1ServerContainer, Tm1WebContainer } from "../src/index.js";
+import { PawContainer, PlanningAnalyticsEnvironment, Tm1ServerContainer, Tm1WebContainer } from "../src/index.js";
 import { PawSession } from "../src/PawSession.js";
-import { requiresPaw, requiresTm1, requiresTm1Web } from "../src/vitest.js";
+import { RequiresPaw, requiresCognos, requiresPaw, requiresTm1, requiresTm1Web } from "../src/vitest.js";
 import { Tm1WebSession } from "./support/Tm1WebSession.js";
 
 /** Against TM1 in Docker: skipped without Docker or a source, as the Java tests. */
@@ -112,5 +112,38 @@ describe("PawContainer", () => {
     expect(paw.getTm1Server()).toBe(tm1);
     expect(paw.isRunning()).toBe(true);
     expect(paw.getUrl()).toMatch(/^http:\/\/.*\/$/);
+  });
+});
+
+/** Java's PawCamSecurityTest: PAW with Cognos (CAM) security, in a PlanningAnalyticsEnvironment.
+ * PAW and Cognos together need most of a developer machine's Docker memory, so nothing else should
+ * run beside it. Skipped without TM1, Cognos and PAW sources. */
+describe("PawCamSecurity", () => {
+  // As Java's @RequiresCognos with @RequiresPaw
+  requiresCognos("logs on through Cognos and calls TM1", { timeout: 45 * 60_000 }, async ({ skip }) => {
+    const why = await RequiresPaw.skipReason();
+    if (why !== undefined) skip(why);
+    await using env = PlanningAnalyticsEnvironment.builder()
+      .tm1("planning")
+      .cognos((cognos) => cognos.withUser("admin", "adminpw", "Admins").withUser("viewer", "viewerpw", "Readers"))
+      .paw((paw) => paw.acceptLicense())
+      .build();
+    await env.start();
+    const url = env.paw().getUrl();
+
+    // Browsers are sent to Cognos, as the host reaches it, to log on
+    const page = await new PawSession(url).get("login");
+    expect(page.body).toContain('extLoginUrl = "' + env.cognos().getUrl() + "v1/disp?b_action=xts.run");
+
+    // A test user logs on with their Cognos password, and calls TM1 as themselves
+    const viewer = await new PawSession(url).login("viewer", "viewerpw");
+    expect(await viewer.servers()).toContain("planning");
+    const user = await viewer.tm1Get("planning", "ActiveUser?$select=Name");
+    expect(user.status).toBe(200);
+    expect(user.body).toContain("CAMID");
+    expect(user.body.toLowerCase()).toContain("viewer");
+
+    // Cognos checks the password
+    await expect(new PawSession(url).login("viewer", "not-the-password")).rejects.toThrow();
   });
 });
