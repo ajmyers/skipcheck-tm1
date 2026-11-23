@@ -57,7 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: ['20', '22']
+        # The oldest Node the packages support, and the current LTS
+        node: ['22', '24']
     defaults:
       run:
         working-directory: typescript

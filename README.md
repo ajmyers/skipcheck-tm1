@@ -23,7 +23,7 @@ Java is the reference: the other clients have its API, and their tests replay wh
 | [`docker/tm1-web`](docker/tm1-web) | Docker image for TM1 Web (Planning Analytics Spreadsheet Services), to run alongside `tm1-server`. You supply your own licensed TM1 Web; no IBM software is included. |
 | [`docker/paw`](docker/paw) | Runs IBM's Planning Analytics Workspace Local images from your own PAW zip, next to `tm1-server`. No IBM software is included. |
 
-The Java libraries require Java 17+, the Python client Python 3.10+, the .NET client .NET 10, the TypeScript client Node 20+ or a modern browser.
+The Java libraries require Java 17+, the Python client Python 3.10+, the .NET client .NET 10, the TypeScript client Node 22+ or a modern browser (its testcontainers, Node 22.22+).
 
 ## Building
 

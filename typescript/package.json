@@ -4,7 +4,7 @@
   "description": "The TypeScript client for the IBM Planning Analytics (TM1) REST API and its tm1-testcontainers, as one workspace",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.22"
   },
   "workspaces": [
     "tm1-client",
@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@types/node": "20.19.43",
+    "@types/node": "22.20.5",
     "eslint": "10.15.0",
     "eslint-plugin-jsdoc": "62.9.0",
     "prettier": "3.10.1",
@@ -31,5 +31,10 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.73.0",
     "vitest": "4.1.12"
+  },
+  "overrides": {
+    "archiver-utils": {
+      "glob": "14.0.2"
+    }
   }
 }

@@ -1,6 +1,6 @@
 # @skipcheck/tm1-client (TypeScript)
 
-A TypeScript client for the **IBM Planning Analytics (TM1) REST API**, with the same API as the Java client (`tm1-client`): the same services, methods, parameters, queries, patches, session views and errors, named the TypeScript way. Its model is generated from the same language-neutral spec ([`spec/tm1-api.json`](../spec)). ESM, for Node 20+ and browsers, with no runtime dependencies: it sends with `fetch`.
+A TypeScript client for the **IBM Planning Analytics (TM1) REST API**, with the same API as the Java client (`tm1-client`): the same services, methods, parameters, queries, patches, session views and errors, named the TypeScript way. Its model is generated from the same language-neutral spec ([`spec/tm1-api.json`](../spec)). ESM, for Node 22+ and browsers, with no runtime dependencies: it sends with `fetch`.
 
 ```ts
 import { Cube, CubePatch, Filter, ODataPath, ODataQuery, Tm1Client } from "@skipcheck/tm1-client";
