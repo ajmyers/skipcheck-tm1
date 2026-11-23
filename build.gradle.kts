@@ -10,6 +10,9 @@
 //   ./gradlew checkLicense         every source file starts with its license line
 //   ./gradlew checkAll             all of the above, and ./gradlew build
 //
+//   ./gradlew packageTest          builds every package as a release does, installs each somewhere
+//                                  clean and runs it (package-tests/README.md)
+//
 //   ./gradlew liveTest --continue  every client's tests against a real TM1, then the comparison of
 //                                  what each sent (needs a TM1 source: see scripts/live-tests.sh)
 //
@@ -27,23 +30,19 @@ val pythonEnvironment = tasks.register<PythonVenv>("pythonEnvironment") {
 	description = "Makes the build's Python virtual environment and installs the client and testcontainers into it."
 	venv = pythonVenv
 	interpreter = providers.gradleProperty("python").orElse(providers.environmentVariable("PYTHON"))
-	install = listOf("-e", root.dir("python/tm1-client").asFile.path + "[test]", "-e", root.dir("python/tm1-testcontainers").asFile.path + "[test]")
+	// build: what packagePython makes the wheels and sdists with
+	install = listOf("-e", root.dir("python/tm1-client").asFile.path + "[test]", "-e", root.dir("python/tm1-testcontainers").asFile.path + "[test]", "build")
 	directory = root
-	commands = listOf<List<String>>()
-	defaultEnvironment = mapOf<String, String>()
 }
 
 fun PythonTask.python() {
 	venv = pythonVenv
-	defaultEnvironment = mapOf<String, String>()
 	dependsOn(pythonEnvironment)
 }
 
 val npmInstall = tasks.register<NpmInstall>("npmInstall") {
 	description = "Installs the TypeScript workspace's dependencies (npm ci), when they're missing or the lock file changed."
 	directory = root.dir("typescript")
-	commands = listOf<List<String>>()
-	defaultEnvironment = mapOf<String, String>()
 }
 
 // A machine with only a newer .NET SDK than the projects target (net10.0) runs them on the runtime it has
@@ -71,7 +70,6 @@ val checkTypescript = tasks.register<ToolTask>("checkTypescript") {
 	description = "Tests the TypeScript client and testcontainers (npm test, with prettier, eslint and tsc), then builds them."
 	directory = root.dir("typescript")
 	commands = listOf(listOf("npm", "test"), listOf("npm", "run", "build"))
-	defaultEnvironment = mapOf<String, String>()
 }
 
 val checkLicense = tasks.register<PythonTask>("checkLicense") {
@@ -136,7 +134,6 @@ val liveTestTypescript = tasks.register<ToolTask>("liveTestTypescript") {
 	description = "Runs the TypeScript client's tests against a real TM1 (test/live), and the testcontainers' tests."
 	directory = root.dir("typescript")
 	commands = listOf(listOf("npm", "run", "test:live", "-w", "tm1-client"), listOf("npm", "test", "-w", "tm1-testcontainers"))
-	defaultEnvironment = mapOf<String, String>()
 	dependsOn(liveTestPrepare)
 	mustRunAfter(liveTestJava, liveTestPython, liveTestDotnet)
 }
@@ -156,4 +153,57 @@ tasks.register("liveTest") {
 	group = "verification"
 	description = "Runs every client's tests against a real TM1, then compares what each sent. Use --continue to run them all when one fails."
 	dependsOn(liveTestJava, liveTestPython, liveTestDotnet, liveTestTypescript, compareLiveTraffic)
+}
+
+// The package tests: each ecosystem's packages built as a release builds them, installed
+// somewhere clean, and run (package-tests/README.md). The tests of the sources can't see a
+// package that lacks a file, a dependency or its generated code.
+//
+// -PprebuiltPackages tests what is already in build/packages instead of building it: the release
+// workflow builds the packages with the release's version, tests those, and publishes those.
+val windows = System.getProperty("os.name").lowercase().contains("windows")
+val packages = layout.buildDirectory.dir("packages").get()
+val packageTests = layout.buildDirectory.dir("package-test").get()
+val prebuilt = providers.gradleProperty("prebuiltPackages").isPresent
+val rootPath = root.asFile.path
+fun Task.unlessPrebuilt() {
+	val build = !prebuilt
+	onlyIf { build }
+}
+fun venvPython(venv: Directory): String = venv.file(if (windows) "Scripts/python.exe" else "bin/python").asFile.path
+
+val packagePython = tasks.register<PythonTask>("packagePython") {
+	description = "Builds the Python packages' wheels and sdists into build/packages/python."
+	python()
+	directory = root
+	fresh = listOf(packages.dir("python").asFile.path)
+	commands = listOf("tm1-client", "tm1-testcontainers").map { listOf("python", "-m", "build", "--outdir", packages.dir("python").asFile.path, "python/$it") }
+	unlessPrebuilt()
+}
+
+val packageTestPython = tasks.register<PythonTask>("packageTestPython") {
+	group = "verification"
+	description = "Installs the Python wheels, then the sdists, each into an empty environment, and runs them."
+	python()
+	dependsOn(packagePython)
+	directory = packageTests
+	val smoke = root.file("package-tests/python/smoke.py").asFile.path
+	val built = packages.dir("python").asFile.path
+	val environments = mapOf("whl" to packageTests.dir("python-wheel"), "tar.gz" to packageTests.dir("python-sdist"))
+	fresh = environments.values.map { it.asFile.path }
+	// The packages by file, not by name: by name pip would take a newer release from PyPI instead.
+	// Run from outside the repository, so nothing is imported from the sources
+	commands = environments.flatMap { (extension, venv) ->
+		listOf(
+			listOf("python", "-m", "venv", venv.asFile.path),
+			listOf(venvPython(venv), "-m", "pip", "install", "--quiet", "--disable-pip-version-check", "$built/*.$extension"),
+			listOf(venvPython(venv), smoke),
+		)
+	}
+}
+
+tasks.register("packageTest") {
+	group = "verification"
+	description = "Builds every package as a release does, installs each somewhere clean, and runs it."
+	dependsOn(packageTestPython)
 }

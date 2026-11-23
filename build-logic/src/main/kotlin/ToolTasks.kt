@@ -42,31 +42,63 @@ abstract class ToolTask : DefaultTask() {
 	@get:Input
 	abstract val defaultEnvironment: MapProperty<String, String>
 
+	/** Environment variables for the commands, whatever the caller has set. */
+	@get:Input
+	abstract val environment: MapProperty<String, String>
+
+	/** Folders emptied before the commands run (and made, if they aren't there), so nothing of an earlier run is left in them. */
+	@get:Input
+	abstract val fresh: ListProperty<String>
+
 	init {
 		outputs.upToDateWhen { false }
+		defaultEnvironment.convention(mapOf())
+		environment.convention(mapOf())
+		fresh.convention(listOf())
+		commands.convention(listOf())
 	}
 
 	@TaskAction
 	fun runCommands() {
+		fresh.get().map(::File).forEach {
+			it.deleteRecursively()
+			it.mkdirs()
+		}
 		prepare()
-		commands.get().forEach { run(commandLine(it), directory.get().asFile) }
+		commands.get().forEach { run(commandLine(expand(it)), directory.get().asFile) }
+	}
+
+	/** An argument whose file name has a * stands for the files that match it, as a shell would have it: build/packages/python/&#42;.whl. */
+	private fun expand(command: List<String>): List<String> = command.flatMap { argument ->
+		val pattern = File(argument)
+		if (!pattern.name.contains('*')) {
+			listOf(argument)
+		}
+		else {
+			val name = Regex(pattern.name.split('*').joinToString(".*") { Regex.escape(it) })
+			val matches = pattern.parentFile.listFiles { file -> name.matches(file.name) }.orEmpty().map { it.path }.sorted()
+			if (matches.isEmpty()) {
+				throw GradleException("No file matches $argument")
+			}
+			matches
+		}
 	}
 
 	/** What has to be there before the commands run: a virtual environment, node_modules. */
 	protected open fun prepare() {
 	}
 
-	/** The command line as this machine runs it. On Windows, npm and npx are scripts, which need cmd. */
+	/** The command line as this machine runs it. On Windows, npm, npx and batch files are scripts, which need cmd. */
 	protected open fun commandLine(command: List<String>): List<String> =
-		if (windows && command.first() in setOf("npm", "npx")) listOf("cmd", "/c") + command else command
+		if (windows && (command.first() in setOf("npm", "npx") || command.first().endsWith(".bat"))) listOf("cmd", "/c") + command else command
 
 	protected fun run(commandLine: List<String>, workingDirectory: File) {
 		logger.lifecycle("> {}", commandLine.joinToString(" "))
-		val defaults = defaultEnvironment.get().filterKeys { System.getenv(it) == null }
+		val variables = defaultEnvironment.get().filterKeys { System.getenv(it) == null } + environment.get()
 		execOperations.exec {
 			workingDir = workingDirectory
 			commandLine(commandLine)
-			environment(defaults)
+			environment(variables)
 		}
 	}
 
