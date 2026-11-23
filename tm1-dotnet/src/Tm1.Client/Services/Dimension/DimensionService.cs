@@ -40,9 +40,7 @@ public sealed class DimensionService : Tm1Service
     private static readonly ODataPath Dimensions = ODataPath.Of("Dimensions");
 
     public DimensionService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Dimensions</c>: every dimension, control dimensions included, streamed.</summary>
     [Tm1Endpoint("EntitySet Dimensions")]
@@ -100,13 +98,26 @@ public sealed class DimensionService : Tm1Service
     /// <paramref name="keepExistingAttributes"/> keeps the attributes of what's replaced, and when not,
     /// true creates no attributes for the copy.</summary>
     [Tm1Endpoint("Action Dimension/SaveAs")]
-    public Task<Dimension> SaveAsAsync(string name, string newName, bool overwrite, bool keepExistingAttributes, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Action<Dimension>(Tm1Operations.DimensionSaveAs, name, new Dictionary<string, object?>
-        {
-            ["Name"] = newName,
-            ["Overwrite"] = overwrite,
-            ["KeepExistingAttributes"] = keepExistingAttributes,
-        }), cancellationToken);
+    public Task<Dimension> SaveAsAsync(
+        string name,
+        string newName,
+        bool overwrite,
+        bool keepExistingAttributes,
+        CancellationToken cancellationToken = default
+    ) =>
+        Session.ExecuteAsync(
+            Action<Dimension>(
+                Tm1Operations.DimensionSaveAs,
+                name,
+                new Dictionary<string, object?>
+                {
+                    ["Name"] = newName,
+                    ["Overwrite"] = overwrite,
+                    ["KeepExistingAttributes"] = keepExistingAttributes,
+                }
+            ),
+            cancellationToken
+        );
 
     /// <summary><c>tm1.AddAllLeavesHierarchy</c>: adds a hierarchy of all the dimension's leaves, named
     /// <c>Leaves</c> and not visible, which makes it a multi-hierarchy dimension; returns the new hierarchy.</summary>
@@ -118,27 +129,34 @@ public sealed class DimensionService : Tm1Service
     /// <paramref name="hierarchyName"/>, which makes it a multi-hierarchy dimension.</summary>
     [Tm1Endpoint("Action Dimension/AddAllLeavesHierarchy")]
     public Task<Hierarchy> AddAllLeavesHierarchyAsync(string name, string hierarchyName, bool visible, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Action<Hierarchy>(Tm1Operations.DimensionAddAllLeavesHierarchy, name, new Dictionary<string, object?>
-        {
-            ["AllLeavesHierarchyName"] = hierarchyName,
-            ["Visible"] = visible,
-        }), cancellationToken);
+        Session.ExecuteAsync(
+            Action<Hierarchy>(
+                Tm1Operations.DimensionAddAllLeavesHierarchy,
+                name,
+                new Dictionary<string, object?> { ["AllLeavesHierarchyName"] = hierarchyName, ["Visible"] = visible }
+            ),
+            cancellationToken
+        );
 
     /// <summary><c>tm1.Lock</c>: stops everyone else changing the dimension until it's unlocked.</summary>
     [Tm1Endpoint("Action Dimension/Lock")]
-    public Task LockAsync(string name, CancellationToken cancellationToken = default) => Session.ExecuteAsync(Action(Tm1Operations.DimensionLock, name), cancellationToken);
+    public Task LockAsync(string name, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Action(Tm1Operations.DimensionLock, name), cancellationToken);
 
     /// <summary><c>tm1.Unlock</c>.</summary>
     [Tm1Endpoint("Action Dimension/Unlock")]
-    public Task UnlockAsync(string name, CancellationToken cancellationToken = default) => Session.ExecuteAsync(Action(Tm1Operations.DimensionUnlock, name), cancellationToken);
+    public Task UnlockAsync(string name, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Action(Tm1Operations.DimensionUnlock, name), cancellationToken);
 
     /// <summary><c>tm1.Reserve</c>: stops everyone else changing the dimension until it's released. Needs schema 11.8.34.</summary>
     [Tm1Endpoint("Action Dimension/Reserve")]
-    public Task ReserveAsync(string name, CancellationToken cancellationToken = default) => Session.ExecuteAsync(Action(Tm1Operations.DimensionReserve, name), cancellationToken);
+    public Task ReserveAsync(string name, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Action(Tm1Operations.DimensionReserve, name), cancellationToken);
 
     /// <summary><c>tm1.Release</c>. Needs schema 11.8.34.</summary>
     [Tm1Endpoint("Action Dimension/Release")]
-    public Task ReleaseAsync(string name, CancellationToken cancellationToken = default) => Session.ExecuteAsync(Action(Tm1Operations.DimensionRelease, name), cancellationToken);
+    public Task ReleaseAsync(string name, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Action(Tm1Operations.DimensionRelease, name), cancellationToken);
 
     private static ODataPath DimensionPath(string name) => Dimensions.Key(Require(name, nameof(name)));
 

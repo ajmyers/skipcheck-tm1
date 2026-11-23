@@ -37,9 +37,7 @@ public sealed class UserService : Tm1Service
     private static readonly ODataPath Users = ODataPath.Of("Users");
 
     public UserService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Users</c>, streamed.</summary>
     [Tm1Endpoint("EntitySet Users")]
@@ -102,8 +100,10 @@ public sealed class UserService : Tm1Service
     public Task DisconnectAsync(string name, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.UserDisconnect;
-        return Session.ExecuteAsync(Tm1Request.Post(UserPath(name).Action(operation.Name), new Dictionary<string, object?>())
-            .Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(
+            Tm1Request.Post(UserPath(name).Action(operation.Name), new Dictionary<string, object?>()).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     private static UserPatch WithoutGroups(UserPatch patch)

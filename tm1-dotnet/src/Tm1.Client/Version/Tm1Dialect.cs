@@ -21,7 +21,12 @@ public abstract class Tm1Dialect
         public override string ServiceRoot(string address)
         {
             ArgumentNullException.ThrowIfNull(address);
-            if (!Uri.TryCreate(address.Trim(), UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || uri.Query.Length > 0 || uri.Fragment.Length > 0)
+            if (
+                !Uri.TryCreate(address.Trim(), UriKind.Absolute, out var uri)
+                || uri.Scheme is not ("http" or "https")
+                || uri.Query.Length > 0
+                || uri.Fragment.Length > 0
+            )
             {
                 throw new ArgumentException("A TM1 11 address is the server's scheme, host and HTTP port, such as http://tm1:8010: " + address);
             }

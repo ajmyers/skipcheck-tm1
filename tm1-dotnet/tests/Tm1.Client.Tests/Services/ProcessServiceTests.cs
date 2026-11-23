@@ -81,7 +81,10 @@ public class ProcessServiceTests
         _tm1.Respond = _ => null;
         var tm1 = _tm1.Client();
         await tm1.Processes.ExecuteAsync("Load", new Dictionary<string, object?> { ["p"] = 1 });
-        Assert.Equal(("POST", "Processes('Load')/tm1.Execute", """{"Parameters":[{"Name":"p","Value":1}]}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
+        Assert.Equal(
+            ("POST", "Processes('Load')/tm1.Execute", """{"Parameters":[{"Name":"p","Value":1}]}"""),
+            (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text)
+        );
         await tm1.Processes.ExecuteAsync(ProcessPatch.Builder().Name("adhoc").Build());
         Assert.Equal(("ExecuteProcess", """{"Process":{"Name":"adhoc"}}"""), (_tm1.Last.Target, _tm1.Last.Text));
 

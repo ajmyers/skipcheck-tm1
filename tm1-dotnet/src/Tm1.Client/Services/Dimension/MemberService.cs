@@ -12,9 +12,7 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class MemberService : Tm1Service
 {
     public MemberService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET …/Members</c>: the hierarchy's members, streamed.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Members")]
@@ -28,18 +26,33 @@ public sealed class MemberService : Tm1Service
 
     /// <summary><c>GET …/Members('m')/Parent</c>: the member's parent, or null for a root (TM1 sends no content).</summary>
     [Tm1Endpoint("Navigation Member/Parent")]
-    public Task<Member?> ParentAsync(string dimension, string hierarchy, string member, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<Member?>(MemberPath(dimension, hierarchy, member).Nav("Parent"), query), cancellationToken);
+    public Task<Member?> ParentAsync(
+        string dimension,
+        string hierarchy,
+        string member,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Get<Member?>(MemberPath(dimension, hierarchy, member).Nav("Parent"), query), cancellationToken);
 
     /// <summary><c>GET …/Members('m')/Children</c>, streamed.</summary>
     [Tm1Endpoint("Navigation Member/Children")]
-    public IAsyncEnumerable<Member> ChildrenAsync(string dimension, string hierarchy, string member, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<Member>(MemberPath(dimension, hierarchy, member).Nav("Children"), query), cancellationToken);
+    public IAsyncEnumerable<Member> ChildrenAsync(
+        string dimension,
+        string hierarchy,
+        string member,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<Member>(MemberPath(dimension, hierarchy, member).Nav("Children"), query), cancellationToken);
 
     /// <summary><c>GET …/Members('m')/Element</c>: the element the member stands for.</summary>
     [Tm1Endpoint("Navigation Member/Element")]
-    public Task<Element> ElementAsync(string dimension, string hierarchy, string member, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<Element>(MemberPath(dimension, hierarchy, member).Nav("Element"), query), cancellationToken);
+    public Task<Element> ElementAsync(
+        string dimension,
+        string hierarchy,
+        string member,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Get<Element>(MemberPath(dimension, hierarchy, member).Nav("Element"), query), cancellationToken);
 
     /// <summary><c>GET …/Members('m')/Level</c>.</summary>
     [Tm1Endpoint("Navigation Member/Level")]
@@ -48,10 +61,16 @@ public sealed class MemberService : Tm1Service
 
     /// <summary><c>GET …/Members('m')/Hierarchy</c>.</summary>
     [Tm1Endpoint("Navigation Member/Hierarchy")]
-    public Task<Hierarchy> HierarchyAsync(string dimension, string hierarchy, string member, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<Hierarchy>(MemberPath(dimension, hierarchy, member).Nav("Hierarchy"), query), cancellationToken);
+    public Task<Hierarchy> HierarchyAsync(
+        string dimension,
+        string hierarchy,
+        string member,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Get<Hierarchy>(MemberPath(dimension, hierarchy, member).Nav("Hierarchy"), query), cancellationToken);
 
     private static ODataPath MembersPath(string dimension, string hierarchy) => HierarchyService.HierarchyPath(dimension, hierarchy).Nav("Members");
 
-    private static ODataPath MemberPath(string dimension, string hierarchy, string member) => MembersPath(dimension, hierarchy).Key(Require(member, nameof(member)));
+    private static ODataPath MemberPath(string dimension, string hierarchy, string member) =>
+        MembersPath(dimension, hierarchy).Key(Require(member, nameof(member)));
 }

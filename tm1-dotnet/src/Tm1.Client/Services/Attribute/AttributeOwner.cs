@@ -20,7 +20,8 @@ public sealed class AttributeOwner
     public static AttributeOwner Hierarchy(string dimension, string hierarchy) => new(HierarchyService.HierarchyPath(dimension, hierarchy));
 
     /// <summary>An element.</summary>
-    public static AttributeOwner Element(string dimension, string hierarchy, string element) => new(HierarchyService.ElementPath(dimension, hierarchy, element));
+    public static AttributeOwner Element(string dimension, string hierarchy, string element) =>
+        new(HierarchyService.ElementPath(dimension, hierarchy, element));
 
     /// <summary>A member.</summary>
     public static AttributeOwner Member(string dimension, string hierarchy, string member) =>

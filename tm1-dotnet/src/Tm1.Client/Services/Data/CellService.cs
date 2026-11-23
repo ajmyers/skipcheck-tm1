@@ -29,9 +29,7 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class CellService : Tm1Service
 {
     public CellService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>tm1.Update</c>: writes one value to a cell; <paramref name="tuple"/> is dimension to
     /// element, as for <see cref="Tuples.Of"/>; null clears the cell.</summary>
@@ -56,7 +54,10 @@ public sealed class CellService : Tm1Service
     [Tm1Endpoint("Navigation CubeUpdate/ReferenceCube")]
     [Tm1Endpoint("Navigation CubeUpdate/ReferenceCell")]
     public Task UpdateCellsAsync(string cube, IReadOnlyList<CubeUpdatePatch> updates, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Action(Tm1Operations.CubeUpdateCells, cube, new Dictionary<string, object?> { ["Updates"] = Require(updates, nameof(updates)).ToList() }), cancellationToken);
+        Session.ExecuteAsync(
+            Action(Tm1Operations.CubeUpdateCells, cube, new Dictionary<string, object?> { ["Updates"] = Require(updates, nameof(updates)).ToList() }),
+            cancellationToken
+        );
 
     /// <summary><c>tm1.UpdateCells</c> with an order: <c>ByLevel</c> writes leaves before the consolidations
     /// above them, so a spread to a consolidation isn't overwritten. Needs schema 11.0.0.</summary>
@@ -65,7 +66,14 @@ public sealed class CellService : Tm1Service
     [Tm1Endpoint("Navigation CubeUpdate/ReferenceCube")]
     [Tm1Endpoint("Navigation CubeUpdate/ReferenceCell")]
     public Task UpdateCellsAsync(string cube, IReadOnlyList<CubeUpdatePatch> updates, UpdateOrder order, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Action(Tm1Operations.CubeUpdateCells, cube, new Dictionary<string, object?> { ["Updates"] = Require(updates, nameof(updates)).ToList(), ["Order"] = order }), cancellationToken);
+        Session.ExecuteAsync(
+            Action(
+                Tm1Operations.CubeUpdateCells,
+                cube,
+                new Dictionary<string, object?> { ["Updates"] = Require(updates, nameof(updates)).ToList(), ["Order"] = order }
+            ),
+            cancellationToken
+        );
 
     private static Tm1Request<NoContent> Action(Tm1Operation operation, string cube, Dictionary<string, object?> body) =>
         Tm1Request.Post(ODataPath.Of("Cubes").Key(Require(cube, nameof(cube))).Action(operation.Name), body).Requires(operation.Capability());

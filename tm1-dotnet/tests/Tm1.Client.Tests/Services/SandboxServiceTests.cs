@@ -40,13 +40,15 @@ public class SandboxServiceTests
     {
         var tm1 = _tm1.Client();
         _tm1.Respond = _ => null;
-        foreach (var (call, action) in new (Func<Task>, string)[]
-        {
-            (() => tm1.Sandboxes.LoadAsync("s"), "Load"),
-            (() => tm1.Sandboxes.UnloadAsync("s"), "Unload"),
-            (() => tm1.Sandboxes.DiscardChangesAsync("s"), "DiscardChanges"),
-            (() => tm1.Sandboxes.PublishAsync("s"), "Publish"),
-        })
+        foreach (
+            var (call, action) in new (Func<Task>, string)[]
+            {
+                (() => tm1.Sandboxes.LoadAsync("s"), "Load"),
+                (() => tm1.Sandboxes.UnloadAsync("s"), "Unload"),
+                (() => tm1.Sandboxes.DiscardChangesAsync("s"), "DiscardChanges"),
+                (() => tm1.Sandboxes.PublishAsync("s"), "Publish"),
+            }
+        )
         {
             await call();
             Assert.Equal(("POST", $"Sandboxes('s')/tm1.{action}", "{}"), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
@@ -59,7 +61,10 @@ public class SandboxServiceTests
         var tm1 = _tm1.Client();
         _tm1.Respond = _ => null;
         await tm1.Sandboxes.PublishAsync("s", ConflictResolution.UsingSource, true, false);
-        Assert.Equal(("Sandboxes('s')/tm1.Publish", """{"ConflictResolution":"UsingSource","AllowQueueing":true,"CleanAfter":false}"""), (_tm1.Last.Target, _tm1.Last.Text));
+        Assert.Equal(
+            ("Sandboxes('s')/tm1.Publish", """{"ConflictResolution":"UsingSource","AllowQueueing":true,"CleanAfter":false}"""),
+            (_tm1.Last.Target, _tm1.Last.Text)
+        );
 
         await tm1.Sandboxes.MergeAsync("s", "t");
         Assert.Equal(("Sandboxes('s')/tm1.Merge", """{"Target@odata.bind":"Sandboxes('t')"}"""), (_tm1.Last.Target, _tm1.Last.Text));

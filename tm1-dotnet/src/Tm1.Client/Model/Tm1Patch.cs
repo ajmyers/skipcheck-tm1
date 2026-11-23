@@ -19,7 +19,9 @@ public abstract class Tm1Patch : IEquatable<Tm1Patch>
     /// <summary>The properties set, by their names in TM1's JSON, in the order they were set.</summary>
     public IReadOnlyList<KeyValuePair<string, object?>> Values { get; }
 
-    public bool Equals(Tm1Patch? other) => other is not null && other.GetType() == GetType()
+    public bool Equals(Tm1Patch? other) =>
+        other is not null
+        && other.GetType() == GetType()
         && other.Values.Select(v => (v.Key, Text(v.Value))).SequenceEqual(Values.Select(v => (v.Key, Text(v.Value))));
 
     public override bool Equals(object? obj) => obj is Tm1Patch p && Equals(p);
@@ -28,7 +30,8 @@ public abstract class Tm1Patch : IEquatable<Tm1Patch>
 
     public override string ToString() => GetType().Name + "{" + string.Join(", ", Values.Select(v => v.Key + "=" + Text(v.Value))) + "}";
 
-    private static string Text(object? v) => v is System.Collections.IEnumerable e and not string ? "[" + string.Join(",", e.Cast<object?>().Select(Text)) + "]" : v?.ToString() ?? "null";
+    private static string Text(object? v) =>
+        v is System.Collections.IEnumerable e and not string ? "[" + string.Join(",", e.Cast<object?>().Select(Text)) + "]" : v?.ToString() ?? "null";
 
     /// <summary>What every generated builder is made of.</summary>
     public abstract class BuilderBase<TPatch, TSelf>

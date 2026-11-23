@@ -33,9 +33,7 @@ public class Tm1WebContainer : GenericContainer<Tm1WebContainer>
 
     /// <summary>TM1 Web from <paramref name="source"/>, in the image for it.</summary>
     public Tm1WebContainer(Tm1WebSource source)
-        : this(DefaultImageFor(source ?? throw new ArgumentNullException(nameof(source))), source)
-    {
-    }
+        : this(DefaultImageFor(source ?? throw new ArgumentNullException(nameof(source))), source) { }
 
     /// <summary>TM1 Web from <paramref name="source"/>, in <paramref name="image"/>.</summary>
     public Tm1WebContainer(string image, Tm1WebSource source)
@@ -131,9 +129,10 @@ public class Tm1WebContainer : GenericContainer<Tm1WebContainer>
 
     /// <summary>The Admin Server host TM1 Web lists servers from, as a TM1 Web login names it.</summary>
     /// <exception cref="InvalidOperationException">There's none yet.</exception>
-    public string AdminHost => EnvMap.TryGetValue("TM1_ADMIN_HOST", out var host)
-        ? host
-        : throw new InvalidOperationException("No Admin Server yet: set a TM1 server with WithTm1Server and start");
+    public string AdminHost =>
+        EnvMap.TryGetValue("TM1_ADMIN_HOST", out var host)
+            ? host
+            : throw new InvalidOperationException("No Admin Server yet: set a TM1 server with WithTm1Server and start");
 
     /// <inheritdoc/>
     protected internal override void Configure()
@@ -176,7 +175,12 @@ public class Tm1WebContainer : GenericContainer<Tm1WebContainer>
     /// <inheritdoc/>
     protected override Task ContainerIsStartedAsync(CancellationToken cancellationToken)
     {
-        Logger.LogInformation("TM1 Web is up at {Url} ({Source}), listing servers from the Admin Server at {Host}", Url, Source.Describe(), EnvMap.GetValueOrDefault("TM1_ADMIN_HOST", "(none)"));
+        Logger.LogInformation(
+            "TM1 Web is up at {Url} ({Source}), listing servers from the Admin Server at {Host}",
+            Url,
+            Source.Describe(),
+            EnvMap.GetValueOrDefault("TM1_ADMIN_HOST", "(none)")
+        );
         return Task.CompletedTask;
     }
 
@@ -188,7 +192,9 @@ public class Tm1WebContainer : GenericContainer<Tm1WebContainer>
         networks.TryGetValue(network ?? "bridge", out var found);
         if (found is null || string.IsNullOrWhiteSpace(found.IPAddress))
         {
-            throw new InvalidOperationException($"{who} can't reach the TM1 server: it's on [{string.Join(", ", networks.Keys)}]. Give the TM1 server a Network (WithNetwork), or leave it on Docker's default bridge network.");
+            throw new InvalidOperationException(
+                $"{who} can't reach the TM1 server: it's on [{string.Join(", ", networks.Keys)}]. Give the TM1 server a Network (WithNetwork), or leave it on Docker's default bridge network."
+            );
         }
         return found.IPAddress;
     }

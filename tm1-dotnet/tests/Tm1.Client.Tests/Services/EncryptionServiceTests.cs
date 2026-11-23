@@ -21,7 +21,7 @@ public class EncryptionServiceTests
         Assert.Single(report.Issues!);
         Assert.Equal("GET", _tm1.Last.Method);
         Assert.StartsWith("ValidateEncryptionAtRestSettings(Settings=@settings)?@settings=", _tm1.Last.Target);
-        var json = Uri.UnescapeDataString(_tm1.Last.Target[_tm1.Last.Target.IndexOf('=', _tm1.Last.Target.IndexOf('?')) ..][1..]);
+        var json = Uri.UnescapeDataString(_tm1.Last.Target[_tm1.Last.Target.IndexOf('=', _tm1.Last.Target.IndexOf('?'))..][1..]);
         Assert.Contains("\"KeyRef\":\"/tmp/a.key\"", json);
         Assert.Contains("LocalKeyFileProviderSettings", json);
     }
@@ -34,19 +34,24 @@ public class EncryptionServiceTests
         await tm1.Encryption.ConfigureAsync(LocalKeyFileProviderSettingsPatch.Builder().KeyRef("/tmp/a.key").Build());
         Assert.Equal("POST ConfigureEncryptionAtRest", Sent);
         Assert.Equal("/tmp/a.key", _tm1.Last.Json.GetProperty("Settings").GetProperty("KeyRef").GetString());
-        foreach (var (call, name) in new (Func<Task>, string)[]
-        {
-            (() => tm1.Encryption.DisableAsync(), "DisableEncryptionAtRest"),
-            (() => tm1.Encryption.RotateDataEncryptionKeyAsync(), "RotateDataEncryptionKey"),
-            (() => tm1.Encryption.RotateDataModelKeyAsync(), "RotateDataModelKey"),
-        })
+        foreach (
+            var (call, name) in new (Func<Task>, string)[]
+            {
+                (() => tm1.Encryption.DisableAsync(), "DisableEncryptionAtRest"),
+                (() => tm1.Encryption.RotateDataEncryptionKeyAsync(), "RotateDataEncryptionKey"),
+                (() => tm1.Encryption.RotateDataModelKeyAsync(), "RotateDataModelKey"),
+            }
+        )
         {
             await call();
             Assert.Equal(($"POST {name}", "{}"), (Sent, _tm1.Last.Text));
         }
 
         await tm1.Encryption.EncryptFileAsync("tm1s.cfg", "/tmp/tm1s.cfg.enc", EncryptionFileType.Object);
-        Assert.Equal(("POST EncryptDataFile", """{"SourcePath":"tm1s.cfg","DestinationPath":"/tmp/tm1s.cfg.enc","FileType":"Object"}"""), (Sent, _tm1.Last.Text));
+        Assert.Equal(
+            ("POST EncryptDataFile", """{"SourcePath":"tm1s.cfg","DestinationPath":"/tmp/tm1s.cfg.enc","FileType":"Object"}"""),
+            (Sent, _tm1.Last.Text)
+        );
         await tm1.Encryption.DecryptFileAsync("a.log", "/tmp/a.log", EncryptionFileType.TransactionLog);
         Assert.Equal(("POST DecryptDataFile", """{"SourcePath":"a.log","DestinationPath":"/tmp/a.log","FileType":"TransactionLog"}"""), (Sent, _tm1.Last.Text));
 

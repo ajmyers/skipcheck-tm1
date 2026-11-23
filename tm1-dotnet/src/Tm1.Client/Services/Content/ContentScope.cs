@@ -16,10 +16,11 @@ public enum ContentScope
 public static class ContentScopeExtensions
 {
     /// <summary>The folder's navigation property holding entries of this scope, such as <c>PrivateContents</c>.</summary>
-    public static string Navigation(this ContentScope scope) => scope switch
-    {
-        ContentScope.Public => "Contents",
-        ContentScope.Private => "PrivateContents",
-        _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, null),
-    };
+    public static string Navigation(this ContentScope scope) =>
+        scope switch
+        {
+            ContentScope.Public => "Contents",
+            ContentScope.Private => "PrivateContents",
+            _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, null),
+        };
 }

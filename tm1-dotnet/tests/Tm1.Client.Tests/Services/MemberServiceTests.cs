@@ -16,7 +16,10 @@ public class MemberServiceTests
     {
         var tm1 = _tm1.Client();
         _tm1.Respond = _ => FakeTm1.Collection(new { Name = "West", UniqueName = "[Region].[Region].[West]" });
-        Assert.Equal("[Region].[Region].[West]", Assert.Single(await tm1.Members.ListAsync("Region", "Region", ODataQuery.None().Top(1)).ToListAsync()).UniqueName);
+        Assert.Equal(
+            "[Region].[Region].[West]",
+            Assert.Single(await tm1.Members.ListAsync("Region", "Region", ODataQuery.None().Top(1)).ToListAsync()).UniqueName
+        );
         Assert.Equal(Members + "?$top=1", _tm1.Last.Target);
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "West" };
         await tm1.Members.GetAsync("Region", "Region", "West", ODataQuery.None().Select("Name"));

@@ -23,7 +23,13 @@ public sealed record GitCredentials(string? Username, string? PasswordOrToken, s
 
     /// <summary>An SSH key pair, for an SSH remote, with its passphrase, or null for none.</summary>
     public static GitCredentials SshKey(string publicKey, string privateKey, string? passphrase = null) =>
-        new(null, null, publicKey ?? throw new ArgumentNullException(nameof(publicKey)), privateKey ?? throw new ArgumentNullException(nameof(privateKey)), passphrase);
+        new(
+            null,
+            null,
+            publicKey ?? throw new ArgumentNullException(nameof(publicKey)),
+            privateKey ?? throw new ArgumentNullException(nameof(privateKey)),
+            passphrase
+        );
 
     internal void AddTo(IDictionary<string, object?> parameters)
     {

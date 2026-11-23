@@ -84,8 +84,12 @@ public class Tm1WebContainerTests(Tm1WebFixture fixture) : IClassFixture<Tm1WebF
         using var session = await Tm1WebSession.OpenAsync(web);
         var id = await session.LoginAsync(web.AdminHost, server, tm1.Username, tm1.Password);
         var info = await tm1.InspectAsync();
-        var result = await session.EvaluateMdxAsync($"http://{info.Config!.Hostname}:{Tm1ServerContainer.RestPort}", server, id,
-            "SELECT {[}Groups].Members} ON 0, {[}Clients].Members} ON 1 FROM [}ClientGroups]");
+        var result = await session.EvaluateMdxAsync(
+            $"http://{info.Config!.Hostname}:{Tm1ServerContainer.RestPort}",
+            server,
+            id,
+            "SELECT {[}Groups].Members} ON 0, {[}Clients].Members} ON 1 FROM [}ClientGroups]"
+        );
         Assert.Contains("\"success\":true", result, StringComparison.Ordinal);
     }
 

@@ -127,7 +127,9 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// <summary>The TM1 server named <paramref name="name"/>.</summary>
     /// <exception cref="ArgumentException">There's none.</exception>
     public Tm1ServerContainer Tm1(string name) =>
-        Tm1Servers.TryGetValue(name, out var server) ? server : throw new ArgumentException($"No TM1 server {name}; there's [{string.Join(", ", Tm1Servers.Keys)}]", nameof(name));
+        Tm1Servers.TryGetValue(name, out var server)
+            ? server
+            : throw new ArgumentException($"No TM1 server {name}; there's [{string.Join(", ", Tm1Servers.Keys)}]", nameof(name));
 
     /// <summary>The TM1 servers by name, in the order added.</summary>
     public IReadOnlyDictionary<string, Tm1ServerContainer> Tm1Servers { get; }
@@ -192,12 +194,10 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     }
 
     private static T Require<T>(T? part, string what, string how)
-        where T : class =>
-        part ?? throw new InvalidOperationException($"This environment has no {what}; add it with {how}");
+        where T : class => part ?? throw new InvalidOperationException($"This environment has no {what}; add it with {how}");
 
     private static T Get<T>(T? configured, Func<T?> discover, string message)
-        where T : class =>
-        configured ?? discover() ?? throw new InvalidOperationException(message);
+        where T : class => configured ?? discover() ?? throw new InvalidOperationException(message);
 
     /// <summary>The TM1 servers by name, enumerated in the order added.</summary>
     private sealed class OrderedServers(List<string> order, Dictionary<string, Tm1ServerContainer> servers) : IReadOnlyDictionary<string, Tm1ServerContainer>
@@ -212,7 +212,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
 
         public bool ContainsKey(string key) => servers.ContainsKey(key);
 
-        public bool TryGetValue(string key, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out Tm1ServerContainer value) => servers.TryGetValue(key, out value);
+        public bool TryGetValue(string key, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out Tm1ServerContainer value) =>
+            servers.TryGetValue(key, out value);
 
         public IEnumerator<KeyValuePair<string, Tm1ServerContainer>> GetEnumerator() => order.Select(n => KeyValuePair.Create(n, servers[n])).GetEnumerator();
 
@@ -222,9 +223,7 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// <summary>Builds a <see cref="PlanningAnalyticsEnvironment"/>, as Java's <c>PlanningAnalyticsEnvironment.Builder</c>.</summary>
     public sealed partial class EnvironmentBuilder
     {
-        internal EnvironmentBuilder()
-        {
-        }
+        internal EnvironmentBuilder() { }
 
         internal List<string> Tm1Names { get; } = [];
 
@@ -391,9 +390,7 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
                 return [.. CamAdminsSet];
             }
             var users = cognos.Users;
-            return users.Count == 0
-                ? throw new InvalidOperationException("Cognos needs test users for CAM security: add them with WithUser")
-                : [users[0].Name];
+            return users.Count == 0 ? throw new InvalidOperationException("Cognos needs test users for CAM security: add them with WithUser") : [users[0].Name];
         }
 
         [GeneratedRegex("^[A-Za-z0-9_-]+$")]

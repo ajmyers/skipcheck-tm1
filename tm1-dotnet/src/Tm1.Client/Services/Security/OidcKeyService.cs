@@ -17,17 +17,17 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class OidcKeyService : Tm1Service
 {
     public OidcKeyService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GetOIDCKeys()</c>, streamed: the IDs of the cached keys.</summary>
     [Tm1Endpoint("FunctionImport GetOIDCKeys")]
     public IAsyncEnumerable<string> KeysAsync(CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.GetOidcKeys;
-        return Session.StreamAsync(Tm1Request.List<string>(ODataPath.FunctionImport(operation.ImportName!), null)
-            .Requires(operation.Capability()), cancellationToken);
+        return Session.StreamAsync(
+            Tm1Request.List<string>(ODataPath.FunctionImport(operation.ImportName!), null).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>RemoveOIDCKeyFromCache</c>: drops keys from the cache. A key TM1 hasn't cached fails
@@ -38,7 +38,6 @@ public sealed class OidcKeyService : Tm1Service
     {
         var operation = Tm1Operations.RemoveOidcKeyFromCache;
         var body = new Dictionary<string, object?> { ["KeyId"] = Require(keyIds, nameof(keyIds)).Select(key => Require(key, nameof(keyIds))).ToList() };
-        return Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of(operation.ImportName!), body)
-            .Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of(operation.ImportName!), body).Requires(operation.Capability()), cancellationToken);
     }
 }

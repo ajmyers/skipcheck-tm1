@@ -35,9 +35,7 @@ public sealed class SessionService : Tm1Service
     private static readonly ODataPath Sessions = ODataPath.Of("Sessions");
 
     public SessionService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Sessions</c>, streamed: every session on the server, for an admin. Expands
     /// <c>User</c> and <c>Threads</c>.</summary>
@@ -70,7 +68,9 @@ public sealed class SessionService : Tm1Service
     public Task CloseAsync(long id, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.SessionClose;
-        return Session.ExecuteAsync(Tm1Request.Post(Sessions.Key(id).Action(operation.Name), new Dictionary<string, object?>())
-            .Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(
+            Tm1Request.Post(Sessions.Key(id).Action(operation.Name), new Dictionary<string, object?>()).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 }

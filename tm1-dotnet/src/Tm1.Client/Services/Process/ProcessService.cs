@@ -51,9 +51,7 @@ public sealed class ProcessService : Tm1Service
     private static readonly ODataPath Processes = ODataPath.Of("Processes");
 
     public ProcessService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Processes</c>, streamed.</summary>
     [Tm1Endpoint("EntitySet Processes")]
@@ -118,7 +116,12 @@ public sealed class ProcessService : Tm1Service
     /// (<c>TM1UserException: Cancel</c>, code 174).</summary>
     [Tm1Endpoint("Action Process/ExecuteWithReturn")]
     [Tm1Endpoint("Navigation ProcessExecuteResult/ErrorLogFile")]
-    public Task<ProcessExecuteResult> ExecuteWithReturnAsync(string name, IReadOnlyDictionary<string, object?>? parameters = null, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    public Task<ProcessExecuteResult> ExecuteWithReturnAsync(
+        string name,
+        IReadOnlyDictionary<string, object?>? parameters = null,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.ProcessExecuteWithReturn;
         var request = Tm1Request.Post<ProcessExecuteResult>(ProcessPath(name).Action(operation.Name), ProcessFormats.WithParameters(new(), parameters));
@@ -129,11 +132,19 @@ public sealed class ProcessService : Tm1Service
     /// says how it ended. Needs schema 11.3.0.</summary>
     [Tm1Endpoint("ActionImport ExecuteProcessWithReturn")]
     [Tm1Endpoint("Navigation ProcessExecuteResult/ErrorLogFile")]
-    public Task<ProcessExecuteResult> ExecuteWithReturnAsync(ProcessPatch definition, IReadOnlyDictionary<string, object?>? parameters = null, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    public Task<ProcessExecuteResult> ExecuteWithReturnAsync(
+        ProcessPatch definition,
+        IReadOnlyDictionary<string, object?>? parameters = null,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.ExecuteProcessWithReturn;
         var body = ProcessFormats.WithParameters(new() { ["Process"] = Require(definition, nameof(definition)) }, parameters);
-        return Session.ExecuteAsync(Tm1Request.Post<ProcessExecuteResult>(Root(operation), body).WithQuery(query).Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(
+            Tm1Request.Post<ProcessExecuteResult>(Root(operation), body).WithQuery(query).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>tm1.Execute</c>: runs a process, without saying how it ended. Deprecated in TM1
@@ -141,7 +152,10 @@ public sealed class ProcessService : Tm1Service
     [Obsolete("Deprecated in TM1 schema 11.3.0: use ExecuteWithReturnAsync.")]
     [Tm1Endpoint("Action Process/Execute")]
     public Task ExecuteAsync(string name, IReadOnlyDictionary<string, object?>? parameters = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Post(ProcessPath(name).Action(Tm1Operations.ProcessExecute.Name), ProcessFormats.WithParameters(new(), parameters)), cancellationToken);
+        Session.ExecuteAsync(
+            Tm1Request.Post(ProcessPath(name).Action(Tm1Operations.ProcessExecute.Name), ProcessFormats.WithParameters(new(), parameters)),
+            cancellationToken
+        );
 
     /// <summary><c>ExecuteProcess</c>: runs a process definition, without saying how it ended. Needs
     /// schema 11.0.0; deprecated in 11.3.0: use <c>ExecuteWithReturnAsync</c>.</summary>

@@ -22,7 +22,11 @@ public class ProcessDebugServiceTests
     {
         _tm1.Respond = _ => Context("Paused");
         var tm1 = _tm1.Client();
-        var context = await tm1.ProcessDebugging.DebugAsync("Load", new Dictionary<string, object?> { ["pYear"] = 2026, ["pVersion"] = "Actual" }, ODataQuery.None().Expand("Breakpoints"));
+        var context = await tm1.ProcessDebugging.DebugAsync(
+            "Load",
+            new Dictionary<string, object?> { ["pYear"] = 2026, ["pVersion"] = "Actual" },
+            ODataQuery.None().Expand("Breakpoints")
+        );
         Assert.Equal(("d1", ProcessDebugContextStatus.Paused), (context.Id, context.Status));
         Assert.Equal(("POST", "Processes('Load')/tm1.Debug?$expand=Breakpoints"), (_tm1.Last.Method, _tm1.Last.Target));
         Assert.Equal("""{"Parameters":[{"Name":"pYear","Value":2026},{"Name":"pVersion","Value":"Actual"}]}""", _tm1.Last.Text);
@@ -41,13 +45,15 @@ public class ProcessDebugServiceTests
         await tm1.ProcessDebugging.GetAsync("d1", ODataQuery.None().Select("Status"));
         Assert.Equal("GET ProcessDebugContexts('d1')?$select=Status", $"{_tm1.Last.Method} {_tm1.Last.Target}");
 
-        foreach (var (call, action) in new (Func<Task<ProcessDebugContext>>, string)[]
-        {
-            (() => tm1.ProcessDebugging.ResumeAsync("d1"), "Continue"),
-            (() => tm1.ProcessDebugging.StepInAsync("d1"), "StepIn"),
-            (() => tm1.ProcessDebugging.StepOutAsync("d1"), "StepOut"),
-            (() => tm1.ProcessDebugging.StepOverAsync("d1"), "StepOver"),
-        })
+        foreach (
+            var (call, action) in new (Func<Task<ProcessDebugContext>>, string)[]
+            {
+                (() => tm1.ProcessDebugging.ResumeAsync("d1"), "Continue"),
+                (() => tm1.ProcessDebugging.StepInAsync("d1"), "StepIn"),
+                (() => tm1.ProcessDebugging.StepOutAsync("d1"), "StepOut"),
+                (() => tm1.ProcessDebugging.StepOverAsync("d1"), "StepOver"),
+            }
+        )
         {
             Assert.Equal("d1", (await call()).Id);
             Assert.Equal(("POST", $"ProcessDebugContexts('d1')/tm1.{action}", "{}"), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
@@ -68,7 +74,10 @@ public class ProcessDebugServiceTests
         var line = ProcessDebugContextLineBreakpointPatch.Builder().Id(1).Enabled(true).ProcessName("Load").LineNumber(3).Build();
         Assert.Equal(1, (await tm1.ProcessDebugging.AddBreakpointAsync("d1", line)).Id);
         Assert.Equal(("POST", "ProcessDebugContexts('d1')/Breakpoints"), (_tm1.Last.Method, _tm1.Last.Target));
-        Assert.Equal("""{"@odata.type":"#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint","ID":1,"Enabled":true,"ProcessName":"Load","LineNumber":3}""", _tm1.Last.Text);
+        Assert.Equal(
+            """{"@odata.type":"#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint","ID":1,"Enabled":true,"ProcessName":"Load","LineNumber":3}""",
+            _tm1.Last.Text
+        );
 
         _tm1.Respond = _ => null;
         await tm1.ProcessDebugging.UpdateBreakpointAsync("d1", 1, ProcessDebugContextBreakpointPatch.Builder().Enabled(false).Build());
@@ -81,8 +90,12 @@ public class ProcessDebugServiceTests
     public async Task ABreakpointWithoutAnIdOfZeroOrMoreIsRefused()
     {
         var tm1 = _tm1.Client();
-        await Assert.ThrowsAsync<ArgumentException>(() => tm1.ProcessDebugging.AddBreakpointAsync("d1", ProcessDebugContextLineBreakpointPatch.Builder().LineNumber(3).Build()));
-        await Assert.ThrowsAsync<ArgumentException>(() => tm1.ProcessDebugging.AddBreakpointAsync("d1", ProcessDebugContextBreakpointPatch.Builder().Id(-1).Build()));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            tm1.ProcessDebugging.AddBreakpointAsync("d1", ProcessDebugContextLineBreakpointPatch.Builder().LineNumber(3).Build())
+        );
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            tm1.ProcessDebugging.AddBreakpointAsync("d1", ProcessDebugContextBreakpointPatch.Builder().Id(-1).Build())
+        );
         Assert.DoesNotContain(_tm1.Requests, r => r.Target.Contains("Breakpoints", StringComparison.Ordinal));
     }
 
@@ -113,18 +126,26 @@ public class ProcessDebugServiceTests
     public async Task FinishRemovesTheBreakpointsItCanAndResumesToTheEnd()
     {
         var resumes = 0;
-        _tm1.Respond = r => r.Target switch
-        {
-            "ProcessDebugContexts('d1')/Breakpoints" => FakeTm1.Collection(new { ID = 1 }, new { ID = -1 }, new { ID = 4 }),
-            "ProcessDebugContexts('d1')/tm1.Continue" => Context(++resumes < 3 ? "Paused" : "Complete"),
-            _ => null,
-        };
+        _tm1.Respond = r =>
+            r.Target switch
+            {
+                "ProcessDebugContexts('d1')/Breakpoints" => FakeTm1.Collection(new { ID = 1 }, new { ID = -1 }, new { ID = 4 }),
+                "ProcessDebugContexts('d1')/tm1.Continue" => Context(++resumes < 3 ? "Paused" : "Complete"),
+                _ => null,
+            };
         var context = await _tm1.Client().ProcessDebugging.FinishAsync("d1");
         Assert.Equal(ProcessDebugContextStatus.Complete, context.Status);
         Assert.Equal(
-            ["GET ProcessDebugContexts('d1')/Breakpoints", "DELETE ProcessDebugContexts('d1')/Breakpoints(1)", "DELETE ProcessDebugContexts('d1')/Breakpoints(4)",
-             "POST ProcessDebugContexts('d1')/tm1.Continue", "POST ProcessDebugContexts('d1')/tm1.Continue", "POST ProcessDebugContexts('d1')/tm1.Continue"],
-            _tm1.Requests.Where(r => r.Target.StartsWith("ProcessDebugContexts", StringComparison.Ordinal)).Select(r => $"{r.Method} {r.Target}"));
+            [
+                "GET ProcessDebugContexts('d1')/Breakpoints",
+                "DELETE ProcessDebugContexts('d1')/Breakpoints(1)",
+                "DELETE ProcessDebugContexts('d1')/Breakpoints(4)",
+                "POST ProcessDebugContexts('d1')/tm1.Continue",
+                "POST ProcessDebugContexts('d1')/tm1.Continue",
+                "POST ProcessDebugContexts('d1')/tm1.Continue",
+            ],
+            _tm1.Requests.Where(r => r.Target.StartsWith("ProcessDebugContexts", StringComparison.Ordinal)).Select(r => $"{r.Method} {r.Target}")
+        );
     }
 
     [Fact]
@@ -139,7 +160,10 @@ public class ProcessDebugServiceTests
     [Fact]
     public async Task DebuggingFinishesTheRunAfterTheWork()
     {
-        _tm1.Respond = r => r.Target.EndsWith("/Breakpoints", StringComparison.Ordinal) ? FakeTm1.Collection() : Context(r.Target.EndsWith("tm1.Debug", StringComparison.Ordinal) ? "Paused" : "Complete");
+        _tm1.Respond = r =>
+            r.Target.EndsWith("/Breakpoints", StringComparison.Ordinal)
+                ? FakeTm1.Collection()
+                : Context(r.Target.EndsWith("tm1.Debug", StringComparison.Ordinal) ? "Paused" : "Complete");
         var tm1 = _tm1.Client();
         var id = await tm1.ProcessDebugging.DebuggingAsync("Load", null, context => Task.FromResult(context.Id));
         Assert.Equal("d1", id);
@@ -155,17 +179,20 @@ public class ProcessDebugServiceTests
     [Fact]
     public async Task DebuggingFinishesTheRunWhenTheWorkFails()
     {
-        _tm1.Respond = r => r.Target.EndsWith("/Breakpoints", StringComparison.Ordinal) ? FakeTm1.Collection() : Context(r.Target.EndsWith("tm1.Debug", StringComparison.Ordinal) ? "Paused" : "Complete");
+        _tm1.Respond = r =>
+            r.Target.EndsWith("/Breakpoints", StringComparison.Ordinal)
+                ? FakeTm1.Collection()
+                : Context(r.Target.EndsWith("tm1.Debug", StringComparison.Ordinal) ? "Paused" : "Complete");
         var tm1 = _tm1.Client();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => tm1.ProcessDebugging.DebuggingAsync("Load", null, (Func<ProcessDebugContext, Task<int>>)(_ => throw new InvalidOperationException("boom"))));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            tm1.ProcessDebugging.DebuggingAsync("Load", null, (Func<ProcessDebugContext, Task<int>>)(_ => throw new InvalidOperationException("boom")))
+        );
         Assert.Equal("POST ProcessDebugContexts('d1')/tm1.Continue", $"{_tm1.Last.Method} {_tm1.Last.Target}");
 
         _tm1.Requests.Clear();
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await foreach (var _ in tm1.ProcessDebugging.DebuggingAsync("Load", null, _ => Failing()))
-            {
-            }
+            await foreach (var _ in tm1.ProcessDebugging.DebuggingAsync("Load", null, _ => Failing())) { }
         });
         Assert.Equal("POST ProcessDebugContexts('d1')/tm1.Continue", $"{_tm1.Last.Method} {_tm1.Last.Target}");
     }
@@ -174,7 +201,10 @@ public class ProcessDebugServiceTests
     public async Task DebuggingFinishesTheRunWhenItsLeftEarlyAsACancelledFlux()
     {
         // As the Java client's ProcessDebugServiceTest.debuggingFinishesTheRunWhenItsCancelled
-        _tm1.Respond = r => r.Target.EndsWith("/Breakpoints", StringComparison.Ordinal) ? FakeTm1.Collection() : Context(r.Target.EndsWith("tm1.Debug", StringComparison.Ordinal) ? "Paused" : "Complete");
+        _tm1.Respond = r =>
+            r.Target.EndsWith("/Breakpoints", StringComparison.Ordinal)
+                ? FakeTm1.Collection()
+                : Context(r.Target.EndsWith("tm1.Debug", StringComparison.Ordinal) ? "Paused" : "Complete");
         var tm1 = _tm1.Client();
         var taken = new List<int>();
         await foreach (var i in tm1.ProcessDebugging.DebuggingAsync("Load", null, _ => Forever()))

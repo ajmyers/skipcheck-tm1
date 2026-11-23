@@ -54,9 +54,7 @@ public sealed class EncryptionService : Tm1Service
     private static readonly ODataPath.Alias Settings = new("@settings");
 
     public EncryptionService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>ValidateEncryptionAtRestSettings</c>: checks the provider settings would work now
     /// (the key service is reachable and allows it, and the key exists), changing nothing. Returns the
@@ -75,7 +73,11 @@ public sealed class EncryptionService : Tm1Service
     /// server not yet encrypted is encrypted.</summary>
     [Tm1Endpoint("ActionImport ConfigureEncryptionAtRest")]
     public Task ConfigureAsync(EncryptionAtRestProviderSettingsPatch settings, CancellationToken cancellationToken = default) =>
-        Call(Tm1Operations.ConfigureEncryptionAtRest, new Dictionary<string, object?> { ["Settings"] = Require(settings, nameof(settings)) }, cancellationToken);
+        Call(
+            Tm1Operations.ConfigureEncryptionAtRest,
+            new Dictionary<string, object?> { ["Settings"] = Require(settings, nameof(settings)) },
+            cancellationToken
+        );
 
     /// <summary><c>DisableEncryptionAtRest</c>: decrypts the model and stops encrypting it.</summary>
     [Tm1Endpoint("ActionImport DisableEncryptionAtRest")]
@@ -130,7 +132,8 @@ public sealed class EncryptionService : Tm1Service
         };
         var names = Tm1EnumConverter.Describe(typeof(EncryptionFileType))!;
         // The member for a value this client doesn't know has no name to send: no type, as Java has it
-        file["FileType"] = names.ByValue.TryGetValue(type, out var name) ? name
+        file["FileType"] = names.ByValue.TryGetValue(type, out var name)
+            ? name
             : throw new ArgumentException($"{nameof(type)} is required: {type} isn't sent", nameof(type));
         return file;
     }

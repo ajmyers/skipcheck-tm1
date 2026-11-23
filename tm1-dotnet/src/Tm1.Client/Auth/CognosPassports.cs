@@ -35,11 +35,22 @@ public static partial class CognosPassports
     /// <param name="password">The password.</param>
     /// <param name="handler">The handler to send through; null for the client's own.</param>
     /// <returns>A function that logs on each time it's called.</returns>
-    public static Func<CancellationToken, ValueTask<string>> Password(string dispatcher, string @namespace, string user, string password, HttpMessageHandler? handler = null)
+    public static Func<CancellationToken, ValueTask<string>> Password(
+        string dispatcher,
+        string @namespace,
+        string user,
+        string password,
+        HttpMessageHandler? handler = null
+    )
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(password);
-        return Logon(dispatcher, @namespace, _ => ValueTask.FromResult<IReadOnlyList<Parameter>>([new("CAMUsername", user), new("CAMPassword", password)]), handler);
+        return Logon(
+            dispatcher,
+            @namespace,
+            _ => ValueTask.FromResult<IReadOnlyList<Parameter>>([new("CAMUsername", user), new("CAMPassword", password)]),
+            handler
+        );
     }
 
     /// <summary>Passports for an OpenID Connect ID token the application already holds, through
@@ -50,7 +61,12 @@ public static partial class CognosPassports
     /// <param name="idToken">Supplies a current ID token; asked at each logon.</param>
     /// <param name="handler">The handler to send through; null for the client's own.</param>
     /// <returns>A function that logs on each time it's called.</returns>
-    public static Func<CancellationToken, ValueTask<string>> IdToken(string dispatcher, string @namespace, Func<CancellationToken, ValueTask<string>> idToken, HttpMessageHandler? handler = null)
+    public static Func<CancellationToken, ValueTask<string>> IdToken(
+        string dispatcher,
+        string @namespace,
+        Func<CancellationToken, ValueTask<string>> idToken,
+        HttpMessageHandler? handler = null
+    )
     {
         ArgumentNullException.ThrowIfNull(idToken);
         return Logon(dispatcher, @namespace, async ct => [new("CAMOIDCIdToken", await idToken(ct).ConfigureAwait(false))], handler);
@@ -63,8 +79,12 @@ public static partial class CognosPassports
         return new Uri(root + "/api/v1/session");
     }
 
-    private static Func<CancellationToken, ValueTask<string>> Logon(string dispatcher, string @namespace,
-        Func<CancellationToken, ValueTask<IReadOnlyList<Parameter>>> credentials, HttpMessageHandler? handler)
+    private static Func<CancellationToken, ValueTask<string>> Logon(
+        string dispatcher,
+        string @namespace,
+        Func<CancellationToken, ValueTask<IReadOnlyList<Parameter>>> credentials,
+        HttpMessageHandler? handler
+    )
     {
         ArgumentNullException.ThrowIfNull(@namespace);
         var session = SessionUri(dispatcher ?? throw new ArgumentNullException(nameof(dispatcher)));
@@ -73,7 +93,12 @@ public static partial class CognosPassports
         {
             var parameters = new List<Parameter> { new("CAMNamespace", @namespace) };
             parameters.AddRange(await credentials(ct).ConfigureAwait(false));
-            var body = JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object> { ["parameters"] = parameters.ConvertAll(p => new Dictionary<string, string> { ["name"] = p.Name, ["value"] = p.Value }) });
+            var body = JsonSerializer.SerializeToUtf8Bytes(
+                new Dictionary<string, object>
+                {
+                    ["parameters"] = parameters.ConvertAll(p => new Dictionary<string, string> { ["name"] = p.Name, ["value"] = p.Value }),
+                }
+            );
             using var request = new HttpRequestMessage(HttpMethod.Put, session) { Content = new ByteArrayContent(body) };
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
             using var response = await (http ?? Shared.Value).SendAsync(request, ct).ConfigureAwait(false);

@@ -56,9 +56,7 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class ContentService : Tm1Service
 {
     public ContentService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Contents</c>, streamed: the root folders, <c>Applications</c> and <c>Blobs</c>.</summary>
     [Tm1Endpoint("EntitySet Contents")]
@@ -82,8 +80,12 @@ public sealed class ContentService : Tm1Service
     [Tm1Endpoint("Navigation ProcessReference/Process")]
     [Tm1Endpoint("Navigation SubsetReference/Subset")]
     [Tm1Endpoint("Navigation ViewReference/View")]
-    public IAsyncEnumerable<Entry> ContentsAsync(ContentPath folder, ContentScope scope, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<Entry>(Require(folder, nameof(folder)).Path().Nav(scope.Navigation()), query), cancellationToken);
+    public IAsyncEnumerable<Entry> ContentsAsync(
+        ContentPath folder,
+        ContentScope scope,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<Entry>(Require(folder, nameof(folder)).Path().Nav(scope.Navigation()), query), cancellationToken);
 
     /// <summary>Makes an entry in a folder: a <c>FolderPatch</c>, <c>DocumentPatch</c>, <c>LinkPatch</c>
     /// or a reference, such as a <c>CubeReferencePatch</c> with
@@ -93,7 +95,10 @@ public sealed class ContentService : Tm1Service
     [Tm1Endpoint("Navigation Folder/Contents")]
     [Tm1Endpoint("Navigation Folder/PrivateContents")]
     public Task<Entry> CreateAsync(ContentPath folder, ContentScope scope, EntryPatch entry, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Post<Entry>(Require(folder, nameof(folder)).Path().Nav(scope.Navigation()), Require(entry, nameof(entry))), cancellationToken);
+        Session.ExecuteAsync(
+            Tm1Request.Post<Entry>(Require(folder, nameof(folder)).Path().Nav(scope.Navigation()), Require(entry, nameof(entry))),
+            cancellationToken
+        );
 
     /// <summary><c>DELETE</c> of an entry, and everything in it if it's a folder.</summary>
     [Tm1Endpoint("EntitySet Contents")]
@@ -107,21 +112,34 @@ public sealed class ContentService : Tm1Service
 
     /// <summary><c>LocalizedAttributes</c>, streamed: an entry's attributes in each locale.</summary>
     [Tm1Endpoint("Navigation Entry/LocalizedAttributes")]
-    public IAsyncEnumerable<LocalizedAttributes> LocalizedAttributesAsync(ContentPath entry, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<LocalizedAttributes>(Require(entry, nameof(entry)).Path().Nav("LocalizedAttributes"), query), cancellationToken);
+    public IAsyncEnumerable<LocalizedAttributes> LocalizedAttributesAsync(
+        ContentPath entry,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<LocalizedAttributes>(Require(entry, nameof(entry)).Path().Nav("LocalizedAttributes"), query), cancellationToken);
 
     /// <summary><c>tm1.Copy</c>: copies an entry into the folder <paramref name="target"/>, public or
     /// private, named <paramref name="name"/> or, if null, as the entry is. A copied document reference
     /// refers to the same document. Returns the copy.</summary>
     [Tm1Endpoint("Action Entry/Copy")]
-    public Task<Entry> CopyAsync(ContentPath entry, ContentPath target, ContentScope scope, string? name = null, CancellationToken cancellationToken = default) =>
-        Relocate(Tm1Operations.EntryCopy, entry, target, scope, name, cancellationToken);
+    public Task<Entry> CopyAsync(
+        ContentPath entry,
+        ContentPath target,
+        ContentScope scope,
+        string? name = null,
+        CancellationToken cancellationToken = default
+    ) => Relocate(Tm1Operations.EntryCopy, entry, target, scope, name, cancellationToken);
 
     /// <summary><c>tm1.Move</c>: moves an entry into the folder <paramref name="target"/>, public or
     /// private there, renamed <paramref name="name"/> unless it's null. Returns the entry where it is now.</summary>
     [Tm1Endpoint("Action Entry/Move")]
-    public Task<Entry> MoveAsync(ContentPath entry, ContentPath target, ContentScope scope, string? name = null, CancellationToken cancellationToken = default) =>
-        Relocate(Tm1Operations.EntryMove, entry, target, scope, name, cancellationToken);
+    public Task<Entry> MoveAsync(
+        ContentPath entry,
+        ContentPath target,
+        ContentScope scope,
+        string? name = null,
+        CancellationToken cancellationToken = default
+    ) => Relocate(Tm1Operations.EntryMove, entry, target, scope, name, cancellationToken);
 
     /// <summary><c>Document</c>: the document a reference refers to, in <c>Blobs</c>, with its
     /// <c>Size</c> and <c>LastUpdated</c>.</summary>
@@ -139,12 +157,22 @@ public sealed class ContentService : Tm1Service
     /// <c>Blobs</c>. TM1 (11.8) refuses a chunked upload, so the content is sent whole, with its length.</summary>
     [Tm1Endpoint("Navigation DocumentReference/Document")]
     public Task UploadAsync(ContentPath document, byte[] content, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Put(DocumentPath(Require(document, nameof(document))).Nav("Content"), Require(content, nameof(content))), cancellationToken);
+        Session.ExecuteAsync(
+            Tm1Request.Put(DocumentPath(Require(document, nameof(document))).Nav("Content"), Require(content, nameof(content))),
+            cancellationToken
+        );
 
     private static ODataPath DocumentPath(ContentPath entry) =>
         entry.InBlobs() ? entry.Path().Cast("tm1.Document") : entry.Path().Cast("tm1.DocumentReference").Nav("Document");
 
-    private Task<Entry> Relocate(Tm1Operation operation, ContentPath entry, ContentPath target, ContentScope scope, string? name, CancellationToken cancellationToken)
+    private Task<Entry> Relocate(
+        Tm1Operation operation,
+        ContentPath entry,
+        ContentPath target,
+        ContentScope scope,
+        string? name,
+        CancellationToken cancellationToken
+    )
     {
         var body = new Dictionary<string, object?>
         {

@@ -32,9 +32,7 @@ public abstract record Tm1Source
     /// <summary>The setting holding the bundle's SHA-256, checked after the download.</summary>
     public const string BundleSha256 = "TM1_BUNDLE_SHA256";
 
-    private protected Tm1Source()
-    {
-    }
+    private protected Tm1Source() { }
 
     /// <summary>Where TM1 comes from, for logs: never a URL's credentials or query string.</summary>
     public abstract string Describe();
@@ -104,7 +102,10 @@ public abstract record Tm1Source
             Dir = Settings.Absolute(dir);
             if (!File.Exists(Path.Combine(Dir, "bin64", "tm1s.exe")))
             {
-                throw new ArgumentException($"Not a TM1 install: {Dir} has no bin64/tm1s.exe. Point {HomeDir} at the tm1_64 folder of a Linux TM1 Server install.", nameof(dir));
+                throw new ArgumentException(
+                    $"Not a TM1 install: {Dir} has no bin64/tm1s.exe. Point {HomeDir} at the tm1_64 folder of a Linux TM1 Server install.",
+                    nameof(dir)
+                );
             }
         }
 
@@ -143,7 +144,10 @@ public abstract record Tm1Source
             Dir = Settings.Absolute(dir);
             if (!Directory.Exists(Dir))
             {
-                throw new ArgumentException($"{BundleDir} is not a folder: {Dir}. Point it at the folder holding the bundle; name the file itself with {BundleSetting}.", nameof(dir));
+                throw new ArgumentException(
+                    $"{BundleDir} is not a folder: {Dir}. Point it at the folder holding the bundle; name the file itself with {BundleSetting}.",
+                    nameof(dir)
+                );
             }
             File = string.IsNullOrWhiteSpace(file) ? null : file;
             if (File is not null && !System.IO.File.Exists(Path.Combine(Dir, File)))

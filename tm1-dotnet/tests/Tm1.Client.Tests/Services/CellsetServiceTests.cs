@@ -16,7 +16,8 @@ namespace AjMyers.Tm1.Client.Tests.Services;
 /// <c>StreamAsync</c> pages a cellset's cells in order and deletes it however the enumeration ends.</summary>
 public partial class CellsetServiceTests
 {
-    private const string Expand = "$expand=Axes($expand=Hierarchies($select=Name),Tuples($expand=Members($select=Name,UniqueName))),Cells($select=Ordinal,Value;$top=";
+    private const string Expand =
+        "$expand=Axes($expand=Hierarchies($select=Name),Tuples($expand=Members($select=Name,UniqueName))),Cells($select=Ordinal,Value;$top=";
 
     private readonly FakeTm1 _tm1 = new();
 
@@ -59,7 +60,16 @@ public partial class CellsetServiceTests
     public async Task NavigatesAxesTuplesMembersAndCells()
     {
         var tm1 = _tm1.Client();
-        _tm1.Respond = _ => FakeTm1.Collection(new { Ordinal = 0, Cardinality = 2, Name = "Region", UniqueName = "[Region].[Region].[North]" });
+        _tm1.Respond = _ =>
+            FakeTm1.Collection(
+                new
+                {
+                    Ordinal = 0,
+                    Cardinality = 2,
+                    Name = "Region",
+                    UniqueName = "[Region].[Region].[North]",
+                }
+            );
 
         Assert.Equal(2, Assert.Single(await tm1.Cellsets.AxesAsync("c1", ODataQuery.None().Expand("Tuples")).ToListAsync()).Cardinality);
         Assert.Equal("Cellsets('c1')/Axes?$expand=Tuples", _tm1.Last.Target);
@@ -94,12 +104,21 @@ public partial class CellsetServiceTests
         var tm1 = _tm1.Client();
         _tm1.Respond = _ => null;
         await tm1.Cellsets.UpdateAsync("c1", 5, 42);
-        Assert.Equal(("POST", "Cellsets('c1')/tm1.Update", """{"BeginOrdinal":5,"EndOrdinal":5,"Value":42}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
+        Assert.Equal(
+            ("POST", "Cellsets('c1')/tm1.Update", """{"BeginOrdinal":5,"EndOrdinal":5,"Value":42}"""),
+            (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text)
+        );
         await tm1.Cellsets.UpdateAsync("c1", 5, null);
         Assert.Equal("""{"BeginOrdinal":5,"EndOrdinal":5,"Value":null}""", _tm1.Last.Text);
 
-        await tm1.Cellsets.UpdateCellsAsync("c1", [CellsetUpdatePatch.Builder().Ordinal(0).Value("x").Build(), CellsetUpdatePatch.Builder().Ordinal(1).Value(2.5).Build()]);
-        Assert.Equal(("Cellsets('c1')/tm1.UpdateCells", """{"Updates":[{"Ordinal":0,"Value":"x"},{"Ordinal":1,"Value":2.5}]}"""), (_tm1.Last.Target, _tm1.Last.Text));
+        await tm1.Cellsets.UpdateCellsAsync(
+            "c1",
+            [CellsetUpdatePatch.Builder().Ordinal(0).Value("x").Build(), CellsetUpdatePatch.Builder().Ordinal(1).Value(2.5).Build()]
+        );
+        Assert.Equal(
+            ("Cellsets('c1')/tm1.UpdateCells", """{"Updates":[{"Ordinal":0,"Value":"x"},{"Ordinal":1,"Value":2.5}]}"""),
+            (_tm1.Last.Target, _tm1.Last.Text)
+        );
 
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "Saved" };
         Assert.Equal("Saved", (await tm1.Cellsets.SaveViewAsAsync("c1", "Saved")).Name);
@@ -118,8 +137,13 @@ public partial class CellsetServiceTests
         var targets = Targets();
         Assert.Equal("ExecuteMDX?" + Expand + "5)", Uri.UnescapeDataString(targets[0]));
         Assert.Equal(
-            ["Cellsets('c1')/tm1.GetPartition(Begin=3,End=5)?$select=Ordinal,Value", "Cellsets('c1')/tm1.GetPartition(Begin=6,End=8)?$select=Ordinal,Value", "Cellsets('c1')/tm1.GetPartition(Begin=9,End=11)?$select=Ordinal,Value"],
-            targets.Skip(1).SkipLast(1).Order());
+            [
+                "Cellsets('c1')/tm1.GetPartition(Begin=3,End=5)?$select=Ordinal,Value",
+                "Cellsets('c1')/tm1.GetPartition(Begin=6,End=8)?$select=Ordinal,Value",
+                "Cellsets('c1')/tm1.GetPartition(Begin=9,End=11)?$select=Ordinal,Value",
+            ],
+            targets.Skip(1).SkipLast(1).Order()
+        );
         Assert.Equal("DELETE Cellsets('c1')", targets[^1]);
     }
 
@@ -130,7 +154,10 @@ public partial class CellsetServiceTests
         var tm1 = Cellset(14, [2, 7], 4);
         var ordinals = await tm1.Cellsets.StreamAsync("SELECT", Cells(), 4, (_, cells) => cells.Select(c => c.Ordinal!.Value)).ToListAsync();
         Assert.Equal(Enumerable.Range(0, 14).Select(i => (long)i), ordinals);
-        Assert.Equal(["Begin=12,End=13", "Begin=4,End=7", "Begin=8,End=11"], Targets().Where(t => t.Contains("GetPartition")).Select(t => Partition().Match(t).Value).Order());
+        Assert.Equal(
+            ["Begin=12,End=13", "Begin=4,End=7", "Begin=8,End=11"],
+            Targets().Where(t => t.Contains("GetPartition")).Select(t => Partition().Match(t).Value).Order()
+        );
     }
 
     [Fact]
@@ -142,7 +169,8 @@ public partial class CellsetServiceTests
         Assert.Equal(Enumerable.Range(0, 8).Select(i => (long)i), ordinals);
         Assert.Equal(
             ["Cellsets('c1')/Cells?$select=Ordinal,Value&$top=3&$skip=3", "Cellsets('c1')/Cells?$select=Ordinal,Value&$top=3&$skip=6"],
-            Targets().Where(t => t.Contains("/Cells?")).Order());
+            Targets().Where(t => t.Contains("/Cells?")).Order()
+        );
         Assert.Equal("DELETE Cellsets('c1')", Targets()[^1]);
     }
 
@@ -167,7 +195,8 @@ public partial class CellsetServiceTests
 
         _tm1.Requests.Clear();
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await tm1.Cellsets.StreamAsync<int>("SELECT", Cells(), 3, (_, _) => throw new InvalidOperationException("handler")).ToListAsync());
+            await tm1.Cellsets.StreamAsync<int>("SELECT", Cells(), 3, (_, _) => throw new InvalidOperationException("handler")).ToListAsync()
+        );
         Assert.Equal("DELETE Cellsets('c1')", Targets()[^1]);
 
         _tm1.Requests.Clear();
@@ -229,7 +258,8 @@ public partial class CellsetServiceTests
         return _tm1.Client(b => b.HttpHandler(new OneAtATime(_tm1)));
     }
 
-    private static object[] Range(int from, int to) => Enumerable.Range(from, Math.Max(0, to - from + 1)).Select(i => (object)new { Ordinal = i, Value = i * 10 }).ToArray();
+    private static object[] Range(int from, int to) =>
+        Enumerable.Range(from, Math.Max(0, to - from + 1)).Select(i => (object)new { Ordinal = i, Value = i * 10 }).ToArray();
 
     [GeneratedRegex(@"Begin=(\d+),End=(\d+)")]
     private static partial Regex Partition();

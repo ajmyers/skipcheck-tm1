@@ -23,9 +23,16 @@ public sealed class CellServiceLiveTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await LiveModel.DimensionAsync(_tm1, Region,
-            [LiveModel.Element("Total", ElementType.Consolidated), LiveModel.Element("North", ElementType.Numeric), LiveModel.Element("South", ElementType.Numeric)],
-            [LiveModel.Edge("Total", "North"), LiveModel.Edge("Total", "South")]);
+        await LiveModel.DimensionAsync(
+            _tm1,
+            Region,
+            [
+                LiveModel.Element("Total", ElementType.Consolidated),
+                LiveModel.Element("North", ElementType.Numeric),
+                LiveModel.Element("South", ElementType.Numeric),
+            ],
+            [LiveModel.Edge("Total", "North"), LiveModel.Edge("Total", "South")]
+        );
         await LiveModel.DimensionAsync(_tm1, Measure, [LiveModel.Element("Amount", ElementType.Numeric), LiveModel.Element("Note", ElementType.String)], []);
         await _tm1.Cubes.CreateAsync(CubePatch.Builder().Name(_cube).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure)).Build());
     }
@@ -54,10 +61,12 @@ public sealed class CellServiceLiveTests : IAsyncLifetime
     public async Task NeedsAValueInEveryUpdateAndDoesntCopyFromAReference()
     {
         await Cells.UpdateAsync(_cube, Cell("North", "Amount"), 40);
-        CubeUpdatePatch.PatchBuilder WithReference() => CubeUpdatePatch.Builder()
-            .BindTuple(Tuples.Of(Cell("South", "Amount")))
-            .BindReferenceCube(ODataPath.Of("Cubes").Key(_cube))
-            .BindReferenceCell(Tuples.Of(Cell("North", "Amount")));
+        CubeUpdatePatch.PatchBuilder WithReference() =>
+            CubeUpdatePatch
+                .Builder()
+                .BindTuple(Tuples.Of(Cell("South", "Amount")))
+                .BindReferenceCube(ODataPath.Of("Cubes").Key(_cube))
+                .BindReferenceCell(Tuples.Of(Cell("North", "Amount")));
         var e = await Assert.ThrowsAsync<Tm1BadRequestException>(() => Cells.UpdateCellsAsync(_cube, [WithReference().Build()]));
         Assert.Contains("Value", e.Message, StringComparison.Ordinal);
         await Cells.UpdateCellsAsync(_cube, [WithReference().Value(5).Build()]);
@@ -68,11 +77,18 @@ public sealed class CellServiceLiveTests : IAsyncLifetime
     public async Task WritesOnlyTheFirstOfSeveralCellsAndRefusesConsolidations()
     {
         // Through the raw session: the service only offers what TM1 does
-        await _tm1.Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Cubes").Key(_cube).Action("tm1.Update"), new Dictionary<string, object?>
-        {
-            ["Cells"] = new[] { Paths(Cell("North", "Amount")), Paths(Cell("South", "Amount")) }.Select(p => new Dictionary<string, object?> { ["Tuple@odata.bind"] = p }).ToList(),
-            ["Value"] = 3,
-        }));
+        await _tm1.Session.ExecuteAsync(
+            Tm1Request.Post(
+                ODataPath.Of("Cubes").Key(_cube).Action("tm1.Update"),
+                new Dictionary<string, object?>
+                {
+                    ["Cells"] = new[] { Paths(Cell("North", "Amount")), Paths(Cell("South", "Amount")) }
+                        .Select(p => new Dictionary<string, object?> { ["Tuple@odata.bind"] = p })
+                        .ToList(),
+                    ["Value"] = 3,
+                }
+            )
+        );
         Assert.Equal(3.0, await Number("North", "Amount"));
         Assert.Equal(0.0, await Number("South", "Amount")); // only the first cell is written
         var e = await Assert.ThrowsAsync<Tm1BadRequestException>(() => Cells.UpdateAsync(_cube, Cell("Total", "Amount"), 100));
@@ -101,11 +117,23 @@ public sealed class CellServiceLiveTests : IAsyncLifetime
             await _tm1.Cellsets.UpdateAsync(id, 1, 6);
             Assert.Equal(10.0, await Number("Total", "Amount"));
 
-            await _tm1.Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Cellsets").Key(id).Action("tm1.Update"),
-                new Dictionary<string, object?> { ["BeginOrdinal"] = 0, ["EndOrdinal"] = 1, ["Value"] = 9 }));
+            await _tm1.Session.ExecuteAsync(
+                Tm1Request.Post(
+                    ODataPath.Of("Cellsets").Key(id).Action("tm1.Update"),
+                    new Dictionary<string, object?>
+                    {
+                        ["BeginOrdinal"] = 0,
+                        ["EndOrdinal"] = 1,
+                        ["Value"] = 9,
+                    }
+                )
+            );
             Assert.Equal(15.0, await Number("Total", "Amount")); // a range writes only its first cell
 
-            await _tm1.Cellsets.UpdateCellsAsync(id, [CellsetUpdatePatch.Builder().Ordinal(0).Value(1).Build(), CellsetUpdatePatch.Builder().Ordinal(1).Value(2).Build()]);
+            await _tm1.Cellsets.UpdateCellsAsync(
+                id,
+                [CellsetUpdatePatch.Builder().Ordinal(0).Value(1).Build(), CellsetUpdatePatch.Builder().Ordinal(1).Value(2).Build()]
+            );
             Assert.Equal(3.0, await Number("Total", "Amount"));
 
             Assert.Equal("Saved", (await _tm1.Cellsets.SaveViewAsAsync(id, "Saved")).Name);
@@ -123,7 +151,8 @@ public sealed class CellServiceLiveTests : IAsyncLifetime
 
     private static List<string> Paths(Dictionary<string, string> tuple) => Tuples.Of(tuple).Select(p => p.ToString()).ToList();
 
-    private CubeUpdatePatch Write(string region, string measure, object value) => CubeUpdatePatch.Builder().BindTuple(Tuples.Of(Cell(region, measure))).Value(value).Build();
+    private CubeUpdatePatch Write(string region, string measure, object value) =>
+        CubeUpdatePatch.Builder().BindTuple(Tuples.Of(Cell(region, measure))).Value(value).Build();
 
     private Task<double> Number(string region, string measure) => LiveModel.NumberAsync(_tm1, Mdx(region, measure));
 
@@ -158,7 +187,12 @@ public sealed class CellsetServiceLiveTests : IAsyncLifetime
         {
             foreach (var m in Measures)
             {
-                await LiveModel.WriteAsync(_tm1, _cube, [LiveModel.Element(Region, r), LiveModel.Element(Measure, m)], (value++).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                await LiveModel.WriteAsync(
+                    _tm1,
+                    _cube,
+                    [LiveModel.Element(Region, r), LiveModel.Element(Measure, m)],
+                    (value++).ToString(System.Globalization.CultureInfo.InvariantCulture)
+                );
             }
         }
     }
@@ -185,7 +219,10 @@ public sealed class CellsetServiceLiveTests : IAsyncLifetime
             Assert.Equal([Region], await Cellsets.HierarchiesAsync(id, 1).Select(h => h.Name).ToListAsync());
             Assert.Equal(4, (await Cellsets.TuplesAsync(id, 1).ToListAsync()).Count);
             Assert.Equal(["E"], await Cellsets.TupleMembersAsync(id, 1, 2).Select(m => m.Name).ToListAsync());
-            Assert.Equal([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], Values(await Cellsets.CellsAsync(id, ODataQuery.None().Select("Ordinal", "Value")).ToListAsync()));
+            Assert.Equal(
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+                Values(await Cellsets.CellsAsync(id, ODataQuery.None().Select("Ordinal", "Value")).ToListAsync())
+            );
             Assert.Equal(["Base", "E", "Count"], await Cellsets.CellMembersAsync(id, 5).Select(m => m.Name).ToListAsync()); // Sandboxes' Base first
             Assert.Equal(_cube, (await Cellsets.CubeAsync(id)).Name);
             // A rectangle: column 0 of rows 1 and 2
@@ -204,11 +241,13 @@ public sealed class CellsetServiceLiveTests : IAsyncLifetime
     public async Task StreamsCellsInOrderAcrossPagesAndDeletesTheCellset()
     {
         string? id = null;
-        var values = await Cellsets.StreamAsync(Mdx, ODataQuery.None().Select("Ordinal", "Value"), 3, (cellset, cells) =>
-        {
-            id = cellset.Id;
-            return cells.Select(c => c.Value!.Value.GetDouble());
-        }).ToListAsync();
+        var values = await Cellsets
+            .StreamAsync(Mdx, ODataQuery.None().Select("Ordinal", "Value"), 3, (cellset, cells) =>
+            {
+                id = cellset.Id;
+                return cells.Select(c => c.Value!.Value.GetDouble());
+            })
+            .ToListAsync();
         Assert.Equal([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], values);
         await Assert.ThrowsAsync<Tm1NotFoundException>(() => Cellsets.GetAsync(id!)); // the cellset is deleted
     }
@@ -216,19 +255,24 @@ public sealed class CellsetServiceLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task StreamsAtLeastARowPerPage()
     {
-        Assert.Equal([0L, 1L, 2L, 3L, 4L, 5L, 6L, 7L],
-            await Cellsets.StreamAsync(Mdx, ODataQuery.None().Select("Ordinal", "Value"), 1, (_, cells) => cells.Select(c => c.Ordinal)).ToListAsync());
+        Assert.Equal(
+            [0L, 1L, 2L, 3L, 4L, 5L, 6L, 7L],
+            await Cellsets.StreamAsync(Mdx, ODataQuery.None().Select("Ordinal", "Value"), 1, (_, cells) => cells.Select(c => c.Ordinal)).ToListAsync()
+        );
     }
 
     [Tm1Fact]
     public async Task DeletesTheCellsetWhenTheStreamIsAbandoned()
     {
         string? id = null;
-        var first = await Cellsets.StreamAsync(Mdx, ODataQuery.None().Select("Ordinal"), 2, (cellset, cells) =>
-        {
-            id = cellset.Id;
-            return cells.Select(c => c.Ordinal);
-        }).Take(3).ToListAsync();
+        var first = await Cellsets
+            .StreamAsync(Mdx, ODataQuery.None().Select("Ordinal"), 2, (cellset, cells) =>
+            {
+                id = cellset.Id;
+                return cells.Select(c => c.Ordinal);
+            })
+            .Take(3)
+            .ToListAsync();
         Assert.Equal([0L, 1L, 2L], first);
         // Unlike Java's cancel, disposing the enumerator waits for the delete
         await Assert.ThrowsAsync<Tm1NotFoundException>(() => Cellsets.GetAsync(id!));
@@ -242,11 +286,16 @@ public sealed class CellsetServiceLiveTests : IAsyncLifetime
         {
             await LiveModel.SubsetAllAsync(_tm1, d);
         }
-        await _tm1.Views.CreateAsync(_cube, ViewScope.Public, NativeViewPatch.Builder()
-            .Name("Native")
-            .Columns([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(Measure)).Build()])
-            .Rows([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(Region)).Build()])
-            .Build());
+        await _tm1.Views.CreateAsync(
+            _cube,
+            ViewScope.Public,
+            NativeViewPatch
+                .Builder()
+                .Name("Native")
+                .Columns([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(Measure)).Build()])
+                .Rows([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(Region)).Build()])
+                .Build()
+        );
         foreach (var view in new[] { "Mdx", "Native" })
         {
             var cellset = await Cellsets.ExecuteViewAsync(_cube, ViewScope.Public, view, ODataQuery.None().Expand("Cells", c => c.Select("Value")));
@@ -287,22 +336,36 @@ public sealed class DrillthroughLiveTests : IAsyncLifetime
             await LiveModel.DimensionAsync(_tm1, d, "X", "Y");
             await LiveModel.SubsetAllAsync(_tm1, d);
         }
-        await _tm1.Cubes.CreateAsync(CubePatch.Builder()
-            .Name(_cube)
-            .BindDimensions(LiveModel.Dim(_dimensions[0]), LiveModel.Dim(_dimensions[1]))
-            .DrillthroughRules($"[] = S: '{_process["}Drill_".Length..]}';\n")
-            .Build());
-        await _tm1.Views.CreateAsync(_cube, ViewScope.Public, NativeViewPatch.Builder()
-            .Name("Detail")
-            .Columns([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(_dimensions[1])).Build()])
-            .Rows([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(_dimensions[0])).Build()])
-            .Build());
+        await _tm1.Cubes.CreateAsync(
+            CubePatch
+                .Builder()
+                .Name(_cube)
+                .BindDimensions(LiveModel.Dim(_dimensions[0]), LiveModel.Dim(_dimensions[1]))
+                .DrillthroughRules($"[] = S: '{_process["}Drill_".Length..]}';\n")
+                .Build()
+        );
+        await _tm1.Views.CreateAsync(
+            _cube,
+            ViewScope.Public,
+            NativeViewPatch
+                .Builder()
+                .Name("Detail")
+                .Columns([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(_dimensions[1])).Build()])
+                .Rows([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(_dimensions[0])).Build()])
+                .Build()
+        );
         // Processes are another service's; the raw session makes the drillthrough process here
-        await _tm1.Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Processes"), ProcessPatch.Builder()
-            .Name(_process)
-            .Parameters([Parameter("pCube"), Parameter("p0"), Parameter("p1")])
-            .EpilogProcedure($"ReturnViewHandle('{_cube}', 'Detail');\n")
-            .Build()));
+        await _tm1.Session.ExecuteAsync(
+            Tm1Request.Post(
+                ODataPath.Of("Processes"),
+                ProcessPatch
+                    .Builder()
+                    .Name(_process)
+                    .Parameters([Parameter("pCube"), Parameter("p0"), Parameter("p1")])
+                    .EpilogProcedure($"ReturnViewHandle('{_cube}', 'Detail');\n")
+                    .Build()
+            )
+        );
     }
 
     public async Task DisposeAsync()
@@ -361,7 +424,8 @@ public sealed class DrillthroughLiveTests : IAsyncLifetime
         await _tm1.Drillthrough.DeleteRowsetAsync(rowset);
     }
 
-    private static ProcessParameterPatch Parameter(string name) => ProcessParameterPatch.Builder().Name(name).Value("").Type(ProcessVariableType.String).Build();
+    private static ProcessParameterPatch Parameter(string name) =>
+        ProcessParameterPatch.Builder().Name(name).Value("").Type(ProcessVariableType.String).Build();
 }
 
 /// <summary>Member sets, MDX statements, and model against control objects, on the server's own control
@@ -377,7 +441,10 @@ public sealed class MdxAndModelLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task KeepsASetExpressionsResultByOrdinalButListsNone()
     {
-        var set = await _tm1.MemberSets.ExecuteAsync("{TM1SUBSETALL([}Clients].[}Clients])}", ODataQuery.None().Expand("Tuples", t => t.Expand("Members", m => m.Select("Name"))));
+        var set = await _tm1.MemberSets.ExecuteAsync(
+            "{TM1SUBSETALL([}Clients].[}Clients])}",
+            ODataQuery.None().Expand("Tuples", t => t.Expand("Members", m => m.Select("Name")))
+        );
         Assert.Contains(set.Tuples!, t => t.Members!.Select(m => m.Name).SequenceEqual(["Admin"]));
         var ordinal = set.Ordinal!.Value;
         Assert.Equal(set.Cardinality, (await _tm1.MemberSets.GetAsync(ordinal)).Cardinality);
@@ -390,7 +457,9 @@ public sealed class MdxAndModelLiveTests : IAsyncLifetime
     public async Task RunsAnMdxStatementButNotCreateSet()
     {
         await _tm1.Cellsets.ExecuteStatementAsync("SELECT {} ON 0 FROM [}ClientGroups]");
-        await Assert.ThrowsAsync<Tm1BadRequestException>(() => _tm1.Cellsets.ExecuteStatementAsync("CREATE SET [}Clients].[Probe] AS {TM1SUBSETALL([}Clients].[}Clients])}"));
+        await Assert.ThrowsAsync<Tm1BadRequestException>(() =>
+            _tm1.Cellsets.ExecuteStatementAsync("CREATE SET [}Clients].[Probe] AS {TM1SUBSETALL([}Clients].[}Clients])}")
+        );
     }
 
     [Tm1Fact]
@@ -413,7 +482,10 @@ public sealed class MdxAndModelLiveTests : IAsyncLifetime
     }
 
     private async Task<List<string>> Names(string function) =>
-        await _tm1.Session.StreamAsync(Tm1Request.List<Dimension>(ODataPath.FunctionImport(function), ODataQuery.None().Select(Dimension.Fields.Name))).Select(d => d.Name!).ToListAsync();
+        await _tm1
+            .Session.StreamAsync(Tm1Request.List<Dimension>(ODataPath.FunctionImport(function), ODataQuery.None().Select(Dimension.Fields.Name)))
+            .Select(d => d.Name!)
+            .ToListAsync();
 }
 
 /// <summary>Sandboxes and change sets, on a cube of two dimensions of X and Y: Java's
@@ -478,11 +550,13 @@ public sealed class SandboxAndChangeSetLiveTests : IAsyncLifetime
     public async Task UndoesTheWritesOfAChangeSetOnly()
     {
         string? id = null;
-        await _tm1.ChangeSets.WithinAsync(async (Tm1Session session) =>
-        {
-            id = session.ChangeSet();
-            await Tm1Client.Of(session).Cells.UpdateAsync(_cube, Cell("X"), 5);
-        });
+        await _tm1.ChangeSets.WithinAsync(
+            async (Tm1Session session) =>
+            {
+                id = session.ChangeSet();
+                await Tm1Client.Of(session).Cells.UpdateAsync(_cube, Cell("X"), 5);
+            }
+        );
         await _tm1.Cells.UpdateAsync(_cube, Cell("Y"), 7);
         Assert.Equal(5.0, await Value(_tm1, "X"));
         await _tm1.ChangeSets.UndoAsync(id!);

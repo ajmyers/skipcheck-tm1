@@ -49,21 +49,27 @@ public sealed class ProcessDebugService : Tm1Service
     private const int MaxResumes = 100;
 
     public ProcessDebugService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>tm1.Debug</c>: starts debugging a process, paused before its first line.
     /// <paramref name="parameters"/> are its parameters, by name, in order; may be empty.</summary>
     [Tm1Endpoint("Action Process/Debug")]
-    public Task<ProcessDebugContext> DebugAsync(string process, IReadOnlyDictionary<string, object?>? parameters = null, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    public Task<ProcessDebugContext> DebugAsync(
+        string process,
+        IReadOnlyDictionary<string, object?>? parameters = null,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.ProcessDebug;
         var body = ProcessFormats.WithParameters(new Dictionary<string, object?>(), parameters);
-        return Session.ExecuteAsync(Tm1Request
-            .Post<ProcessDebugContext>(ODataPath.Of("Processes").Key(Require(process, nameof(process))).Action(operation.Name), body)
-            .WithQuery(query)
-            .Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(
+            Tm1Request
+                .Post<ProcessDebugContext>(ODataPath.Of("Processes").Key(Require(process, nameof(process))).Action(operation.Name), body)
+                .WithQuery(query)
+                .Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary>Debugs a process for the length of <paramref name="work"/>: starts the run, streams what
@@ -71,8 +77,12 @@ public sealed class ProcessDebugService : Tm1Service
     /// cancelled.</summary>
     [Tm1Endpoint("Action Process/Debug")]
     [Tm1Endpoint("EntitySet ProcessDebugContexts")]
-    public async IAsyncEnumerable<TResult> DebuggingAsync<TResult>(string process, IReadOnlyDictionary<string, object?>? parameters,
-        Func<ProcessDebugContext, IAsyncEnumerable<TResult>> work, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<TResult> DebuggingAsync<TResult>(
+        string process,
+        IReadOnlyDictionary<string, object?>? parameters,
+        Func<ProcessDebugContext, IAsyncEnumerable<TResult>> work,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default
+    )
     {
         Require(work, nameof(work));
         var context = await DebugAsync(process, parameters, null, cancellationToken).ConfigureAwait(false);
@@ -93,8 +103,12 @@ public sealed class ProcessDebugService : Tm1Service
     /// for work with a single result.</summary>
     [Tm1Endpoint("Action Process/Debug")]
     [Tm1Endpoint("EntitySet ProcessDebugContexts")]
-    public async Task<TResult> DebuggingAsync<TResult>(string process, IReadOnlyDictionary<string, object?>? parameters,
-        Func<ProcessDebugContext, Task<TResult>> work, CancellationToken cancellationToken = default)
+    public async Task<TResult> DebuggingAsync<TResult>(
+        string process,
+        IReadOnlyDictionary<string, object?>? parameters,
+        Func<ProcessDebugContext, Task<TResult>> work,
+        CancellationToken cancellationToken = default
+    )
     {
         Require(work, nameof(work));
         var context = await DebugAsync(process, parameters, null, cancellationToken).ConfigureAwait(false);
@@ -163,21 +177,31 @@ public sealed class ProcessDebugService : Tm1Service
 
     /// <summary><c>GET ProcessDebugContexts('id')/Breakpoints</c>, streamed.</summary>
     [Tm1Endpoint("Navigation ProcessDebugContext/Breakpoints")]
-    public IAsyncEnumerable<ProcessDebugContextBreakpoint> BreakpointsAsync(string id, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<ProcessDebugContextBreakpoint>(ContextPath(id).Nav("Breakpoints"), query), cancellationToken);
+    public IAsyncEnumerable<ProcessDebugContextBreakpoint> BreakpointsAsync(
+        string id,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<ProcessDebugContextBreakpoint>(ContextPath(id).Nav("Breakpoints"), query), cancellationToken);
 
     /// <summary><c>POST ProcessDebugContexts('id')/Breakpoints</c>: adds a breakpoint (a line, data or
     /// object breakpoint, by its patch's type). It needs an <c>ID</c> of 0 or more: TM1 stores one
     /// without as -1, which can't be changed or removed, so one without is refused here with an
     /// <see cref="ArgumentException"/>.</summary>
     [Tm1Endpoint("Navigation ProcessDebugContext/Breakpoints")]
-    public Task<ProcessDebugContextBreakpoint> AddBreakpointAsync(string id, ProcessDebugContextBreakpointPatch breakpoint, CancellationToken cancellationToken = default)
+    public Task<ProcessDebugContextBreakpoint> AddBreakpointAsync(
+        string id,
+        ProcessDebugContextBreakpointPatch breakpoint,
+        CancellationToken cancellationToken = default
+    )
     {
         Require(breakpoint, nameof(breakpoint));
         var number = breakpoint.Values.Where(v => v.Key == "ID").Select(v => v.Value).FirstOrDefault();
         if (number is not (int or long or short or byte) || Convert.ToInt64(number, System.Globalization.CultureInfo.InvariantCulture) < 0)
         {
-            throw new ArgumentException("A breakpoint needs an ID of 0 or more: TM1 stores one without as -1, which can't be changed or removed", nameof(breakpoint));
+            throw new ArgumentException(
+                "A breakpoint needs an ID of 0 or more: TM1 stores one without as -1, which can't be changed or removed",
+                nameof(breakpoint)
+            );
         }
         return Session.ExecuteAsync(Tm1Request.Post<ProcessDebugContextBreakpoint>(ContextPath(id).Nav("Breakpoints"), breakpoint), cancellationToken);
     }
@@ -206,8 +230,12 @@ public sealed class ProcessDebugService : Tm1Service
 
     /// <summary><c>GET ProcessDebugContexts('id')/CallStack('frame')/Variables</c>: a frame's variables, streamed.</summary>
     [Tm1Endpoint("Navigation ProcessDebugContextStackFrame/Variables")]
-    public IAsyncEnumerable<ProcessDebugContextVariable> VariablesAsync(string id, string frame, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<ProcessDebugContextVariable>(FramePath(id, frame).Nav("Variables"), query), cancellationToken);
+    public IAsyncEnumerable<ProcessDebugContextVariable> VariablesAsync(
+        string id,
+        string frame,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<ProcessDebugContextVariable>(FramePath(id, frame).Nav("Variables"), query), cancellationToken);
 
     /// <summary><c>GET ProcessDebugContexts('id')/CallStack('frame')/Process</c>: the process a frame runs.</summary>
     [Tm1Endpoint("Navigation ProcessDebugContextStackFrame/Process")]
@@ -234,7 +262,8 @@ public sealed class ProcessDebugService : Tm1Service
     }
 
     private static Tm1Request<ProcessDebugContext> Step(Tm1Operation operation, string id, ODataQuery? query) =>
-        Tm1Request.Post<ProcessDebugContext>(ContextPath(id).Action(operation.Name), new Dictionary<string, object?>())
+        Tm1Request
+            .Post<ProcessDebugContext>(ContextPath(id).Action(operation.Name), new Dictionary<string, object?>())
             .WithQuery(query)
             .Requires(operation.Capability());
 

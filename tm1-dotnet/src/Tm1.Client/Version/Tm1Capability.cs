@@ -50,13 +50,14 @@ public sealed record Tm1Capability
 
     public string? AddedInVersion() => AddedIn;
 
-    public string Describe() => Kind switch
-    {
-        CapabilityKind.EntitySet => "entity set " + Name,
-        CapabilityKind.Singleton => "singleton " + Name,
-        CapabilityKind.UnboundOperation => "operation " + Name,
-        _ => Simple(Type!) + "." + Simple(Name),
-    };
+    public string Describe() =>
+        Kind switch
+        {
+            CapabilityKind.EntitySet => "entity set " + Name,
+            CapabilityKind.Singleton => "singleton " + Name,
+            CapabilityKind.UnboundOperation => "operation " + Name,
+            _ => Simple(Type!) + "." + Simple(Name),
+        };
 
     private static string Simple(string qualified) => qualified[(qualified.LastIndexOf('.') + 1)..];
 }

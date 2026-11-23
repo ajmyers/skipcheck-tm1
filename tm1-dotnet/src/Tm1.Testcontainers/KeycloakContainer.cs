@@ -35,9 +35,7 @@ public partial class KeycloakContainer : GenericContainer<KeycloakContainer>
 
     /// <summary>Keycloak in <see cref="DefaultImage"/>, or <c>KEYCLOAK_IMAGE</c> if set.</summary>
     public KeycloakContainer()
-        : this(Settings.Text(Settings.Get(Image)) ?? DefaultImage)
-    {
-    }
+        : this(Settings.Text(Settings.Get(Image)) ?? DefaultImage) { }
 
     /// <summary>Keycloak in <paramref name="image"/>.</summary>
     public KeycloakContainer(string image)
@@ -64,15 +62,18 @@ public partial class KeycloakContainer : GenericContainer<KeycloakContainer>
     public async Task<string> IdTokenAsync(string user, string password, CancellationToken cancellationToken = default)
     {
         using var http = new HttpClient { Timeout = Timeout };
-        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["grant_type"] = "password",
-            ["client_id"] = AppClient,
-            ["scope"] = "openid",
-            ["username"] = user,
-            ["password"] = password,
-        });
-        using var response = await http.PostAsync(new Uri(Url + "/realms/" + Realm + "/protocol/openid-connect/token"), form, cancellationToken).ConfigureAwait(false);
+        using var form = new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["grant_type"] = "password",
+                ["client_id"] = AppClient,
+                ["scope"] = "openid",
+                ["username"] = user,
+                ["password"] = password,
+            }
+        );
+        using var response = await http.PostAsync(new Uri(Url + "/realms/" + Realm + "/protocol/openid-connect/token"), form, cancellationToken)
+            .ConfigureAwait(false);
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         var m = IdToken().Match(body);
         if (response.StatusCode != HttpStatusCode.OK || !m.Success)

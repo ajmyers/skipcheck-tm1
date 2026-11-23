@@ -20,9 +20,17 @@ public sealed class Tm1Capabilities
     private readonly HashSet<string> _imports;
     private readonly Dictionary<string, string> _aliases;
 
-    private Tm1Capabilities(string? schemaVersion, Tm1Version? productVersion, IReadOnlySet<string> endpoints,
-        Dictionary<string, (string?, HashSet<string>)> types, Dictionary<string, HashSet<string>> bound,
-        HashSet<string> entitySets, HashSet<string> singletons, HashSet<string> imports, Dictionary<string, string> aliases)
+    private Tm1Capabilities(
+        string? schemaVersion,
+        Tm1Version? productVersion,
+        IReadOnlySet<string> endpoints,
+        Dictionary<string, (string?, HashSet<string>)> types,
+        Dictionary<string, HashSet<string>> bound,
+        HashSet<string> entitySets,
+        HashSet<string> singletons,
+        HashSet<string> imports,
+        Dictionary<string, string> aliases
+    )
     {
         SchemaVersion = schemaVersion;
         ProductVersion = productVersion;
@@ -59,7 +67,9 @@ public sealed class Tm1Capabilities
             throw new Tm1ProtocolException("TM1's $metadata isn't CSDL: its root is " + doc.Root?.Name.LocalName);
         }
         var schemas = doc.Descendants(Edm + "Schema").ToList();
-        var aliases = schemas.Where(s => s.Attribute("Alias") is not null).ToDictionary(s => (string)s.Attribute("Alias")!, s => (string)s.Attribute("Namespace")!);
+        var aliases = schemas
+            .Where(s => s.Attribute("Alias") is not null)
+            .ToDictionary(s => (string)s.Attribute("Alias")!, s => (string)s.Attribute("Namespace")!);
         string Qualify(string name)
         {
             var dot = name.LastIndexOf('.');
@@ -80,7 +90,11 @@ public sealed class Tm1Capabilities
         foreach (var schema in schemas)
         {
             var ns = (string)schema.Attribute("Namespace")!;
-            foreach (var a in schema.Elements(Edm + "Annotation").Where(a => ((string?)a.Attribute("Term") ?? "").EndsWith("SchemaVersion", StringComparison.Ordinal)))
+            foreach (
+                var a in schema
+                    .Elements(Edm + "Annotation")
+                    .Where(a => ((string?)a.Attribute("Term") ?? "").EndsWith("SchemaVersion", StringComparison.Ordinal))
+            )
             {
                 version = (string?)a.Attribute("String") ?? a.Value.Trim();
             }
@@ -148,7 +162,8 @@ public sealed class Tm1Capabilities
             Tm1Capability.CapabilityKind.EntitySet => _entitySets.Contains(capability.Name),
             Tm1Capability.CapabilityKind.Singleton => _singletons.Contains(capability.Name),
             Tm1Capability.CapabilityKind.UnboundOperation => _imports.Contains(capability.Name),
-            Tm1Capability.CapabilityKind.BoundOperation => Hierarchy(capability.Type!).Any(t => _bound.TryGetValue(t, out var ops) && ops.Contains(Simple(capability.Name))),
+            Tm1Capability.CapabilityKind.BoundOperation => Hierarchy(capability.Type!)
+                .Any(t => _bound.TryGetValue(t, out var ops) && ops.Contains(Simple(capability.Name))),
             _ => Hierarchy(capability.Type!).Any(t => _types[t].Members.Contains(capability.Name)),
         };
     }

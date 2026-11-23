@@ -24,9 +24,7 @@ public sealed class SandboxService : Tm1Service
     private static readonly ODataPath Sandboxes = ODataPath.Of("Sandboxes");
 
     public SandboxService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Sandboxes</c>, streamed: the session user's sandboxes.</summary>
     [Tm1Endpoint("EntitySet Sandboxes")]
@@ -89,7 +87,14 @@ public sealed class SandboxService : Tm1Service
     /// <summary><c>tm1.Merge</c> with options: what to do with cells the target changed too, whether to
     /// wait for a lock rather than fail, and whether to empty this sandbox once merged.</summary>
     [Tm1Endpoint("Action Sandbox/Merge")]
-    public Task MergeAsync(string name, string target, ConflictResolution conflicts, bool allowQueueing, bool cleanAfter, CancellationToken cancellationToken = default)
+    public Task MergeAsync(
+        string name,
+        string target,
+        ConflictResolution conflicts,
+        bool allowQueueing,
+        bool cleanAfter,
+        CancellationToken cancellationToken = default
+    )
     {
         var body = new Dictionary<string, object?> { ["Target@odata.bind"] = SandboxPath(target).ToString() };
         foreach (var (k, v) in Options(conflicts, allowQueueing, cleanAfter))
@@ -99,12 +104,13 @@ public sealed class SandboxService : Tm1Service
         return Session.ExecuteAsync(Action(Tm1Operations.SandboxMerge, name, body), cancellationToken);
     }
 
-    private static Dictionary<string, object?> Options(ConflictResolution conflicts, bool allowQueueing, bool cleanAfter) => new()
-    {
-        ["ConflictResolution"] = conflicts,
-        ["AllowQueueing"] = allowQueueing,
-        ["CleanAfter"] = cleanAfter,
-    };
+    private static Dictionary<string, object?> Options(ConflictResolution conflicts, bool allowQueueing, bool cleanAfter) =>
+        new()
+        {
+            ["ConflictResolution"] = conflicts,
+            ["AllowQueueing"] = allowQueueing,
+            ["CleanAfter"] = cleanAfter,
+        };
 
     private static ODataPath SandboxPath(string name) => Sandboxes.Key(Require(name, nameof(name)));
 

@@ -21,7 +21,8 @@ public sealed class AttributeSet
     public static AttributeSet Hierarchies(string dimension) => new(HierarchyService.DimensionPath(dimension).Nav("HierarchyAttributes"));
 
     /// <summary>The attributes of a hierarchy's elements: <c>…/Hierarchies('h')/ElementAttributes</c>.</summary>
-    public static AttributeSet Elements(string dimension, string hierarchy) => new(HierarchyService.HierarchyPath(dimension, hierarchy).Nav("ElementAttributes"));
+    public static AttributeSet Elements(string dimension, string hierarchy) =>
+        new(HierarchyService.HierarchyPath(dimension, hierarchy).Nav("ElementAttributes"));
 
     /// <summary>The attributes of a hierarchy's subsets: <c>…/Hierarchies('h')/SubsetAttributes</c>.</summary>
     public static AttributeSet Subsets(string dimension, string hierarchy) => new(HierarchyService.HierarchyPath(dimension, hierarchy).Nav("SubsetAttributes"));
@@ -32,7 +33,8 @@ public sealed class AttributeSet
     /// <summary>The attributes of a cube's views: <c>Cubes('c')/ViewAttributes</c>. TM1 (11.8) refuses to
     /// create one (400, "no public views") until the cube has a public <em>native</em> view; an MDX view
     /// doesn't count.</summary>
-    public static AttributeSet Views(string cube) => new(ODataPath.Of("Cubes").Key(cube ?? throw new ArgumentNullException(nameof(cube))).Nav("ViewAttributes"));
+    public static AttributeSet Views(string cube) =>
+        new(ODataPath.Of("Cubes").Key(cube ?? throw new ArgumentNullException(nameof(cube))).Nav("ViewAttributes"));
 
     /// <summary>Processes' attributes: <c>/ProcessAttributes</c>.</summary>
     public static AttributeSet Processes() => new(ODataPath.Of("ProcessAttributes"));

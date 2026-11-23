@@ -56,7 +56,12 @@ public sealed class RawTm1 : IDisposable
         // A header character that isn't ASCII goes out as "?", as Java's HttpClient writes it, so the
         // impersonation test sends what Java's does. .NET refuses to send one otherwise. Sent as
         // UTF-8, TM1 would accept the name: issue 184.
-        var handler = new SocketsHttpHandler { UseCookies = false, PooledConnectionIdleTimeout = Connection.MaxIdle, RequestHeaderEncodingSelector = (_, _) => Encoding.ASCII };
+        var handler = new SocketsHttpHandler
+        {
+            UseCookies = false,
+            PooledConnectionIdleTimeout = Connection.MaxIdle,
+            RequestHeaderEncodingSelector = (_, _) => Encoding.ASCII,
+        };
         if (Environment.GetEnvironmentVariable("TM1_VERIFY") == "false")
         {
             handler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
@@ -69,7 +74,10 @@ public sealed class RawTm1 : IDisposable
     {
         var (url, user, password) = Live.Target();
         var ns = Environment.GetEnvironmentVariable("TM1_URL") is { Length: > 0 } ? Environment.GetEnvironmentVariable("TM1_NAMESPACE") : null;
-        var builder = Tm1Session.Builder().BaseUrl(url).Authenticator(ns is null ? Tm1Authenticator.Basic(user, password) : Tm1Authenticator.CamNamespace(user, password, ns));
+        var builder = Tm1Session
+            .Builder()
+            .BaseUrl(url)
+            .Authenticator(ns is null ? Tm1Authenticator.Basic(user, password) : Tm1Authenticator.CamNamespace(user, password, ns));
         if (Environment.GetEnvironmentVariable("TM1_VERIFY") == "false")
         {
             builder.HttpHandler(Handler());
@@ -83,7 +91,8 @@ public sealed class RawTm1 : IDisposable
     public static string UniqueContext() => "test-" + Guid.NewGuid();
 
     /// <summary>Logs in with Basic credentials and no cookie; the new session's cookie, as <c>name=value</c>.</summary>
-    public string Login() => CookieOf(Send(Request("GET", "ActiveSession?$select=ID").WithBasic())) ?? throw new InvalidOperationException("TM1 set no session cookie");
+    public string Login() =>
+        CookieOf(Send(Request("GET", "ActiveSession?$select=ID").WithBasic())) ?? throw new InvalidOperationException("TM1 set no session cookie");
 
     public long SessionId(string cookie) => Json(Send(Request("GET", "ActiveSession?$select=ID").WithCookie(cookie))).GetProperty("ID").GetInt64();
 
@@ -123,7 +132,9 @@ public sealed class RawTm1 : IDisposable
     /// <summary>How many sessions labelled <paramref name="context"/> TM1 has open: leak checks count
     /// a label unique to the test, since the server is shared.</summary>
     public int SessionCount(string admin, string context) =>
-        Json(Send(Request("GET", "Sessions?$select=ID,Context").WithCookie(admin))).GetProperty("value").EnumerateArray()
+        Json(Send(Request("GET", "Sessions?$select=ID,Context").WithCookie(admin)))
+            .GetProperty("value")
+            .EnumerateArray()
             .Count(s => s.TryGetProperty("Context", out var c) && c.ValueKind == JsonValueKind.String && c.GetString() == context);
 
     /// <summary>How many sessions TM1 has open, those with no user included.</summary>
@@ -139,7 +150,8 @@ public sealed class RawTm1 : IDisposable
         }
     }
 
-    public void DeleteUser(string admin, string name) => Send(Request("DELETE", $"Users('{Uri.EscapeDataString(name.Replace("'", "''", StringComparison.Ordinal))}')").WithCookie(admin));
+    public void DeleteUser(string admin, string name) =>
+        Send(Request("DELETE", $"Users('{Uri.EscapeDataString(name.Replace("'", "''", StringComparison.Ordinal))}')").WithCookie(admin));
 
     public RawRequest Request(string method, string path) => new(this, method, path);
 
@@ -212,7 +224,9 @@ public sealed class RawTm1 : IDisposable
     {
         using var message = request.Build();
         using var response = await _http.SendAsync(message);
-        var headers = response.Headers.Concat(response.Content.Headers).GroupBy(h => h.Key, StringComparer.OrdinalIgnoreCase)
+        var headers = response
+            .Headers.Concat(response.Content.Headers)
+            .GroupBy(h => h.Key, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.SelectMany(h => h.Value).ToArray(), StringComparer.OrdinalIgnoreCase);
         return new RawResponse(response.StatusCode, headers, await response.Content.ReadAsStringAsync());
     }
@@ -232,7 +246,10 @@ public sealed class RawTm1 : IDisposable
 public sealed class Tm1SessionTm1Test : IDisposable
 {
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(30);
-    private static readonly Tm1Request<JsonElement> Server = Tm1Request.Get<JsonElement>(ODataPath.Of("Server"), ODataQuery.None().Select("Name", "ProductVersion"));
+    private static readonly Tm1Request<JsonElement> Server = Tm1Request.Get<JsonElement>(
+        ODataPath.Of("Server"),
+        ODataQuery.None().Select("Name", "ProductVersion")
+    );
 
     private readonly Lazy<(RawTm1 Raw, string Admin)> _setUp = new(() =>
     {
@@ -260,7 +277,10 @@ public sealed class Tm1SessionTm1Test : IDisposable
     {
         var session = Session();
         var tm1 = await session.ExecuteAsync(Server);
-        Assert.Equal(RawTm1.Json(Raw.Send(Raw.Request("GET", "Server?$select=ProductVersion").WithCookie(Admin))).GetProperty("ProductVersion").GetString(), tm1.GetProperty("ProductVersion").GetString());
+        Assert.Equal(
+            RawTm1.Json(Raw.Send(Raw.Request("GET", "Server?$select=ProductVersion").WithCookie(Admin))).GetProperty("ProductVersion").GetString(),
+            tm1.GetProperty("ProductVersion").GetString()
+        );
         var id = await session.SessionIdAsync();
         Assert.Equal(1, Raw.SessionCount(Admin, _context));
         await session.CloseAsync();
@@ -308,7 +328,11 @@ public sealed class Tm1SessionTm1Test : IDisposable
         {
             var first = await session.SessionIdAsync();
             Assert.Equal(204, Raw.Kill(Admin, first));
-            var dimension = new Dictionary<string, object?> { ["Name"] = name, ["Hierarchies"] = new[] { new Dictionary<string, object?> { ["Name"] = name } } };
+            var dimension = new Dictionary<string, object?>
+            {
+                ["Name"] = name,
+                ["Hierarchies"] = new[] { new Dictionary<string, object?> { ["Name"] = name } },
+            };
             await session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Dimensions"), dimension));
             Assert.Equal("1", Raw.Send(Raw.Request("GET", $"Dimensions/$count?$filter=Name%20eq%20'{name}'").WithCookie(Admin)).Body);
             Assert.NotEqual(first, await session.SessionIdAsync());
@@ -368,7 +392,10 @@ public sealed class Tm1SessionTm1Test : IDisposable
         var session = Session();
         try
         {
-            var names = await session.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Dimensions"), ODataQuery.None().Select("Name"))).Select(d => d.GetProperty("Name").GetString()).ToListAsync();
+            var names = await session
+                .StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Dimensions"), ODataQuery.None().Select("Name")))
+                .Select(d => d.GetProperty("Name").GetString())
+                .ToListAsync();
             Assert.NotEmpty(names);
             Assert.All(names, n => Assert.False(string.IsNullOrWhiteSpace(n)));
         }
@@ -384,7 +411,9 @@ public sealed class Tm1SessionTm1Test : IDisposable
         var session = Session();
         try
         {
-            await Assert.ThrowsAsync<Tm1NotFoundException>(() => session.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Cubes").Key("zz_no_such_cube"))));
+            await Assert.ThrowsAsync<Tm1NotFoundException>(() =>
+                session.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Cubes").Key("zz_no_such_cube")))
+            );
         }
         finally
         {
@@ -469,7 +498,8 @@ public sealed class Tm1SessionImpersonationTm1Test : IDisposable
 
     private static Tm1Session Session(string user) => RawTm1.Sessions().Impersonate(user).Build();
 
-    private static async Task<Tm1ErrorKind> KindOf(Tm1Session session) => (await Assert.ThrowsAnyAsync<Tm1ApiException>(() => session.ExecuteAsync(ActiveUser))).Kind;
+    private static async Task<Tm1ErrorKind> KindOf(Tm1Session session) =>
+        (await Assert.ThrowsAnyAsync<Tm1ApiException>(() => session.ExecuteAsync(ActiveUser))).Kind;
 }
 
 /// <summary>The Java client's <c>Tm1SessionPoolTm1Test</c>.</summary>
@@ -502,7 +532,8 @@ public sealed class Tm1SessionPoolTm1Test : IAsyncLifetime
         _bob = "zz_bob_" + run;
         Raw.CreateUser(_admin, _alice, "a");
         Raw.CreateUser(_admin, _bob, "b");
-        _pool = Tm1SessionPool.Builder(RawTm1.Sessions().SessionContext(_context))
+        _pool = Tm1SessionPool
+            .Builder(RawTm1.Sessions().SessionContext(_context))
             .IdleTimeout(TimeSpan.FromSeconds(1))
             .CloseGrace(TimeSpan.Zero)
             .SweepInterval(TimeSpan.FromHours(1))
@@ -574,7 +605,9 @@ public class Tm1CapabilitiesTm1Test
         var session = RawTm1.Sessions().Build();
         try
         {
-            var reported = (await session.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Server"), ODataQuery.None().Select("ProductVersion")))).GetProperty("ProductVersion").GetString()!;
+            var reported = (await session.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Server"), ODataQuery.None().Select("ProductVersion"))))
+                .GetProperty("ProductVersion")
+                .GetString()!;
             Assert.Equal(Tm1Version.Parse(reported), await session.VersionAsync());
             var capabilities = await session.CapabilitiesAsync();
             var snapshot = XDocument.Load(Repo.Snapshot);
@@ -647,7 +680,9 @@ public class Tm1SessionAsyncTm1Test
         {
             var result = await async.Session.ExecuteAsync(Execute(process)).WaitAsync(Wait);
             Assert.Equal("CompletedSuccessfully", result.GetProperty("ProcessExecuteStatusCode").GetString());
-            Assert.NotEmpty(await async.Session.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"), ODataQuery.None().Select("Name"))).ToListAsync());
+            Assert.NotEmpty(
+                await async.Session.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"), ODataQuery.None().Select("Name"))).ToListAsync()
+            );
         }
         finally
         {
@@ -689,8 +724,13 @@ public class Tm1SessionAsyncTm1Test
     {
         for (int i = 0; i < 150; i++)
         {
-            var found = await tm1.Session.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Threads")))
-                .AnyAsync(t => t.TryGetProperty("Function", out var f) && f.ValueKind == JsonValueKind.String && f.GetString()!.Contains($"Processes('{process}')", StringComparison.Ordinal));
+            var found = await tm1
+                .Session.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Threads")))
+                .AnyAsync(t =>
+                    t.TryGetProperty("Function", out var f)
+                    && f.ValueKind == JsonValueKind.String
+                    && f.GetString()!.Contains($"Processes('{process}')", StringComparison.Ordinal)
+                );
             if (found == running)
             {
                 return true;
@@ -712,7 +752,12 @@ public class Tm1BatchTm1Test
         await using var tm1 = Live.Client();
         var dimension = "batch" + Guid.NewGuid().ToString("N")[..8];
         var process = "tm1-client-" + Guid.NewGuid().ToString("N")[..8];
-        await tm1.Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Dimensions"), new Dictionary<string, object?> { ["Name"] = dimension, ["Hierarchies"] = new[] { new Dictionary<string, object?> { ["Name"] = dimension } } }));
+        await tm1.Session.ExecuteAsync(
+            Tm1Request.Post(
+                ODataPath.Of("Dimensions"),
+                new Dictionary<string, object?> { ["Name"] = dimension, ["Hierarchies"] = new[] { new Dictionary<string, object?> { ["Name"] = dimension } } }
+            )
+        );
         await tm1.Session.ExecuteAsync(Tm1SessionAsyncTm1Test.CreateProcess(process, "x = 1;\n"));
         try
         {
@@ -747,7 +792,12 @@ public class Tm1BatchTm1Test
     {
         await using var tm1 = Live.Client();
         var batch = tm1.Batch();
-        var reads = Enumerable.Range(0, 1000).Select(_ => batch.Client.Session.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Cubes").Key("}ClientGroups"), ODataQuery.None().Select("Name")))).ToList();
+        var reads = Enumerable
+            .Range(0, 1000)
+            .Select(_ =>
+                batch.Client.Session.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Cubes").Key("}ClientGroups"), ODataQuery.None().Select("Name")))
+            )
+            .ToList();
         await batch.RunAsync(1000).WaitAsync(Wait);
         Assert.Equal(1000, (await Task.WhenAll(reads)).Length);
     }
@@ -760,7 +810,9 @@ public class Tm1ClientTm1Test
     public async Task ConnectsReadsTheServerAndCloses()
     {
         var client = Live.Client();
-        var server = await (await client.ConnectAsync()).Session.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Server"), ODataQuery.None().Select("Name", "ProductVersion")));
+        var server = await (await client.ConnectAsync()).Session.ExecuteAsync(
+            Tm1Request.Get<JsonElement>(ODataPath.Of("Server"), ODataQuery.None().Select("Name", "ProductVersion"))
+        );
         var version = await client.Session.VersionAsync();
         await client.CloseAsync();
         Assert.Equal(version.ToString(), server.GetProperty("ProductVersion").GetString());
@@ -891,7 +943,9 @@ public sealed class Tm1SessionBehaviorTest : IDisposable
         var cookie = Tm1.Login();
         var close = Tm1.Send(Tm1.Request("POST", "ActiveSession/tm1.Close").WithCookie(cookie).WithBody("{}"));
         Assert.Equal(HttpStatusCode.NoContent, close.Status);
-        Assert.Contains(close.All("Set-Cookie"), c => c.StartsWith("TM1SessionId=", StringComparison.Ordinal) && c.Contains("Max-Age=0", StringComparison.Ordinal));
+        Assert.Contains(close.All("Set-Cookie"), c =>
+            c.StartsWith("TM1SessionId=", StringComparison.Ordinal) && c.Contains("Max-Age=0", StringComparison.Ordinal)
+        );
         var after = Tm1.Send(Tm1.Request("GET", "ActiveSession?$select=ID").WithCookie(cookie));
         Assert.Equal(HttpStatusCode.Unauthorized, after.Status);
         var leftover = RawTm1.CookieOf(after)!;
@@ -908,9 +962,18 @@ public sealed class Tm1SessionBehaviorTest : IDisposable
         var process = RawTm1.Scratch();
         try
         {
-            Assert.Equal(HttpStatusCode.Created, Tm1.Send(Tm1.Request("POST", "Processes").WithCookie(cookie).WithBody($"{{\"Name\":\"{process}\",\"PrologProcedure\":\"Sleep(1000);\"}}")).Status);
+            Assert.Equal(
+                HttpStatusCode.Created,
+                Tm1.Send(
+                    Tm1.Request("POST", "Processes").WithCookie(cookie).WithBody($"{{\"Name\":\"{process}\",\"PrologProcedure\":\"Sleep(1000);\"}}")
+                ).Status
+            );
             var start = Stopwatch.StartNew();
-            var runs = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => Tm1.SendAsync(Tm1.Request("POST", $"Processes('{process}')/tm1.ExecuteWithReturn").WithCookie(cookie).WithBody("{}"))));
+            var runs = await Task.WhenAll(
+                Enumerable
+                    .Range(0, 3)
+                    .Select(_ => Tm1.SendAsync(Tm1.Request("POST", $"Processes('{process}')/tm1.ExecuteWithReturn").WithCookie(cookie).WithBody("{}")))
+            );
             Assert.All(runs, r => Assert.Equal("CompletedSuccessfully", RawTm1.Json(r).GetProperty("ProcessExecuteStatusCode").GetString()));
             Assert.True(start.Elapsed < TimeSpan.FromMilliseconds(2500), $"three 1 s runs on one session took {start.Elapsed}");
         }
@@ -932,7 +995,10 @@ public sealed class Tm1SessionBehaviorTest : IDisposable
         {
             Assert.Equal("first", RawTm1.Json(login).GetProperty("Context").GetString());
             Tm1.Send(Tm1.Request("GET", "Server?$select=Name").WithCookie(cookie).WithHeader("TM1-SessionContext", "second"));
-            Assert.Equal("second", RawTm1.Json(Tm1.Send(Tm1.Request("GET", "ActiveSession?$select=Context").WithCookie(cookie))).GetProperty("Context").GetString());
+            Assert.Equal(
+                "second",
+                RawTm1.Json(Tm1.Send(Tm1.Request("GET", "ActiveSession?$select=Context").WithCookie(cookie))).GetProperty("Context").GetString()
+            );
         }
         finally
         {
@@ -977,7 +1043,9 @@ public sealed class Tm1SessionBehaviorTest : IDisposable
         {
             Tm1.Send(Tm1.Request("POST", "Dimensions").WithCookie(cookie).WithBody(Dimension(name)));
             var minimal = RawTm1.Json(Tm1.Send(Tm1.Request("GET", $"Dimensions('{name}')").WithCookie(cookie)));
-            var none = RawTm1.Json(Tm1.Send(Tm1.Request("GET", $"Dimensions('{name}')").WithCookie(cookie).WithHeader("Accept", "application/json;odata.metadata=none")));
+            var none = RawTm1.Json(
+                Tm1.Send(Tm1.Request("GET", $"Dimensions('{name}')").WithCookie(cookie).WithHeader("Accept", "application/json;odata.metadata=none"))
+            );
             Assert.True(minimal.TryGetProperty("@odata.etag", out _));
             Assert.False(none.TryGetProperty("@odata.etag", out _));
             Assert.True(none.TryGetProperty("@odata.context", out _));
@@ -1135,7 +1203,15 @@ public sealed class Tm1ImpersonationBehaviorTest : IDisposable
         CreateUser(dataAdmin, "DataAdmin");
         try
         {
-            foreach (var (user, password, target) in new[] { (Tm1.User, Tm1.Password, otherAdmin), (Tm1.User, Tm1.Password, "Admin"), (dataAdmin, "p", otherAdmin), (dataAdmin, "p", "Admin") })
+            foreach (
+                var (user, password, target) in new[]
+                {
+                    (Tm1.User, Tm1.Password, otherAdmin),
+                    (Tm1.User, Tm1.Password, "Admin"),
+                    (dataAdmin, "p", otherAdmin),
+                    (dataAdmin, "p", "Admin"),
+                }
+            )
             {
                 var refused = Impersonate(user, password, target);
                 Assert.True(refused.Status == HttpStatusCode.Forbidden, $"{user} impersonating {target}: {refused.Status}");
@@ -1262,7 +1338,9 @@ public sealed class Tm1ImpersonationBehaviorTest : IDisposable
         Tm1.Send(Tm1.Request("GET", "ActiveUser?$select=Name").WithHeader("Authorization", RawTm1.Basic(user, password)).WithHeader("TM1-Impersonate", target));
 
     private void CreateUser(string name, string group) =>
-        Tm1.Send(Tm1.Request("POST", "Users").WithCookie(Admin).WithBody($"{{\"Name\":\"{name}\",\"Password\":\"p\",\"Groups@odata.bind\":[\"Groups('{group}')\"]}}"));
+        Tm1.Send(
+            Tm1.Request("POST", "Users").WithCookie(Admin).WithBody($"{{\"Name\":\"{name}\",\"Password\":\"p\",\"Groups@odata.bind\":[\"Groups('{group}')\"]}}")
+        );
 
     private string? Name(RawTm1.RawRequest request) => RawTm1.Json(Tm1.Send(request)).GetProperty("Name").GetString();
 }

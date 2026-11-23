@@ -18,9 +18,18 @@ namespace AjMyers.Tm1.Testcontainers.Xunit;
 public class RequiresTm1FactAttribute : FactAttribute
 {
     /// <summary>Why a test is skipped without a source.</summary>
-    public const string NoSourceMessage = "No TM1 source configured. Set one of " + Tm1Source.PrivateImageSetting + ", "
-        + Tm1Source.HomeDir + ", " + Tm1Source.InstallVolumeSetting + ", " + Tm1Source.BundleDir + " or "
-        + Tm1Source.BundleUrlSetting + " (as an environment variable or system property) to run tests against TM1.";
+    public const string NoSourceMessage =
+        "No TM1 source configured. Set one of "
+        + Tm1Source.PrivateImageSetting
+        + ", "
+        + Tm1Source.HomeDir
+        + ", "
+        + Tm1Source.InstallVolumeSetting
+        + ", "
+        + Tm1Source.BundleDir
+        + " or "
+        + Tm1Source.BundleUrlSetting
+        + " (as an environment variable or system property) to run tests against TM1.";
 
     /// <summary>Why a test is skipped without Docker.</summary>
     public const string NoDockerMessage = "Docker isn't available, so there's no TM1 to test against";
@@ -61,9 +70,17 @@ public class RequiresTm1FactAttribute : FactAttribute
 public sealed class RequiresCognosFactAttribute : RequiresTm1FactAttribute
 {
     /// <summary>Why a test is skipped without a source.</summary>
-    public new const string NoSourceMessage = "No Cognos source configured. Set one of " + CognosSource.PrivateImageSetting + ", "
-        + CognosSource.InstallVolumeSetting + ", " + CognosSource.ZipDir + " or " + CognosSource.ZipUrlSetting
-        + ", or put a casrv-*-linuxi38664h.zip in " + Tm1Source.BundleDir
+    public new const string NoSourceMessage =
+        "No Cognos source configured. Set one of "
+        + CognosSource.PrivateImageSetting
+        + ", "
+        + CognosSource.InstallVolumeSetting
+        + ", "
+        + CognosSource.ZipDir
+        + " or "
+        + CognosSource.ZipUrlSetting
+        + ", or put a casrv-*-linuxi38664h.zip in "
+        + Tm1Source.BundleDir
         + " (as an environment variable or system property) to run tests against Cognos.";
 
     /// <summary>Skips unless there's TM1 and Cognos to test against.</summary>
@@ -79,9 +96,19 @@ public sealed class RequiresCognosFactAttribute : RequiresTm1FactAttribute
 public sealed class RequiresTm1WebFactAttribute : RequiresTm1FactAttribute
 {
     /// <summary>Why a test is skipped without a source.</summary>
-    public new const string NoSourceMessage = "No TM1 Web source configured. Set one of " + Tm1WebSource.PrivateImageSetting + ", "
-        + Tm1WebSource.HomeDir + ", " + Tm1WebSource.InstallVolumeSetting + ", " + Tm1WebSource.BundleDir + " or "
-        + Tm1WebSource.BundleUrlSetting + ", or put a tm1web bundle in " + Tm1Source.BundleDir
+    public new const string NoSourceMessage =
+        "No TM1 Web source configured. Set one of "
+        + Tm1WebSource.PrivateImageSetting
+        + ", "
+        + Tm1WebSource.HomeDir
+        + ", "
+        + Tm1WebSource.InstallVolumeSetting
+        + ", "
+        + Tm1WebSource.BundleDir
+        + " or "
+        + Tm1WebSource.BundleUrlSetting
+        + ", or put a tm1web bundle in "
+        + Tm1Source.BundleDir
         + " (as an environment variable or system property) to run tests against TM1 Web.";
 
     /// <summary>Skips unless there's TM1 and TM1 Web to test against.</summary>
@@ -97,18 +124,26 @@ public sealed class RequiresTm1WebFactAttribute : RequiresTm1FactAttribute
 public sealed class RequiresPawFactAttribute : RequiresTm1FactAttribute
 {
     /// <summary>Why a test is skipped without a source.</summary>
-    public new const string NoSourceMessage = "No Planning Analytics Workspace source configured. Set " + PawSource.ZipSetting
-        + " to IBM's ipa_workspace_local_*.zip, or " + PawSource.BundleDir
+    public new const string NoSourceMessage =
+        "No Planning Analytics Workspace source configured. Set "
+        + PawSource.ZipSetting
+        + " to IBM's ipa_workspace_local_*.zip, or "
+        + PawSource.BundleDir
         + " to its folder (as an environment variable or system property), to run tests against PAW.";
 
     /// <summary>Why a test is skipped until the license is accepted.</summary>
-    public const string NoLicenseMessage = "IBM's Planning Analytics Workspace license hasn't been accepted. Read it (licenses/LA_en"
-        + " in the PAW Local zip), then set " + PawContainer.AcceptLicenseSetting
+    public const string NoLicenseMessage =
+        "IBM's Planning Analytics Workspace license hasn't been accepted. Read it (licenses/LA_en"
+        + " in the PAW Local zip), then set "
+        + PawContainer.AcceptLicenseSetting
         + "=true (as an environment variable or system property) to run tests against PAW.";
 
     /// <summary>Skips unless there's TM1 and PAW to test against.</summary>
     public RequiresPawFactAttribute()
     {
-        Skip ??= !Discovers(PawSource.Discover) ? NoSourceMessage : !PawContainer.LicenseAcceptedBySetting() ? NoLicenseMessage : null;
+        Skip ??=
+            !Discovers(PawSource.Discover) ? NoSourceMessage
+            : !PawContainer.LicenseAcceptedBySetting() ? NoLicenseMessage
+            : null;
     }
 }

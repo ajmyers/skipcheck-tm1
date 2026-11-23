@@ -19,7 +19,8 @@ internal static class DockerHost
 
     public static IDockerClient Client() =>
         (TestcontainersSettings.OS.DockerEndpointAuthConfig ?? throw new InvalidOperationException("Docker isn't available"))
-            .GetDockerClientBuilder(ResourceReaper.DefaultSessionId).Build();
+            .GetDockerClientBuilder(ResourceReaper.DefaultSessionId)
+            .Build();
 
     /// <summary>The daemon's socket, as a container that drives Docker mounts it.</summary>
     public static string SocketPath()

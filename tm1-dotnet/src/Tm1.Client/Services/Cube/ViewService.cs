@@ -22,9 +22,7 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class ViewService : Tm1Service
 {
     public ViewService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Cubes('c')/Views</c> (or the private ones), streamed; a native view's axes
     /// expand through its type, as <c>tm1.NativeView/Columns/Subset</c>.</summary>
@@ -49,8 +47,13 @@ public sealed class ViewService : Tm1Service
     [Tm1Endpoint("Navigation ViewAxisSelection/Subset")]
     [Tm1Endpoint("Navigation ViewTitle/Subset")]
     [Tm1Endpoint("Navigation ViewTitle/Selected")]
-    public Task<NativeView> GetNativeAsync(string cube, ViewScope scope, string view, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<NativeView>(ViewPath(cube, scope, view).Cast("ibm.tm1.api.v1.NativeView"), query), cancellationToken);
+    public Task<NativeView> GetNativeAsync(
+        string cube,
+        ViewScope scope,
+        string view,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Get<NativeView>(ViewPath(cube, scope, view).Cast("ibm.tm1.api.v1.NativeView"), query), cancellationToken);
 
     /// <summary><c>POST Cubes('c')/Views</c>: creates a view; the patch's type says which kind
     /// (<c>MDXViewPatch</c>, <c>NativeViewPatch</c>), and a native view's axes bind subsets. TM1
@@ -66,7 +69,14 @@ public sealed class ViewService : Tm1Service
     /// <c>Tm1PreconditionFailedException</c> if the view had changed.</summary>
     [Tm1Endpoint("Navigation Cube/Views")]
     [Tm1Endpoint("Navigation Cube/PrivateViews")]
-    public async Task UpdateAsync(string cube, ViewScope scope, string view, ViewPatch patch, string? etag = null, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(
+        string cube,
+        ViewScope scope,
+        string view,
+        ViewPatch patch,
+        string? etag = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var request = Tm1Request.Patch(ViewPath(cube, scope, view), Require(patch, nameof(patch)));
         await Session.ExecuteAsync(etag is null ? request : request.IfMatch(etag), cancellationToken).ConfigureAwait(false);

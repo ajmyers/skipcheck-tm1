@@ -34,24 +34,28 @@ public static class ODataLiterals
     /// numbers as plain decimals (<c>NaN</c>, <c>INF</c>), the generated enums as
     /// <c>ibm.tm1.api.v1.Type'Member'</c>, dates and times in ISO 8601, durations as
     /// <c>duration'P…'</c>; <see cref="Raw"/> as is.</summary>
-    public static string Of(object? value) => value switch
-    {
-        null => "null",
-        IODataLiteral literal => literal.ODataLiteral(),
-        string s => String(s),
-        bool b => b ? "true" : "false",
-        Enum e when Tm1EnumConverter.Describe(e.GetType()) is { } d => d.Literal(e),
-        decimal m => m.ToString(CultureInfo.InvariantCulture),
-        int or long or short or byte or sbyte or uint or ulong or ushort or BigInteger => Convert.ToString(value, CultureInfo.InvariantCulture)!,
-        double d => Double(d),
-        float f => Double(f),
-        DateTimeOffset dto => dto.ToString(dto.Offset == TimeSpan.Zero ? "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'" : "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture),
-        DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        TimeOnly time => time.ToString("HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture),
-        TimeSpan span => "duration'" + XmlConvert.ToString(span) + "'",
-        Guid g => g.ToString(),
-        _ => throw new ArgumentException($"No OData literal for {value.GetType().FullName}; pass ODataLiterals.Raw for a preformed literal"),
-    };
+    public static string Of(object? value) =>
+        value switch
+        {
+            null => "null",
+            IODataLiteral literal => literal.ODataLiteral(),
+            string s => String(s),
+            bool b => b ? "true" : "false",
+            Enum e when Tm1EnumConverter.Describe(e.GetType()) is { } d => d.Literal(e),
+            decimal m => m.ToString(CultureInfo.InvariantCulture),
+            int or long or short or byte or sbyte or uint or ulong or ushort or BigInteger => Convert.ToString(value, CultureInfo.InvariantCulture)!,
+            double d => Double(d),
+            float f => Double(f),
+            DateTimeOffset dto => dto.ToString(
+                dto.Offset == TimeSpan.Zero ? "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'" : "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz",
+                CultureInfo.InvariantCulture
+            ),
+            DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            TimeOnly time => time.ToString("HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture),
+            TimeSpan span => "duration'" + XmlConvert.ToString(span) + "'",
+            Guid g => g.ToString(),
+            _ => throw new ArgumentException($"No OData literal for {value.GetType().FullName}; pass ODataLiterals.Raw for a preformed literal"),
+        };
 
     private static string Double(double d)
     {

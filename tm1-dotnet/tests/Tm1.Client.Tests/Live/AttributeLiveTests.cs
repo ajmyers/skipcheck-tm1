@@ -37,7 +37,9 @@ public class AttributeLiveTests
 
     private static async Task<DimensionLiveTests.Made> MadeWithSubset()
     {
-        var made = await DimensionLiveTests.Made.Of(n => DimensionLiveTests.DimensionOf(n, [DimensionLiveTests.Numeric("North"), DimensionLiveTests.Numeric("South")]));
+        var made = await DimensionLiveTests.Made.Of(n =>
+            DimensionLiveTests.DimensionOf(n, [DimensionLiveTests.Numeric("North"), DimensionLiveTests.Numeric("South")])
+        );
         var d = made.Name;
         await made.Tm1.Subsets.CreateAsync(d, d, SubsetScope.Public, SubsetPatch.Builder().Name("S").Expression($"{{[{d}].[{d}].[North]}}").Build());
         return made;
@@ -114,7 +116,9 @@ public class AttributeLiveTests
         // Caption isn't an attribute until it's defined
         await Assert.ThrowsAsync<Tm1BadRequestException>(() => tm1.LocalizedAttributes.CreateAsync(AttributeOwner.Element(d, d, "North"), caption));
         // POST isn't supported on a member's
-        await Assert.ThrowsAsync<Tm1BadRequestException>(() => tm1.LocalizedAttributes.CreateAsync(AttributeOwner.Member(d, d, "North"), LocalizedAttributesPatch.Builder().LocaleID("fr").Build()));
+        await Assert.ThrowsAsync<Tm1BadRequestException>(() =>
+            tm1.LocalizedAttributes.CreateAsync(AttributeOwner.Member(d, d, "North"), LocalizedAttributesPatch.Builder().LocaleID("fr").Build())
+        );
     }
 
     // CubeAttributeTm1Test
@@ -131,15 +135,31 @@ public class AttributeLiveTests
             foreach (var dim in dims)
             {
                 await tm1.Dimensions.CreateAsync(DimensionLiveTests.DimensionOf(dim, [DimensionLiveTests.Numeric("X")]));
-                await tm1.Subsets.CreateAsync(dim, dim, SubsetScope.Public, SubsetPatch.Builder().Name("All").Expression($"{{TM1SUBSETALL([{dim}].[{dim}])}}").Build());
+                await tm1.Subsets.CreateAsync(
+                    dim,
+                    dim,
+                    SubsetScope.Public,
+                    SubsetPatch.Builder().Name("All").Expression($"{{TM1SUBSETALL([{dim}].[{dim}])}}").Build()
+                );
             }
             await tm1.Cubes.CreateAsync(CubePatch.Builder().Name(name).BindDimensions(dimensions.Key(dims[0]), dimensions.Key(dims[1])).Build());
-            await tm1.Views.CreateAsync(name, ViewScope.Public, MDXViewPatch.Builder().Name("V").Mdx($"SELECT {{[{dims[0]}].[{dims[0]}].Members}} ON 0 FROM [{name}]").Build());
-            ViewAxisSelectionPatch Axis(string dim) => ViewAxisSelectionPatch.Builder().BindSubset(dimensions.Key(dim).Nav("Hierarchies").Key(dim).Nav("Subsets").Key("All")).Build();
+            await tm1.Views.CreateAsync(
+                name,
+                ViewScope.Public,
+                MDXViewPatch.Builder().Name("V").Mdx($"SELECT {{[{dims[0]}].[{dims[0]}].Members}} ON 0 FROM [{name}]").Build()
+            );
+            ViewAxisSelectionPatch Axis(string dim) =>
+                ViewAxisSelectionPatch.Builder().BindSubset(dimensions.Key(dim).Nav("Hierarchies").Key(dim).Nav("Subsets").Key("All")).Build();
             // A view attribute needs a public native view
             await tm1.Views.CreateAsync(name, ViewScope.Public, NativeViewPatch.Builder().Name("N").Columns([Axis(dims[0])]).Rows([Axis(dims[1])]).Build());
 
-            foreach (var (set, owner) in new[] { (AttributeSet.Cubes(), AttributeOwner.Cube(name)), (AttributeSet.Views(name), AttributeOwner.View(name, ViewScope.Public, "V")) })
+            foreach (
+                var (set, owner) in new[]
+                {
+                    (AttributeSet.Cubes(), AttributeOwner.Cube(name)),
+                    (AttributeSet.Views(name), AttributeOwner.View(name, ViewScope.Public, "V")),
+                }
+            )
             {
                 var attribute = Label();
                 await tm1.Attributes.CreateAsync(set, StringAttribute(attribute));
@@ -190,18 +210,27 @@ public class AttributeLiveTests
         await tm1.Processes.CreateAsync(ProcessPatch.Builder().Name(process).PrologProcedure("nX = 1;\n").Build());
         try
         {
-            await tm1.Chores.CreateAsync(ChorePatch.Builder()
-                .Name(chore)
-                .StartTime(new DateTimeOffset(2026, 1, 1, 2, 0, 0, TimeSpan.Zero))
-                .DstSensitive(false)
-                .Active(false)
-                .ExecutionMode(ChoreExecutionMode.SingleCommit)
-                .Frequency(TimeSpan.FromDays(1))
-                .Tasks([ChoreTaskPatch.Builder().BindProcess(ODataPath.Of("Processes").Key(process)).Build()])
-                .Build());
+            await tm1.Chores.CreateAsync(
+                ChorePatch
+                    .Builder()
+                    .Name(chore)
+                    .StartTime(new DateTimeOffset(2026, 1, 1, 2, 0, 0, TimeSpan.Zero))
+                    .DstSensitive(false)
+                    .Active(false)
+                    .ExecutionMode(ChoreExecutionMode.SingleCommit)
+                    .Frequency(TimeSpan.FromDays(1))
+                    .Tasks([ChoreTaskPatch.Builder().BindProcess(ODataPath.Of("Processes").Key(process)).Build()])
+                    .Build()
+            );
             try
             {
-                foreach (var (set, owner) in new[] { (AttributeSet.Processes(), AttributeOwner.Process(process)), (AttributeSet.Chores(), AttributeOwner.Chore(chore)) })
+                foreach (
+                    var (set, owner) in new[]
+                    {
+                        (AttributeSet.Processes(), AttributeOwner.Process(process)),
+                        (AttributeSet.Chores(), AttributeOwner.Chore(chore)),
+                    }
+                )
                 {
                     var attribute = Label();
                     await tm1.Attributes.CreateAsync(set, StringAttribute(attribute));

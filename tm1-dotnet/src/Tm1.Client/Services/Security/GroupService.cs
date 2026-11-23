@@ -23,9 +23,7 @@ public sealed class GroupService : Tm1Service
     private static readonly ODataPath Groups = ODataPath.Of("Groups");
 
     public GroupService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Groups</c>, streamed.</summary>
     [Tm1Endpoint("EntitySet Groups")]

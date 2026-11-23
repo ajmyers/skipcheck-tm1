@@ -41,7 +41,12 @@ public class ProcessAndServerScenariosTests
                     return FakeTm1.Json(new { error = new { code = "278", message = "no" } }, HttpStatusCode.NotFound);
                 }
                 return entity.Groups[1].Value == "Chores"
-                    ? new Dictionary<string, object?> { ["Name"] = name, ["Active"] = false, ["ExecutionMode"] = "SingleCommit" }
+                    ? new Dictionary<string, object?>
+                    {
+                        ["Name"] = name,
+                        ["Active"] = false,
+                        ["ExecutionMode"] = "SingleCommit",
+                    }
                     : new Dictionary<string, object?> { ["Name"] = name };
             }
             if (method == "GET" && target.StartsWith("Processes?", System.StringComparison.Ordinal))
@@ -58,9 +63,19 @@ public class ProcessAndServerScenariosTests
             }
             if (target == "CompileProcess")
             {
-                return FakeTm1.Collection(new { Procedure = "Prolog", LineNumber = 1, Message = "Syntax error" });
+                return FakeTm1.Collection(
+                    new
+                    {
+                        Procedure = "Prolog",
+                        LineNumber = 1,
+                        Message = "Syntax error",
+                    }
+                );
             }
-            if (target.Contains("ExecuteWithReturn", System.StringComparison.Ordinal) || target.StartsWith("ExecuteProcessWithReturn", System.StringComparison.Ordinal))
+            if (
+                target.Contains("ExecuteWithReturn", System.StringComparison.Ordinal)
+                || target.StartsWith("ExecuteProcessWithReturn", System.StringComparison.Ordinal)
+            )
             {
                 return new Dictionary<string, object?> { ["ProcessExecuteStatusCode"] = "CompletedSuccessfully" };
             }
@@ -103,8 +118,12 @@ public class ProcessAndServerScenariosTests
             }
             if (method == "GET" && top.Success)
             {
-                return FakeTm1.Collection(Enumerable.Range(0, int.Parse(top.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture))
-                    .Select(i => (object)new { ID = i, Message = "m" }).ToArray());
+                return FakeTm1.Collection(
+                    Enumerable
+                        .Range(0, int.Parse(top.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture))
+                        .Select(i => (object)new { ID = i, Message = "m" })
+                        .ToArray()
+                );
             }
             return method == "GET" && target == "SQLDataSources" ? FakeTm1.Collection() : null;
         };

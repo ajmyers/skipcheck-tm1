@@ -223,7 +223,13 @@ public class PawContainer : IStartable
     /// <summary>Whether <c>PAW_ACCEPT_LICENSE=true</c> is set.</summary>
     internal static bool LicenseAcceptedBySetting() => string.Equals(Settings.Get(AcceptLicenseSetting)?.Trim(), "true", StringComparison.OrdinalIgnoreCase);
 
-    private async Task RunScriptAsync(IDockerClient docker, string command, Dictionary<string, string> env, TimeSpan timeout, CancellationToken cancellationToken)
+    private async Task RunScriptAsync(
+        IDockerClient docker,
+        string command,
+        Dictionary<string, string> env,
+        TimeSpan timeout,
+        CancellationToken cancellationToken
+    )
     {
         var home = await HomeMountpointAsync(docker, cancellationToken).ConfigureAwait(false);
         var zipName = Path.GetFileName(Source.Zip);
@@ -268,16 +274,26 @@ public class PawContainer : IStartable
 
     private static async Task ConnectToNetworkAsync(IDockerClient docker, string networkId, CancellationToken cancellationToken)
     {
-        var containers = await docker.Containers.ListContainersAsync(new ContainersListParameters
-        {
-            Filters = new Dictionary<string, IDictionary<string, bool>> { ["label"] = new Dictionary<string, bool> { ["com.docker.compose.project=" + ComposeProject] = true } },
-        }, cancellationToken).ConfigureAwait(false);
+        var containers = await docker
+            .Containers.ListContainersAsync(
+                new ContainersListParameters
+                {
+                    Filters = new Dictionary<string, IDictionary<string, bool>>
+                    {
+                        ["label"] = new Dictionary<string, bool> { ["com.docker.compose.project=" + ComposeProject] = true },
+                    },
+                },
+                cancellationToken
+            )
+            .ConfigureAwait(false);
         foreach (var container in containers)
         {
             var attached = container.NetworkSettings?.Networks?.Values.Any(n => n.NetworkID == networkId) ?? false;
             if (!attached)
             {
-                await docker.Networks.ConnectNetworkAsync(networkId, new NetworkConnectParameters { Container = container.ID }, cancellationToken).ConfigureAwait(false);
+                await docker
+                    .Networks.ConnectNetworkAsync(networkId, new NetworkConnectParameters { Container = container.ID }, cancellationToken)
+                    .ConfigureAwait(false);
             }
         }
     }
@@ -334,8 +350,12 @@ public class PawContainer : IStartable
         try
         {
             await File.WriteAllBytesAsync(Path.Combine(context.FullName, Script), script, cancellationToken).ConfigureAwait(false);
-            await File.WriteAllTextAsync(Path.Combine(context.FullName, "Dockerfile"),
-                $"FROM {RunnerBase}\nRUN apk add --no-cache bash curl\nCOPY {Script} /usr/local/bin/{Script}\nRUN chmod 755 /usr/local/bin/{Script}\n", cancellationToken).ConfigureAwait(false);
+            await File.WriteAllTextAsync(
+                    Path.Combine(context.FullName, "Dockerfile"),
+                    $"FROM {RunnerBase}\nRUN apk add --no-cache bash curl\nCOPY {Script} /usr/local/bin/{Script}\nRUN chmod 755 /usr/local/bin/{Script}\n",
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
             var image = new ImageFromDockerfileBuilder()
                 .WithName(name)
                 .WithDockerfileDirectory(context.FullName)

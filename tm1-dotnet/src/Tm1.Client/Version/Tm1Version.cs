@@ -25,7 +25,10 @@ public sealed partial class Tm1Version : IComparable<Tm1Version>, IEquatable<Tm1
         {
             throw new ArgumentException($"Not a TM1 version: '{text}' (expected numbers separated by dots, like 11.8.03500.6)");
         }
-        var parts = trimmed.Split('.').Select(p => int.TryParse(p, out var n) ? n : throw new ArgumentException($"Not a TM1 version: '{text}' (part '{p}' is too large)")).ToArray();
+        var parts = trimmed
+            .Split('.')
+            .Select(p => int.TryParse(p, out var n) ? n : throw new ArgumentException($"Not a TM1 version: '{text}' (part '{p}' is too large)"))
+            .ToArray();
         return new Tm1Version(trimmed, parts);
     }
 

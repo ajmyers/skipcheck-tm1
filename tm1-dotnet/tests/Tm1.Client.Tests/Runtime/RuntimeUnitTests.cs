@@ -40,8 +40,17 @@ public class Tm1ErrorsTest
         Assert.Empty(unknown.Code);
         var classifier = Tm1ErrorClassifier.Defaults();
         Assert.Equal(Tm1ErrorKind.UnknownUser, classifier.Classify(400, unknown));
-        Assert.Equal(Tm1ErrorKind.ImpersonationRefused, classifier.Classify(403, ODataError.FromText("Error: Forbidden\r\nYou have insufficient rights to impersonate the user specified!\r\n")));
-        Assert.Equal(Tm1ErrorKind.ImpersonationRefused, classifier.Classify(403, ODataError.FromText("Error: Forbidden\r\nYou need to be a (data-)administrator to be able to impersonate another user.\r\n")));
+        Assert.Equal(
+            Tm1ErrorKind.ImpersonationRefused,
+            classifier.Classify(403, ODataError.FromText("Error: Forbidden\r\nYou have insufficient rights to impersonate the user specified!\r\n"))
+        );
+        Assert.Equal(
+            Tm1ErrorKind.ImpersonationRefused,
+            classifier.Classify(
+                403,
+                ODataError.FromText("Error: Forbidden\r\nYou need to be a (data-)administrator to be able to impersonate another user.\r\n")
+            )
+        );
         Assert.Null(ODataError.FromText("Error: Unauthorized\r\n"));
         Assert.Equal(1001, ODataError.FromText(new string('x', 5000))!.Message.Length);
     }
@@ -59,7 +68,10 @@ public class Tm1ErrorsTest
         // PATCH with a stale If-Match
         Assert.IsType<Tm1PreconditionFailedException>(Api(412, "{\"error\":{\"code\":\"278\",\"message\":\"\"}}"));
         // Multipart $batch
-        var batch = Api(400, "{\"error\":{\"code\":\"278\",\"message\":\"The content type specified is not supported. Please use JSON (application/json) as the content type.\"}}");
+        var batch = Api(
+            400,
+            "{\"error\":{\"code\":\"278\",\"message\":\"The content type specified is not supported. Please use JSON (application/json) as the content type.\"}}"
+        );
         Assert.IsType<Tm1BadRequestException>(batch);
         Assert.Equal(Tm1ErrorKind.Other, batch.Kind);
     }
@@ -71,7 +83,10 @@ public class Tm1ErrorsTest
         Assert.Equal(Tm1ErrorKind.UnknownUser, Api(400, Msg("The user specified in the impersonation request does not exist")).Kind);
         Assert.Equal(Tm1ErrorKind.Cancelled, Api(400, Msg("TM1UserException: Cancel")).Kind);
         Assert.Equal(Tm1ErrorKind.DataSpreadFailed, Api(400, Msg("DataSpreadFailed")).Kind);
-        Assert.Equal(Tm1ErrorKind.InvalidUniqueName, Api(400, "{\"error\":{\"code\":\"248\",\"message\":\"Invalid element unique name specified in dimensional context\"}}").Kind);
+        Assert.Equal(
+            Tm1ErrorKind.InvalidUniqueName,
+            Api(400, "{\"error\":{\"code\":\"248\",\"message\":\"Invalid element unique name specified in dimensional context\"}}").Kind
+        );
         Assert.IsType<Tm1ConflictException>(Api(400, Msg("Dimension 'Region' already exists")));
         Assert.IsType<Tm1NotFoundException>(Api(400, Msg("ObjectNotFound")));
         Assert.Equal(Tm1ErrorKind.Locked, Api(400, Msg("Object is locked by another user")).Kind);
@@ -218,7 +233,10 @@ public class CognosPassportsTest
         Assert.Equal("CAMPassport from Cognos LDAP/viewer", cam.Describe());
         Assert.DoesNotContain("viewerpw", cam.ToString());
         Assert.Equal("CAMPassport passport-1", await cam.AuthorizationAsync());
-        Assert.Equal("CAMPassport from Cognos OIDC (ID token)", Tm1Authenticator.CognosIdToken(Dispatcher, "OIDC", _ => ValueTask.FromResult("t"), _cognos).Describe());
+        Assert.Equal(
+            "CAMPassport from Cognos OIDC (ID token)",
+            Tm1Authenticator.CognosIdToken(Dispatcher, "OIDC", _ => ValueTask.FromResult("t"), _cognos).Describe()
+        );
     }
 
     [Fact]
@@ -275,7 +293,11 @@ public class ODataQueryTest
     [Fact]
     public void NestsExpandOptionsWithSemicolons()
     {
-        var query = ODataQuery.None().Select("Name").Expand("Hierarchies", h => h.Select("Name").Expand("Elements", e => e.Select("Name").Top(1))).Expand("Cube");
+        var query = ODataQuery
+            .None()
+            .Select("Name")
+            .Expand("Hierarchies", h => h.Select("Name").Expand("Elements", e => e.Select("Name").Top(1)))
+            .Expand("Cube");
         Assert.Equal("$select=Name&$expand=Hierarchies($select=Name;$expand=Elements($select=Name;$top=1)),Cube", query.ToString());
         // '=' inside a nested option is encoded; TM1 accepts it
         Assert.Equal("$select=Name&$expand=Hierarchies($select%3DName;$expand%3DElements($select%3DName;$top%3D1)),Cube", query.ToQueryString());
@@ -283,11 +305,17 @@ public class ODataQueryTest
 
     [Fact]
     public void AppliesNestedOptionsInAnyOrder() =>
-        Assert.Equal("$expand=Hierarchies($select=Name;$orderby=Name;$top=1)", ODataQuery.None().Expand("Hierarchies", h => h.Top(1).Select("Name").OrderBy("Name")).ToString());
+        Assert.Equal(
+            "$expand=Hierarchies($select=Name;$orderby=Name;$top=1)",
+            ODataQuery.None().Expand("Hierarchies", h => h.Top(1).Select("Name").OrderBy("Name")).ToString()
+        );
 
     [Fact]
     public void MergesRepeatedExpandsOfOneNavigation() =>
-        Assert.Equal("$expand=Hierarchies($select=Name;$top=2)", ODataQuery.None().Expand("Hierarchies", h => h.Select("Name")).Expand("Hierarchies", h => h.Top(2)).ToString());
+        Assert.Equal(
+            "$expand=Hierarchies($select=Name;$top=2)",
+            ODataQuery.None().Expand("Hierarchies", h => h.Select("Name")).Expand("Hierarchies", h => h.Top(2)).ToString()
+        );
 
     [Fact]
     public void OrdersDescending() => Assert.Equal("$orderby=TimeStamp desc,ID", ODataQuery.None().OrderByDescending("TimeStamp").OrderBy("ID").ToString());
@@ -357,7 +385,13 @@ public class ODataQueryTest
         var name = ODataProperty.Of("Name");
         Assert.Equal(
             ODataQuery.None().Expand("Dimensions", d => d.Select("Name")).Expand("Views").OrderBy("Name").OrderByDescending("LastDataUpdate"),
-            ODataQuery.None().Expand(dimensions, d => d.Select(name)).Expand(ODataProperty.Of("Views")).OrderBy(name).OrderByDescending(ODataProperty.Of("LastDataUpdate")));
+            ODataQuery
+                .None()
+                .Expand(dimensions, d => d.Select(name))
+                .Expand(ODataProperty.Of("Views"))
+                .OrderBy(name)
+                .OrderByDescending(ODataProperty.Of("LastDataUpdate"))
+        );
     }
 
     /// <summary>Splits and decodes a query string once, as a server would.</summary>
@@ -382,7 +416,10 @@ public class FilterTest
         Assert.Equal("(Value gt 2.5)", ODataProperty.Of("Value").Gt(2.5d).ToString());
         Assert.Equal("(Active eq true)", ODataProperty.Of("Active").Eq(true).ToString());
         Assert.Equal("(Parent eq null)", ODataProperty.Of("Parent").IsNull().ToString());
-        Assert.Equal("(Type eq ibm.tm1.api.v1.ElementType'Numeric')", ODataProperty.Of("Type").Eq(new ODataLiterals.Raw(ODataLiterals.EnumMember("ibm.tm1.api.v1.ElementType", "Numeric"))).ToString());
+        Assert.Equal(
+            "(Type eq ibm.tm1.api.v1.ElementType'Numeric')",
+            ODataProperty.Of("Type").Eq(new ODataLiterals.Raw(ODataLiterals.EnumMember("ibm.tm1.api.v1.ElementType", "Numeric"))).ToString()
+        );
     }
 
     [Fact]
@@ -449,7 +486,10 @@ public class ODataPathTest
     [Fact]
     public void BuildsNestedPaths()
     {
-        Assert.Equal("Dimensions('Region')/Hierarchies('Region')/Elements", ODataPath.Of("Dimensions").Key("Region").Nav("Hierarchies").Key("Region").Nav("Elements").ToString());
+        Assert.Equal(
+            "Dimensions('Region')/Hierarchies('Region')/Elements",
+            ODataPath.Of("Dimensions").Key("Region").Nav("Hierarchies").Key("Region").Nav("Elements").ToString()
+        );
         Assert.Equal("Cubes('Sales')/tm1.Reserve", ODataPath.Of("Cubes").Key("Sales").Action("tm1.Reserve").ToString());
         Assert.Equal("Cubes('Sales')/Views/tm1.NativeView", ODataPath.Of("Cubes").Key("Sales").Nav("Views").Cast("tm1.NativeView").ToString());
         Assert.Equal("Configuration/ProductVersion/$value", ODataPath.Of("Configuration").Nav("ProductVersion").Value().ToString());
@@ -460,13 +500,22 @@ public class ODataPathTest
 
     [Fact]
     public void WritesCompoundKeysInOrder() =>
-        Assert.Equal("Edges(ParentName='Total',ComponentName='Q1%20''26')", ODataPath.Of("Edges").Key(new Dictionary<string, object?> { ["ParentName"] = "Total", ["ComponentName"] = "Q1 '26" }).ToString());
+        Assert.Equal(
+            "Edges(ParentName='Total',ComponentName='Q1%20''26')",
+            ODataPath.Of("Edges").Key(new Dictionary<string, object?> { ["ParentName"] = "Total", ["ComponentName"] = "Q1 '26" }).ToString()
+        );
 
     [Fact]
     public void CallsFunctionsWithLiteralsOrAliases()
     {
-        Assert.Equal("Cellsets('abc')/tm1.GetPartition(Begin=0,End=99)", ODataPath.Of("Cellsets").Key("abc").Function("tm1.GetPartition", new Dictionary<string, object?> { ["Begin"] = 0, ["End"] = 99 }).ToString());
-        Assert.Equal("Hierarchies/tm1.Fn(p=@p)", ODataPath.Of("Hierarchies").Function("tm1.Fn", new Dictionary<string, object?> { ["p"] = new ODataPath.Alias("@p") }).ToString());
+        Assert.Equal(
+            "Cellsets('abc')/tm1.GetPartition(Begin=0,End=99)",
+            ODataPath.Of("Cellsets").Key("abc").Function("tm1.GetPartition", new Dictionary<string, object?> { ["Begin"] = 0, ["End"] = 99 }).ToString()
+        );
+        Assert.Equal(
+            "Hierarchies/tm1.Fn(p=@p)",
+            ODataPath.Of("Hierarchies").Function("tm1.Fn", new Dictionary<string, object?> { ["p"] = new ODataPath.Alias("@p") }).ToString()
+        );
     }
 
     [Theory]
@@ -726,7 +775,16 @@ public class Tm1OperationTest
     [Fact]
     public void AnUnboundOperationNeedsItsImport()
     {
-        var mdx = new Tm1Operation(Tm1Operation.OperationKind.Action, "tm1.ExecuteMDX", null, "ExecuteMDX", [new Tm1Operation.Parameter("MDX", "Edm.String", false)], "tm1.Cellset", null, null);
+        var mdx = new Tm1Operation(
+            Tm1Operation.OperationKind.Action,
+            "tm1.ExecuteMDX",
+            null,
+            "ExecuteMDX",
+            [new Tm1Operation.Parameter("MDX", "Edm.String", false)],
+            "tm1.Cellset",
+            null,
+            null
+        );
         Assert.False(mdx.Bound());
         Assert.Equal("ActionImport ExecuteMDX", mdx.Endpoint());
         Assert.Equal(Tm1Capability.UnboundOperation("ExecuteMDX"), mdx.Capability());

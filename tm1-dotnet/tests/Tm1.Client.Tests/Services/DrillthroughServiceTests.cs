@@ -17,7 +17,8 @@ public class DrillthroughServiceTests
     [Fact]
     public async Task ListsACellsDrillthroughs()
     {
-        _tm1.Respond = _ => FakeTm1.Collection(new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.CubeDrillthrough", ["Name"] = "}Drill_Sales" });
+        _tm1.Respond = _ =>
+            FakeTm1.Collection(new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.CubeDrillthrough", ["Name"] = "}Drill_Sales" });
         var scripts = await _tm1.Client().Drillthrough.ScriptsAsync("c1", 4, ODataQuery.None().Select("Name")).ToListAsync();
         Assert.Equal("}Drill_Sales", Assert.Single(scripts).Name);
         Assert.Equal("GET Cellsets('c1')/Cells(4)/DrillthroughScripts?$select=Name", $"{_tm1.Last.Method} {_tm1.Last.Target}");
@@ -54,12 +55,18 @@ public class DrillthroughServiceTests
         Assert.Equal("""{"DrillthroughProcess@odata.bind":"Processes('%7DDrill_Sales')"}""", _tm1.Last.Text);
 
         _tm1.Respond = _ => FakeTm1.Collection(new { Amount = 5 }, new { Amount = 6 });
-        Assert.Equal([5, 6], (await tm1.Drillthrough.ExecuteRelationalProcessAsync("}Drill_Orders", parameters).ToListAsync()).Select(r => r.GetProperty("Amount").GetInt32()));
+        Assert.Equal(
+            [5, 6],
+            (await tm1.Drillthrough.ExecuteRelationalProcessAsync("}Drill_Orders", parameters).ToListAsync()).Select(r => r.GetProperty("Amount").GetInt32())
+        );
         Assert.Equal(("POST", "ExecuteRelationalDrillthrough"), (_tm1.Last.Method, _tm1.Last.Target));
 
         _tm1.Respond = _ => new Dictionary<string, object?> { ["ID"] = "r1" };
         Assert.Equal("r1", (await tm1.Drillthrough.ExecuteRelationalProcessWithRowsetAsync("}Drill_Orders", [])).Id);
-        Assert.Equal(("POST", "ExecuteRelationalDrillthroughWithRowset", """{"DrillthroughProcess@odata.bind":"Processes('%7DDrill_Orders')"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
+        Assert.Equal(
+            ("POST", "ExecuteRelationalDrillthroughWithRowset", """{"DrillthroughProcess@odata.bind":"Processes('%7DDrill_Orders')"}"""),
+            (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text)
+        );
     }
 
     [Fact]

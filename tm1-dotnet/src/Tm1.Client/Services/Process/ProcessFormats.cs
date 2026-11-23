@@ -30,8 +30,10 @@ internal static class ProcessFormats
     public static string DateTime(DateTimeOffset value)
     {
         var offset = value.Offset == TimeSpan.Zero ? "Z" : value.ToString("zzz", CultureInfo.InvariantCulture);
-        return value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "T"
-            + Time(value.Hour, value.Minute, value.Second, value.Ticks % TimeSpan.TicksPerSecond) + offset;
+        return value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            + "T"
+            + Time(value.Hour, value.Minute, value.Second, value.Ticks % TimeSpan.TicksPerSecond)
+            + offset;
     }
 
     private static string Time(int hour, int minute, int second, long ticks)
@@ -47,8 +49,11 @@ internal static class ProcessFormats
             return text;
         }
         var nanos = ticks * 100;
-        return text + (nanos % 1_000_000 == 0 ? "." + (nanos / 1_000_000).ToString("000", CultureInfo.InvariantCulture)
-            : nanos % 1000 == 0 ? "." + (nanos / 1000).ToString("000000", CultureInfo.InvariantCulture)
-            : "." + nanos.ToString("000000000", CultureInfo.InvariantCulture));
+        return text
+            + (
+                nanos % 1_000_000 == 0 ? "." + (nanos / 1_000_000).ToString("000", CultureInfo.InvariantCulture)
+                : nanos % 1000 == 0 ? "." + (nanos / 1000).ToString("000000", CultureInfo.InvariantCulture)
+                : "." + nanos.ToString("000000000", CultureInfo.InvariantCulture)
+            );
     }
 }

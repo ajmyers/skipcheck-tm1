@@ -43,7 +43,8 @@ public class AnnotationLiveTests
 
             Assert.Equal(
                 ["[}Clients].[}Clients].[Admin]", "[}Groups].[}Groups].[ADMIN]"],
-                await tm1.Annotations.DimensionalContextAsync(id, ODataQuery.None().Select("UniqueName")).Select(m => m.UniqueName).ToListAsync());
+                await tm1.Annotations.DimensionalContextAsync(id, ODataQuery.None().Select("UniqueName")).Select(m => m.UniqueName).ToListAsync()
+            );
             // Reads back empty, though the facet value exists
             Assert.Empty(await tm1.Annotations.ApplicationContextAsync(id).ToListAsync());
             Assert.Contains(Cube, await tm1.Annotations.FacetValuesAsync("}Cubes").Select(v => v.Value).ToListAsync());

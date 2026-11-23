@@ -40,9 +40,7 @@ public sealed class ChoreService : Tm1Service
     private static readonly ODataPath Chores = ODataPath.Of("Chores");
 
     public ChoreService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Chores</c>, streamed.</summary>
     [Tm1Endpoint("EntitySet Chores")]

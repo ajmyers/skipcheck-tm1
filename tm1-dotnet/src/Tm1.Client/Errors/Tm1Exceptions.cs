@@ -13,36 +13,52 @@ public enum Tm1ErrorKind
 {
     /// <summary>The object doesn't exist.</summary>
     NotFound,
+
     /// <summary>An object of that name already exists.</summary>
     AlreadyExists,
+
     /// <summary>The object is locked (a reserved cube, a locked element).</summary>
     Locked,
+
     /// <summary>The object is in use, so TM1 refused to change or delete it.</summary>
     InUse,
+
     /// <summary>Some other conflict with the object's state.</summary>
     Conflict,
+
     /// <summary>An <c>If-Match</c> ETag didn't match: someone else changed the object.</summary>
     PreconditionFailed,
+
     /// <summary>The session isn't logged in, or no longer is.</summary>
     Unauthenticated,
+
     /// <summary>The login's credentials were refused (or the impersonated user is disabled).</summary>
     CredentialRejected,
+
     /// <summary>The user may not do this.</summary>
     Forbidden,
+
     /// <summary>The user can't read the object.</summary>
     NoReadRights,
+
     /// <summary>The user may not impersonate the one asked for.</summary>
     ImpersonationRefused,
+
     /// <summary>The user to impersonate doesn't exist.</summary>
     UnknownUser,
+
     /// <summary>A data spread couldn't be applied.</summary>
     DataSpreadFailed,
+
     /// <summary>A member's unique name doesn't resolve.</summary>
     InvalidUniqueName,
+
     /// <summary>The operation was cancelled on TM1.</summary>
     Cancelled,
+
     /// <summary>TM1 doesn't implement the operation.</summary>
     NotImplemented,
+
     /// <summary>None of the above.</summary>
     Other,
 }
@@ -147,10 +163,16 @@ public sealed record ODataError
     }
 
     private static string? Text(JsonElement node, string field) =>
-        !node.TryGetProperty(field, out var v) || v.ValueKind == JsonValueKind.Null ? null : v.ValueKind == JsonValueKind.String ? v.GetString() : v.ToString();
+        !node.TryGetProperty(field, out var v) || v.ValueKind == JsonValueKind.Null ? null
+        : v.ValueKind == JsonValueKind.String ? v.GetString()
+        : v.ToString();
 
     public bool Equals(ODataError? other) =>
-        other is not null && Code == other.Code && Message == other.Message && Target == other.Target && Details.SequenceEqual(other.Details)
+        other is not null
+        && Code == other.Code
+        && Message == other.Message
+        && Target == other.Target
+        && Details.SequenceEqual(other.Details)
         && InnerError?.GetRawText() == other.InnerError?.GetRawText();
 
     public override int GetHashCode() => HashCode.Combine(Code, Message, Target, Details.Count);
@@ -210,18 +232,31 @@ public class Tm1ApiException : Tm1Exception
         Of(status, (classifier ?? throw new ArgumentNullException(nameof(classifier))).Classify(status, error), error, method, url);
 
     /// <summary>The exception for a refused request of a known kind, of the class the kind calls for.</summary>
-    public static Tm1ApiException Of(int status, Tm1ErrorKind kind, ODataError? error, string method, string url) => kind switch
-    {
-        Tm1ErrorKind.NotFound => new Tm1NotFoundException(status, kind, error, method, url),
-        Tm1ErrorKind.AlreadyExists or Tm1ErrorKind.Locked or Tm1ErrorKind.InUse or Tm1ErrorKind.Conflict => new Tm1ConflictException(status, kind, error, method, url),
-        Tm1ErrorKind.PreconditionFailed => new Tm1PreconditionFailedException(status, kind, error, method, url),
-        Tm1ErrorKind.Unauthenticated or Tm1ErrorKind.CredentialRejected => new Tm1AuthenticationException(status, kind, error, method, url),
-        Tm1ErrorKind.Forbidden or Tm1ErrorKind.NoReadRights or Tm1ErrorKind.ImpersonationRefused => new Tm1ForbiddenException(status, kind, error, method, url),
-        Tm1ErrorKind.NotImplemented => new Tm1NotImplementedException(status, kind, error, method, url),
-        _ when status >= 500 => new Tm1ServerException(status, kind, error, method, url),
-        _ when status >= 400 => new Tm1BadRequestException(status, kind, error, method, url),
-        _ => new Tm1ApiException(status, kind, error, method, url),
-    };
+    public static Tm1ApiException Of(int status, Tm1ErrorKind kind, ODataError? error, string method, string url) =>
+        kind switch
+        {
+            Tm1ErrorKind.NotFound => new Tm1NotFoundException(status, kind, error, method, url),
+            Tm1ErrorKind.AlreadyExists or Tm1ErrorKind.Locked or Tm1ErrorKind.InUse or Tm1ErrorKind.Conflict => new Tm1ConflictException(
+                status,
+                kind,
+                error,
+                method,
+                url
+            ),
+            Tm1ErrorKind.PreconditionFailed => new Tm1PreconditionFailedException(status, kind, error, method, url),
+            Tm1ErrorKind.Unauthenticated or Tm1ErrorKind.CredentialRejected => new Tm1AuthenticationException(status, kind, error, method, url),
+            Tm1ErrorKind.Forbidden or Tm1ErrorKind.NoReadRights or Tm1ErrorKind.ImpersonationRefused => new Tm1ForbiddenException(
+                status,
+                kind,
+                error,
+                method,
+                url
+            ),
+            Tm1ErrorKind.NotImplemented => new Tm1NotImplementedException(status, kind, error, method, url),
+            _ when status >= 500 => new Tm1ServerException(status, kind, error, method, url),
+            _ when status >= 400 => new Tm1BadRequestException(status, kind, error, method, url),
+            _ => new Tm1ApiException(status, kind, error, method, url),
+        };
 
     /// <summary>The exception for an error status and its body (JSON or TM1's plain text).</summary>
     internal static Tm1ApiException FromBody(int status, byte[]? body, string method, string url, Tm1ErrorClassifier classifier) =>
@@ -244,65 +279,57 @@ public class Tm1ApiException : Tm1Exception
 /// <summary>A 4xx TM1 rejected as invalid.</summary>
 public sealed class Tm1BadRequestException : Tm1ApiException
 {
-    internal Tm1BadRequestException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url) : base(status, kind, error, method, url)
-    {
-    }
+    internal Tm1BadRequestException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url)
+        : base(status, kind, error, method, url) { }
 }
 
 /// <summary>Not logged in, or the credentials were refused.</summary>
 public sealed class Tm1AuthenticationException : Tm1ApiException
 {
-    internal Tm1AuthenticationException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url) : base(status, kind, error, method, url)
-    {
-    }
+    internal Tm1AuthenticationException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url)
+        : base(status, kind, error, method, url) { }
 }
 
 /// <summary>The user may not do this, can't read the object, or may not impersonate.</summary>
 public sealed class Tm1ForbiddenException : Tm1ApiException
 {
-    internal Tm1ForbiddenException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url) : base(status, kind, error, method, url)
-    {
-    }
+    internal Tm1ForbiddenException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url)
+        : base(status, kind, error, method, url) { }
 }
 
 /// <summary>The object doesn't exist, whatever status TM1 said so with.</summary>
 public sealed class Tm1NotFoundException : Tm1ApiException
 {
-    internal Tm1NotFoundException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url) : base(status, kind, error, method, url)
-    {
-    }
+    internal Tm1NotFoundException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url)
+        : base(status, kind, error, method, url) { }
 }
 
 /// <summary>The object exists already, is locked, in use or otherwise in the way.</summary>
 public sealed class Tm1ConflictException : Tm1ApiException
 {
-    internal Tm1ConflictException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url) : base(status, kind, error, method, url)
-    {
-    }
+    internal Tm1ConflictException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url)
+        : base(status, kind, error, method, url) { }
 }
 
 /// <summary>An ETag didn't match: someone else changed the object.</summary>
 public sealed class Tm1PreconditionFailedException : Tm1ApiException
 {
-    internal Tm1PreconditionFailedException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url) : base(status, kind, error, method, url)
-    {
-    }
+    internal Tm1PreconditionFailedException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url)
+        : base(status, kind, error, method, url) { }
 }
 
 /// <summary>TM1 doesn't implement the operation.</summary>
 public sealed class Tm1NotImplementedException : Tm1ApiException
 {
-    internal Tm1NotImplementedException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url) : base(status, kind, error, method, url)
-    {
-    }
+    internal Tm1NotImplementedException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url)
+        : base(status, kind, error, method, url) { }
 }
 
 /// <summary>TM1 failed with a 5xx.</summary>
 public sealed class Tm1ServerException : Tm1ApiException
 {
-    internal Tm1ServerException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url) : base(status, kind, error, method, url)
-    {
-    }
+    internal Tm1ServerException(int status, Tm1ErrorKind kind, ODataError? error, string method, string url)
+        : base(status, kind, error, method, url) { }
 }
 
 /// <summary>The request got no complete response: it couldn't be sent (<see cref="Phase.Connect"/>:
@@ -315,6 +342,7 @@ public sealed class Tm1TransportException : Tm1Exception
     {
         /// <summary>The request never reached TM1.</summary>
         Connect,
+
         /// <summary>The request was sent but no complete response came back.</summary>
         Response,
     }
@@ -322,8 +350,14 @@ public sealed class Tm1TransportException : Tm1Exception
     private readonly bool _idempotent;
 
     public Tm1TransportException(Phase phase, bool idempotent, string method, string url, Exception? cause)
-        : base((phase == Phase.Connect ? "Couldn't send the request to TM1" : "No complete response from TM1") + Describe(method, url)
-            + (cause?.Message is { } m ? ": " + m : ""), method, url, cause)
+        : base(
+            (phase == Phase.Connect ? "Couldn't send the request to TM1" : "No complete response from TM1")
+                + Describe(method, url)
+                + (cause?.Message is { } m ? ": " + m : ""),
+            method,
+            url,
+            cause
+        )
     {
         TransportPhase = phase;
         _idempotent = idempotent;
@@ -350,9 +384,7 @@ public sealed class Tm1ProtocolException : Tm1Exception
 
     /// <summary>A protocol failure that isn't a request's.</summary>
     public Tm1ProtocolException(string message, Exception? cause = null)
-        : this(message, null, null, null, cause)
-    {
-    }
+        : this(message, null, null, null, cause) { }
 
     public ODataError? Error { get; }
 

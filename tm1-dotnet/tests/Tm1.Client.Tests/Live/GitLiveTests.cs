@@ -50,10 +50,13 @@ public class GitLiveTests
             Assert.Contains("main", tied.Remote!.Branches!);
             await Fails(() => tm1.Git.PushAsync("main", null, Commit, none, true), "Cannot create bare commit"); // nothing has changed
 
-            await tm1.Dimensions.CreateAsync(DimensionPatch.Builder()
-                .Name(dimension)
-                .Hierarchies([HierarchyPatch.Builder().Name(dimension).Elements([ElementPatch.Builder().Name("North").Build()]).Build()])
-                .Build());
+            await tm1.Dimensions.CreateAsync(
+                DimensionPatch
+                    .Builder()
+                    .Name(dimension)
+                    .Hierarchies([HierarchyPatch.Builder().Name(dimension).Elements([ElementPatch.Builder().Name("North").Build()]).Build()])
+                    .Build()
+            );
             var push = await tm1.Git.PushAsync("main", null, Commit, none, true);
             Assert.Contains($"/dimensions/{dimension}.json", push.SourceFiles!);
             Assert.IsType<GitPushPlan>(await tm1.Git.PlanAsync(push.Id!));
@@ -172,12 +175,18 @@ public sealed class GitDaemon : IAsyncDisposable
         }
         // The container the live tests share, asked for by name: it's already running by now
         var tm1 = Tm1ServerContainer.SharedAsync().GetAwaiter().GetResult().ContainerId;
-        var script = string.Join(" && ",
+        var script = string.Join(
+            " && ",
             "apk add -q --no-cache git git-daemon",
-            "git init -q --bare -b main /srv/model.git", "git clone -q /srv/model.git /tmp/seed", "cd /tmp/seed",
-            "echo 'A TM1 model' > README.md", "git add README.md",
-            "git -c user.name=seed -c user.email=seed@example.com commit -qm Seed", "git push -q origin main",
-            "exec git daemon --verbose --reuseaddr --base-path=/srv --export-all --enable=receive-pack /srv");
+            "git init -q --bare -b main /srv/model.git",
+            "git clone -q /srv/model.git /tmp/seed",
+            "cd /tmp/seed",
+            "echo 'A TM1 model' > README.md",
+            "git add README.md",
+            "git -c user.name=seed -c user.email=seed@example.com commit -qm Seed",
+            "git push -q origin main",
+            "exec git daemon --verbose --reuseaddr --base-path=/srv --export-all --enable=receive-pack /srv"
+        );
         var id = Docker("run", "-d", "--network", "container:" + tm1, "alpine:3.21", "sh", "-c", script).Trim();
         var daemon = new GitDaemon(DaemonUrl, id);
         var deadline = DateTime.UtcNow + TimeSpan.FromMinutes(2);
@@ -199,13 +208,23 @@ public sealed class GitDaemon : IAsyncDisposable
     /// <summary>Commits, on the remote's <c>main</c>, a copy of a dimension TM1 pushed, under another
     /// name: a change made elsewhere for TM1 to pull.</summary>
     public void CommitCopyOf(string dimension, string copy) =>
-        Docker("exec", _id!, "sh", "-c", string.Join(" && ", "cd /tmp/seed", "git pull -q origin main",
-            $"mkdir -p dimensions/{copy}.hierarchies",
-            $"sed 's/{dimension}/{copy}/g' dimensions/{dimension}.json > dimensions/{copy}.json",
-            $"sed 's/{dimension}/{copy}/g' dimensions/{dimension}.hierarchies/{dimension}.json > dimensions/{copy}.hierarchies/{copy}.json",
-            "git add dimensions",
-            $"git -c user.name=elsewhere -c user.email=elsewhere@example.com commit -qm 'Copy {dimension}'",
-            "git push -q origin main"));
+        Docker(
+            "exec",
+            _id!,
+            "sh",
+            "-c",
+            string.Join(
+                " && ",
+                "cd /tmp/seed",
+                "git pull -q origin main",
+                $"mkdir -p dimensions/{copy}.hierarchies",
+                $"sed 's/{dimension}/{copy}/g' dimensions/{dimension}.json > dimensions/{copy}.json",
+                $"sed 's/{dimension}/{copy}/g' dimensions/{dimension}.hierarchies/{dimension}.json > dimensions/{copy}.hierarchies/{copy}.json",
+                "git add dimensions",
+                $"git -c user.name=elsewhere -c user.email=elsewhere@example.com commit -qm 'Copy {dimension}'",
+                "git push -q origin main"
+            )
+        );
 
     public ValueTask DisposeAsync()
     {

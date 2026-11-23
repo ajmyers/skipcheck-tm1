@@ -16,7 +16,8 @@ public class Tm1ServerFixture : IAsyncLifetime
 
     /// <summary>The shared TM1 server.</summary>
     /// <exception cref="InvalidOperationException">There's no TM1 to test against.</exception>
-    public Tm1ServerContainer Tm1Server => tm1 ?? throw new InvalidOperationException(RequiresTm1FactAttribute.Tm1SkipReason() ?? "The TM1 server isn't started");
+    public Tm1ServerContainer Tm1Server =>
+        tm1 ?? throw new InvalidOperationException(RequiresTm1FactAttribute.Tm1SkipReason() ?? "The TM1 server isn't started");
 
     /// <summary>A new client of the shared server, logged in as its <see cref="Tm1ServerContainer.Username"/>.</summary>
     public Tm1Client Client() => ClientOf(Tm1Server);

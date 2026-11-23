@@ -48,7 +48,9 @@ public class UserServiceTests
     public async Task UpdateRefusesGroups()
     {
         var tm1 = _tm1.Client();
-        await Assert.ThrowsAsync<ArgumentException>(() => tm1.Users.UpdateAsync("jsmith", UserPatch.Builder().BindGroups(ODataPath.Of("Groups").Key("Finance")).Build()));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            tm1.Users.UpdateAsync("jsmith", UserPatch.Builder().BindGroups(ODataPath.Of("Groups").Key("Finance")).Build())
+        );
         await Assert.ThrowsAsync<ArgumentException>(() => tm1.Users.UpdateAsync("jsmith", UserPatch.Builder().Groups([]).Build()));
         Assert.DoesNotContain(_tm1.Requests, r => r.Method == "PATCH");
     }

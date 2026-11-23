@@ -22,7 +22,17 @@ internal sealed partial class PawSession : IDisposable
     public PawSession(string url)
     {
         this.url = url;
-        http = new HttpClient(new SocketsHttpHandler { UseCookies = false, AllowAutoRedirect = false, ConnectTimeout = RequestTimeout }) { Timeout = RequestTimeout };
+        http = new HttpClient(
+            new SocketsHttpHandler
+            {
+                UseCookies = false,
+                AllowAutoRedirect = false,
+                ConnectTimeout = RequestTimeout,
+            }
+        )
+        {
+            Timeout = RequestTimeout,
+        };
     }
 
     /// <summary>Logs on with PAW's form.</summary>
@@ -36,7 +46,14 @@ internal sealed partial class PawSession : IDisposable
         }
         var post = new HttpRequestMessage(HttpMethod.Post, url + "login/form/")
         {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["mode"] = "basic", ["username"] = username, ["password"] = password }),
+            Content = new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["mode"] = "basic",
+                    ["username"] = username,
+                    ["password"] = password,
+                }
+            ),
         };
         if (cookies.TryGetValue("ba-sso-csrf", out var csrf))
         {

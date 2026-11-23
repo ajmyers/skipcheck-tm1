@@ -31,9 +31,7 @@ public abstract record Tm1WebSource
     /// <summary>The setting holding the bundle's SHA-256, checked after the download.</summary>
     public const string BundleSha256 = "TM1_WEB_BUNDLE_SHA256";
 
-    private protected Tm1WebSource()
-    {
-    }
+    private protected Tm1WebSource() { }
 
     /// <summary>Where TM1 comes from, for logs: never a URL's credentials or query string.</summary>
     public abstract string Describe();
@@ -81,7 +79,8 @@ public abstract record Tm1WebSource
     }
 
     private static bool IsBundle(string name) =>
-        name.StartsWith("tm1web-", StringComparison.Ordinal) && (name.EndsWith("_bundle.tar.gz", StringComparison.Ordinal) || name.EndsWith("-linuxi38664h.zip", StringComparison.Ordinal));
+        name.StartsWith("tm1web-", StringComparison.Ordinal)
+        && (name.EndsWith("_bundle.tar.gz", StringComparison.Ordinal) || name.EndsWith("-linuxi38664h.zip", StringComparison.Ordinal));
 
     /// <summary>An image with TM1 Web built in, used in place of <c>tm1-server</c>.</summary>
     public sealed record PrivateImage : Tm1WebSource
@@ -111,7 +110,10 @@ public abstract record Tm1WebSource
             Dir = Settings.Absolute(dir);
             if (!File.Exists(Path.Combine(Dir, "wlp", "bin", "server")))
             {
-                throw new ArgumentException($"Not a TM1 Web install: {Dir} has no wlp/bin/server. Point {HomeDir} at the tm1web folder of a Linux TM1 Web install.", nameof(dir));
+                throw new ArgumentException(
+                    $"Not a TM1 Web install: {Dir} has no wlp/bin/server. Point {HomeDir} at the tm1web folder of a Linux TM1 Web install.",
+                    nameof(dir)
+                );
             }
         }
 
@@ -150,7 +152,10 @@ public abstract record Tm1WebSource
             Dir = Settings.Absolute(dir);
             if (!Directory.Exists(Dir))
             {
-                throw new ArgumentException($"{BundleDir} is not a folder: {Dir}. Point it at the folder holding the bundle; name the file itself with {BundleSetting}.", nameof(dir));
+                throw new ArgumentException(
+                    $"{BundleDir} is not a folder: {Dir}. Point it at the folder holding the bundle; name the file itself with {BundleSetting}.",
+                    nameof(dir)
+                );
             }
             File = string.IsNullOrWhiteSpace(file) ? null : file;
             if (File is not null && !System.IO.File.Exists(Path.Combine(Dir, File)))

@@ -220,17 +220,29 @@ public sealed class Tm1Session : IAsyncDisposable
         // Raw bytes (document content) aren't sent async
         if (_async is { } every && request.Response != Tm1Response.Bytes && request.Body is not byte[])
         {
-            reply = await SendRespondAsync(request.Method, url, content, contentType, request.Headers, request.Accept, request.Timeout, every, ct).ConfigureAwait(false);
+            reply = await SendRespondAsync(request.Method, url, content, contentType, request.Headers, request.Accept, request.Timeout, every, ct)
+                .ConfigureAwait(false);
         }
         else
         {
-            reply = await _connection.SendAsync(request.Method, url, content, contentType, request.Headers, request.Accept, request.Timeout, ct).ConfigureAwait(false);
+            reply = await _connection
+                .SendAsync(request.Method, url, content, contentType, request.Headers, request.Accept, request.Timeout, ct)
+                .ConfigureAwait(false);
         }
         return _connection.Check(request.Method, url, reply);
     }
 
-    private async Task<Reply> SendRespondAsync(string method, string url, byte[]? content, string? contentType, IReadOnlyDictionary<string, string> headers,
-        string accept, TimeSpan? timeout, TimeSpan every, CancellationToken ct)
+    private async Task<Reply> SendRespondAsync(
+        string method,
+        string url,
+        byte[]? content,
+        string? contentType,
+        IReadOnlyDictionary<string, string> headers,
+        string accept,
+        TimeSpan? timeout,
+        TimeSpan every,
+        CancellationToken ct
+    )
     {
         var withPrefer = new Dictionary<string, string>(headers) { ["Prefer"] = "respond-async" };
         var reply = await _connection.SendAsync(method, url, content, contentType, withPrefer, accept, timeout, ct).ConfigureAwait(false);
@@ -250,7 +262,11 @@ public sealed class Tm1Session : IAsyncDisposable
             while (true)
             {
                 await Task.Delay(every, ct).ConfigureAwait(false);
-                var polled = _connection.Check("GET", monitor, await _connection.SendAsync("GET", monitor, null, null, new Dictionary<string, string>(), "*/*", null, ct).ConfigureAwait(false));
+                var polled = _connection.Check(
+                    "GET",
+                    monitor,
+                    await _connection.SendAsync("GET", monitor, null, null, new Dictionary<string, string>(), "*/*", null, ct).ConfigureAwait(false)
+                );
                 if (polled.Status != 202)
                 {
                     finished = true;
@@ -265,7 +281,9 @@ public sealed class Tm1Session : IAsyncDisposable
                 // Deleting the monitor is what stops the work on TM1
                 try
                 {
-                    await _connection.SendAsync("DELETE", monitor, null, null, new Dictionary<string, string>(), Connection.Json, null, CancellationToken.None).ConfigureAwait(false);
+                    await _connection
+                        .SendAsync("DELETE", monitor, null, null, new Dictionary<string, string>(), Connection.Json, null, CancellationToken.None)
+                        .ConfigureAwait(false);
                 }
                 catch (Tm1Exception)
                 {
@@ -275,7 +293,7 @@ public sealed class Tm1Session : IAsyncDisposable
         }
     }
 
-    internal T Read<T>(Tm1Request<T> request, Reply reply)
+    internal static T Read<T>(Tm1Request<T> request, Reply reply)
     {
         object? value = request.Response switch
         {
@@ -309,7 +327,11 @@ public sealed class Tm1Session : IAsyncDisposable
         try
         {
             using var doc = JsonDocument.Parse(Utf8Repair.Whole(reply.Body));
-            if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("value", out var items) || items.ValueKind != JsonValueKind.Array)
+            if (
+                doc.RootElement.ValueKind != JsonValueKind.Object
+                || !doc.RootElement.TryGetProperty("value", out var items)
+                || items.ValueKind != JsonValueKind.Array
+            )
             {
                 throw new Tm1ProtocolException($"{request}: expected a collection");
             }
@@ -323,7 +345,8 @@ public sealed class Tm1Session : IAsyncDisposable
         }
     }
 
-    public override string ToString() => $"Tm1Session[{_connection.Root}{(_sandbox is null ? "" : ", sandbox=" + _sandbox)}{(_changeSet is null ? "" : ", changeSet=" + _changeSet)}]";
+    public override string ToString() =>
+        $"Tm1Session[{_connection.Root}{(_sandbox is null ? "" : ", sandbox=" + _sandbox)}{(_changeSet is null ? "" : ", changeSet=" + _changeSet)}]";
 
     internal sealed record Page<T>(IReadOnlyList<T> Items, string? NextLink);
 }
@@ -385,7 +408,9 @@ internal sealed class BatchQueue
         {
             if (_ran)
             {
-                throw new InvalidOperationException("The batch has already run, so this call can't join it: a call whose request depends on another's result can't be batched. " + request);
+                throw new InvalidOperationException(
+                    "The batch has already run, so this call can't join it: a call whose request depends on another's result can't be batched. " + request
+                );
             }
             _entries.Add(entry);
         }
@@ -408,33 +433,39 @@ internal sealed class BatchQueue
         for (int start = 0; start < all.Count; start += perRequest)
         {
             var chunk = all.Skip(start).Take(perRequest).ToList();
-            var requests = chunk.Select((e, i) =>
-            {
-                var item = new Dictionary<string, object?>
-                {
-                    ["id"] = (i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    ["method"] = e.Method,
-                    ["url"] = e.Url,
-                };
-                // TM1 (11.8) gives a request of a batch the batch's own Accept unless it has one, and
-                // refuses plain text ($count, $value) under the batch's application/json. It reads a
-                // header's name as written, and only knows this one in lower case.
-                var headers = new Dictionary<string, string> { ["accept"] = e.Accept };
-                foreach (var header in e.Headers)
-                {
-                    headers[header.Key] = header.Value;
-                }
-                if (e.Body is not null)
-                {
-                    headers["content-type"] = "application/json";
-                    item["body"] = e.Body;
-                }
-                item["headers"] = headers;
-                return item;
-            }).ToList();
+            var requests = chunk
+                .Select(
+                    (e, i) =>
+                    {
+                        var item = new Dictionary<string, object?>
+                        {
+                            ["id"] = (i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                            ["method"] = e.Method,
+                            ["url"] = e.Url,
+                        };
+                        // TM1 (11.8) gives a request of a batch the batch's own Accept unless it has one, and
+                        // refuses plain text ($count, $value) under the batch's application/json. It reads a
+                        // header's name as written, and only knows this one in lower case.
+                        var headers = new Dictionary<string, string> { ["accept"] = e.Accept };
+                        foreach (var header in e.Headers)
+                        {
+                            headers[header.Key] = header.Value;
+                        }
+                        if (e.Body is not null)
+                        {
+                            headers["content-type"] = "application/json";
+                            item["body"] = e.Body;
+                        }
+                        item["headers"] = headers;
+                        return item;
+                    }
+                )
+                .ToList();
             try
             {
-                var reply = await _sender.ExecuteAsync(Tm1Request.Post<JsonElement>(ODataPath.Batch(), new Dictionary<string, object?> { ["requests"] = requests }), ct).ConfigureAwait(false);
+                var reply = await _sender
+                    .ExecuteAsync(Tm1Request.Post<JsonElement>(ODataPath.Batch(), new Dictionary<string, object?> { ["requests"] = requests }), ct)
+                    .ConfigureAwait(false);
                 var byId = reply.TryGetProperty("responses", out var responses)
                     ? responses.EnumerateArray().ToDictionary(r => r.GetProperty("id").ToString())
                     : new Dictionary<string, JsonElement>();
@@ -448,9 +479,14 @@ internal sealed class BatchQueue
                         continue;
                     }
                     var status = item.TryGetProperty("status", out var s) ? s.GetInt32() : 0;
-                    var body = item.TryGetProperty("body", out var b) && b.ValueKind != JsonValueKind.Null
-                        ? (b.ValueKind == JsonValueKind.String ? System.Text.Encoding.UTF8.GetBytes(b.GetString()!) : JsonSerializer.SerializeToUtf8Bytes(b))
-                        : [];
+                    var body =
+                        item.TryGetProperty("body", out var b) && b.ValueKind != JsonValueKind.Null
+                            ? (
+                                b.ValueKind == JsonValueKind.String
+                                    ? System.Text.Encoding.UTF8.GetBytes(b.GetString()!)
+                                    : JsonSerializer.SerializeToUtf8Bytes(b)
+                            )
+                            : [];
                     try
                     {
                         e.Result.TrySetResult(e.Read(connection.Check(e.Method, url, new Reply(status, new Dictionary<string, string>(), body))));
@@ -542,7 +578,10 @@ public class Tm1SessionBuilder
     public Tm1SessionBuilder SessionContext(string sessionContext)
     {
         ArgumentNullException.ThrowIfNull(sessionContext);
-        _sessionContext = sessionContext.Length > 250 ? throw new ArgumentException("TM1 keeps at most 250 characters of session context, got " + sessionContext.Length) : sessionContext;
+        _sessionContext =
+            sessionContext.Length > 250
+                ? throw new ArgumentException("TM1 keeps at most 250 characters of session context, got " + sessionContext.Length)
+                : sessionContext;
         return this;
     }
 
@@ -588,8 +627,26 @@ public class Tm1SessionBuilder
 
     public Tm1Session Build()
     {
-        var root = _root ?? (_address is not null ? _dialect.ServiceRoot(_address) : throw new InvalidOperationException("Give the server: BaseUrl or Address"));
+        var root = _root
+            ?? (_address is not null ? _dialect.ServiceRoot(_address) : throw new InvalidOperationException("Give the server: BaseUrl or Address"));
         var authenticator = _authenticator ?? throw new InvalidOperationException("Give the login: BasicAuth or Authenticator");
-        return new Tm1Session(new Connection(root, authenticator, _impersonate, _sessionContext, _timeouts, _classifier, _handler, _checkCapabilities, _clock, _capabilitiesCache), null, null, null, null);
+        return new Tm1Session(
+            new Connection(
+                root,
+                authenticator,
+                _impersonate,
+                _sessionContext,
+                _timeouts,
+                _classifier,
+                _handler,
+                _checkCapabilities,
+                _clock,
+                _capabilitiesCache
+            ),
+            null,
+            null,
+            null,
+            null
+        );
     }
 }

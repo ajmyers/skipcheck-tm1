@@ -23,9 +23,7 @@ public sealed class MemberSetService : Tm1Service
     private static readonly ODataPath MemberSets = ODataPath.Of("MemberSets");
 
     public MemberSetService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>ExecuteMDXSetExpression</c>: evaluates an MDX set expression, such as
     /// <c>{TM1SUBSETALL([Region].[Region])}</c>, keeping the result as a member set, with the
@@ -35,8 +33,10 @@ public sealed class MemberSetService : Tm1Service
     public Task<CellsetAxis> ExecuteAsync(string mdx, ODataQuery? query = null, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.ExecuteMdxSetExpression;
-        var request = Tm1Request.Post<CellsetAxis>(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
-            .WithQuery(query).Requires(operation.Capability());
+        var request = Tm1Request
+            .Post<CellsetAxis>(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
+            .WithQuery(query)
+            .Requires(operation.Capability());
         return Session.ExecuteAsync(request, cancellationToken);
     }
 

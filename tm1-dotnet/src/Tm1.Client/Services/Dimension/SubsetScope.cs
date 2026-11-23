@@ -18,11 +18,12 @@ public enum SubsetScope
 public static class SubsetScopes
 {
     /// <summary>The hierarchy's navigation property holding subsets of this scope, such as <c>PrivateSubsets</c>.</summary>
-    public static string Navigation(this SubsetScope scope) => scope switch
-    {
-        SubsetScope.Public => "Subsets",
-        SubsetScope.Private => "PrivateSubsets",
-        SubsetScope.Session => "SessionSubsets",
-        _ => throw new System.ArgumentOutOfRangeException(nameof(scope)),
-    };
+    public static string Navigation(this SubsetScope scope) =>
+        scope switch
+        {
+            SubsetScope.Public => "Subsets",
+            SubsetScope.Private => "PrivateSubsets",
+            SubsetScope.Session => "SessionSubsets",
+            _ => throw new System.ArgumentOutOfRangeException(nameof(scope)),
+        };
 }

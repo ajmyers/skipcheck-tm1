@@ -29,9 +29,7 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class HierarchyService : Tm1Service
 {
     public HierarchyService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Dimensions('d')/Hierarchies</c>: the dimension's hierarchies, streamed.</summary>
     [Tm1Endpoint("Navigation Dimension/Hierarchies")]
@@ -62,13 +60,22 @@ public sealed class HierarchyService : Tm1Service
     /// <c>Elements</c> or <c>Edges</c> is refused: use <see cref="ReplaceStructureAsync"/>.</summary>
     [Tm1Endpoint("Navigation Dimension/Hierarchies")]
     public Task UpdateAsync(string dimension, string hierarchy, HierarchyPatch patch, string etag, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Patch(HierarchyPath(dimension, hierarchy), WithoutStructure(patch)).IfMatch(Require(etag, nameof(etag))), cancellationToken);
+        Session.ExecuteAsync(
+            Tm1Request.Patch(HierarchyPath(dimension, hierarchy), WithoutStructure(patch)).IfMatch(Require(etag, nameof(etag))),
+            cancellationToken
+        );
 
     /// <summary><c>PATCH Dimensions('d')/Hierarchies('h')</c> with <c>Elements</c> and <c>Edges</c>:
     /// replaces the hierarchy's structure. TM1 (11.8) deletes the elements the new structure doesn't
     /// list, and the edges with them; data in cells of a deleted element is lost.</summary>
     [Tm1Endpoint("Navigation Dimension/Hierarchies")]
-    public Task ReplaceStructureAsync(string dimension, string hierarchy, IReadOnlyList<ElementPatch> elements, IReadOnlyList<EdgePatch> edges, CancellationToken cancellationToken = default)
+    public Task ReplaceStructureAsync(
+        string dimension,
+        string hierarchy,
+        IReadOnlyList<ElementPatch> elements,
+        IReadOnlyList<EdgePatch> edges,
+        CancellationToken cancellationToken = default
+    )
     {
         var patch = HierarchyPatch.Builder().Elements(Require(elements, nameof(elements))).Edges(Require(edges, nameof(edges))).Build();
         return Session.ExecuteAsync(Tm1Request.Patch(HierarchyPath(dimension, hierarchy), patch), cancellationToken);
@@ -104,52 +111,98 @@ public sealed class HierarchyService : Tm1Service
 
     /// <summary><c>tm1.RootMembers()</c>: the hierarchy's top-level members, streamed.</summary>
     [Tm1Endpoint("Function Hierarchy/RootMembers")]
-    public IAsyncEnumerable<Member> RootMembersAsync(string dimension, string hierarchy, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<Member> RootMembersAsync(
+        string dimension,
+        string hierarchy,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.HierarchyRootMembers;
-        return Session.StreamAsync(Tm1Request.List<Member>(HierarchyPath(dimension, hierarchy).Function(operation.Name), query).Requires(operation.Capability()), cancellationToken);
+        return Session.StreamAsync(
+            Tm1Request.List<Member>(HierarchyPath(dimension, hierarchy).Function(operation.Name), query).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>tm1.SaveAs</c>: copies a hierarchy under a new name in the same dimension, failing if
     /// one exists.</summary>
     [Tm1Endpoint("Action Hierarchy/SaveAs")]
     public Task<Hierarchy> SaveAsAsync(string dimension, string hierarchy, string newName, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Action<Hierarchy>(Tm1Operations.HierarchySaveAs, dimension, hierarchy, new Dictionary<string, object?> { ["Name"] = newName }), cancellationToken);
+        Session.ExecuteAsync(
+            Action<Hierarchy>(Tm1Operations.HierarchySaveAs, dimension, hierarchy, new Dictionary<string, object?> { ["Name"] = newName }),
+            cancellationToken
+        );
 
     /// <summary><c>tm1.SaveAs</c>: copies a hierarchy under a new name. <paramref name="overwrite"/>
     /// replaces a hierarchy that already has it; <paramref name="keepExistingAttributes"/> keeps the
     /// attributes of what's replaced.</summary>
     [Tm1Endpoint("Action Hierarchy/SaveAs")]
-    public Task<Hierarchy> SaveAsAsync(string dimension, string hierarchy, string newName, bool overwrite, bool keepExistingAttributes, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Action<Hierarchy>(Tm1Operations.HierarchySaveAs, dimension, hierarchy, new Dictionary<string, object?>
-        {
-            ["Name"] = newName,
-            ["Overwrite"] = overwrite,
-            ["KeepExistingAttributes"] = keepExistingAttributes,
-        }), cancellationToken);
+    public Task<Hierarchy> SaveAsAsync(
+        string dimension,
+        string hierarchy,
+        string newName,
+        bool overwrite,
+        bool keepExistingAttributes,
+        CancellationToken cancellationToken = default
+    ) =>
+        Session.ExecuteAsync(
+            Action<Hierarchy>(
+                Tm1Operations.HierarchySaveAs,
+                dimension,
+                hierarchy,
+                new Dictionary<string, object?>
+                {
+                    ["Name"] = newName,
+                    ["Overwrite"] = overwrite,
+                    ["KeepExistingAttributes"] = keepExistingAttributes,
+                }
+            ),
+            cancellationToken
+        );
 
     /// <summary><c>tm1.SetElement</c> with no <c>Before</c>: makes an element a root of the hierarchy,
     /// placed <em>last</em> among the roots. (<c>$metadata</c> says first; TM1 11.8 puts it last.)</summary>
     [Tm1Endpoint("Action Hierarchy/SetElement")]
     public Task SetElementAsync(string dimension, string hierarchy, string element, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(VoidAction(Tm1Operations.HierarchySetElement, dimension, hierarchy, new Dictionary<string, object?>
-        {
-            ["Element@odata.bind"] = ElementPath(dimension, hierarchy, element).ToString(),
-        }), cancellationToken);
+        Session.ExecuteAsync(
+            VoidAction(
+                Tm1Operations.HierarchySetElement,
+                dimension,
+                hierarchy,
+                new Dictionary<string, object?> { ["Element@odata.bind"] = ElementPath(dimension, hierarchy, element).ToString() }
+            ),
+            cancellationToken
+        );
 
     /// <summary><c>tm1.SetElement</c>: makes an element a root of the hierarchy, placed just before another root.</summary>
     [Tm1Endpoint("Action Hierarchy/SetElement")]
     public Task SetElementAsync(string dimension, string hierarchy, string element, string before, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(VoidAction(Tm1Operations.HierarchySetElement, dimension, hierarchy, new Dictionary<string, object?>
-        {
-            ["Element@odata.bind"] = ElementPath(dimension, hierarchy, element).ToString(),
-            ["Before@odata.bind"] = ElementPath(dimension, hierarchy, before).ToString(),
-        }), cancellationToken);
+        Session.ExecuteAsync(
+            VoidAction(
+                Tm1Operations.HierarchySetElement,
+                dimension,
+                hierarchy,
+                new Dictionary<string, object?>
+                {
+                    ["Element@odata.bind"] = ElementPath(dimension, hierarchy, element).ToString(),
+                    ["Before@odata.bind"] = ElementPath(dimension, hierarchy, before).ToString(),
+                }
+            ),
+            cancellationToken
+        );
 
     private static HierarchyPatch WithoutStructure(HierarchyPatch patch)
     {
         // Bindings to the collections (Elements@odata.bind) are structure changes too
-        if (Require(patch, nameof(patch)).Values.Any(v => v.Key is "Elements" or "Edges" || v.Key.StartsWith("Elements@", StringComparison.Ordinal) || v.Key.StartsWith("Edges@", StringComparison.Ordinal)))
+        if (
+            Require(patch, nameof(patch))
+                .Values.Any(v =>
+                    v.Key is "Elements" or "Edges"
+                    || v.Key.StartsWith("Elements@", StringComparison.Ordinal)
+                    || v.Key.StartsWith("Edges@", StringComparison.Ordinal)
+                )
+        )
         {
             throw new ArgumentException("A hierarchy PATCH with Elements or Edges replaces them, deleting what it doesn't list: use ReplaceStructureAsync");
         }

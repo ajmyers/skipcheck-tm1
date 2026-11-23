@@ -64,12 +64,17 @@ public sealed class ProcessLiveTests : IAsyncLifetime
         var read = await _tm1.Processes.GetAsync(_name);
         Assert.Contains("ProcessQuit", read.PrologProcedure);
         Assert.Equal(["pName", "pCount"], read.Parameters!.Select(p => p.Name));
-        var listed = await _tm1.Processes.ListAsync(ODataQuery.None().Select(Process.Fields.Name).Filter(Filter.StartsWith(Process.Fields.Name, _name))).Select(p => p.Name).ToListAsync();
+        var listed = await _tm1
+            .Processes.ListAsync(ODataQuery.None().Select(Process.Fields.Name).Filter(Filter.StartsWith(Process.Fields.Name, _name)))
+            .Select(p => p.Name)
+            .ToListAsync();
         Assert.Equal([_name], listed);
 
         await _tm1.Processes.UpdateAsync(_name, ProcessPatch.Builder().EpilogProcedure("nX = 1;\n").Build(), read.ETag);
         Assert.Contains("nX = 1;", (await _tm1.Processes.GetAsync(_name)).EpilogProcedure);
-        await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() => _tm1.Processes.UpdateAsync(_name, ProcessPatch.Builder().EpilogProcedure("").Build(), read.ETag));
+        await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() =>
+            _tm1.Processes.UpdateAsync(_name, ProcessPatch.Builder().EpilogProcedure("").Build(), read.ETag)
+        );
 
         await _tm1.Processes.DeleteAsync(_name);
         await Assert.ThrowsAsync<Tm1NotFoundException>(() => _tm1.Processes.GetAsync(_name));
@@ -104,7 +109,10 @@ public sealed class ProcessLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task RunsUnsavedCodeAndTheDeprecatedWays()
     {
-        Assert.Equal(ProcessExecuteStatusCode.QuitCalled, (await _tm1.Processes.ExecuteWithReturnAsync(Definition("unsaved", Prolog), Parameters(2))).ProcessExecuteStatusCode);
+        Assert.Equal(
+            ProcessExecuteStatusCode.QuitCalled,
+            (await _tm1.Processes.ExecuteWithReturnAsync(Definition("unsaved", Prolog), Parameters(2))).ProcessExecuteStatusCode
+        );
 
         await _tm1.Processes.ExecuteWithReturnAsync(_name, Parameters(3));
         await _tm1.Processes.ExecuteAsync(_name, Parameters(1));
@@ -118,14 +126,16 @@ public sealed class ProcessLiveTests : IAsyncLifetime
 
     private static Dictionary<string, object?> Parameters(int count) => new() { ["pName"] = "x", ["pCount"] = count };
 
-    private static ProcessPatch Definition(string name, string prolog) => ProcessPatch.Builder()
-        .Name(name)
-        .Parameters([
-            ProcessParameterPatch.Builder().Name("pName").Value("").Type(ProcessVariableType.String).Build(),
-            ProcessParameterPatch.Builder().Name("pCount").Value(0).Type(ProcessVariableType.Numeric).Build(),
-        ])
-        .PrologProcedure(prolog)
-        .Build();
+    private static ProcessPatch Definition(string name, string prolog) =>
+        ProcessPatch
+            .Builder()
+            .Name(name)
+            .Parameters([
+                ProcessParameterPatch.Builder().Name("pName").Value("").Type(ProcessVariableType.String).Build(),
+                ProcessParameterPatch.Builder().Name("pCount").Value(0).Type(ProcessVariableType.Numeric).Build(),
+            ])
+            .PrologProcedure(prolog)
+            .Build();
 }
 
 /// <summary>Debugging a process of three lines (nA = 1; nB = nA + 1; nC = nB + 1) against a real TM1:
@@ -218,7 +228,10 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
         Assert.Empty(await Debug.ListAsync().ToListAsync()); // lists none
 
         // Past the last line: still running, paused with no line to be on, or already complete
-        Assert.Contains((await Debug.StepOverAsync(id)).Status, new ProcessDebugContextStatus?[] { ProcessDebugContextStatus.Running, ProcessDebugContextStatus.Paused, ProcessDebugContextStatus.Complete });
+        Assert.Contains(
+            (await Debug.StepOverAsync(id)).Status,
+            new ProcessDebugContextStatus?[] { ProcessDebugContextStatus.Running, ProcessDebugContextStatus.Paused, ProcessDebugContextStatus.Complete }
+        );
         var done = await Debug.FinishAsync(id);
         Assert.Equal(ProcessDebugContextStatus.Complete, done.Status);
         Assert.Equal(ProcessExecuteStatusCode.CompletedSuccessfully, done.Result!.ProcessExecuteStatusCode);
@@ -233,7 +246,9 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
         var breakpoints = await Debug.DebuggingAsync(_process, null, async context =>
         {
             var id = context.Id!;
-            await Assert.ThrowsAsync<ArgumentException>(() => Debug.AddBreakpointAsync(id, ProcessDebugContextLineBreakpointPatch.Builder().ProcessName(_process).LineNumber(2).Build()));
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                Debug.AddBreakpointAsync(id, ProcessDebugContextLineBreakpointPatch.Builder().ProcessName(_process).LineNumber(2).Build())
+            );
             await Debug.AddBreakpointAsync(id, Line(1, 2));
             await Debug.AddBreakpointAsync(id, Line(2, 3));
             await Debug.RemoveBreakpointAsync(id, 1);
@@ -256,8 +271,8 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
         Assert.Equal(ProcessDebugContextStatus.Complete, (await Debug.GetAsync(id)).Status);
     }
 
-    private ProcessDebugContextLineBreakpointPatch Line(int id, int line) => ProcessDebugContextLineBreakpointPatch.Builder()
-        .Id(id).ProcessName(_process).Procedure(ProcessProcedure.Prolog).LineNumber(line).Enabled(true).Build();
+    private ProcessDebugContextLineBreakpointPatch Line(int id, int line) =>
+        ProcessDebugContextLineBreakpointPatch.Builder().Id(id).ProcessName(_process).Procedure(ProcessProcedure.Prolog).LineNumber(line).Enabled(true).Build();
 }
 
 /// <summary>ChoreService against a real TM1, with a process that creates the dimension its pName
@@ -280,23 +295,29 @@ public sealed class ChoreLiveTests : IAsyncLifetime
             return;
         }
         _tm1 = Live.Client();
-        await _tm1.Processes.CreateAsync(ProcessPatch.Builder()
-            .Name(Process)
-            .Parameters([
-                ProcessParameterPatch.Builder().Name("pName").Value("").Type(ProcessVariableType.String).Build(),
-                ProcessParameterPatch.Builder().Name("pCount").Value(0).Type(ProcessVariableType.Numeric).Build(),
-            ])
-            .PrologProcedure("If(DimensionExists(pName) = 0);\n  DimensionCreate(pName);\nEndIf;\n")
-            .Build());
-        await Chores.CreateAsync(ChorePatch.Builder()
-            .Name(Chore)
-            .StartTime(DateTimeOffset.Parse("2026-01-01T02:00:00Z", System.Globalization.CultureInfo.InvariantCulture))
-            .DstSensitive(false)
-            .Active(false)
-            .ExecutionMode(ChoreExecutionMode.SingleCommit)
-            .Frequency(TimeSpan.FromDays(1))
-            .Tasks([TaskFor("marker_" + _id)])
-            .Build());
+        await _tm1.Processes.CreateAsync(
+            ProcessPatch
+                .Builder()
+                .Name(Process)
+                .Parameters([
+                    ProcessParameterPatch.Builder().Name("pName").Value("").Type(ProcessVariableType.String).Build(),
+                    ProcessParameterPatch.Builder().Name("pCount").Value(0).Type(ProcessVariableType.Numeric).Build(),
+                ])
+                .PrologProcedure("If(DimensionExists(pName) = 0);\n  DimensionCreate(pName);\nEndIf;\n")
+                .Build()
+        );
+        await Chores.CreateAsync(
+            ChorePatch
+                .Builder()
+                .Name(Chore)
+                .StartTime(DateTimeOffset.Parse("2026-01-01T02:00:00Z", System.Globalization.CultureInfo.InvariantCulture))
+                .DstSensitive(false)
+                .Active(false)
+                .ExecutionMode(ChoreExecutionMode.SingleCommit)
+                .Frequency(TimeSpan.FromDays(1))
+                .Tasks([TaskFor("marker_" + _id)])
+                .Build()
+        );
     }
 
     public async Task DisposeAsync()
@@ -336,7 +357,9 @@ public sealed class ChoreLiveTests : IAsyncLifetime
         Assert.NotEqual(read.ETag, etag); // task changes change the chore's ETag
         await Chores.UpdateAsync(Chore, ChorePatch.Builder().Frequency(TimeSpan.FromHours(6)).Build(), etag);
         Assert.Equal(TimeSpan.FromHours(6), (await Chores.GetAsync(Chore)).Frequency);
-        await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() => Chores.UpdateAsync(Chore, ChorePatch.Builder().Frequency(TimeSpan.FromHours(1)).Build(), etag));
+        await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() =>
+            Chores.UpdateAsync(Chore, ChorePatch.Builder().Frequency(TimeSpan.FromHours(1)).Build(), etag)
+        );
     }
 
     [Tm1Fact]
@@ -374,10 +397,8 @@ public sealed class ChoreLiveTests : IAsyncLifetime
 
     private async Task<bool> Active() => (await Chores.GetAsync(Chore)).Active == true;
 
-    private ChoreTaskPatch TaskFor(string marker) => ChoreTaskPatch.Builder()
-        .BindProcess(ODataPath.Of("Processes").Key(Process))
-        .Parameters([Parameter("pName", marker), Parameter("pCount", 1)])
-        .Build();
+    private ChoreTaskPatch TaskFor(string marker) =>
+        ChoreTaskPatch.Builder().BindProcess(ODataPath.Of("Processes").Key(Process)).Parameters([Parameter("pName", marker), Parameter("pCount", 1)]).Build();
 
     private static ChoreTaskParameterPatch Parameter(string name, object value) => ChoreTaskParameterPatch.Builder().Name(name).Value(value).Build();
 

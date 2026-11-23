@@ -8,7 +8,13 @@ namespace AjMyers.Tm1.Client.Session;
 /// to try every time).</summary>
 public sealed record Tm1Timeouts
 {
-    public static readonly Tm1Timeouts Defaults = new(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
+    public static readonly Tm1Timeouts Defaults = new(
+        TimeSpan.FromSeconds(10),
+        TimeSpan.FromSeconds(30),
+        TimeSpan.FromMinutes(10),
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromSeconds(30)
+    );
 
     public Tm1Timeouts(TimeSpan connect, TimeSpan login, TimeSpan request, TimeSpan close, TimeSpan refusedLogin)
     {

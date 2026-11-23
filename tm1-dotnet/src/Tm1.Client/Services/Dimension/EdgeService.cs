@@ -17,9 +17,7 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class EdgeService : Tm1Service
 {
     public EdgeService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Dimensions('d')/Hierarchies('h')/Edges</c>: the hierarchy's edges, streamed.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Edges")]
@@ -28,8 +26,14 @@ public sealed class EdgeService : Tm1Service
 
     /// <summary><c>GET …/Edges(ParentName='p',ComponentName='c')</c>.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Edges")]
-    public Task<Edge> GetAsync(string dimension, string hierarchy, string parent, string component, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<Edge>(EdgePath(dimension, hierarchy, parent, component), query), cancellationToken);
+    public Task<Edge> GetAsync(
+        string dimension,
+        string hierarchy,
+        string parent,
+        string component,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Get<Edge>(EdgePath(dimension, hierarchy, parent, component), query), cancellationToken);
 
     /// <summary><c>POST …/Edges</c>: links a component under a parent, with a weight; returns the edge.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Edges")]
@@ -38,8 +42,14 @@ public sealed class EdgeService : Tm1Service
 
     /// <summary><c>PATCH …/Edges(ParentName='p',ComponentName='c')</c>: changes the edge, typically its weight.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Edges")]
-    public Task UpdateAsync(string dimension, string hierarchy, string parent, string component, EdgePatch patch, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Patch(EdgePath(dimension, hierarchy, parent, component), Require(patch, nameof(patch))), cancellationToken);
+    public Task UpdateAsync(
+        string dimension,
+        string hierarchy,
+        string parent,
+        string component,
+        EdgePatch patch,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Patch(EdgePath(dimension, hierarchy, parent, component), Require(patch, nameof(patch))), cancellationToken);
 
     /// <summary><c>DELETE …/Edges(ParentName='p',ComponentName='c')</c>: unlinks the component; the
     /// element stays in the hierarchy.</summary>
@@ -49,25 +59,42 @@ public sealed class EdgeService : Tm1Service
 
     /// <summary><c>GET …/Edges(…)/Parent</c>: the edge's parent element.</summary>
     [Tm1Endpoint("Navigation Edge/Parent")]
-    public Task<Element> ParentAsync(string dimension, string hierarchy, string parent, string component, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<Element>(EdgePath(dimension, hierarchy, parent, component).Nav("Parent"), query), cancellationToken);
+    public Task<Element> ParentAsync(
+        string dimension,
+        string hierarchy,
+        string parent,
+        string component,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Get<Element>(EdgePath(dimension, hierarchy, parent, component).Nav("Parent"), query), cancellationToken);
 
     /// <summary><c>GET …/Edges(…)/Component</c>: the edge's component element.</summary>
     [Tm1Endpoint("Navigation Edge/Component")]
-    public Task<Element> ComponentAsync(string dimension, string hierarchy, string parent, string component, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<Element>(EdgePath(dimension, hierarchy, parent, component).Nav("Component"), query), cancellationToken);
+    public Task<Element> ComponentAsync(
+        string dimension,
+        string hierarchy,
+        string parent,
+        string component,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Get<Element>(EdgePath(dimension, hierarchy, parent, component).Nav("Component"), query), cancellationToken);
 
     /// <summary><c>GET …/Edges(…)/Hierarchy</c>: the hierarchy the edge belongs to.</summary>
     [Tm1Endpoint("Navigation Edge/Hierarchy")]
-    public Task<Hierarchy> HierarchyAsync(string dimension, string hierarchy, string parent, string component, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<Hierarchy>(EdgePath(dimension, hierarchy, parent, component).Nav("Hierarchy"), query), cancellationToken);
+    public Task<Hierarchy> HierarchyAsync(
+        string dimension,
+        string hierarchy,
+        string parent,
+        string component,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Get<Hierarchy>(EdgePath(dimension, hierarchy, parent, component).Nav("Hierarchy"), query), cancellationToken);
 
     private static ODataPath EdgesPath(string dimension, string hierarchy) => HierarchyService.HierarchyPath(dimension, hierarchy).Nav("Edges");
 
     private static ODataPath EdgePath(string dimension, string hierarchy, string parent, string component) =>
-        EdgesPath(dimension, hierarchy).Key(new Dictionary<string, object?>
-        {
-            ["ParentName"] = Require(parent, nameof(parent)),
-            ["ComponentName"] = Require(component, nameof(component)),
-        });
+        EdgesPath(dimension, hierarchy)
+            .Key(
+                new Dictionary<string, object?> { ["ParentName"] = Require(parent, nameof(parent)), ["ComponentName"] = Require(component, nameof(component)) }
+            );
 }

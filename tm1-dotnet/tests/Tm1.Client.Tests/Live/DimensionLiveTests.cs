@@ -87,7 +87,9 @@ public class DimensionLiveTests
         Assert.False(string.IsNullOrEmpty(read.ETag));
         var hierarchy = Assert.Single(read.Hierarchies!);
         Assert.Equal(["North", "South"], Names(hierarchy.Elements!).Order());
-        var listed = await tm1.Dimensions.ListAsync(ODataQuery.None().Select(Dimension.Fields.Name).Filter(Filter.StartsWith(Dimension.Fields.Name, name))).ToListAsync();
+        var listed = await tm1
+            .Dimensions.ListAsync(ODataQuery.None().Select(Dimension.Fields.Name).Filter(Filter.StartsWith(Dimension.Fields.Name, name)))
+            .ToListAsync();
         Assert.Equal(name, Assert.Single(listed).Name);
         await tm1.Dimensions.DeleteAsync(name);
         await Assert.ThrowsAsync<Tm1NotFoundException>(() => tm1.Dimensions.GetAsync(name));
@@ -111,10 +113,14 @@ public class DimensionLiveTests
     {
         await using var made = await Made.Of(n => DimensionOf(n, [Numeric("North"), Numeric("South")]));
         var (tm1, d) = (made.Tm1, made.Name);
-        await tm1.Dimensions.UpdateAsync(d, DimensionPatch.Builder()
-            .AllLeavesHierarchyName("AllLeaves")
-            .Hierarchies([HierarchyPatch.Builder().Name(d).Elements([Numeric("North"), Numeric("South"), Numeric("East")]).Build()])
-            .Build());
+        await tm1.Dimensions.UpdateAsync(
+            d,
+            DimensionPatch
+                .Builder()
+                .AllLeavesHierarchyName("AllLeaves")
+                .Hierarchies([HierarchyPatch.Builder().Name(d).Elements([Numeric("North"), Numeric("South"), Numeric("East")]).Build()])
+                .Build()
+        );
         var read = await tm1.Dimensions.GetAsync(d, ODataQuery.None().Expand(Dimension.Fields.Hierarchies, h => h.Expand(Hierarchy.Fields.Elements)));
         Assert.True(string.IsNullOrEmpty(read.AllLeavesHierarchyName), "TM1 accepts the PATCH and ignores it");
         Assert.Equal(2, Assert.Single(read.Hierarchies!).Elements!.Count);
@@ -148,15 +154,18 @@ public class DimensionLiveTests
     // HierarchyServiceTm1Test
 
     /// <summary>A dimension: Total = North + South, and East, a second root.</summary>
-    private static Task<Made> Region() => Made.Of(n => DimensionOf(n,
-        [Consolidated("Total"), Numeric("North"), Numeric("South"), Numeric("East")],
-        [Edge("Total", "North"), Edge("Total", "South")]));
+    private static Task<Made> Region() =>
+        Made.Of(n =>
+            DimensionOf(n, [Consolidated("Total"), Numeric("North"), Numeric("South"), Numeric("East")], [Edge("Total", "North"), Edge("Total", "South")])
+        );
 
-    private static HierarchyPatch Structure(string name) => HierarchyPatch.Builder()
-        .Name(name)
-        .Elements([Consolidated("Total"), Numeric("North"), Numeric("South"), Numeric("East")])
-        .Edges([Edge("Total", "North"), Edge("Total", "South")])
-        .Build();
+    private static HierarchyPatch Structure(string name) =>
+        HierarchyPatch
+            .Builder()
+            .Name(name)
+            .Elements([Consolidated("Total"), Numeric("North"), Numeric("South"), Numeric("East")])
+            .Edges([Edge("Total", "North"), Edge("Total", "South")])
+            .Build();
 
     private static async Task<List<string>> Roots(Tm1Client tm1, string d) =>
         Names(await tm1.Hierarchies.RootMembersAsync(d, d, ODataQuery.None().Select(Member.Fields.Name)).ToListAsync());
@@ -182,11 +191,20 @@ public class DimensionLiveTests
     {
         await using var made = await Region();
         var (tm1, d) = (made.Tm1, made.Name);
-        var e = Assert.Throws<ArgumentException>(() => { _ = tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().Elements([]).Build()); });
+        var e = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().Elements([]).Build());
+        });
         Assert.Contains("ReplaceStructureAsync", e.Message);
         var north = ODataPath.Of("Dimensions").Key(d).Nav("Hierarchies").Key(d).Nav("Elements").Key("North");
-        Assert.Throws<ArgumentException>(() => { _ = tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().BindElements(north).Build()); });
-        Assert.Throws<ArgumentException>(() => { _ = tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().Edges([Edge("Total", "East")]).Build(), "W/\"x\""); });
+        Assert.Throws<ArgumentException>(() =>
+        {
+            _ = tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().BindElements(north).Build());
+        });
+        Assert.Throws<ArgumentException>(() =>
+        {
+            _ = tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().Edges([Edge("Total", "East")]).Build(), "W/\"x\"");
+        });
     }
 
     [Tm1Fact]
@@ -246,9 +264,14 @@ public class DimensionLiveTests
 
     // ElementServiceTm1Test
 
-    private static Task<Made> ElementsDimension() => Made.Of(n => DimensionOf(n,
-        [Consolidated("Total"), Numeric("North"), Numeric("South"), Numeric("East"), Text("Label")],
-        [Edge("Total", "North"), Edge("Total", "South")]));
+    private static Task<Made> ElementsDimension() =>
+        Made.Of(n =>
+            DimensionOf(
+                n,
+                [Consolidated("Total"), Numeric("North"), Numeric("South"), Numeric("East"), Text("Label")],
+                [Edge("Total", "North"), Edge("Total", "South")]
+            )
+        );
 
     private static async Task<List<string>> Components(Tm1Client tm1, string d, string parent) =>
         Names(await tm1.Elements.ComponentsAsync(d, d, parent).ToListAsync());
@@ -259,11 +282,16 @@ public class DimensionLiveTests
         await using var made = await ElementsDimension();
         var (elements, d) = (made.Tm1.Elements, made.Name);
         Assert.Equal("West", (await elements.CreateAsync(d, d, Numeric("West"))).Name);
-        Assert.Equal(new[] { "Total", "North", "South", "East", "Label", "West" }.Order(), Names(await elements.ListAsync(d, d, ODataQuery.None().Select(Element.Fields.Name)).ToListAsync()).Order());
+        Assert.Equal(
+            new[] { "Total", "North", "South", "East", "Label", "West" }.Order(),
+            Names(await elements.ListAsync(d, d, ODataQuery.None().Select(Element.Fields.Name)).ToListAsync()).Order()
+        );
         var etag = (await elements.GetAsync(d, d, "West")).ETag!;
         await elements.UpdateAsync(d, d, "West", ElementPatch.Builder().Type(ElementType.String).Build(), etag);
         Assert.Equal(ElementType.String, (await elements.GetAsync(d, d, "West")).Type);
-        await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() => elements.UpdateAsync(d, d, "West", ElementPatch.Builder().Type(ElementType.Numeric).Build(), etag));
+        await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() =>
+            elements.UpdateAsync(d, d, "West", ElementPatch.Builder().Type(ElementType.Numeric).Build(), etag)
+        );
         await elements.DeleteAsync(d, d, "West");
         await Assert.ThrowsAsync<Tm1NotFoundException>(() => elements.GetAsync(d, d, "West"));
     }
@@ -273,12 +301,27 @@ public class DimensionLiveTests
     {
         await using var made = await ElementsDimension();
         var (tm1, d) = (made.Tm1, made.Name);
-        Assert.Contains("renamed", Assert.Throws<ArgumentException>(() => { _ = tm1.Elements.UpdateAsync(d, d, "East", ElementPatch.Builder().Name("Est").Build()); }).Message);
-        Assert.Throws<ArgumentException>(() => { _ = tm1.Elements.UpdateAsync(d, d, "East", ElementPatch.Builder().Name("Est").Build(), "W/\"x\""); });
+        Assert.Contains(
+            "renamed",
+            Assert
+                .Throws<ArgumentException>(() =>
+                {
+                    _ = tm1.Elements.UpdateAsync(d, d, "East", ElementPatch.Builder().Name("Est").Build());
+                })
+                .Message
+        );
+        Assert.Throws<ArgumentException>(() =>
+        {
+            _ = tm1.Elements.UpdateAsync(d, d, "East", ElementPatch.Builder().Name("Est").Build(), "W/\"x\"");
+        });
         var east = ODataPath.Of("Dimensions").Key(d).Nav("Hierarchies").Key(d).Nav("Elements").Key("East");
         await tm1.Session.ExecuteAsync(Tm1Request.Patch(east, new Dictionary<string, object?> { ["Name"] = "Est" }));
         Assert.Equal("East", (await tm1.Elements.GetAsync(d, d, "East")).Name); // TM1 ignores the new name
-        await Assert.ThrowsAsync<Tm1BadRequestException>(() => tm1.Session.ExecuteAsync(Tm1Request.Patch(east, new Dictionary<string, object?> { ["Attributes"] = new Dictionary<string, object?> { ["Caption"] = "E" } })));
+        await Assert.ThrowsAsync<Tm1BadRequestException>(() =>
+            tm1.Session.ExecuteAsync(
+                Tm1Request.Patch(east, new Dictionary<string, object?> { ["Attributes"] = new Dictionary<string, object?> { ["Caption"] = "E" } })
+            )
+        );
     }
 
     [Tm1Fact]
@@ -288,7 +331,10 @@ public class DimensionLiveTests
         var (tm1, d) = (made.Tm1, made.Name);
         Assert.Equal(["Total"], Names(await tm1.Elements.ParentsAsync(d, d, "North").ToListAsync()));
         Assert.Equal(["North", "South"], await Components(tm1, d, "Total"));
-        Assert.Equal([("Total", "North"), ("Total", "South")], (await tm1.Elements.EdgesAsync(d, d, "Total").ToListAsync()).Select(e => (e.ParentName, e.ComponentName)));
+        Assert.Equal(
+            [("Total", "North"), ("Total", "South")],
+            (await tm1.Elements.EdgesAsync(d, d, "Total").ToListAsync()).Select(e => (e.ParentName, e.ComponentName))
+        );
         Assert.Equal(d, (await tm1.Elements.HierarchyAsync(d, d, "North")).Name);
     }
 
@@ -342,9 +388,14 @@ public class DimensionLiveTests
 
     // LevelAndMemberServiceTm1Test
 
-    private static Task<Made> World() => Made.Of(n => DimensionOf(n,
-        [Consolidated("World"), Consolidated("Europe"), Consolidated("Asia"), Numeric("France"), Numeric("Spain"), Numeric("Japan")],
-        [Edge("World", "Europe"), Edge("World", "Asia"), Edge("Europe", "France"), Edge("Europe", "Spain"), Edge("Asia", "Japan")]));
+    private static Task<Made> World() =>
+        Made.Of(n =>
+            DimensionOf(
+                n,
+                [Consolidated("World"), Consolidated("Europe"), Consolidated("Asia"), Numeric("France"), Numeric("Spain"), Numeric("Japan")],
+                [Edge("World", "Europe"), Edge("World", "Asia"), Edge("Europe", "France"), Edge("Europe", "Spain"), Edge("Asia", "Japan")]
+            )
+        );
 
     [Tm1Fact]
     public async Task ListsLevelsAndTheirMembers()
@@ -355,7 +406,10 @@ public class DimensionLiveTests
         Assert.Equal([0, 1, 2], levels.Select(l => l.Number!.Value));
         Assert.Equal([1, 2, 3], levels.Select(l => l.Cardinality!.Value));
         Assert.Equal(3, (await tm1.Levels.GetAsync(d, d, 2)).Cardinality);
-        Assert.Equal(["France", "Japan", "Spain"], Names(await tm1.Levels.MembersAsync(d, d, 2, ODataQuery.None().Select(Member.Fields.Name)).ToListAsync()).Order());
+        Assert.Equal(
+            ["France", "Japan", "Spain"],
+            Names(await tm1.Levels.MembersAsync(d, d, 2, ODataQuery.None().Select(Member.Fields.Name)).ToListAsync()).Order()
+        );
         Assert.Equal(d, (await tm1.Levels.HierarchyAsync(d, d, 0)).Name);
     }
 
@@ -399,7 +453,9 @@ public class DimensionLiveTests
         var etag = (await subsets.GetAsync(d, d, pub, "Dynamic")).ETag!;
         await subsets.UpdateAsync(d, d, pub, "Dynamic", SubsetPatch.Builder().Expression($"{{[{d}].[{d}].[C]}}").Build(), etag);
         Assert.Equal(["C"], await SubsetElements(tm1, d, pub, "Dynamic"));
-        await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() => subsets.UpdateAsync(d, d, pub, "Dynamic", SubsetPatch.Builder().Expression("{}").Build(), etag));
+        await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() =>
+            subsets.UpdateAsync(d, d, pub, "Dynamic", SubsetPatch.Builder().Expression("{}").Build(), etag)
+        );
         Assert.Equal(d, (await subsets.HierarchyAsync(d, d, pub, "Static")).Name);
         await subsets.DeleteAsync(d, d, pub, "Static");
         Assert.Equal(["Dynamic"], Names(await subsets.ListAsync(d, d, pub).ToListAsync()));
@@ -416,7 +472,10 @@ public class DimensionLiveTests
         Assert.Equal(["A", "C", "B"], await SubsetElements(tm1, d, pub, "S")); // appended, in order
         await tm1.Subsets.ClearElementsAsync(d, d, pub, "S");
         Assert.Empty(await SubsetElements(tm1, d, pub, "S"));
-        var e = Assert.Throws<ArgumentException>(() => { _ = tm1.Subsets.UpdateAsync(d, d, pub, "S", SubsetPatch.Builder().BindElements(El(d, "D")).Build()); });
+        var e = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = tm1.Subsets.UpdateAsync(d, d, pub, "S", SubsetPatch.Builder().BindElements(El(d, "D")).Build());
+        });
         Assert.Contains("AddElementsAsync", e.Message);
     }
 

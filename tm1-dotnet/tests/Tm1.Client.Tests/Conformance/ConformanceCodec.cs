@@ -33,9 +33,10 @@ public static class ConformanceCodec
     private static readonly Assembly Client = typeof(Tm1Client).Assembly;
 
     /// <summary><c>modelCubes</c> → <c>ModelCubes</c>; <c>PRIVATE_VIEWS</c> → <c>PrivateViews</c>.</summary>
-    public static string Pascal(string name) => name.Contains('_', StringComparison.Ordinal) || name.All(c => !char.IsLower(c))
-        ? string.Concat(name.ToLowerInvariant().Split('_').Select(w => w.Length == 0 ? w : char.ToUpperInvariant(w[0]) + w[1..]))
-        : char.ToUpperInvariant(name[0]) + name[1..];
+    public static string Pascal(string name) =>
+        name.Contains('_', StringComparison.Ordinal) || name.All(c => !char.IsLower(c))
+            ? string.Concat(name.ToLowerInvariant().Split('_').Select(w => w.Length == 0 ? w : char.ToUpperInvariant(w[0]) + w[1..]))
+            : char.ToUpperInvariant(name[0]) + name[1..];
 
     /// <summary>An argument, as the parameter of type <paramref name="type"/> takes it.</summary>
     public static object? Decode(JsonNode? node, Type type)
@@ -46,21 +47,21 @@ public static class ConformanceCodec
             case null:
                 return null;
             case JsonArray array:
+            {
+                var element = ElementType(target) ?? throw new UnknownConformanceValueException($"a list for a {type}");
+                var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(element))!;
+                foreach (var item in array)
                 {
-                    var element = ElementType(target) ?? throw new UnknownConformanceValueException($"a list for a {type}");
-                    var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(element))!;
-                    foreach (var item in array)
-                    {
-                        list.Add(Decode(item, element));
-                    }
-                    if (target.IsArray)
-                    {
-                        var copy = Array.CreateInstance(element, list.Count);
-                        list.CopyTo(copy, 0);
-                        return copy;
-                    }
-                    return list;
+                    list.Add(Decode(item, element));
                 }
+                if (target.IsArray)
+                {
+                    var copy = Array.CreateInstance(element, list.Count);
+                    list.CopyTo(copy, 0);
+                    return copy;
+                }
+                return list;
+            }
             case JsonValue value:
                 return Primitive(value, target);
             case JsonObject tagged:
@@ -95,43 +96,43 @@ public static class ConformanceCodec
             case "$path":
                 return ODataPath.Link(body!.GetValue<string>());
             case "$map":
+            {
+                var args = target.IsGenericType ? target.GetGenericArguments() : [typeof(string), typeof(object)];
+                var map = (IDictionary)Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(args[0], args[1]))!;
+                foreach (var (key, value) in body!.AsObject())
                 {
-                    var args = target.IsGenericType ? target.GetGenericArguments() : [typeof(string), typeof(object)];
-                    var map = (IDictionary)Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(args[0], args[1]))!;
-                    foreach (var (key, value) in body!.AsObject())
-                    {
-                        map[key] = Decode(value, args[1]);
-                    }
-                    return map;
+                    map[key] = Decode(value, args[1]);
                 }
+                return map;
+            }
             case "$patch":
+            {
+                var type = Client.GetType("AjMyers.Tm1.Client.Model." + body!.GetValue<string>())
+                    ?? throw new UnknownConformanceValueException("no patch " + body);
+                var values = new Dictionary<string, object?>();
+                foreach (var (key, value) in node["json"]!.AsObject())
                 {
-                    var type = Client.GetType("AjMyers.Tm1.Client.Model." + body!.GetValue<string>())
-                        ?? throw new UnknownConformanceValueException("no patch " + body);
-                    var values = new Dictionary<string, object?>();
-                    foreach (var (key, value) in node["json"]!.AsObject())
-                    {
-                        values[key] = Plain(value);
-                    }
-                    var ctor = type.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                        .Single(c => c.GetParameters() is [var p] && p.ParameterType.IsAssignableFrom(typeof(Dictionary<string, object?>)));
-                    return ctor.Invoke([values]);
+                    values[key] = Plain(value);
                 }
+                var ctor = type.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                    .Single(c => c.GetParameters() is [var p] && p.ParameterType.IsAssignableFrom(typeof(Dictionary<string, object?>)));
+                return ctor.Invoke([values]);
+            }
             case "$model":
-                {
-                    var type = Client.GetType("AjMyers.Tm1.Client.Model." + body!.GetValue<string>())
-                        ?? throw new UnknownConformanceValueException("no model " + body);
-                    // An argument Java built: its date-times as given, as a caller's are
-                    return JsonSerializer.Deserialize(JsonSerializer.SerializeToElement(node["json"]), type, AsGiven.Value);
-                }
+            {
+                var type = Client.GetType("AjMyers.Tm1.Client.Model." + body!.GetValue<string>())
+                    ?? throw new UnknownConformanceValueException("no model " + body);
+                // An argument Java built: its date-times as given, as a caller's are
+                return JsonSerializer.Deserialize(JsonSerializer.SerializeToElement(node["json"]), type, AsGiven.Value);
+            }
             case "$enum":
+            {
+                if (!target.IsEnum || target.Name != body!.GetValue<string>())
                 {
-                    if (!target.IsEnum || target.Name != body!.GetValue<string>())
-                    {
-                        throw new UnknownConformanceValueException($"enum {body} for a {target}");
-                    }
-                    return Enum.Parse(target, Pascal(node["name"]!.GetValue<string>()), ignoreCase: true);
+                    throw new UnknownConformanceValueException($"enum {body} for a {target}");
                 }
+                return Enum.Parse(target, Pascal(node["name"]!.GetValue<string>()), ignoreCase: true);
+            }
             case "$duration":
                 return XmlConvert.ToTimeSpan(body!.GetValue<string>());
             case "$dateTime":
@@ -143,93 +144,98 @@ public static class ConformanceCodec
             case "$bytes":
                 return Convert.FromBase64String(body!.GetValue<string>());
             case "$handler":
-                {
-                    var handler = Handler(body!.GetValue<string>());
-                    return target.IsInstanceOfType(handler.Value) ? handler.Value
-                        : throw new UnknownConformanceValueException($"handler {body} for a {target}");
-                }
+            {
+                var handler = Handler(body!.GetValue<string>());
+                return target.IsInstanceOfType(handler.Value) ? handler.Value : throw new UnknownConformanceValueException($"handler {body} for a {target}");
+            }
             case "$type":
+            {
+                var name = body!.GetValue<string>();
+                var type = Client.GetTypes().SingleOrDefault(t => t.IsPublic && t.Name == name && t.Namespace == "AjMyers.Tm1.Client.Services")
+                    ?? throw new UnknownConformanceValueException("no type " + name);
+                var args = node["args"]!.AsArray();
+                var factoryName = node["factory"]!.GetValue<string>();
+                if (factoryName == "new")
                 {
-                    var name = body!.GetValue<string>();
-                    var type = Client.GetTypes().SingleOrDefault(t => t.IsPublic && t.Name == name && t.Namespace == "AjMyers.Tm1.Client.Services")
-                        ?? throw new UnknownConformanceValueException("no type " + name);
-                    var args = node["args"]!.AsArray();
-                    var factoryName = node["factory"]!.GetValue<string>();
-                    if (factoryName == "new")
+                    var ctor = type.GetConstructors().SingleOrDefault(c => c.GetParameters().Length == args.Count)
+                        ?? throw new UnknownConformanceValueException($"no constructor {name}({args.Count})");
+                    var ps = ctor.GetParameters();
+                    return ctor.Invoke(args.Select((a, i) => Decode(a, ps[i].ParameterType)).ToArray());
+                }
+                var factory = type.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .SingleOrDefault(m => m.Name == Pascal(factoryName) && m.GetParameters().Length == args.Count);
+                if (factory is null && args.Count > 0)
+                {
+                    // An instance method, such as ContentPath.Child, on the first argument: the
+                    // overload the rest of the arguments decode for
+                    var receiver = Decode(args[0], type);
+                    foreach (
+                        var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                            .Where(m => m.Name == Pascal(factoryName) && m.GetParameters().Length == args.Count - 1)
+                    )
                     {
-                        var ctor = type.GetConstructors().SingleOrDefault(c => c.GetParameters().Length == args.Count)
-                            ?? throw new UnknownConformanceValueException($"no constructor {name}({args.Count})");
-                        var ps = ctor.GetParameters();
-                        return ctor.Invoke(args.Select((a, i) => Decode(a, ps[i].ParameterType)).ToArray());
-                    }
-                    var factory = type.GetMethods(BindingFlags.Public | BindingFlags.Static)
-                        .SingleOrDefault(m => m.Name == Pascal(factoryName) && m.GetParameters().Length == args.Count);
-                    if (factory is null && args.Count > 0)
-                    {
-                        // An instance method, such as ContentPath.Child, on the first argument: the
-                        // overload the rest of the arguments decode for
-                        var receiver = Decode(args[0], type);
-                        foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                            .Where(m => m.Name == Pascal(factoryName) && m.GetParameters().Length == args.Count - 1))
+                        var ps = method.GetParameters();
+                        object?[] values;
+                        try
                         {
-                            var ps = method.GetParameters();
-                            object?[] values;
-                            try
-                            {
-                                values = ps.Select((p, i) => Decode(args[i + 1], p.ParameterType)).ToArray();
-                            }
-                            catch (UnknownConformanceValueException)
-                            {
-                                continue;
-                            }
-                            if (values.Select((v, i) => v is null || ps[i].ParameterType.IsInstanceOfType(v)).All(fits => fits))
-                            {
-                                return method.Invoke(receiver, values);
-                            }
+                            values = ps.Select((p, i) => Decode(args[i + 1], p.ParameterType)).ToArray();
+                        }
+                        catch (UnknownConformanceValueException)
+                        {
+                            continue;
+                        }
+                        if (values.Select((v, i) => v is null || ps[i].ParameterType.IsInstanceOfType(v)).All(fits => fits))
+                        {
+                            return method.Invoke(receiver, values);
                         }
                     }
-                    if (factory is null)
-                    {
-                        throw new UnknownConformanceValueException($"no factory {name}.{factoryName}");
-                    }
-                    var parameters = factory.GetParameters();
-                    return factory.Invoke(null, args.Select((a, i) => Decode(a, parameters[i].ParameterType)).ToArray());
                 }
+                if (factory is null)
+                {
+                    throw new UnknownConformanceValueException($"no factory {name}.{factoryName}");
+                }
+                var parameters = factory.GetParameters();
+                return factory.Invoke(null, args.Select((a, i) => Decode(a, parameters[i].ParameterType)).ToArray());
+            }
         }
         throw new UnknownConformanceValueException("unknown tag " + tag);
     }
 
     /// <summary>The handlers every runner knows by name (Java's <c>ConformanceHandler</c>): the
     /// delegate, and the type it gives, for a generic method's type argument.</summary>
-    private static (object Value, Type Result) Handler(string name) => name switch
-    {
-        // (cellset, cells) => cells: a cellset stream's cells
-        "cells" => (new Func<Cellset, IAsyncEnumerable<CellsetCell>, IAsyncEnumerable<CellsetCell>>((_, cells) => cells), typeof(CellsetCell)),
-        _ => throw new UnknownConformanceValueException("no handler " + name),
-    };
+    private static (object Value, Type Result) Handler(string name) =>
+        name switch
+        {
+            // (cellset, cells) => cells: a cellset stream's cells
+            "cells" => (new Func<Cellset, IAsyncEnumerable<CellsetCell>, IAsyncEnumerable<CellsetCell>>((_, cells) => cells), typeof(CellsetCell)),
+            _ => throw new UnknownConformanceValueException("no handler " + name),
+        };
 
     /// <summary>JSON as plain values, as a patch holds them.</summary>
-    private static object? Plain(JsonNode? node) => node switch
-    {
-        null => null,
-        JsonArray a => a.Select(Plain).ToList(),
-        JsonObject o => o.ToDictionary(p => p.Key, p => Plain(p.Value)),
-        JsonValue v => Element(v) switch
+    private static object? Plain(JsonNode? node) =>
+        node switch
         {
-            { ValueKind: JsonValueKind.String } e => e.GetString(),
-            { ValueKind: JsonValueKind.True } => true,
-            { ValueKind: JsonValueKind.False } => false,
-            { ValueKind: JsonValueKind.Number } e => e.TryGetInt64(out var l) ? (object)l : e.GetDouble(),
-            var e => throw new UnknownConformanceValueException(e.ToString()),
-        },
-        _ => throw new UnknownConformanceValueException(node.ToJsonString()),
-    };
+            null => null,
+            JsonArray a => a.Select(Plain).ToList(),
+            JsonObject o => o.ToDictionary(p => p.Key, p => Plain(p.Value)),
+            JsonValue v => Element(v) switch
+            {
+                { ValueKind: JsonValueKind.String } e => e.GetString(),
+                { ValueKind: JsonValueKind.True } => true,
+                { ValueKind: JsonValueKind.False } => false,
+                { ValueKind: JsonValueKind.Number } e => e.TryGetInt64(out var l) ? (object)l : e.GetDouble(),
+                var e => throw new UnknownConformanceValueException(e.ToString()),
+            },
+            _ => throw new UnknownConformanceValueException(node.ToJsonString()),
+        };
 
     private static JsonElement Element(JsonNode node) => JsonSerializer.SerializeToElement(node);
 
-    private static Type? ElementType(Type type) => type.IsArray ? type.GetElementType()
+    private static Type? ElementType(Type type) =>
+        type.IsArray ? type.GetElementType()
         : type.IsGenericType && type.GetGenericArguments().Length == 1 ? type.GetGenericArguments()[0]
-        : type == typeof(object) ? typeof(object) : null;
+        : type == typeof(object) ? typeof(object)
+        : null;
 
     /// <summary>The overload that takes Java's parameters by name, with the rest left to their
     /// defaults (the <c>CancellationToken</c> among them).</summary>
@@ -258,15 +264,22 @@ public static class ConformanceCodec
             {
                 continue;
             }
-            var values = parameters.Select(object? (p) =>
-            {
-                var i = names.IndexOf(p.Name!);
-                return i >= 0 ? ConformanceCodec.Decode(args[i], p.ParameterType)
-                    : p.HasDefaultValue ? p.DefaultValue : p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null;
-            }).ToArray();
+            var values = parameters
+                .Select(
+                    object? (p) =>
+                    {
+                        var i = names.IndexOf(p.Name!);
+                        return i >= 0 ? ConformanceCodec.Decode(args[i], p.ParameterType)
+                            : p.HasDefaultValue ? p.DefaultValue
+                            : p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType)
+                            : null;
+                    }
+                )
+                .ToArray();
             fits.Add((m, values));
         }
-        return fits.Count == 1 ? fits[0]
+        return fits.Count == 1
+            ? fits[0]
             : throw new UnknownConformanceValueException($"{fits.Count} methods {type.Name}.{name} take ({string.Join(", ", names)})");
     }
 
@@ -351,8 +364,7 @@ public static class ConformanceCodec
             case Task task:
                 await task;
                 // By the declared type: a method that returns Task may hand back a Task<T> underneath
-                return declared.IsGenericType && declared.GetGenericTypeDefinition() == typeof(Task<>)
-                    ? declared.GetProperty("Result")!.GetValue(task) : null;
+                return declared.IsGenericType && declared.GetGenericTypeDefinition() == typeof(Task<>) ? declared.GetProperty("Result")!.GetValue(task) : null;
             case null:
                 return null;
         }
@@ -361,7 +373,8 @@ public static class ConformanceCodec
         {
             return returned;
         }
-        var collect = typeof(ConformanceCodec).GetMethod(nameof(Collect), BindingFlags.NonPublic | BindingFlags.Static)!
+        var collect = typeof(ConformanceCodec)
+            .GetMethod(nameof(Collect), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(enumerable.GetGenericArguments()[0]);
         return await (Task<List<object?>>)collect.Invoke(null, [returned, take])!;
     }
@@ -385,18 +398,22 @@ public static class ConformanceCodec
     }
 
     /// <summary>A result, encoded as the Java recorder encodes its own.</summary>
-    public static JsonNode? Result(object? value) => value switch
-    {
-        null => null,
-        string or bool => JsonValue.Create(value),
-        byte[] bytes => new JsonObject { ["$bytes"] = Convert.ToBase64String(bytes) },
-        int or long or short => JsonValue.Create(Convert.ToInt64(value, CultureInfo.InvariantCulture)),
-        double or float or decimal => JsonValue.Create(Convert.ToDouble(value, CultureInfo.InvariantCulture)),
-        IList list => new JsonArray(list.Cast<object?>().Select(Result).ToArray()),
-        _ when value.GetType().Namespace == "AjMyers.Tm1.Client.Model" && !value.GetType().IsEnum =>
-            new JsonObject { ["$model"] = value.GetType().Name, ["json"] = WithoutTypes(JsonSerializer.SerializeToNode(value, value.GetType(), ResultOptions)) },
-        _ => JsonSerializer.SerializeToNode(value, value.GetType(), ResultOptions),
-    };
+    public static JsonNode? Result(object? value) =>
+        value switch
+        {
+            null => null,
+            string or bool => JsonValue.Create(value),
+            byte[] bytes => new JsonObject { ["$bytes"] = Convert.ToBase64String(bytes) },
+            int or long or short => JsonValue.Create(Convert.ToInt64(value, CultureInfo.InvariantCulture)),
+            double or float or decimal => JsonValue.Create(Convert.ToDouble(value, CultureInfo.InvariantCulture)),
+            IList list => new JsonArray(list.Cast<object?>().Select(Result).ToArray()),
+            _ when value.GetType().Namespace == "AjMyers.Tm1.Client.Model" && !value.GetType().IsEnum => new JsonObject
+            {
+                ["$model"] = value.GetType().Name,
+                ["json"] = WithoutTypes(JsonSerializer.SerializeToNode(value, value.GetType(), ResultOptions)),
+            },
+            _ => JsonSerializer.SerializeToNode(value, value.GetType(), ResultOptions),
+        };
 
     /// <summary>The client's JSON options, but reading date-times as given (the client reads TM1's
     /// in UTC, as Java's Jackson does), for arguments Java built.</summary>
@@ -411,8 +428,7 @@ public static class ConformanceCodec
 
     private sealed class AsGivenDateTime : System.Text.Json.Serialization.JsonConverter<DateTimeOffset>
     {
-        public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-            reader.GetDateTimeOffset();
+        public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.GetDateTimeOffset();
 
         public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) =>
             throw new NotSupportedException("Arguments are read, not written");
@@ -421,7 +437,10 @@ public static class ConformanceCodec
     private sealed class AsGivenLenientDateTime : System.Text.Json.Serialization.JsonConverter<DateTimeOffset?>
     {
         public override DateTimeOffset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-            reader.TokenType == JsonTokenType.String && DateTimeOffset.TryParse(reader.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d) ? d : null;
+            reader.TokenType == JsonTokenType.String
+            && DateTimeOffset.TryParse(reader.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d)
+                ? d
+                : null;
 
         public override void Write(Utf8JsonWriter writer, DateTimeOffset? value, JsonSerializerOptions options) =>
             throw new NotSupportedException("Arguments are read, not written");
@@ -541,16 +560,17 @@ public static class ConformanceCodec
     /// <paramref name="dropNulls"/>, null members left out and a model by its JSON alone.</summary>
     public static string Comparable(JsonNode? node, bool dropNulls = false) => Normal(node, dropNulls)?.ToJsonString() ?? "null";
 
-    private static JsonNode? Normal(JsonNode? node, bool dropNulls) => node switch
-    {
-        null => null,
-        JsonArray a => new JsonArray(a.Select(x => Normal(x, dropNulls)).ToArray()),
-        JsonObject o when dropNulls && o.ContainsKey("$model") => Normal(o["json"], dropNulls),
-        JsonObject o => Members(o, dropNulls),
-        JsonValue v when Element(v).ValueKind == JsonValueKind.Number => JsonValue.Create(Element(v).GetDouble()),
-        JsonValue v => JsonNode.Parse(v.ToJsonString()),
-        _ => throw new InvalidOperationException(),
-    };
+    private static JsonNode? Normal(JsonNode? node, bool dropNulls) =>
+        node switch
+        {
+            null => null,
+            JsonArray a => new JsonArray(a.Select(x => Normal(x, dropNulls)).ToArray()),
+            JsonObject o when dropNulls && o.ContainsKey("$model") => Normal(o["json"], dropNulls),
+            JsonObject o => Members(o, dropNulls),
+            JsonValue v when Element(v).ValueKind == JsonValueKind.Number => JsonValue.Create(Element(v).GetDouble()),
+            JsonValue v => JsonNode.Parse(v.ToJsonString()),
+            _ => throw new InvalidOperationException(),
+        };
 
     private static JsonObject Members(JsonObject o, bool dropNulls)
     {
@@ -574,7 +594,12 @@ public static class ConformanceCodec
                 kept[key] = value;
             }
         }
-        var o = new JsonObject { ["method"] = method, ["target"] = target, ["headers"] = kept };
+        var o = new JsonObject
+        {
+            ["method"] = method,
+            ["target"] = target,
+            ["headers"] = kept,
+        };
         if (body.Length > 0)
         {
             var type = headers.TryGetValue("content-type", out var t) ? t.ToLowerInvariant() : "";

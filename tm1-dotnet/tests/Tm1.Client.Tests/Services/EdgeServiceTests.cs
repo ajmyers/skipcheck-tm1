@@ -17,11 +17,24 @@ public class EdgeServiceTests
     public async Task ListsGetsCreatesUpdatesAndDeletes()
     {
         var tm1 = _tm1.Client();
-        _tm1.Respond = _ => FakeTm1.Collection(new { ParentName = "Total", ComponentName = "West", Weight = 1.0 });
+        _tm1.Respond = _ =>
+            FakeTm1.Collection(
+                new
+                {
+                    ParentName = "Total",
+                    ComponentName = "West",
+                    Weight = 1.0,
+                }
+            );
         Assert.Equal(1.0, Assert.Single(await tm1.Edges.ListAsync("Region", "Region", ODataQuery.None().Top(1)).ToListAsync()).Weight);
         Assert.Equal(Edges + "?$top=1", _tm1.Last.Target);
 
-        _tm1.Respond = _ => new Dictionary<string, object?> { ["ParentName"] = "Total", ["ComponentName"] = "O'Brien", ["Weight"] = 2.0 };
+        _tm1.Respond = _ => new Dictionary<string, object?>
+        {
+            ["ParentName"] = "Total",
+            ["ComponentName"] = "O'Brien",
+            ["Weight"] = 2.0,
+        };
         Assert.Equal(2.0, (await tm1.Edges.GetAsync("Region", "Region", "Total", "O'Brien")).Weight);
         Assert.Equal(("GET", Edge), (_tm1.Last.Method, _tm1.Last.Target));
         await tm1.Edges.CreateAsync("Region", "Region", EdgePatch.Builder().ParentName("Total").ComponentName("West").Weight(1.0).Build());

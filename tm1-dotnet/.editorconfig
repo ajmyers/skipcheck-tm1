@@ -1,0 +1,6 @@
+# Settings for .NET's analyzers (Directory.Build.props turns them on). Layout is CSharpier's
+# (.csharpierrc.json), not set here.
+[*.cs]
+# "Can be static" only for members callers can't see: a public one keeps the shape the Java
+# client's has, where it is an instance member
+dotnet_code_quality.CA1822.api_surface = private, internal

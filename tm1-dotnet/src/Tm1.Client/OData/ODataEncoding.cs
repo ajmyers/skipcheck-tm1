@@ -21,7 +21,7 @@ public static class ODataEncoding
         var sb = new StringBuilder(text.Length + 16);
         foreach (var b in Encoding.UTF8.GetBytes(text))
         {
-            if (b < 128 && safe.IndexOf((char)b) >= 0)
+            if (b < 128 && safe.Contains((char)b))
             {
                 sb.Append((char)b);
             }

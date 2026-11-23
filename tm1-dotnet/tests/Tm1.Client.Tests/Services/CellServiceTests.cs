@@ -18,7 +18,8 @@ public class CellServiceTests
         Assert.Equal(("POST", "Cubes('Sales')/tm1.Update"), (_tm1.Last.Method, _tm1.Last.Target));
         Assert.Equal(
             """{"Cells":[{"Tuple@odata.bind":["Dimensions('Region')/Hierarchies('Region')/Elements('North')","Dimensions('Month')/Hierarchies('Month')/Elements('Jan')"]}],"Value":42}""",
-            _tm1.Last.Text);
+            _tm1.Last.Text
+        );
     }
 
     [Fact]
@@ -43,7 +44,8 @@ public class CellServiceTests
         Assert.Equal(("POST", "Cubes('Sales')/tm1.UpdateCells"), (_tm1.Last.Method, _tm1.Last.Target));
         Assert.Equal(
             """{"Updates":[{"Tuple@odata.bind":["Dimensions('Region')/Hierarchies('Region')/Elements('North')"],"Value":1},{"Tuple@odata.bind":["Dimensions('Region')/Hierarchies('Region')/Elements('South')"],"Value":"x"}]}""",
-            _tm1.Last.Text);
+            _tm1.Last.Text
+        );
 
         await tm1.Cells.UpdateCellsAsync("Sales", updates, UpdateOrder.ByLevel);
         Assert.EndsWith("""],"Order":"ByLevel"}""", _tm1.Last.Text);

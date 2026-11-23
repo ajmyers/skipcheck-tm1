@@ -43,9 +43,13 @@ public class ConformanceCallsTests
     }
 
     /// <summary>Cases this client can't express, each with its reason: <c>id  reason</c>.</summary>
-    private static Dictionary<string, string> Unsupported() => !File.Exists(UnsupportedFile) ? []
-        : File.ReadAllLines(UnsupportedFile).Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith('#'))
-            .ToDictionary(l => l.Split(' ', 2)[0], l => l.Split(' ', 2) is [_, var r] ? r.Trim() : "", StringComparer.Ordinal);
+    private static Dictionary<string, string> Unsupported() =>
+        !File.Exists(UnsupportedFile)
+            ? []
+            : File.ReadAllLines(UnsupportedFile)
+                .Select(l => l.Trim())
+                .Where(l => l.Length > 0 && !l.StartsWith('#'))
+                .ToDictionary(l => l.Split(' ', 2)[0], l => l.Split(' ', 2) is [_, var r] ? r.Trim() : "", StringComparer.Ordinal);
 
     public static IEnumerable<object[]> Cases() => All.Value.Keys.Order(StringComparer.Ordinal).Select(id => new object[] { id });
 
@@ -67,8 +71,9 @@ public class ConformanceCallsTests
         var (session, c) = All.Value[id];
         var fake = new FakeTm1 { ProductVersion = session["productVersion"]!.GetValue<string>() };
         // Each entry a list of exchanges: one, or an unordered group's, answered by the equal request
-        var entries = new Queue<List<JsonNode>>(c["exchanges"]!.AsArray()
-            .Select(x => x!["unordered"] is JsonArray group ? group.Select(g => g!).ToList() : [x!]));
+        var entries = new Queue<List<JsonNode>>(
+            c["exchanges"]!.AsArray().Select(x => x!["unordered"] is JsonArray group ? group.Select(g => g!).ToList() : [x!])
+        );
         var answered = new List<(JsonNode Sent, JsonNode Expected)>();
         fake.Respond = r =>
         {
@@ -126,8 +131,10 @@ public class ConformanceCallsTests
 
         if (c["error"] is JsonObject error)
         {
-            Assert.True(outcome["error"] is JsonObject got && ConformanceCodec.SameError(error, got),
-                $"Java failed with {error.ToJsonString()}, .NET gave {outcome.ToJsonString()}");
+            Assert.True(
+                outcome["error"] is JsonObject got && ConformanceCodec.SameError(error, got),
+                $"Java failed with {error.ToJsonString()}, .NET gave {outcome.ToJsonString()}"
+            );
         }
         else
         {
@@ -139,7 +146,8 @@ public class ConformanceCallsTests
     private static HttpResponseMessage Answer(JsonNode r)
     {
         var message = new HttpResponseMessage((HttpStatusCode)r["status"]!.GetValue<int>());
-        HttpContent? content = r["json"] is { } json ? new ByteArrayContent(Encoding.UTF8.GetBytes(json.ToJsonString()))
+        HttpContent? content =
+            r["json"] is { } json ? new ByteArrayContent(Encoding.UTF8.GetBytes(json.ToJsonString()))
             : r["text"] is { } text ? new ByteArrayContent(Encoding.UTF8.GetBytes(text.GetValue<string>()))
             : r["bytes"] is { } bytes ? new ByteArrayContent(Convert.FromBase64String(bytes.GetValue<string>()))
             : null;

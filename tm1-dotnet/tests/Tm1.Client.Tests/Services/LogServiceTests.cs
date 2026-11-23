@@ -69,9 +69,8 @@ public class LogServiceTests
             FakeTm1.Collection(new { Message = "a" }),
             FakeTm1.Collection(new { Message = "a" }, new { Message = "b" }, new { Message = "c" }),
         ]);
-        _tm1.Respond = r => r.Target == "TailMessageLog()"
-            ? new Dictionary<string, object?> { ["value"] = "MessageLogEntries/!delta('0[4096]38@11!19')" }
-            : polls.Dequeue();
+        _tm1.Respond = r =>
+            r.Target == "TailMessageLog()" ? new Dictionary<string, object?> { ["value"] = "MessageLogEntries/!delta('0[4096]38@11!19')" } : polls.Dequeue();
         var entries = await _tm1.Client().Logs.TailMessageLogAsync(TimeSpan.FromMilliseconds(1)).Take(3).ToListAsync();
         Assert.Equal(["a", "b", "c"], entries.Select(e => e.Message));
         Assert.Single(_tm1.Requests, r => r.Target == "TailMessageLog()");
@@ -82,9 +81,10 @@ public class LogServiceTests
     public async Task TailsTheTransactionAndAuditLogsUntilCancelled()
     {
         var tm1 = _tm1.Client();
-        _tm1.Respond = r => r.Target.StartsWith("Tail", StringComparison.Ordinal)
-            ? new Dictionary<string, object?> { ["value"] = "TransactionLogEntries/!delta('1')" }
-            : FakeTm1.Collection(new { Cube = "Sales" });
+        _tm1.Respond = r =>
+            r.Target.StartsWith("Tail", StringComparison.Ordinal)
+                ? new Dictionary<string, object?> { ["value"] = "TransactionLogEntries/!delta('1')" }
+                : FakeTm1.Collection(new { Cube = "Sales" });
         Assert.Equal("Sales", (await tm1.Logs.TailTransactionLogAsync(TimeSpan.FromMilliseconds(1)).FirstAsync()).Cube);
         Assert.Contains(_tm1.Requests, r => r.Target == "TailTransactionLog()");
 

@@ -38,9 +38,7 @@ public sealed class CubeService : Tm1Service
     private static readonly ODataPath Cubes = ODataPath.Of("Cubes");
 
     public CubeService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Cubes</c>: every cube, control cubes included, streamed.</summary>
     [Tm1Endpoint("EntitySet Cubes")]
@@ -97,7 +95,10 @@ public sealed class CubeService : Tm1Service
     public IAsyncEnumerable<Dimension> DimensionsStorageOrderAsync(string name, ODataQuery? query = null, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.CubeDimensionsStorageOrder;
-        return Session.StreamAsync(Tm1Request.List<Dimension>(CubePath(name).Function(operation.Name), query).Requires(operation.Capability()), cancellationToken);
+        return Session.StreamAsync(
+            Tm1Request.List<Dimension>(CubePath(name).Function(operation.Name), query).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>tm1.ReorderDimensions</c>: changes the order TM1 stores the cube's cells in, and returns
@@ -106,34 +107,45 @@ public sealed class CubeService : Tm1Service
     public async Task<double> ReorderDimensionsAsync(string name, IReadOnlyList<string> dimensions, CancellationToken cancellationToken = default)
     {
         var bindings = dimensions.Select(d => ODataPath.Of("Dimensions").Key(d).ToString()).ToList();
-        var result = await Session.ExecuteAsync(Action<JsonElement>(Tm1Operations.CubeReorderDimensions, name, new Dictionary<string, object?> { ["Dimensions@odata.bind"] = bindings }), cancellationToken).ConfigureAwait(false);
+        var result = await Session
+            .ExecuteAsync(
+                Action<JsonElement>(Tm1Operations.CubeReorderDimensions, name, new Dictionary<string, object?> { ["Dimensions@odata.bind"] = bindings }),
+                cancellationToken
+            )
+            .ConfigureAwait(false);
         // A primitive result comes wrapped, as {"@odata.context": ..., "value": 12.5}
         return result.ValueKind == JsonValueKind.Object && result.TryGetProperty("value", out var v) ? v.GetDouble() : 0.0;
     }
 
     /// <summary><c>tm1.Load</c>: loads the cube into memory.</summary>
     [Tm1Endpoint("Action Cube/Load")]
-    public Task LoadAsync(string name, CancellationToken cancellationToken = default) => Session.ExecuteAsync(Action(Tm1Operations.CubeLoad, name), cancellationToken);
+    public Task LoadAsync(string name, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Action(Tm1Operations.CubeLoad, name), cancellationToken);
 
     /// <summary><c>tm1.Unload</c>: unloads the cube from memory.</summary>
     [Tm1Endpoint("Action Cube/Unload")]
-    public Task UnloadAsync(string name, CancellationToken cancellationToken = default) => Session.ExecuteAsync(Action(Tm1Operations.CubeUnload, name), cancellationToken);
+    public Task UnloadAsync(string name, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Action(Tm1Operations.CubeUnload, name), cancellationToken);
 
     /// <summary><c>tm1.Lock</c>.</summary>
     [Tm1Endpoint("Action Cube/Lock")]
-    public Task LockAsync(string name, CancellationToken cancellationToken = default) => Session.ExecuteAsync(Action(Tm1Operations.CubeLock, name), cancellationToken);
+    public Task LockAsync(string name, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Action(Tm1Operations.CubeLock, name), cancellationToken);
 
     /// <summary><c>tm1.Unlock</c>.</summary>
     [Tm1Endpoint("Action Cube/Unlock")]
-    public Task UnlockAsync(string name, CancellationToken cancellationToken = default) => Session.ExecuteAsync(Action(Tm1Operations.CubeUnlock, name), cancellationToken);
+    public Task UnlockAsync(string name, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Action(Tm1Operations.CubeUnlock, name), cancellationToken);
 
     /// <summary><c>tm1.Reserve</c>: no one else can change the cube until it's released.</summary>
     [Tm1Endpoint("Action Cube/Reserve")]
-    public Task ReserveAsync(string name, CancellationToken cancellationToken = default) => Session.ExecuteAsync(Action(Tm1Operations.CubeReserve, name), cancellationToken);
+    public Task ReserveAsync(string name, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Action(Tm1Operations.CubeReserve, name), cancellationToken);
 
     /// <summary><c>tm1.Release</c>.</summary>
     [Tm1Endpoint("Action Cube/Release")]
-    public Task ReleaseAsync(string name, CancellationToken cancellationToken = default) => Session.ExecuteAsync(Action(Tm1Operations.CubeRelease, name), cancellationToken);
+    public Task ReleaseAsync(string name, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Action(Tm1Operations.CubeRelease, name), cancellationToken);
 
     /// <summary><c>tm1.CheckRules</c>: the syntax errors in the cube's rules, or in <paramref name="rules"/>
     /// if given (checked as if they were the cube's, without saving them); none if they compile.</summary>
@@ -142,7 +154,10 @@ public sealed class CubeService : Tm1Service
     {
         var operation = Tm1Operations.CubeCheckRules;
         var body = rules is null ? new Dictionary<string, object?>() : new Dictionary<string, object?> { ["Rules"] = rules };
-        return Session.StreamAsync(Tm1Request.PostList<RuleSyntaxError>(CubePath(name).Action(operation.Name), body).Requires(operation.Capability()), cancellationToken);
+        return Session.StreamAsync(
+            Tm1Request.PostList<RuleSyntaxError>(CubePath(name).Action(operation.Name), body).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>tm1.TraceCellCalculation</c>: how a cell's value is calculated, component by
@@ -150,27 +165,58 @@ public sealed class CubeService : Tm1Service
     [Tm1Endpoint("Action Cube/TraceCellCalculation")]
     [Tm1Endpoint("Navigation CalculationComponent/Cube")]
     [Tm1Endpoint("Navigation CalculationComponent/Tuple")]
-    public Task<CalculationComponent> TraceCellCalculationAsync(string name, IReadOnlyDictionary<string, string> tuple, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Action<CalculationComponent>(Tm1Operations.CubeTraceCellCalculation, name, new Dictionary<string, object?> { ["Tuple@odata.bind"] = Bindings(tuple) }).WithQuery(query), cancellationToken);
+    public Task<CalculationComponent> TraceCellCalculationAsync(
+        string name,
+        IReadOnlyDictionary<string, string> tuple,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) =>
+        Session.ExecuteAsync(
+            Action<CalculationComponent>(
+                    Tm1Operations.CubeTraceCellCalculation,
+                    name,
+                    new Dictionary<string, object?> { ["Tuple@odata.bind"] = Bindings(tuple) }
+                )
+                .WithQuery(query),
+            cancellationToken
+        );
 
     /// <summary><c>tm1.TraceFeeders</c>: what a cell feeds. TM1 (11.8) needs a path to expand into a
     /// complex property (<c>FedCells/Tuple</c>); nested options (<c>FedCells($expand=Tuple)</c>) get 400.</summary>
     [Tm1Endpoint("Action Cube/TraceFeeders")]
     [Tm1Endpoint("Navigation FedCellDescriptor/Cube")]
     [Tm1Endpoint("Navigation FedCellDescriptor/Tuple")]
-    public Task<FeederTrace> TraceFeedersAsync(string name, IReadOnlyDictionary<string, string> tuple, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Action<FeederTrace>(Tm1Operations.CubeTraceFeeders, name, new Dictionary<string, object?> { ["Tuple@odata.bind"] = Bindings(tuple) }).WithQuery(query), cancellationToken);
+    public Task<FeederTrace> TraceFeedersAsync(
+        string name,
+        IReadOnlyDictionary<string, string> tuple,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) =>
+        Session.ExecuteAsync(
+            Action<FeederTrace>(Tm1Operations.CubeTraceFeeders, name, new Dictionary<string, object?> { ["Tuple@odata.bind"] = Bindings(tuple) })
+                .WithQuery(query),
+            cancellationToken
+        );
 
     /// <summary><c>tm1.CheckFeeders</c>: the cells under a consolidated cell that aren't fed though they
     /// have values, chosen by <paramref name="selection"/>.</summary>
     [Tm1Endpoint("Action Cube/CheckFeeders")]
     [Tm1Endpoint("Navigation FedCellDescriptor/Cube")]
     [Tm1Endpoint("Navigation FedCellDescriptor/Tuple")]
-    public IAsyncEnumerable<FedCellDescriptor> CheckFeedersAsync(string name, IReadOnlyDictionary<string, string> tuple, CheckFeedersSelection selection, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<FedCellDescriptor> CheckFeedersAsync(
+        string name,
+        IReadOnlyDictionary<string, string> tuple,
+        CheckFeedersSelection selection,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.CubeCheckFeeders;
         var body = new Dictionary<string, object?> { ["Tuple@odata.bind"] = Bindings(tuple), ["Selection"] = selection };
-        return Session.StreamAsync(Tm1Request.PostList<FedCellDescriptor>(CubePath(name).Action(operation.Name), body).WithQuery(query).Requires(operation.Capability()), cancellationToken);
+        return Session.StreamAsync(
+            Tm1Request.PostList<FedCellDescriptor>(CubePath(name).Action(operation.Name), body).WithQuery(query).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     private static List<string> Bindings(IReadOnlyDictionary<string, string> tuple) =>

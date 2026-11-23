@@ -27,9 +27,7 @@ public sealed class ServerService : Tm1Service
     private static readonly ODataPath Loggers = ODataPath.Of("Loggers");
 
     public ServerService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Server</c>: the server's name, version and ports. TM1 (11.8) sends no ETag for it.</summary>
     [Tm1Endpoint("Singleton Server")]
@@ -77,7 +75,8 @@ public sealed class ServerService : Tm1Service
     public Task SetLoggerLevelAsync(string name, LogLevel level, CancellationToken cancellationToken = default)
     {
         // As the Java client's: a level this client doesn't know is a bad argument, and isn't sent
-        var json = Tm1EnumConverter.Describe(typeof(LogLevel))!.ByValue.TryGetValue(level, out var known) ? known
+        var json = Tm1EnumConverter.Describe(typeof(LogLevel))!.ByValue.TryGetValue(level, out var known)
+            ? known
             : throw new System.ArgumentException($"LogLevel.{level} stands for a level this client doesn't know, and isn't sent", nameof(level));
         var body = new Dictionary<string, object?> { ["Level"] = json };
         return Session.ExecuteAsync(Tm1Request.Patch(Loggers.Key(Require(name, nameof(name))), body), cancellationToken);

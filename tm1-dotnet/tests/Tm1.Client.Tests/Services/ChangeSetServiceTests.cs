@@ -15,12 +15,13 @@ public class ChangeSetServiceTests
 
     public ChangeSetServiceTests()
     {
-        _tm1.Respond = r => r.Target switch
-        {
-            "BeginChangeSet" => new Dictionary<string, object?> { ["value"] = "7" },
-            "EndChangeSet" => new Dictionary<string, object?> { ["value"] = 2 },
-            _ => null,
-        };
+        _tm1.Respond = r =>
+            r.Target switch
+            {
+                "BeginChangeSet" => new Dictionary<string, object?> { ["value"] = "7" },
+                "EndChangeSet" => new Dictionary<string, object?> { ["value"] = 2 },
+                _ => null,
+            };
     }
 
     [Fact]
@@ -48,7 +49,9 @@ public class ChangeSetServiceTests
         Assert.Equal(["BeginChangeSet", "Cubes('Sales')/tm1.Update?!ChangeSet=7", "EndChangeSet"], _tm1.Requests.Select(r => r.Target));
 
         _tm1.Requests.Clear();
-        await tm1.ChangeSets.WithinAsync(session => Tm1Client.Of(session).Cells.UpdateAsync("Sales", new Dictionary<string, string> { ["Region"] = "North" }, 2));
+        await tm1.ChangeSets.WithinAsync(session =>
+            Tm1Client.Of(session).Cells.UpdateAsync("Sales", new Dictionary<string, string> { ["Region"] = "North" }, 2)
+        );
         Assert.Equal(["BeginChangeSet", "Cubes('Sales')/tm1.Update?!ChangeSet=7", "EndChangeSet"], _tm1.Requests.Select(r => r.Target));
     }
 
@@ -65,7 +68,14 @@ public class ChangeSetServiceTests
     public async Task DoesNoWorkIfTheChangeSetCantBegin()
     {
         // Java: doesNoWorkIfTheChangeSetCantBegin
-        _tm1.Respond = _ => FakeTm1.Json(new Dictionary<string, object?> { ["error"] = new Dictionary<string, object?> { ["code"] = "1", ["message"] = "down" } }, System.Net.HttpStatusCode.InternalServerError);
+        _tm1.Respond = _ =>
+            FakeTm1.Json(
+                new Dictionary<string, object?>
+                {
+                    ["error"] = new Dictionary<string, object?> { ["code"] = "1", ["message"] = "down" },
+                },
+                System.Net.HttpStatusCode.InternalServerError
+            );
         var ran = false;
         Func<Tm1Session, Task<int>> work = _ =>
         {

@@ -43,8 +43,13 @@ public sealed class ScriptedTm1 : HttpMessageHandler
         public string? Header(string name) => Headers.TryGetValue(name, out var v) ? v : null;
 
         /// <summary>The <c>TM1SessionId</c> cookie it sends.</summary>
-        public string? Cookie => Header("Cookie")?.Split(';').Select(c => c.Trim()).Where(c => c.StartsWith("TM1SessionId=", StringComparison.Ordinal))
-            .Select(c => c["TM1SessionId=".Length..]).FirstOrDefault();
+        public string? Cookie =>
+            Header("Cookie")
+                ?.Split(';')
+                .Select(c => c.Trim())
+                .Where(c => c.StartsWith("TM1SessionId=", StringComparison.Ordinal))
+                .Select(c => c["TM1SessionId=".Length..])
+                .FirstOrDefault();
 
         public string? Authorization => Header("Authorization");
 
@@ -69,7 +74,8 @@ public sealed class ScriptedTm1 : HttpMessageHandler
     }
 
     /// <summary>Fails the request with <paramref name="failure"/>, as a broken connection does.</summary>
-    public ScriptedTm1 Fail(string key, Exception failure) => On(key, (Func<Request, Task<HttpResponseMessage>>)(_ => Task.FromException<HttpResponseMessage>(failure)));
+    public ScriptedTm1 Fail(string key, Exception failure) =>
+        On(key, (Func<Request, Task<HttpResponseMessage>>)(_ => Task.FromException<HttpResponseMessage>(failure)));
 
     public Tm1Session Session(Func<Tm1SessionBuilder, Tm1SessionBuilder>? settings = null) =>
         SessionWithOwnCredentials(b => (settings?.Invoke(b) ?? b).BasicAuth("admin", "apple"));

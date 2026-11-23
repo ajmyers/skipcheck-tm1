@@ -56,9 +56,7 @@ public partial class CognosContainer : GenericContainer<CognosContainer>
 
     /// <summary>Cognos from <paramref name="source"/>, in the image for it.</summary>
     public CognosContainer(CognosSource source)
-        : this(DefaultImageFor(source ?? throw new ArgumentNullException(nameof(source))), source)
-    {
-    }
+        : this(DefaultImageFor(source ?? throw new ArgumentNullException(nameof(source))), source) { }
 
     /// <summary>Cognos from <paramref name="source"/>, in <paramref name="image"/>.</summary>
     public CognosContainer(string image, CognosSource source)
@@ -163,11 +161,16 @@ public partial class CognosContainer : GenericContainer<CognosContainer>
     /// <exception cref="InvalidOperationException">Cognos refused the token.</exception>
     public async Task<string> PassportAsync(string idToken, CancellationToken cancellationToken = default)
     {
-        var body = "{\"parameters\":[{\"name\":\"CAMNamespace\",\"value\":\"" + Namespace.Oidc.Id()
-            + "\"},{\"name\":\"CAMOIDCIdToken\",\"value\":\"" + idToken + "\"}]}";
+        var body =
+            "{\"parameters\":[{\"name\":\"CAMNamespace\",\"value\":\""
+            + Namespace.Oidc.Id()
+            + "\"},{\"name\":\"CAMOIDCIdToken\",\"value\":\""
+            + idToken
+            + "\"}]}";
         using var http = new HttpClient(new SocketsHttpHandler { UseCookies = false }) { Timeout = TimeSpan.FromSeconds(60) };
         using var content = new StringContent(body, Encoding.UTF8, "application/json");
-        using var response = await http.PutAsync(new Uri($"http://{Host}:{GetMappedPort(DispatcherPort)}/api/v1/session"), content, cancellationToken).ConfigureAwait(false);
+        using var response = await http.PutAsync(new Uri($"http://{Host}:{GetMappedPort(DispatcherPort)}/api/v1/session"), content, cancellationToken)
+            .ConfigureAwait(false);
         var passport = response.Headers.TryGetValues("Set-Cookie", out var cookies)
             ? cookies.Select(c => c.Split(';', 2)[0].Trim()).FirstOrDefault(c => c.StartsWith("cam_passport=", StringComparison.Ordinal))
             : null;
@@ -195,7 +198,13 @@ public partial class CognosContainer : GenericContainer<CognosContainer>
     /// <inheritdoc/>
     protected override Task ContainerIsStartedAsync(CancellationToken cancellationToken)
     {
-        Logger.LogInformation("Cognos is up at {Url} ({Source}), with {Count} test user(s) in namespace {Namespace}", Url, Source.Describe(), users.Count, NamespaceId);
+        Logger.LogInformation(
+            "Cognos is up at {Url} ({Source}), with {Count} test user(s) in namespace {Namespace}",
+            Url,
+            Source.Describe(),
+            users.Count,
+            NamespaceId
+        );
         return Task.CompletedTask;
     }
 

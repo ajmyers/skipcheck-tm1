@@ -11,28 +11,32 @@ namespace AjMyers.Tm1.Client.Tests.Conformance;
 /// answers as TM1 would, writing traffic without the session's own requests.</summary>
 public class ConformanceLiveRunnerTests
 {
-    private static FakeTm1 Fake(System.Collections.Generic.IReadOnlyDictionary<string, string> names) => new()
-    {
-        Respond = r =>
+    private static FakeTm1 Fake(System.Collections.Generic.IReadOnlyDictionary<string, string> names) =>
+        new()
         {
-            var get = Regex.Match(r.Target, @"^Cubes\('([^']*)'\)(\?.*)?$");
-            if (r.Method == "POST" && r.Target is "Dimensions" or "Cubes")
+            Respond = r =>
             {
-                return FakeTm1.Json(new System.Collections.Generic.Dictionary<string, object?> { ["Name"] = r.Json.GetProperty("Name").GetString() }, HttpStatusCode.Created);
-            }
-            if (r.Method == "GET" && get.Success)
-            {
-                return get.Groups[1].Value == names["missing"]
-                    ? FakeTm1.Json(new { error = new { code = "278", message = "no" } }, HttpStatusCode.NotFound)
-                    : new System.Collections.Generic.Dictionary<string, object?> { ["Name"] = get.Groups[1].Value };
-            }
-            if (r.Method == "GET" && r.Target.EndsWith("/Dimensions?$select=Name", System.StringComparison.Ordinal))
-            {
-                return FakeTm1.Collection(new { Name = "Sandboxes" }, new { Name = names["region"] }, new { Name = names["month"] });
-            }
-            return r.Target.EndsWith("tm1.CheckRules", System.StringComparison.Ordinal) ? FakeTm1.Collection() : null;
-        },
-    };
+                var get = Regex.Match(r.Target, @"^Cubes\('([^']*)'\)(\?.*)?$");
+                if (r.Method == "POST" && r.Target is "Dimensions" or "Cubes")
+                {
+                    return FakeTm1.Json(
+                        new System.Collections.Generic.Dictionary<string, object?> { ["Name"] = r.Json.GetProperty("Name").GetString() },
+                        HttpStatusCode.Created
+                    );
+                }
+                if (r.Method == "GET" && get.Success)
+                {
+                    return get.Groups[1].Value == names["missing"]
+                        ? FakeTm1.Json(new { error = new { code = "278", message = "no" } }, HttpStatusCode.NotFound)
+                        : new System.Collections.Generic.Dictionary<string, object?> { ["Name"] = get.Groups[1].Value };
+                }
+                if (r.Method == "GET" && r.Target.EndsWith("/Dimensions?$select=Name", System.StringComparison.Ordinal))
+                {
+                    return FakeTm1.Collection(new { Name = "Sandboxes" }, new { Name = names["region"] }, new { Name = names["month"] });
+                }
+                return r.Target.EndsWith("tm1.CheckRules", System.StringComparison.Ordinal) ? FakeTm1.Collection() : null;
+            },
+        };
 
     [Fact]
     public async Task RunsTheCubesScenarioAndWritesItsTraffic()
@@ -52,61 +56,79 @@ public class ConformanceLiveRunnerTests
 
     /// <summary>Answers as TM1 would for the cellsets, views and sandboxes scenarios: a cellset of
     /// 3 × 2 cells (and the slicer), names that exist but <c>missing</c>.</summary>
-    private static FakeTm1 DataFake(System.Collections.Generic.IReadOnlyDictionary<string, string> names) => new()
-    {
-        Respond = r =>
+    private static FakeTm1 DataFake(System.Collections.Generic.IReadOnlyDictionary<string, string> names) =>
+        new()
         {
-            static object[] Cells(long begin, long end) =>
-                Enumerable.Range((int)begin, (int)(end - begin + 1)).Select(object (n) => new { Ordinal = n, Value = n }).ToArray();
-            var (method, target) = (r.Method, r.Target);
-            if (target.Contains("('" + names["missing"] + "')", System.StringComparison.Ordinal)
-                || (method == "POST" && target.StartsWith("ExecuteRelationalDrillthrough", System.StringComparison.Ordinal)))
+            Respond = r =>
             {
-                return FakeTm1.Json(new { error = new { code = "278", message = "no" } }, HttpStatusCode.NotFound);
-            }
-            if (method == "POST" && Regex.IsMatch(target, @"^(Dimensions|Cubes|Sandboxes|Cubes\('[^']*'\)/(Private)?Views)$"))
-            {
-                return FakeTm1.Json(new { Name = r.Json.GetProperty("Name").GetString() }, HttpStatusCode.Created);
-            }
-            if (method == "POST" && target.Split('?')[0] == "ExecuteMDX")
-            {
-                if (r.Json.GetProperty("MDX").GetString()!.Contains("SELEKT", System.StringComparison.Ordinal))
+                static object[] Cells(long begin, long end) =>
+                    Enumerable.Range((int)begin, (int)(end - begin + 1)).Select(object (n) => new { Ordinal = n, Value = n }).ToArray();
+                var (method, target) = (r.Method, r.Target);
+                if (
+                    target.Contains("('" + names["missing"] + "')", System.StringComparison.Ordinal)
+                    || (method == "POST" && target.StartsWith("ExecuteRelationalDrillthrough", System.StringComparison.Ordinal))
+                )
                 {
-                    return FakeTm1.Json(new { error = new { code = "501", message = "syntax" } }, HttpStatusCode.BadRequest);
+                    return FakeTm1.Json(new { error = new { code = "278", message = "no" } }, HttpStatusCode.NotFound);
                 }
-                var top = long.Parse(Regex.Match(target, @"\$top%3D(\d+)").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-                return new { ID = "cs1", Axes = new[] { new { Ordinal = 0, Cardinality = 3 }, new { Ordinal = 1, Cardinality = 2 }, new { Ordinal = 2, Cardinality = 1 } }, Cells = Cells(0, top - 1) };
-            }
-            if (method == "POST" && target.EndsWith("/tm1.Execute?$select=ID", System.StringComparison.Ordinal))
-            {
-                return new { ID = "cs2" };
-            }
-            Match m;
-            if (method == "GET" && (m = Regex.Match(target, @"^Cellsets\('cs1'\)/tm1\.GetPartition\(Begin=(\d+),End=(\d+)\)")).Success)
-            {
-                return FakeTm1.Collection(Cells(long.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), long.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture)));
-            }
-            if (method == "GET" && (m = Regex.Match(target, @"^Cubes\('([^']*)'\)/[A-Za-z]+\('[^']*'\)/Cube")).Success)
-            {
-                return new { Name = m.Groups[1].Value };
-            }
-            if (method == "GET" && (m = Regex.Match(target, @"^Cubes\('[^']*'\)/(Private)?Views\('([^']*)'\)")).Success)
-            {
-                return target.Contains("NativeView", System.StringComparison.Ordinal)
-                    ? new System.Collections.Generic.Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.NativeView", ["SuppressEmptyRows"] = true, ["Name"] = m.Groups[2].Value }
-                    : new System.Collections.Generic.Dictionary<string, object?> { ["Name"] = m.Groups[2].Value };
-            }
-            if (method == "GET" && Regex.IsMatch(target, @"^Cubes\('[^']*'\)/PrivateViews\?"))
-            {
-                return FakeTm1.Collection(new { Name = names["native"] });
-            }
-            if (method == "GET" && (m = Regex.Match(target, @"^Sandboxes\('([^']*)'\)")).Success)
-            {
-                return new { Name = m.Groups[1].Value, IsLoaded = true };
-            }
-            return null;
-        },
-    };
+                if (method == "POST" && Regex.IsMatch(target, @"^(Dimensions|Cubes|Sandboxes|Cubes\('[^']*'\)/(Private)?Views)$"))
+                {
+                    return FakeTm1.Json(new { Name = r.Json.GetProperty("Name").GetString() }, HttpStatusCode.Created);
+                }
+                if (method == "POST" && target.Split('?')[0] == "ExecuteMDX")
+                {
+                    if (r.Json.GetProperty("MDX").GetString()!.Contains("SELEKT", System.StringComparison.Ordinal))
+                    {
+                        return FakeTm1.Json(new { error = new { code = "501", message = "syntax" } }, HttpStatusCode.BadRequest);
+                    }
+                    var top = long.Parse(Regex.Match(target, @"\$top%3D(\d+)").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                    return new
+                    {
+                        ID = "cs1",
+                        Axes = new[] { new { Ordinal = 0, Cardinality = 3 }, new { Ordinal = 1, Cardinality = 2 }, new { Ordinal = 2, Cardinality = 1 } },
+                        Cells = Cells(0, top - 1),
+                    };
+                }
+                if (method == "POST" && target.EndsWith("/tm1.Execute?$select=ID", System.StringComparison.Ordinal))
+                {
+                    return new { ID = "cs2" };
+                }
+                Match m;
+                if (method == "GET" && (m = Regex.Match(target, @"^Cellsets\('cs1'\)/tm1\.GetPartition\(Begin=(\d+),End=(\d+)\)")).Success)
+                {
+                    return FakeTm1.Collection(
+                        Cells(
+                            long.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture),
+                            long.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture)
+                        )
+                    );
+                }
+                if (method == "GET" && (m = Regex.Match(target, @"^Cubes\('([^']*)'\)/[A-Za-z]+\('[^']*'\)/Cube")).Success)
+                {
+                    return new { Name = m.Groups[1].Value };
+                }
+                if (method == "GET" && (m = Regex.Match(target, @"^Cubes\('[^']*'\)/(Private)?Views\('([^']*)'\)")).Success)
+                {
+                    return target.Contains("NativeView", System.StringComparison.Ordinal)
+                        ? new System.Collections.Generic.Dictionary<string, object?>
+                        {
+                            ["@odata.type"] = "#ibm.tm1.api.v1.NativeView",
+                            ["SuppressEmptyRows"] = true,
+                            ["Name"] = m.Groups[2].Value,
+                        }
+                        : new System.Collections.Generic.Dictionary<string, object?> { ["Name"] = m.Groups[2].Value };
+                }
+                if (method == "GET" && Regex.IsMatch(target, @"^Cubes\('[^']*'\)/PrivateViews\?"))
+                {
+                    return FakeTm1.Collection(new { Name = names["native"] });
+                }
+                if (method == "GET" && (m = Regex.Match(target, @"^Sandboxes\('([^']*)'\)")).Success)
+                {
+                    return new { Name = m.Groups[1].Value, IsLoaded = true };
+                }
+                return null;
+            },
+        };
 
     [Theory]
     [InlineData("cellsets")]
@@ -121,7 +143,10 @@ public class ConformanceLiveRunnerTests
         var traffic = new ConformanceLive.Traffic(fake, FakeTm1.Base);
         var failures = await ConformanceLive.Run(fake.Client(b => b.HttpHandler(traffic)), traffic, scenario, names);
         Assert.True(failures.Count == 0, string.Join("; ", failures));
-        Assert.Equal(scenario["steps"]!.AsArray().Count + scenario["finally"]!.AsArray().Count, traffic.Exchanges.Select(e => e["step"]!.GetValue<string>()).Distinct().Count());
+        Assert.Equal(
+            scenario["steps"]!.AsArray().Count + scenario["finally"]!.AsArray().Count,
+            traffic.Exchanges.Select(e => e["step"]!.GetValue<string>()).Distinct().Count()
+        );
     }
 
     [Fact]
@@ -144,13 +169,29 @@ public class ConformanceLiveRunnerTests
         if (expect["error"] is JsonObject error)
         {
             var kind = error["kind"]?.GetValue<string>();
-            var status = error["status"]?.GetValue<int>() ?? kind switch { "NOT_FOUND" => 404, "CONFLICT" => 409, "PRECONDITION_FAILED" => 412, _ => 400 };
+            var status = error["status"]?.GetValue<int>()
+                ?? kind switch
+                {
+                    "NOT_FOUND" => 404,
+                    "CONFLICT" => 409,
+                    "PRECONDITION_FAILED" => 412,
+                    _ => 400,
+                };
             var message = kind == "NOT_FOUND" ? "can not be found" : "refused";
-            return Reply((HttpStatusCode)status, new JsonObject { ["error"] = new JsonObject { ["code"] = kind == "INVALID_UNIQUE_NAME" ? "248" : "278", ["message"] = message } });
+            return Reply(
+                (HttpStatusCode)status,
+                new JsonObject
+                {
+                    ["error"] = new JsonObject { ["code"] = kind == "INVALID_UNIQUE_NAME" ? "248" : "278", ["message"] = message },
+                }
+            );
         }
         if (expect["fields"] is JsonObject { } bytes && bytes["$bytes"] is JsonValue content)
         {
-            var answer = new System.Net.Http.HttpResponseMessage(HttpStatusCode.OK) { Content = new System.Net.Http.ByteArrayContent(System.Convert.FromBase64String(content.GetValue<string>())) };
+            var answer = new System.Net.Http.HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new System.Net.Http.ByteArrayContent(System.Convert.FromBase64String(content.GetValue<string>())),
+            };
             answer.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
             return answer;
         }
@@ -184,14 +225,17 @@ public class ConformanceLiveRunnerTests
 
     /// <summary>Answers each step's one request with what the step expects, and a finally step's with 204.</summary>
     /// <summary>Whether a step sends a request: all but those refused before one (an argument error).</summary>
-    private static bool Sends(JsonNode? step) =>
-        step!["expect"]?["error"] is not JsonObject error || error["category"]?.GetValue<string>() == "api";
+    private static bool Sends(JsonNode? step) => step!["expect"]?["error"] is not JsonObject error || error["category"]?.GetValue<string>() == "api";
 
     private static FakeTm1 AnsweringAsExpected(JsonObject scenario, System.Collections.Generic.IReadOnlyDictionary<string, string> names)
     {
         var answers = new System.Collections.Generic.Queue<System.Net.Http.HttpResponseMessage>(
-            scenario["steps"]!.AsArray().Where(Sends).Select(s => Expected(ConformanceLive.Substitute(s!["expect"], names)!.AsObject()))
-                .Concat((scenario["finally"]?.AsArray() ?? []).Select(_ => new System.Net.Http.HttpResponseMessage(HttpStatusCode.NoContent))));
+            scenario["steps"]!
+                .AsArray()
+                .Where(Sends)
+                .Select(s => Expected(ConformanceLive.Substitute(s!["expect"], names)!.AsObject()))
+                .Concat((scenario["finally"]?.AsArray() ?? []).Select(_ => new System.Net.Http.HttpResponseMessage(HttpStatusCode.NoContent)))
+        );
         return new FakeTm1 { Respond = _ => answers.Count > 0 ? answers.Dequeue() : new System.Net.Http.HttpResponseMessage((HttpStatusCode)599) };
     }
 

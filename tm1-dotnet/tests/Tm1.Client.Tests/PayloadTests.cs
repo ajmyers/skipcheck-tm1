@@ -15,13 +15,23 @@ namespace AjMyers.Tm1.Client.Tests;
 /// <c>@odata.type</c> aside, nulls aside, values compared by meaning.</summary>
 public class PayloadTests
 {
-    public static IEnumerable<object[]> Payloads() => new (string, Type)[]
-    {
-        ("server", typeof(Server)), ("configuration", typeof(Configuration)), ("active-session", typeof(Model.Session)),
-        ("users", typeof(User)), ("groups", typeof(Group)), ("dimension", typeof(Dimension)), ("members", typeof(Member)),
-        ("cube", typeof(Cube)), ("views", typeof(View)), ("process", typeof(Process)), ("chore", typeof(Chore)),
-        ("threads", typeof(ModelThread)), ("cellset", typeof(Cellset)),
-    }.Select(p => new object[] { p.Item1, p.Item2 });
+    public static IEnumerable<object[]> Payloads() =>
+        new (string, Type)[]
+        {
+            ("server", typeof(Server)),
+            ("configuration", typeof(Configuration)),
+            ("active-session", typeof(Model.Session)),
+            ("users", typeof(User)),
+            ("groups", typeof(Group)),
+            ("dimension", typeof(Dimension)),
+            ("members", typeof(Member)),
+            ("cube", typeof(Cube)),
+            ("views", typeof(View)),
+            ("process", typeof(Process)),
+            ("chore", typeof(Chore)),
+            ("threads", typeof(ModelThread)),
+            ("cellset", typeof(Cellset)),
+        }.Select(p => new object[] { p.Item1, p.Item2 });
 
     [Theory]
     [MemberData(nameof(Payloads))]
@@ -67,8 +77,14 @@ public class PayloadTests
     [Fact]
     public void ReadsDeparturesAndLenientDatesFromTheOverlay()
     {
-        Assert.Equal(JsonValueKind.String, Tm1Json.Read<CAMSettings>(JsonDocument.Parse("""{"ClientPingCAMPassport": "PT15M"}""").RootElement)!.ClientPingCAMPassport!.Value.ValueKind);
-        Assert.Equal(JsonValueKind.Number, Tm1Json.Read<CAMSettings>(JsonDocument.Parse("""{"ClientPingCAMPassport": 900}""").RootElement)!.ClientPingCAMPassport!.Value.ValueKind);
+        Assert.Equal(
+            JsonValueKind.String,
+            Tm1Json.Read<CAMSettings>(JsonDocument.Parse("""{"ClientPingCAMPassport": "PT15M"}""").RootElement)!.ClientPingCAMPassport!.Value.ValueKind
+        );
+        Assert.Equal(
+            JsonValueKind.Number,
+            Tm1Json.Read<CAMSettings>(JsonDocument.Parse("""{"ClientPingCAMPassport": 900}""").RootElement)!.ClientPingCAMPassport!.Value.ValueKind
+        );
         Assert.Null(Tm1Json.Read<MessageLogEntry>(JsonDocument.Parse("""{"TimeStamp": "0000-00-00T00:00Z"}""").RootElement)!.TimeStamp);
     }
 
@@ -77,9 +93,18 @@ public class PayloadTests
     {
         var dimensions = OData.ODataPath.Of("Dimensions");
         var patch = CubePatch.Builder().Name("Sales").BindDimensions(dimensions.Key("Region"), dimensions.Key("Month")).Rules(null).Build();
-        Assert.Equal("""{"Name":"Sales","Dimensions@odata.bind":["Dimensions('Region')","Dimensions('Month')"],"Rules":null}""", JsonSerializer.Serialize<Tm1Patch>(patch, Tm1Json.Options));
-        Assert.Equal("""{"@odata.type":"#ibm.tm1.api.v1.NativeView","Name":"v","SuppressEmptyRows":true}""", JsonSerializer.Serialize<Tm1Patch>(NativeViewPatch.Builder().Name("v").SuppressEmptyRows(true).Build(), Tm1Json.Options));
-        Assert.Equal("""{"Frequency":"PT24H"}""", JsonSerializer.Serialize<Tm1Patch>(ChorePatch.Builder().Frequency(TimeSpan.FromDays(1)).Build(), Tm1Json.Options));
+        Assert.Equal(
+            """{"Name":"Sales","Dimensions@odata.bind":["Dimensions('Region')","Dimensions('Month')"],"Rules":null}""",
+            JsonSerializer.Serialize<Tm1Patch>(patch, Tm1Json.Options)
+        );
+        Assert.Equal(
+            """{"@odata.type":"#ibm.tm1.api.v1.NativeView","Name":"v","SuppressEmptyRows":true}""",
+            JsonSerializer.Serialize<Tm1Patch>(NativeViewPatch.Builder().Name("v").SuppressEmptyRows(true).Build(), Tm1Json.Options)
+        );
+        Assert.Equal(
+            """{"Frequency":"PT24H"}""",
+            JsonSerializer.Serialize<Tm1Patch>(ChorePatch.Builder().Frequency(TimeSpan.FromDays(1)).Build(), Tm1Json.Options)
+        );
         Assert.Equal("""{"Caption":"x"}""", JsonSerializer.Serialize<Tm1Patch>(AttributesPatch.Builder().Property("Caption", "x").Build(), Tm1Json.Options));
     }
 

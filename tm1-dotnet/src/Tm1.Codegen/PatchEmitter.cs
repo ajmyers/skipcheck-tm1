@@ -19,7 +19,8 @@ public sealed class PatchEmitter
     public string Emit()
     {
         _out.Append(ModelEmitter.Header);
-        _out.Append("""
+        _out.Append(
+            """
             using System;
             using System.Collections.Generic;
             using System.Text.Json;
@@ -27,7 +28,8 @@ public sealed class PatchEmitter
 
             namespace AjMyers.Tm1.Client.Model;
 
-            """);
+            """
+        );
         foreach (var t in _spec.Types)
         {
             EmitPatch(t);
@@ -64,7 +66,9 @@ public sealed class PatchEmitter
         var typeId = baseType is null ? "null" : $"\"#{Spec.Str(t, "qualifiedName")}\"";
         _out.Append($"\n/// <summary>A write of <see cref=\"{name}\"/>: only the properties set are sent.</summary>\n");
         _out.Append($"public {(hasDerived ? "" : "sealed ")}partial class {patch} : {basePatch}\n{{\n");
-        _out.Append($"    {(hasDerived ? "protected" : "private")} {patch}(IReadOnlyDictionary<string, object?> values)\n        : base(values)\n    {{\n    }}\n\n");
+        _out.Append(
+            $"    {(hasDerived ? "protected" : "private")} {patch}(IReadOnlyDictionary<string, object?> values)\n        : base(values)\n    {{\n    }}\n\n"
+        );
         _out.Append($"    /// <summary>A builder with nothing set{(baseType is null ? "" : " but <c>@odata.type</c>")}.</summary>\n");
         var hide = baseType is null ? "" : "new ";
         _out.Append($"    public {hide}static PatchBuilder Builder() => new();\n\n");
@@ -115,7 +119,9 @@ public sealed class PatchEmitter
         }
         if (_spec.Chain(t).Any(l => Spec.Bool(l, "open")))
         {
-            _out.Append("\n        /// <summary>Sets a property <c>$metadata</c> doesn't declare, which this open type can have, such as an attribute's value.</summary>\n");
+            _out.Append(
+                "\n        /// <summary>Sets a property <c>$metadata</c> doesn't declare, which this open type can have, such as an attribute's value.</summary>\n"
+            );
             _out.Append("        public PatchBuilder Property(string name, object? value) => Set(name, value);\n");
         }
         _out.Append("    }\n}\n");

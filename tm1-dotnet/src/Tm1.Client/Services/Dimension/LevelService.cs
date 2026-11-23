@@ -12,9 +12,7 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class LevelService : Tm1Service
 {
     public LevelService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET …/Levels</c>: the hierarchy's levels, streamed.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Levels")]
@@ -28,13 +26,23 @@ public sealed class LevelService : Tm1Service
 
     /// <summary><c>GET …/Levels(n)/Members</c>: the members at the level, streamed.</summary>
     [Tm1Endpoint("Navigation Level/Members")]
-    public IAsyncEnumerable<Member> MembersAsync(string dimension, string hierarchy, int number, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<Member>(LevelsPath(dimension, hierarchy).Key(number).Nav("Members"), query), cancellationToken);
+    public IAsyncEnumerable<Member> MembersAsync(
+        string dimension,
+        string hierarchy,
+        int number,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<Member>(LevelsPath(dimension, hierarchy).Key(number).Nav("Members"), query), cancellationToken);
 
     /// <summary><c>GET …/Levels(n)/Hierarchy</c>: the hierarchy the level belongs to.</summary>
     [Tm1Endpoint("Navigation Level/Hierarchy")]
-    public Task<Hierarchy> HierarchyAsync(string dimension, string hierarchy, int number, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<Hierarchy>(LevelsPath(dimension, hierarchy).Key(number).Nav("Hierarchy"), query), cancellationToken);
+    public Task<Hierarchy> HierarchyAsync(
+        string dimension,
+        string hierarchy,
+        int number,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Get<Hierarchy>(LevelsPath(dimension, hierarchy).Key(number).Nav("Hierarchy"), query), cancellationToken);
 
     private static ODataPath LevelsPath(string dimension, string hierarchy) => HierarchyService.HierarchyPath(dimension, hierarchy).Nav("Levels");
 }

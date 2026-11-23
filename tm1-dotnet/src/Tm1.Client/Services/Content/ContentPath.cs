@@ -30,8 +30,7 @@ public sealed class ContentPath : IEquatable<ContentPath>
     }
 
     /// <summary>A root folder: <c>Contents('id')</c>, such as <c>Applications</c>.</summary>
-    public static ContentPath Root(string id) =>
-        new([(id ?? throw new ArgumentNullException(nameof(id)), ContentScope.Public)]);
+    public static ContentPath Root(string id) => new([(id ?? throw new ArgumentNullException(nameof(id)), ContentScope.Public)]);
 
     /// <summary>The <c>Applications</c> folder, where applications are built.</summary>
     public static ContentPath Applications() => Root("Applications");
@@ -58,8 +57,7 @@ public sealed class ContentPath : IEquatable<ContentPath>
     }
 
     /// <summary>A child of this folder, public or private.</summary>
-    public ContentPath Child(string id, ContentScope scope) =>
-        new([.. _steps, (id ?? throw new ArgumentNullException(nameof(id)), scope)]);
+    public ContentPath Child(string id, ContentScope scope) => new([.. _steps, (id ?? throw new ArgumentNullException(nameof(id)), scope)]);
 
     /// <summary>Whether this is in the <c>Blobs</c> folder, where documents themselves are.</summary>
     public bool InBlobs() => _steps[0].Id == "Blobs";

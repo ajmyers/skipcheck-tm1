@@ -57,7 +57,9 @@ public class CubeServiceTests
     public async Task AStaleEtagIsRefused()
     {
         _tm1.Respond = _ => FakeTm1.Json(new { error = new { code = "278", message = "stale" } }, HttpStatusCode.PreconditionFailed);
-        var e = await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() => _tm1.Client().Cubes.UpdateAsync("Sales", CubePatch.Builder().Rules("x").Build(), "W/\"0\""));
+        var e = await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() =>
+            _tm1.Client().Cubes.UpdateAsync("Sales", CubePatch.Builder().Rules("x").Build(), "W/\"0\"")
+        );
         Assert.Equal(Tm1ErrorKind.PreconditionFailed, e.Kind);
         Assert.Equal("278", e.Error!.Code);
     }
@@ -67,12 +69,17 @@ public class CubeServiceTests
     {
         var tm1 = _tm1.Client();
         _tm1.Respond = _ => null;
-        foreach (var (call, action) in new (Func<Task>, string)[]
-        {
-            (() => tm1.Cubes.LoadAsync("Sales"), "Load"), (() => tm1.Cubes.UnloadAsync("Sales"), "Unload"),
-            (() => tm1.Cubes.LockAsync("Sales"), "Lock"), (() => tm1.Cubes.UnlockAsync("Sales"), "Unlock"),
-            (() => tm1.Cubes.ReserveAsync("Sales"), "Reserve"), (() => tm1.Cubes.ReleaseAsync("Sales"), "Release"),
-        })
+        foreach (
+            var (call, action) in new (Func<Task>, string)[]
+            {
+                (() => tm1.Cubes.LoadAsync("Sales"), "Load"),
+                (() => tm1.Cubes.UnloadAsync("Sales"), "Unload"),
+                (() => tm1.Cubes.LockAsync("Sales"), "Lock"),
+                (() => tm1.Cubes.UnlockAsync("Sales"), "Unlock"),
+                (() => tm1.Cubes.ReserveAsync("Sales"), "Reserve"),
+                (() => tm1.Cubes.ReleaseAsync("Sales"), "Release"),
+            }
+        )
         {
             await call();
             Assert.Equal(("POST", $"Cubes('Sales')/tm1.{action}", "{}"), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
@@ -100,7 +107,8 @@ public class CubeServiceTests
     {
         var tm1 = _tm1.Client();
         var cell = new Dictionary<string, string> { ["Region"] = "North", ["Month"] = "Jan" };
-        const string Elements = """["Dimensions('Region')/Hierarchies('Region')/Elements('North')","Dimensions('Month')/Hierarchies('Month')/Elements('Jan')"]""";
+        const string Elements =
+            """["Dimensions('Region')/Hierarchies('Region')/Elements('North')","Dimensions('Month')/Hierarchies('Month')/Elements('Jan')"]""";
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Type"] = "Rule" };
         await tm1.Cubes.TraceCellCalculationAsync("Sales", cell, ODataQuery.None().Expand("Components"));
         Assert.Equal("Cubes('Sales')/tm1.TraceCellCalculation?$expand=Components", _tm1.Last.Target);

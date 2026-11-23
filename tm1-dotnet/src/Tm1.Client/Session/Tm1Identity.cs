@@ -19,8 +19,10 @@ public sealed class Tm1Identity : IEquatable<Tm1Identity>
     {
         /// <summary>As the pool's own credentials.</summary>
         ServiceAccount,
+
         /// <summary>As the pool's credentials, impersonating a user.</summary>
         Impersonating,
+
         /// <summary>With the user's own credentials.</summary>
         OwnCredentials,
     }
@@ -61,25 +63,28 @@ public sealed class Tm1Identity : IEquatable<Tm1Identity>
     public Tm1Authenticator? Authenticator { get; }
 
     /// <summary>The pool's session settings, changed to log in as this identity.</summary>
-    internal Tm1SessionBuilder ApplyTo(Tm1SessionBuilder settings) => Kind switch
-    {
-        IdentityKind.ServiceAccount => settings,
-        IdentityKind.Impersonating => settings.Impersonate(Name),
-        _ => settings.WithoutImpersonation().Authenticator(Authenticator!),
-    };
+    internal Tm1SessionBuilder ApplyTo(Tm1SessionBuilder settings) =>
+        Kind switch
+        {
+            IdentityKind.ServiceAccount => settings,
+            IdentityKind.Impersonating => settings.Impersonate(Name),
+            _ => settings.WithoutImpersonation().Authenticator(Authenticator!),
+        };
 
-    public bool Equals(Tm1Identity? other) => ReferenceEquals(this, other) || (other is not null && Kind == other.Kind && _comparableName == other._comparableName);
+    public bool Equals(Tm1Identity? other) =>
+        ReferenceEquals(this, other) || (other is not null && Kind == other.Kind && _comparableName == other._comparableName);
 
     public override bool Equals(object? obj) => Equals(obj as Tm1Identity);
 
     public override int GetHashCode() => HashCode.Combine(Kind, _comparableName);
 
-    public override string ToString() => Kind switch
-    {
-        IdentityKind.ServiceAccount => "Tm1Identity[service account]",
-        IdentityKind.Impersonating => $"Tm1Identity[impersonating {Name}]",
-        _ => $"Tm1Identity[{Name}]",
-    };
+    public override string ToString() =>
+        Kind switch
+        {
+            IdentityKind.ServiceAccount => "Tm1Identity[service account]",
+            IdentityKind.Impersonating => $"Tm1Identity[impersonating {Name}]",
+            _ => $"Tm1Identity[{Name}]",
+        };
 }
 
 /// <summary>TM1's user names: compared without case or spaces, and impersonated only in printable ASCII.</summary>
@@ -96,7 +101,9 @@ internal static class UserNames
         {
             if (c < 0x20 || c > 0x7e)
             {
-                throw new ArgumentException($"TM1 can't impersonate '{user}': it doesn't match user names with characters other than printable ASCII through TM1-Impersonate");
+                throw new ArgumentException(
+                    $"TM1 can't impersonate '{user}': it doesn't match user names with characters other than printable ASCII through TM1-Impersonate"
+                );
             }
         }
         return user;

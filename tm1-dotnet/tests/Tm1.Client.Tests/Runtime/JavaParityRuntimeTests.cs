@@ -145,7 +145,11 @@ public partial class JavaParityRuntimeTests
                 continue;
             }
             var m = MethodPattern().Match(trimmed);
-            if (!m.Success || (!m.Groups["public"].Success && !isInterface) || m.Groups["name"].Value is "if" or "for" or "while" or "switch" or "return" or "new")
+            if (
+                !m.Success
+                || (!m.Groups["public"].Success && !isInterface)
+                || m.Groups["name"].Value is "if" or "for" or "while" or "switch" or "return" or "new"
+            )
             {
                 continue;
             }
@@ -161,6 +165,8 @@ public partial class JavaParityRuntimeTests
     [GeneratedRegex(@"^\t(public\s+)?(static\s+)?(final\s+)?(sealed\s+)?(class|record|interface|enum)\s+(?<name>\w+)")]
     private static partial Regex NestedPattern();
 
-    [GeneratedRegex(@"^(?<public>public\s+)?(static\s+)?(default\s+)?(synchronized\s+)?(<[^>]+>\s+)?(?<ret>[\w.<>\[\]?, @]+?)\s+(?<name>\w+)\s*\([^)]*\)?\s*(throws [\w., ]+)?(\{|;)?$")]
+    [GeneratedRegex(
+        @"^(?<public>public\s+)?(static\s+)?(default\s+)?(synchronized\s+)?(<[^>]+>\s+)?(?<ret>[\w.<>\[\]?, @]+?)\s+(?<name>\w+)\s*\([^)]*\)?\s*(throws [\w., ]+)?(\{|;)?$"
+    )]
     private static partial Regex MethodPattern();
 }

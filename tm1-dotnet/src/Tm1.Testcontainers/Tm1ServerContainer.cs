@@ -49,9 +49,7 @@ public class Tm1ServerContainer : GenericContainer<Tm1ServerContainer>
 
     /// <summary>TM1 from <paramref name="source"/>, in the image <see cref="DefaultImageFor"/> picks.</summary>
     public Tm1ServerContainer(Tm1Source source)
-        : this(DefaultImageFor(source ?? throw new ArgumentNullException(nameof(source))), source)
-    {
-    }
+        : this(DefaultImageFor(source ?? throw new ArgumentNullException(nameof(source))), source) { }
 
     /// <summary>TM1 from <paramref name="source"/>, in <paramref name="image"/>.</summary>
     public Tm1ServerContainer(string image, Tm1Source source)
@@ -119,7 +117,8 @@ public class Tm1ServerContainer : GenericContainer<Tm1ServerContainer>
 
     /// <summary>Puts TM1 in CAM security (mode 5) with <paramref name="cognos"/>'s LDAP namespace,
     /// its test users <paramref name="admins"/> TM1 administrators; it logs in as the first.</summary>
-    public Tm1ServerContainer WithCamSecurity(CognosContainer cognos, params string[] admins) => WithCamSecurity(cognos, CognosContainer.Namespace.Ldap, admins);
+    public Tm1ServerContainer WithCamSecurity(CognosContainer cognos, params string[] admins) =>
+        WithCamSecurity(cognos, CognosContainer.Namespace.Ldap, admins);
 
     /// <summary>As <see cref="WithCamSecurity(CognosContainer, string[])"/>, in <paramref name="namespace"/>.</summary>
     /// <exception cref="ArgumentException">No admin is named.</exception>
@@ -158,9 +157,10 @@ public class Tm1ServerContainer : GenericContainer<Tm1ServerContainer>
     public CognosContainer.Namespace? CamNamespace => Cognos is null ? null : camNamespace;
 
     /// <summary>The <c>Authorization</c> header that logs in as <see cref="Username"/>.</summary>
-    public string Authorization => Cognos is not null
-        ? CognosContainer.CamAuthorization(Username, Password, camNamespace.Id())
-        : "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(Username + ":" + Password));
+    public string Authorization =>
+        Cognos is not null
+            ? CognosContainer.CamAuthorization(Username, Password, camNamespace.Id())
+            : "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(Username + ":" + Password));
 
     /// <summary>Refuses to start unless the server reports <paramref name="version"/>.</summary>
     public Tm1ServerContainer WithExpectedVersion(Tm1Version version)
@@ -205,7 +205,9 @@ public class Tm1ServerContainer : GenericContainer<Tm1ServerContainer>
         }
         else if (!ReferenceEquals(container.Network, network))
         {
-            throw new InvalidOperationException($"Containers that work together must share one Network, but {container.GetType().Name} is on another. Give them the same Network.");
+            throw new InvalidOperationException(
+                $"Containers that work together must share one Network, but {container.GetType().Name} is on another. Give them the same Network."
+            );
         }
     }
 
@@ -288,7 +290,9 @@ public class Tm1ServerContainer : GenericContainer<Tm1ServerContainer>
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             if (response.StatusCode != HttpStatusCode.OK)
             {
-                throw new InvalidOperationException($"TM1 refused the login '{Username}' (HTTP {(int)response.StatusCode}): {body}. Set the database's login with WithCredentials.");
+                throw new InvalidOperationException(
+                    $"TM1 refused the login '{Username}' (HTTP {(int)response.StatusCode}): {body}. Set the database's login with WithCredentials."
+                );
             }
             var cookie = response.Headers.TryGetValues("Set-Cookie", out var cookies)
                 ? cookies.Select(c => c.Split(';', 2)[0].Trim()).FirstOrDefault(c => c.StartsWith("TM1SessionId=", StringComparison.Ordinal))
@@ -307,7 +311,10 @@ public class Tm1ServerContainer : GenericContainer<Tm1ServerContainer>
 
     private async Task CloseSessionAsync(HttpClient http, string cookie, CancellationToken cancellationToken)
     {
-        using var close = new HttpRequestMessage(HttpMethod.Post, RestUrl + "ActiveSession/tm1.Close") { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+        using var close = new HttpRequestMessage(HttpMethod.Post, RestUrl + "ActiveSession/tm1.Close")
+        {
+            Content = new StringContent("{}", Encoding.UTF8, "application/json"),
+        };
         close.Headers.TryAddWithoutValidation("Cookie", cookie);
         try
         {
@@ -324,8 +331,7 @@ public class Tm1ServerContainer : GenericContainer<Tm1ServerContainer>
     /// library's version (<c>edge</c> for a development build).</summary>
     public static string DefaultImageFor(Tm1Source source) => source is Tm1Source.PrivateImage p ? p.Image : ImageFor(ServerImage, DefaultImage);
 
-    internal static string ImageFor(string setting, string image) =>
-        Settings.Text(Settings.Get(setting)) ?? image + ":" + ImageTag(Settings.LibraryVersion());
+    internal static string ImageFor(string setting, string image) => Settings.Text(Settings.Get(setting)) ?? image + ":" + ImageTag(Settings.LibraryVersion());
 
     /// <summary>The image tag for a library version: <c>edge</c> for a snapshot (Java's
     /// <c>-SNAPSHOT</c>, .NET's <c>-dev</c>), the version otherwise.</summary>

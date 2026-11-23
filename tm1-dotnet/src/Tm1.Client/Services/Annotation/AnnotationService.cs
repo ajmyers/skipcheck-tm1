@@ -50,9 +50,7 @@ public sealed class AnnotationService : Tm1Service
     private static readonly ODataPath Facets = ODataPath.Of("ApplicationContextFacets");
 
     public AnnotationService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Annotations</c>, streamed. TM1 (11.8) lists none here: use
     /// <see cref="CubeAnnotationsAsync"/> or <see cref="CellAnnotationsAsync"/>.</summary>
@@ -78,15 +76,19 @@ public sealed class AnnotationService : Tm1Service
         var members = Require(elements, nameof(elements))
             .Select(e => ODataPath.Of("Dimensions").Key(e.Key).Nav("Hierarchies").Key(e.Key).Nav("Members").Key(e.Value))
             .ToArray();
-        return CreateAsync(AnnotationPatch.Builder()
-            .Text(text)
-            .ApplicationContext([ApplicationContextFacetValuePatch.Builder().BindFacet(Facets.Key("}Cubes")).Value(cube).Build()])
-            .BindDimensionalContext(members)
-            .Property("objectName", cube)
-            .Property("commentValue", text)
-            .Property("commentType", "ANNOTATION")
-            .Property("commentLocation", string.Join(",", elements.Values))
-            .Build(), cancellationToken);
+        return CreateAsync(
+            AnnotationPatch
+                .Builder()
+                .Text(text)
+                .ApplicationContext([ApplicationContextFacetValuePatch.Builder().BindFacet(Facets.Key("}Cubes")).Value(cube).Build()])
+                .BindDimensionalContext(members)
+                .Property("objectName", cube)
+                .Property("commentValue", text)
+                .Property("commentType", "ANNOTATION")
+                .Property("commentLocation", string.Join(",", elements.Values))
+                .Build(),
+            cancellationToken
+        );
     }
 
     /// <summary><c>POST Annotations</c>, for an annotation built by hand. Returns the annotation as
@@ -109,8 +111,11 @@ public sealed class AnnotationService : Tm1Service
 
     /// <summary><c>ApplicationContext</c>, streamed, with <c>Facet</c> by expand. TM1 (11.8) returns none.</summary>
     [Tm1Endpoint("Navigation Annotation/ApplicationContext")]
-    public IAsyncEnumerable<ApplicationContextFacetValue> ApplicationContextAsync(string id, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<ApplicationContextFacetValue>(AnnotationPath(id).Nav("ApplicationContext"), query), cancellationToken);
+    public IAsyncEnumerable<ApplicationContextFacetValue> ApplicationContextAsync(
+        string id,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<ApplicationContextFacetValue>(AnnotationPath(id).Nav("ApplicationContext"), query), cancellationToken);
 
     /// <summary><c>DimensionalContext</c>, streamed: the members of the annotated cell.</summary>
     [Tm1Endpoint("Navigation Annotation/DimensionalContext")]
@@ -130,7 +135,12 @@ public sealed class AnnotationService : Tm1Service
     /// <summary><c>Cellsets('id')/Cells(n)/Annotations</c>, streamed: one cellset cell's annotations.
     /// They also come with the cells by <c>Expand("Annotations")</c>.</summary>
     [Tm1Endpoint("Navigation CellsetCell/Annotations")]
-    public IAsyncEnumerable<Annotation> CellAnnotationsAsync(string cellset, long ordinal, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<Annotation> CellAnnotationsAsync(
+        string cellset,
+        long ordinal,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var path = ODataPath.Of("Cellsets").Key(Require(cellset, nameof(cellset))).Nav("Cells").Key(ordinal).Nav("Annotations");
         return Session.StreamAsync(Tm1Request.List<Annotation>(path, query), cancellationToken);
@@ -144,8 +154,11 @@ public sealed class AnnotationService : Tm1Service
 
     /// <summary>A facet's <c>Values</c>, streamed: for <c>}Cubes</c>, the cubes with annotations.</summary>
     [Tm1Endpoint("Navigation ApplicationContextFacet/Values")]
-    public IAsyncEnumerable<ApplicationContextFacetValue> FacetValuesAsync(string facet, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<ApplicationContextFacetValue>(Facets.Key(Require(facet, nameof(facet))).Nav("Values"), query), cancellationToken);
+    public IAsyncEnumerable<ApplicationContextFacetValue> FacetValuesAsync(
+        string facet,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<ApplicationContextFacetValue>(Facets.Key(Require(facet, nameof(facet))).Nav("Values"), query), cancellationToken);
 
     /// <summary>A facet value's <c>Facet</c>.</summary>
     [Tm1Endpoint("Navigation ApplicationContextFacetValue/Facet")]

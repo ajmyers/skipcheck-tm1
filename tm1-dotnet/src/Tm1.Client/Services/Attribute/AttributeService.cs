@@ -23,9 +23,7 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class AttributeService : Tm1Service
 {
     public AttributeService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET</c> the set's attributes, streamed.</summary>
     [Tm1Endpoint("EntitySet DimensionAttributes")]

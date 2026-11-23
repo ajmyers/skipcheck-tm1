@@ -31,9 +31,7 @@ public sealed class ThreadService : Tm1Service
     private static readonly ODataPath Threads = ODataPath.Of("Threads");
 
     public ThreadService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Threads</c>, streamed. A process run through REST shows as its request:
     /// <c>Function</c> is <c>POST /api/v1/Processes('name')/tm1.ExecuteWithReturn</c>, and TM1 (11.8)
@@ -60,7 +58,9 @@ public sealed class ThreadService : Tm1Service
     public Task CancelAsync(long id, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.ThreadCancelOperation;
-        return Session.ExecuteAsync(Tm1Request.Post(Threads.Key(id).Action(operation.Name), new Dictionary<string, object?>())
-            .Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(
+            Tm1Request.Post(Threads.Key(id).Action(operation.Name), new Dictionary<string, object?>()).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 }

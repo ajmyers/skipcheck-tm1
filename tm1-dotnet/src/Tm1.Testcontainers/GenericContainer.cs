@@ -235,9 +235,7 @@ public abstract class GenericContainer<TSelf> : IStartable
 
     /// <summary>Finishes the configuration as it starts, once what it depends on is running; the
     /// tests call it to check the wiring.</summary>
-    protected internal virtual void Configure()
-    {
-    }
+    protected internal virtual void Configure() { }
 
     /// <summary>Runs once what it depends on is running, before <see cref="Configure"/>.</summary>
     private protected virtual Task DependenciesStartedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -306,9 +304,10 @@ public abstract class GenericContainer<TSelf> : IStartable
         }
         if (wait is { } w)
         {
-            builder = builder.WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(
-                r => r.ForPath(w.Path).ForPort((ushort)w.Port).ForStatusCodeMatching(w.Ok),
-                s => s.WithTimeout(w.Timeout)));
+            builder = builder.WithWaitStrategy(
+                Wait.ForUnixContainer()
+                    .UntilHttpRequestIsSucceeded(r => r.ForPath(w.Path).ForPort((ushort)w.Port).ForStatusCodeMatching(w.Ok), s => s.WithTimeout(w.Timeout))
+            );
         }
         return builder.Build();
     }

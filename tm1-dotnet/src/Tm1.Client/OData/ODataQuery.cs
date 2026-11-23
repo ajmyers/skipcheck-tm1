@@ -26,14 +26,13 @@ public sealed partial class ODataQuery : IEquatable<ODataQuery>
     private IReadOnlyList<KeyValuePair<string, string>> _custom = [];
     private IReadOnlyList<KeyValuePair<string, string>> _aliases = [];
 
-    private ODataQuery()
-    {
-    }
+    private ODataQuery() { }
 
     /// <summary>No options: the server's default response.</summary>
     public static ODataQuery None() => Empty;
 
-    public ODataQuery Select(params string[] properties) => With(q => q._select = [.. _select, .. properties.Select(p => p ?? throw new ArgumentNullException(nameof(properties)))]);
+    public ODataQuery Select(params string[] properties) =>
+        With(q => q._select = [.. _select, .. properties.Select(p => p ?? throw new ArgumentNullException(nameof(properties)))]);
 
     public ODataQuery Select(params ODataProperty[] properties) => Select(properties.Select(p => p.Path).ToArray());
 
@@ -94,7 +93,9 @@ public sealed partial class ODataQuery : IEquatable<ODataQuery>
 
     /// <summary>A parameter alias's value: <c>Fn(p=@p)</c> with <c>?@p=…</c>.</summary>
     public ODataQuery Alias(ODataPath.Alias alias, string literalOrJson) =>
-        With(q => q._aliases = [.. _aliases.Where(a => a.Key != alias.Name), new(alias.Name, literalOrJson ?? throw new ArgumentNullException(nameof(literalOrJson)))]);
+        With(q =>
+            q._aliases = [.. _aliases.Where(a => a.Key != alias.Name), new(alias.Name, literalOrJson ?? throw new ArgumentNullException(nameof(literalOrJson)))]
+        );
 
     public bool IsEmpty() => SystemOptions().Count == 0 && _custom.Count == 0 && _aliases.Count == 0;
 
@@ -130,11 +131,19 @@ public sealed partial class ODataQuery : IEquatable<ODataQuery>
         }
         if (_expand.Count > 0)
         {
-            options.Add(new("$expand", string.Join(",", _expand.Select(e =>
-            {
-                var inner = e.Value.SystemOptions();
-                return inner.Count == 0 ? e.Key : e.Key + "(" + string.Join(";", inner.Select(o => o.Key + "=" + o.Value)) + ")";
-            }))));
+            options.Add(
+                new(
+                    "$expand",
+                    string.Join(
+                        ",",
+                        _expand.Select(e =>
+                        {
+                            var inner = e.Value.SystemOptions();
+                            return inner.Count == 0 ? e.Key : e.Key + "(" + string.Join(";", inner.Select(o => o.Key + "=" + o.Value)) + ")";
+                        })
+                    )
+                )
+            );
         }
         if (_filter is not null)
         {

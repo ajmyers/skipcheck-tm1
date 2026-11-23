@@ -35,13 +35,19 @@ internal static class LiveModel
         {
             hierarchy.Edges(edges);
         }
-        return tm1.Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Dimensions"), DimensionPatch.Builder().Name(name).Hierarchies([hierarchy.Build()]).Build()));
+        return tm1.Session.ExecuteAsync(
+            Tm1Request.Post(ODataPath.Of("Dimensions"), DimensionPatch.Builder().Name(name).Hierarchies([hierarchy.Build()]).Build())
+        );
     }
 
     /// <summary>The public subset <c>All</c> of a dimension's own hierarchy.</summary>
     public static Task SubsetAllAsync(Tm1Client tm1, string dimension) =>
-        tm1.Session.ExecuteAsync(Tm1Request.Post(Dim(dimension).Nav("Hierarchies").Key(dimension).Nav("Subsets"),
-            SubsetPatch.Builder().Name("All").Expression($"{{TM1SUBSETALL([{dimension}].[{dimension}])}}").Build()));
+        tm1.Session.ExecuteAsync(
+            Tm1Request.Post(
+                Dim(dimension).Nav("Hierarchies").Key(dimension).Nav("Subsets"),
+                SubsetPatch.Builder().Name("All").Expression($"{{TM1SUBSETALL([{dimension}].[{dimension}])}}").Build()
+            )
+        );
 
     public static async Task DeleteDimensionsAsync(Tm1Client tm1, params string[] names)
     {
@@ -53,11 +59,16 @@ internal static class LiveModel
 
     /// <summary>Writes a cell through the raw session's <c>tm1.Update</c>.</summary>
     public static Task WriteAsync(Tm1Client tm1, string cube, IEnumerable<ODataPath> tuple, object value) =>
-        tm1.Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Cubes").Key(cube).Action("tm1.Update"), new Dictionary<string, object?>
-        {
-            ["Cells"] = new[] { new Dictionary<string, object?> { ["Tuple@odata.bind"] = tuple.Select(p => p.ToString()).ToList() } },
-            ["Value"] = value,
-        }));
+        tm1.Session.ExecuteAsync(
+            Tm1Request.Post(
+                ODataPath.Of("Cubes").Key(cube).Action("tm1.Update"),
+                new Dictionary<string, object?>
+                {
+                    ["Cells"] = new[] { new Dictionary<string, object?> { ["Tuple@odata.bind"] = tuple.Select(p => p.ToString()).ToList() } },
+                    ["Value"] = value,
+                }
+            )
+        );
 
     /// <summary>The value of the cell an MDX query of one cell selects; 0 for an empty one.</summary>
     public static async Task<double> NumberAsync(Tm1Client tm1, string mdx)
@@ -109,7 +120,10 @@ public sealed class CubeServiceLiveTests : IAsyncLifetime
     public async Task CreatesReadsListsAndDeletesACube()
     {
         Assert.False(string.IsNullOrWhiteSpace((await Cubes.GetAsync(_cube)).ETag));
-        var listed = await Cubes.ListAsync(ODataQuery.None().Select(Cube.Fields.Name).Filter(Filter.StartsWith(Cube.Fields.Name, _cube))).Select(c => c.Name).ToListAsync();
+        var listed = await Cubes
+            .ListAsync(ODataQuery.None().Select(Cube.Fields.Name).Filter(Filter.StartsWith(Cube.Fields.Name, _cube)))
+            .Select(c => c.Name)
+            .ToListAsync();
         Assert.Equal([_cube], listed);
         Assert.Equal(["Sandboxes", Region, Measure], await Names(Cubes.DimensionsAsync(_cube, ODataQuery.None().Select(Dimension.Fields.Name))));
         await Cubes.DeleteAsync(_cube);
@@ -134,7 +148,10 @@ public sealed class CubeServiceLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task ReordersTheStorageOrder()
     {
-        Assert.Equal(new[] { Region, Measure }.Order(StringComparer.Ordinal), (await Names(Cubes.DimensionsStorageOrderAsync(_cube))).Order(StringComparer.Ordinal));
+        Assert.Equal(
+            new[] { Region, Measure }.Order(StringComparer.Ordinal),
+            (await Names(Cubes.DimensionsStorageOrderAsync(_cube))).Order(StringComparer.Ordinal)
+        );
         await Cubes.ReorderDimensionsAsync(_cube, [Measure, Region]);
         Assert.Equal([Measure, Region], await Names(Cubes.DimensionsStorageOrderAsync(_cube)));
         Assert.Equal(["Sandboxes", Region, Measure], await Names(Cubes.DimensionsAsync(_cube))); // presentation order unchanged
@@ -169,9 +186,16 @@ public sealed class CubeRulesLiveTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await LiveModel.DimensionAsync(_tm1, Region,
-            [LiveModel.Element("Total", ElementType.Consolidated), LiveModel.Element("North", ElementType.Numeric), LiveModel.Element("South", ElementType.Numeric)],
-            [LiveModel.Edge("Total", "North"), LiveModel.Edge("Total", "South")]);
+        await LiveModel.DimensionAsync(
+            _tm1,
+            Region,
+            [
+                LiveModel.Element("Total", ElementType.Consolidated),
+                LiveModel.Element("North", ElementType.Numeric),
+                LiveModel.Element("South", ElementType.Numeric),
+            ],
+            [LiveModel.Edge("Total", "North"), LiveModel.Edge("Total", "South")]
+        );
         await LiveModel.DimensionAsync(_tm1, Measure, "Amount", "Double");
         await Cubes.CreateAsync(CubePatch.Builder().Name(_cube).Rules(RulesText).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure)).Build());
     }
@@ -237,7 +261,9 @@ public sealed class ViewServiceLiveTests : IAsyncLifetime
             await LiveModel.DimensionAsync(_tm1, d, elements);
             await LiveModel.SubsetAllAsync(_tm1, d);
         }
-        await _tm1.Cubes.CreateAsync(CubePatch.Builder().Name(_cube).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure), LiveModel.Dim(Year)).Build());
+        await _tm1.Cubes.CreateAsync(
+            CubePatch.Builder().Name(_cube).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure), LiveModel.Dim(Year)).Build()
+        );
     }
 
     public async Task DisposeAsync()
@@ -261,7 +287,9 @@ public sealed class ViewServiceLiveTests : IAsyncLifetime
         var changed = $"SELECT {{[{Measure}].[{Measure}].[Amount]}} ON 0 FROM [{_cube}]";
         await Views.UpdateAsync(_cube, ViewScope.Public, "Mdx", MDXViewPatch.Builder().Mdx(changed).Build(), etag);
         Assert.Equal(changed, Assert.IsType<MDXView>(await Views.GetAsync(_cube, ViewScope.Public, "Mdx")).Mdx);
-        await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() => Views.UpdateAsync(_cube, ViewScope.Public, "Mdx", MDXViewPatch.Builder().Mdx(Mdx()).Build(), etag));
+        await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() =>
+            Views.UpdateAsync(_cube, ViewScope.Public, "Mdx", MDXViewPatch.Builder().Mdx(Mdx()).Build(), etag)
+        );
 
         Assert.Equal(_cube, (await Views.CubeAsync(_cube, ViewScope.Public, "Mdx")).Name);
         await Views.DeleteAsync(_cube, ViewScope.Public, "Mdx");
@@ -280,8 +308,12 @@ public sealed class ViewServiceLiveTests : IAsyncLifetime
     public async Task ExpandsANativeViewsAxesThroughItsType()
     {
         await Views.CreateAsync(_cube, ViewScope.Public, NativeView("Native"));
-        var read = await Views.GetNativeAsync(_cube, ViewScope.Public, "Native",
-            ODataQuery.None().Expand("Columns/Subset").Expand("Rows/Subset").Expand("Titles/Subset").Expand("Titles/Selected"));
+        var read = await Views.GetNativeAsync(
+            _cube,
+            ViewScope.Public,
+            "Native",
+            ODataQuery.None().Expand("Columns/Subset").Expand("Rows/Subset").Expand("Titles/Subset").Expand("Titles/Selected")
+        );
         Assert.Equal("All", Assert.Single(read.Columns!).Subset!.Name);
         Assert.Contains(Region, Assert.Single(read.Rows!).Subset!.UniqueName);
         Assert.Equal("2026", Assert.Single(read.Titles!).Selected!.Name);
@@ -297,12 +329,14 @@ public sealed class ViewServiceLiveTests : IAsyncLifetime
         Assert.Single(all.OfType<MDXView>());
     }
 
-    private NativeViewPatch NativeView(string name) => NativeViewPatch.Builder()
-        .Name(name)
-        .Columns([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(Measure)).Build()])
-        .Rows([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(Region)).Build()])
-        .Titles([ViewTitlePatch.Builder().BindSubset(LiveModel.Subset(Year)).BindSelected(LiveModel.Element(Year, "2026")).Build()])
-        .Build();
+    private NativeViewPatch NativeView(string name) =>
+        NativeViewPatch
+            .Builder()
+            .Name(name)
+            .Columns([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(Measure)).Build()])
+            .Rows([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(Region)).Build()])
+            .Titles([ViewTitlePatch.Builder().BindSubset(LiveModel.Subset(Year)).BindSelected(LiveModel.Element(Year, "2026")).Build()])
+            .Build();
 
     private string Mdx() => $"SELECT {{[{Measure}].[{Measure}].Members}} ON 0, {{[{Region}].[{Region}].Members}} ON 1 FROM [{_cube}]";
 }

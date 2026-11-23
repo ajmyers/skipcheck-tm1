@@ -25,7 +25,10 @@ public sealed record PawSource
         Zip = Settings.Absolute(zip);
         if (!File.Exists(Zip))
         {
-            throw new ArgumentException($"Not a file: {Zip}. Point {ZipSetting} at IBM's ipa_workspace_local_<release>.<build>.zip, or {BundleDir} at its folder.", nameof(zip));
+            throw new ArgumentException(
+                $"Not a file: {Zip}. Point {ZipSetting} at IBM's ipa_workspace_local_<release>.<build>.zip, or {BundleDir} at its folder.",
+                nameof(zip)
+            );
         }
     }
 
@@ -61,10 +64,12 @@ public sealed record PawSource
         {
             throw new ArgumentException($"{BundleDir} is not a folder: {dir}");
         }
-        return new DirectoryInfo(dir).EnumerateFiles()
+        return new DirectoryInfo(dir)
+            .EnumerateFiles()
             .Where(f => f.Name.StartsWith(Prefix, StringComparison.Ordinal) && f.Name.EndsWith(".zip", StringComparison.Ordinal))
             .OrderByDescending(f => f.LastWriteTimeUtc)
-            .FirstOrDefault()?.FullName
+            .FirstOrDefault()
+            ?.FullName
             ?? throw new ArgumentException($"{BundleDir} has no {Prefix}*.zip: {Settings.Absolute(dir)}");
     }
 }

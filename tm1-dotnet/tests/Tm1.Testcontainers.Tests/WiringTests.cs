@@ -201,7 +201,9 @@ public class PlanningAnalyticsEnvironmentTests
     [Fact]
     public void CognosPutsEveryServerInCamSecurity()
     {
-        var env = Builder().Tm1("planning").Tm1("reporting")
+        var env = Builder()
+            .Tm1("planning")
+            .Tm1("reporting")
             .Cognos(cognos => cognos.WithUser("admin", "adminpw", "Admins").WithUser("viewer", "viewerpw", "Readers"))
             .Build();
         foreach (var server in env.Tm1Servers.Values)
@@ -217,7 +219,8 @@ public class PlanningAnalyticsEnvironmentTests
     [Fact]
     public void KeycloakAddsOidc()
     {
-        var env = Builder().Tm1("planning")
+        var env = Builder()
+            .Tm1("planning")
             .Cognos(cognos => cognos.WithUser("admin", "adminpw").WithUser("boss", "bosspw"))
             .Keycloak()
             .CamSecurity(CognosContainer.Namespace.Oidc, "boss")
@@ -247,8 +250,18 @@ public class PlanningAnalyticsEnvironmentTests
     {
         Assert.Contains("at least one", Assert.Throws<InvalidOperationException>(() => Builder().Build()).Message);
         Assert.Contains("Cognos", Assert.Throws<InvalidOperationException>(() => Builder().Tm1("a").Keycloak().Build()).Message);
-        Assert.Contains("Keycloak", Assert.Throws<InvalidOperationException>(() => Builder().Tm1("a").Cognos(c => c.WithUser("u", "p")).CamSecurity(CognosContainer.Namespace.Oidc).Build()).Message);
-        Assert.Contains("PAW", Assert.Throws<InvalidOperationException>(() => Builder().Tm1("a").Cognos(c => c.WithUser("u", "p")).Paw(_ => { }).Build()).Message);
+        Assert.Contains(
+            "Keycloak",
+            Assert
+                .Throws<InvalidOperationException>(() =>
+                    Builder().Tm1("a").Cognos(c => c.WithUser("u", "p")).CamSecurity(CognosContainer.Namespace.Oidc).Build()
+                )
+                .Message
+        );
+        Assert.Contains(
+            "PAW",
+            Assert.Throws<InvalidOperationException>(() => Builder().Tm1("a").Cognos(c => c.WithUser("u", "p")).Paw(_ => { }).Build()).Message
+        );
         Assert.Contains("test users", Assert.Throws<InvalidOperationException>(() => Builder().Tm1("a").Cognos(_ => { }).Build()).Message);
         Assert.Contains("already", Assert.Throws<ArgumentException>(() => Builder().Tm1("a").Tm1("a")).Message);
         Assert.Throws<ArgumentException>(() => Builder().Tm1("two words"));
@@ -258,7 +271,8 @@ public class PlanningAnalyticsEnvironmentTests
     }
 
     private static PlanningAnalyticsEnvironment.EnvironmentBuilder Builder() =>
-        PlanningAnalyticsEnvironment.Builder()
+        PlanningAnalyticsEnvironment
+            .Builder()
             .Tm1Source(new Tm1Source.PrivateImage("tm1-server:test"))
             .Tm1WebSource(new Tm1WebSource.PrivateImage("tm1-web:test"))
             .CognosSource(new CognosSource.PrivateImage("cognos-server:test"));

@@ -44,9 +44,7 @@ public sealed class DrillthroughService : Tm1Service
     private static readonly ODataPath Rowsets = ODataPath.Of("Rowsets");
 
     public DrillthroughService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET Cellsets('id')/Cells(n)/DrillthroughScripts</c>: the drillthroughs a cell has,
     /// streamed, each a <c>CubeDrillthrough</c> or <c>RelationalDrillthrough</c>.</summary>
@@ -58,21 +56,41 @@ public sealed class DrillthroughService : Tm1Service
     /// returns, left on the server until deleted. Needs schema 10.2.2.6. The process must take the cube's
     /// name and one parameter per dimension (see the class description).</summary>
     [Tm1Endpoint("Action CubeDrillthrough/Execute")]
-    public Task<Cellset> ExecuteAsync(string cellset, long ordinal, string drillthrough, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    public Task<Cellset> ExecuteAsync(
+        string cellset,
+        long ordinal,
+        string drillthrough,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.CubeDrillthroughExecute;
-        return Session.ExecuteAsync(Tm1Request.Post<Cellset>(ScriptPath(cellset, ordinal, drillthrough).Action(operation.Name), new Dictionary<string, object?>())
-            .WithQuery(query).Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(
+            Tm1Request
+                .Post<Cellset>(ScriptPath(cellset, ordinal, drillthrough).Action(operation.Name), new Dictionary<string, object?>())
+                .WithQuery(query)
+                .Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>tm1.Execute</c> on a cell's relational drillthrough: its rows, as JSON, streamed. Needs
     /// schema 10.2.2.6.</summary>
     [Tm1Endpoint("Action RelationalDrillthrough/Execute")]
-    public IAsyncEnumerable<JsonElement> ExecuteRelationalAsync(string cellset, long ordinal, string drillthrough, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<JsonElement> ExecuteRelationalAsync(
+        string cellset,
+        long ordinal,
+        string drillthrough,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.RelationalDrillthroughExecute;
-        return Session.StreamAsync(Tm1Request.PostList<JsonElement>(ScriptPath(cellset, ordinal, drillthrough).Action(operation.Name), new Dictionary<string, object?>())
-            .Requires(operation.Capability()), cancellationToken);
+        return Session.StreamAsync(
+            Tm1Request
+                .PostList<JsonElement>(ScriptPath(cellset, ordinal, drillthrough).Action(operation.Name), new Dictionary<string, object?>())
+                .Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>tm1.ExecuteWithRowset</c> on a cell's relational drillthrough: its rows, kept as a
@@ -81,8 +99,12 @@ public sealed class DrillthroughService : Tm1Service
     public Task<Rowset> ExecuteRelationalWithRowsetAsync(string cellset, long ordinal, string drillthrough, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.RelationalDrillthroughExecuteWithRowset;
-        return Session.ExecuteAsync(Tm1Request.Post<Rowset>(ScriptPath(cellset, ordinal, drillthrough).Action(operation.Name), new Dictionary<string, object?>())
-            .Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(
+            Tm1Request
+                .Post<Rowset>(ScriptPath(cellset, ordinal, drillthrough).Action(operation.Name), new Dictionary<string, object?>())
+                .Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>ExecuteCubeDrillthrough</c>: runs a cube drillthrough process directly, with its
@@ -93,31 +115,50 @@ public sealed class DrillthroughService : Tm1Service
     /// <param name="query">What to expand of the cellset.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     [Tm1Endpoint("ActionImport ExecuteCubeDrillthrough")]
-    public Task<Cellset> ExecuteProcessAsync(string process, IReadOnlyList<ProcessParameterPatch> parameters, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    public Task<Cellset> ExecuteProcessAsync(
+        string process,
+        IReadOnlyList<ProcessParameterPatch> parameters,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.ExecuteCubeDrillthrough;
-        return Session.ExecuteAsync(Tm1Request.Post<Cellset>(Root(operation), ProcessBody(process, parameters))
-            .WithQuery(query).Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(
+            Tm1Request.Post<Cellset>(Root(operation), ProcessBody(process, parameters)).WithQuery(query).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>ExecuteRelationalDrillthrough</c>: runs a relational drillthrough process directly:
     /// its rows, as JSON, streamed. Needs schema 11.2.0.</summary>
     [Tm1Endpoint("ActionImport ExecuteRelationalDrillthrough")]
-    public IAsyncEnumerable<JsonElement> ExecuteRelationalProcessAsync(string process, IReadOnlyList<ProcessParameterPatch> parameters, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<JsonElement> ExecuteRelationalProcessAsync(
+        string process,
+        IReadOnlyList<ProcessParameterPatch> parameters,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.ExecuteRelationalDrillthrough;
-        return Session.StreamAsync(Tm1Request.PostList<JsonElement>(Root(operation), ProcessBody(process, parameters))
-            .Requires(operation.Capability()), cancellationToken);
+        return Session.StreamAsync(
+            Tm1Request.PostList<JsonElement>(Root(operation), ProcessBody(process, parameters)).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>ExecuteRelationalDrillthroughWithRowset</c>: runs a relational drillthrough process
     /// directly, keeping its rows as a rowset. Needs schema 11.6.0.</summary>
     [Tm1Endpoint("ActionImport ExecuteRelationalDrillthroughWithRowset")]
-    public Task<Rowset> ExecuteRelationalProcessWithRowsetAsync(string process, IReadOnlyList<ProcessParameterPatch> parameters, CancellationToken cancellationToken = default)
+    public Task<Rowset> ExecuteRelationalProcessWithRowsetAsync(
+        string process,
+        IReadOnlyList<ProcessParameterPatch> parameters,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.ExecuteRelationalDrillthroughWithRowset;
-        return Session.ExecuteAsync(Tm1Request.Post<Rowset>(Root(operation), ProcessBody(process, parameters))
-            .Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(
+            Tm1Request.Post<Rowset>(Root(operation), ProcessBody(process, parameters)).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>GET Rowsets('id')</c>.</summary>

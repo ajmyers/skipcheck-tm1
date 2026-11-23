@@ -49,11 +49,9 @@ public sealed class Spec
 
     public Dictionary<string, string> Aliases { get; } = new();
 
-    public static string? Str(JsonElement e, string name) =>
-        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+    public static string? Str(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
-    public static bool Bool(JsonElement e, string name) =>
-        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
+    public static bool Bool(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
 
     public static IEnumerable<JsonElement> Array(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Array ? v.EnumerateArray() : Enumerable.Empty<JsonElement>();
@@ -104,13 +102,83 @@ public static class Names
 {
     private static readonly HashSet<string> Keywords = new()
     {
-        "abstract", "as", "base", "bool", "break", "byte", "case", "catch", "char", "checked", "class", "const",
-        "continue", "decimal", "default", "delegate", "do", "double", "else", "enum", "event", "explicit", "extern",
-        "false", "finally", "fixed", "float", "for", "foreach", "goto", "if", "implicit", "in", "int", "interface",
-        "internal", "is", "lock", "long", "namespace", "new", "null", "object", "operator", "out", "override",
-        "params", "private", "protected", "public", "readonly", "ref", "return", "sbyte", "sealed", "short",
-        "sizeof", "stackalloc", "static", "string", "struct", "switch", "this", "throw", "true", "try", "typeof",
-        "uint", "ulong", "unchecked", "unsafe", "ushort", "using", "virtual", "void", "volatile", "while",
+        "abstract",
+        "as",
+        "base",
+        "bool",
+        "break",
+        "byte",
+        "case",
+        "catch",
+        "char",
+        "checked",
+        "class",
+        "const",
+        "continue",
+        "decimal",
+        "default",
+        "delegate",
+        "do",
+        "double",
+        "else",
+        "enum",
+        "event",
+        "explicit",
+        "extern",
+        "false",
+        "finally",
+        "fixed",
+        "float",
+        "for",
+        "foreach",
+        "goto",
+        "if",
+        "implicit",
+        "in",
+        "int",
+        "interface",
+        "internal",
+        "is",
+        "lock",
+        "long",
+        "namespace",
+        "new",
+        "null",
+        "object",
+        "operator",
+        "out",
+        "override",
+        "params",
+        "private",
+        "protected",
+        "public",
+        "readonly",
+        "ref",
+        "return",
+        "sbyte",
+        "sealed",
+        "short",
+        "sizeof",
+        "stackalloc",
+        "static",
+        "string",
+        "struct",
+        "switch",
+        "this",
+        "throw",
+        "true",
+        "try",
+        "typeof",
+        "uint",
+        "ulong",
+        "unchecked",
+        "unsafe",
+        "ushort",
+        "using",
+        "virtual",
+        "void",
+        "volatile",
+        "while",
     };
 
     /// <summary>The Java client's <c>componentName</c>, capitalized: <c>ID</c> → <c>Id</c>,
@@ -174,6 +242,5 @@ public static class Names
     }
 
     /// <summary>Text as an XML doc comment's content.</summary>
-    public static string Doc(string text) =>
-        Regex.Replace(text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;"), "`([^`]*)`", "<c>$1</c>");
+    public static string Doc(string text) => Regex.Replace(text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;"), "`([^`]*)`", "<c>$1</c>");
 }

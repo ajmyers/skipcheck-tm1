@@ -59,8 +59,7 @@ public sealed class Tm1SessionPool : IAsyncDisposable
 
     /// <summary>A pool building its sessions from <paramref name="sessions"/> (copied: later changes
     /// to it don't reach the pool). Its authenticator is the service account's.</summary>
-    public static Tm1SessionPoolBuilder Builder(Tm1SessionBuilder sessions) =>
-        new((sessions ?? throw new ArgumentNullException(nameof(sessions))).Copy());
+    public static Tm1SessionPoolBuilder Builder(Tm1SessionBuilder sessions) => new((sessions ?? throw new ArgumentNullException(nameof(sessions))).Copy());
 
     /// <summary>The session for <paramref name="identity"/>: the one held for it, unless that has
     /// expired, or a new one.</summary>
@@ -111,7 +110,7 @@ public sealed class Tm1SessionPool : IAsyncDisposable
         var now = _time.GetUtcNow();
         lock (_gate)
         {
-            for (var node = _order.First; node is not null;)
+            for (var node = _order.First; node is not null; )
             {
                 var next = node.Next;
                 if (Expiry(node.Value.Entry, now) is { } reason)
@@ -128,7 +127,15 @@ public sealed class Tm1SessionPool : IAsyncDisposable
     {
         lock (_gate)
         {
-            return new Tm1SessionPoolStats(_entries.Count, _closing.Count, _created, _evictedIdle, _evictedAge, _evictedSize, Interlocked.Read(ref _closedSessions));
+            return new Tm1SessionPoolStats(
+                _entries.Count,
+                _closing.Count,
+                _created,
+                _evictedIdle,
+                _evictedAge,
+                _evictedSize,
+                Interlocked.Read(ref _closedSessions)
+            );
         }
     }
 
@@ -151,18 +158,20 @@ public sealed class Tm1SessionPool : IAsyncDisposable
                     all.Add(session);
                 }
                 _closing.Clear();
-                _closeAll = Task.WhenAll(all.Select(async s =>
-                {
-                    try
+                _closeAll = Task.WhenAll(
+                    all.Select(async s =>
                     {
-                        await s.CloseAsync(CancellationToken.None).ConfigureAwait(false);
-                        Interlocked.Increment(ref _closedSessions);
-                    }
-                    catch (Exception)
-                    {
-                        // One session failing to close doesn't stop the others
-                    }
-                }));
+                        try
+                        {
+                            await s.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+                            Interlocked.Increment(ref _closedSessions);
+                        }
+                        catch (Exception)
+                        {
+                            // One session failing to close doesn't stop the others
+                        }
+                    })
+                );
             }
             return _closeAll.WaitAsync(cancellationToken);
         }

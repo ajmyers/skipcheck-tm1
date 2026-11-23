@@ -21,14 +21,16 @@ public class CoverageGateTests
         return doc.RootElement.GetProperty("endpoints").EnumerateArray().Select(e => e.GetProperty("id").GetString()!).ToHashSet();
     }
 
-    public static IReadOnlySet<string> Implemented() => typeof(Tm1Client).Assembly.GetTypes()
-        .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
-        .SelectMany(m => m.GetCustomAttributes<Tm1EndpointAttribute>())
-        .Select(a => a.Value)
-        .ToHashSet();
+    public static IReadOnlySet<string> Implemented() =>
+        typeof(Tm1Client)
+            .Assembly.GetTypes()
+            .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .SelectMany(m => m.GetCustomAttributes<Tm1EndpointAttribute>())
+            .Select(a => a.Value)
+            .ToHashSet();
 
-    private static List<string> Lines(string file) => File.ReadAllLines(Path.Combine(Coverage, file))
-        .Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith('#')).ToList();
+    private static List<string> Lines(string file) =>
+        File.ReadAllLines(Path.Combine(Coverage, file)).Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith('#')).ToList();
 
     [Fact]
     public void EveryEndpointIsAccountedFor()

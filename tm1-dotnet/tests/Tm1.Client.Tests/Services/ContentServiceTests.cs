@@ -41,7 +41,15 @@ public class ContentServiceTests
     public async Task ListsGetsAndDeletes()
     {
         var tm1 = _tm1.Client();
-        _tm1.Respond = _ => FakeTm1.Collection(new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.Folder", ["ID"] = "Applications", ["Name"] = "Applications" });
+        _tm1.Respond = _ =>
+            FakeTm1.Collection(
+                new Dictionary<string, object?>
+                {
+                    ["@odata.type"] = "#ibm.tm1.api.v1.Folder",
+                    ["ID"] = "Applications",
+                    ["Name"] = "Applications",
+                }
+            );
         Assert.IsType<Folder>(Assert.Single(await tm1.Contents.RootsAsync(ODataQuery.None().Select("Name")).ToListAsync()));
         Assert.Equal("GET Contents?$select=Name", Sent);
 
@@ -51,7 +59,12 @@ public class ContentServiceTests
         await tm1.Contents.ContentsAsync(planning, ContentScope.Private).ToListAsync();
         Assert.Equal("GET Contents('Applications')/Contents('Planning')/PrivateContents", Sent);
 
-        _tm1.Respond = _ => new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.Link", ["ID"] = "ibm.extr", ["URL"] = "https://www.ibm.com" };
+        _tm1.Respond = _ => new Dictionary<string, object?>
+        {
+            ["@odata.type"] = "#ibm.tm1.api.v1.Link",
+            ["ID"] = "ibm.extr",
+            ["URL"] = "https://www.ibm.com",
+        };
         var link = Assert.IsType<Link>(await tm1.Contents.GetAsync(planning.Child("ibm.extr")));
         Assert.Equal("https://www.ibm.com", link.Url);
         Assert.Equal("GET Contents('Applications')/Contents('Planning')/Contents('ibm.extr')", Sent);

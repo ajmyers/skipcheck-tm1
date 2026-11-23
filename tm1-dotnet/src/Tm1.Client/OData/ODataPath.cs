@@ -101,12 +101,14 @@ public sealed partial class ODataPath : IEquatable<ODataPath>
         return new(_segments.Take(_segments.Count - 1).Append(last + suffix).ToList());
     }
 
-    private static string KeyValue(object? value) => value is string s
-        ? "'" + ODataEncoding.PathValue(s.Replace("'", "''")) + "'"
-        : ODataEncoding.PathValue(ODataLiterals.Of(value));
+    private static string KeyValue(object? value) =>
+        value is string s ? "'" + ODataEncoding.PathValue(s.Replace("'", "''")) + "'" : ODataEncoding.PathValue(ODataLiterals.Of(value));
 
     private static string Call(string function, IReadOnlyDictionary<string, object?> parameters) =>
-        function + "(" + string.Join(",", parameters.Select(p => Identifier(p.Key) + "=" + (p.Value is Alias a ? a.Name : ODataEncoding.PathValue(ODataLiterals.Of(p.Value))))) + ")";
+        function
+        + "("
+        + string.Join(",", parameters.Select(p => Identifier(p.Key) + "=" + (p.Value is Alias a ? a.Name : ODataEncoding.PathValue(ODataLiterals.Of(p.Value)))))
+        + ")";
 
     private static string Identifier(string name)
     {

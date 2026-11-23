@@ -20,9 +20,7 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class ElementService : Tm1Service
 {
     public ElementService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET …/Elements</c>: the hierarchy's elements, streamed.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Elements")]
@@ -31,8 +29,13 @@ public sealed class ElementService : Tm1Service
 
     /// <summary><c>GET …/Elements('e')</c>.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Elements")]
-    public Task<Element> GetAsync(string dimension, string hierarchy, string element, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<Element>(ElementPath(dimension, hierarchy, element), query), cancellationToken);
+    public Task<Element> GetAsync(
+        string dimension,
+        string hierarchy,
+        string element,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Get<Element>(ElementPath(dimension, hierarchy, element), query), cancellationToken);
 
     /// <summary><c>POST …/Elements</c>: adds an element, with its components if the patch has them;
     /// returns the element as created.</summary>
@@ -51,8 +54,18 @@ public sealed class ElementService : Tm1Service
     /// unless the element changed since it was read with <paramref name="etag"/>; a
     /// <c>Tm1PreconditionFailedException</c> if it had.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Elements")]
-    public Task UpdateAsync(string dimension, string hierarchy, string element, ElementPatch patch, string etag, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Patch(ElementPath(dimension, hierarchy, element), Checked(patch)).IfMatch(Require(etag, nameof(etag))), cancellationToken);
+    public Task UpdateAsync(
+        string dimension,
+        string hierarchy,
+        string element,
+        ElementPatch patch,
+        string etag,
+        CancellationToken cancellationToken = default
+    ) =>
+        Session.ExecuteAsync(
+            Tm1Request.Patch(ElementPath(dimension, hierarchy, element), Checked(patch)).IfMatch(Require(etag, nameof(etag))),
+            cancellationToken
+        );
 
     /// <summary><c>DELETE …/Elements('e')</c>: removes the element, its edges, and its cells' data.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Elements")]
@@ -61,23 +74,43 @@ public sealed class ElementService : Tm1Service
 
     /// <summary><c>GET …/Elements('e')/Parents</c>: the consolidations the element is under, streamed.</summary>
     [Tm1Endpoint("Navigation Element/Parents")]
-    public IAsyncEnumerable<Element> ParentsAsync(string dimension, string hierarchy, string element, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<Element>(ElementPath(dimension, hierarchy, element).Nav("Parents"), query), cancellationToken);
+    public IAsyncEnumerable<Element> ParentsAsync(
+        string dimension,
+        string hierarchy,
+        string element,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<Element>(ElementPath(dimension, hierarchy, element).Nav("Parents"), query), cancellationToken);
 
     /// <summary><c>GET …/Elements('e')/Components</c>: the elements directly under it, streamed.</summary>
     [Tm1Endpoint("Navigation Element/Components")]
-    public IAsyncEnumerable<Element> ComponentsAsync(string dimension, string hierarchy, string element, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<Element>(ElementPath(dimension, hierarchy, element).Nav("Components"), query), cancellationToken);
+    public IAsyncEnumerable<Element> ComponentsAsync(
+        string dimension,
+        string hierarchy,
+        string element,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<Element>(ElementPath(dimension, hierarchy, element).Nav("Components"), query), cancellationToken);
 
     /// <summary><c>GET …/Elements('e')/Edges</c>: the edges to its components, streamed.</summary>
     [Tm1Endpoint("Navigation Element/Edges")]
-    public IAsyncEnumerable<Edge> EdgesAsync(string dimension, string hierarchy, string element, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<Edge>(ElementPath(dimension, hierarchy, element).Nav("Edges"), query), cancellationToken);
+    public IAsyncEnumerable<Edge> EdgesAsync(
+        string dimension,
+        string hierarchy,
+        string element,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<Edge>(ElementPath(dimension, hierarchy, element).Nav("Edges"), query), cancellationToken);
 
     /// <summary><c>GET …/Elements('e')/Hierarchy</c>: the hierarchy the element belongs to.</summary>
     [Tm1Endpoint("Navigation Element/Hierarchy")]
-    public Task<Hierarchy> HierarchyAsync(string dimension, string hierarchy, string element, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<Hierarchy>(ElementPath(dimension, hierarchy, element).Nav("Hierarchy"), query), cancellationToken);
+    public Task<Hierarchy> HierarchyAsync(
+        string dimension,
+        string hierarchy,
+        string element,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Get<Hierarchy>(ElementPath(dimension, hierarchy, element).Nav("Hierarchy"), query), cancellationToken);
 
     /// <summary><c>tm1.SetComponent</c>: puts <paramref name="child"/> under <paramref name="parent"/>, with
     /// TM1's default weight, last among its components.</summary>
@@ -87,14 +120,27 @@ public sealed class ElementService : Tm1Service
 
     /// <summary><c>tm1.SetComponent</c>: puts <paramref name="child"/> under <paramref name="parent"/> with a weight.</summary>
     [Tm1Endpoint("Action Element/SetComponent")]
-    public Task SetComponentAsync(string dimension, string hierarchy, string parent, string child, double weight, CancellationToken cancellationToken = default) =>
-        SendSetComponent(dimension, hierarchy, parent, child, null, weight, cancellationToken);
+    public Task SetComponentAsync(
+        string dimension,
+        string hierarchy,
+        string parent,
+        string child,
+        double weight,
+        CancellationToken cancellationToken = default
+    ) => SendSetComponent(dimension, hierarchy, parent, child, null, weight, cancellationToken);
 
     /// <summary><c>tm1.SetComponent</c>: puts <paramref name="child"/> under <paramref name="parent"/> with a
     /// weight, just before the component <paramref name="before"/>.</summary>
     [Tm1Endpoint("Action Element/SetComponent")]
-    public Task SetComponentAsync(string dimension, string hierarchy, string parent, string child, string before, double weight, CancellationToken cancellationToken = default) =>
-        SendSetComponent(dimension, hierarchy, parent, child, Require(before, nameof(before)), weight, cancellationToken);
+    public Task SetComponentAsync(
+        string dimension,
+        string hierarchy,
+        string parent,
+        string child,
+        string before,
+        double weight,
+        CancellationToken cancellationToken = default
+    ) => SendSetComponent(dimension, hierarchy, parent, child, Require(before, nameof(before)), weight, cancellationToken);
 
     /// <summary><c>tm1.Lock</c>.</summary>
     [Tm1Endpoint("Action Element/Lock")]
@@ -116,7 +162,15 @@ public sealed class ElementService : Tm1Service
     public Task ReleaseAsync(string dimension, string hierarchy, string element, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Action(Tm1Operations.ElementRelease, dimension, hierarchy, element, new Dictionary<string, object?>()), cancellationToken);
 
-    private Task SendSetComponent(string dimension, string hierarchy, string parent, string child, string? before, double? weight, CancellationToken cancellationToken)
+    private Task SendSetComponent(
+        string dimension,
+        string hierarchy,
+        string parent,
+        string child,
+        string? before,
+        double? weight,
+        CancellationToken cancellationToken
+    )
     {
         var body = new Dictionary<string, object?> { ["Element@odata.bind"] = ElementPath(dimension, hierarchy, child).ToString() };
         if (before is not null)
@@ -148,7 +202,8 @@ public sealed class ElementService : Tm1Service
 
     private static ODataPath ElementsPath(string dimension, string hierarchy) => HierarchyService.HierarchyPath(dimension, hierarchy).Nav("Elements");
 
-    private static ODataPath ElementPath(string dimension, string hierarchy, string element) => ElementsPath(dimension, hierarchy).Key(Require(element, nameof(element)));
+    private static ODataPath ElementPath(string dimension, string hierarchy, string element) =>
+        ElementsPath(dimension, hierarchy).Key(Require(element, nameof(element)));
 
     private static Tm1Request<NoContent> Action(Tm1Operation operation, string dimension, string hierarchy, string element, Dictionary<string, object?> body) =>
         Tm1Request.Post(ElementPath(dimension, hierarchy, element).Action(operation.Name), body).Requires(operation.Capability());

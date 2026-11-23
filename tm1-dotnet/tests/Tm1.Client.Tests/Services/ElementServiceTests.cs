@@ -42,10 +42,16 @@ public class ElementServiceTests
     public void AnUpdateWithANameOrAttributesIsRefused()
     {
         var tm1 = _tm1.Client();
-        var rename = Assert.Throws<ArgumentException>(() => { _ = tm1.Elements.UpdateAsync("Region", "Region", "West", ElementPatch.Builder().Name("East").Build()); });
+        var rename = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = tm1.Elements.UpdateAsync("Region", "Region", "West", ElementPatch.Builder().Name("East").Build());
+        });
         Assert.Contains("can't be renamed", rename.Message);
         var attributes = ElementPatch.Builder().Attributes(AttributesPatch.Builder().Caption("W").Build()).Build();
-        var e = Assert.Throws<ArgumentException>(() => { _ = tm1.Elements.UpdateAsync("Region", "Region", "West", attributes, "W/\"1\""); });
+        var e = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = tm1.Elements.UpdateAsync("Region", "Region", "West", attributes, "W/\"1\"");
+        });
         Assert.Contains("}ElementAttributes_", e.Message);
         Assert.Empty(_tm1.Requests);
     }
@@ -59,7 +65,15 @@ public class ElementServiceTests
         Assert.Equal(Elements + "('West')/Parents?$select=Name", _tm1.Last.Target);
         await tm1.Elements.ComponentsAsync("Region", "Region", "Total").ToListAsync();
         Assert.Equal(Elements + "('Total')/Components", _tm1.Last.Target);
-        _tm1.Respond = _ => FakeTm1.Collection(new { ParentName = "Total", ComponentName = "West", Weight = 1.0 });
+        _tm1.Respond = _ =>
+            FakeTm1.Collection(
+                new
+                {
+                    ParentName = "Total",
+                    ComponentName = "West",
+                    Weight = 1.0,
+                }
+            );
         var edge = Assert.Single(await tm1.Elements.EdgesAsync("Region", "Region", "Total").ToListAsync());
         Assert.Equal(("Total", "West", 1.0), (edge.ParentName, edge.ComponentName, edge.Weight));
         Assert.Equal(Elements + "('Total')/Edges", _tm1.Last.Target);
@@ -87,11 +101,15 @@ public class ElementServiceTests
     {
         _tm1.Respond = _ => null;
         var tm1 = _tm1.Client();
-        foreach (var (call, action) in new (Func<Task>, string)[]
-        {
-            (() => tm1.Elements.LockAsync("Region", "Region", "West"), "Lock"), (() => tm1.Elements.UnlockAsync("Region", "Region", "West"), "Unlock"),
-            (() => tm1.Elements.ReserveAsync("Region", "Region", "West"), "Reserve"), (() => tm1.Elements.ReleaseAsync("Region", "Region", "West"), "Release"),
-        })
+        foreach (
+            var (call, action) in new (Func<Task>, string)[]
+            {
+                (() => tm1.Elements.LockAsync("Region", "Region", "West"), "Lock"),
+                (() => tm1.Elements.UnlockAsync("Region", "Region", "West"), "Unlock"),
+                (() => tm1.Elements.ReserveAsync("Region", "Region", "West"), "Reserve"),
+                (() => tm1.Elements.ReleaseAsync("Region", "Region", "West"), "Release"),
+            }
+        )
         {
             await call();
             Assert.Equal(("POST", $"{Elements}('West')/tm1.{action}", "{}"), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));

@@ -18,7 +18,12 @@ public class AnnotationServiceTests
     public async Task AnnotatesACellAsWorkspaceDoes()
     {
         var tm1 = _tm1.Client();
-        _tm1.Respond = _ => new Dictionary<string, object?> { ["ID"] = "C}ClientGroups~B.B~7uA", ["Text"] = "first note", ["commentLocation"] = "Admin,ADMIN" };
+        _tm1.Respond = _ => new Dictionary<string, object?>
+        {
+            ["ID"] = "C}ClientGroups~B.B~7uA",
+            ["Text"] = "first note",
+            ["commentLocation"] = "Admin,ADMIN",
+        };
         var cell = new Dictionary<string, string> { ["}Clients"] = "Admin", ["}Groups"] = "ADMIN" };
         var made = await tm1.Annotations.CreateAsync("}ClientGroups", cell, "first note");
         Assert.Equal("C}ClientGroups~B.B~7uA", made.Id);
@@ -31,7 +36,8 @@ public class AnnotationServiceTests
         Assert.Equal("}ClientGroups", context.GetProperty("Value").GetString());
         Assert.Equal(
             ["Dimensions('}Clients')/Hierarchies('}Clients')/Members('Admin')", "Dimensions('}Groups')/Hierarchies('}Groups')/Members('ADMIN')"],
-            body.GetProperty("DimensionalContext@odata.bind").EnumerateArray().Select(e => Uri.UnescapeDataString(e.GetString()!)));
+            body.GetProperty("DimensionalContext@odata.bind").EnumerateArray().Select(e => Uri.UnescapeDataString(e.GetString()!))
+        );
         Assert.Equal("}ClientGroups", body.GetProperty("objectName").GetString());
         Assert.Equal("first note", body.GetProperty("commentValue").GetString());
         Assert.Equal("ANNOTATION", body.GetProperty("commentType").GetString());
@@ -63,7 +69,12 @@ public class AnnotationServiceTests
         await tm1.Annotations.FacetValuesAsync("}Cubes").ToListAsync();
         Assert.Equal("GET ApplicationContextFacets('}Cubes')/Values", Sent);
 
-        _tm1.Respond = _ => new { Name = "}Cubes", ID = "a1", Text = "note" };
+        _tm1.Respond = _ => new
+        {
+            Name = "}Cubes",
+            ID = "a1",
+            Text = "note",
+        };
         Assert.Equal("}Cubes", (await tm1.Annotations.FacetAsync("}Cubes", "Sales")).Name);
         Assert.Equal("GET ApplicationContextFacets('}Cubes')/Values('Sales')/Facet", Sent);
         Assert.Equal("note", (await tm1.Annotations.GetAsync("a1")).Text);

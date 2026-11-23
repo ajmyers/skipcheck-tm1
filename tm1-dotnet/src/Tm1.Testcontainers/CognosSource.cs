@@ -29,9 +29,7 @@ public abstract record CognosSource
     /// <summary>The setting holding the zip's SHA-256.</summary>
     public const string ZipSha256 = "COGNOS_ZIP_SHA256";
 
-    private protected CognosSource()
-    {
-    }
+    private protected CognosSource() { }
 
     /// <summary>Where Cognos comes from, for logs: never a URL's credentials or query string.</summary>
     public abstract string Describe();
@@ -72,7 +70,8 @@ public abstract record CognosSource
         return null;
     }
 
-    private static bool IsZip(string name) => name.StartsWith("casrv-", StringComparison.Ordinal) && name.EndsWith("-linuxi38664h.zip", StringComparison.Ordinal);
+    private static bool IsZip(string name) =>
+        name.StartsWith("casrv-", StringComparison.Ordinal) && name.EndsWith("-linuxi38664h.zip", StringComparison.Ordinal);
 
     /// <summary>An image with Cognos Analytics built in, used in place of <c>cognos-server</c>.</summary>
     public sealed record PrivateImage : CognosSource
@@ -119,7 +118,10 @@ public abstract record CognosSource
             Dir = Settings.Absolute(dir);
             if (!Directory.Exists(Dir))
             {
-                throw new ArgumentException($"{ZipDir} is not a folder: {Dir}. Point it at the folder holding the zip; name the file itself with {ZipSetting}.", nameof(dir));
+                throw new ArgumentException(
+                    $"{ZipDir} is not a folder: {Dir}. Point it at the folder holding the zip; name the file itself with {ZipSetting}.",
+                    nameof(dir)
+                );
             }
             File = string.IsNullOrWhiteSpace(file) ? null : file;
             if (File is not null && !System.IO.File.Exists(Path.Combine(Dir, File)))

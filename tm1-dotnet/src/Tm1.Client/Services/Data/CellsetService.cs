@@ -52,9 +52,7 @@ public sealed class CellsetService : Tm1Service
     private const int PagesInFlight = 2;
 
     public CellsetService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>ExecuteMDX</c>: runs an MDX query, leaving its cellset on the server until
     /// <see cref="DeleteAsync"/>. Expand <c>Axes</c> and <c>Cells</c> (with <c>$top</c> and
@@ -63,8 +61,10 @@ public sealed class CellsetService : Tm1Service
     public Task<Cellset> ExecuteAsync(string mdx, ODataQuery? query = null, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.ExecuteMdx;
-        var request = Tm1Request.Post<Cellset>(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
-            .WithQuery(query).Requires(operation.Capability());
+        var request = Tm1Request
+            .Post<Cellset>(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
+            .WithQuery(query)
+            .Requires(operation.Capability());
         return Session.ExecuteAsync(request, cancellationToken);
     }
 
@@ -75,7 +75,8 @@ public sealed class CellsetService : Tm1Service
     public Task ExecuteStatementAsync(string mdx, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.ExecuteMdxStatement;
-        var request = Tm1Request.Post(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
+        var request = Tm1Request
+            .Post(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["MDX"] = Require(mdx, nameof(mdx)) })
             .Requires(operation.Capability());
         return Session.ExecuteAsync(request, cancellationToken);
     }
@@ -86,7 +87,11 @@ public sealed class CellsetService : Tm1Service
     [Tm1Endpoint("Action MDXView/Execute")]
     public Task<Cellset> ExecuteViewAsync(string cube, ViewScope scope, string view, ODataQuery? query = null, CancellationToken cancellationToken = default)
     {
-        var path = ODataPath.Of("Cubes").Key(Require(cube, nameof(cube))).Nav(scope.Navigation()).Key(Require(view, nameof(view)))
+        var path = ODataPath
+            .Of("Cubes")
+            .Key(Require(cube, nameof(cube)))
+            .Nav(scope.Navigation())
+            .Key(Require(view, nameof(view)))
             .Action(Tm1Operations.NativeViewExecute.Name);
         return Session.ExecuteAsync(Tm1Request.Post<Cellset>(path, new Dictionary<string, object?>()).WithQuery(query), cancellationToken);
     }
@@ -127,8 +132,13 @@ public sealed class CellsetService : Tm1Service
     /// <summary><c>GET Cellsets('id')/Axes(n)/Tuples(t)/Members</c>, streamed: one member per hierarchy
     /// on the axis.</summary>
     [Tm1Endpoint("Navigation CellsetAxisTuple/Members")]
-    public IAsyncEnumerable<Member> TupleMembersAsync(string id, int axis, int tuple, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.StreamAsync(Tm1Request.List<Member>(AxisPath(id, axis).Nav("Tuples").Key(tuple).Nav("Members"), query), cancellationToken);
+    public IAsyncEnumerable<Member> TupleMembersAsync(
+        string id,
+        int axis,
+        int tuple,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    ) => Session.StreamAsync(Tm1Request.List<Member>(AxisPath(id, axis).Nav("Tuples").Key(tuple).Nav("Members"), query), cancellationToken);
 
     /// <summary><c>GET Cellsets('id')/Cells</c>, streamed, in ordinal order. Use <c>$top</c> and
     /// <c>$skip</c>, or <see cref="PartitionAsync"/>, for pages.</summary>
@@ -156,11 +166,20 @@ public sealed class CellsetService : Tm1Service
     /// whole rows, from a row's first cell to a row's last, is a range.</para>
     /// <para><paramref name="query"/> selects what of each cell; across pages, keep it the same.</para></summary>
     [Tm1Endpoint("Function Cellset/GetPartition")]
-    public IAsyncEnumerable<CellsetCell> PartitionAsync(string id, long begin, long end, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<CellsetCell> PartitionAsync(
+        string id,
+        long begin,
+        long end,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.CellsetGetPartition;
         var range = new Dictionary<string, object?> { ["Begin"] = begin, ["End"] = end };
-        return Session.StreamAsync(Tm1Request.List<CellsetCell>(CellsetPath(id).Function(operation.Name, range), query).Requires(operation.Capability()), cancellationToken);
+        return Session.StreamAsync(
+            Tm1Request.List<CellsetCell>(CellsetPath(id).Function(operation.Name, range), query).Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary><c>tm1.Update</c>: writes one value to a cell of the cellset, by ordinal. The action
@@ -168,7 +187,19 @@ public sealed class CellsetService : Tm1Service
     /// of it, so this takes one ordinal; <see cref="UpdateCellsAsync"/> writes many. A null <paramref name="value"/> clears the cell.</summary>
     [Tm1Endpoint("Action Cellset/Update")]
     public Task UpdateAsync(string id, long ordinal, object? value, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(CellsetAction(Tm1Operations.CellsetUpdate, id, new Dictionary<string, object?> { ["BeginOrdinal"] = ordinal, ["EndOrdinal"] = ordinal, ["Value"] = value }), cancellationToken);
+        Session.ExecuteAsync(
+            CellsetAction(
+                Tm1Operations.CellsetUpdate,
+                id,
+                new Dictionary<string, object?>
+                {
+                    ["BeginOrdinal"] = ordinal,
+                    ["EndOrdinal"] = ordinal,
+                    ["Value"] = value,
+                }
+            ),
+            cancellationToken
+        );
 
     /// <summary><c>tm1.UpdateCells</c>: writes many of the cellset's cells, each its own value, by
     /// ordinal. Needs schema 11.0.0. Each of <paramref name="updates"/> is
@@ -178,20 +209,38 @@ public sealed class CellsetService : Tm1Service
     [Tm1Endpoint("Navigation CellsetUpdate/ReferenceCube")]
     [Tm1Endpoint("Navigation CellsetUpdate/ReferenceCell")]
     public Task UpdateCellsAsync(string id, IReadOnlyList<CellsetUpdatePatch> updates, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(CellsetAction(Tm1Operations.CellsetUpdateCells, id, new Dictionary<string, object?> { ["Updates"] = Require(updates, nameof(updates)).ToList() }), cancellationToken);
+        Session.ExecuteAsync(
+            CellsetAction(Tm1Operations.CellsetUpdateCells, id, new Dictionary<string, object?> { ["Updates"] = Require(updates, nameof(updates)).ToList() }),
+            cancellationToken
+        );
 
     /// <summary><c>tm1.SaveViewAs</c>: saves the cellset's query as a public view of its cube, failing if
     /// one has the name. Needs schema 11.0.0.</summary>
     [Tm1Endpoint("Action Cellset/SaveViewAs")]
     public Task<View> SaveViewAsAsync(string id, string name, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(CellsetAction<View>(Tm1Operations.CellsetSaveViewAs, id, new Dictionary<string, object?> { ["Name"] = Require(name, nameof(name)) }), cancellationToken);
+        Session.ExecuteAsync(
+            CellsetAction<View>(Tm1Operations.CellsetSaveViewAs, id, new Dictionary<string, object?> { ["Name"] = Require(name, nameof(name)) }),
+            cancellationToken
+        );
 
     /// <summary><c>tm1.SaveViewAs</c>: saves the cellset's query as a view of its cube, replacing one that
     /// has the name if <paramref name="overwrite"/>, private if <paramref name="makePrivate"/>. Needs
     /// schema 11.0.0.</summary>
     [Tm1Endpoint("Action Cellset/SaveViewAs")]
     public Task<View> SaveViewAsAsync(string id, string name, bool overwrite, bool makePrivate, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(CellsetAction<View>(Tm1Operations.CellsetSaveViewAs, id, new Dictionary<string, object?> { ["Name"] = Require(name, nameof(name)), ["Overwrite"] = overwrite, ["MakePrivate"] = makePrivate }), cancellationToken);
+        Session.ExecuteAsync(
+            CellsetAction<View>(
+                Tm1Operations.CellsetSaveViewAs,
+                id,
+                new Dictionary<string, object?>
+                {
+                    ["Name"] = Require(name, nameof(name)),
+                    ["Overwrite"] = overwrite,
+                    ["MakePrivate"] = makePrivate,
+                }
+            ),
+            cancellationToken
+        );
 
     /// <summary>Runs an MDX query and streams its cells to <paramref name="handler"/>, then deletes the
     /// cellset, however the enumeration ends: completed, failed, cancelled or abandoned.
@@ -215,7 +264,13 @@ public sealed class CellsetService : Tm1Service
     [Tm1Endpoint("ActionImport ExecuteMDX")]
     [Tm1Endpoint("Function Cellset/GetPartition")]
     [Tm1Endpoint("EntitySet Cellsets")]
-    public IAsyncEnumerable<R> StreamAsync<R>(string mdx, ODataQuery cellQuery, int pageSize, Func<Cellset, IAsyncEnumerable<CellsetCell>, IAsyncEnumerable<R>> handler, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<R> StreamAsync<R>(
+        string mdx,
+        ODataQuery cellQuery,
+        int pageSize,
+        Func<Cellset, IAsyncEnumerable<CellsetCell>, IAsyncEnumerable<R>> handler,
+        CancellationToken cancellationToken = default
+    )
     {
         Require(mdx, nameof(mdx));
         Require(cellQuery, nameof(cellQuery));
@@ -227,15 +282,24 @@ public sealed class CellsetService : Tm1Service
         return Stream(mdx, cellQuery, pageSize, handler, cancellationToken);
     }
 
-    private async IAsyncEnumerable<R> Stream<R>(string mdx, ODataQuery query, int pageSize, Func<Cellset, IAsyncEnumerable<CellsetCell>, IAsyncEnumerable<R>> handler, [EnumeratorCancellation] CancellationToken cancellationToken)
+    private async IAsyncEnumerable<R> Stream<R>(
+        string mdx,
+        ODataQuery query,
+        int pageSize,
+        Func<Cellset, IAsyncEnumerable<CellsetCell>, IAsyncEnumerable<R>> handler,
+        [EnumeratorCancellation] CancellationToken cancellationToken
+    )
     {
-        var first = ODataQuery.None()
+        var first = ODataQuery
+            .None()
             .Expand("Axes", a => a.Expand("Hierarchies", h => h.Select("Name")).Expand("Tuples", t => t.Expand("Members", m => m.Select("Name", "UniqueName"))))
             .Expand("Cells", _ => query.Top(pageSize));
         var cellset = await ExecuteAsync(mdx, first, cancellationToken).ConfigureAwait(false);
         try
         {
-            await foreach (var r in handler(cellset, Cells(cellset, query, pageSize)).WithCancellation(cancellationToken).ConfigureAwait(false))
+            await foreach (
+                var r in handler(cellset, Cells(cellset, query, pageSize, cancellationToken)).WithCancellation(cancellationToken).ConfigureAwait(false)
+            )
             {
                 yield return r;
             }
@@ -254,7 +318,12 @@ public sealed class CellsetService : Tm1Service
     /// <c>GetPartition</c> takes a rectangle, so with two axes the pages are whole rows: the first page's
     /// last row, if it came incomplete, is dropped and fetched again with the next. With more axes, rows
     /// aren't rectangles, so pages come from <c>Cells</c> with <c>$skip</c> and <c>$top</c>.</summary>
-    private async IAsyncEnumerable<CellsetCell> Cells(Cellset cellset, ODataQuery query, int pageSize, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    private async IAsyncEnumerable<CellsetCell> Cells(
+        Cellset cellset,
+        ODataQuery query,
+        int pageSize,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default
+    )
     {
         var inline = cellset.Cells ?? [];
         var axes = cellset.Axes ?? [];

@@ -21,7 +21,8 @@ public static class ConformanceLive
     /// <summary>The session's own requests, which differ by when each client logs in and caches capabilities.</summary>
     private static readonly string[] SessionRequests = ["ActiveSession", "$metadata", "Server?$select=ProductVersion"];
 
-    public static IEnumerable<string> Names() => Directory.GetFiles(Scenarios, "*.json").Select(Path.GetFileNameWithoutExtension).Order(StringComparer.Ordinal)!;
+    public static IEnumerable<string> Names() =>
+        Directory.GetFiles(Scenarios, "*.json").Select(Path.GetFileNameWithoutExtension).Order(StringComparer.Ordinal)!;
 
     public static JsonObject Load(string name) => JsonNode.Parse(File.ReadAllText(Path.Combine(Scenarios, name + ".json")))!.AsObject();
 
@@ -32,14 +33,15 @@ public static class ConformanceLive
         return scenario["names"]!.AsArray().Select(n => n!.GetValue<string>()).ToDictionary(n => n, n => $"tm1conf_{run}_{n}");
     }
 
-    public static JsonNode? Substitute(JsonNode? node, IReadOnlyDictionary<string, string> names) => node switch
-    {
-        null => null,
-        JsonArray a => new JsonArray(a.Select(x => Substitute(x, names)).ToArray()),
-        JsonObject o => new JsonObject(o.Select(p => KeyValuePair.Create(Replace(p.Key, names), Substitute(p.Value, names)))),
-        JsonValue v when v.GetValueKind() == System.Text.Json.JsonValueKind.String => JsonValue.Create(Replace(v.GetValue<string>(), names)),
-        _ => node.DeepClone(),
-    };
+    public static JsonNode? Substitute(JsonNode? node, IReadOnlyDictionary<string, string> names) =>
+        node switch
+        {
+            null => null,
+            JsonArray a => new JsonArray(a.Select(x => Substitute(x, names)).ToArray()),
+            JsonObject o => new JsonObject(o.Select(p => KeyValuePair.Create(Replace(p.Key, names), Substitute(p.Value, names)))),
+            JsonValue v when v.GetValueKind() == System.Text.Json.JsonValueKind.String => JsonValue.Create(Replace(v.GetValue<string>(), names)),
+            _ => node.DeepClone(),
+        };
 
     private static string Replace(string s, IReadOnlyDictionary<string, string> names) =>
         names.Aggregate(s, (acc, n) => acc.Replace("${" + n.Key + "}", n.Value, StringComparison.Ordinal));
@@ -66,12 +68,14 @@ public static class ConformanceLive
             var target = url.StartsWith(prefix, StringComparison.Ordinal) ? url[prefix.Length..] : url;
             if (!SessionRequests.Any(s => target.StartsWith(s, StringComparison.Ordinal)))
             {
-                Exchanges.Add(new JsonObject
-                {
-                    ["step"] = Step,
-                    ["request"] = ConformanceCodec.Request(request.Method.Method, target, headers, body),
-                    ["status"] = (int)response.StatusCode,
-                });
+                Exchanges.Add(
+                    new JsonObject
+                    {
+                        ["step"] = Step,
+                        ["request"] = ConformanceCodec.Request(request.Method.Method, target, headers, body),
+                        ["status"] = (int)response.StatusCode,
+                    }
+                );
             }
             return response;
         }
@@ -81,7 +85,12 @@ public static class ConformanceLive
             var dir = Path.Combine(TrafficDirectory, "dotnet");
             Directory.CreateDirectory(dir);
             var file = Path.Combine(dir, scenario + ".jsonl");
-            var head = new JsonObject { ["scenario"] = scenario, ["language"] = "dotnet", ["names"] = new JsonObject(names.Select(n => KeyValuePair.Create(n.Key, (JsonNode?)n.Value))) };
+            var head = new JsonObject
+            {
+                ["scenario"] = scenario,
+                ["language"] = "dotnet",
+                ["names"] = new JsonObject(names.Select(n => KeyValuePair.Create(n.Key, (JsonNode?)n.Value))),
+            };
             File.WriteAllLines(file, new[] { head }.Concat(Exchanges).Select(x => x.ToJsonString()));
             return file;
         }
@@ -105,7 +114,8 @@ public static class ConformanceLive
     {
         if (expect["error"] is JsonObject error)
         {
-            return outcome["error"] is JsonObject got && error.All(p => JsonNode.DeepEquals(p.Value, got[p.Key])) ? null
+            return outcome["error"] is JsonObject got && error.All(p => JsonNode.DeepEquals(p.Value, got[p.Key]))
+                ? null
                 : $"expected the error {error.ToJsonString()}, got {outcome.ToJsonString()}";
         }
         if (outcome["error"] is JsonObject failed)
@@ -145,8 +155,12 @@ public static class ConformanceLive
     {
         var service = typeof(Tm1Client).GetProperty(ConformanceCodec.Pascal(step["service"]!.GetValue<string>()))!.GetValue(client)!;
         var parameters = step["params"]!.AsArray().Select(p => p!.GetValue<string>()).ToList();
-        var (method, values) = ConformanceCodec.Bind(service.GetType(), ConformanceCodec.Pascal(step["method"]!.GetValue<string>()) + "Async",
-            parameters, Substitute(step["args"], names)!.AsArray());
+        var (method, values) = ConformanceCodec.Bind(
+            service.GetType(),
+            ConformanceCodec.Pascal(step["method"]!.GetValue<string>()) + "Async",
+            parameters,
+            Substitute(step["args"], names)!.AsArray()
+        );
         try
         {
             return new JsonObject { ["result"] = await ConformanceCodec.Call(service, method, values) };

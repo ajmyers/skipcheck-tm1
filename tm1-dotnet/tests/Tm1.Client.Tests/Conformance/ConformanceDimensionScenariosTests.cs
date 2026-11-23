@@ -21,13 +21,14 @@ public class ConformanceDimensionScenariosTests
         if (expect["error"] is JsonObject error)
         {
             var kind = error["kind"]?.GetValue<string>() ?? "";
-            var status = error["status"]?.GetValue<int>() ?? kind switch
-            {
-                "NOT_FOUND" => 404,
-                "CONFLICT" or "ALREADY_EXISTS" => 409,
-                "PRECONDITION_FAILED" => 412,
-                _ => 400,
-            };
+            var status = error["status"]?.GetValue<int>()
+                ?? kind switch
+                {
+                    "NOT_FOUND" => 404,
+                    "CONFLICT" or "ALREADY_EXISTS" => 409,
+                    "PRECONDITION_FAILED" => 412,
+                    _ => 400,
+                };
             var message = kind switch
             {
                 "NOT_FOUND" => "'x' can not be found in collection",
@@ -78,14 +79,19 @@ public class ConformanceDimensionScenariosTests
                 JsonNode? expect = null;
                 if (step.StartsWith("steps[", System.StringComparison.Ordinal))
                 {
-                    expect = ConformanceLive.Substitute(scenario["steps"]![int.Parse(step[6..^1], System.Globalization.CultureInfo.InvariantCulture)]!["expect"], names);
+                    expect = ConformanceLive.Substitute(
+                        scenario["steps"]![int.Parse(step[6..^1], System.Globalization.CultureInfo.InvariantCulture)]!["expect"],
+                        names
+                    );
                 }
                 return Answer(expect);
             },
         };
         traffic = new ConformanceLive.Traffic(fake, FakeTm1.Base);
         Assert.Empty(await ConformanceLive.Run(fake.Client(b => b.HttpHandler(traffic)), traffic, scenario, names));
-        var labels = Enumerable.Range(0, scenario["steps"]!.AsArray().Count).Select(i => $"steps[{i}]")
+        var labels = Enumerable
+            .Range(0, scenario["steps"]!.AsArray().Count)
+            .Select(i => $"steps[{i}]")
             .Concat(Enumerable.Range(0, scenario["finally"]!.AsArray().Count).Select(i => $"finally[{i}]"));
         Assert.Equal(labels, traffic.Exchanges.Select(e => e["step"]!.GetValue<string>()));
     }

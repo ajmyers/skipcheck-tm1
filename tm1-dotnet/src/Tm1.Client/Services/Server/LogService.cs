@@ -40,9 +40,7 @@ public sealed class LogService : Tm1Service
     private static readonly ODataPath ErrorLogFiles = ODataPath.Of("ErrorLogFiles");
 
     public LogService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET MessageLogEntries</c>, streamed, oldest first unless ordered otherwise.</summary>
     [Tm1Endpoint("EntitySet MessageLogEntries")]
@@ -66,7 +64,12 @@ public sealed class LogService : Tm1Service
 
     /// <summary><c>TransactionLog(Reverse=…,IgnoreStatusMessages=…)</c>: the transaction log, streamed.</summary>
     [Tm1Endpoint("FunctionImport TransactionLog")]
-    public IAsyncEnumerable<TransactionLogEntry> TransactionLogAsync(bool reverse, bool ignoreStatusMessages, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<TransactionLogEntry> TransactionLogAsync(
+        bool reverse,
+        bool ignoreStatusMessages,
+        ODataQuery? query = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var operation = Tm1Operations.TransactionLog;
         var parameters = new Dictionary<string, object?> { ["Reverse"] = reverse, ["IgnoreStatusMessages"] = ignoreStatusMessages };

@@ -43,12 +43,18 @@ public partial class JavaParityTests
         ["PlanningAnalyticsEnvironment.Builder"] = ("EnvironmentBuilder", "the Builder() method has the name"),
     };
 
-    public static IEnumerable<object[]> Types() => Directory.GetFiles(Repo.JavaSources, "*.java")
-        .Where(f => Regex.IsMatch(File.ReadAllText(f), $@"public\s+(final\s+|sealed\s+)*(class|enum|record|interface)\s+{Path.GetFileNameWithoutExtension(f)}\b"))
-        .Select(f => Path.GetFileNameWithoutExtension(f)).Order().Select(n => new object[] { n });
+    public static IEnumerable<object[]> Types() =>
+        Directory
+            .GetFiles(Repo.JavaSources, "*.java")
+            .Where(f =>
+                Regex.IsMatch(File.ReadAllText(f), $@"public\s+(final\s+|sealed\s+)*(class|enum|record|interface)\s+{Path.GetFileNameWithoutExtension(f)}\b")
+            )
+            .Select(f => Path.GetFileNameWithoutExtension(f))
+            .Order()
+            .Select(n => new object[] { n });
 
-    public static IEnumerable<object[]> Annotations() => Directory.GetFiles(Repo.JavaSources, "Requires*.java")
-        .Select(f => Path.GetFileNameWithoutExtension(f)).Order().Select(n => new object[] { n });
+    public static IEnumerable<object[]> Annotations() =>
+        Directory.GetFiles(Repo.JavaSources, "Requires*.java").Select(f => Path.GetFileNameWithoutExtension(f)).Order().Select(n => new object[] { n });
 
     [Theory]
     [MemberData(nameof(Types))]
@@ -100,7 +106,9 @@ public partial class JavaParityTests
         Assert.Contains(members, m => m is { Name: "getRestUrl", Params.Count: 0 });
         Assert.Contains(members, m => m is { Constructor: true } && m.Params.SequenceEqual(["image", "source"]));
         Assert.DoesNotContain(members, m => m.Name is "configure" or "mountSource" or "readVersion");
-        Assert.Contains(Members(File.ReadAllText(Path.Combine(Repo.JavaSources, "Tm1Source.java")), 1, true), m => m is { Name: "discover", Params: ["lookup"] });
+        Assert.Contains(Members(File.ReadAllText(Path.Combine(Repo.JavaSources, "Tm1Source.java")), 1, true), m =>
+            m is { Name: "discover", Params: ["lookup"] }
+        );
     }
 
     [Fact]
@@ -109,7 +117,17 @@ public partial class JavaParityTests
         Assert.Equal("LDAP", CognosContainer.Namespace.Ldap.Id());
         Assert.Equal("OIDC", CognosContainer.Namespace.Oidc.Id());
         Assert.NotNull(typeof(CognosContainer.User).GetProperty("Groups"));
-        foreach (var (type, property) in new[] { (typeof(Tm1Source.PrivateImage), "Image"), (typeof(Tm1Source.InstallDir), "Dir"), (typeof(Tm1Source.Bundle), "File"), (typeof(Tm1Source.BundleUrl), "Sha256"), (typeof(CognosSource.Zip), "File"), (typeof(PawSource), "Zip") })
+        foreach (
+            var (type, property) in new[]
+            {
+                (typeof(Tm1Source.PrivateImage), "Image"),
+                (typeof(Tm1Source.InstallDir), "Dir"),
+                (typeof(Tm1Source.Bundle), "File"),
+                (typeof(Tm1Source.BundleUrl), "Sha256"),
+                (typeof(CognosSource.Zip), "File"),
+                (typeof(PawSource), "Zip"),
+            }
+        )
         {
             Assert.NotNull(type.GetProperty(property));
         }
@@ -160,9 +178,10 @@ public partial class JavaParityTests
                 continue;
             }
             var getter = Regex.Match(java, "^(get|is)([A-Z].*)$");
-            var dotnet = getter.Success && parameters.Count == 0
-                ? (getter.Groups[1].Value == "is" ? "Is" : "") + getter.Groups[2].Value
-                : Capitalize(java) + (Io.Contains(java) ? "Async" : "");
+            var dotnet =
+                getter.Success && parameters.Count == 0
+                    ? (getter.Groups[1].Value == "is" ? "Is" : "") + getter.Groups[2].Value
+                    : Capitalize(java) + (Io.Contains(java) ? "Async" : "");
             var found = type.GetMember(dotnet, BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
             if (found.Length == 0)
             {
@@ -180,7 +199,10 @@ public partial class JavaParityTests
             }
             if (!methods.Any(m => Subsequence(parameters, Names(m))))
             {
-                problems.Add($"{dotnet}: no overload takes ({string.Join(", ", parameters)}); has " + string.Join(" | ", methods.Select(m => "(" + string.Join(", ", Names(m)) + ")")));
+                problems.Add(
+                    $"{dotnet}: no overload takes ({string.Join(", ", parameters)}); has "
+                        + string.Join(" | ", methods.Select(m => "(" + string.Join(", ", Names(m)) + ")"))
+                );
             }
         }
     }
@@ -206,7 +228,12 @@ public partial class JavaParityTests
             {
                 continue; // a nested type's declaration, checked as a nested type
             }
-            if (!(isPublic || constructor) || ret.Contains("private", StringComparison.Ordinal) || ret.Contains("protected", StringComparison.Ordinal) || name is "toString" or "equals" or "hashCode")
+            if (
+                !(isPublic || constructor)
+                || ret.Contains("private", StringComparison.Ordinal)
+                || ret.Contains("protected", StringComparison.Ordinal)
+                || name is "toString" or "equals" or "hashCode"
+            )
             {
                 continue;
             }
@@ -253,7 +280,8 @@ public partial class JavaParityTests
 
     private static string Capitalize(string s) => char.ToUpperInvariant(s[0]) + s[1..];
 
-    private static string Pascal(string constant) => string.Concat(constant.Split('_', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0] + w[1..].ToLowerInvariant()));
+    private static string Pascal(string constant) =>
+        string.Concat(constant.Split('_', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0] + w[1..].ToLowerInvariant()));
 
     private static List<string> Split(string parameters)
     {
@@ -262,7 +290,10 @@ public partial class JavaParityTests
         var current = "";
         foreach (var c in parameters)
         {
-            depth += c == '<' ? 1 : c == '>' ? -1 : 0;
+            depth +=
+                c == '<' ? 1
+                : c == '>' ? -1
+                : 0;
             if (c == ',' && depth == 0)
             {
                 result.Add(current);
@@ -280,6 +311,9 @@ public partial class JavaParityTests
         return [.. result.Select(p => Regex.Replace(p, @"\s+", " ").Trim())];
     }
 
-    [GeneratedRegex(@"^(?<indent>\t+)(?<mods>(?:(?:public|static|synchronized|final|default)\s+)*)(?:<[^>]+>\s+)?(?<ret>[\w.<>\[\]?, @]+?)\s+(?<name>\w+)\s*\((?<params>[^)]*)\)\s*(?:throws\s+[\w., ]+)?[{;]", RegexOptions.Multiline)]
+    [GeneratedRegex(
+        @"^(?<indent>\t+)(?<mods>(?:(?:public|static|synchronized|final|default)\s+)*)(?:<[^>]+>\s+)?(?<ret>[\w.<>\[\]?, @]+?)\s+(?<name>\w+)\s*\((?<params>[^)]*)\)\s*(?:throws\s+[\w., ]+)?[{;]",
+        RegexOptions.Multiline
+    )]
     private static partial Regex MethodPattern();
 }

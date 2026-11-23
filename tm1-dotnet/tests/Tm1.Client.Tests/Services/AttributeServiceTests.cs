@@ -13,16 +13,16 @@ public class AttributeServiceTests
     private readonly FakeTm1 _tm1 = new();
 
     public static IEnumerable<object[]> Sets() =>
-    [
-        [AttributeSet.Dimensions(), "DimensionAttributes"],
-        [AttributeSet.Hierarchies("Region"), "Dimensions('Region')/HierarchyAttributes"],
-        [AttributeSet.Elements("Region", "Leaves"), "Dimensions('Region')/Hierarchies('Leaves')/ElementAttributes"],
-        [AttributeSet.Subsets("Region", "Region"), "Dimensions('Region')/Hierarchies('Region')/SubsetAttributes"],
-        [AttributeSet.Cubes(), "CubeAttributes"],
-        [AttributeSet.Views("Sales"), "Cubes('Sales')/ViewAttributes"],
-        [AttributeSet.Processes(), "ProcessAttributes"],
-        [AttributeSet.Chores(), "ChoreAttributes"],
-    ];
+        [
+            [AttributeSet.Dimensions(), "DimensionAttributes"],
+            [AttributeSet.Hierarchies("Region"), "Dimensions('Region')/HierarchyAttributes"],
+            [AttributeSet.Elements("Region", "Leaves"), "Dimensions('Region')/Hierarchies('Leaves')/ElementAttributes"],
+            [AttributeSet.Subsets("Region", "Region"), "Dimensions('Region')/Hierarchies('Region')/SubsetAttributes"],
+            [AttributeSet.Cubes(), "CubeAttributes"],
+            [AttributeSet.Views("Sales"), "Cubes('Sales')/ViewAttributes"],
+            [AttributeSet.Processes(), "ProcessAttributes"],
+            [AttributeSet.Chores(), "ChoreAttributes"],
+        ];
 
     [Theory]
     [MemberData(nameof(Sets))]

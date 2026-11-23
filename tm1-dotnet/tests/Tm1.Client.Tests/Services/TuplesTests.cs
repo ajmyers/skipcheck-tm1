@@ -12,7 +12,10 @@ public class TuplesTests
     public void PlacesEachElementInItsDimensionsOwnHierarchyInOrder()
     {
         var tuple = Tuples.Of(new Dictionary<string, string> { ["Region"] = "North", ["Month"] = "Jan's" });
-        Assert.Equal(["Dimensions('Region')/Hierarchies('Region')/Elements('North')", "Dimensions('Month')/Hierarchies('Month')/Elements('Jan''s')"], tuple.Select(p => p.ToString()));
+        Assert.Equal(
+            ["Dimensions('Region')/Hierarchies('Region')/Elements('North')", "Dimensions('Month')/Hierarchies('Month')/Elements('Jan''s')"],
+            tuple.Select(p => p.ToString())
+        );
     }
 
     [Fact]

@@ -48,9 +48,15 @@ public class SubsetServiceTests
         var tm1 = _tm1.Client();
         var set = SubsetPatch.Builder().Elements([ElementPatch.Builder().Name("West").Build()]).Build();
         var bound = SubsetPatch.Builder().BindElements(ODataPath.Of("x")).Build();
-        var e = Assert.Throws<ArgumentException>(() => { _ = tm1.Subsets.UpdateAsync("Region", "Region", SubsetScope.Public, "s", set); });
+        var e = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = tm1.Subsets.UpdateAsync("Region", "Region", SubsetScope.Public, "s", set);
+        });
         Assert.Contains("AddElementsAsync", e.Message);
-        Assert.Throws<ArgumentException>(() => { _ = tm1.Subsets.UpdateAsync("Region", "Region", SubsetScope.Public, "s", bound, "W/\"1\""); });
+        Assert.Throws<ArgumentException>(() =>
+        {
+            _ = tm1.Subsets.UpdateAsync("Region", "Region", SubsetScope.Public, "s", bound, "W/\"1\"");
+        });
         Assert.Empty(_tm1.Requests);
     }
 

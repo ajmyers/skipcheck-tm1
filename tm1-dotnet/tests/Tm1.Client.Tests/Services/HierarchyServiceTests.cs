@@ -45,9 +45,15 @@ public class HierarchyServiceTests
         var withEdges = HierarchyPatch.Builder().Edges([]).Build();
         foreach (var patch in new[] { withElements, withBinding, withEdges })
         {
-            var e = Assert.Throws<ArgumentException>(() => { _ = tm1.Hierarchies.UpdateAsync("Region", "Region", patch); });
+            var e = Assert.Throws<ArgumentException>(() =>
+            {
+                _ = tm1.Hierarchies.UpdateAsync("Region", "Region", patch);
+            });
             Assert.Contains("ReplaceStructureAsync", e.Message);
-            Assert.Throws<ArgumentException>(() => { _ = tm1.Hierarchies.UpdateAsync("Region", "Region", patch, "W/\"1\""); });
+            Assert.Throws<ArgumentException>(() =>
+            {
+                _ = tm1.Hierarchies.UpdateAsync("Region", "Region", patch, "W/\"1\"");
+            });
         }
         Assert.Empty(_tm1.Requests);
     }
@@ -56,9 +62,13 @@ public class HierarchyServiceTests
     public async Task ReplacesTheStructure()
     {
         _tm1.Respond = _ => null;
-        await _tm1.Client().Hierarchies.ReplaceStructureAsync("Region", "Region",
-            [ElementPatch.Builder().Name("All").Type(ElementType.Consolidated).Build()],
-            [EdgePatch.Builder().ParentName("All").ComponentName("North").Weight(1.0).Build()]);
+        await _tm1.Client()
+            .Hierarchies.ReplaceStructureAsync(
+                "Region",
+                "Region",
+                [ElementPatch.Builder().Name("All").Type(ElementType.Consolidated).Build()],
+                [EdgePatch.Builder().ParentName("All").ComponentName("North").Weight(1.0).Build()]
+            );
         Assert.Equal(("PATCH", "Dimensions('Region')/Hierarchies('Region')"), (_tm1.Last.Method, _tm1.Last.Target));
         var body = _tm1.Last.Json;
         Assert.Equal("All", body.GetProperty("Elements")[0].GetProperty("Name").GetString());
@@ -95,7 +105,10 @@ public class HierarchyServiceTests
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "Copy" };
         var tm1 = _tm1.Client();
         Assert.Equal("Copy", (await tm1.Hierarchies.SaveAsAsync("Region", "Region", "Copy")).Name);
-        Assert.Equal(("POST", "Dimensions('Region')/Hierarchies('Region')/tm1.SaveAs", """{"Name":"Copy"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
+        Assert.Equal(
+            ("POST", "Dimensions('Region')/Hierarchies('Region')/tm1.SaveAs", """{"Name":"Copy"}"""),
+            (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text)
+        );
         await tm1.Hierarchies.SaveAsAsync("Region", "Region", "Copy", true, true);
         Assert.Equal("""{"Name":"Copy","Overwrite":true,"KeepExistingAttributes":true}""", _tm1.Last.Text);
     }

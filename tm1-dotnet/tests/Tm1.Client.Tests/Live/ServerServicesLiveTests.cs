@@ -29,8 +29,9 @@ public class ServerServicesLiveTests
 #pragma warning restore CS0618
         await tm1.Server.UpdateStaticConfigurationAsync(ServerSettingsPatch.Builder().ServerName(fixedSettings.ServerName).Build());
         // The active configuration is read only
-        await Assert.ThrowsAsync<Tm1BadRequestException>(() => tm1.Session.ExecuteAsync(
-            Tm1Request.Patch(ODataPath.Of("ActiveConfiguration"), ServerSettingsPatch.Builder().ServerName(active.ServerName).Build())));
+        await Assert.ThrowsAsync<Tm1BadRequestException>(() =>
+            tm1.Session.ExecuteAsync(Tm1Request.Patch(ODataPath.Of("ActiveConfiguration"), ServerSettingsPatch.Builder().ServerName(active.ServerName).Build()))
+        );
     }
 
     [Tm1Fact]

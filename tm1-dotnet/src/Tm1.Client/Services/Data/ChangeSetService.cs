@@ -30,16 +30,16 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class ChangeSetService : Tm1Service
 {
     public ChangeSetService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>BeginChangeSet</c>: starts a change set, and returns its ID, for
     /// <see cref="Tm1Session.WithChangeSet"/>. Needs schema 10.2.2.6.</summary>
     [Tm1Endpoint("ActionImport BeginChangeSet")]
     public async Task<string> BeginAsync(CancellationToken cancellationToken = default)
     {
-        var result = await Session.ExecuteAsync(Request(Tm1Operations.BeginChangeSet, new Dictionary<string, object?>()), cancellationToken).ConfigureAwait(false);
+        var result = await Session
+            .ExecuteAsync(Request(Tm1Operations.BeginChangeSet, new Dictionary<string, object?>()), cancellationToken)
+            .ConfigureAwait(false);
         // A primitive result comes wrapped, as {"value": "3"}
         return Value(result).ToString();
     }
@@ -49,9 +49,13 @@ public sealed class ChangeSetService : Tm1Service
     [Tm1Endpoint("ActionImport EndChangeSet")]
     public async Task<long> EndAsync(string id, CancellationToken cancellationToken = default)
     {
-        var result = await Session.ExecuteAsync(Request(Tm1Operations.EndChangeSet, new Dictionary<string, object?> { ["ChangeSetID"] = Require(id, nameof(id)) }), cancellationToken).ConfigureAwait(false);
+        var result = await Session
+            .ExecuteAsync(Request(Tm1Operations.EndChangeSet, new Dictionary<string, object?> { ["ChangeSetID"] = Require(id, nameof(id)) }), cancellationToken)
+            .ConfigureAwait(false);
         var value = Value(result);
-        return value.ValueKind == JsonValueKind.Number ? value.GetInt64() : long.TryParse(value.ToString(), out var n) ? n : 0;
+        return value.ValueKind == JsonValueKind.Number ? value.GetInt64()
+            : long.TryParse(value.ToString(), out var n) ? n
+            : 0;
     }
 
     /// <summary><c>UndoChangeSet</c>: reverts every write recorded in a change set. Needs schema 10.2.2.6.</summary>
@@ -59,7 +63,12 @@ public sealed class ChangeSetService : Tm1Service
     public Task UndoAsync(string id, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.UndoChangeSet;
-        return Session.ExecuteAsync(Tm1Request.Post(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["ChangeSetID"] = Require(id, nameof(id)) }).Requires(operation.Capability()), cancellationToken);
+        return Session.ExecuteAsync(
+            Tm1Request
+                .Post(ODataPath.Of(operation.ImportName!), new Dictionary<string, object?> { ["ChangeSetID"] = Require(id, nameof(id)) })
+                .Requires(operation.Capability()),
+            cancellationToken
+        );
     }
 
     /// <summary>Runs <paramref name="work"/> in a new change set: begins it, gives the work a view of the
@@ -87,18 +96,24 @@ public sealed class ChangeSetService : Tm1Service
     public Task WithinAsync(Func<Tm1Session, Task> work, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(work);
-        return WithinAsync<bool>(async s =>
-        {
-            await work(s).ConfigureAwait(false);
-            return true;
-        }, cancellationToken);
+        return WithinAsync<bool>(
+            async s =>
+            {
+                await work(s).ConfigureAwait(false);
+                return true;
+            },
+            cancellationToken
+        );
     }
 
     /// <summary>Java's <c>within</c> for work that streams (a <c>Flux</c>): the change set ends when the
     /// enumeration ends, however it ends.</summary>
     [Tm1Endpoint("ActionImport BeginChangeSet")]
     [Tm1Endpoint("ActionImport EndChangeSet")]
-    public async IAsyncEnumerable<R> WithinAsync<R>(Func<Tm1Session, IAsyncEnumerable<R>> work, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<R> WithinAsync<R>(
+        Func<Tm1Session, IAsyncEnumerable<R>> work,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(work);
         var id = await BeginAsync(cancellationToken).ConfigureAwait(false);
@@ -115,8 +130,7 @@ public sealed class ChangeSetService : Tm1Service
         }
     }
 
-    private static JsonElement Value(JsonElement result) =>
-        result.ValueKind == JsonValueKind.Object && result.TryGetProperty("value", out var v) ? v : result;
+    private static JsonElement Value(JsonElement result) => result.ValueKind == JsonValueKind.Object && result.TryGetProperty("value", out var v) ? v : result;
 
     private static Tm1Request<JsonElement> Request(Tm1Operation operation, Dictionary<string, object?> body) =>
         Tm1Request.Post<JsonElement>(ODataPath.Of(operation.ImportName!), body).Requires(operation.Capability());

@@ -28,9 +28,7 @@ public sealed class Tm1EnumMemberAttribute(string name) : Attribute
 
 /// <summary>The member a value this client doesn't know reads as; it's never sent.</summary>
 [AttributeUsage(AttributeTargets.Field)]
-public sealed class Tm1EnumFallbackAttribute : Attribute
-{
-}
+public sealed class Tm1EnumFallbackAttribute : Attribute { }
 
 /// <summary>The JSON options every request and answer uses: TM1's enum names with a fallback for
 /// new values, ISO 8601 durations (TM1's <c>P1DT00H00M00S</c> too, and bare seconds), hierarchies
@@ -71,34 +69,41 @@ public static class Tm1EnumConverter
 
     /// <summary>What a generated enum is called in TM1, or null for another enum.</summary>
     public static Description? Describe(Type type) => Cache.GetOrAdd(type, t =>
-    {
-        if (!t.IsEnum || t.GetCustomAttribute<Tm1EnumAttribute>() is not { } e)
         {
-            return null;
-        }
-        var byName = new Dictionary<string, object>();
-        var byValue = new Dictionary<object, string>();
-        object? fallback = null;
-        foreach (var field in t.GetFields(BindingFlags.Public | BindingFlags.Static))
-        {
-            var value = field.GetValue(null)!;
-            if (field.GetCustomAttribute<Tm1EnumMemberAttribute>() is { } m)
+            if (!t.IsEnum || t.GetCustomAttribute<Tm1EnumAttribute>() is not { } e)
             {
-                byName[m.Name] = value;
-                byValue[value] = m.Name;
+                return null;
             }
-            else if (field.GetCustomAttribute<Tm1EnumFallbackAttribute>() is not null)
+            var byName = new Dictionary<string, object>();
+            var byValue = new Dictionary<object, string>();
+            object? fallback = null;
+            foreach (var field in t.GetFields(BindingFlags.Public | BindingFlags.Static))
             {
-                fallback = value;
+                var value = field.GetValue(null)!;
+                if (field.GetCustomAttribute<Tm1EnumMemberAttribute>() is { } m)
+                {
+                    byName[m.Name] = value;
+                    byValue[value] = m.Name;
+                }
+                else if (field.GetCustomAttribute<Tm1EnumFallbackAttribute>() is not null)
+                {
+                    fallback = value;
+                }
             }
-        }
-        return new Description(e.QualifiedName, byName, byValue, fallback!);
-    });
+            return new Description(e.QualifiedName, byName, byValue, fallback!);
+        });
 
-    public sealed record Description(string QualifiedName, IReadOnlyDictionary<string, object> ByName, IReadOnlyDictionary<object, string> ByValue, object Fallback)
+    public sealed record Description(
+        string QualifiedName,
+        IReadOnlyDictionary<string, object> ByName,
+        IReadOnlyDictionary<object, string> ByValue,
+        object Fallback
+    )
     {
-        public string Name(Enum value) => ByValue.TryGetValue(value, out var n) ? n
-            : throw new InvalidOperationException($"{value.GetType().Name}.{value} stands for a value this client doesn't know, and isn't sent");
+        public string Name(Enum value) =>
+            ByValue.TryGetValue(value, out var n)
+                ? n
+                : throw new InvalidOperationException($"{value.GetType().Name}.{value} stands for a value this client doesn't know, and isn't sent");
 
         public string Literal(Enum value) => ODataLiterals.EnumMember(QualifiedName, Name(value));
     }
@@ -130,11 +135,12 @@ internal sealed class Tm1EnumConverterFactory : JsonConverterFactory
 /// accepts the standard form.</summary>
 public sealed class Iso8601TimeSpanConverter : JsonConverter<TimeSpan>
 {
-    public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.TokenType switch
-    {
-        JsonTokenType.Number => TimeSpan.FromSeconds(reader.GetDouble()),
-        _ => XmlConvert.ToTimeSpan(reader.GetString()!),
-    };
+    public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType switch
+        {
+            JsonTokenType.Number => TimeSpan.FromSeconds(reader.GetDouble()),
+            _ => XmlConvert.ToTimeSpan(reader.GetString()!),
+        };
 
     public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options) => writer.WriteStringValue(Format(value));
 
@@ -190,18 +196,20 @@ public sealed class Iso8601DateTimeOffsetConverter : JsonConverter<DateTimeOffse
     public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
         reader.GetDateTimeOffset().ToUniversalTime();
 
-    public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) =>
-        writer.WriteStringValue(Format(value));
+    public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) => writer.WriteStringValue(Format(value));
 
-    internal static string Format(DateTimeOffset value) => value.ToString(
-        value.Offset == TimeSpan.Zero ? "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'" : "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture);
+    internal static string Format(DateTimeOffset value) =>
+        value.ToString(value.Offset == TimeSpan.Zero ? "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'" : "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture);
 }
 
 /// <summary>A date-time TM1 sometimes sends something else in (<c>0000-00-00T00:00Z</c>): read as null.</summary>
 public sealed class LenientDateTimeOffsetConverter : JsonConverter<DateTimeOffset?>
 {
     public override DateTimeOffset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-        reader.TokenType == JsonTokenType.String && DateTimeOffset.TryParse(reader.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d) ? d.ToUniversalTime() : null;
+        reader.TokenType == JsonTokenType.String
+        && DateTimeOffset.TryParse(reader.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d)
+            ? d.ToUniversalTime()
+            : null;
 
     public override void Write(Utf8JsonWriter writer, DateTimeOffset? value, JsonSerializerOptions options)
     {
@@ -249,15 +257,15 @@ internal sealed class Tm1PolymorphicConverterFactory : JsonConverterFactory
 
     /// <summary>The same options without this converter, to read the chosen type itself.</summary>
     private static JsonSerializerOptions Without(JsonSerializerOptions options) => Plain.GetOrAdd(options, o =>
-    {
-        var copy = new JsonSerializerOptions(o);
-        foreach (var c in copy.Converters.OfType<Tm1PolymorphicConverterFactory>().ToList())
         {
-            copy.Converters.Remove(c);
-        }
-        copy.MakeReadOnly(populateMissingResolver: true);
-        return copy;
-    });
+            var copy = new JsonSerializerOptions(o);
+            foreach (var c in copy.Converters.OfType<Tm1PolymorphicConverterFactory>().ToList())
+            {
+                copy.Converters.Remove(c);
+            }
+            copy.MakeReadOnly(populateMissingResolver: true);
+            return copy;
+        });
 
     private sealed class Converter<T> : JsonConverter<T>
     {
@@ -267,10 +275,12 @@ internal sealed class Tm1PolymorphicConverterFactory : JsonConverterFactory
         {
             using var doc = JsonDocument.ParseValue(ref reader);
             var type = typeof(T);
-            if (doc.RootElement.ValueKind == JsonValueKind.Object
+            if (
+                doc.RootElement.ValueKind == JsonValueKind.Object
                 && doc.RootElement.TryGetProperty(ODataJson.Type, out var t)
                 && t.GetString() is { } name
-                && _types.TryGetValue(name.TrimStart('#'), out var chosen))
+                && _types.TryGetValue(name.TrimStart('#'), out var chosen)
+            )
             {
                 type = chosen;
             }

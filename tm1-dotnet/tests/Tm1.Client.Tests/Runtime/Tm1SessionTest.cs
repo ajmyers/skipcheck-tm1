@@ -58,8 +58,11 @@ public class Tm1SessionTest
     [Fact]
     public async Task ReportsRefusedCredentialsAndCanTryAgainOnTheNextRequest()
     {
-        _tm1.OnEach(ScriptedTm1.Login, _ => ScriptedTm1.Status(401, "TM1SessionId=anon; Path=/api/"),
-            _ => ScriptedTm1.Json(200, "{\"ID\":2}", "TM1SessionId=ok; Path=/api/"));
+        _tm1.OnEach(
+            ScriptedTm1.Login,
+            _ => ScriptedTm1.Status(401, "TM1SessionId=anon; Path=/api/"),
+            _ => ScriptedTm1.Json(200, "{\"ID\":2}", "TM1SessionId=ok; Path=/api/")
+        );
         // With the refused-login back-off off; Tm1SessionImpersonationTest covers the back-off
         var session = _tm1.Session(b => b.Timeouts(Tm1Timeouts.Builder().RefusedLogin(TimeSpan.Zero).Build()));
         var e = await Assert.ThrowsAsync<Tm1AuthenticationException>(() => session.ExecuteAsync(Server));
@@ -72,8 +75,12 @@ public class Tm1SessionTest
     [Fact]
     public async Task MapsErrorResponsesThroughTheClassifier()
     {
-        _tm1.On("GET Cubes('Nope')", _ => ScriptedTm1.Json(404, "{\"error\":{\"code\":\"278\",\"message\":\"'Nope' can not be found in collection of type 'Cube'.\"}}"));
-        var n = await Assert.ThrowsAsync<Tm1NotFoundException>(() => _tm1.Session().ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Cubes").Key("Nope"))));
+        _tm1.On("GET Cubes('Nope')", _ =>
+            ScriptedTm1.Json(404, "{\"error\":{\"code\":\"278\",\"message\":\"'Nope' can not be found in collection of type 'Cube'.\"}}")
+        );
+        var n = await Assert.ThrowsAsync<Tm1NotFoundException>(() =>
+            _tm1.Session().ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Cubes").Key("Nope")))
+        );
         Assert.Equal(404, n.Status);
         Assert.Equal("278", n.Error!.Code);
         Assert.Equal(ScriptedTm1.Root + "Cubes('Nope')", n.Url);
@@ -102,11 +109,17 @@ public class Tm1SessionTest
     [Fact]
     public async Task StreamsCollectionsAcrossNextLinks()
     {
-        _tm1.On("GET Dimensions?$select=Name", _ => ScriptedTm1.Json(200,
-            "{\"@odata.context\":\"$metadata#Dimensions(Name)\",\"value\":[{\"Name\":\"a\"},{\"Name\":\"b\"}],\"@odata.nextLink\":\"Dimensions?$skiptoken=2\"}"));
+        _tm1.On("GET Dimensions?$select=Name", _ =>
+            ScriptedTm1.Json(
+                200,
+                "{\"@odata.context\":\"$metadata#Dimensions(Name)\",\"value\":[{\"Name\":\"a\"},{\"Name\":\"b\"}],\"@odata.nextLink\":\"Dimensions?$skiptoken=2\"}"
+            )
+        );
         _tm1.On("GET Dimensions?$skiptoken=2", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"c\"}]}"));
-        var names = await _tm1.Session().StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Dimensions"), ODataQuery.None().Select("Name")))
-            .Select(d => d.GetProperty("Name").GetString()).ToListAsync();
+        var names = await _tm1.Session()
+            .StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Dimensions"), ODataQuery.None().Select("Name")))
+            .Select(d => d.GetProperty("Name").GetString())
+            .ToListAsync();
         Assert.Equal(["a", "b", "c"], names);
     }
 
@@ -138,13 +151,18 @@ public class Tm1SessionTest
     [Fact]
     public async Task MapsConnectFailuresAndOtherTransportFailures()
     {
-        _tm1.Fail("GET Server?$select=Name", new HttpRequestException(HttpRequestError.ConnectionError, "refused", new SocketException((int)SocketError.ConnectionRefused)));
+        _tm1.Fail(
+            "GET Server?$select=Name",
+            new HttpRequestException(HttpRequestError.ConnectionError, "refused", new SocketException((int)SocketError.ConnectionRefused))
+        );
         _tm1.Fail("POST Processes('p')/tm1.ExecuteWithReturn", new IOException("Connection reset"));
         var session = _tm1.Session();
         var connect = await Assert.ThrowsAsync<Tm1TransportException>(() => session.ExecuteAsync(Server));
         Assert.Equal(Tm1TransportException.Phase.Connect, connect.TransportPhase);
         Assert.False(connect.MayHaveApplied());
-        var response = await Assert.ThrowsAsync<Tm1TransportException>(() => session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Processes").Key("p").Action("tm1.ExecuteWithReturn"), null)));
+        var response = await Assert.ThrowsAsync<Tm1TransportException>(() =>
+            session.ExecuteAsync(Tm1Request.Post(ODataPath.Of("Processes").Key("p").Action("tm1.ExecuteWithReturn"), null))
+        );
         Assert.Equal(Tm1TransportException.Phase.Response, response.TransportPhase);
         Assert.True(response.MayHaveApplied());
         Assert.False(response.IsRetryable()); // a POST that may have run
@@ -240,7 +258,10 @@ public class Tm1SessionTest
 public class Tm1SessionReloginTest
 {
     private const string CreateKey = "POST Dimensions";
-    private static readonly Tm1Request<JsonElement> Create = Tm1Request.Post<JsonElement>(ODataPath.Of("Dimensions"), new Dictionary<string, object?> { ["Name"] = "d" });
+    private static readonly Tm1Request<JsonElement> Create = Tm1Request.Post<JsonElement>(
+        ODataPath.Of("Dimensions"),
+        new Dictionary<string, object?> { ["Name"] = "d" }
+    );
     private static readonly Tm1Request<JsonElement> Server = Tm1Request.Get<JsonElement>(ODataPath.Of("Server"));
 
     private readonly ScriptedTm1 _tm1 = new();
@@ -349,7 +370,9 @@ public class Tm1SessionReloginTest
     {
         var issued = 0;
         _tm1.OnEach(CreateKey, _ => ScriptedTm1.Status(401, "TM1SessionId=fresh; Path=/api/"), _ => ScriptedTm1.Json(201, "{}"));
-        var session = _tm1.SessionWithOwnCredentials(b => b.Authenticator(Tm1Authenticator.CamPassport(_ => ValueTask.FromResult("passport" + Interlocked.Increment(ref issued)))));
+        var session = _tm1.SessionWithOwnCredentials(b =>
+            b.Authenticator(Tm1Authenticator.CamPassport(_ => ValueTask.FromResult("passport" + Interlocked.Increment(ref issued))))
+        );
         await session.ConnectAsync();
         await session.ExecuteAsync(Create);
         var logins = _tm1.Requests(ScriptedTm1.Login);
@@ -424,7 +447,12 @@ public class Tm1SessionImpersonationTest
     [Fact]
     public async Task RemembersARefusedLoginAndFailsFastUntilTheBackOffEnds()
     {
-        _tm1.OnEach(ScriptedTm1.Login, _ => ScriptedTm1.Status(401), _ => ScriptedTm1.Status(401), _ => ScriptedTm1.Json(200, "{\"ID\":9}", "TM1SessionId=ok; Path=/api/"));
+        _tm1.OnEach(
+            ScriptedTm1.Login,
+            _ => ScriptedTm1.Status(401),
+            _ => ScriptedTm1.Status(401),
+            _ => ScriptedTm1.Json(200, "{\"ID\":9}", "TM1SessionId=ok; Path=/api/")
+        );
         var session = Session(Tm1Timeouts.Builder().RefusedLogin(TimeSpan.FromSeconds(30)).Build());
         await Assert.ThrowsAsync<Tm1AuthenticationException>(() => session.ExecuteAsync(Server));
         _now += TimeSpan.FromSeconds(29);
@@ -536,19 +564,28 @@ public class Tm1SessionBatchTest
     [Fact]
     public async Task SendsQueuedRequestsTogetherAndHandsEachItsResult()
     {
-        var tm1 = new ScriptedTm1().On(BatchKey, _ => ScriptedTm1.Json(200, """
-            {"responses":[
-             {"id":"1","status":200,"body":{"Name":"Sales"}},
-             {"id":"2","status":404,"body":{"error":{"code":"278","message":"'Nope' can not be found"}}},
-             {"id":"3","status":200,"body":{"value":[{"Name":"a"},{"Name":"b"}]}},
-             {"id":"4","status":204}
-            ]}
-            """));
+        var tm1 = new ScriptedTm1().On(BatchKey, _ =>
+            ScriptedTm1.Json(
+                200,
+                """
+                {"responses":[
+                 {"id":"1","status":200,"body":{"Name":"Sales"}},
+                 {"id":"2","status":404,"body":{"error":{"code":"278","message":"'Nope' can not be found"}}},
+                 {"id":"3","status":200,"body":{"value":[{"Name":"a"},{"Name":"b"}]}},
+                 {"id":"4","status":204}
+                ]}
+                """
+            )
+        );
         var batch = tm1.Session().Batch();
         var queued = batch.Session;
         var sales = queued.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Cubes").Key("Sales")));
         var nope = queued.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Cubes").Key("Nope")));
-        var listed = queued.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"))).Select(n => n.GetProperty("Name").GetString()).ToListAsync().AsTask();
+        var listed = queued
+            .StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes")))
+            .Select(n => n.GetProperty("Name").GetString())
+            .ToListAsync()
+            .AsTask();
         await ScriptedTm1.Eventually(() => batch.Size() == 3, "for the stream to queue");
         var deleted = queued.ExecuteAsync(Tm1Request.Delete(ODataPath.Of("Cubes").Key("Old")));
         Assert.Equal(4, batch.Size());
@@ -599,7 +636,10 @@ public class Tm1SessionAsyncTest
 {
     private const string Run = "POST Processes('p')/tm1.ExecuteWithReturn";
     private const string Monitor = "GET _async('a1')";
-    private static readonly Tm1Request<JsonElement> Request = Tm1Request.Post<JsonElement>(ODataPath.Of("Processes").Key("p").Action("tm1.ExecuteWithReturn"), null);
+    private static readonly Tm1Request<JsonElement> Request = Tm1Request.Post<JsonElement>(
+        ODataPath.Of("Processes").Key("p").Action("tm1.ExecuteWithReturn"),
+        null
+    );
 
     private static HttpResponseMessage Accepted()
     {
@@ -619,8 +659,14 @@ public class Tm1SessionAsyncTest
     [Fact]
     public async Task PollsTheMonitorUntilTheResultIsThere()
     {
-        var tm1 = new ScriptedTm1().On(Run, _ => Accepted())
-            .OnEach(Monitor, _ => ScriptedTm1.Status(202), _ => ScriptedTm1.Status(202), _ => Done("201 Created", "{\"ProcessExecuteStatusCode\":\"CompletedSuccessfully\"}"));
+        var tm1 = new ScriptedTm1()
+            .On(Run, _ => Accepted())
+            .OnEach(
+                Monitor,
+                _ => ScriptedTm1.Status(202),
+                _ => ScriptedTm1.Status(202),
+                _ => Done("201 Created", "{\"ProcessExecuteStatusCode\":\"CompletedSuccessfully\"}")
+            );
         var result = await tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10)).ExecuteAsync(Request);
         Assert.Equal("CompletedSuccessfully", result.GetProperty("ProcessExecuteStatusCode").GetString());
         Assert.Equal("respond-async", Assert.Single(tm1.Requests(Run)).Header("Prefer"));
@@ -631,7 +677,8 @@ public class Tm1SessionAsyncTest
     [Fact]
     public async Task RaisesTheErrorTheWorkEndedWith()
     {
-        var tm1 = new ScriptedTm1().On(Run, _ => Accepted())
+        var tm1 = new ScriptedTm1()
+            .On(Run, _ => Accepted())
             .On(Monitor, _ => Done("500 Internal Server Error", "{\"error\":{\"code\":\"174\",\"message\":\"TM1UserException: Cancel\"}}"));
         var e = await Assert.ThrowsAsync<Tm1ServerException>(() => tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10)).ExecuteAsync(Request));
         Assert.Contains("Cancel", e.Message);
@@ -720,7 +767,8 @@ public class Tm1SessionCapabilitiesTest
     [Fact]
     public async Task SendsARequestWhoseRequirementTheServerMeets()
     {
-        var order = Tm1Request.Get<JsonElement>(ODataPath.Of("Cubes").Key("Sales").Function("tm1.DimensionsStorageOrder", new Dictionary<string, object?>()))
+        var order = Tm1Request
+            .Get<JsonElement>(ODataPath.Of("Cubes").Key("Sales").Function("tm1.DimensionsStorageOrder", new Dictionary<string, object?>()))
             .Requires(Version.Tm1Capability.BoundOperation("tm1.Cube", "tm1.DimensionsStorageOrder").Since("11.4.0"));
         await _tm1.Session().ExecuteAsync(order);
     }
@@ -757,7 +805,11 @@ public class Tm1SessionCapabilitiesTest
     [Fact]
     public async Task DoesntKeepAFailedRead()
     {
-        _tm1.OnEach(VersionKey, _ => ScriptedTm1.Json(503, "{\"error\":{\"code\":\"1\",\"message\":\"busy\"}}"), _ => ScriptedTm1.Json(200, "{\"ProductVersion\":\"11.8.03500.6\"}"));
+        _tm1.OnEach(
+            VersionKey,
+            _ => ScriptedTm1.Json(503, "{\"error\":{\"code\":\"1\",\"message\":\"busy\"}}"),
+            _ => ScriptedTm1.Json(200, "{\"ProductVersion\":\"11.8.03500.6\"}")
+        );
         var session = _tm1.Session();
         await Assert.ThrowsAnyAsync<Exception>(() => session.VersionAsync());
         await session.VersionAsync();
@@ -777,7 +829,10 @@ public class Tm1TimeoutsTest
     [Fact]
     public void FillsInDefaults()
     {
-        Assert.Equal(new Tm1Timeouts(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30)), Tm1Timeouts.Defaults);
+        Assert.Equal(
+            new Tm1Timeouts(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30)),
+            Tm1Timeouts.Defaults
+        );
         var longRequests = Tm1Timeouts.Builder().Request(TimeSpan.FromHours(1)).Build();
         Assert.Equal(TimeSpan.FromHours(1), longRequests.Request);
         Assert.Equal(TimeSpan.FromSeconds(30), longRequests.Login);

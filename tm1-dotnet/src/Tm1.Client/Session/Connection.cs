@@ -51,8 +51,18 @@ internal sealed class Connection
     private bool _closed;
     private Task? _closing;
 
-    public Connection(string root, Tm1Authenticator authenticator, string? impersonate, string? sessionContext, Tm1Timeouts timeouts,
-        Tm1ErrorClassifier classifier, HttpMessageHandler? handler, bool checkCapabilities, Func<DateTimeOffset>? clock, CapabilitiesCache? capabilitiesCache = null)
+    public Connection(
+        string root,
+        Tm1Authenticator authenticator,
+        string? impersonate,
+        string? sessionContext,
+        Tm1Timeouts timeouts,
+        Tm1ErrorClassifier classifier,
+        HttpMessageHandler? handler,
+        bool checkCapabilities,
+        Func<DateTimeOffset>? clock,
+        CapabilitiesCache? capabilitiesCache = null
+    )
     {
         _capabilitiesCache = capabilitiesCache ?? new CapabilitiesCache();
         Root = root.EndsWith('/') ? root : root + "/";
@@ -64,13 +74,17 @@ internal sealed class Connection
         CheckCapabilities = checkCapabilities;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _ownsHttp = handler is null;
-        _http = new HttpClient(handler ?? new SocketsHttpHandler
-        {
-            UseCookies = false,
-            ConnectTimeout = timeouts.Connect,
-            PooledConnectionIdleTimeout = MaxIdle,
-            AutomaticDecompression = DecompressionMethods.All,
-        }, disposeHandler: handler is null)
+        _http = new HttpClient(
+            handler
+                ?? new SocketsHttpHandler
+                {
+                    UseCookies = false,
+                    ConnectTimeout = timeouts.Connect,
+                    PooledConnectionIdleTimeout = MaxIdle,
+                    AutomaticDecompression = DecompressionMethods.All,
+                },
+            disposeHandler: handler is null
+        )
         {
             Timeout = System.Threading.Timeout.InfiniteTimeSpan,
         };
@@ -243,7 +257,9 @@ internal sealed class Connection
         if (reply.Status == 401)
         {
             // TM1 answers a disabled impersonated user exactly like wrong credentials
-            var why = ImpersonateUser is null ? null : new ODataError("", $"The credentials were refused, or the user being impersonated ({ImpersonateUser}) is disabled");
+            var why = ImpersonateUser is null
+                ? null
+                : new ODataError("", $"The credentials were refused, or the user being impersonated ({ImpersonateUser}) is disabled");
             throw Tm1ApiException.Of(401, Tm1ErrorKind.CredentialRejected, why, "GET", url);
         }
         if (reply.Status >= 400)
@@ -260,7 +276,9 @@ internal sealed class Connection
             }
             throw error;
         }
-        var cookie = SessionCookie(reply) ?? seedCookie ?? throw new Tm1ProtocolException($"TM1 accepted the login but set no {Cookie} cookie", null, "GET", url, null);
+        var cookie = SessionCookie(reply)
+            ?? seedCookie
+            ?? throw new Tm1ProtocolException($"TM1 accepted the login but set no {Cookie} cookie", null, "GET", url, null);
         try
         {
             using var doc = JsonDocument.Parse(reply.Body);
@@ -284,8 +302,16 @@ internal sealed class Connection
 
     /// <summary>Sends a request with the session cookie, logging in again once on 401; a second 401
     /// is a <see cref="Tm1AuthenticationException"/> of kind <see cref="Tm1ErrorKind.Unauthenticated"/>.</summary>
-    public async Task<Reply> SendAsync(string method, string url, byte[]? content, string? contentType, IReadOnlyDictionary<string, string> headers,
-        string accept, TimeSpan? timeout, CancellationToken ct)
+    public async Task<Reply> SendAsync(
+        string method,
+        string url,
+        byte[]? content,
+        string? contentType,
+        IReadOnlyDictionary<string, string> headers,
+        string accept,
+        TimeSpan? timeout,
+        CancellationToken ct
+    )
     {
         var used = Current();
         var session = await used.Login.WaitAsync(ct).ConfigureAwait(false);
@@ -340,8 +366,13 @@ internal sealed class Connection
         catch (OperationCanceledException e) when (!ct.IsCancellationRequested)
         {
             var connect = e.InnerException is TimeoutException t && t.Message.Contains("ConnectTimeout", StringComparison.Ordinal);
-            throw new Tm1TransportException(connect ? Tm1TransportException.Phase.Connect : Tm1TransportException.Phase.Response, idempotent, method, url,
-                connect ? e.InnerException : new TimeoutException($"no answer within {timeout}", e));
+            throw new Tm1TransportException(
+                connect ? Tm1TransportException.Phase.Connect : Tm1TransportException.Phase.Response,
+                idempotent,
+                method,
+                url,
+                connect ? e.InnerException : new TimeoutException($"no answer within {timeout}", e)
+            );
         }
         catch (Exception e) when (e is HttpRequestException or IOException)
         {
@@ -353,22 +384,34 @@ internal sealed class Connection
     /// unknown host, unreachable, TLS handshake) is the connect phase; anything later, the response phase.</summary>
     internal static Tm1TransportException Transport(Exception failure, string method, string url, bool idempotent)
     {
-        var connect = failure is HttpRequestException
-        {
-            HttpRequestError: HttpRequestError.ConnectionError or HttpRequestError.NameResolutionError or HttpRequestError.SecureConnectionError,
-        };
+        var connect =
+            failure is HttpRequestException
+            {
+                HttpRequestError: HttpRequestError.ConnectionError or HttpRequestError.NameResolutionError or HttpRequestError.SecureConnectionError,
+            };
         for (var t = failure; t is not null && !connect; t = t.InnerException)
         {
-            connect = t is System.Net.Sockets.SocketException
-            {
-                SocketErrorCode: System.Net.Sockets.SocketError.ConnectionRefused or System.Net.Sockets.SocketError.HostNotFound
-                    or System.Net.Sockets.SocketError.HostUnreachable or System.Net.Sockets.SocketError.NetworkUnreachable,
-            } or System.Security.Authentication.AuthenticationException;
+            connect =
+                t
+                    is System.Net.Sockets.SocketException
+                        {
+                            SocketErrorCode: System.Net.Sockets.SocketError.ConnectionRefused
+                                or System.Net.Sockets.SocketError.HostNotFound
+                                or System.Net.Sockets.SocketError.HostUnreachable
+                                or System.Net.Sockets.SocketError.NetworkUnreachable,
+                        }
+                        or System.Security.Authentication.AuthenticationException;
         }
-        return new Tm1TransportException(connect ? Tm1TransportException.Phase.Connect : Tm1TransportException.Phase.Response, idempotent, method, url, failure);
+        return new Tm1TransportException(
+            connect ? Tm1TransportException.Phase.Connect : Tm1TransportException.Phase.Response,
+            idempotent,
+            method,
+            url,
+            failure
+        );
     }
 
-    private void Headers(HttpRequestMessage request, string accept)
+    private static void Headers(HttpRequestMessage request, string accept)
     {
         request.Headers.TryAddWithoutValidation("OData-Version", "4.0");
         request.Headers.TryAddWithoutValidation("OData-MaxVersion", "4.0");
@@ -419,11 +462,20 @@ internal sealed class Connection
     {
         await Task.Yield();
         var url = Root + "Server?$select=ProductVersion";
-        var reply = Check("GET", url, await SendAsync("GET", url, null, null, new Dictionary<string, string>(), Json, null, CancellationToken.None).ConfigureAwait(false));
+        var reply = Check(
+            "GET",
+            url,
+            await SendAsync("GET", url, null, null, new Dictionary<string, string>(), Json, null, CancellationToken.None).ConfigureAwait(false)
+        );
         try
         {
             using var doc = JsonDocument.Parse(reply.Body);
-            var text = doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("ProductVersion", out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+            var text =
+                doc.RootElement.ValueKind == JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("ProductVersion", out var v)
+                && v.ValueKind == JsonValueKind.String
+                    ? v.GetString()
+                    : null;
             return Tm1Version.Parse(text ?? throw new Tm1ProtocolException("TM1 didn't report its ProductVersion", null, "GET", url, null));
         }
         catch (JsonException e)
@@ -437,19 +489,27 @@ internal sealed class Connection
     public async Task<Tm1Capabilities> CapabilitiesAsync(CancellationToken ct)
     {
         var version = await VersionAsync(ct).ConfigureAwait(false);
-        return await _capabilitiesCache.Get(Root, version, async () =>
-        {
-            var url = Root + "$metadata";
-            var reply = Check("GET", url, await SendAsync("GET", url, null, null, new Dictionary<string, string>(), "application/xml", null, CancellationToken.None).ConfigureAwait(false));
-            try
+        return await _capabilitiesCache
+            .Get(Root, version, async () =>
             {
-                return Tm1Capabilities.Parse(Encoding.UTF8.GetString(reply.Body), version);
-            }
-            catch (Tm1ProtocolException e)
-            {
-                throw new Tm1ProtocolException("TM1 sent $metadata that isn't valid CSDL", null, "GET", url, e);
-            }
-        }).WaitAsync(ct).ConfigureAwait(false);
+                var url = Root + "$metadata";
+                var reply = Check(
+                    "GET",
+                    url,
+                    await SendAsync("GET", url, null, null, new Dictionary<string, string>(), "application/xml", null, CancellationToken.None)
+                        .ConfigureAwait(false)
+                );
+                try
+                {
+                    return Tm1Capabilities.Parse(Encoding.UTF8.GetString(reply.Body), version);
+                }
+                catch (Tm1ProtocolException e)
+                {
+                    throw new Tm1ProtocolException("TM1 sent $metadata that isn't valid CSDL", null, "GET", url, e);
+                }
+            })
+            .WaitAsync(ct)
+            .ConfigureAwait(false);
     }
 
     public Reply Check(string method, string url, Reply reply) =>
@@ -559,8 +619,12 @@ internal sealed class CapabilitiesCache
         var key = serviceRoot + " " + version;
         var entry = _byServer.GetOrAdd(key, _ => new Lazy<Task<Tm1Capabilities>>(() => Task.Run(fetch)));
         var task = entry.Value;
-        task.ContinueWith(_ => _byServer.TryRemove(new KeyValuePair<string, Lazy<Task<Tm1Capabilities>>>(key, entry)),
-            CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        task.ContinueWith(
+            _ => _byServer.TryRemove(new KeyValuePair<string, Lazy<Task<Tm1Capabilities>>>(key, entry)),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default
+        );
         return task;
     }
 }

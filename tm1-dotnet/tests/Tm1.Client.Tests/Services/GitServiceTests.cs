@@ -25,7 +25,10 @@ public class GitServiceTests
         _tm1.Respond = _ => new Dictionary<string, object?> { ["URL"] = "git://localhost/model.git", ["Remote"] = new { Branches = new[] { "main" } } };
         var git = await tm1.Git.InitAsync("git://localhost/model.git", "dev", GitCredentials.Password("me", "s3cret"), true, null);
         Assert.Equal(["main"], git.Remote!.Branches!);
-        Assert.Equal(("POST GitInit", """{"URL":"git://localhost/model.git","Username":"me","Password":"s3cret","Deployment":"dev","Force":true}"""), (Sent, _tm1.Last.Text));
+        Assert.Equal(
+            ("POST GitInit", """{"URL":"git://localhost/model.git","Username":"me","Password":"s3cret","Deployment":"dev","Force":true}"""),
+            (Sent, _tm1.Last.Text)
+        );
         await tm1.Git.InitAsync("git://localhost/model.git", null, GitCredentials.None(), false, GitConfigurationPatch.Builder().Build());
         Assert.Equal("""{"URL":"git://localhost/model.git","Force":false,"Config":{}}""", _tm1.Last.Text);
 
@@ -43,13 +46,26 @@ public class GitServiceTests
     public async Task PlansAndExecutesPushesAndPulls()
     {
         var tm1 = _tm1.Client();
-        _tm1.Respond = _ => new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.GitPushPlan", ["ID"] = "p1", ["SourceFiles"] = new[] { "/dimensions/Region.json" } };
+        _tm1.Respond = _ => new Dictionary<string, object?>
+        {
+            ["@odata.type"] = "#ibm.tm1.api.v1.GitPushPlan",
+            ["ID"] = "p1",
+            ["SourceFiles"] = new[] { "/dimensions/Region.json" },
+        };
         var push = await tm1.Git.PushAsync("main", "feature", Commit, GitCredentials.None(), false);
         Assert.Equal(["/dimensions/Region.json"], push.SourceFiles!);
         Assert.Equal("POST GitPush", Sent);
-        Assert.Equal("""{"Branch":"main","NewBranch":"feature","Message":"Add a dimension","Author":"tm1-client","Email":"tm1-client@example.com","Force":false}""", _tm1.Last.Text);
+        Assert.Equal(
+            """{"Branch":"main","NewBranch":"feature","Message":"Add a dimension","Author":"tm1-client","Email":"tm1-client@example.com","Force":false}""",
+            _tm1.Last.Text
+        );
 
-        _tm1.Respond = _ => new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.GitPullPlan", ["ID"] = "p2", ["Operations"] = new[] { "Skip Dimensions('Region')" } };
+        _tm1.Respond = _ => new Dictionary<string, object?>
+        {
+            ["@odata.type"] = "#ibm.tm1.api.v1.GitPullPlan",
+            ["ID"] = "p2",
+            ["Operations"] = new[] { "Skip Dimensions('Region')" },
+        };
         var pull = await tm1.Git.PullAsync("main", GitCredentials.None(), GitPlanExecutionMode.MultipleCommit, true);
         Assert.Equal(["Skip Dimensions('Region')"], pull.Operations!);
         Assert.Equal(("POST GitPull", """{"Branch":"main","ExecutionMode":"MultipleCommit","Force":true}"""), (Sent, _tm1.Last.Text));
@@ -68,9 +84,11 @@ public class GitServiceTests
     public async Task FindsAPlanInTheList()
     {
         var tm1 = _tm1.Client();
-        _tm1.Respond = _ => FakeTm1.Collection(
-            new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.GitPushPlan", ["ID"] = "p1" },
-            new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.GitPullPlan", ["ID"] = "p2" });
+        _tm1.Respond = _ =>
+            FakeTm1.Collection(
+                new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.GitPushPlan", ["ID"] = "p1" },
+                new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.GitPullPlan", ["ID"] = "p2" }
+            );
         var plans = await tm1.Git.PlansAsync(ODataQuery.None().Select("ID")).ToListAsync();
         Assert.Equal([typeof(GitPushPlan), typeof(GitPullPlan)], plans.Select(p => p.GetType()));
         Assert.Equal("GET GitPlans?$select=ID", Sent);

@@ -14,9 +14,7 @@ public sealed class SqlDataSourceService : Tm1Service
     private static readonly ODataPath Sources = ODataPath.Of("SQLDataSources");
 
     public SqlDataSourceService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET SQLDataSources</c>, streamed.</summary>
     [Tm1Endpoint("EntitySet SQLDataSources")]

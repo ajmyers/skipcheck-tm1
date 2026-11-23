@@ -28,26 +28,51 @@ public class Tm1SourceTests : TempDir
         };
         Assert.IsType<Tm1Source.PrivateImage>(Tm1Source.Discover(Settings(all)));
         Assert.Equal(new Tm1Source.InstallDir(install), Tm1Source.Discover(Settings(Without(all, Tm1Source.PrivateImageSetting))));
-        Assert.Equal(new Tm1Source.InstallVolume("tm1_tm1-install"), Tm1Source.Discover(Settings(Without(all, Tm1Source.PrivateImageSetting, Tm1Source.HomeDir))));
-        Assert.Equal(new Tm1Source.Bundle(Temp, null), Tm1Source.Discover(Settings(Without(all, Tm1Source.PrivateImageSetting, Tm1Source.HomeDir, Tm1Source.InstallVolumeSetting))));
-        Assert.Equal(new Tm1Source.BundleUrl(new Uri("https://example.com/b.tar.gz"), "abc"),
-            Tm1Source.Discover(Settings(new() { [Tm1Source.BundleUrlSetting] = "https://example.com/b.tar.gz", [Tm1Source.BundleSha256] = "abc" })));
+        Assert.Equal(
+            new Tm1Source.InstallVolume("tm1_tm1-install"),
+            Tm1Source.Discover(Settings(Without(all, Tm1Source.PrivateImageSetting, Tm1Source.HomeDir)))
+        );
+        Assert.Equal(
+            new Tm1Source.Bundle(Temp, null),
+            Tm1Source.Discover(Settings(Without(all, Tm1Source.PrivateImageSetting, Tm1Source.HomeDir, Tm1Source.InstallVolumeSetting)))
+        );
+        Assert.Equal(
+            new Tm1Source.BundleUrl(new Uri("https://example.com/b.tar.gz"), "abc"),
+            Tm1Source.Discover(Settings(new() { [Tm1Source.BundleUrlSetting] = "https://example.com/b.tar.gz", [Tm1Source.BundleSha256] = "abc" }))
+        );
     }
 
     [Fact]
     public void FailsOnAWrongSettingRatherThanSkipping()
     {
-        Assert.Contains("no bin64/tm1s.exe", Assert.Throws<ArgumentException>(() => Tm1Source.Discover(Settings(new() { [Tm1Source.HomeDir] = Temp }))).Message);
-        Assert.Contains("is not a folder", Assert.Throws<ArgumentException>(() => Tm1Source.Discover(Settings(new() { [Tm1Source.BundleDir] = Path.Combine(Temp, "missing") }))).Message);
-        Assert.Contains("isn't in", Assert.Throws<ArgumentException>(() => Tm1Source.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp, [Tm1Source.BundleSetting] = "nope.tar.gz" }))).Message);
+        Assert.Contains(
+            "no bin64/tm1s.exe",
+            Assert.Throws<ArgumentException>(() => Tm1Source.Discover(Settings(new() { [Tm1Source.HomeDir] = Temp }))).Message
+        );
+        Assert.Contains(
+            "is not a folder",
+            Assert.Throws<ArgumentException>(() => Tm1Source.Discover(Settings(new() { [Tm1Source.BundleDir] = Path.Combine(Temp, "missing") }))).Message
+        );
+        Assert.Contains(
+            "isn't in",
+            Assert
+                .Throws<ArgumentException>(() =>
+                    Tm1Source.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp, [Tm1Source.BundleSetting] = "nope.tar.gz" }))
+                )
+                .Message
+        );
     }
 
     [Fact]
     public void NamesABundleFileWithinItsFolder()
     {
         Touch("tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz");
-        Assert.Equal(new Tm1Source.Bundle(Temp, "tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz"),
-            Tm1Source.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp, [Tm1Source.BundleSetting] = "tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz" })));
+        Assert.Equal(
+            new Tm1Source.Bundle(Temp, "tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz"),
+            Tm1Source.Discover(
+                Settings(new() { [Tm1Source.BundleDir] = Temp, [Tm1Source.BundleSetting] = "tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz" })
+            )
+        );
     }
 
     [Fact]
@@ -115,12 +140,24 @@ public class CognosSourceTests : TempDir
     [Fact]
     public void TriesSourcesInOrder()
     {
-        Assert.Equal(new CognosSource.PrivateImage("cognos-server:12.1.1-private"),
-            CognosSource.Discover(Settings(new() { [CognosSource.PrivateImageSetting] = "cognos-server:12.1.1-private", [CognosSource.InstallVolumeSetting] = "v" })));
-        Assert.Equal(new CognosSource.InstallVolume("v"), CognosSource.Discover(Settings(new() { [CognosSource.InstallVolumeSetting] = "v", [CognosSource.ZipDir] = Temp })));
-        Assert.Equal(new CognosSource.Zip(Temp, null), CognosSource.Discover(Settings(new() { [CognosSource.ZipDir] = Temp, [CognosSource.ZipUrlSetting] = "https://example.com/c.zip" })));
-        Assert.Equal(new CognosSource.ZipUrl(new Uri("https://example.com/c.zip"), "abc"),
-            CognosSource.Discover(Settings(new() { [CognosSource.ZipUrlSetting] = "https://example.com/c.zip", [CognosSource.ZipSha256] = "abc" })));
+        Assert.Equal(
+            new CognosSource.PrivateImage("cognos-server:12.1.1-private"),
+            CognosSource.Discover(
+                Settings(new() { [CognosSource.PrivateImageSetting] = "cognos-server:12.1.1-private", [CognosSource.InstallVolumeSetting] = "v" })
+            )
+        );
+        Assert.Equal(
+            new CognosSource.InstallVolume("v"),
+            CognosSource.Discover(Settings(new() { [CognosSource.InstallVolumeSetting] = "v", [CognosSource.ZipDir] = Temp }))
+        );
+        Assert.Equal(
+            new CognosSource.Zip(Temp, null),
+            CognosSource.Discover(Settings(new() { [CognosSource.ZipDir] = Temp, [CognosSource.ZipUrlSetting] = "https://example.com/c.zip" }))
+        );
+        Assert.Equal(
+            new CognosSource.ZipUrl(new Uri("https://example.com/c.zip"), "abc"),
+            CognosSource.Discover(Settings(new() { [CognosSource.ZipUrlSetting] = "https://example.com/c.zip", [CognosSource.ZipSha256] = "abc" }))
+        );
     }
 
     [Fact]
@@ -129,15 +166,27 @@ public class CognosSourceTests : TempDir
         Assert.Null(CognosSource.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp })));
         Touch("casrv-12.1.1-2512181837-linuxi38664h.zip");
         Assert.Equal(new CognosSource.Zip(Temp, null), CognosSource.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp })));
-        Assert.Equal(new CognosSource.Zip(Temp, "casrv-12.1.1-2512181837-linuxi38664h.zip"),
-            CognosSource.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp, [CognosSource.ZipSetting] = "casrv-12.1.1-2512181837-linuxi38664h.zip" })));
+        Assert.Equal(
+            new CognosSource.Zip(Temp, "casrv-12.1.1-2512181837-linuxi38664h.zip"),
+            CognosSource.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp, [CognosSource.ZipSetting] = "casrv-12.1.1-2512181837-linuxi38664h.zip" }))
+        );
     }
 
     [Fact]
     public void FailsOnAWrongSettingRatherThanSkipping()
     {
-        Assert.Contains(CognosSource.ZipDir, Assert.Throws<ArgumentException>(() => CognosSource.Discover(Settings(new() { [CognosSource.ZipDir] = Path.Combine(Temp, "missing") }))).Message);
-        Assert.Contains("nope.zip", Assert.Throws<ArgumentException>(() => CognosSource.Discover(Settings(new() { [CognosSource.ZipDir] = Temp, [CognosSource.ZipSetting] = "nope.zip" }))).Message);
+        Assert.Contains(
+            CognosSource.ZipDir,
+            Assert.Throws<ArgumentException>(() => CognosSource.Discover(Settings(new() { [CognosSource.ZipDir] = Path.Combine(Temp, "missing") }))).Message
+        );
+        Assert.Contains(
+            "nope.zip",
+            Assert
+                .Throws<ArgumentException>(() =>
+                    CognosSource.Discover(Settings(new() { [CognosSource.ZipDir] = Temp, [CognosSource.ZipSetting] = "nope.zip" }))
+                )
+                .Message
+        );
     }
 
     [Fact]
@@ -186,9 +235,18 @@ public class PawSourceTests : TempDir
     [Fact]
     public void FailsOnAWrongSettingRatherThanSkipping()
     {
-        Assert.Contains("Not a file", Assert.Throws<ArgumentException>(() => PawSource.Discover(Settings(new() { [PawSource.ZipSetting] = Path.Combine(Temp, "missing.zip") }))).Message);
-        Assert.Contains("has no ipa_workspace_local_*.zip", Assert.Throws<ArgumentException>(() => PawSource.Discover(Settings(new() { [PawSource.BundleDir] = Temp }))).Message);
-        Assert.Contains("is not a folder", Assert.Throws<ArgumentException>(() => PawSource.Discover(Settings(new() { [PawSource.BundleDir] = Path.Combine(Temp, "nope") }))).Message);
+        Assert.Contains(
+            "Not a file",
+            Assert.Throws<ArgumentException>(() => PawSource.Discover(Settings(new() { [PawSource.ZipSetting] = Path.Combine(Temp, "missing.zip") }))).Message
+        );
+        Assert.Contains(
+            "has no ipa_workspace_local_*.zip",
+            Assert.Throws<ArgumentException>(() => PawSource.Discover(Settings(new() { [PawSource.BundleDir] = Temp }))).Message
+        );
+        Assert.Contains(
+            "is not a folder",
+            Assert.Throws<ArgumentException>(() => PawSource.Discover(Settings(new() { [PawSource.BundleDir] = Path.Combine(Temp, "nope") }))).Message
+        );
     }
 
     [Fact]
@@ -217,12 +275,27 @@ public class Tm1WebSourceTests : TempDir
     public void TriesSourcesInTheImagesOrder()
     {
         var install = FakeInstall();
-        Assert.IsType<Tm1WebSource.PrivateImage>(Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.PrivateImageSetting] = "registry.example.com/private/tm1-web:2.1.19", [Tm1WebSource.HomeDir] = install })));
-        Assert.Equal(new Tm1WebSource.InstallDir(install), Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.HomeDir] = install, [Tm1WebSource.InstallVolumeSetting] = "v" })));
-        Assert.Equal(new Tm1WebSource.InstallVolume("v"), Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.InstallVolumeSetting] = "v", [Tm1WebSource.BundleDir] = Temp })));
-        Assert.Equal(new Tm1WebSource.Bundle(Temp, null), Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.BundleDir] = Temp, [Tm1WebSource.BundleUrlSetting] = "https://example.com/b.tar.gz" })));
-        Assert.Equal(new Tm1WebSource.BundleUrl(new Uri("https://example.com/b.tar.gz"), "abc"),
-            Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.BundleUrlSetting] = "https://example.com/b.tar.gz", [Tm1WebSource.BundleSha256] = "abc" })));
+        Assert.IsType<Tm1WebSource.PrivateImage>(
+            Tm1WebSource.Discover(
+                Settings(new() { [Tm1WebSource.PrivateImageSetting] = "registry.example.com/private/tm1-web:2.1.19", [Tm1WebSource.HomeDir] = install })
+            )
+        );
+        Assert.Equal(
+            new Tm1WebSource.InstallDir(install),
+            Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.HomeDir] = install, [Tm1WebSource.InstallVolumeSetting] = "v" }))
+        );
+        Assert.Equal(
+            new Tm1WebSource.InstallVolume("v"),
+            Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.InstallVolumeSetting] = "v", [Tm1WebSource.BundleDir] = Temp }))
+        );
+        Assert.Equal(
+            new Tm1WebSource.Bundle(Temp, null),
+            Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.BundleDir] = Temp, [Tm1WebSource.BundleUrlSetting] = "https://example.com/b.tar.gz" }))
+        );
+        Assert.Equal(
+            new Tm1WebSource.BundleUrl(new Uri("https://example.com/b.tar.gz"), "abc"),
+            Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.BundleUrlSetting] = "https://example.com/b.tar.gz", [Tm1WebSource.BundleSha256] = "abc" }))
+        );
     }
 
     [Fact]
@@ -231,18 +304,38 @@ public class Tm1WebSourceTests : TempDir
         Assert.Null(Tm1WebSource.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp })));
         Touch("tm1web-11.0.112-26031316-2.1.19-linuxi38664h_bundle.tar.gz");
         Assert.Equal(new Tm1WebSource.Bundle(Temp, null), Tm1WebSource.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp })));
-        Assert.Equal(new Tm1WebSource.Bundle(Temp, "tm1web-11.0.112-26031316-2.1.19-linuxi38664h_bundle.tar.gz"),
-            Tm1WebSource.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp, [Tm1WebSource.BundleSetting] = "tm1web-11.0.112-26031316-2.1.19-linuxi38664h_bundle.tar.gz" })));
+        Assert.Equal(
+            new Tm1WebSource.Bundle(Temp, "tm1web-11.0.112-26031316-2.1.19-linuxi38664h_bundle.tar.gz"),
+            Tm1WebSource.Discover(
+                Settings(new() { [Tm1Source.BundleDir] = Temp, [Tm1WebSource.BundleSetting] = "tm1web-11.0.112-26031316-2.1.19-linuxi38664h_bundle.tar.gz" })
+            )
+        );
         var other = Directory.CreateDirectory(Path.Combine(Temp, "other")).FullName;
-        Assert.Equal(new Tm1WebSource.Bundle(other, null), Tm1WebSource.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp, [Tm1WebSource.BundleDir] = other })));
+        Assert.Equal(
+            new Tm1WebSource.Bundle(other, null),
+            Tm1WebSource.Discover(Settings(new() { [Tm1Source.BundleDir] = Temp, [Tm1WebSource.BundleDir] = other }))
+        );
     }
 
     [Fact]
     public void FailsOnAWrongSettingRatherThanSkipping()
     {
-        Assert.Contains("no wlp/bin/server", Assert.Throws<ArgumentException>(() => Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.HomeDir] = Temp }))).Message);
-        Assert.Contains("is not a folder", Assert.Throws<ArgumentException>(() => Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.BundleDir] = Path.Combine(Temp, "missing") }))).Message);
-        Assert.Contains("isn't in", Assert.Throws<ArgumentException>(() => Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.BundleDir] = Temp, [Tm1WebSource.BundleSetting] = "nope.tar.gz" }))).Message);
+        Assert.Contains(
+            "no wlp/bin/server",
+            Assert.Throws<ArgumentException>(() => Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.HomeDir] = Temp }))).Message
+        );
+        Assert.Contains(
+            "is not a folder",
+            Assert.Throws<ArgumentException>(() => Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.BundleDir] = Path.Combine(Temp, "missing") }))).Message
+        );
+        Assert.Contains(
+            "isn't in",
+            Assert
+                .Throws<ArgumentException>(() =>
+                    Tm1WebSource.Discover(Settings(new() { [Tm1WebSource.BundleDir] = Temp, [Tm1WebSource.BundleSetting] = "nope.tar.gz" }))
+                )
+                .Message
+        );
     }
 
     [Fact]

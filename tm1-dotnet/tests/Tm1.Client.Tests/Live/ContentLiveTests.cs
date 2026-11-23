@@ -76,16 +76,22 @@ public class ContentLiveTests
         {
             var link = await tm1.Contents.CreateAsync(folder, ContentScope.Public, LinkPatch.Builder().Name("ibm").Url("https://www.ibm.com").Build());
             Assert.Equal("ibm.extr", link.Id);
-            var reference = await tm1.Contents.CreateAsync(folder, ContentScope.Public,
-                CubeReferencePatch.Builder().Name("}ClientGroups").BindCube(ODataPath.Of("Cubes").Key("}ClientGroups")).Build());
+            var reference = await tm1.Contents.CreateAsync(
+                folder,
+                ContentScope.Public,
+                CubeReferencePatch.Builder().Name("}ClientGroups").BindCube(ODataPath.Of("Cubes").Key("}ClientGroups")).Build()
+            );
             Assert.Equal("}ClientGroups.cube", reference.Id);
-            var listed = await tm1.Contents.ContentsAsync(folder, ContentScope.Public, ODataQuery.None().Expand("tm1.CubeReference/Cube($select=Name)")).ToListAsync();
+            var listed = await tm1
+                .Contents.ContentsAsync(folder, ContentScope.Public, ODataQuery.None().Expand("tm1.CubeReference/Cube($select=Name)"))
+                .ToListAsync();
             Assert.Equal("}ClientGroups", Assert.Single(listed.OfType<CubeReference>()).Cube!.Name);
             Assert.Equal("https://www.ibm.com", Assert.IsType<Link>(await tm1.Contents.GetAsync(folder.Child(link.Id!))).Url);
             Assert.Equal(name, (await tm1.Contents.ContainedByAsync(folder.Child(link.Id!))).Id);
             // Entries can't be changed
-            await Assert.ThrowsAsync<Tm1BadRequestException>(() => tm1.Session.ExecuteAsync(
-                Tm1Request.Patch(folder.Child(link.Id!).Path(), new Dictionary<string, object?> { ["Name"] = "renamed" })));
+            await Assert.ThrowsAsync<Tm1BadRequestException>(() =>
+                tm1.Session.ExecuteAsync(Tm1Request.Patch(folder.Child(link.Id!).Path(), new Dictionary<string, object?> { ["Name"] = "renamed" }))
+            );
             var moved = await tm1.Contents.MoveAsync(folder.Child(link.Id!), other, ContentScope.Public, null);
             Assert.Equal("ibm.extr", moved.Id);
             Assert.Equal(["ibm.extr"], await tm1.Contents.ContentsAsync(other, ContentScope.Public).Select(e => e.Id).ToListAsync());

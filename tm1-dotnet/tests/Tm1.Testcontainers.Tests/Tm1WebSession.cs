@@ -58,7 +58,8 @@ public sealed partial class Tm1WebSession : IDisposable
 
     public void Dispose() => http.Dispose();
 
-    private static string Json(string value) => "\"" + value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
+    private static string Json(string value) =>
+        "\"" + value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
 
     private async Task<string> CallAsync(string script, string method, params string[] parameters)
     {

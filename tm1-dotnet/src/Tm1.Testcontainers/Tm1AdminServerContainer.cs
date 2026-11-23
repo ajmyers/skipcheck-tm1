@@ -22,9 +22,7 @@ public class Tm1AdminServerContainer : GenericContainer<Tm1AdminServerContainer>
 
     /// <summary>An Admin Server from <paramref name="source"/>, in the image TM1 runs in.</summary>
     public Tm1AdminServerContainer(Tm1Source source)
-        : this(Tm1ServerContainer.DefaultImageFor(source ?? throw new ArgumentNullException(nameof(source))), source)
-    {
-    }
+        : this(Tm1ServerContainer.DefaultImageFor(source ?? throw new ArgumentNullException(nameof(source))), source) { }
 
     /// <summary>An Admin Server from <paramref name="source"/>, in <paramref name="image"/>.</summary>
     public Tm1AdminServerContainer(string image, Tm1Source source)

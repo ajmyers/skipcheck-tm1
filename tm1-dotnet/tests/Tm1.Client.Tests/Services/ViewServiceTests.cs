@@ -39,7 +39,12 @@ public class ViewServiceTests
     [Fact]
     public async Task GetsANativeViewByItsCast()
     {
-        _tm1.Respond = _ => new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.NativeView", ["Name"] = "Default", ["SuppressEmptyRows"] = true };
+        _tm1.Respond = _ => new Dictionary<string, object?>
+        {
+            ["@odata.type"] = "#ibm.tm1.api.v1.NativeView",
+            ["Name"] = "Default",
+            ["SuppressEmptyRows"] = true,
+        };
         var view = await _tm1.Client().Views.GetNativeAsync("Sales", ViewScope.Public, "Default", ODataQuery.None().Expand("Columns"));
         Assert.Equal("Default", view.Name);
         Assert.True(view.SuppressEmptyRows);

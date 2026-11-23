@@ -70,16 +70,21 @@ public sealed class GitService : Tm1Service
     private static readonly ODataPath Plans = ODataPath.Of("GitPlans");
 
     public GitService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GitInit</c>: ties the model to the repository at <paramref name="url"/>, as the
     /// deployment <paramref name="deployment"/> (such as <c>dev</c>, or null for none), replacing an
     /// existing tie if <paramref name="force"/>, with <paramref name="config"/> or, if null, TM1's Git
     /// configuration. Returns the tie: URL, deployment, deployed commit, and the remote's branches and tags.</summary>
     [Tm1Endpoint("ActionImport GitInit")]
-    public Task<Git> InitAsync(string url, string? deployment, GitCredentials credentials, bool force, GitConfigurationPatch? config, CancellationToken cancellationToken = default)
+    public Task<Git> InitAsync(
+        string url,
+        string? deployment,
+        GitCredentials credentials,
+        bool force,
+        GitConfigurationPatch? config,
+        CancellationToken cancellationToken = default
+    )
     {
         var parameters = new Dictionary<string, object?> { ["URL"] = Require(url, nameof(url)) };
         Require(credentials, nameof(credentials)).AddTo(parameters);
@@ -114,7 +119,14 @@ public sealed class GitService : Tm1Service
     /// <paramref name="branch"/>; even if the remote moved on if <paramref name="force"/>. The plan lists
     /// the files; <see cref="ExecuteAsync"/> pushes them.</summary>
     [Tm1Endpoint("ActionImport GitPush")]
-    public Task<GitPushPlan> PushAsync(string branch, string? newBranch, GitCommitDetails commit, GitCredentials credentials, bool force, CancellationToken cancellationToken = default)
+    public Task<GitPushPlan> PushAsync(
+        string branch,
+        string? newBranch,
+        GitCommitDetails commit,
+        GitCredentials credentials,
+        bool force,
+        CancellationToken cancellationToken = default
+    )
     {
         Require(commit, nameof(commit));
         var parameters = new Dictionary<string, object?>();
@@ -134,7 +146,13 @@ public sealed class GitService : Tm1Service
     /// newest: TM1 (11.8) lags a pull behind the remote. The plan lists the operations;
     /// <see cref="ExecuteAsync"/> carries them out.</summary>
     [Tm1Endpoint("ActionImport GitPull")]
-    public Task<GitPullPlan> PullAsync(string branch, GitCredentials credentials, GitPlanExecutionMode? mode, bool force, CancellationToken cancellationToken = default)
+    public Task<GitPullPlan> PullAsync(
+        string branch,
+        GitCredentials credentials,
+        GitPlanExecutionMode? mode,
+        bool force,
+        CancellationToken cancellationToken = default
+    )
     {
         var parameters = new Dictionary<string, object?>();
         Require(credentials, nameof(credentials)).AddTo(parameters);
@@ -148,7 +166,15 @@ public sealed class GitService : Tm1Service
     /// <paramref name="branch"/> into it, in one step. Refused while Git is initialized. Completes when
     /// it's deployed; <see cref="StatusAsync"/> then shows the commit.</summary>
     [Tm1Endpoint("ActionImport GitDeploy")]
-    public Task DeployAsync(string url, string branch, string? deployment, GitCredentials credentials, bool force, GitConfigurationPatch? config, CancellationToken cancellationToken = default)
+    public Task DeployAsync(
+        string url,
+        string branch,
+        string? deployment,
+        GitCredentials credentials,
+        bool force,
+        GitConfigurationPatch? config,
+        CancellationToken cancellationToken = default
+    )
     {
         var parameters = new Dictionary<string, object?> { ["URL"] = Require(url, nameof(url)) };
         Require(credentials, nameof(credentials)).AddTo(parameters);
@@ -206,6 +232,5 @@ public sealed class GitService : Tm1Service
     private Task<T> Call<T>(Tm1Operation operation, Dictionary<string, object?> parameters, CancellationToken cancellationToken) =>
         Session.ExecuteAsync(Tm1Request.Post<T>(ImportPath(operation), parameters).Requires(operation.Capability()), cancellationToken);
 
-    private static ODataPath ImportPath(Tm1Operation operation) =>
-        ODataPath.Of(operation.ImportName ?? throw new InvalidOperationException(operation.Name));
+    private static ODataPath ImportPath(Tm1Operation operation) => ODataPath.Of(operation.ImportName ?? throw new InvalidOperationException(operation.Name));
 }

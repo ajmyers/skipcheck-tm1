@@ -62,24 +62,25 @@ public static class Live
         if (string.IsNullOrWhiteSpace(Running))
         {
             var tm1 = Tm1ServerContainer.SharedAsync().GetAwaiter().GetResult();
-            var own = tm1.CamNamespace is { } cam && user is null
-                ? Tm1Authenticator.CamNamespace(tm1.Username, tm1.Password, cam.Id())
-                : Tm1Authenticator.Basic(user ?? tm1.Username, user is null ? tm1.Password : password);
+            var own =
+                tm1.CamNamespace is { } cam && user is null
+                    ? Tm1Authenticator.CamNamespace(tm1.Username, tm1.Password, cam.Id())
+                    : Tm1Authenticator.Basic(user ?? tm1.Username, user is null ? tm1.Password : password);
             return Tm1Client.Builder().BaseUrl(tm1.RestUrl).Authenticator(own);
         }
         var (url, liveUser, livePassword) = Target();
         var ns = Environment.GetEnvironmentVariable("TM1_NAMESPACE");
-        var builder = Tm1Client.Builder().BaseUrl(url).Authenticator(
-            user is not null ? Tm1Authenticator.Basic(user, password)
-            : string.IsNullOrWhiteSpace(ns) ? Tm1Authenticator.Basic(liveUser, livePassword)
-            : Tm1Authenticator.CamNamespace(liveUser, livePassword, ns));
+        var builder = Tm1Client
+            .Builder()
+            .BaseUrl(url)
+            .Authenticator(
+                user is not null ? Tm1Authenticator.Basic(user, password)
+                : string.IsNullOrWhiteSpace(ns) ? Tm1Authenticator.Basic(liveUser, livePassword)
+                : Tm1Authenticator.CamNamespace(liveUser, livePassword, ns)
+            );
         if (Environment.GetEnvironmentVariable("TM1_VERIFY") == "false")
         {
-            builder.HttpHandler(new SocketsHttpHandler
-            {
-                UseCookies = false,
-                SslOptions = { RemoteCertificateValidationCallback = (_, _, _, _) => true },
-            });
+            builder.HttpHandler(new SocketsHttpHandler { UseCookies = false, SslOptions = { RemoteCertificateValidationCallback = (_, _, _, _) => true } });
         }
         return builder;
     }

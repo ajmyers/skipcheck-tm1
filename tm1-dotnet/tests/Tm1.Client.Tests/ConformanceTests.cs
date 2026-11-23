@@ -12,9 +12,11 @@ public class ConformanceTests
 {
     private static readonly JsonElement Cases = JsonDocument.Parse(File.ReadAllText(Path.Combine(Repo.Conformance, "odata-encoding.json"))).RootElement;
 
-    public static IEnumerable<object[]> Paths() => Cases.GetProperty("paths").EnumerateArray().Select(c => new object[] { c.GetProperty("expect").GetString()!, c.GetProperty("steps").GetRawText() });
+    public static IEnumerable<object[]> Paths() =>
+        Cases.GetProperty("paths").EnumerateArray().Select(c => new object[] { c.GetProperty("expect").GetString()!, c.GetProperty("steps").GetRawText() });
 
-    public static IEnumerable<object[]> Literals() => Cases.GetProperty("literals").EnumerateArray().Select(c => new object[] { c.GetProperty("expect").GetString()!, c.GetRawText() });
+    public static IEnumerable<object[]> Literals() =>
+        Cases.GetProperty("literals").EnumerateArray().Select(c => new object[] { c.GetProperty("expect").GetString()!, c.GetRawText() });
 
     [Theory]
     [MemberData(nameof(Paths))]
@@ -54,14 +56,15 @@ public class ConformanceTests
 
     private static Dictionary<string, object?> Map(JsonElement e) => e.EnumerateObject().ToDictionary(p => p.Name, p => Value(p.Value, null));
 
-    private static object? Value(JsonElement e, string? @as) => e.ValueKind switch
-    {
-        JsonValueKind.Null => null,
-        _ when @as == "double" => e.GetDouble(),
-        JsonValueKind.True => true,
-        JsonValueKind.False => false,
-        JsonValueKind.Number when e.TryGetInt64(out var l) => l,
-        JsonValueKind.Number => e.GetDouble(),
-        _ => e.GetString(),
-    };
+    private static object? Value(JsonElement e, string? @as) =>
+        e.ValueKind switch
+        {
+            JsonValueKind.Null => null,
+            _ when @as == "double" => e.GetDouble(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Number when e.TryGetInt64(out var l) => l,
+            JsonValueKind.Number => e.GetDouble(),
+            _ => e.GetString(),
+        };
 }

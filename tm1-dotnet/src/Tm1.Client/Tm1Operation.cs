@@ -16,7 +16,16 @@ public sealed record Tm1Operation
 
     public sealed record Parameter(string Name, string Type, bool Nullable);
 
-    public Tm1Operation(OperationKind kind, string name, string? bindingType, string? importName, IReadOnlyList<Parameter> parameters, string? returnType, string? addedIn, string? deprecatedIn)
+    public Tm1Operation(
+        OperationKind kind,
+        string name,
+        string? bindingType,
+        string? importName,
+        IReadOnlyList<Parameter> parameters,
+        string? returnType,
+        string? addedIn,
+        string? deprecatedIn
+    )
     {
         ArgumentNullException.ThrowIfNull(name);
         if ((bindingType is null) == (importName is null))

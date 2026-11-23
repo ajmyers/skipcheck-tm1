@@ -19,7 +19,8 @@ public static class Tuples
 
     /// <summary><c>Dimensions('d')/Hierarchies('h')/Elements('e')</c>.</summary>
     public static ODataPath Element(string dimension, string hierarchy, string element) =>
-        ODataPath.Of("Dimensions")
+        ODataPath
+            .Of("Dimensions")
             .Key(dimension ?? throw new ArgumentNullException(nameof(dimension)))
             .Nav("Hierarchies")
             .Key(hierarchy ?? throw new ArgumentNullException(nameof(hierarchy)))

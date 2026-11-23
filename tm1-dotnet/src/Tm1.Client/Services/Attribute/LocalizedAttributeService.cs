@@ -20,9 +20,7 @@ namespace AjMyers.Tm1.Client.Services;
 public sealed class LocalizedAttributeService : Tm1Service
 {
     public LocalizedAttributeService(Tm1Session session)
-        : base(session)
-    {
-    }
+        : base(session) { }
 
     /// <summary><c>GET …/LocalizedAttributes</c>: the owner's translations, one per locale, streamed.</summary>
     [Tm1Endpoint("Navigation Dimension/LocalizedAttributes")]

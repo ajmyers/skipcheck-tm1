@@ -19,11 +19,13 @@ public partial class JavaParityTests
 {
     public sealed record JavaMethod(string Name, bool Reactive, List<List<(string Type, string Name)>> Overloads, HashSet<string> Endpoints);
 
-    public static IEnumerable<object[]> Classes() => Directory.GetFiles(Repo.JavaServices, "*.java", SearchOption.AllDirectories)
-        .Where(f => !f.EndsWith("package-info.java", StringComparison.Ordinal))
-        .Where(f => Regex.IsMatch(File.ReadAllText(f), $@"public\s+(final\s+)?(class|enum|record|interface)\s+{Path.GetFileNameWithoutExtension(f)}\b"))
-        .Order()
-        .Select(f => new object[] { Path.GetFileNameWithoutExtension(f) });
+    public static IEnumerable<object[]> Classes() =>
+        Directory
+            .GetFiles(Repo.JavaServices, "*.java", SearchOption.AllDirectories)
+            .Where(f => !f.EndsWith("package-info.java", StringComparison.Ordinal))
+            .Where(f => Regex.IsMatch(File.ReadAllText(f), $@"public\s+(final\s+)?(class|enum|record|interface)\s+{Path.GetFileNameWithoutExtension(f)}\b"))
+            .Order()
+            .Select(f => new object[] { Path.GetFileNameWithoutExtension(f) });
 
     public static Dictionary<string, JavaMethod> JavaMethods(string file)
     {
@@ -33,19 +35,30 @@ public partial class JavaParityTests
         foreach (Match m in MethodPattern().Matches(source))
         {
             var name = m.Groups["name"].Value;
-            if (name == cls || !m.Groups["decl"].Value.TrimStart('\n', '\r').StartsWith("\tpublic", StringComparison.Ordinal) || name is "toString" or "equals" or "hashCode")
+            if (
+                name == cls
+                || !m.Groups["decl"].Value.TrimStart('\n', '\r').StartsWith("\tpublic", StringComparison.Ordinal)
+                || name is "toString" or "equals" or "hashCode"
+            )
             {
                 continue;
             }
-            var parameters = Split(m.Groups["params"].Value).Select(p =>
-            {
-                var parts = p.Replace("@Nullable", "", StringComparison.Ordinal).Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                return (string.Join(" ", parts[..^1]), parts[^1].TrimStart('.'));
-            }).ToList();
+            var parameters = Split(m.Groups["params"].Value)
+                .Select(p =>
+                {
+                    var parts = p.Replace("@Nullable", "", StringComparison.Ordinal).Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    return (string.Join(" ", parts[..^1]), parts[^1].TrimStart('.'));
+                })
+                .ToList();
             var ret = m.Groups["ret"].Value;
             if (!result.TryGetValue(name, out var method))
             {
-                result[name] = method = new JavaMethod(name, ret.StartsWith("Mono", StringComparison.Ordinal) || ret.StartsWith("Flux", StringComparison.Ordinal), new(), new());
+                result[name] = method = new JavaMethod(
+                    name,
+                    ret.StartsWith("Mono", StringComparison.Ordinal) || ret.StartsWith("Flux", StringComparison.Ordinal),
+                    new(),
+                    new()
+                );
             }
             method.Overloads.Add(parameters);
             foreach (Match e in Regex.Matches(m.Groups["ann"].Value, "@Tm1Endpoint\\(\"([^\"]+)\"\\)"))
@@ -96,9 +109,22 @@ public partial class JavaParityTests
             foreach (var overload in method.Overloads)
             {
                 var expected = overload.Select(p => p.Type == "ODataQuery" ? "query" : p.Name).ToList();
-                if (!overloads.Any(o => Subsequence(expected, o.GetParameters().Select(p => p.ParameterType == typeof(OData.ODataQuery) ? "query" : p.Name!).Where(n => n != "cancellationToken").ToList())))
+                if (
+                    !overloads.Any(o =>
+                        Subsequence(
+                            expected,
+                            o.GetParameters()
+                                .Select(p => p.ParameterType == typeof(OData.ODataQuery) ? "query" : p.Name!)
+                                .Where(n => n != "cancellationToken")
+                                .ToList()
+                        )
+                    )
+                )
                 {
-                    problems.Add($"{dotnet}: no overload takes ({string.Join(", ", expected)}); has " + string.Join(" | ", overloads.Select(o => "(" + string.Join(", ", o.GetParameters().Select(p => p.Name)) + ")")));
+                    problems.Add(
+                        $"{dotnet}: no overload takes ({string.Join(", ", expected)}); has "
+                            + string.Join(" | ", overloads.Select(o => "(" + string.Join(", ", o.GetParameters().Select(p => p.Name)) + ")"))
+                    );
                 }
             }
         }
@@ -109,7 +135,12 @@ public partial class JavaParityTests
     public void TheClientHasEveryService()
     {
         var methods = JavaMethods(Path.Combine(Repo.JavaServices, "..", "Tm1Client.java"));
-        foreach (var m in methods.Values.Where(m => m.Overloads.All(o => o.Count == 0) && m.Name.EndsWith('s') || m.Name is "server" or "git" or "encryption" or "drillthrough" or "processDebugging"))
+        foreach (
+            var m in methods.Values.Where(m =>
+                m.Overloads.All(o => o.Count == 0) && m.Name.EndsWith('s')
+                || m.Name is "server" or "git" or "encryption" or "drillthrough" or "processDebugging"
+            )
+        )
         {
             if (m.Name is "builder" or "session" or "batch" or "connect" or "close" or "withoutAsync" or "toString")
             {
@@ -134,7 +165,8 @@ public partial class JavaParityTests
 
     private static string Capitalize(string s) => char.ToUpperInvariant(s[0]) + s[1..];
 
-    private static string Pascal(string constant) => string.Concat(constant.Split('_', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0] + w[1..].ToLowerInvariant()));
+    private static string Pascal(string constant) =>
+        string.Concat(constant.Split('_', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0] + w[1..].ToLowerInvariant()));
 
     private static List<string> Split(string parameters)
     {
@@ -143,7 +175,10 @@ public partial class JavaParityTests
         var current = "";
         foreach (var c in parameters)
         {
-            depth += c == '<' ? 1 : c == '>' ? -1 : 0;
+            depth +=
+                c == '<' ? 1
+                : c == '>' ? -1
+                : 0;
             if (c == ',' && depth == 0)
             {
                 result.Add(current);
@@ -161,6 +196,8 @@ public partial class JavaParityTests
         return result.Select(p => Regex.Replace(p, @"\s+", " ").Trim()).ToList();
     }
 
-    [GeneratedRegex(@"(?<ann>(?:\s*@Tm1Endpoint\(""[^""]+""\)\s*)*)(?<decl>\s+public\s+(?:static\s+)?(?:<[^>]+>\s+)?(?<ret>[\w.<>\[\]?, ]+?)\s+(?<name>\w+)\s*\((?<params>[^)]*)\)\s*(?:throws [\w., ]+)?\{)")]
+    [GeneratedRegex(
+        @"(?<ann>(?:\s*@Tm1Endpoint\(""[^""]+""\)\s*)*)(?<decl>\s+public\s+(?:static\s+)?(?:<[^>]+>\s+)?(?<ret>[\w.<>\[\]?, ]+?)\s+(?<name>\w+)\s*\((?<params>[^)]*)\)\s*(?:throws [\w., ]+)?\{)"
+    )]
     private static partial Regex MethodPattern();
 }

@@ -1,6 +1,6 @@
 using AjMyers.Tm1.Client.Tests.Live;
-using LiveTm1 = AjMyers.Tm1.Client.Tests.Live.Live;
 using AjMyers.Tm1.Testcontainers.Xunit;
+using LiveTm1 = AjMyers.Tm1.Client.Tests.Live.Live;
 
 namespace AjMyers.Tm1.Client.Tests;
 

@@ -26,13 +26,17 @@ public class ChoreServiceTests
         Assert.Equal("W/\"3\"", (await tm1.Chores.GetAsync("Nightly Load", ODataQuery.None().Expand("Tasks"))).ETag);
         Assert.Equal("Chores('Nightly%20Load')?$expand=Tasks", _tm1.Last.Target);
 
-        var task = ChoreTaskPatch.Builder()
+        var task = ChoreTaskPatch
+            .Builder()
             .BindProcess(ODataPath.Of("Processes").Key("Load Sales"))
             .Parameters([ChoreTaskParameterPatch.Builder().Name("pYear").Value(2026).Build()])
             .Build();
         await tm1.Chores.CreateAsync(ChorePatch.Builder().Name("Nightly Load").Active(false).Tasks([task]).Build());
         Assert.Equal(("POST", "Chores"), (_tm1.Last.Method, _tm1.Last.Target));
-        Assert.Equal("""{"Name":"Nightly Load","Active":false,"Tasks":[{"Process@odata.bind":"Processes('Load%20Sales')","Parameters":[{"Name":"pYear","Value":2026}]}]}""", _tm1.Last.Text);
+        Assert.Equal(
+            """{"Name":"Nightly Load","Active":false,"Tasks":[{"Process@odata.bind":"Processes('Load%20Sales')","Parameters":[{"Name":"pYear","Value":2026}]}]}""",
+            _tm1.Last.Text
+        );
 
         _tm1.Respond = _ => null;
         await tm1.Chores.UpdateAsync("Nightly Load", ChorePatch.Builder().Active(true).Build());
@@ -76,12 +80,14 @@ public class ChoreServiceTests
     {
         _tm1.Respond = _ => null;
         var tm1 = _tm1.Client();
-        foreach (var (call, action) in new (Func<Task>, string)[]
-        {
-            (() => tm1.Chores.ExecuteAsync("c"), "Execute"),
-            (() => tm1.Chores.ActivateAsync("c"), "Activate"),
-            (() => tm1.Chores.DeactivateAsync("c"), "Deactivate"),
-        })
+        foreach (
+            var (call, action) in new (Func<Task>, string)[]
+            {
+                (() => tm1.Chores.ExecuteAsync("c"), "Execute"),
+                (() => tm1.Chores.ActivateAsync("c"), "Activate"),
+                (() => tm1.Chores.DeactivateAsync("c"), "Deactivate"),
+            }
+        )
         {
             await call();
             Assert.Equal(("POST", $"Chores('c')/tm1.{action}", "{}"), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));

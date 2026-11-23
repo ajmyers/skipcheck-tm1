@@ -9,8 +9,7 @@ namespace AjMyers.Tm1.Client.Errors;
 /// <c>Tm1ErrorClassifier</c>: the first rule that matches, else by status.</summary>
 public sealed class Tm1ErrorClassifier
 {
-    private static readonly Tm1ErrorClassifier DefaultRules = new(
-    [
+    private static readonly Tm1ErrorClassifier DefaultRules = new([
         Rule.Message("insufficient rights to impersonate", Tm1ErrorKind.ImpersonationRefused),
         Rule.Message("administrator to be able to impersonate", Tm1ErrorKind.ImpersonationRefused),
         Rule.Message("user specified in the impersonation request does not exist", Tm1ErrorKind.UnknownUser),

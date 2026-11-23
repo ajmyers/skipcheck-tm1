@@ -64,11 +64,15 @@ public class DimensionServiceTests
         Assert.Contains("Leaves", _tm1.Last.Text);
 
         _tm1.Respond = _ => null;
-        foreach (var (call, action) in new (System.Func<Task>, string)[]
-        {
-            (() => tm1.Dimensions.LockAsync("Region"), "Lock"), (() => tm1.Dimensions.UnlockAsync("Region"), "Unlock"),
-            (() => tm1.Dimensions.ReserveAsync("Region"), "Reserve"), (() => tm1.Dimensions.ReleaseAsync("Region"), "Release"),
-        })
+        foreach (
+            var (call, action) in new (System.Func<Task>, string)[]
+            {
+                (() => tm1.Dimensions.LockAsync("Region"), "Lock"),
+                (() => tm1.Dimensions.UnlockAsync("Region"), "Unlock"),
+                (() => tm1.Dimensions.ReserveAsync("Region"), "Reserve"),
+                (() => tm1.Dimensions.ReleaseAsync("Region"), "Release"),
+            }
+        )
         {
             await call();
             Assert.Equal(("POST", $"Dimensions('Region')/tm1.{action}"), (_tm1.Last.Method, _tm1.Last.Target));
