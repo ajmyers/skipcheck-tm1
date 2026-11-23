@@ -32,6 +32,22 @@
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Tm1.Client' Or '$(MSBuildProjectName)' == 'Tm1.Testcontainers'">
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
+  <!-- What nuget.org shows for the two published libraries. The version is each project's own until
+       a release, when the release workflow sets one for both (-p:Version). -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Tm1.Client' Or '$(MSBuildProjectName)' == 'Tm1.Testcontainers'">
+    <Authors>Andrew Myers</Authors>
+    <Copyright>© Andrew Myers</Copyright>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <PackageProjectUrl>https://skipcheck.io</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ajmyers/skipcheck-tm1</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>tm1;planning-analytics;ibm;odata;testcontainers</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Tm1.Client' Or '$(MSBuildProjectName)' == 'Tm1.Testcontainers'">
+    <!-- One README for both: it covers the client and its testcontainers -->
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
   <ItemGroup>
     <!-- The same version as the tool in dotnet-tools.json: they have to lay code out alike -->
     <PackageReference Include="CSharpier.MsBuild" Version="1.4.1" PrivateAssets="all" />

@@ -5,7 +5,6 @@
     <PackageId>Skipcheck.Tm1.Client</PackageId>
     <Version>0.1.0-dev</Version>
     <Description>.NET client for the IBM Planning Analytics (TM1) REST API, generated from its $metadata</Description>
-    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
     <GeneratedDir>$(BaseIntermediateOutputPath)generated/</GeneratedDir>
     <SpecFile>$(RepositoryRoot)/spec/tm1-api.json</SpecFile>
   </PropertyGroup>
