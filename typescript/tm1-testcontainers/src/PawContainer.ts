@@ -44,6 +44,15 @@ let sharedFailure: string | undefined;
  * Users log on as users of the TM1 server (`PAAuthMode=tm1`), and every PAW container is
  * connected to TM1's network.
  *
+ * When the TM1 server runs in Cognos (CAM) security ({@link Tm1ServerContainer.withCamSecurity}),
+ * PAW does too (`PAAuthMode=cam`), as pa-setup wires it: users log on through Cognos, in the TM1
+ * server's namespace. PAW checks logons with Cognos's dispatcher on the network
+ * (`http://cognos:9300`), and sends browsers to Cognos's address on the host to log on. Tests log
+ * on with a Cognos test user's name and password, which PAW checks with Cognos. A browser that logs
+ * on through Cognos isn't sent back to PAW, though: Cognos hands logons back only to the addresses
+ * in IBM's `pmhub.html`, which `CognosContainer` doesn't install (pa-setup does, with
+ * `COGNOS_PMHUB_URLS`).
+ *
  * - **The license:** starting fails unless IBM's PAW license is accepted, with
  *   {@link acceptLicense} or `PAW_ACCEPT_LICENSE=true`.
  * - **One PAW per Docker daemon:** IBM's compose files give every container a fixed name.
@@ -204,16 +213,9 @@ export class PawContainer implements Startable {
       adminAddress = adminNetwork.address;
     }
     this.#httpPort = await freePort();
-    const env: Record<string, string> = {
-      ...Object.fromEntries(this.#settings),
-      PAW_TM1_ADMIN_URL: "http://" + adminAddress + ":" + PawContainer.ADMIN_PORT,
-      PAW_TM1_LOGIN_URL: "http://" + tm1Network.address + ":" + Tm1ServerContainer.REST_PORT,
-      PAW_AUTH_MODE: "tm1",
-      PAW_HTTP_PORT: String(this.#httpPort),
-      PAW_HTTPS_PORT: String(await freePort()),
-      PAW_NETWORK: PawContainer.PAW_NETWORK,
-      PAW_WAIT: "0",
-    };
+    const env = this.scriptSettings(tm1Network.address, adminAddress, server.getCognos()?.getUrl());
+    env["PAW_HTTP_PORT"] = String(this.#httpPort);
+    env["PAW_HTTPS_PORT"] = String(await freePort());
     log.info(`Starting PAW from ${this.#source.describe()} against the TM1 server at ${tm1Network.address} (the first start loads IBM's images)`);
     await this.#runScript("up", env, this.#startupTimeout);
     await connectToNetwork(tm1Network.id);
@@ -221,6 +223,40 @@ export class PawContainer implements Startable {
     this.#running = true;
     await this.#awaitReady(server);
     log.info(`PAW is up at ${this.getUrl()}, logging users on to the TM1 server at ${tm1Network.address}`);
+  }
+
+  /** `paw-local.sh`'s settings for PAW against the TM1 server, without the ports: the caller's own,
+   * then this class's wiring. With the server in CAM security, PAW logs users on through its Cognos
+   * and namespace.
+   * @param tm1Address the TM1 server's address on its network
+   * @param adminAddress the Admin Server's address on that network
+   * @param cognosUrl Cognos as the host sees it (`CognosContainer.getUrl()`), where PAW sends
+   * browsers to log on; `undefined` unless the server is in CAM security
+   * @internal */
+  scriptSettings(tm1Address: string, adminAddress: string, cognosUrl: string | undefined): Record<string, string> {
+    const server = this.#tm1;
+    if (!server) throw new IllegalStateException("No TM1 server: set one with withTm1Server");
+    const env: Record<string, string> = {
+      ...Object.fromEntries(this.#settings),
+      PAW_TM1_ADMIN_URL: "http://" + adminAddress + ":" + PawContainer.ADMIN_PORT,
+      PAW_TM1_LOGIN_URL: "http://" + tm1Address + ":" + Tm1ServerContainer.REST_PORT,
+      PAW_NETWORK: PawContainer.PAW_NETWORK,
+      PAW_WAIT: "0",
+    };
+    const cognos = server.getCognos();
+    const namespace = server.getCamNamespace();
+    if (cognos === undefined || namespace === undefined) {
+      env["PAW_AUTH_MODE"] = "tm1";
+      return env;
+    }
+    if (cognosUrl === undefined) throw new IllegalStateException("PAW in CAM security needs Cognos's address on the host");
+    // As pa-setup: the dispatcher on the network checks logons; the gateway, Cognos as browsers
+    // reach it, is where PAW sends them to log on
+    env["PAW_AUTH_MODE"] = "cam";
+    env["PAW_CAM_SERVLET"] = cognos.getNetworkUrl() + "/p2pd/servlet/dispatch";
+    env["PAW_CAM_GATEWAY"] = cognosUrl + "v1/disp";
+    env["PAW_CAM_NAMESPACE"] = namespace.id();
+    return env;
   }
 
   /** Removes the PAW containers, keeping PAW's data. */

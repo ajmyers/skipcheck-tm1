@@ -254,10 +254,6 @@ final class PaEnvironmentFile {
 			throw error("cognos: PlanningAnalyticsEnvironment needs a TM1 server too (tm1.servers); "
 					+ "for Cognos alone, use CognosContainer");
 		}
-		if (pawPort != null && cam != null) {
-			throw error("paw: PlanningAnalyticsEnvironment can't run PAW with Cognos (CAM) security yet; "
-					+ "remove paw or cognos");
-		}
 		servers.forEach((name, s) -> {
 			if (s.seed().equals("24retail")) {
 				throw error("tm1.servers." + name + ".seed: 24retail isn't available in tm1-testcontainers "

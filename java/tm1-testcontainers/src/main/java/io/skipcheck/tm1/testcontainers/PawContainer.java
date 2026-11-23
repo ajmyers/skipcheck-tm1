@@ -64,6 +64,17 @@ import com.github.dockerjava.api.model.Volume;
  * advertises.
  *
  * <p>
+ * When the TM1 server runs in Cognos (CAM) security
+ * ({@link Tm1ServerContainer#withCamSecurity}), PAW does too ({@code PAAuthMode=cam}), as
+ * pa-setup wires it: users log on through Cognos, in the TM1 server's namespace. PAW
+ * checks logons with Cognos's dispatcher on the network ({@code http://cognos:9300}), and
+ * sends browsers to Cognos's address on the host to log on. Tests log on with a Cognos
+ * test user's name and password, which PAW checks with Cognos. A browser that logs on
+ * through Cognos isn't sent back to PAW, though: Cognos hands logons back only to the
+ * addresses in IBM's {@code pmhub.html}, which {@link CognosContainer} doesn't install
+ * (pa-setup does, with {@code COGNOS_PMHUB_URLS}).
+ *
+ * <p>
  * Things to know:
  * <ul>
  * <li><b>The license:</b> starting fails unless IBM's PAW license is accepted, with
@@ -316,15 +327,11 @@ public class PawContainer implements Startable {
 			}
 			adminAddress = Objects.requireNonNull(adminNetwork.getIpAddress(), "the Admin Server's address");
 		}
+		CognosContainer cognos = server.getCognos();
 		httpPort = freePort();
-		Map<String, String> env = new LinkedHashMap<>(settings);
-		env.put("PAW_TM1_ADMIN_URL", "http://" + adminAddress + ":" + ADMIN_PORT);
-		env.put("PAW_TM1_LOGIN_URL", "http://" + tm1Address + ":" + Tm1ServerContainer.REST_PORT);
-		env.put("PAW_AUTH_MODE", "tm1");
+		Map<String, String> env = scriptSettings(tm1Address, adminAddress, cognos == null ? null : cognos.getUrl());
 		env.put("PAW_HTTP_PORT", Integer.toString(httpPort));
 		env.put("PAW_HTTPS_PORT", Integer.toString(freePort()));
-		env.put("PAW_NETWORK", PAW_NETWORK);
-		env.put("PAW_WAIT", "0");
 		log.info("Starting PAW from {} against the TM1 server at {} (the first start loads IBM's images)",
 				source.describe(), tm1Address);
 		runScript(docker, "up", env, startupTimeout);
@@ -332,6 +339,42 @@ public class PawContainer implements Startable {
 		running = true;
 		awaitReady(server);
 		log.info("PAW is up at {}, logging users on to the TM1 server at {}", getUrl(), tm1Address);
+	}
+
+	/**
+	 * {@code paw-local.sh}'s settings for PAW against the {@linkplain #withTm1Server TM1
+	 * server}, without the ports: the caller's own, then this class's wiring. With the
+	 * server in CAM security, PAW logs users on through its Cognos and namespace.
+	 * @param tm1Address the TM1 server's address on its network
+	 * @param adminAddress the Admin Server's address on that network
+	 * @param cognosUrl Cognos as the host sees it ({@link CognosContainer#getUrl()}),
+	 * where PAW sends browsers to log on; {@code null} unless the server is in CAM
+	 * security
+	 * @return the settings, a new map
+	 */
+	Map<String, String> scriptSettings(String tm1Address, String adminAddress, @Nullable String cognosUrl) {
+		Tm1ServerContainer server = Objects.requireNonNull(this.tm1, "the TM1 server");
+		Map<String, String> env = new LinkedHashMap<>(settings);
+		env.put("PAW_TM1_ADMIN_URL", "http://" + adminAddress + ":" + ADMIN_PORT);
+		env.put("PAW_TM1_LOGIN_URL", "http://" + tm1Address + ":" + Tm1ServerContainer.REST_PORT);
+		env.put("PAW_NETWORK", PAW_NETWORK);
+		env.put("PAW_WAIT", "0");
+		CognosContainer cognos = server.getCognos();
+		CognosContainer.Namespace namespace = server.getCamNamespace();
+		if (cognos == null || namespace == null) {
+			env.put("PAW_AUTH_MODE", "tm1");
+			return env;
+		}
+		if (cognosUrl == null) {
+			throw new IllegalStateException("PAW in CAM security needs Cognos's address on the host");
+		}
+		// As pa-setup: the dispatcher on the network checks logons; the gateway, Cognos
+		// as browsers reach it, is where PAW sends them to log on
+		env.put("PAW_AUTH_MODE", "cam");
+		env.put("PAW_CAM_SERVLET", cognos.getNetworkUrl() + "/p2pd/servlet/dispatch");
+		env.put("PAW_CAM_GATEWAY", cognosUrl + "v1/disp");
+		env.put("PAW_CAM_NAMESPACE", namespace.id());
+		return env;
 	}
 
 	/** Removes the PAW containers, keeping PAW's data. */

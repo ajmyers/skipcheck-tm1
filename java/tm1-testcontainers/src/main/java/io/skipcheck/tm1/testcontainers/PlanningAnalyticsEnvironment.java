@@ -65,7 +65,7 @@ import io.skipcheck.tm1.testcontainers.CognosContainer.Namespace;
  * it. With one server, its own Admin Server is used.
  * <li>With Cognos, every TM1 server runs in CAM security against it
  * ({@link Builder#camSecurity}); with {@link Builder#keycloak()}, Cognos also has an OIDC
- * namespace.
+ * namespace. PAW then logs users on through Cognos too, in the same namespace.
  * <li>{@link #start()} starts everything in dependency order, independent parts in
  * parallel. {@link #close()} stops it all.
  * </ul>
@@ -294,7 +294,7 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 	 *
 	 * <p>
 	 * Refused, because the environment can't run them yet: {@code cognos} without
-	 * {@code tm1.servers}, {@code paw} with {@code cognos}, and {@code seed: 24retail}.
+	 * {@code tm1.servers}, and {@code seed: 24retail}.
 	 * @param path the file, usually {@code pa-environment.yaml}
 	 * @return a builder configured from the file
 	 * @throws IllegalArgumentException if the file can't be read, isn't valid, or asks
@@ -691,8 +691,8 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		/**
 		 * Adds PAW, logging users on to the first TM1 server and listing every one. IBM's
 		 * license must be accepted ({@link PawContainer#acceptLicense()} in the
-		 * customizer, or {@code PAW_ACCEPT_LICENSE=true}). Not available with Cognos yet:
-		 * PAW logs users on with TM1's own security.
+		 * customizer, or {@code PAW_ACCEPT_LICENSE=true}). With {@link #cognos}, users
+		 * log on to PAW through Cognos, in the {@linkplain #camSecurity CAM namespace}.
 		 * @param customizer configures the container
 		 * @return this builder
 		 */
@@ -842,10 +842,6 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 			}
 			if (camNamespace == Namespace.OIDC && keycloak == null) {
 				throw new IllegalStateException("CAM security through OIDC needs keycloak()");
-			}
-			if (paw != null && cognos != null) {
-				throw new IllegalStateException(
-						"PAW with Cognos (CAM) security isn't supported yet: PAW logs users on with TM1's own security");
 			}
 			return new PlanningAnalyticsEnvironment(this, reuseEnabled);
 		}

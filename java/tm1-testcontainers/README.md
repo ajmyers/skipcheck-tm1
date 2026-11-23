@@ -142,7 +142,7 @@ try (var env = PlanningAnalyticsEnvironment.builder()
   than one, or with `adminServer()`, they share a `Tm1AdminServerContainer`, and TM1 Web and
   PAW list them all.
 - **With `cognos(...)`, every server runs in CAM security**
-  ([below](#cognos-cam-security)). PAW with CAM security isn't supported yet.
+  ([below](#cognos-cam-security)), and PAW logs users on through Cognos too.
 - **Sources** are discovered from the environment, as for each container, unless set with
   `tm1Source(...)`, `cognosSource(...)` and so on. `start()` starts parts in dependency
   order, in parallel where it can; `close()` stops everything and removes the network.
@@ -171,8 +171,8 @@ checked as `pa-setup` checks it, with the same defaults and messages.
   `images` entry is the image the part runs.
 - **Ignored:** `name`, every port, and `files`. Testcontainers gives the environment its own
   network, random host ports and a new database each time.
-- **Refused** with a message naming the setting: `cognos` without `tm1.servers`, `paw` with
-  `cognos`, and `seed: 24retail`, which the environment can't run yet.
+- **Refused** with a message naming the setting: `cognos` without `tm1.servers`, and
+  `seed: 24retail`, which the environment can't run yet.
 
 ## Several servers, one Admin Server
 

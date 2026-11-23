@@ -262,10 +262,6 @@ internal sealed partial class PaEnvironmentFile
         {
             throw Error("cognos: PlanningAnalyticsEnvironment needs a TM1 server too (tm1.servers); for Cognos alone, use CognosContainer");
         }
-        if (pawPort is not null && cam is not null)
-        {
-            throw Error("paw: PlanningAnalyticsEnvironment can't run PAW with Cognos (CAM) security yet; remove paw or cognos");
-        }
         foreach (var (name, s) in servers.Where(s => s.Server.Seed == "24retail"))
         {
             throw Error("tm1.servers." + name + ".seed: 24retail isn't available in tm1-testcontainers (Tm1Seed has empty and sdata)");

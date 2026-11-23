@@ -75,7 +75,16 @@ class PawContainer:
 
     Not one container but IBM's compose project (``paw``), started by ``paw-local.sh`` and
     joined to the TM1 server's network. Starting needs IBM's license accepted:
-    ``PAW_ACCEPT_LICENSE=true``, or :meth:`accept_license`."""
+    ``PAW_ACCEPT_LICENSE=true``, or :meth:`accept_license`.
+
+    When the TM1 server runs in Cognos (CAM) security (:meth:`Tm1ServerContainer.with_cam_security`),
+    PAW does too (``PAAuthMode=cam``), as pa-setup wires it: users log on through Cognos, in the TM1
+    server's namespace. PAW checks logons with Cognos's dispatcher on the network
+    (``http://cognos:9300``), and sends browsers to Cognos's address on the host to log on. Tests
+    log on with a Cognos test user's name and password, which PAW checks with Cognos. A browser that
+    logs on through Cognos isn't sent back to PAW, though: Cognos hands logons back only to the
+    addresses in IBM's ``pmhub.html``, which :class:`CognosContainer` doesn't install (pa-setup
+    does, with ``COGNOS_PMHUB_URLS``)."""
 
     ACCEPT_LICENSE: ClassVar[str] = "PAW_ACCEPT_LICENSE"
     HOME_VOLUME: ClassVar[str] = "tm1-paw-home"
@@ -208,21 +217,44 @@ class PawContainer:
                 if admin_network.get("NetworkID") != tm1_network.get("NetworkID"):
                     raise RuntimeError("PAW needs the Admin Server and the TM1 server on one network")
                 admin_address = admin_network["IPAddress"]
+            cognos = server.cognos
             self._http_port = _free_port()
-            env = dict(self._settings)
-            env["PAW_TM1_ADMIN_URL"] = f"http://{admin_address}:{self.ADMIN_PORT}"
-            env["PAW_TM1_LOGIN_URL"] = f"http://{tm1_address}:{Tm1ServerContainer.REST_PORT}"
-            env["PAW_AUTH_MODE"] = "tm1"
+            env = self._script_settings(tm1_address, admin_address, None if cognos is None else cognos.url)
             env["PAW_HTTP_PORT"] = str(self._http_port)
             env["PAW_HTTPS_PORT"] = str(_free_port())
-            env["PAW_NETWORK"] = self.PAW_NETWORK
-            env["PAW_WAIT"] = "0"
             _log.info("Starting PAW from %s against the TM1 server at %s (the first start loads IBM's images)", self._source.describe(), tm1_address)
             self._run_script(docker, "up", env, self._startup_timeout)
             _connect_to_network(docker, tm1_network["NetworkID"])
             self._running = True
             self._await_ready(server)
             _log.info("PAW is up at %s, logging users on to the TM1 server at %s", self.url, tm1_address)
+
+    def _script_settings(self, tm1_address: str, admin_address: str, cognos_url: str | None) -> dict[str, str]:
+        """``paw-local.sh``'s settings for PAW against the TM1 server, without the ports: the
+        caller's own, then this class's wiring. With the server in CAM security, PAW logs users on
+        through its Cognos and namespace; ``cognos_url`` is Cognos as the host sees it
+        (:attr:`CognosContainer.url`), where PAW sends browsers to log on."""
+        server = self._tm1
+        if server is None:
+            raise RuntimeError("No TM1 server: set one with with_tm1_server")
+        env = dict(self._settings)
+        env["PAW_TM1_ADMIN_URL"] = f"http://{admin_address}:{self.ADMIN_PORT}"
+        env["PAW_TM1_LOGIN_URL"] = f"http://{tm1_address}:{Tm1ServerContainer.REST_PORT}"
+        env["PAW_NETWORK"] = self.PAW_NETWORK
+        env["PAW_WAIT"] = "0"
+        cognos, namespace = server.cognos, server.cam_namespace
+        if cognos is None or namespace is None:
+            env["PAW_AUTH_MODE"] = "tm1"
+            return env
+        if cognos_url is None:
+            raise RuntimeError("PAW in CAM security needs Cognos's address on the host")
+        # As pa-setup: the dispatcher on the network checks logons; the gateway, Cognos as
+        # browsers reach it, is where PAW sends them to log on
+        env["PAW_AUTH_MODE"] = "cam"
+        env["PAW_CAM_SERVLET"] = f"{cognos.network_url}/p2pd/servlet/dispatch"
+        env["PAW_CAM_GATEWAY"] = f"{cognos_url}v1/disp"
+        env["PAW_CAM_NAMESPACE"] = namespace.id
+        return env
 
     def stop(self) -> None:
         """Removes the PAW containers, keeping PAW's data."""
@@ -360,7 +392,8 @@ class PawSession:
         self._http = httpx2.Client(timeout=30.0, follow_redirects=False)
 
     def login(self, username: str, password: str) -> Self:
-        """Logs on with TM1's own security; raises :class:`OSError` when PAW refuses."""
+        """Logs on as a user PAW authenticates: a user of its TM1 server, or a Cognos user when PAW
+        runs in CAM security. Raises :class:`OSError` when PAW refuses."""
         page = self._send("GET", "login")
         if page.status_code != 200:
             raise OSError(f"PAW's logon page answered {page.status_code}")

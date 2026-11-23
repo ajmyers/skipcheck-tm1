@@ -16,7 +16,7 @@ import pytest
 from conftest import REPO
 
 FIXTURES = REPO / "spec" / "conformance" / "pa-environment"
-VALID = [FIXTURES / "settings.yaml", FIXTURES / "paw.yaml", REPO / "docker" / "pa-setup" / "examples" / "everything.yaml"]
+VALID = [FIXTURES / "settings.yaml", FIXTURES / "paw.yaml", FIXTURES / "paw-cognos.yaml", REPO / "docker" / "pa-setup" / "examples" / "everything.yaml"]
 INVALID = sorted((FIXTURES / "invalid").glob("*.yaml"))
 
 

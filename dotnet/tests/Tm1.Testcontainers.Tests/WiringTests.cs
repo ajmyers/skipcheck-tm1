@@ -261,10 +261,6 @@ public class PlanningAnalyticsEnvironmentTests
                 )
                 .Message
         );
-        Assert.Contains(
-            "PAW",
-            Assert.Throws<InvalidOperationException>(() => Builder().Tm1("a").Cognos(c => c.WithUser("u", "p")).Paw(_ => { }).Build()).Message
-        );
         Assert.Contains("test users", Assert.Throws<InvalidOperationException>(() => Builder().Tm1("a").Cognos(_ => { }).Build()).Message);
         Assert.Contains("already", Assert.Throws<ArgumentException>(() => Builder().Tm1("a").Tm1("a")).Message);
         Assert.Throws<ArgumentException>(() => Builder().Tm1("two words"));
@@ -342,6 +338,59 @@ public class PlanningAnalyticsEnvironmentTests
         Assert.Same(env.Tm1("tm1"), env.Paw().Tm1Server);
         Assert.Null(env.AdminServer);
     }
+
+    [Fact]
+    public void FromConfigRunsPawWithCognos()
+    {
+        var env = PlanningAnalyticsEnvironment.FromConfig(Fixture("paw-cognos.yaml")).Build();
+        Assert.Same(env.Tm1("tm1"), env.Paw().Tm1Server);
+        Assert.Same(env.Cognos(), env.Tm1("tm1").Cognos);
+        var settings = env.Paw().ScriptSettings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/");
+        Assert.Equal("cam", settings["PAW_AUTH_MODE"]);
+        Assert.Equal("LDAP", settings["PAW_CAM_NAMESPACE"]);
+    }
+
+    [Fact]
+    public void PawLogsOnToTm1WithoutCognos()
+    {
+        var env = Builder().Tm1("planning").Paw(paw => paw.AcceptLicense()).PawSource(TestPawSource()).Build();
+        var settings = env.Paw().ScriptSettings("10.0.0.2", "10.0.0.3", null);
+        Assert.Equal("tm1", settings["PAW_AUTH_MODE"]);
+        Assert.Equal("http://10.0.0.2:8010", settings["PAW_TM1_LOGIN_URL"]);
+        Assert.Equal("http://10.0.0.3:5895", settings["PAW_TM1_ADMIN_URL"]);
+        Assert.DoesNotContain(settings.Keys, key => key.StartsWith("PAW_CAM_", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PawWithCognosLogsOnThroughCam()
+    {
+        var env = Builder()
+            .Tm1("planning")
+            .Cognos(cognos => cognos.WithUser("admin", "adminpw"))
+            .Paw(paw => paw.AcceptLicense())
+            .PawSource(TestPawSource())
+            .Build();
+        Assert.Same(env.Tm1("planning"), env.Paw().Tm1Server);
+        // The dispatcher on the network checks logons; browsers go to Cognos on the host
+        var settings = env.Paw().ScriptSettings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/");
+        Assert.Equal("cam", settings["PAW_AUTH_MODE"]);
+        Assert.Equal("http://cognos:9300/p2pd/servlet/dispatch", settings["PAW_CAM_SERVLET"]);
+        Assert.Equal("http://localhost:9300/bi/v1/disp", settings["PAW_CAM_GATEWAY"]);
+        Assert.Equal("LDAP", settings["PAW_CAM_NAMESPACE"]);
+        // The TM1 server's namespace
+        var oidc = Builder()
+            .Tm1("planning")
+            .Cognos(cognos => cognos.WithUser("admin", "adminpw"))
+            .Keycloak()
+            .CamSecurity(CognosContainer.Namespace.Oidc)
+            .Paw(paw => paw.AcceptLicense())
+            .PawSource(TestPawSource())
+            .Build();
+        Assert.Equal("OIDC", oidc.Paw().ScriptSettings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/")["PAW_CAM_NAMESPACE"]);
+        Assert.Contains("Cognos", Assert.Throws<InvalidOperationException>(() => env.Paw().ScriptSettings("10.0.0.2", "10.0.0.2", null)).Message);
+    }
+
+    private static PawSource TestPawSource() => new(Path.Combine(Fixture("ibm"), "ipa_workspace_local_0.0.0.zip"));
 
     [Fact]
     public void FromConfigRefusesWhatItCannotRun()

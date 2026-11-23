@@ -104,8 +104,8 @@ checked as `pa-setup` checks it, with the same defaults and messages.
   `images` entry is the image the part runs.
 - **Ignored:** `name`, every port, and `files`. Testcontainers gives the environment its own
   network, random host ports and a new database each time.
-- **Refused** with a `ValueError` naming the setting: `cognos` without `tm1.servers`, `paw` with
-  `cognos`, and `seed: 24retail`, which the environment can't run yet.
+- **Refused** with a `ValueError` naming the setting: `cognos` without `tm1.servers`, and
+  `seed: 24retail`, which the environment can't run yet.
 
 ### Reusing a whole environment
 

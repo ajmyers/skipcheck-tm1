@@ -1,0 +1,8 @@
+# PAW with Cognos (CAM) security: users log on to PAW through Cognos.
+version: 1
+ibm: ibm
+tm1:
+  servers:
+    tm1: {}
+cognos: { users: [admin:adminpw, viewer:viewerpw] }
+paw: { acceptLicense: true, zip: ipa_workspace_local_0.0.0.zip }
