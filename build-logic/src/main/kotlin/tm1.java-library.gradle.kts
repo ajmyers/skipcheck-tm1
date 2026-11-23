@@ -11,6 +11,14 @@ tasks.withType<JavaCompile>().configureEach {
 	options.release = 17
 }
 
+// Every jar (classes, sources, Javadoc) carries the license and its notice in META-INF: Apache 2.0
+// asks that whoever gets the library gets them too
+tasks.withType<Jar>().configureEach {
+	metaInf {
+		from(layout.settingsDirectory.file("LICENSE"), layout.settingsDirectory.file("NOTICE"))
+	}
+}
+
 // The public API's Javadoc is part of the deliverable (plan §13 item 14): every public class,
 // method and record component must be documented, any doclint warning fails, and check runs it,
 // so ./gradlew build catches a gap rather than the release.

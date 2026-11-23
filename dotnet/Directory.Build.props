@@ -47,6 +47,8 @@
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'Tm1.Client' Or '$(MSBuildProjectName)' == 'Tm1.Testcontainers'">
     <!-- One README for both: it covers the client and its testcontainers -->
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" />
+    <!-- The license and its notice go with the package, as Apache 2.0 asks -->
+    <None Include="$(MSBuildThisFileDirectory)../LICENSE;$(MSBuildThisFileDirectory)../NOTICE" Pack="true" PackagePath="/" Visible="false" />
   </ItemGroup>
   <ItemGroup>
     <!-- The same version as the tool in dotnet-tools.json: they have to lay code out alike -->

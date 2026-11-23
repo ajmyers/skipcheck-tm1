@@ -39,7 +39,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "generate": "tsx codegen/main.ts ../../spec/tm1-api.json src/generated",
@@ -49,7 +51,7 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:live": "vitest run test/live",
-    "prepack": "npm run build && node --input-type=module -e \"import { copyFileSync } from 'node:fs'; copyFileSync('../../LICENSE', 'LICENSE');\""
+    "prepack": "npm run build && node ../scripts/copy-license.mjs"
   },
   "devDependencies": {
     "@skipcheck/tm1-testcontainers": "*",
