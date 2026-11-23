@@ -4,6 +4,7 @@ package io.skipcheck.tm1.client.auth;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -31,6 +32,15 @@ import reactor.core.publisher.Mono;
  * <p>
  * Implementations must not log or otherwise reveal the credentials; {@link #describe()}
  * is what logs show.
+ *
+ * <p>
+ * A {@code Tm1SessionPool} keeps one session for each set of a user's own credentials,
+ * and tells them apart with {@code equals}. The authenticators here that hold their
+ * credentials ({@link #basic}, {@link #camNamespace}, {@link #camPassport(String)},
+ * {@link #cognosLogon}) are equal when the credentials are. One that asks a supplier
+ * ({@link #camPassport(Supplier)}, {@link #cognosIdToken}) is only equal to itself, so
+ * keep it and pass the same one each time; so is your own, unless it defines
+ * {@code equals}.
  */
 public interface Tm1Authenticator {
 
@@ -78,6 +88,20 @@ public interface Tm1Authenticator {
 	}
 
 	/**
+	 * Cognos Access Manager security with one CAM passport the application already holds,
+	 * such as the one a signed-in user's request carries: {@code CAMPassport <passport>}.
+	 * The passport isn't renewed: once it expires, a login with it is refused. Two of
+	 * these are equal when their passports are, so a {@code Tm1SessionPool} gives a
+	 * user's renewed passport a session of its own.
+	 * @param passport the passport
+	 * @return the authenticator
+	 */
+	static Tm1Authenticator camPassport(String passport) {
+		Objects.requireNonNull(passport, "passport");
+		return new Fixed("CAMPassport " + passport, "CAMPassport");
+	}
+
+	/**
 	 * Cognos Access Manager security with a CAM passport, such as one obtained by
 	 * exchanging an OIDC token with Cognos: {@code CAMPassport <passport>}. Passports
 	 * expire, so {@code passport} is asked for a current one on every login. When TM1
@@ -122,7 +146,8 @@ public interface Tm1Authenticator {
 	 */
 	static Tm1Authenticator cognosLogon(String dispatcher, String namespace, String user, String password) {
 		Tm1Authenticator passports = camPassport(CognosPassports.password(dispatcher, namespace, user, password));
-		return described(passports, "CAMPassport from Cognos " + namespace + "/" + user);
+		return new Described(passports, "CAMPassport from Cognos " + namespace + "/" + user,
+				List.of(dispatcher, namespace, user, password));
 	}
 
 	/**
@@ -137,27 +162,8 @@ public interface Tm1Authenticator {
 	 */
 	static Tm1Authenticator cognosIdToken(String dispatcher, String namespace, Supplier<Mono<String>> idToken) {
 		Tm1Authenticator passports = camPassport(CognosPassports.idToken(dispatcher, namespace, idToken));
-		return described(passports, "CAMPassport from Cognos " + namespace + " (ID token)");
-	}
-
-	private static Tm1Authenticator described(Tm1Authenticator authenticator, String description) {
-		return new Tm1Authenticator() {
-
-			@Override
-			public Mono<String> authorization() {
-				return authenticator.authorization();
-			}
-
-			@Override
-			public String describe() {
-				return description;
-			}
-
-			@Override
-			public String toString() {
-				return "Tm1Authenticator[" + description + "]";
-			}
-		};
+		return new Described(passports, "CAMPassport from Cognos " + namespace + " (ID token)",
+				List.of(dispatcher, namespace, idToken));
 	}
 
 	private static String base64(String text) {
@@ -190,6 +196,62 @@ public interface Tm1Authenticator {
 		@Override
 		public String toString() {
 			return "Tm1Authenticator[" + description + "]";
+		}
+
+		/** Equal when the credentials are. */
+		@Override
+		public boolean equals(@Nullable Object other) {
+			return this == other || (other instanceof Fixed fixed && value.equals(fixed.value));
+		}
+
+		@Override
+		public int hashCode() {
+			return value.hashCode();
+		}
+
+	}
+
+	/** Another authenticator under its own description: the ones that ask Cognos. */
+	final class Described implements Tm1Authenticator {
+
+		private final Tm1Authenticator authenticator;
+
+		private final String description;
+
+		/** What it was made from, which is what makes two of them equal. */
+		private final List<Object> madeFrom;
+
+		private Described(Tm1Authenticator authenticator, String description, List<Object> madeFrom) {
+			this.authenticator = authenticator;
+			this.description = description;
+			this.madeFrom = madeFrom;
+		}
+
+		@Override
+		public Mono<String> authorization() {
+			return authenticator.authorization();
+		}
+
+		@Override
+		public String describe() {
+			return description;
+		}
+
+		/** The description only: never the credentials. */
+		@Override
+		public String toString() {
+			return "Tm1Authenticator[" + description + "]";
+		}
+
+		/** Equal when they were made from the same address, namespace and credentials. */
+		@Override
+		public boolean equals(@Nullable Object other) {
+			return this == other || (other instanceof Described described && madeFrom.equals(described.madeFrom));
+		}
+
+		@Override
+		public int hashCode() {
+			return madeFrom.hashCode();
 		}
 
 	}

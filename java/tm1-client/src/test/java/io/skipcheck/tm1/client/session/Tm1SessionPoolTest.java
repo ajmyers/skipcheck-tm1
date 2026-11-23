@@ -102,6 +102,37 @@ class Tm1SessionPoolTest {
 	}
 
 	@Test
+	void givesDifferentCredentialsForTheSameNameTheirOwnSession() {
+		Tm1Session carol = pool.session(Tm1Identity.withCredentials("carol", Tm1Authenticator.basic("carol", "c")));
+		assertThat(pool.session(Tm1Identity.withCredentials("Carol", Tm1Authenticator.basic("carol", "c"))))
+			.as("the same credentials, made again")
+			.isSameAs(carol);
+		carol.execute(SERVER).block();
+
+		Tm1Session other = pool.session(Tm1Identity.withCredentials("carol", Tm1Authenticator.basic("carol", "wrong")));
+		assertThat(other).as("never the session someone else's credentials opened").isNotSameAs(carol);
+		other.execute(SERVER).block();
+		assertThat(tm1.requests(FakeTm1.LOGIN)).extracting(FakeTm1::authorization)
+			.as("each logs in with what it was given")
+			.containsExactly("Basic Y2Fyb2w6Yw==", "Basic Y2Fyb2w6d3Jvbmc=");
+	}
+
+	@Test
+	void sharesASessionForTheSameAuthenticatorWhenItsCredentialsCantBeCompared() {
+		Tm1Authenticator passport = Tm1Authenticator.camPassport(() -> Mono.just("p1"));
+		Tm1Session dave = pool.session(Tm1Identity.withCredentials("dave", passport));
+		assertThat(pool.session(Tm1Identity.withCredentials("dave", passport))).isSameAs(dave);
+		assertThat(
+				pool.session(Tm1Identity.withCredentials("dave", Tm1Authenticator.camPassport(() -> Mono.just("p1")))))
+			.isNotSameAs(dave);
+		assertThat(Tm1Authenticator.camPassport("p1")).isEqualTo(Tm1Authenticator.camPassport("p1"))
+			.isNotEqualTo(Tm1Authenticator.camPassport("p2"));
+		assertThat(Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "d"))
+			.isEqualTo(Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "d"))
+			.isNotEqualTo(Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "other"));
+	}
+
+	@Test
 	void keepsASessionWhileARequestIsRunningOnIt() {
 		Sinks.One<ClientResponse> answer = Sinks.one();
 		tm1.on("GET Server", r -> answer.asMono());
