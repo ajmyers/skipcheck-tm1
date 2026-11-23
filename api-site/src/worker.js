@@ -78,10 +78,13 @@ export default {
 
 		const [masthead, footer] = await Promise.all([partial(env, 'masthead'), partial(env, 'footer')]);
 		const page = new HTMLRewriter()
-			// The site's colour mode (system, light or dark), set before the page is drawn
+			// The site's colour mode (system, light or dark), set before the page is drawn, and its Copy
+			// buttons
 			.on('head', {
 				element(head) {
 					head.prepend('<script src="/theme.js"></script>', { html: true });
+					// Copy buttons on code blocks, but not in the Javadoc, which has its own
+					if (!url.pathname.includes('/api/java/')) head.append('<script src="/copy.js" defer></script>', { html: true });
 				},
 			})
 			.on('body', {

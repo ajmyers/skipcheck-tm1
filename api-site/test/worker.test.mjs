@@ -233,4 +233,12 @@ test("every page loads the site's colour mode before it's drawn", async () => {
 	assets['/tm1-client/api/java/mode.html'] = () => new Response('<html><head><title>T</title></head><body>x</body></html>', { headers: { 'Content-Type': 'text/html' } });
 	const html = await (await get('/tm1-client/api/java/mode.html')).text();
 	assert.ok(html.startsWith('<html><head><script src="/theme.js"></script><title>'), html);
+	// The Javadoc has its own copy buttons
+	assert.ok(!html.includes('/copy.js'), html);
+});
+
+test('pages other than the Javadoc get the site\'s Copy buttons', async () => {
+	assets['/tm1-client/index.html'] = () => new Response('<html><head></head><body>x</body></html>', { headers: { 'Content-Type': 'text/html' } });
+	const html = await (await get('/tm1-client/')).text();
+	assert.ok(html.includes('<script src="/copy.js" defer></script>'), html);
 });

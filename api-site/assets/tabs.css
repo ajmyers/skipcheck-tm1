@@ -31,4 +31,4 @@
 .tabs [role="tabpanel"] { background: var(--surface, #fff); }
 .tabs [role="tabpanel"] pre { background: transparent; }
 .tabs .caption + pre, .tabs .needs + .caption { border-top: 0; }
-.tabs pre + .caption, .tabs pre + .needs { border-top: 1px solid var(--rule, #d8d8d8); padding-top: 0.6rem; }
+.tabs pre + .caption, .tabs pre + .needs, .tabs .copy-wrap + .caption, .tabs .copy-wrap + .needs { border-top: 1px solid var(--rule, #d8d8d8); padding-top: 0.6rem; }
