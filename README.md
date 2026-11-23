@@ -34,19 +34,31 @@ The Java libraries require Java 17+, the Python client Python 3.10+, the .NET cl
 ./gradlew :tm1-codegen:exportSpec        # refresh spec/tm1-api.json after changing the snapshot or overlay
 ./gradlew checkAll                       # the above, and the Python, .NET and TypeScript clients' checks
 ./gradlew checkPython                    # one client: checkPython, checkDotnet, checkTypescript
+./gradlew checkScripts checkApiSite      # the scripts and git hooks, and the API docs site (both part of checkAll)
+./gradlew packageTest                    # build every package as a release does, install each somewhere clean, run it
 ./gradlew liveTest --continue            # every client's tests against a real TM1 (bring your own: see scripts/live-tests.sh)
 ```
 
-The `check` and `liveTest` tasks run each client's own tool, the same on macOS, Linux and Windows, and are what CI runs: `pytest python` in a virtual environment Gradle makes (`build/python-venv`), `dotnet test dotnet/Tm1.slnx`, and `npm ci`, `npm test` and `npm run build` in `typescript`. Those commands work on their own too. They need Python 3.10+, the .NET 10 SDK and Node 22+ installed; `./gradlew build` needs only a JDK.
+The `check` and `liveTest` tasks run each client's own tool, the same on macOS, Linux and Windows, and are what CI runs: `pytest python` in a virtual environment Gradle makes (`build/python-venv`), `dotnet test dotnet/Tm1.slnx`, and `npm ci`, `npm test` and `npm run build` in `typescript`. Those commands work on their own too. They need Python 3.10+, the .NET 10 SDK and Node 22+ installed; `./gradlew build` needs only a JDK. [CONTRIBUTING](CONTRIBUTING.md#checks) says which to run for what, and what a pull request has to pass.
 
 Builds use JDK 27 via Gradle toolchains; published libraries target Java 17 bytecode.
 
 ## Releases
 
-Pushing a tag like `v0.1.0` publishes everything at that version:
+Pushing a tag like `v0.1.0` to a commit of `master` publishes everything at that version ([`release.yml`](.github/workflows/release.yml)):
 
-- Libraries go to Maven Central as `io.skipcheck:<module>:0.1.0` ([`release.yml`](.github/workflows/release.yml)).
-- Docker images go to `ghcr.io/ajmyers/<image>:0.1.0` and `:latest` ([`docker.yml`](.github/workflows/docker.yml)). Every commit to `master` also publishes `:edge`. Pull requests build and smoke-test the images but don't push them.
+- The Java libraries go to Maven Central as `io.skipcheck:<module>:0.1.0`.
+- The Python packages go to PyPI (`skipcheck-tm1`, `skipcheck-tm1-testcontainers`), the .NET packages to NuGet (`Skipcheck.Tm1.Client`, `Skipcheck.Tm1.Testcontainers`), and the TypeScript packages to npm (`@skipcheck/tm1-client`, `@skipcheck/tm1-testcontainers`).
+- Docker images go to `ghcr.io/ajmyers/<image>:0.1.0` and `:latest` ([`docker.yml`](.github/workflows/docker.yml)), and the API docs are deployed. Every commit to `master` also publishes `:edge`. Pull requests build and smoke-test the images but don't push them.
+
+Nothing is published until everything has passed on the tagged commit: all of CI, and each ecosystem's packages built with the release's version, installed somewhere clean and run ([package-tests](package-tests/README.md)). A tag that isn't on `master` is refused. PyPI, NuGet and npm get the very files that were tested. A published version can't be taken back, so if a registry fails after the gate, the others stay published: run the workflow again by hand for what's missing.
+
+Before tagging:
+
+1. Run the live tests, which CI can't: `./gradlew liveTest --continue`, with a TM1.
+2. Do a dry run: `gh workflow run release.yml`. It runs the whole gate, uploads `0.0.0-dryrun.<n>` to the Central Portal for validation without releasing it (drop it there afterwards), and publishes nothing else. `-f only=python` (or `dotnet`, `typescript`, `maven`) limits what it uploads to.
+
+A manual run can also publish a pre-release to one registry: `gh workflow run release.yml -f only=python -f python_version=0.1.0.dev1` (`dotnet_version` and `npm_version` take `0.1.0-dev.1`). A version can never be reused on a registry, even after it's deleted.
 
 Each image has its own on/off switch, a repository variable named in `docker.yml` (e.g. `PUBLISH_DOCKER_TM1_SERVER`). Until it's set to `true`, that image is built and tested but never pushed:
 

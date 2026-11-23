@@ -13,7 +13,8 @@ for older ones.
 | `scripts/assemble.mjs` | Copies each module's output into `dist/projects/<module>/api/`, and hashes the inline scripts, event handlers and style attributes Javadoc writes, for the CSP. |
 | `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, and serves the site's 404 page for missing paths. |
 | `wrangler.jsonc` | The Worker's config. Its routes (one per module and zone) are the list of published modules. |
-| `.github/workflows/api-docs.yml` | Builds on pull requests; deploys on a release tag or a manual run. |
+| `test/` | The Worker's tests, in Node: `npm test` here, or `./gradlew checkApiSite`. |
+| `.github/workflows/api-docs.yml` | Tests the Worker, builds the site and bundles the Worker on every change, as part of CI. Deploys when the release workflow calls it for a tag, or when run by hand. |
 
 Changes to the site's palette, fonts, masthead or footer reach the docs without a rebuild. The site
 side is in ajmyers/skipcheck.io: `public/tokens.css`, `public/chrome.css` and `public/partials/`.

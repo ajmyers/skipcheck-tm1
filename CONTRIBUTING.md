@@ -18,6 +18,59 @@ agreement to sign.
    does), so run those by hand: `./gradlew liveTest --continue`. `scripts/test-summary.py` prints
    how many tests each suite ran, passed and skipped; CI puts it in each job's summary.
 
+## Checks
+
+Every codebase has tests, and one Gradle task runs each. They're the same tasks CI runs, on macOS,
+Linux and Windows. Run what matches what you changed:
+
+| You changed | Run |
+|---|---|
+| Java only | `./gradlew build` |
+| The Java client's public API or services, or anything in `spec/` | `./gradlew checkAll`: the other clients' parity and conformance tests read them |
+| The Python, .NET or TypeScript client | `./gradlew checkPython`, `checkDotnet` or `checkTypescript` |
+| What a package contains or depends on (`pyproject.toml`, a `.csproj`, `package.json`, the publishing plugin, a build hook) | `./gradlew packageTest` ([package-tests](package-tests/README.md)) |
+| `scripts/`, `.githooks/`, a shell script, `docker/pa-setup`'s setup scripts | `./gradlew checkScripts` |
+| `api-site/` | `./gradlew checkApiSite` |
+| How a client talks to TM1 | `./gradlew liveTest --continue`, with a TM1 ([`scripts/live-tests.sh`](scripts/live-tests.sh) says how to give it one). CI has no TM1 and can't run these for you |
+| Not sure | `./gradlew checkAll packageTest` |
+
+`checkAll` is the Java build, the three other clients, the scripts and hooks, the API docs site and
+the license lines. The clients' own commands (`pytest`, `dotnet test`, `npm test`) still work; the
+tasks only set them up and run them.
+
+**A test that needs TM1 is skipped without one, never left out.** Mark it with the language's
+`RequiresTm1` (`@RequiresTm1`, `@pytest.mark.requires_tm1`, `[RequiresTm1Fact]`, `requiresTm1`), so
+it's collected everywhere and runs wherever a TM1 is configured. Each CI job's summary shows how
+many tests ran and how many were skipped (`scripts/test-summary.py` prints the same table locally).
+
+**New code comes with tests that CI runs.** That goes for scripts, hooks and workflows too: they're
+what decides whether a change merges. A new kind of check is a Gradle task first, then a CI job
+that runs it.
+
+## What gates a merge
+
+The `master` ruleset requires three checks, on a branch that is up to date with `master`:
+
+- `ci-ok` passes only when every job of [`ci.yml`](.github/workflows/ci.yml) did: each client's
+  checks, the scripts, the package tests, the API docs site, the paw and setup scripts.
+- `docker-ok` passes only when every image built and passed its smoke test.
+- `conventions` checks the PR's title and description.
+
+So:
+
+- **Rebase onto `master` before merging,** and again if `master` moves first
+  (`git rebase origin/master`, then `git push --force-with-lease`). There's no merge queue: GitHub
+  doesn't offer one on a repository a user owns.
+- **A new CI job goes in `ci-ok`'s `needs`,** or it gates nothing. A new image goes in
+  `docker.yml`'s matrix, which `docker-ok` covers.
+- **A workflow that gates has no path filter.** A required check can't wait for a workflow that
+  didn't start, so a workflow of its own is called from `ci.yml` instead (as `paw.yml`,
+  `setup-scripts.yml` and `api-docs.yml` are).
+- **Don't work around a red check:** no `--admin` merge, no `--no-verify`, no test deleted or
+  skipped to get through. Fix the cause, or say why it can't be fixed in the PR.
+
+Releases have a gate of their own: see [Releases](README.md#releases).
+
 ## Commit and PR messages
 
 Enable the commit message hook once per clone:
