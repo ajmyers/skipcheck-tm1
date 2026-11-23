@@ -357,12 +357,28 @@ export class Connection {
     closeConnection = false,
   ): Promise<Reply> {
     if (signal?.aborted) throw abortError(signal);
+    // An idle timeout, as Java's (Netty's response timeout): it restarts each time the transport
+    // says data arrived, so a large body that keeps arriving isn't cut off
     const deadline = new AbortController();
-    const timer = setTimeout(() => deadline.abort(new Error(`no answer within ${timeout} ms`)), timeout);
+    const expire = (): void => deadline.abort(new Error(`nothing received for ${timeout} ms`));
+    let timer = setTimeout(expire, timeout);
+    const received = (): void => {
+      clearTimeout(timer);
+      if (!deadline.signal.aborted) timer = setTimeout(expire, timeout);
+    };
     const onAbort = (): void => deadline.abort(abortError(signal!));
     signal?.addEventListener("abort", onAbort, { once: true });
     try {
-      return await this.transport.send({ method, url, headers, body, signal: deadline.signal, closeConnection, connectTimeout: this.timeouts.connect });
+      return await this.transport.send({
+        method,
+        url,
+        headers,
+        body,
+        signal: deadline.signal,
+        closeConnection,
+        connectTimeout: this.timeouts.connect,
+        received,
+      });
     } catch (e) {
       if (signal?.aborted) throw abortError(signal);
       if (deadline.signal.aborted) throw new Tm1TransportException("Response", idempotent, method, url, deadline.signal.reason);

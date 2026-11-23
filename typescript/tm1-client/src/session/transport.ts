@@ -14,6 +14,10 @@ export interface Tm1HttpRequest {
   readonly signal: AbortSignal;
   /** Asks not to reuse the connection afterwards (TM1 sometimes drops the one that carried a close). */
   readonly closeConnection?: boolean;
+  /** For the transport to call as data arrives: when the headers come, and after each piece of the
+   * body. The request timeout is an idle timeout ({@link Tm1Timeouts.request}) and restarts at each
+   * call; a transport that never calls it gets the timeout over the whole exchange. */
+  readonly received?: () => void;
   /** How long to wait for a connection, in milliseconds ({@link Tm1Timeouts.connect}), for a
    * transport that can tell connecting from waiting; `fetch` can't, and ignores it. */
   readonly connectTimeout?: number;
@@ -84,7 +88,30 @@ export function fetchTransport(options: FetchTransportOptions = {}): Tm1Transpor
       });
       const cookies = typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [];
       if (cookies.length) out["set-cookie"] = cookies.join("\n");
-      return { status: response.status, headers: out, body: new Uint8Array(await response.arrayBuffer()) };
+      request.received?.();
+      return { status: response.status, headers: out, body: await readBody(response, request.received) };
     },
   };
+}
+
+/** A response's whole body, read piece by piece, calling `received` after each piece. */
+async function readBody(response: Response, received: (() => void) | undefined): Promise<Uint8Array> {
+  if (!response.body) return new Uint8Array(await response.arrayBuffer());
+  const reader = response.body.getReader();
+  const pieces: Uint8Array[] = [];
+  let length = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received?.();
+    pieces.push(value);
+    length += value.length;
+  }
+  const body = new Uint8Array(length);
+  let at = 0;
+  for (const piece of pieces) {
+    body.set(piece, at);
+    at += piece.length;
+  }
+  return body;
 }
