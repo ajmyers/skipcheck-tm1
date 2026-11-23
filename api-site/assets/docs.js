@@ -34,3 +34,12 @@ if (document.body.hasAttribute('data-choose')) {
 	const link = document.querySelector('a[data-lang="' + language + '"]') ?? document.querySelector('a[data-lang]');
 	if (link) location.replace(link.href);
 }
+
+// The sidebar opens scrolled to the page's own entry, which it marks
+const here = location.pathname.split('/').pop();
+const entry = here && document.querySelector('.sidebar a[href="' + here + '"]');
+if (entry) {
+	entry.setAttribute('aria-current', 'page');
+	const sidebar = entry.closest('.sidebar');
+	sidebar.scrollTop = entry.offsetTop - sidebar.clientHeight / 3;
+}
