@@ -1,0 +1,15 @@
+{
+  // How an application would compile against the installed packages: their declarations are
+  // found through each package's "exports", as Node finds the code
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "ESNext.Disposable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": []
+  },
+  "files": ["types.ts"]
+}

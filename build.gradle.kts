@@ -224,8 +224,36 @@ val packageTestDotnet = tasks.register<ToolTask>("packageTestDotnet") {
 	environment = mapOf("NUGET_PACKAGES" to work.dir("packages").asFile.path)
 }
 
+val packageTypescript = tasks.register<ToolTask>("packageTypescript") {
+	description = "Packs the npm packages into build/packages/npm."
+	dependsOn(npmInstall)
+	directory = root.dir("typescript")
+	fresh = listOf(packages.dir("npm").asFile.path)
+	commands = listOf(listOf("npm", "pack", "-w", "tm1-client", "-w", "tm1-testcontainers", "--pack-destination", packages.dir("npm").asFile.path))
+	unlessPrebuilt()
+}
+
+// An empty project to install the tarballs into, made anew each time
+val packageTestTypescriptProject = tasks.register<Sync>("packageTestTypescriptProject") {
+	from(root.dir("package-tests/typescript"))
+	into(packageTests.dir("typescript"))
+}
+
+val packageTestTypescript = tasks.register<ToolTask>("packageTestTypescript") {
+	group = "verification"
+	description = "Installs the packed npm packages into an empty project, runs them and compiles against their types."
+	dependsOn(packageTypescript, packageTestTypescriptProject, npmInstall)
+	directory = packageTests.dir("typescript")
+	commands = listOf(
+		listOf("npm", "install", "--no-audit", "--no-fund", packages.dir("npm").asFile.path + "/*.tgz"),
+		listOf("node", "smoke.mjs", rootPath),
+		// The workspace's compiler, against the installed packages' declarations
+		listOf("node", root.file("typescript/node_modules/typescript/bin/tsc").asFile.path, "-p", "."),
+	)
+}
+
 tasks.register("packageTest") {
 	group = "verification"
 	description = "Builds every package as a release does, installs each somewhere clean, and runs it."
-	dependsOn(packageTestPython, packageTestDotnet)
+	dependsOn(packageTestPython, packageTestDotnet, packageTestTypescript)
 }
