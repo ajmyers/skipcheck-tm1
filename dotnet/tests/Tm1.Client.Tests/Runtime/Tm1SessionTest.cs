@@ -929,6 +929,40 @@ public class Tm1SessionCapabilitiesTest
     }
 
     [Fact]
+    public async Task RefusesARequestTheServerCantServeInABatchAndStillSendsTheRest()
+    {
+        // Answers each request it's sent, under the ID it came with
+        _tm1.On("POST $batch", r =>
+            ScriptedTm1.Json(
+                200,
+                "{\"responses\":["
+                    + string.Join(
+                        ",",
+                        r.Json.GetProperty("requests")
+                            .EnumerateArray()
+                            .Select(q => $"{{\"id\":\"{q.GetProperty("id").GetString()}\",\"status\":200,\"body\":{{}}}}")
+                    )
+                    + "]}"
+            )
+        );
+        var batch = _tm1.Session().Batch();
+        var bananas = batch
+            .Session.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Bananas")).Requires(Version.Tm1Capability.EntitySet("Bananas").Since("99.0")))
+            .ToListAsync()
+            .AsTask();
+        var server = batch.Session.ExecuteAsync(Tm1Request.Get<JsonElement>(ODataPath.Of("Server")));
+        Assert.Equal(2, batch.Size()); // checked at the run, not when queued
+        Assert.Empty(_tm1.Requests()); // so queueing sends nothing
+
+        await batch.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(() => bananas.WaitAsync(TimeSpan.FromSeconds(5)));
+        await server.WaitAsync(TimeSpan.FromSeconds(5));
+        var sent = Assert.Single(_tm1.Requests("POST $batch")).Text;
+        Assert.Contains("Server", sent);
+        Assert.DoesNotContain("Bananas", sent);
+    }
+
+    [Fact]
     public async Task ReadsTheVersionAgainAfterLoggingInAgain()
     {
         _tm1.OnEach("GET Server", _ => ScriptedTm1.Status(401, "TM1SessionId=fresh; Path=/api/"), _ => ScriptedTm1.Json(200, "{}"));

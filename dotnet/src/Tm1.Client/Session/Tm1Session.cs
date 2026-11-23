@@ -185,12 +185,13 @@ public sealed class Tm1Session : IAsyncDisposable
         {
             throw new ArgumentException("Collection requests are streamed: use StreamAsync() for " + request);
         }
-        await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
         if (_batch is not null)
         {
+            // The queue checks what the request requires when the batch runs: queueing sends nothing.
             // Null only when TM1 answers a JSON null, which is then what T has to allow
             return (T)(await _batch.Add(this, request, r => Read(request, r)).ConfigureAwait(false))!;
         }
+        await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
         var reply = await SendAsync(request, Target(request.RelativeUri()), cancellationToken).ConfigureAwait(false);
         return Read(request, reply);
     }
@@ -204,9 +205,9 @@ public sealed class Tm1Session : IAsyncDisposable
         {
             throw new ArgumentException("Only collection requests are streamed: use ExecuteAsync() for " + request);
         }
-        await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
         if (_batch is not null)
         {
+            // Checked by the queue when the batch runs, as in ExecuteAsync
             var page = (Page<T>)(await _batch.Add(this, request, r => ReadPage(request, r)).ConfigureAwait(false))!; // ReadPage never returns null
             if (page.NextLink is not null)
             {
@@ -218,6 +219,7 @@ public sealed class Tm1Session : IAsyncDisposable
             }
             yield break;
         }
+        await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
         var url = Target(request.RelativeUri());
         while (true)
         {
@@ -237,7 +239,9 @@ public sealed class Tm1Session : IAsyncDisposable
         }
     }
 
-    private async Task CheckAsync(Tm1Capability? requirement, CancellationToken ct)
+    /// <summary>Fails with <see cref="Tm1UnsupportedOperationException"/> if the server doesn't define
+    /// <paramref name="requirement"/>, reading its <c>$metadata</c> if that hasn't been read yet.</summary>
+    internal async Task CheckAsync(Tm1Capability? requirement, CancellationToken ct)
     {
         if (requirement is null || !_connection.CheckCapabilities)
         {
@@ -413,7 +417,11 @@ public sealed class Tm1Session : IAsyncDisposable
 /// each request's task gets its own result or error. A request's body is written as JSON when the
 /// call is made, not at the run: one that can't be written fails its own call at once and never
 /// joins the batch, and a change to the body object afterwards isn't sent. If TM1 answers a
-/// <c>$batch</c> with no body, every call in it fails with <see cref="Tm1ProtocolException"/>.</summary>
+/// <c>$batch</c> with no body, every call in it fails with <see cref="Tm1ProtocolException"/>.
+///
+/// <para>A request that requires (<see cref="Tm1Request{T}.Requires"/>) something the server
+/// doesn't define is checked when the batch runs: its call fails with
+/// <see cref="Tm1UnsupportedOperationException"/> and it isn't sent, and the others still are.</para></summary>
 public sealed class Tm1SessionBatch
 {
     /// <summary>The most requests <see cref="RunAsync(CancellationToken)"/> sends in one
@@ -475,7 +483,7 @@ internal sealed class BatchQueue
             using var doc = JsonDocument.Parse(written);
             body = doc.RootElement.Clone();
         }
-        var entry = new Entry(request.Method, view.Contextual(request.RelativeUri()), request.Headers, body, request.Accept, read);
+        var entry = new Entry(request.Method, view.Contextual(request.RelativeUri()), request.Headers, body, request.Accept, request.Requirement, read);
         lock (_entries)
         {
             if (_ran)
@@ -502,6 +510,23 @@ internal sealed class BatchQueue
             all = _entries.ToList();
         }
         var connection = _sender.Connection;
+        // Checked now and not when the call was queued: the check may need the server's $metadata, and
+        // queueing sends nothing. A request the server can't serve (or whose requirement can't be
+        // checked) fails its own call and isn't sent, as outside a batch; the rest are.
+        var sendable = new List<Entry>();
+        foreach (var e in all)
+        {
+            try
+            {
+                await _sender.CheckAsync(e.Requirement, ct).ConfigureAwait(false);
+                sendable.Add(e);
+            }
+            catch (Exception error)
+            {
+                e.Result.TrySetException(error);
+            }
+        }
+        all = sendable;
         for (int start = 0; start < all.Count; start += perRequest)
         {
             var chunk = all.Skip(start).Take(perRequest).ToList();
@@ -599,6 +624,7 @@ internal sealed class BatchQueue
         IReadOnlyDictionary<string, string> Headers,
         JsonElement? Body,
         string Accept,
+        Tm1Capability? Requirement,
         Func<Reply, object?> Read
     )
     {
