@@ -397,16 +397,44 @@ public sealed class Tm1Session : IAsyncDisposable
         }
     }
 
+    /// <summary>A page of a collection, read whole. A response that isn't one fails as Java's
+    /// <c>ODataCollectionDecoder</c> does, saying what was wrong: empty, cut short, malformed, more after
+    /// the collection, or an error TM1 reported in place of the collection (with that error).</summary>
     internal static Page<T> ReadPage<T>(Tm1Request<T> request, Reply reply)
     {
+        var body = Utf8Repair.Whole(reply.Body);
+        if (body.AsSpan().Trim(" \t\r\n"u8).IsEmpty)
+        {
+            throw new Tm1ProtocolException($"{request}: The response was empty");
+        }
+        JsonDocument parsed;
         try
         {
-            using var doc = JsonDocument.Parse(Utf8Repair.Whole(reply.Body));
-            if (
-                doc.RootElement.ValueKind != JsonValueKind.Object
-                || !doc.RootElement.TryGetProperty("value", out var items)
-                || items.ValueKind != JsonValueKind.Array
-            )
+            parsed = JsonDocument.Parse(body);
+        }
+        catch (JsonException e)
+        {
+            throw new Tm1ProtocolException($"{request}: {WhatIsWrongWith(body)}", e);
+        }
+        try
+        {
+            using var doc = parsed;
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new Tm1ProtocolException($"{request}: Expected a JSON object with a 'value' array, got {doc.RootElement.ValueKind}");
+            }
+            if (doc.RootElement.TryGetProperty("error", out _))
+            {
+                var error = ODataError.From(doc.RootElement);
+                throw new Tm1ProtocolException(
+                    $"{request}: TM1 reported an error in the response" + (error is null ? "" : ": " + error.Message),
+                    error,
+                    null,
+                    null,
+                    null
+                );
+            }
+            if (!doc.RootElement.TryGetProperty("value", out var items) || items.ValueKind != JsonValueKind.Array)
             {
                 throw new Tm1ProtocolException($"{request}: expected a collection");
             }
@@ -417,6 +445,28 @@ public sealed class Tm1Session : IAsyncDisposable
         catch (JsonException e)
         {
             throw new Tm1ProtocolException($"{request}: {e.Message}", e);
+        }
+    }
+
+    /// <summary>Why a body that isn't JSON isn't: it ended before its value did (a dropped
+    /// connection), it has more after its value, or it's malformed.</summary>
+    private static string WhatIsWrongWith(byte[] body)
+    {
+        var reader = new Utf8JsonReader(body, isFinalBlock: false, state: default);
+        try
+        {
+            while (reader.Read())
+            {
+                if (reader.CurrentDepth == 0 && reader.TokenType is not (JsonTokenType.StartObject or JsonTokenType.StartArray))
+                {
+                    return "Unexpected content after the collection";
+                }
+            }
+            return "The response ended before the collection was complete";
+        }
+        catch (JsonException e)
+        {
+            return "TM1 sent malformed JSON: " + e.Message;
         }
     }
 

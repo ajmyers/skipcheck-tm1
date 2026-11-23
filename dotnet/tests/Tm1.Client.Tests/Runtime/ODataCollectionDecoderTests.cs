@@ -3,6 +3,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Skipcheck.Tm1.Client.Errors;
 using Skipcheck.Tm1.Client.OData;
 
 namespace Skipcheck.Tm1.Client.Tests.Runtime;
@@ -10,7 +11,7 @@ namespace Skipcheck.Tm1.Client.Tests.Runtime;
 /// <summary>The Java client's <c>ODataCollectionDecoderTest</c>, through the session: this client reads
 /// each page of a collection whole, so the Java tests of its buffers (how bytes are split, demand,
 /// release on cancel) have no counterpart here (coverage/unit-excluded.txt). What a collection
-/// response may hold is the same.</summary>
+/// response may hold, and how a bad one fails, is the same.</summary>
 public class ODataCollectionDecoderTests
 {
     public sealed record Element(string Name, string Type);
@@ -29,6 +30,9 @@ public class ODataCollectionDecoderTests
         _tm1.On("GET Elements", _ => ScriptedTm1.Json(200, body));
         return _tm1.Session().StreamAsync(Tm1Request.List<T>(ODataPath.Of("Elements")));
     }
+
+    private async Task<Tm1ProtocolException> Fails(string body) =>
+        await Assert.ThrowsAsync<Tm1ProtocolException>(async () => await Stream<Element>(body).ToListAsync());
 
     [Fact]
     public async Task DecodesItemsAndControlInformation()
@@ -51,4 +55,29 @@ public class ODataCollectionDecoderTests
 
     [Fact]
     public async Task DecodesAnEmptyCollection() => Assert.Empty(await Stream<Element>("""{"@odata.context":"x","value":[]}""").ToListAsync());
+
+    [Fact]
+    public async Task FailsOnAnErrorInsteadOfACollection()
+    {
+        var e = await Fails("""{"error":{"code":"278","message":"Boom"}}""");
+        Assert.Contains("Boom", e.Message);
+        Assert.Equal("278", e.Error?.Code);
+    }
+
+    [Fact]
+    public async Task FailsWhenTheResponseIsCutShortAfterSomeItems()
+    {
+        // A page is read whole, so the items before the cut don't arrive either
+        var e = await Fails(Body[..Body.IndexOf("Total", System.StringComparison.Ordinal)]);
+        Assert.Contains("ended before the collection was complete", e.Message);
+    }
+
+    [Fact]
+    public async Task FailsOnMalformedOrUnexpectedBodies()
+    {
+        Assert.Contains("malformed JSON", (await Fails("""{"value":[{"Name":}]}""")).Message);
+        await Fails("[1,2]");
+        Assert.Contains("empty", (await Fails("")).Message);
+        Assert.Contains("after the collection", (await Fails("""{"value":[]} {}""")).Message);
+    }
 }
