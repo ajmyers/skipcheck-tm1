@@ -16,6 +16,7 @@ import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
  * {@link Tm1ConnectionDetails} from a {@link Tm1ServerContainer} annotated
  * {@code @ServiceConnection}: its REST URL and its login, Basic or, for a container in
  * Cognos security ({@code withCamSecurity}), {@code CAMNamespace} through its namespace.
+ * It connects the starter's default server, the one a plain {@code Tm1Client} gets.
  * Registered in {@code META-INF/spring.factories}, so Spring Boot finds it; applications
  * don't use it directly.
  *
