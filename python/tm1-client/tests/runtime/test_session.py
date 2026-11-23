@@ -802,6 +802,21 @@ def test_reports_whatever_stops_metadata_being_read_as_a_protocol_error(monkeypa
         Tm1Capabilities.parse(SNAPSHOT.read_bytes())
 
 
+def test_refuses_doctypes_so_entities_cant_be_expanded(rt: Runtime) -> None:
+    rt.fake.metadata = b"""<?xml version="1.0"?>
+        <!DOCTYPE edmx:Edmx [<!ENTITY x SYSTEM "file:///etc/passwd">]>
+        <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">&x;</edmx:Edmx>"""
+    error = rt.raises(Tm1ProtocolError, lambda: rt.session().capabilities())
+    assert "DOCTYPE" in str(error)
+    # One that only defines an entity of its own, which a parser would expand, is refused as well
+    rt.fake.metadata = b"""<!DOCTYPE edmx:Edmx [<!ENTITY x "expanded">]>
+        <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+          <edmx:DataServices><Schema Namespace="&x;" xmlns="http://docs.oasis-open.org/odata/ns/edm"/></edmx:DataServices>
+        </edmx:Edmx>"""
+    error = rt.raises(Tm1ProtocolError, lambda: rt.session().capabilities())
+    assert "DOCTYPE" in str(error)
+
+
 def test_reports_an_operation_it_cant_model_as_a_parse_error(rt: Runtime) -> None:
     rt.fake.metadata = b"""
         <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">

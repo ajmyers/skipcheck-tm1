@@ -179,6 +179,14 @@ class _Type:
     members: set[str] = field(default_factory=set)
 
 
+class _NoDoctype(ET.TreeBuilder):
+    """Builds the document's tree, and refuses a DOCTYPE: that rules out external entities and
+    entity expansion entirely, and TM1's ``$metadata`` has none."""
+
+    def doctype(self, name: str, pubid: str | None, system: str | None) -> None:
+        raise Tm1ProtocolError("TM1 sent $metadata with a DOCTYPE, which this client refuses to read")
+
+
 class Tm1Capabilities:
     """What a server's ``$metadata`` defines, and its versions: what requests check before
     they're sent, as the Java client's ``Tm1Capabilities``."""
@@ -208,7 +216,8 @@ class Tm1Capabilities:
         :class:`~skipcheck_tm1.errors.Tm1ProtocolError`, never the parser's own error, so a caller
         of a session has one error to catch for a server that answers ``$metadata`` with
         something else. That includes a document with an operation marked bound that has no
-        binding parameter, which is refused whole, as the other clients refuse it."""
+        binding parameter, which is refused whole, as the other clients refuse it, and one with a
+        DOCTYPE, so that no entity is ever fetched or expanded."""
         try:
             return Tm1Capabilities._parse(metadata, product_version)
         except Tm1ProtocolError:
@@ -219,7 +228,9 @@ class Tm1Capabilities:
     @staticmethod
     def _parse(metadata: bytes, product_version: Tm1Version | None) -> Tm1Capabilities:
         try:
-            root = ET.fromstring(metadata)
+            parser = ET.XMLParser(target=_NoDoctype())
+            parser.feed(metadata)
+            root = parser.close()
         except (ET.ParseError, LookupError, ValueError) as e:
             # Not only ParseError: the parser raises LookupError or ValueError for an encoding it doesn't know or can't read
             raise Tm1ProtocolError(f"TM1's $metadata isn't XML: {e}") from e
