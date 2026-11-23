@@ -1,0 +1,25 @@
+import { KeyProtectSettingsPatch, type Tm1Client } from "@skipcheck/tm1-client";
+
+// Examples for EncryptionService, quoted in its documentation.
+
+export async function configure(tm1: Tm1Client): Promise<void> {
+  // @start region = configure
+  // Check the settings first: the report says what's wrong, without secrets
+  const keyProtect = KeyProtectSettingsPatch.builder()
+    .serviceEndpoint("https://us-south.kms.cloud.ibm.com")
+    .instanceID("8f2c1d6e-0000-4000-8000-000000000000")
+    .authRef("/run/secrets/key-protect-api-key")
+    .keyRef("planning-root-key")
+    .build();
+  const report = await tm1.encryption.validate(keyProtect);
+  if (report.IsValid !== true) throw new Error("Can't encrypt: " + JSON.stringify(report.Issues));
+  await tm1.encryption.configure(keyProtect);
+  // @end
+}
+
+export function rotate(tm1: Tm1Client): Promise<void> {
+  // @start region = rotate
+  // A new data encryption key; TM1 re-encrypts the whole model with it
+  return tm1.encryption.rotateDataEncryptionKey();
+  // @end
+}

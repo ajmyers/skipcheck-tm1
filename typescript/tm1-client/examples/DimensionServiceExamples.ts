@@ -1,0 +1,38 @@
+import { Dimension, DimensionPatch, EdgePatch, ElementPatch, ElementType, Hierarchy, HierarchyPatch, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
+
+// Examples for DimensionService, quoted in its documentation.
+
+export async function list(tm1: Tm1Client): Promise<string[]> {
+  // @start region = list
+  // The names of the model dimensions, in name order
+  const dimensions = await tm1.dimensions.modelDimensions(ODataQuery.none().select(Dimension.Fields.Name).orderBy(Dimension.Fields.Name)).toArray();
+  return dimensions.map((dimension) => dimension.Name!);
+  // @end
+}
+
+export function create(tm1: Tm1Client): Promise<Dimension> {
+  // @start region = create
+  // Region, with one hierarchy of the same name: Total = North + South
+  const total = ElementPatch.builder().name("Total").type(ElementType.Consolidated).build();
+  const north = ElementPatch.builder().name("North").type(ElementType.Numeric).build();
+  const south = ElementPatch.builder().name("South").type(ElementType.Numeric).build();
+  const region = HierarchyPatch.builder()
+    .name("Region")
+    .elements([total, north, south])
+    .edges([
+      EdgePatch.builder().parentName("Total").componentName("North").weight(1).build(),
+      EdgePatch.builder().parentName("Total").componentName("South").weight(1).build(),
+    ])
+    .build();
+  return tm1.dimensions.create(DimensionPatch.builder().name("Region").hierarchies([region]).build());
+  // @end
+}
+
+export async function hierarchies(tm1: Tm1Client): Promise<string[]> {
+  // @start region = hierarchies
+  // A dimension with its hierarchies' names expanded in the same request
+  const withHierarchies = ODataQuery.none().expand(Dimension.Fields.Hierarchies, (h) => h.select(Hierarchy.Fields.Name));
+  const region = await tm1.dimensions.get("Region", withHierarchies);
+  return (region.Hierarchies ?? []).map((hierarchy) => hierarchy.Name!);
+  // @end
+}
