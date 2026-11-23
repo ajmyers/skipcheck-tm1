@@ -753,6 +753,21 @@ describe("Tm1Session batches", () => {
     expect(await Promise.race([failure(second), settle().then(() => "still waiting")])).toBeInstanceOf(Tm1ProtocolException);
   });
 
+  it("follows a next link in an answer", async () => {
+    const tm1 = new ScriptedTm1()
+      .on(BATCH, () => ScriptedTm1.json(200, '{"responses":[{"id":"1","status":200,"body":{"value":[{"Name":"a"}],"@odata.nextLink":"Cubes?$skiptoken=2"}}]}'))
+      .on("GET Cubes?$skiptoken=2", () => ScriptedTm1.json(200, '{"value":[{"Name":"b"}]}'));
+    const batch = tm1.session().batch();
+    const names = batch.session
+      .stream(Tm1Request.list<{ Name: string }>(ODataPath.of("Cubes"), ODataQuery.none()))
+      .map((cube) => cube.Name)
+      .toArray();
+
+    await batch.run();
+    expect(await names).toEqual(["a", "b"]);
+    expect(tm1.requests(BATCH), "the pages after it aren't part of the batch").toHaveLength(1);
+  });
+
   it("splits a big queue", async () => {
     const tm1 = new ScriptedTm1().on(BATCH, () => ScriptedTm1.json(200, '{"responses":[]}'));
     const batch = tm1.session().batch();
@@ -857,6 +872,21 @@ describe("Tm1Session async", () => {
       .toArray();
     expect(cubes).toHaveLength(1);
     expect(cubes[0]!.Name).toHaveLength(300_000);
+  });
+
+  it("follows a next link in a result", async () => {
+    const tm1 = new ScriptedTm1()
+      .on("GET Cubes", () => ScriptedTm1.json(200, '{"value":[{"Name":"a"}],"@odata.nextLink":"Cubes?$skiptoken=2"}'))
+      .on("GET Cubes?$skiptoken=2", () => ScriptedTm1.json(200, '{"value":[{"Name":"b"}]}'));
+    const names = await tm1
+      .session()
+      .withAsync(10)
+      .stream(Tm1Request.list<{ Name: string }>(ODataPath.of("Cubes"), ODataQuery.none()))
+      .map((cube) => cube.Name)
+      .toArray();
+    expect(names).toEqual(["a", "b"]);
+    expect(tm1.requests("GET Cubes")[0]!.header("Prefer")).toBe("respond-async");
+    expect(tm1.requests("GET Cubes?$skiptoken=2")[0]!.header("Prefer"), "the pages after it are ordinary requests").toBeUndefined();
   });
 
   it("reads a big error body", async () => {

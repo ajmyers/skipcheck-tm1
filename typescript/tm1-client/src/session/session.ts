@@ -178,36 +178,42 @@ export class Tm1Session implements AsyncDisposable {
     return this.read(request, reply);
   }
 
-  /** The items of a collection, fetching pages as they're needed (Java's `stream`). In a batch, its
-   * first page, once the batch has run: the request joins the batch at once. */
+  /** The items of a collection, fetching pages as they're needed (Java's `stream`). In a batch, the
+   * request joins the batch at once, and its items are there once the batch has run.
+   *
+   * A next link is followed with ordinary requests on the same session, in every view: the pages
+   * after the first aren't part of an async request or of a batch. (TM1 11.8 doesn't page, so that
+   * is untested against a server.) */
   stream<T>(request: Tm1Request<T>, options?: Tm1CallOptions): Tm1Stream<T> {
     if (!(request instanceof Tm1Request)) throw new TypeError("stream() takes a Tm1Request");
     if (request.response !== "Collection") throw new TypeError("Only collection requests are streamed: use execute() for " + request.toString());
     const signal = options?.signal;
+    const self = this;
     if (this.queue) {
       const page = this.queue.add(this, request, (r) => readPage(request, r)) as Promise<Page<T>>;
       return Tm1Stream.from(async function* () {
-        const p = await page;
-        if (p.nextLink !== undefined)
-          throw new Tm1ProtocolException(`${request.toString()}: TM1 sent more than one page, which a batch can't follow; ask for fewer with top()`);
-        yield* p.items;
+        yield* self.items(request, await page, signal);
       });
     }
-    const self = this;
     return Tm1Stream.from(async function* () {
       await self.check(request.requirement(), options);
-      let url = self.target(request.relativeUri());
-      let current: Tm1Request<T> = request;
-      for (;;) {
-        const reply = await self.send(current, url, signal);
-        const page = readPage(current, reply);
-        yield* page.items;
-        if (page.nextLink === undefined) return;
-        // The link carries the query and TM1's options already
-        url = self.connection.url(page.nextLink);
-        current = current.withQuery(ODataQuery.none());
-      }
+      const reply = await self.send(request, self.target(request.relativeUri()), signal);
+      yield* self.items(request, readPage(request, reply), signal);
     });
+  }
+
+  /** The items of one page, then those of the pages after it, if it has a next link. The pages after
+   * it are fetched with ordinary requests, as Java's: the rest of the collection isn't part of the
+   * async result or the batch the first page came in. */
+  private async *items<T>(request: Tm1Request<T>, first: Page<T>, signal: AbortSignal | undefined): AsyncGenerator<T> {
+    // The link carries the query and TM1's options already
+    const later = request.withQuery(ODataQuery.none());
+    for (let page = first; ;) {
+      yield* page.items;
+      if (page.nextLink === undefined) return;
+      // Next links are opaque: resolved against the service root, never changed
+      page = readPage(later, await this.send(later, this.connection.url(page.nextLink), signal, true));
+    }
   }
 
   /** @internal Fails if the server doesn't define what a request requires, unless the session was told not to check. */
@@ -231,11 +237,12 @@ export class Tm1Session implements AsyncDisposable {
     return options.length === 0 ? relative : relative + (relative.includes("?") ? "&" : "?") + options.join("&");
   }
 
-  private async send<T>(request: Tm1Request<T>, url: string, signal: AbortSignal | undefined): Promise<Reply> {
+  /** Sends a request and checks its answer's status: async in an async view, unless `ordinary`. */
+  private async send<T>(request: Tm1Request<T>, url: string, signal: AbortSignal | undefined, ordinary = false): Promise<Reply> {
     const [content, contentType] = encode(request);
     let reply: Reply;
     // Raw bytes (document content) aren't sent async
-    if (this.asyncEvery !== undefined && request.response !== "Bytes" && !(request.body instanceof Uint8Array)) {
+    if (!ordinary && this.asyncEvery !== undefined && request.response !== "Bytes" && !(request.body instanceof Uint8Array)) {
       reply = await this.sendRespondAsync(
         request.method,
         url,
