@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AjMyers.Tm1.Client.Errors;
 using AjMyers.Tm1.Client.Model;
 using AjMyers.Tm1.Client.Services;
+using AjMyers.Tm1.Testcontainers;
 
 namespace AjMyers.Tm1.Client.Tests.Live;
 
@@ -165,11 +166,12 @@ public sealed class GitDaemon : IAsyncDisposable
         {
             return new GitDaemon(url, null);
         }
-        var port = new Uri(Live.Url).Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        var tm1 = Docker("ps", "-q", "--filter", "label=net.ajmyers.tm1.tests=dotnet", "--filter", "publish=8010")
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .FirstOrDefault(id => Docker("port", id, "8010").Contains(":" + port, StringComparison.Ordinal))
-            ?? throw new InvalidOperationException("No TM1 container found for " + Live.Url + "; set TM1_GIT_URL");
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TM1_URL")))
+        {
+            throw new InvalidOperationException("The git daemon runs beside the TM1 container, and TM1_URL names a server that isn't one; set TM1_GIT_URL");
+        }
+        // The container the live tests share, asked for by name: it's already running by now
+        var tm1 = Tm1ServerContainer.SharedAsync().GetAwaiter().GetResult().ContainerId;
         var script = string.Join(" && ",
             "apk add -q --no-cache git git-daemon",
             "git init -q --bare -b main /srv/model.git", "git clone -q /srv/model.git /tmp/seed", "cd /tmp/seed",

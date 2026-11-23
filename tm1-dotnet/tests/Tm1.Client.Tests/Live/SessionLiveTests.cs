@@ -53,7 +53,10 @@ public sealed class RawTm1 : IDisposable
     /// <summary>The handler live tests send through: no cookie jar, and no certificate check with <c>TM1_VERIFY=false</c>.</summary>
     public static SocketsHttpHandler Handler()
     {
-        var handler = new SocketsHttpHandler { UseCookies = false, PooledConnectionIdleTimeout = Connection.MaxIdle };
+        // A header character that isn't ASCII goes out as "?", as Java's HttpClient writes it, so the
+        // impersonation test sends what Java's does. .NET refuses to send one otherwise. Sent as
+        // UTF-8, TM1 would accept the name: issue 184.
+        var handler = new SocketsHttpHandler { UseCookies = false, PooledConnectionIdleTimeout = Connection.MaxIdle, RequestHeaderEncodingSelector = (_, _) => Encoding.ASCII };
         if (Environment.GetEnvironmentVariable("TM1_VERIFY") == "false")
         {
             handler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
