@@ -2,7 +2,7 @@
   "name": "@skipcheck/tm1-client",
   "version": "0.1.0-dev",
   "description": "A client for the IBM Planning Analytics (TM1) REST API, with the Java client's API",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "author": "Andrew Myers (https://ajmyers.net)",
   "homepage": "https://skipcheck.io",
   "repository": {
@@ -39,7 +39,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "generate": "tsx codegen/main.ts ../../spec/tm1-api.json src/generated",
@@ -49,7 +51,7 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:live": "vitest run test/live",
-    "prepack": "npm run build && node --input-type=module -e \"import { copyFileSync } from 'node:fs'; copyFileSync('../../LICENSE', 'LICENSE');\""
+    "prepack": "npm run build && node ../scripts/copy-license.mjs"
   },
   "devDependencies": {
     "@skipcheck/tm1-testcontainers": "*",

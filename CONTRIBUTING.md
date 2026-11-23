@@ -2,9 +2,9 @@
 
 Issues and pull requests are welcome.
 
-Because this project is dual-licensed (AGPL-3.0 and commercial), contributors must agree to a
-Contributor License Agreement before a pull request can be merged. The agreement lets your
-contribution be distributed under both licenses, and you keep the copyright to your work.
+The project is under the [Apache License 2.0](LICENSE), and so is what you contribute to it
+(section 5 of the license). You keep the copyright to your work, and there's no separate
+agreement to sign.
 
 ## Workflow
 

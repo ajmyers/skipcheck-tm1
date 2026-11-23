@@ -47,3 +47,6 @@ logs/
 
 ### Python ###
 __pycache__/
+# Copied from the repository root when a package is built (hatch_build.py)
+/python/*/LICENSE
+/python/*/NOTICE

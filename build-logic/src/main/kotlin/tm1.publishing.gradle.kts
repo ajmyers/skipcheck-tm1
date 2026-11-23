@@ -23,13 +23,8 @@ mavenPublishing {
 		inceptionYear = "2026"
 		licenses {
 			license {
-				name = "GNU Affero General Public License v3.0 only"
-				url = "https://www.gnu.org/licenses/agpl-3.0.txt"
-				distribution = "repo"
-			}
-			license {
-				name = "Commercial license (for use without AGPL obligations)"
-				url = "https://github.com/$githubRepo/blob/master/COMMERCIAL-LICENSE.md"
+				name = "Apache-2.0"
+				url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
 				distribution = "repo"
 			}
 		}
