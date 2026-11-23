@@ -725,6 +725,32 @@ public class Tm1SessionBatchTest
     }
 
     [Fact]
+    public async Task FollowsANextLinkInAnAnswer()
+    {
+        var tm1 = new ScriptedTm1()
+            .On(BatchKey, _ =>
+                ScriptedTm1.Json(
+                    200,
+                    """
+                    {"responses":[
+                     {"id":"1","status":200,"body":{"value":[{"Name":"a"}],"@odata.nextLink":"Cubes?$skiptoken=2"}}
+                    ]}
+                    """
+                )
+            )
+            .On("GET Cubes?$skiptoken=2", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"b\"}]}"));
+        var batch = tm1.Session().Batch();
+        var names = batch
+            .Session.StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes")))
+            .Select(cube => cube.GetProperty("Name").GetString())
+            .ToListAsync()
+            .AsTask();
+
+        await batch.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(["a", "b"], await names.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
     public async Task SplitsABigQueue()
     {
         var tm1 = new ScriptedTm1().On(BatchKey, _ => ScriptedTm1.Json(200, "{\"responses\":[]}"));
@@ -839,6 +865,22 @@ public class Tm1SessionAsyncTest
         var tm1 = new ScriptedTm1().On("GET Cubes", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"" + big + "\"}]}"));
         var cubes = await tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10)).StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"))).ToListAsync();
         Assert.Equal(300_000, Assert.Single(cubes).GetProperty("Name").GetString()!.Length);
+    }
+
+    [Fact]
+    public async Task FollowsANextLinkInAResult()
+    {
+        var tm1 = new ScriptedTm1()
+            .On("GET Cubes", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"a\"}],\"@odata.nextLink\":\"Cubes?$skiptoken=2\"}"))
+            .On("GET Cubes?$skiptoken=2", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"b\"}]}"));
+        var names = await tm1.Session()
+            .WithAsync(TimeSpan.FromMilliseconds(10))
+            .StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes")))
+            .Select(cube => cube.GetProperty("Name").GetString())
+            .ToListAsync();
+        Assert.Equal(["a", "b"], names);
+        Assert.Equal("respond-async", Assert.Single(tm1.Requests("GET Cubes")).Header("Prefer"));
+        Assert.Null(Assert.Single(tm1.Requests("GET Cubes?$skiptoken=2")).Header("Prefer")); // the rest with ordinary requests
     }
 
     [Fact]

@@ -192,12 +192,14 @@ public sealed class Tm1Session : IAsyncDisposable
             return (T)(await _batch.Add(this, request, r => Read(request, r)).ConfigureAwait(false))!;
         }
         await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
-        var reply = await SendAsync(request, Target(request.RelativeUri()), cancellationToken).ConfigureAwait(false);
+        var reply = await SendAsync(request, Target(request.RelativeUri()), _async, cancellationToken).ConfigureAwait(false);
         return Read(request, reply);
     }
 
     /// <summary>The items of a collection, fetching pages as they're needed (Java's <c>stream</c>).
-    /// In a batch, its first page, once the batch has run.</summary>
+    /// In a batch, the items come once the batch has run. If TM1 pages (<c>@odata.nextLink</c>), the
+    /// pages after the first are fetched with ordinary requests on this session, also through an
+    /// async view or a batch: they aren't part of the async result or the batch.</summary>
     public async IAsyncEnumerable<T> StreamAsync<T>(Tm1Request<T> request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -205,26 +207,19 @@ public sealed class Tm1Session : IAsyncDisposable
         {
             throw new ArgumentException("Only collection requests are streamed: use ExecuteAsync() for " + request);
         }
+        Page<T> page;
         if (_batch is not null)
         {
             // Checked by the queue when the batch runs, as in ExecuteAsync
-            var page = (Page<T>)(await _batch.Add(this, request, r => ReadPage(request, r)).ConfigureAwait(false))!; // ReadPage never returns null
-            if (page.NextLink is not null)
-            {
-                throw new Tm1ProtocolException($"{request}: TM1 sent more than one page, which a batch can't follow; ask for fewer with Top()");
-            }
-            foreach (var item in page.Items)
-            {
-                yield return item;
-            }
-            yield break;
+            page = (Page<T>)(await _batch.Add(this, request, r => ReadPage(request, r)).ConfigureAwait(false))!; // ReadPage never returns null
         }
-        await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
-        var url = Target(request.RelativeUri());
+        else
+        {
+            await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
+            page = ReadPage(request, await SendAsync(request, Target(request.RelativeUri()), _async, cancellationToken).ConfigureAwait(false));
+        }
         while (true)
         {
-            var reply = await SendAsync(request, url, cancellationToken).ConfigureAwait(false);
-            var page = ReadPage(request, reply);
             foreach (var item in page.Items)
             {
                 yield return item;
@@ -233,9 +228,11 @@ public sealed class Tm1Session : IAsyncDisposable
             {
                 yield break;
             }
-            // The link carries the query and TM1's options already
-            url = _connection.Url(page.NextLink);
+            // The link carries the query and TM1's options already. It's followed with an ordinary
+            // request, whatever the view: the rest of the collection isn't part of the async result or
+            // the batch
             request = request with { Query = ODataQuery.None() };
+            page = ReadPage(request, await SendAsync(request, _connection.Url(page.NextLink), null, cancellationToken).ConfigureAwait(false));
         }
     }
 
@@ -272,12 +269,14 @@ public sealed class Tm1Session : IAsyncDisposable
         return options.Count == 0 ? relative : relative + (relative.Contains('?') ? "&" : "?") + string.Join("&", options);
     }
 
-    private async Task<Reply> SendAsync<T>(Tm1Request<T> request, string url, CancellationToken ct)
+    /// <summary>Sends <paramref name="request"/> to <paramref name="url"/>: asynchronously, polling
+    /// every <paramref name="async"/>, if that's given.</summary>
+    private async Task<Reply> SendAsync<T>(Tm1Request<T> request, string url, TimeSpan? async, CancellationToken ct)
     {
         var (content, contentType) = request.Encode();
         Reply reply;
         // Raw bytes (document content) aren't sent async
-        if (_async is { } every && request.Response != Tm1Response.Bytes && request.Body is not byte[])
+        if (async is { } every && request.Response != Tm1Response.Bytes && request.Body is not byte[])
         {
             reply = await SendRespondAsync(request.Method, url, content, contentType, request.Headers, request.Accept, request.Timeout, every, ct)
                 .ConfigureAwait(false);
