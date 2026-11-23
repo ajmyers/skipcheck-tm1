@@ -9,7 +9,7 @@ Run IBM Planning Analytics locally for development, testing and learning: TM1 Se
 
 ## How it works
 
-1. **Tick what you want on the [setup page](/projects/pa-docker/setup/).** It tells you which IBM downloads you need and how much memory to give Docker, and writes the command for your choices.
+1. **Tick what you want on the [setup page](/pa-docker/setup/).** It tells you which IBM downloads you need and how much memory to give Docker, and writes the command for your choices.
 2. **Run the command.** [pa-setup](pa-setup/) reads your choices from `pa-environment.yaml`, starts everything in the right order and waits until it's healthy.
 3. **Open it.** The setup ends by listing every address and login, for example TM1 at `http://localhost:8010/api/v1/`.
 

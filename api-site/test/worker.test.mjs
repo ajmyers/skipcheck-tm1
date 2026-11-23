@@ -23,7 +23,7 @@ const projects = {
 		{ id: 'tm1-client', landing: true, docs: true },
 		{ id: 'tm1-testcontainers', landing: true, docs: true },
 		{ id: 'tm1-csdl', landing: false, docs: true },
-		{ id: 'pa-docker', landing: true, docs: false },
+		{ id: 'pa-docker', landing: true, docs: false, site: ['setup'] },
 		{ id: 'llms.txt', landing: false, docs: false, file: true },
 		{ id: 'llms-full.txt', landing: false, docs: false, file: true },
 	],
@@ -184,12 +184,32 @@ test("anything that isn't a project's goes to the site, as under wrangler dev", 
 	assert.deepEqual(assetRequests, []);
 });
 
-test("the site's own pages under /projects/ go to the site too, though /pa-docker/ is served here", async () => {
+test("the site's own addresses under /projects/ go to the site too, which redirects them", async () => {
 	site['/projects/pa-docker/'] = () => new Response('Docker');
 	site['/projects/pa-docker/setup/'] = () => new Response('Setup');
 	assert.equal(await (await get('/projects/pa-docker/')).text(), 'Docker');
 	assert.equal(await (await get('/projects/pa-docker/setup/')).text(), 'Setup');
 	assert.deepEqual(assetRequests, []);
+});
+
+test("the site's setup page under /pa-docker/, and everything under it, goes to the site as it is", async () => {
+	site['/pa-docker/setup/'] = () => new Response('<html><body>Setup</body></html>', { headers: { 'Content-Type': 'text/html' } });
+	site['/pa-docker/setup/wizard.js'] = () => new Response('let wizard;', { headers: { 'Content-Type': 'text/javascript' } });
+	site['/pa-docker/setup'] = () => new Response(null, { status: 307, headers: { Location: '/pa-docker/setup/' } });
+	const page = await get('/pa-docker/setup/?sample=1');
+	assert.equal(page.status, 200);
+	assert.equal(await page.text(), '<html><body>Setup</body></html>', 'no second masthead or footer: the site page has its own');
+	assert.equal(await (await get('/pa-docker/setup/wizard.js')).text(), 'let wizard;');
+	const bare = await get('/pa-docker/setup');
+	assert.equal(bare.headers.get('Location'), '/pa-docker/setup/', "the site's own redirect, not this Worker's");
+	assert.deepEqual(siteRequests, [SITE + '/pa-docker/setup/?sample=1', SITE + '/pa-docker/setup/wizard.js', SITE + '/pa-docker/setup']);
+	assert.deepEqual(assetRequests, []);
+});
+
+test('a Docker page whose path only starts like the setup page is still served here', async () => {
+	assets['/pa-docker/setups/index.html'] = () => new Response('<html><body>Here</body></html>', { headers: { 'Content-Type': 'text/html' } });
+	assert.equal(await (await get('/pa-docker/setups/')).text(), '<html><body><div class="masthead"><nav>Home</nav></div>Here<footer>The end</footer></body></html>');
+	assert.deepEqual(siteRequests.filter((url) => !url.includes('/partials/')), []);
 });
 
 test('a path that only starts like a project is not that project', async () => {

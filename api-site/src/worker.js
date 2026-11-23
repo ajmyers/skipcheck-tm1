@@ -7,7 +7,8 @@
 // nav reaches these pages without a rebuild. skipcheck.dev serves the same pages, each naming its
 // skipcheck.io address as canonical.
 //
-// The Docker pages, from the READMEs under docker/, are served the same way at /pa-docker/, and
+// The Docker pages, from the READMEs under docker/, are served the same way at /pa-docker/ (but
+// for the site's setup page, /pa-docker/setup/, which goes to the site), and
 // the docs for coding agents, /llms.txt and /llms-full.txt (scripts/llms.mjs), as they are.
 //
 // The addresses these pages had before, under /projects/, are sent to the new ones. The theme stylesheet imports the site's tokens and chrome
@@ -48,8 +49,10 @@ export default {
 
 		// In production only the projects' paths are routed here. Under `wrangler dev` everything is,
 		// so pass the rest (the site's styles, its other pages, links home) through to the site.
+		// So does a page of the site's own under one of these paths: the setup page, /pa-docker/setup/.
+		// In production that fetch goes to the site, the zone's origin, not back to this Worker.
 		const project = site.projects.find((p) => url.pathname === '/' + p.id || url.pathname.startsWith('/' + p.id + '/'));
-		if (!project) return fetch(new URL(url.pathname + url.search, env.SITE_ORIGIN), request);
+		if (!project || isSitePage(project, url.pathname)) return fetch(new URL(url.pathname + url.search, env.SITE_ORIGIN), request);
 
 		// A library without a landing page opens at its docs
 		if (project.docs && !project.landing && (url.pathname === '/' + project.id || url.pathname === '/' + project.id + '/')) {
@@ -131,9 +134,9 @@ async function partial(env, name) {
 //   /projects/tm1/guide/                /tm1-client/docs/
 //   /projects/<project>/                /<project>/
 //
-// The site's own pages under /projects/ are left alone: /projects/pa-docker/ (which the site sends to
-// /pa-docker/ here) and its setup page, /projects/pa-docker/setup/. Only a library (one with docs)
-// had its pages under /projects/.
+// The site's own addresses under /projects/ are left alone: /projects/pa-docker/ and its setup page,
+// /projects/pa-docker/setup/, which the site sends to /pa-docker/ and /pa-docker/setup/. Only a
+// library (one with docs) had its pages under /projects/.
 function formerAddress(pathname) {
 	const match = /^\/projects\/([^/]+)(\/.*)?$/.exec(pathname);
 	if (!match) return null;
@@ -147,6 +150,12 @@ function formerAddress(pathname) {
 	if (!site.projects.some((project) => project.id === name && project.docs)) return null;
 	const api = /^\/api(?:\/(.*))?$/.exec(rest);
 	return api ? '/' + name + '/api/java/' + (api[1] ?? '') : '/' + name + '/';
+}
+
+// Whether a path under a project's is one of the site's own pages (site in scripts/site.mjs), or
+// under one: /pa-docker/setup, /pa-docker/setup/ and /pa-docker/setup/wizard.js are the site's.
+function isSitePage(project, pathname) {
+	return (project.site ?? []).some((page) => pathname === '/' + project.id + '/' + page || pathname.startsWith('/' + project.id + '/' + page + '/'));
 }
 
 function unconditional(request) {

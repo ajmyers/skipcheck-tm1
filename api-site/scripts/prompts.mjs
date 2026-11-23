@@ -165,7 +165,7 @@ export async function commandProblems({ project, language, text }, version) {
 
 /** A prompt on a page: the text, which the site's copy.js gives a Copy button, and the links that
  * open it in Claude. They are links with custom schemes, as on the setup page (ajmyers/skipcheck.io,
- * public/projects/pa-docker/setup/): claude://code/new?q= opens Claude Desktop's Code tab, and
+ * public/pa-docker/setup/): claude://code/new?q= opens Claude Desktop's Code tab, and
  * claude-cli://open?q= the Claude Code CLI, which works once claude has run interactively. Both
  * fill the prompt in without sending it. */
 export function promptHtml(text) {

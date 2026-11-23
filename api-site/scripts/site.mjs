@@ -130,10 +130,13 @@ export const PA_DOCKER = {
 // the docs landing page, and the docs for coding agents (llms.mjs). reference.mjs writes it into
 // .generated/site.json for the Worker; wrangler.jsonc has a route for each (test/site.test.mjs
 // checks), and check-links.mjs looks for their links in dist/. landing: /<id>/ is a page; a library
-// without one opens at its docs. file: /<id> is a file, served as it is.
+// without one opens at its docs. file: /<id> is a file, served as it is. site: the paths under
+// /<id>/ that are ajmyers/skipcheck.io's own pages, not built here: the Worker passes them, and
+// everything under them, through to the site, and check-links.mjs takes them for site addresses.
 export const SECTIONS = [
 	...PROJECTS.map((project) => ({ id: project.id, landing: project.landing, docs: true })),
-	{ id: PA_DOCKER.id, landing: true, docs: false },
+	// The setup page, /pa-docker/setup/, is the site's: it writes pa-environment.yaml in the browser
+	{ id: PA_DOCKER.id, landing: true, docs: false, site: ['setup'] },
 	{ id: 'docs', landing: true, docs: false },
 	{ id: 'llms.txt', landing: false, docs: false, file: true },
 	{ id: 'llms-full.txt', landing: false, docs: false, file: true },

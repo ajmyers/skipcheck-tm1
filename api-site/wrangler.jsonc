@@ -44,7 +44,8 @@
     { "pattern": "*skipcheck.io/llms-full.txt*", "zone_name": "skipcheck.io" },
     // Where these pages were before: /projects/<project>/..., and the guide at /projects/tm1/guide/.
     // The Worker sends them to the addresses above. /projects/pa-docker/ is the site's, and
-    // doesn't match: the site sends it to /pa-docker/, and keeps its setup page there.
+    // doesn't match: the site sends it to /pa-docker/, and its setup page to /pa-docker/setup/,
+    // which the /pa-docker* routes bring here and the Worker passes through to the site.
     { "pattern": "*skipcheck.io/projects/tm1*", "zone_name": "skipcheck.io" },
 
     // The same on skipcheck.dev

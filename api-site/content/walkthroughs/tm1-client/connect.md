@@ -8,7 +8,7 @@ You connect to a TM1 server, ask for its version, and list its cubes. Each step 
 
 ## Before you start
 
-- **A TM1 server with IBM's SData sample.** [Run Planning Analytics on your own computer](/projects/pa-docker/setup/) starts one if you ask for the sample too. It answers at `http://localhost:8011/api/v1/`, and you log in as `admin` with the password `apple`. You need your own licensed copy of TM1 Server.
+- **A TM1 server with IBM's SData sample.** [Run Planning Analytics on your own computer](/pa-docker/setup/) starts one if you ask for the sample too. It answers at `http://localhost:8011/api/v1/`, and you log in as `admin` with the password `apple`. You need your own licensed copy of TM1 Server.
 
 ## Steps
 
