@@ -178,13 +178,15 @@ def test_async_monitor_messages() -> None:
 # Capabilities
 
 
-def test_the_metadata_reader_makes_the_specs_inventory(spec: dict[str, Any]) -> None:
-    """Python reads $metadata into the same 242 endpoint IDs as the Java client's Endpoints."""
+def test_spec_lists_the_endpoints_the_coverage_gate_counts(spec: dict[str, Any]) -> None:
+    """Python reads $metadata into the same 242 endpoint IDs as the Java client's Endpoints, and
+    the spec is of the snapshot's schema (Java's ApiSpecInventoryTest)."""
     from skipcheck_tm1.version import Tm1Capabilities
 
     caps = Tm1Capabilities.parse(SNAPSHOT.read_bytes())
     assert caps.schema_version == "11.8.35"
     assert caps.endpoints == {e["id"] for e in spec["endpoints"]}
+    assert spec["source"]["schemaVersion"] == caps.schema_version
 
 
 OLD_SERVER = b"""<?xml version="1.0" encoding="utf-8"?>
