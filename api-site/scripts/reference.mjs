@@ -28,9 +28,14 @@ import { CANONICAL_ORIGIN, copyAssets, distDir, DOC_LANGUAGES, escape, generated
 
 const allowMissing = process.argv.includes('--allow-missing');
 
-// Areas, by the end of the Java package name, in the order the docs home shows them
+// Areas, by the end of the Java package name, in the order the docs home shows them. Where one
+// package holds different kinds of type, names (a pattern on the type's name) splits it further.
 const AREAS = [
-	{ id: 'client', title: 'The client', packages: ['client', 'testcontainers', 'autoconfigure', 'boot.testcontainers'] },
+	{ id: 'tests', title: 'Writing tests', packages: ['testcontainers'], names: /^Requires/ },
+	{ id: 'containers', title: 'Containers', packages: ['testcontainers'], names: /(?:Container|Environment)(?:\.|$)/ },
+	{ id: 'sources', title: 'Where TM1 comes from', packages: ['testcontainers'], names: /(?:Source|Seed)(?:\.|$)/ },
+	{ id: 'testing-more', title: 'More', packages: ['testcontainers'] },
+	{ id: 'client', title: 'The client', packages: ['client', 'autoconfigure', 'boot.testcontainers'] },
 	{ id: 'session', title: 'Sessions and logins', packages: ['session', 'auth'] },
 	{ id: 'dimensions', title: 'Dimensions and hierarchies', packages: ['service.dimension', 'service.attribute'] },
 	{ id: 'cubes', title: 'Cubes and views', packages: ['service.cube'] },
@@ -46,11 +51,15 @@ const AREAS = [
 ];
 const OTHER = { id: 'other', title: 'Other types', packages: [] };
 
-function areaOf(pkg) {
+function areaOf(type) {
 	let best = null;
 	for (const area of AREAS) {
+		if (area.names && !area.names.test(type.name)) continue;
 		for (const suffix of area.packages) {
-			if ((pkg === suffix || pkg.endsWith('.' + suffix)) && (!best || suffix.length > best.length)) best = { area, length: suffix.length };
+			const fits = type.package === suffix || type.package.endsWith('.' + suffix);
+			// The longest package wins; a name pattern beats the package alone
+			const score = suffix.length + (area.names ? 1000 : 0);
+			if (fits && (!best || score > best.score)) best = { area, score };
 		}
 	}
 	return best?.area ?? OTHER;
@@ -457,7 +466,7 @@ for (const project of PROJECTS) {
 			}
 
 			const name = type.name;
-			const area = areaOf(javaType.package);
+			const area = areaOf(javaType);
 			const importLine = {
 				java: 'import ' + javaType.package + '.' + javaType.name + ';',
 				python: 'from ' + type.package + ' import ' + name,
@@ -521,7 +530,7 @@ for (const project of PROJECTS) {
 function groupByArea(list) {
 	const groups = new Map();
 	for (const type of list) {
-		const area = areaOf(type.package);
+		const area = areaOf(type);
 		if (!groups.has(area)) groups.set(area, []);
 		groups.get(area).push(type);
 	}
@@ -535,7 +544,8 @@ function navHtml(project, language, list, pageOf, nameOf) {
 			.map(
 				({ area, list: types }) =>
 					'<p class="area">' + escape(area.title) + '</p><ul>' +
-					types.map((t) => '<li' + (nameOf(t).includes('.') ? ' class="nested"' : '') + '><a href="' + pageOf(t) + '">' + escape(nameOf(t).includes('.') ? '.' + nameOf(t).split('.').at(-1) : nameOf(t)) + '</a></li>').join('') +
+					// A type nested in Java sits under its outer type, in every language
+					types.map((t) => '<li' + (t.name.includes('.') ? ' class="nested"' : '') + '><a href="' + pageOf(t) + '">' + escape(nameOf(t).includes('.') ? '.' + nameOf(t).split('.').at(-1) : nameOf(t)) + '</a></li>').join('') +
 					'</ul>',
 			)
 			.join('') +
