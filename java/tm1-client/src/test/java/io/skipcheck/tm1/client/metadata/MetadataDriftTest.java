@@ -29,7 +29,7 @@ import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
  * byte. A difference means the snapshot is stale.
  * <li><b>Another version:</b> writes what it adds and removes to
  * {@code build/reports/tm1-metadata-drift.txt} and passes. This is how running the tests
- * against another TM1 version shows its API differences (plan §12.4).
+ * against another TM1 version shows its API differences.
  * </ul>
  */
 @RequiresTm1

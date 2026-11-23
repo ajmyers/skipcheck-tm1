@@ -12,7 +12,7 @@ import io.skipcheck.tm1.client.version.Tm1Version;
 
 /**
  * Capability checks against the committed snapshot, and against approximate older schemas
- * made from it (plan §12.4): the way to test version handling with one TM1 version.
+ * made from it: the way to test version handling with one TM1 version.
  */
 class Tm1CapabilitiesTest {
 

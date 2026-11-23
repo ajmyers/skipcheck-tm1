@@ -30,8 +30,8 @@ import reactor.core.scheduler.Schedulers;
 
 /**
  * Sessions on one TM1 server, one per {@link Tm1Identity}, for applications that act on
- * behalf of many users (plan §16.1). In TM1 identity is the session, so the number of
- * sessions grows with the number of users; the pool keeps that bounded.
+ * behalf of many users. In TM1 identity is the session, so the number of sessions grows
+ * with the number of users; the pool keeps that bounded.
  *
  * <pre class="code">
  * Tm1SessionPool pool = Tm1SessionPool.builder(Tm1Session.builder()

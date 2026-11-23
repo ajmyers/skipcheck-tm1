@@ -11,8 +11,7 @@ import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 
 /**
  * Who a session is: the identity a {@link Tm1SessionPool} keys its sessions by. In TM1
- * the identity is fixed when the session logs in, so one identity is one session (plan
- * §16.1).
+ * the identity is fixed when the session logs in, so one identity is one session.
  *
  * <ul>
  * <li>{@link #serviceAccount()}: the pool's own credentials, as they are.</li>

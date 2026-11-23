@@ -8,7 +8,7 @@ leave any out), unknown properties are ignored, an enum member a newer server ad
 as the enum's fallback, and a subtype is chosen by ``@odata.type``.
 
 Writing sends only the properties that were set, an explicit ``None`` included, so one
-model class serves for reading and for ``PATCH``/``POST`` (plan §8.3)::
+model class serves for reading and for ``PATCH``/``POST``::
 
     Cube(rules="SKIPCHECK;")       # {"Rules": "SKIPCHECK;"}
     Cube(drillthrough_rules=None)  # {"DrillthroughRules": null}

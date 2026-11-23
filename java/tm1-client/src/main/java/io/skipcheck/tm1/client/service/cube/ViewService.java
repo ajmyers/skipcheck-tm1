@@ -26,7 +26,7 @@ import reactor.core.publisher.Mono;
  * {@code tm1.NativeView} type: {@code list} with {@code tm1.NativeView/Columns/Subset},
  * or {@link #getNative}, which reads one view through the type. On TM1 11.8.35 the
  * type-cast expand works on a list holding MDX views too; an older server was reported to
- * fail it (plan §16.5), and {@code getNative} doesn't depend on it.
+ * fail it, and {@code getNative} doesn't depend on it.
  *
  * <p>
  * Create a native view: each axis binds a subset, and every dimension of the cube has to

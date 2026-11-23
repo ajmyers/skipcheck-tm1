@@ -29,9 +29,8 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * One TM1 session, shared by every service (plan §5). Thread-safe, and safe to share
- * between any number of concurrent subscribers: TM1 runs requests on one session in
- * parallel.
+ * One TM1 session, shared by every service. Thread-safe, and safe to share between any
+ * number of concurrent subscribers: TM1 runs requests on one session in parallel.
  *
  * <ul>
  * <li><b>Login is lazy and happens once.</b> The first request logs in, and concurrent
@@ -160,10 +159,10 @@ public final class Tm1Session {
 	}
 
 	/**
-	 * What the server supports, from its own {@code $metadata} (plan §9). Fetched once
-	 * per server version and shared by every session built from the same settings, a
-	 * pool's included. A request that declares {@link Tm1Request#requires} is checked
-	 * against it before it's sent.
+	 * What the server supports, from its own {@code $metadata}. Fetched once per server
+	 * version and shared by every session built from the same settings, a pool's
+	 * included. A request that declares {@link Tm1Request#requires} is checked against it
+	 * before it's sent.
 	 * @return the capabilities
 	 */
 	public Mono<Tm1Capabilities> capabilities() {
@@ -178,9 +177,9 @@ public final class Tm1Session {
 	 *
 	 * <p>
 	 * Derived rather than set on the session, so one caller's sandbox can't leak into
-	 * another caller's requests (plan §5). TM1 evaluates {@code NON EMPTY} and filters in
-	 * the request's sandbox, so every request of an operation needs it, cellset reads and
-	 * deletes included (plan §16.3); a service given this view gets that for free.
+	 * another caller's requests. TM1 evaluates {@code NON EMPTY} and filters in the
+	 * request's sandbox, so every request of an operation needs it, cellset reads and
+	 * deletes included; a service given this view gets that for free.
 	 * @param name the sandbox's name; not blank
 	 * @return a view of this session in that sandbox
 	 * @throws IllegalArgumentException if {@code name} is blank

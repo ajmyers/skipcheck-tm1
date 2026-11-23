@@ -10,7 +10,7 @@ using Skipcheck.Tm1.Client.Services;
 
 namespace Skipcheck.Tm1.Client.Tests;
 
-/// <summary>The endpoint coverage gate, as the Java client's CoverageGateTest (plan §12.3): every
+/// <summary>The endpoint coverage gate, as the Java client's CoverageGateTest: every
 /// endpoint of the spec is implemented (a <see cref="Tm1EndpointAttribute"/>), excluded with a
 /// reason, or pending, under the same rules, against the same inventory.</summary>
 public class CoverageGateTests

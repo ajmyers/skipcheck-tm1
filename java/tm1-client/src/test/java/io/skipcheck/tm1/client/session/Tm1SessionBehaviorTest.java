@@ -22,14 +22,12 @@ import reactor.netty.resources.ConnectionProvider;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Pins how TM1 handles sessions, which {@code Tm1Session}'s design relies on (plan §5,
- * §16.1).
+ * Pins how TM1 handles sessions, which {@code Tm1Session}'s design relies on.
  *
  * <p>
  * These tests talk to TM1 over bare HTTP ({@link RawTm1}), not through the client, so
  * they show what TM1 does rather than what the client does. If a TM1 version changes one
- * of these behaviors, its test fails, and the session code needs a version branch (plan
- * §16.7).
+ * of these behaviors, its test fails, and the session code needs a version branch.
  */
 @RequiresTm1
 class Tm1SessionBehaviorTest {
@@ -43,9 +41,9 @@ class Tm1SessionBehaviorTest {
 
 	/**
 	 * The client replays a request once after a 401 on an established session, POSTs
-	 * included (plan §5). That's only safe if TM1 refuses the request before running it.
-	 * Checked with a cookie-only request: a request that also sent credentials would open
-	 * a new session and succeed, and prove nothing.
+	 * included. That's only safe if TM1 refuses the request before running it. Checked
+	 * with a cookie-only request: a request that also sent credentials would open a new
+	 * session and succeed, and prove nothing.
 	 */
 	@Test
 	void refusesARequestOnAKilledSessionWithoutRunningIt() {

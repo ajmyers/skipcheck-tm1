@@ -25,8 +25,8 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import io.skipcheck.tm1.client.service.Tm1Endpoint;
 
 /**
- * The endpoint coverage gate (plan §12.3): every endpoint in the snapshot must be
- * accounted for, as implemented, excluded with a reason, or pending.
+ * The endpoint coverage gate: every endpoint in the snapshot must be accounted for, as
+ * implemented, excluded with a reason, or pending.
  *
  * <ul>
  * <li>{@code metadata/coverage-excluded.txt}: endpoints deliberately not implemented, one

@@ -53,7 +53,7 @@ class ArchitectureTest {
 					DescribedPredicate.describe("a method that blocks on a Mono or Flux", ArchitectureTest::blocks))
 			.orShould()
 			.callMethod(Thread.class, "sleep", long.class)
-			.because("the client is reactive only (plan Q9): blocking an event loop thread stalls every request on it, "
+			.because("the client is reactive only: blocking an event loop thread stalls every request on it, "
 					+ "and callers who want to block call block() themselves")
 			.check(LIBRARY);
 	}
@@ -76,7 +76,7 @@ class ArchitectureTest {
 					ArchitectureTest::uriTemplate))
 			.because(
 					"TM1 object names contain braces (control objects such as }Clients), which a URI template reads as "
-							+ "variables; requests use a URI already encoded by ODataPath and ODataQuery (plan §16.2)")
+							+ "variables; requests use a URI already encoded by ODataPath and ODataQuery")
 			.check(LIBRARY);
 	}
 
@@ -104,7 +104,7 @@ class ArchitectureTest {
 			.dependOnClassesThat()
 			.resideInAnyPackage("io.skipcheck.tm1.client", "io.skipcheck.tm1.client.session..",
 					"io.skipcheck.tm1.client.version..")
-			.because("the odata layer is TM1-agnostic (plan §3.2): OData correctness lives in one place and doesn't "
+			.because("the odata layer is TM1-agnostic: OData correctness lives in one place and doesn't "
 					+ "depend on sessions, requests or TM1 versions")
 			.check(LIBRARY);
 	}
@@ -128,7 +128,7 @@ class ArchitectureTest {
 							.allMatch(f -> f.getModifiers().contains(JavaModifier.FINAL)
 									&& (f.getModifiers().contains(JavaModifier.STATIC)
 											|| f.getRawType().isEquivalentTo(Tm1Session.class))))))
-			.because("services are free to create and safe to share (plan §6): everything they need is the session")
+			.because("services are free to create and safe to share: everything they need is the session")
 			.allowEmptyShould(true)
 			.check(LIBRARY);
 	}
@@ -145,8 +145,8 @@ class ArchitectureTest {
 			.andShould(ArchCondition.from(DescribedPredicate.describe("declare the endpoints they implement",
 					(JavaMethod m) -> m.isAnnotatedWith(Tm1Endpoint.class)
 							|| m.isAnnotatedWith(Tm1Endpoint.List.class))))
-			.because("each service method is one REST call that never blocks (plan §6, §7), and the coverage gate "
-					+ "counts what's implemented from @Tm1Endpoint (plan §12.3)")
+			.because("each service method is one REST call that never blocks, and the coverage gate "
+					+ "counts what's implemented from @Tm1Endpoint")
 			.allowEmptyShould(true)
 			.check(LIBRARY);
 	}

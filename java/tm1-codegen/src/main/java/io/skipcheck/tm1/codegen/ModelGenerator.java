@@ -52,7 +52,7 @@ import io.skipcheck.tm1.csdl.CsdlStructuredType;
 import io.skipcheck.tm1.csdl.CsdlTypeRef;
 
 /**
- * Generates the model from a {@code $metadata} document (plan §8.1), into one package:
+ * Generates the model from a {@code $metadata} document, into one package:
  *
  * <ul>
  * <li>a Java enum per CSDL enum type, with a fallback constant, so a newer server's new
@@ -134,7 +134,7 @@ public final class ModelGenerator {
 	 * Properties TM1 sends in another type than {@code $metadata} declares, by
 	 * {@code Type/Property}, with what it does instead (from the overlay). Their
 	 * components are {@code JsonNode}, so either form reads; each was found against a
-	 * server (plan §16.5).
+	 * server.
 	 */
 	private final Map<String, String> departures;
 
@@ -627,10 +627,10 @@ public final class ModelGenerator {
 	}
 
 	/**
-	 * A type's patch (plan §8.3): only the properties set are written, explicit nulls
-	 * included, plus {@code @odata.bind} references, in the order they were set. A record
-	 * can't do that, since it can't tell "not set" from "set to null". A subtype's patch
-	 * extends its root's and writes {@code @odata.type} first.
+	 * A type's patch: only the properties set are written, explicit nulls included, plus
+	 * {@code @odata.bind} references, in the order they were set. A record can't do that,
+	 * since it can't tell "not set" from "set to null". A subtype's patch extends its
+	 * root's and writes {@code @odata.type} first.
 	 */
 	private TypeSpec.Builder patch(CsdlStructuredType type) {
 		ClassName name = patchName(type);

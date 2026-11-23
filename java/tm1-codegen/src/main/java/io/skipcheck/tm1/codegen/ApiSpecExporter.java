@@ -42,8 +42,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>{@code enums}, {@code types} and {@code operations}, with descriptions and
  * {@code Core.Revisions} (since, deprecated);</li>
  * <li>{@code container}: entity sets, singletons and imports;</li>
- * <li>{@code endpoints}: the coverage gate's inventory (plan §12.3), the unit every
- * client's coverage is counted in, with the overlay's notes.</li>
+ * <li>{@code endpoints}: the coverage gate's inventory, the unit every client's coverage
+ * is counted in, with the overlay's notes.</li>
  * </ul>
  *
  * <p>

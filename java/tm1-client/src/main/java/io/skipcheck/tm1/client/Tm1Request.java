@@ -248,7 +248,7 @@ public final class Tm1Request<T> {
 	 * A copy that's only sent if the server defines {@code capability}: before sending,
 	 * the session checks the server's {@code $metadata} and otherwise fails with
 	 * {@link io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException}, without
-	 * calling the server (plan §9). Service methods for newer endpoints declare it.
+	 * calling the server. Service methods for newer endpoints declare it.
 	 * @param capability what the request needs the server to define
 	 * @return the copy
 	 */

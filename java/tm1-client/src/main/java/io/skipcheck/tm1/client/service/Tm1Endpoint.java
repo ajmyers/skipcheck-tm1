@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
 
 /**
  * An endpoint of the TM1 REST API that a service method implements, named as the coverage
- * gate names it (plan §12.3): {@code EntitySet Dimensions}, {@code Navigation
+ * gate names it: {@code EntitySet Dimensions}, {@code Navigation
  * Dimension/Hierarchies}, {@code Action Dimension/SaveAs},
  * {@code ActionImport ExecuteMDX}. For an operation, {@code Tm1Operation.endpoint()}
  * gives the name.

@@ -35,7 +35,7 @@ trim_trailing_whitespace = false
 [*.{bat,cmd}]
 end_of_line = crlf
 
-# TM1's $metadata is committed exactly as the server sends it (plan Q2): never reformat it
+# TM1's $metadata is committed exactly as the server sends it: never reformat it
 [java/tm1-client/src/model/metadata/**]
 charset = unset
 end_of_line = unset

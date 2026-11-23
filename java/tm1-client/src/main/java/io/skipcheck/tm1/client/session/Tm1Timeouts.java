@@ -8,9 +8,9 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * How long the session waits, by kind of work (plan §16.2). TM1 answers some calls only
- * when the work is done, so one timeout for everything is either too short for processes
- * or too long for a login.
+ * How long the session waits, by kind of work. TM1 answers some calls only when the work
+ * is done, so one timeout for everything is either too short for processes or too long
+ * for a login.
  *
  * {@snippet class = examples.Tm1TimeoutsExamples region = long-requests}
  *
