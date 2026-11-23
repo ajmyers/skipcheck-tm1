@@ -2,17 +2,23 @@
 
 Libraries and tools for the **IBM Planning Analytics (TM1) REST API**: a Java client, and Python, .NET and TypeScript clients with the same API, all generated from one spec.
 
-| Module | What it is |
+The same client in four languages, each with a testcontainers library beside it:
+
+| | Client | Testcontainers | Installed as |
+|---|---|---|---|
+| [`java`](java) | [`tm1-client`](java/tm1-client) | [`tm1-testcontainers`](java/tm1-testcontainers) | `io.skipcheck:tm1-client`, `io.skipcheck:tm1-testcontainers` |
+| [`python`](python) | [`tm1-client`](python/tm1-client) (sync and asyncio) | [`tm1-testcontainers`](python/tm1-testcontainers) | `skipcheck-tm1`, `skipcheck-tm1-testcontainers` |
+| [`dotnet`](dotnet) | [`Tm1.Client`](dotnet/src/Tm1.Client) | [`Tm1.Testcontainers`](dotnet/src/Tm1.Testcontainers) | `Skipcheck.Tm1.Client`, `Skipcheck.Tm1.Testcontainers` |
+| [`typescript`](typescript) | [`tm1-client`](typescript/tm1-client) (Node and browsers) | [`tm1-testcontainers`](typescript/tm1-testcontainers) | `@skipcheck/tm1-client`, `@skipcheck/tm1-testcontainers` |
+
+Java is the reference: the other clients have its API, and their tests replay what its tests record ([`spec/conformance`](spec/conformance)). The testcontainers libraries run real TM1 servers in Docker for your tests, with [Testcontainers](https://testcontainers.com); you bring your own licensed TM1.
+
+| Also here | What it is |
 |---|---|
-| [`tm1-client`](java/tm1-client) | Plain Java client. No Spring container required. |
-| [`tm1-spring-boot-starter`](java/tm1-spring-boot-starter) | Spring Boot auto-configuration for the client. |
-| [`tm1-testcontainers`](java/tm1-testcontainers) | Real TM1 servers in Docker for your tests, with [Testcontainers](https://testcontainers.com). Bring your own licensed TM1. Ported to Python ([`python/tm1-testcontainers`](python/tm1-testcontainers)), .NET ([`dotnet/src/Tm1.Testcontainers`](dotnet/src/Tm1.Testcontainers)) and TypeScript ([`typescript/tm1-testcontainers`](typescript/tm1-testcontainers)). |
-| [`tm1-bom`](java/tm1-bom) | Keeps the module versions aligned. |
+| [`java/tm1-spring-boot-starter`](java/tm1-spring-boot-starter) | Spring Boot auto-configuration for the Java client. |
+| [`java/tm1-bom`](java/tm1-bom) | Keeps the Java module versions aligned. |
+| [`java/tools`](java/tools) | Applications built on the libraries (not published). |
 | [`spec`](spec) | The language-neutral API spec every client is generated from and counts its coverage against, exported from TM1's `$metadata` by `tm1-codegen`. |
-| [`python`](python) | Python client (sync and asyncio), with the Java client's API. |
-| [`dotnet`](dotnet) | .NET client, with the Java client's API. See its [README](dotnet/README.md). |
-| [`typescript`](typescript) | TypeScript client for Node and browsers, with the Java client's API. See its [README](typescript/tm1-client/README.md). |
-| [`tools/`](java/tools) | Applications built on the libraries (not published). |
 | [`docker/tm1-server`](docker/tm1-server) | Docker image for TM1 Server, for local development and tests. You supply your own licensed TM1; no IBM software is included. **[Getting started](docker/tm1-server/GETTING-STARTED.md)** |
 | [`docker/tm1-web`](docker/tm1-web) | Docker image for TM1 Web (Planning Analytics Spreadsheet Services), to run alongside `tm1-server`. You supply your own licensed TM1 Web; no IBM software is included. |
 | [`docker/paw`](docker/paw) | Runs IBM's Planning Analytics Workspace Local images from your own PAW zip, next to `tm1-server`. No IBM software is included. |
