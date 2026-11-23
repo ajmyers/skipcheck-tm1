@@ -12,8 +12,8 @@
 //                                language's examples file, which its tests compile or type-check
 //   ::file <path> <language>     a whole file from the repository, such as a configuration example
 //   ::walkthroughs               the project's walkthroughs, as a list of links
-//   ::prompt                     the prompt to hand to a coding agent, in each language, with a
-//                                copy button and links that open it in Claude (prompts.mjs)
+//   ::prompt                     the prompt to hand to a coding agent, in each language, collapsed,
+//                                with a copy button and links that open it in Claude (prompts.mjs)
 //
 // Under an example's code is what it printed, as the live tests recorded it (output.mjs). On a
 // walkthrough, an example that prints must have its output recorded.

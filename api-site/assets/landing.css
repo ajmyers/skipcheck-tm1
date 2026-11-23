@@ -21,7 +21,8 @@
     font-size: 0.85em;
 }
 
-/* A prompt for a coding agent (prompts.mjs): its text wraps, and the links that open it in Claude sit
-   under it, inside the panel */
-.tabs pre.prompt { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 28rem; overflow-y: auto; }
+/* A prompt for a coding agent (prompts.mjs): the site's collapsed prompt (details.prompt, in its
+   styles.css), which is the panel's first block here rather than a box of its own. The links that
+   open it in Claude sit under it, inside the panel */
+.tabs details.prompt { margin: 0; border: 0; border-radius: 0; background: transparent; }
 .tabs .actions { margin: 0; padding: 0.9rem 1rem 0; border-top: 1px solid var(--rule, #d8d8d8); }

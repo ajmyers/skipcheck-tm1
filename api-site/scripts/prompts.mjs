@@ -26,8 +26,8 @@
 // ({{install}}, from packages.mjs), as code on the pages comes from compiled examples. A fenced or
 // indented block, inline code or an install command in the file fails the build (codeProblems).
 //
-// pages.mjs and docker.mjs show a prompt where its content file says ::prompt, with a copy button
-// and the links that open it in Claude, as the setup page (ajmyers/skipcheck.io) does.
+// pages.mjs and docker.mjs show a prompt where its content file says ::prompt, collapsed, with a
+// copy button and the links that open it in Claude, as the setup page (ajmyers/skipcheck.io) does.
 // check-links.mjs checks every address in every prompt, and that every install command in one is
 // what packages.mjs gives.
 
@@ -163,16 +163,19 @@ export async function commandProblems({ project, language, text }, version) {
 	return problems;
 }
 
-/** A prompt on a page: the text, which the site's copy.js gives a Copy button, and the links that
- * open it in Claude. They are links with custom schemes, as on the setup page (ajmyers/skipcheck.io,
+/** A prompt on a page: the text, collapsed until the reader opens it, which the site's copy.js gives
+ * a Copy button that copies it whole while closed, and the links that open it in Claude. The text is
+ * in the site's <details class="prompt"> (ajmyers/skipcheck.io, styles.css), as on the setup page,
+ * so it opens without a script, and shows its first lines while closed where the browser can. They are links with custom schemes, as on the setup page (ajmyers/skipcheck.io,
  * public/pa-docker/setup/): claude://code/new?q= opens Claude Desktop's Code tab, and
  * claude-cli://open?q= the Claude Code CLI, which works once claude has run interactively. Both
  * fill the prompt in without sending it. */
 export function promptHtml(text) {
 	const q = encodeURIComponent(text);
 	return (
-		'<p class="caption">Prompt</p>' +
-		codeBlock(text, null).replace('<pre>', '<pre class="prompt">') +
+		'<details class="prompt"><summary>Prompt <span class="prompt-toggle"><span class="prompt-show">Show the full prompt</span><span class="prompt-hide">Hide the prompt</span></span></summary>' +
+		codeBlock(text, null) +
+		'</details>' +
 		'<p class="actions"><a class="button primary" href="' + escape('claude://code/new?q=' + q) + '">Open in Claude Desktop</a>' +
 		'<a class="button" href="' + escape('claude-cli://open?q=' + q) + '">Open in Claude Code</a></p>' +
 		'<p class="needs">Either link fills in the prompt, and you press Enter to send it. "Open in Claude Code" is for the terminal app, and works once you\'ve run <code>claude</code> on this computer. ' +
