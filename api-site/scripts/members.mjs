@@ -27,14 +27,13 @@ const pascal = (name) => name.toLowerCase().replace(/(?:^|_)([a-z0-9])/g, (m, c)
 const capital = (name) => name.charAt(0).toUpperCase() + name.slice(1);
 const PYTHON_KEYWORDS = new Set(['and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'try', 'while', 'with', 'yield']);
 
-/** The names a Java type may have in another language, most likely first: a nested Builder is
- * Tm1Client.Builder in Java and Tm1ClientBuilder elsewhere, an exception is an Error in Python.
- * renamed is the name the language's list gives it, if any. */
+/** The names a Java type may have in another language, most likely first: a nested type keeps its
+ * outer type (Tm1Timeouts.Builder), or is joined to it (Tm1ClientBuilder), or stands alone; an
+ * exception is an Error in Python. renamed is the name the language's list gives it, if any. */
 export function typeCandidates(language, javaName, renamed) {
 	if (renamed) return [javaName.split('.').slice(0, -1).concat(renamed).join('.'), renamed];
-	const last = javaName.split('.').at(-1);
-	if (language === 'python') return [last.replace(/Exception$/, 'Error'), javaName.replace('.', '').replace(/Exception$/, 'Error')];
-	return [javaName, javaName.replace('.', ''), last];
+	const names = [javaName, javaName.replaceAll('.', ''), javaName.split('.').at(-1)];
+	return language === 'python' ? names.map((name) => name.replace(/Exception(?=\.|$)/g, 'Error')) : names;
 }
 
 /** The names a Java member may have in another language, as each language's parity tests require:
@@ -42,8 +41,9 @@ export function typeCandidates(language, javaName, renamed) {
 export function memberCandidates(language, javaMember, typeName) {
 	const name = javaMember.name;
 	if (javaMember.kind === 'constructor') return language === 'python' ? ['__init__'] : [typeName];
-	// A constant (an enum's NOT_FOUND, a static final) keeps its name, but in .NET (NotFound)
-	if (/^[A-Z][A-Z0-9_]*$/.test(name) && (javaMember.kind === 'constant' || javaMember.kind === 'field')) return language === 'dotnet' ? [pascal(name)] : [name];
+	// A constant (an enum's NOT_FOUND, a static final) keeps its name, but in .NET (NotFound); in
+	// TypeScript an enum's is a string union's value, also NotFound
+	if (/^[A-Z][A-Z0-9_]*$/.test(name) && (javaMember.kind === 'constant' || javaMember.kind === 'field')) return language === 'dotnet' ? [pascal(name)] : language === 'typescript' ? [name, pascal(name)] : [name];
 	// A Python keyword (and, from) takes a trailing underscore: and_
 	if (language === 'python' && PYTHON_KEYWORDS.has(snake(name))) return [snake(name) + '_'];
 	// A Java getter (getUrl) is a property elsewhere (url, Url)
@@ -174,8 +174,8 @@ export function javaOnlyNames(javaTypes, names) {
 }
 
 /** A Java member's likely name in a language that has no counterpart of its type to look in: the
- * first of its candidates the language's names have, a constant's PascalCase too (TypeScript's
- * Tm1ErrorKind.CredentialRejected), or else the first candidate. */
+ * first of its candidates the language's names have, a constant's PascalCase too (whatever kind the
+ * caller took it for), or else the first candidate. */
 export function guessMember(language, javaMember, names) {
 	const candidates = memberCandidates(language, javaMember, '');
 	if (/^[A-Z][A-Z0-9_]*$/.test(javaMember.name)) candidates.push(pascal(javaMember.name));

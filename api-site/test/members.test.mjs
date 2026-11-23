@@ -24,6 +24,8 @@ test('a Java member is found by the parity rule in each language', () => {
 	assert.deepEqual(gate('python', java, [member('model_cubes'), member('url', 'property'), member('NOT_FOUND', 'constant'), member('DEFAULT_IMAGE', 'constant'), member('and_')]).missing, []);
 	assert.deepEqual(gate('dotnet', java, [member('ModelCubesAsync'), member('Url', 'property'), member('NotFound', 'constant'), member('DefaultImage', 'constant'), member('And')]).missing, []);
 	assert.deepEqual(gate('typescript', java, [member('modelCubes'), member('url', 'property'), member('NOT_FOUND', 'constant'), member('DEFAULT_IMAGE', 'property'), member('and')]).missing, []);
+	// An enum is a string union in TypeScript, whose values are PascalCase
+	assert.deepEqual(gate('typescript', [member('NOT_FOUND', 'constant')], [member('NotFound', 'constant')]).missing, []);
 });
 
 test('.NET names are compared without case: odataLiteral is ODataLiteral, ETAG is ETag', () => {

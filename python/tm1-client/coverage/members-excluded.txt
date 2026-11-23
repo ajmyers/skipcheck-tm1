@@ -24,3 +24,4 @@ Tm1Authenticator.camNamespace | a function of skipcheck_tm1.auth: auth.cam_names
 Tm1Authenticator.camPassport | a function of skipcheck_tm1.auth: auth.cam_passport(passport), given the passport or a function that returns one
 Tm1Authenticator.cognosLogon | a function of skipcheck_tm1.auth: auth.cognos_logon(dispatcher, namespace, user, password)
 Tm1Authenticator.cognosIdToken | a function of skipcheck_tm1.auth: auth.cognos_id_token(dispatcher, namespace, id_token)
+Filter.Variable.self -> self_ | self names the instance in a Python method
