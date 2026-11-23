@@ -1,5 +1,8 @@
 # Weekly version updates, grouped so each ecosystem opens one PR per week.
 # Dependabot PRs are exempt from the "link an issue" rule (see pr-conventions.yml).
+#
+# Every ecosystem the repository builds with is here. One that's left out gets no updates until a
+# security alert, and then several at once: the TypeScript workspace's first eight arrived that way.
 version: 2
 updates:
   # Covers gradle/libs.versions.toml, which also pins the build-logic plugins.
@@ -20,4 +23,56 @@ updates:
       day: monday
     groups:
       github-actions:
+        patterns: ["*"]
+
+  # The TypeScript workspace (one lock file for the client and its testcontainers), and the API
+  # docs site. Versions in typescript/package.json are pinned exactly, so every update is a PR.
+  - package-ecosystem: npm
+    directories:
+      - /typescript
+      - /api-site
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      npm:
+        patterns: ["*"]
+
+  # Ruff and Pyright are pinned in tm1-client's test extra: a newer one may lay code out
+  # differently or report more, so each bump comes with whatever it reformats or finds.
+  - package-ecosystem: pip
+    directories:
+      - /python/tm1-client
+      - /python/tm1-testcontainers
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      pip:
+        patterns: ["*"]
+
+  # The projects' packages, and CSharpier in dotnet-tools.json. CSharpier.MsBuild in
+  # Directory.Build.props has to stay the same version as the tool.
+  - package-ecosystem: nuget
+    directories:
+      - /dotnet
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      nuget:
+        patterns: ["*"]
+
+  # The images' base images
+  - package-ecosystem: docker
+    directories:
+      - /docker/tm1-server
+      - /docker/tm1-web
+      - /docker/cognos-server
+      - /docker/pa-setup
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      docker:
         patterns: ["*"]

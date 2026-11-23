@@ -26,6 +26,8 @@ plugins {
 
 val root = layout.projectDirectory
 val pythonVenv = layout.buildDirectory.dir("python-venv")
+// Where the other clients' suites write their reports, for scripts/test-summary.py (Java's are Gradle's own)
+val testResults = layout.buildDirectory.dir("test-results").get()
 
 // One virtual environment for every Python task, with both packages installed for editing
 val pythonEnvironment = tasks.register<PythonVenv>("pythonEnvironment") {
@@ -55,14 +57,16 @@ val checkPython = tasks.register<PythonTask>("checkPython") {
 	description = "Runs the Python client's and testcontainers' tests (pytest), with their layout, lint and type checks."
 	python()
 	directory = root
-	commands = listOf(listOf("python", "-m", "pytest", "python"))
+	commands = listOf(listOf("python", "-m", "pytest", "python", "--junitxml=" + testResults.file("python/pytest.xml").asFile.path))
 }
 
 val checkDotnet = tasks.register<ToolTask>("checkDotnet") {
 	group = "verification"
 	description = "Builds and tests the .NET client and testcontainers (dotnet test)."
 	directory = root
-	commands = listOf(listOf("dotnet", "test", "dotnet/Tm1.slnx"))
+	// A report per test project, named by the time: the folder is emptied first, so they're this run's
+	fresh = listOf(testResults.dir("dotnet").asFile.path)
+	commands = listOf(listOf("dotnet", "test", "dotnet/Tm1.slnx", "--logger", "trx", "--results-directory", testResults.dir("dotnet").asFile.path))
 	defaultEnvironment = dotnetEnvironment
 }
 
@@ -72,6 +76,8 @@ val checkTypescript = tasks.register<ToolTask>("checkTypescript") {
 	description = "Tests the TypeScript client and testcontainers (npm test, with prettier, eslint and tsc), then builds them."
 	directory = root.dir("typescript")
 	commands = listOf(listOf("npm", "test"), listOf("npm", "run", "build"))
+	// Each vitest.config.ts writes a JUnit report there, when this is set
+	environment = mapOf("TEST_RESULTS" to testResults.dir("typescript").asFile.path)
 }
 
 val checkLicense = tasks.register<PythonTask>("checkLicense") {
@@ -87,7 +93,7 @@ val checkScripts = tasks.register<PythonTask>("checkScripts") {
 	description = "Tests the repository's own tooling (scripts/tests): the scripts, the git hooks, and ShellCheck over every shell script."
 	python()
 	directory = root
-	commands = listOf(listOf("python", "-m", "pytest", "scripts/tests"))
+	commands = listOf(listOf("python", "-m", "pytest", "scripts/tests", "--junitxml=" + testResults.file("scripts/pytest.xml").asFile.path))
 }
 
 val checkApiSite = tasks.register<ToolTask>("checkApiSite") {

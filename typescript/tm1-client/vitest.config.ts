@@ -19,6 +19,16 @@ export default defineConfig({
     ],
   },
   test: {
+    // With TEST_RESULTS set (./gradlew checkTypescript sets it), a JUnit report too, for
+    // scripts/test-summary.py. Naming reporters turns off the ones vitest picks itself, so its own
+    // choice is spelled out: default, and in GitHub Actions the one that annotates a pull request
+    reporters: process.env.TEST_RESULTS
+      ? [
+          "default",
+          ...(process.env.GITHUB_ACTIONS === "true" ? ["github-actions"] : []),
+          ["junit", { outputFile: `${process.env.TEST_RESULTS}/tm1-client.xml` }],
+        ]
+      : undefined,
     testTimeout: 20_000,
     // The live tests' setup may start TM1 in Docker: a bundle's first install takes minutes
     hookTimeout: 10 * 60_000,

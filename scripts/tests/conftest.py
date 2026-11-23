@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import subprocess
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -24,6 +25,7 @@ def load(path: str) -> ModuleType:
     spec = importlib.util.spec_from_file_location(file.stem.replace("-", "_"), file)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module  # a dataclass looks its module up there
     spec.loader.exec_module(module)
     return module
 
