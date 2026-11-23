@@ -183,9 +183,17 @@ export function head({ title, description, canonical, styles, scripts }) {
 		scripts.map((src) => '<script src="' + src + '" defer></script>').join('') +
 		(description ? '<meta property="og:type" content="website"><meta property="og:title" content="' + escape(title) + '"><meta property="og:description" content="' + escape(description) + '">' : '') +
 		(canonical ? '<meta property="og:url" content="' + escape(canonical) + '">' : '') +
+		(description ? SOCIAL_IMAGE_TAGS : '') +
 		'</head>'
 	);
 }
 
 /** The address the pages name as canonical: skipcheck.dev serves the same pages. */
 export const CANONICAL_ORIGIN = 'https://skipcheck.io';
+
+/** The link preview image of the pages with a description, as og:image: the site's own, which
+ * ajmyers/skipcheck.io renders and serves (social/ there). Absolute, as link previews need. */
+const SOCIAL_IMAGE_TAGS =
+	'<meta property="og:image" content="https://skipcheck.io/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">' +
+	'<meta property="og:image:alt" content="Skipcheck: developer tools for IBM Planning Analytics, for Java, Python, .NET, TypeScript and Docker">' +
+	'<meta name="twitter:card" content="summary_large_image">';
