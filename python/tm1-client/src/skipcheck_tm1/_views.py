@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import functools
 import json
-from collections.abc import Iterator
 from dataclasses import replace
 from datetime import timedelta
 from typing import Any
@@ -85,12 +84,12 @@ class Queue:
         self.entries.append((call, context, deferred))
         return deferred
 
-    def chunks(self, per_request: int) -> Iterator[list[tuple[p.Call, p.Context, p.Deferred[Any]]]]:
+    def take(self) -> list[tuple[p.Call, p.Context, p.Deferred[Any]]]:
+        """Every queued call, for the one run: afterwards the queue takes no more."""
         if self.ran:
             raise RuntimeError("The batch has already run")
         self.ran = True
-        for start in range(0, len(self.entries), per_request):
-            yield self.entries[start : start + per_request]
+        return list(self.entries)
 
 
 def settle(chunk: list[tuple[p.Call, p.Context, p.Deferred[Any]]], reply: p.Reply, url: Any, classifier: Any = None) -> None:

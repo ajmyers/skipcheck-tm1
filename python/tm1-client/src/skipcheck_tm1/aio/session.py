@@ -593,9 +593,11 @@ class AsyncTm1Session:
         if isinstance(request, Tm1Request) and request.response is Tm1Request.Response.COLLECTION:
             raise ValueError(f"Collection requests are streamed: use stream() or collect() for {request}")
         call = as_call(request)
-        await self._check(call)
         if self._queue is not None:
+            # What the call requires is checked when the batch runs: the check may read the
+            # server's $metadata, and queueing sends nothing
             return self._queue.add(call, self._context)
+        await self._check(call)
         url = self._connection.url(p.target(call, self._context))
         content, headers = call.body()
         if self._async_every is not None and not call.raw:
@@ -696,6 +698,13 @@ class AsyncTm1SessionBatch:
     change made to the object afterwards isn't sent. If TM1 answers a ``$batch`` with no body, or
     with something that isn't a batch response, every call of that request fails with
     :class:`~skipcheck_tm1.errors.Tm1ProtocolError`.
+
+    A request that requires something the server doesn't define (``Tm1Request.requires``, or an
+    operation of the generated API) is checked when the batch runs, not when the call is made, so
+    that making a call sends nothing: its call fails with
+    :class:`~skipcheck_tm1.errors.Tm1UnsupportedOperationError` and it isn't sent, and the others
+    still are. If the server's capabilities can't be read at all, each call that needs them fails
+    with that error.
     """
 
     DEFAULT_PER_REQUEST = 500
@@ -736,7 +745,12 @@ class AsyncTm1SessionBatch:
         request's result (or error) is in its ``Deferred``. Runs once."""
         if per_request < 1:
             raise ValueError(f"A batch needs room for at least one request: {per_request}")
-        for chunk in self._queue.chunks(per_request):
+        sendable = []
+        for entry in self._queue.take():
+            if await self._supported(entry[0], entry[2]):
+                sendable.append(entry)
+        for start in range(0, len(sendable), per_request):
+            chunk = sendable[start : start + per_request]
             body = p.batch_body([(call, context) for call, context, _ in chunk])
             try:
                 reply = await self._sender.execute(p.Call("POST", "$batch", json_body=body, read=lambda r: r, contextual=False))
@@ -746,6 +760,16 @@ class AsyncTm1SessionBatch:
                 # a response with no body, or one that isn't a batch response.
                 for _, _, deferred in chunk:
                     deferred._fail(e)
+
+    async def _supported(self, call: p.Call, deferred: p.Deferred[Any]) -> bool:
+        """Whether the server defines what the call requires. If it doesn't (or that can't be found
+        out), the call fails and isn't sent, as outside a batch."""
+        try:
+            await self._sender._check(call)
+        except Exception as e:  # noqa: BLE001
+            deferred._fail(e)
+            return False
+        return True
 
 
 class AsyncTm1SessionBuilder:

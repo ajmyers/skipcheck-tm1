@@ -609,6 +609,36 @@ def test_refuses_a_request_the_server_cant_serve_without_sending_it(rt: Runtime)
     assert rt.fake.requests == []
 
 
+def test_refuses_a_request_the_server_cant_serve_in_a_batch_and_still_sends_the_rest(rt: Runtime) -> None:
+    rt.fake.respond = lambda r: {"responses": [{"id": "1", "status": 200, "body": {}}]}
+    batch = rt.session().batch()
+    bananas = rt.run(
+        batch.session.collect(Tm1Request.list(ODataPath.of("Bananas"), ODataQuery.none(), dict).requires(Tm1Capability.entity_set("Bananas").since("99.0")))
+    )
+    server = rt.run(batch.session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), dict)))
+    assert rt.fake.metadata_reads == 0 and rt.fake.login_requests == [], "queueing sends nothing: the check waits for the run"
+    rt.run(batch.run())
+    with pytest.raises(Tm1UnsupportedOperationError):
+        bananas.result()
+    assert server.result() == {}
+    (sent,) = requests_to(rt, "POST $batch")
+    assert "Server" in sent.content.decode() and "Bananas" not in sent.content.decode()
+
+
+def test_fails_only_the_calls_that_need_them_in_a_batch_when_the_capabilities_cant_be_read(rt: Runtime) -> None:
+    rt.fake.metadata = b"<html>Not metadata</html>"
+    rt.fake.respond = lambda r: {"responses": [{"id": "1", "status": 200, "body": {}}]}
+    batch = rt.session().batch()
+    bananas = rt.run(
+        batch.session.collect(Tm1Request.list(ODataPath.of("Bananas"), ODataQuery.none(), dict).requires(Tm1Capability.entity_set("Bananas").since("99.0")))
+    )
+    server = rt.run(batch.session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), dict)))
+    rt.run(batch.run())
+    with pytest.raises(Tm1ProtocolError):
+        bananas.result()
+    assert server.result() == {}
+
+
 def test_reads_the_version_again_after_logging_in_again(rt: Runtime) -> None:
     reads: list[str] = []
     handler = rt.fake.handler
