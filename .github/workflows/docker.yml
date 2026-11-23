@@ -170,3 +170,19 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}
           provenance: mode=max
           sbom: true
+
+  # The check the master ruleset requires for the images: it passes only when every image above
+  # built and passed its smoke test (see ci-ok in ci.yml, which this is to the image matrix)
+  docker-ok:
+    if: always()
+    needs: [image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Every image built and passed its smoke test
+        env:
+          RESULT: ${{ needs.image.result }}
+        run: |
+          echo "image: $RESULT"
+          test "$RESULT" = success
