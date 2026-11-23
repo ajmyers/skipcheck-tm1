@@ -11,6 +11,7 @@ import base64
 import gzip
 import json
 import logging
+import random
 import threading
 import time
 from typing import Any
@@ -1186,7 +1187,7 @@ TWO_PAGES = {
 }
 
 
-def test_releases_the_response_when_a_stream_is_cancelled(rt: Runtime) -> None:
+def test_releases_buffers_it_hasnt_read_when_cancelled(rt: Runtime) -> None:
     # Java held pooled buffers it hadn't read; what this client could hold is a response left open
     opened = from_the_network(rt, TWO_PAGES)
     assert first_then_stop(rt, rt.session(), ELEMENTS) == {"Name": "Q1"}
@@ -1250,9 +1251,47 @@ def names_and_types(items: list[Any]) -> list[tuple[str, str]]:
     return [(item["Name"], item["Type"]) for item in items]
 
 
+def test_decodes_items_and_control_information(rt: Runtime) -> None:
+    session = rt.session()
+    items = read(rt, session, in_pieces(BODY[:7], BODY[7:]))
+    assert names_and_types(items) == EXPECTED
+    assert items[0]["@odata.etag"] == 'W/"1"', "an item's own control information is kept"
+    assert [target(r) for r in rt.fake.requests] == ["GET Elements", "GET Elements?$skiptoken=3"], "the collection's next link is followed"
+
+
+def test_gives_the_same_result_however_the_bytes_are_split(rt: Runtime) -> None:
+    session = rt.session()
+    for split in range(1, len(BODY)):
+        assert names_and_types(read(rt, session, in_pieces(BODY[:split], BODY[split:]))) == EXPECTED, f"split at {split}"
+    rng = random.Random(7)
+    for _ in range(200):
+        cuts = sorted(rng.sample(range(1, len(BODY)), rng.randint(1, 20)))
+        pieces = [BODY[a:b] for a, b in zip([0, *cuts], [*cuts, len(BODY)], strict=True)]
+        assert names_and_types(read(rt, session, in_pieces(*pieces))) == EXPECTED
+
+
+def test_handles_multibyte_characters_split_across_buffers(rt: Runtime) -> None:
+    body = '{"value":[{"Name":"Région 日本 😀","Type":"String"}]}'.encode()
+    session = rt.session()
+    for split in range(1, len(body)):
+        assert read(rt, session, in_pieces(body[:split], body[split:]))[0]["Name"] == "Région 日本 😀"
+
+
+def test_reads_bytes_that_arent_utf8_as_the_replacement_character_however_they_are_split(rt: Runtime) -> None:
+    # As TM1's transaction log gives a password's hash, with "é" (two bytes) beside it
+    body = '{"value":[{"Name":"é'.encode() + bytes([0xE0, 0xEC]) + b"r" + bytes([0xFF, 0xFF]) + '","Type":"é"}]}'.encode()
+    session = rt.session()
+    for split in range(1, len(body)):
+        assert names_and_types(read(rt, session, in_pieces(body[:split], body[split:]))) == [("é\ufffd\ufffdr\ufffd\ufffd", "é")], f"split at {split}"
+
+
 def test_decodes_collections_of_primitives(rt: Runtime) -> None:
     strings = Tm1Request.list(ODataPath.of("Elements"), ODataQuery.none(), str)
     assert read(rt, rt.session(), in_pieces(b'{"value":["a",null,"b"]}'), strings) == ["a", "b"]
+
+
+def test_decodes_an_empty_collection(rt: Runtime) -> None:
+    assert read(rt, rt.session(), in_pieces(b'{"@odata.context":"x","value":[]}')) == []
 
 
 def test_fails_on_an_error_instead_of_a_collection(rt: Runtime) -> None:
@@ -1280,6 +1319,18 @@ def test_fails_on_malformed_or_unexpected_bodies(rt: Runtime) -> None:
     failure(b"[1,2]")
     assert "empty" in str(failure(b""))
     assert "after the collection" in str(failure(b'{"value":[]} {}'))
+
+
+def test_follows_next_links_as_given(rt: Runtime) -> None:
+    pages = {
+        "GET Elements": in_pieces(BODY[:11], BODY[11:]),
+        "GET Elements?$skiptoken=3": {"value": [{"Name": "p2"}], "@odata.nextLink": "Elements?$skiptoken=4&x='a b'"},
+        "GET Elements?$skiptoken=4&x='a%20b'": {"value": [{"Name": "p3"}]},
+    }
+    rt.fake.respond = lambda r: pages[target(r)]
+    assert [e["Name"] for e in rt.run(rt.session().collect(ELEMENTS))] == ["Q1", "Q'2 {x}", "Total", "p2", "p3"]
+    # As TM1 gave them: only the space is percent-encoded, which a URL on the wire needs
+    assert [target(r) for r in rt.fake.requests][1:] == ["GET Elements?$skiptoken=3", "GET Elements?$skiptoken=4&x='a%20b'"]
 
 
 # Tm1Dialect, through a session
