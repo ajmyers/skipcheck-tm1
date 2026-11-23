@@ -407,15 +407,18 @@ internal sealed class Connection
         }
     }
 
+    /// <summary>Sends a request and reads the whole response. The timeout is an idle timeout, as Java's
+    /// (Netty's response timeout): it counts from sending until the headers arrive, then restarts at
+    /// each read that brings data, so a large body that keeps arriving isn't cut off.</summary>
     private async Task<Reply> SendRawAsync(HttpRequestMessage request, TimeSpan timeout, string url, bool idempotent, CancellationToken ct)
     {
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        deadline.CancelAfter(timeout);
+        using var idle = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        idle.CancelAfter(timeout);
         var method = request.Method.Method;
         try
         {
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseContentRead, deadline.Token).ConfigureAwait(false);
-            var body = await response.Content.ReadAsByteArrayAsync(deadline.Token).ConfigureAwait(false);
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, idle.Token).ConfigureAwait(false);
+            var body = await ReadBodyAsync(response.Content, idle, timeout).ConfigureAwait(false);
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var h in response.Headers.Concat(response.Content.Headers))
             {
@@ -431,12 +434,33 @@ internal sealed class Connection
                 idempotent,
                 method,
                 url,
-                connect ? e.InnerException : new TimeoutException($"no answer within {timeout}", e)
+                connect ? e.InnerException : new TimeoutException($"nothing received for {timeout}", e)
             );
         }
         catch (Exception e) when (e is HttpRequestException or IOException)
         {
             throw Transport(e, method, url, idempotent);
+        }
+    }
+
+    /// <summary>The body, read piece by piece, restarting <paramref name="idle"/>'s timeout after each
+    /// piece. Each wait also ends on <paramref name="idle"/> itself, for a handler's content that
+    /// ignores cancellation (one that buffers the whole body first, say).</summary>
+    private static async Task<byte[]> ReadBodyAsync(HttpContent content, CancellationTokenSource idle, TimeSpan timeout)
+    {
+        idle.CancelAfter(timeout);
+        var stream = await content.ReadAsStreamAsync(idle.Token).WaitAsync(idle.Token).ConfigureAwait(false);
+        await using (stream.ConfigureAwait(false))
+        {
+            using var body = new MemoryStream();
+            var buffer = new byte[81920];
+            int read;
+            while ((read = await stream.ReadAsync(buffer, idle.Token).AsTask().WaitAsync(idle.Token).ConfigureAwait(false)) > 0)
+            {
+                idle.CancelAfter(timeout);
+                body.Write(buffer, 0, read);
+            }
+            return body.ToArray();
         }
     }
 
