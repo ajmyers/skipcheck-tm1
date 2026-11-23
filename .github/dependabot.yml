@@ -15,6 +15,12 @@ updates:
     groups:
       gradle:
         patterns: ["*"]
+    ignore:
+      # Jackson moves with Spring Boot: an application using the client resolves Boot's version,
+      # so a newer minor here is tested against a combination nobody runs. Jackson 3.3 also
+      # changes the order of @JsonAnySetter maps, which the conformance fixtures record.
+      - dependency-name: "tools.jackson*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
