@@ -6,6 +6,7 @@ repository reads; an sdist carries its own copy inside the package, so a wheel b
 (as pip builds one) finds it there and has nothing to add.
 """
 
+import shutil
 from pathlib import Path
 
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
@@ -15,6 +16,12 @@ PACKAGE = "skipcheck_tm1_testcontainers"
 
 class PawScriptHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
+        # The repository's LICENSE and NOTICE go beside pyproject.toml, where its license-files looks
+        # for them. An sdist has them there already, and no repository above it.
+        for name in ("LICENSE", "NOTICE"):
+            source = Path(self.root, "..", "..", name).resolve()
+            if source.is_file():
+                shutil.copyfile(source, Path(self.root, name))
         in_repository = Path(self.root, "..", "..", "docker", "paw", "paw-local.sh").resolve()
         if not in_repository.is_file():
             if not Path(self.root, "src", PACKAGE, "paw-local.sh").is_file():

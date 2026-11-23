@@ -101,7 +101,7 @@ banner() {
      Issues   https://github.com/ajmyers/tm1-pa-developer-tools/issues
 
    Useful? A star helps: https://github.com/ajmyers/tm1-pa-developer-tools
-   Need help with TM1, or a commercial license? https://ajmyers.net
+   Need help with TM1? https://ajmyers.net
    Not affiliated with IBM. You need your own licensed copy of TM1.
   ------------------------------------------------------------------
 EOF

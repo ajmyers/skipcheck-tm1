@@ -6,6 +6,7 @@ The spec is the repository's spec/tm1-api.json; an sdist carries a copy in spec/
 
 from __future__ import annotations
 
+import shutil
 import sys
 from pathlib import Path
 
@@ -31,8 +32,18 @@ def generate() -> None:
         sys.path.pop(0)
 
 
+def copy_license() -> None:
+    """Puts the repository's LICENSE and NOTICE beside pyproject.toml, where its license-files
+    looks for them. An sdist has them there already, and no repository above it."""
+    for name in ("LICENSE", "NOTICE"):
+        source = ROOT.parent.parent / name
+        if source.is_file():
+            shutil.copyfile(source, ROOT / name)
+
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
+        copy_license()
         # An sdist carries the spec instead (pyproject.toml's force-include)
         if self.target_name != "sdist":
             generate()

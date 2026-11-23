@@ -63,10 +63,7 @@ To add an image, add the sub-project to the matrix in `docker.yml`, with its own
 
 ## License
 
-Dual-licensed:
-
-- **[AGPL-3.0](LICENSE)**: free to use, modify, and run, including inside companies. If you distribute it, or offer it over a network as part of your own software, that software must also be released under the AGPL.
-- **[Commercial license](COMMERCIAL-LICENSE.md)**: for embedding in proprietary or commercial products without the AGPL's obligations.
+[Apache License 2.0](LICENSE): free to use, modify and distribute, in open source and in proprietary or commercial products alike. Keep the license and the [`NOTICE`](NOTICE) file with what you distribute.
 
 ---
 

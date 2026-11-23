@@ -7,7 +7,9 @@ name = "skipcheck-tm1-testcontainers"
 version = "0.1.0.dev0"
 description = "Testcontainers support for running IBM Planning Analytics (TM1) servers in tests"
 readme = "README.md"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
+# hatch_build.py copies them here from the repository root; an sdist carries them
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10"
 dependencies = [
     # Tm1Version is part of this package's API (Tm1ServerContainer.with_expected_version)
@@ -34,6 +36,8 @@ packages = ["src/skipcheck_tm1_testcontainers"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src", "tests", "README.md", "hatch_build.py"]
+# Copied here by hatch_build.py and not committed, so named as artifacts
+artifacts = ["/LICENSE", "/NOTICE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,4 +1,7 @@
 node_modules/
 dist/
+# Copied from the repository root when a package is packed (scripts/copy-license.mjs)
+tm1-*/LICENSE
+tm1-*/NOTICE
 # Generated from ../spec/tm1-api.json by npm run generate, never committed
 tm1-client/src/generated/
