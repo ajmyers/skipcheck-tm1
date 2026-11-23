@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import gzip
 import json
 import logging
 import threading
@@ -37,7 +38,7 @@ from skipcheck_tm1 import (
     Tm1Version,
     auth,
 )
-from skipcheck_tm1._protocol import Call
+from skipcheck_tm1._protocol import Call, async_result
 from skipcheck_tm1.aio import cognos as aio_cognos
 
 from ..conftest import BASE, SNAPSHOT, target
@@ -1050,6 +1051,70 @@ def test_follows_a_next_link_in_a_result_it_polled_for(rt: Runtime) -> None:
         },
     )
     assert [cube["Name"] for cube in rt.run(rt.session().with_async(0.01).collect(CUBES))] == ["a", "b"]
+
+
+def test_polls_the_monitor_until_the_result_is_there(rt: Runtime) -> None:
+    answers(
+        rt,
+        {
+            RUN: accepted(),
+            MONITOR: each(httpx.Response(202), httpx.Response(202), done("201 Created", json.dumps({"ProcessExecuteStatusCode": "CompletedSuccessfully"}))),
+            "DELETE _async('a1')": None,
+        },
+    )
+    result = rt.run(rt.session().with_async(0.01).execute(REQUEST))
+    assert result["ProcessExecuteStatusCode"] == "CompletedSuccessfully"
+    assert [r.headers.get("Prefer") for r in requests_to(rt, RUN)] == ["respond-async"]
+    assert len(requests_to(rt, MONITOR)) == 3
+    assert requests_to(rt, "DELETE _async('a1')") == [], "not deleted once done"
+
+
+def test_raises_the_error_the_work_ended_with(rt: Runtime) -> None:
+    answers(rt, {RUN: accepted(), MONITOR: done("500 Internal Server Error", json.dumps({"error": {"code": "174", "message": "TM1UserException: Cancel"}}))})
+    error = rt.raises(Tm1ServerError, lambda: rt.session().with_async(0.01).execute(REQUEST))
+    assert "Cancel" in str(error)
+
+
+def test_reads_an_answer_tm1_gave_at_once(rt: Runtime) -> None:
+    answers(rt, {RUN: json_response(201, {"ProcessExecuteStatusCode": "Aborted"})})
+    assert rt.run(rt.session().with_async(0.01).execute(REQUEST))["ProcessExecuteStatusCode"] == "Aborted"
+    assert len(requests_to(rt, RUN)) == 1, "sent once"
+
+
+def test_deletes_the_monitor_when_cancelled(rt: Runtime) -> None:
+    if rt.flavor == "sync":
+        # A blocking call can't be cancelled: giving up is an exception while it waits, as Ctrl-C raises
+        def poll(request: httpx.Request) -> httpx.Response:
+            if len(requests_to(rt, MONITOR)) > 2:
+                raise KeyboardInterrupt
+            return httpx.Response(202)
+
+        answers(rt, {RUN: accepted(), MONITOR: poll, "DELETE _async('a1')": httpx.Response(204)})
+        with pytest.raises(KeyboardInterrupt):
+            rt.session().with_async(0.01).execute(REQUEST)
+    else:
+        answers(rt, {RUN: accepted(), MONITOR: httpx.Response(202), "DELETE _async('a1')": httpx.Response(204)})
+
+        async def cancelled() -> None:
+            running = asyncio.ensure_future(rt.session().with_async(0.01).execute(REQUEST))
+            await asyncio.sleep(0.2)
+            running.cancel()
+            await asyncio.gather(running, return_exceptions=True)
+
+        rt.run(cancelled())
+    assert requests_to(rt, MONITOR) != []
+    assert len(requests_to(rt, "DELETE _async('a1')")) == 1
+
+
+def test_unwraps_an_application_http_message() -> None:
+    result = async_result(b"HTTP/1.1 201 Created\r\nContent-Length: 2\r\n\r\n{}")
+    assert result.status == 201
+    assert result.content == b"{}"
+
+
+def test_decompresses_a_gzipped_inner_body() -> None:
+    head = b"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Type: application/json\r\n\r\n"
+    assert async_result(head + gzip.compress(b'{"Name":"tm1"}')).content == b'{"Name":"tm1"}'
 
 
 def test_reads_a_big_error_body(rt: Runtime) -> None:
