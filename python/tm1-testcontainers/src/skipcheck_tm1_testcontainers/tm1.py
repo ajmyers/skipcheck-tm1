@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """TM1 Server and the TM1 Admin Server in Docker: Java's ``Tm1ServerContainer``,
 ``Tm1AdminServerContainer`` and ``Tm1Seed``."""
 

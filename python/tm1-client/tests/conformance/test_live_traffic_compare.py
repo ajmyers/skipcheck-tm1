@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """scripts/compare-live-traffic.py: the normalizer and comparer the live conformance runs share."""
 
 from __future__ import annotations

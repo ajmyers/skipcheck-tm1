@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The session pool and identities, ported from the Java client's Tm1SessionPoolTest, in both
 flavors. Where Java's scheduler closes an evicted session after its grace period on its own,
 these tests call ``evict_expired()``, which is when this pool does it."""

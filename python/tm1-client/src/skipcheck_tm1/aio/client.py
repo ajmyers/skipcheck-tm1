@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The client for one TM1 server: one session, and every service built on it, as the Java
 client's ``Tm1Client``::
 

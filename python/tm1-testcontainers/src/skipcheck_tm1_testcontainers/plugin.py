@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The pytest plugin: Java's ``@RequiresTm1``, ``@RequiresCognos``, ``@RequiresTm1Web`` and
 ``@RequiresPaw`` as markers, and their parameters as session fixtures.
 

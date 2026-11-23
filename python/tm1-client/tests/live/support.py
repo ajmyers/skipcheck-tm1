@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """What the live tests build their models from: dimensions, elements, edges, and the like."""
 
 from __future__ import annotations

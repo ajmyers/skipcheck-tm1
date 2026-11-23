@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """CellService against a real TM1: a port of the Java client's CellServiceTm1Test. The cube is
 Region (Total = North + South) by Measure (Amount, and Note as text)."""
 

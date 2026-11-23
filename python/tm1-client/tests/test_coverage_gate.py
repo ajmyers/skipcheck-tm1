@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The endpoint coverage gate, as the Java client's CoverageGateTest (plan §12.3): every
 endpoint of the spec (spec/tm1-api.json) is implemented, excluded with a reason, or pending.
 

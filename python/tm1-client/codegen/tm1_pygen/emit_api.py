@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Emits ``skipcheck_tm1/_generated/api.py``: a resource class per entity type and the root of
 the API, with a member for every endpoint of the spec, and ``index.py``, which says which
 member implements which endpoint (the contract tests walk it)."""

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Python names for TM1's: ``DrillthroughRules`` → ``drillthrough_rules``, ``ExecuteMDX`` →
 ``execute_mdx``, ``NativeView`` → ``NATIVE_VIEW``."""
 

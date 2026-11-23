@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Who a session acts as, as the Java client's ``Tm1Identity``: the service account it logs in
 with, a user it impersonates, or a user with credentials of their own. The session pool keeps
 one session per identity."""

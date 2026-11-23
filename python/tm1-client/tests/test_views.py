@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Session views (sandbox, change set, async operations, batch) and capability checks, in both
 flavors, against a fake TM1."""
 

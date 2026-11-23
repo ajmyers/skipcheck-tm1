@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Services for annotations on cube cells (the Java client's ``io.skipcheck.tm1.client.service.annotation``)."""
 
 from __future__ import annotations

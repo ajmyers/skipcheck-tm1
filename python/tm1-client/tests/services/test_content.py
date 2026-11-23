@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """ContentService, ContentPath and ContentScope, in both flavors, against a fake TM1."""
 
 from __future__ import annotations

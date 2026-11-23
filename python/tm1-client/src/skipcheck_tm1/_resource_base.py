@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """What the sync and asyncio resources share: a path, a session, and what's refused."""
 
 from __future__ import annotations

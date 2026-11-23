@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Services for the Applications contents tree: folders, documents, links and references (the
 Java client's ``io.skipcheck.tm1.client.service.content``)."""
 

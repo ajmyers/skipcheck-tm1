@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Java's Tm1WebContainerTest and PawContainerTest: against TM1 Web and PAW in Docker, skipped
 without their sources."""
 

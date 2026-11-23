@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """ProcessService, ProcessDebugService, ChoreService and SqlDataSourceService, in both flavors,
 against a fake TM1: each method sends what the Java client's does."""
 

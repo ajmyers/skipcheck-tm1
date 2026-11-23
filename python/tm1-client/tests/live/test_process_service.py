@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """ProcessService against a real TM1: a port of the Java client's ProcessServiceTm1Test. The
 process's numeric parameter picks how it ends."""
 

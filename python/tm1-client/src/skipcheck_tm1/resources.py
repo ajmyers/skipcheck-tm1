@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Resources (sync flavor), generated from :mod:`skipcheck_tm1.aio.resources`; see there."""
 
 from ._calls import UNSET, Returns, Unset, endpoint, implemented_endpoints, query_of, register_endpoint

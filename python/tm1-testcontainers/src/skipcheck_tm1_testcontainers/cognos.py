@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Cognos Analytics and Keycloak in Docker, for TM1 in CAM security: Java's ``CognosContainer``
 and ``KeycloakContainer``."""
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Examples for RequiresTm1, quoted in the guide: pytest tests, type-checked but never run here."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The live conformance runner, offline: the cubes scenario against a fake TM1 that answers as TM1
 would, in both flavors, writing traffic that scripts/compare-live-traffic.py finds equal."""
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Generates the model and API (src/skipcheck_tm1/_generated) from the API spec at build time,
 as Gradle does for the Java client: generated code is never committed.
 

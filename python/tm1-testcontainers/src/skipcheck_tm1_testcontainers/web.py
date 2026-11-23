@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """TM1 Web in Docker: Java's ``Tm1WebContainer``."""
 
 from __future__ import annotations

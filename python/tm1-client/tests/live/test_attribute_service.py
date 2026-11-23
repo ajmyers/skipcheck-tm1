@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """AttributeService and LocalizedAttributeService against a real TM1, for dimensions, hierarchies,
 elements and subsets: a port of the Java client's AttributeServiceTm1Test."""
 

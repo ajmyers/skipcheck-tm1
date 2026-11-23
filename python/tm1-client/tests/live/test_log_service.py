@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """LogService against a real TM1: a port of the Java client's LogServiceTm1Test."""
 
 from __future__ import annotations

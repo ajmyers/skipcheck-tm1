@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """A request of the REST API, and how its answer is read: what services send through the
 session, and what callers can send for anything without a service, as the Java client's
 ``Tm1Request``::

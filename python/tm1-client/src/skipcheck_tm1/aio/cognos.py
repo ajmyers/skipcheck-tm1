@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """CAM passports from Cognos itself, as the Java client's ``CognosPassports``: a logon to the
 Cognos dispatcher (``PUT <dispatcher>/api/v1/session``) by password, or by exchanging an
 OpenID Connect ID token, for each TM1 login, so an expired passport is never reused::

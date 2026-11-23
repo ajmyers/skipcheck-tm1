@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Generates the sync flavor from the asyncio one, as httpx and httpcore do: the hand-written
 code lives once, in ``skipcheck_tm1/aio``, and ``skipcheck_tm1/_sync`` is made from it at build time.
 
@@ -41,6 +43,9 @@ NAMES = {
 }
 
 _ASYNC_TM1 = re.compile(r"\bAsync(Tm1\w*)")
+
+# What every generated file starts with, as the hand-written sources do: the license it's under
+LICENSE = "# SPDX-License-Identifier: Apache-2.0\n\n"
 
 HEADER = "# Generated from skipcheck_tm1/aio/{source} by tm1_pygen.unasync: don't edit, don't commit.\n"
 
@@ -129,7 +134,8 @@ def generate(aio_dir: str | Path, sync_dir: str | Path) -> list[Path]:
         relative = path.relative_to(aio_dir)
         target = sync_dir / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        text = HEADER.format(source=relative.as_posix()) + transform(path.read_text(encoding="utf-8"))
-        target.write_text(text, encoding="utf-8")
+        # The license line stays first, above the note that the file is generated
+        body = transform(path.read_text(encoding="utf-8")).removeprefix(LICENSE)
+        target.write_text(LICENSE + HEADER.format(source=relative.as_posix()) + body, encoding="utf-8")
         written.append(target)
     return written

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Puts docker/paw/paw-local.sh in the package as it's built.
 
 PawContainer runs that script in its runner container, so the package ships it, as the Java build

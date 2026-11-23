@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """An operation of the REST API, as ``$metadata`` declares it: what the generated
 ``Tm1Operations`` catalog holds (``Tm1Operations.CUBE_RESERVE``), as in the Java client."""
 

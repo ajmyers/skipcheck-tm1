@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests only the Python client has: none of these is a port of a Java live test class. They cover
 the generated API (``tm1.api``), which Java has no counterpart of, against a real TM1 (see
 conftest.py for how to point it at one)."""

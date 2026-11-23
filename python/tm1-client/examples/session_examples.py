@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Examples for Tm1Session, quoted in the guide."""
 
 from __future__ import annotations

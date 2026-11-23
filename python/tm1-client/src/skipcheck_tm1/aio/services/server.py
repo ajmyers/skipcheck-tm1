@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Services for the server and its logs (the Java client's ``io.skipcheck.tm1.client.service.server``)."""
 
 from __future__ import annotations

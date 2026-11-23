@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The live tests are the Java client's, class for class and test for test, read from the Java
 sources themselves (java/tm1-client/src/test/java/.../*Tm1Test.java and *BehaviorTest.java):
 

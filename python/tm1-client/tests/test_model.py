@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The generated model: reading what TM1 sends, and writing only what was set.
 
 The payloads are the Java client's (java/tm1-client/src/test/resources/payloads), captured from a

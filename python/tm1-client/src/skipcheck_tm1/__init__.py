@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """A Python client for the IBM Planning Analytics (TM1) REST API.
 
 Generated from the same language-neutral API spec as the Java client (``spec/tm1-api.json``,

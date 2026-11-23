@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The session (sync flavor), generated from :mod:`skipcheck_tm1.aio.session`; see there."""
 
 from ._sync.pool import Tm1PoolStats, Tm1SessionPool, Tm1SessionPoolBuilder

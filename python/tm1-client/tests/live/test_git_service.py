@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """GitService against a real TM1: a port of the Java client's GitServiceTm1Test.
 
 The remote is ``TM1_GIT_URL`` if it's set: a ``git://`` (or ``https://``) repository TM1 can

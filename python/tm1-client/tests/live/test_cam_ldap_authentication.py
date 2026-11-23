@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Logging on to a TM1 in CAM security through Cognos's LDAP namespace: with the password
 (``CAMNamespace``), and with a passport the client gets from Cognos. A port of the Java client's
 CamLdapAuthenticationTm1Test. Cognos takes a couple of minutes to start, so the containers are

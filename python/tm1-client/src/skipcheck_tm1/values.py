@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Value types of the services, shared by the sync and asyncio flavors (so a ``ContentScope``
 is the same type in both): the Java client's ``ViewScope``, ``SubsetScope``, ``ContentScope``,
 ``ContentPath``, ``Tuples``, ``AttributeOwner``, ``AttributeSet``, ``GitCredentials`` and

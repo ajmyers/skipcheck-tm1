@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Runs a live conformance scenario (spec/conformance/live/<name>.json) with one of this client's
 flavors, checks each step's expectation, and writes what it sent to
 build/conformance-live/<language>/<name>.jsonl for scripts/compare-live-traffic.py."""

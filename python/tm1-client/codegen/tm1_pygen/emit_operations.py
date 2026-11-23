@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Emits ``skipcheck_tm1/_generated/operations.py``: ``Tm1Operations``, a :class:`Tm1Operation`
 per action and function, named as in the Java client (``CHORE_ACTIVATE``, ``EXECUTE_MDX``)."""
 

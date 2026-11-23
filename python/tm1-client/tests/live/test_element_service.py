@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """ElementService against a real TM1: a port of the Java client's ElementServiceTm1Test. The
 dimension is conftest.py's elements_dim."""
 
