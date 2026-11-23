@@ -39,7 +39,8 @@ the Java documentation quotes, when a language lacks a Java member that its
 `coverage/members-excluded.txt` doesn't list (or lists one it has, or one Java no longer has), or
 when an overview on another language's page names something only Java has (`Mono`, `JsonNode`, a
 Java member name that the language's API and code don't have: `javaIsms` in `scripts/members.mjs`), or
-when a link on a generated page goes nowhere (`scripts/check-links.mjs`). So a new Java example
+when a link on a generated page goes nowhere (`scripts/check-links.mjs`), or when a doc comment the
+reference reads has code typed into it rather than quoted from a region (`scripts/doc-code.mjs`). So a new Java example
 needs its three counterparts before the build passes, and so does a new Java member.
 
 ## Walkthroughs, and what the examples print
@@ -81,6 +82,7 @@ has one, and isn't required.
 | `scripts/extract.mjs` | Each project's API per language, into `.generated/api/`. |
 | `scripts/reference.mjs` | The reference pages and `.generated/site.json` for the Worker: the projects, and which one documents each type. |
 | `scripts/members.mjs` | Which member is which across languages, and the gate that each language has every Java member or lists it with the reason. |
+| `scripts/doc-code.mjs` | The gate that no doc comment the reference reads has code typed into it: a Javadoc `<pre>` or inline `{@snippet}`, a .NET `<code>`, a TypeScript fence or `@example`, a Python `::` block or doctest. |
 | `scripts/search.mjs` | The search index of each docs language, `search.json` beside its pages: every type and member, a short summary, and where it is. `reference.mjs` writes it from the data it renders the pages with. |
 | `scripts/pages.mjs` | The landing pages and the walkthroughs. |
 | `scripts/sitemap.mjs` | `/docs/sitemap.xml`: every generated page but the Javadoc, for search engines. skipcheck.io's `robots.txt` names it. |

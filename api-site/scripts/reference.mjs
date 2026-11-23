@@ -24,15 +24,18 @@
 // members-excluded.txt doesn't list, or when an overview in another language names what only Java
 // has (--allow-missing lists them instead), and writes .generated/site.json for the Worker and
 // .generated/reference.json, each type's overview in each language, for llms-full.txt (llms.mjs).
+// It also fails, always, when a doc comment it reads has code typed into it (doc-code.mjs): code
+// comes only from example regions, which are compiled.
 //
 //   node scripts/reference.mjs [--allow-missing]
 
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
+import { typedCode } from './doc-code.mjs';
 import { checkMembers, findMember, guessMember, javaIsms, javaOnlyNames, languageNames, listFile, readList, stale, typeCandidates, withoutComments } from './members.mjs';
 import { searchIndex } from './search.mjs';
-import { CANONICAL_ORIGIN, copyAssets, dedent, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, SECTIONS } from './site.mjs';
+import { CANONICAL_ORIGIN, copyAssets, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, SECTIONS } from './site.mjs';
 import { examplesOf, typesUsed, walkthroughsOf } from './walkthroughs.mjs';
 
 const allowMissing = process.argv.includes('--allow-missing');
@@ -131,24 +134,13 @@ function javadocHtml(doc, page) {
 		html += doc.slice(at, open);
 		const [, tag, rest = ''] = /^\{@(\w+)\s*([\s\S]*)$/.exec(doc.slice(open, close));
 		const body = rest.trim();
-		const block = tag === 'code' && /<pre[^>]*>\s*$/.test(html);
 		if (tag === 'snippet') {
 			const cls = /class\s*=\s*"?examples\.(\w+)"?/.exec(body);
 			const region = /region\s*=\s*"?([\w-]+)"?/.exec(body);
 			const quoted = snippetFile(body);
-			// An inline snippet ({@snippet : code}) is Java written into the comment
-			const inline = /^[^:]*:\s*\n?([\s\S]*)$/.exec(rest);
+			// Any other snippet is code typed into the comment, which the build refuses (doc-code.mjs)
 			if (cls && region) html += '</p>' + page.example(cls[1], region[1]) + '<p>';
 			else if (quoted) html += '</p>' + (page.file?.(quoted) ?? '') + '<p>';
-			else if (inline) html += '</p>' + page.javaCode(inline[1]) + '<p>';
-		} else if (block) {
-			// <pre>{@code ...}</pre>: a block of Java written into the comment
-			html = html.replace(/<pre[^>]*>\s*$/, '') + '</p>' + page.javaCode(rest) + '<p>';
-			const after = /^\s*<\/pre>/.exec(doc.slice(close + 1));
-			if (after) {
-				at = close + 1 + after[0].length;
-				continue;
-			}
 		} else if (tag === 'code') {
 			html += page.code ? page.code(body) : '<code>' + escape(body) + '</code>';
 		} else if (tag === 'literal') {
@@ -184,7 +176,6 @@ function xmlDocParts(doc) {
 
 function xmlInline(text) {
 	return text
-		.replace(/<code>([\s\S]*?)<\/code>/g, (m, body) => '</p>' + code(body.replace(/^\n|\n\s*$/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'), 'csharp') + '<p>')
 		.replace(/<para>/g, '</p><p>')
 		.replace(/<\/para>/g, '</p><p>')
 		.replace(/<c>([\s\S]*?)<\/c>/g, '<code>$1</code>')
@@ -197,7 +188,7 @@ function xmlInline(text) {
 		.trim();
 }
 
-/** A TSDoc comment as HTML: its description and its tags. Markdown code, fenced and inline. */
+/** A TSDoc comment as HTML: its description and its tags, with Markdown's inline code. */
 function tsDocParts(doc) {
 	const [description, ...rest] = doc.split(/^\s*(?=@(?:param|returns?|throws|see|deprecated|internal|example)\b)/m);
 	const params = {};
@@ -217,16 +208,9 @@ function tsDocParts(doc) {
 
 function mdBlocks(text) {
 	return text
-		.split(/```(\w*)\n([\s\S]*?)```/)
-		.map((part, i, parts) => {
-			if (i % 3 === 1) return '';
-			if (i % 3 === 2) return '</p>' + code(part.replace(/\n$/, ''), 'typescript') + '<p>';
-			return part
-				.split(/\n\s*\n/)
-				.map((p) => mdInline(p))
-				.join('</p><p>');
-		})
-		.join('');
+		.split(/\n\s*\n/)
+		.map((p) => mdInline(p))
+		.join('</p><p>');
 }
 
 function mdInline(text) {
@@ -236,7 +220,7 @@ function mdInline(text) {
 		.replace(/\s*\n\s*/g, ' ');
 }
 
-/** A Python docstring as HTML: paragraphs, ``code``, and the blocks after "::". */
+/** A Python docstring as HTML: paragraphs and ``code``. */
 function docstringHtml(doc) {
 	const lines = doc.split('\n');
 	const out = [];
@@ -245,21 +229,9 @@ function docstringHtml(doc) {
 		if (paragraph.length > 0) out.push('<p>' + inlineRst(paragraph.join(' ')) + '</p>');
 		paragraph = [];
 	};
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
+	for (const line of lines) {
 		if (line.trim() === '') {
 			flush();
-			continue;
-		}
-		if (/::\s*$/.test(line)) {
-			paragraph.push(line.replace(/::\s*$/, ':').replace(/\s:$/, ''));
-			flush();
-			const block = [];
-			let j = i + 1;
-			while (j < lines.length && (lines[j].trim() === '' || /^\s/.test(lines[j]))) block.push(lines[j++]);
-			const indent = Math.min(...block.filter((l) => l.trim()).map((l) => l.length - l.trimStart().length));
-			out.push(code(block.map((l) => l.slice(indent)).join('\n').trim(), 'python'));
-			i = j - 1;
 			continue;
 		}
 		paragraph.push(line.trim());
@@ -329,9 +301,9 @@ const missing = new Set();
 // Java members a language lacks, unlisted, and lines of the lists that are wrong
 const memberFaults = [];
 const lists = new Map();
-// Pages showing Java code in another language, overviews with fewer examples than Java's, and
+// Code typed into a doc comment the pages read, overviews with fewer examples than Java's, and
 // overviews naming what only Java has
-const foreign = [];
+const typed = [];
 const fewer = [];
 const javaWords = [];
 // Every path the Worker serves: the projects, the Docker pages and the docs landing page
@@ -465,18 +437,13 @@ for (const project of PROJECTS) {
 					exampleBlocks.set('file:' + quoted, text === undefined ? '' : code(text.trim(), FILE_HIGHLIGHT[quoted.split('.').at(-1)] ?? 'plaintext', 'x-' + quoted));
 				}
 			}
-			// Java written into a comment (not an example region) is shown on Java's page only; on another
-			// language's page it would be Java in the wrong place, so the build counts it as a fault
-			let fallback = false;
+			// Every comment this page reads: Java's for the type and its members, else this language's
+			// members' own (the overview is always Java's). Code typed into any of them fails the build
+			const read = language === 'java' ? [[javaType.name, javaType.doc], ...javaType.members.map((m) => [javaType.name + '.' + m.name, m.doc])] : type.members.map((m) => [type.name + '.' + m.name, m.doc]);
+			for (const [where, doc] of read) for (const block of typedCode(doc, language)) typed.push(project.id + ' ' + language + ' ' + where + ': ' + block);
 			const render = {
 				example: (cls, region) => exampleBlocks.get(cls + '#' + region) ?? '',
 				file: (quoted) => exampleBlocks.get('file:' + quoted) ?? '',
-				javaCode(text) {
-					if (language === 'java') return code(dedent(text.split('\n')).replace(/\}\s*$/, '').trimEnd(), 'java');
-					if (fallback) return '';
-					foreign.push(project.id + ' ' + language + ' ' + javaType.name);
-					return code(dedent(text.split('\n')), 'java');
-				},
 				link(target, linkLabel, asCode) {
 					const [typePart, memberPart] = target.split('#');
 					const simple = typePart.replace(/^.*\.(?=[A-Z])/, '');
@@ -551,15 +518,14 @@ for (const project of PROJECTS) {
 					return word;
 				});
 
-			// The overview is Java's, with its examples in this language, unless it has Java written
-			// into it: then it's this language's own comment, whose examples are its own
+			// The overview is Java's in every language, with its examples in this one. So the other
+			// languages' own type comments are never read here: what they say, examples typed into them
+			// included, is for their IDEs and API docs, and can't reach a page
 			const javaDescription = javadocParts(javaType.doc).description;
-			const inlineJava = /<pre[^>]*>\s*\{@code|\{@snippet\s*:/.test(javaDescription);
-			const ownDoc = language === 'java' || !type.doc ? null : language === 'dotnet' ? xmlDocParts(type.doc).description : language === 'typescript' ? tsDocParts(type.doc).description : docstringHtml(type.doc);
-			const overview = inlineJava && ownDoc ? ownDoc : javadocHtml(javaDescription, render);
+			const overview = javadocHtml(javaDescription, render);
 			const blocks = (html) => (html.match(/<pre[ >]/g) ?? []).length;
 			if (language !== 'java') {
-				const javaBlocks = (javaDescription.match(/\{@snippet|<pre[^>]*>\s*\{@code/g) ?? []).length;
+				const javaBlocks = (javaDescription.match(/\{@snippet/g) ?? []).length;
 				if (blocks(overview) < javaBlocks) fewer.push(project.id + ' ' + language + ' ' + javaType.name + ' (' + blocks(overview) + ' of ' + javaBlocks + ')');
 				const words = javaIsms(overview, javaOnly[language]);
 				if (words.length > 0) javaWords.push(project.id + ' ' + language + ' ' + javaType.name + ': ' + words.join(', '));
@@ -592,16 +558,14 @@ for (const project of PROJECTS) {
 				let doc = parts.description;
 				if (language !== 'java' && java) {
 					if (!member.doc && java.doc) {
-						// Java's words where this language has none, without the Java code in them
-						fallback = true;
+						// Java's words where this language has none
 						doc = javadocHtml(javadocParts(java.doc).description, render);
-						fallback = false;
 					}
 					// Java's examples for the same member, in this language
 					doc += [...java.doc.matchAll(/\{@snippet[^}]*class\s*=\s*"?examples\.(\w+)"?[^}]*region\s*=\s*"?([\w-]+)"?[^}]*\}/g)].map(([, cls, region]) => exampleBlocks.get(cls + '#' + region) ?? '').join('');
 				}
 				if (language !== 'java' && java) {
-					const javaBlocks = (javadocParts(java.doc).description.match(/\{@snippet|<pre[^>]*>\s*\{@code/g) ?? []).length;
+					const javaBlocks = (javadocParts(java.doc).description.match(/\{@snippet/g) ?? []).length;
 					if (blocks(doc) < javaBlocks) fewer.push(project.id + ' ' + language + ' ' + javaType.name + '.' + java.name + ' (' + blocks(doc) + ' of ' + javaBlocks + ')');
 				}
 				const kindLabel = member.kind === 'property' ? 'property' : member.kind === 'constructor' ? 'constructor' : member.static ? 'static' : '';
@@ -664,7 +628,7 @@ for (const project of PROJECTS) {
 		// The docs home, in this language
 		const grouped = groupByArea(here);
 		const start = (project.start ?? []).map((n) => here.find((t) => t.name === n)).filter(Boolean);
-		const summaries = new Map(here.map((t) => [t.name, summary(javadocHtml(javadocParts(t.doc).description, { example: () => '', javaCode: () => '', link: (target, l) => escape(l || target.replace(/^.*[.#]/, '')) }))]));
+		const summaries = new Map(here.map((t) => [t.name, summary(javadocHtml(javadocParts(t.doc).description, { example: () => '', link: (target, l) => escape(l || target.replace(/^.*[.#]/, '')) }))]));
 		for (const entry of overviews) if (entry.project === project.id && entry.language === language) entry.summary = summaries.get(entry.java);
 		// The walkthroughs, which pages.mjs builds: their examples are in every language, behind tabs
 		// that open in the language last chosen, this one when it's read here
@@ -836,11 +800,12 @@ if (fewer.length > 0) {
 	if (!allowMissing) throw new Error(line + ':\n  ' + fewer.join('\n  '));
 	console.warn(line + ':\n  ' + fewer.join('\n  '));
 }
-if (foreign.length > 0) {
-	const list = [...new Set(foreign)].sort();
-	const line = list.length + ' page(s) show Java code in another language: give the type an examples region in each language, or a doc comment of its own with its own examples';
-	if (!allowMissing) throw new Error(line + ':\n  ' + list.join('\n  '));
-	console.warn(line + ':\n  ' + list.join('\n  '));
+if (typed.length > 0) {
+	throw new Error(
+		typed.length +
+			' doc comment block(s) have code typed into them. Put the code in an examples region in every language, and quote it in the Javadoc with {@snippet class = examples.<Class> region = <name>}, so it is compiled:\n  ' +
+			typed.join('\n  '),
+	);
 }
 if (javaWords.length > 0) {
 	const line = javaWords.length + " overview(s) name what only Java has: word the Javadoc for every language, or name it in a {@code} or {@link} the page can translate (members.mjs, javaIsms)";
