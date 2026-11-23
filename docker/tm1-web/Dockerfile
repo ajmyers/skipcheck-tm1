@@ -20,7 +20,7 @@ LABEL org.opencontainers.image.authors="Andrew Myers (https://ajmyers.net)" \
       org.opencontainers.image.url="https://skipcheck.io" \
       org.opencontainers.image.vendor="Andrew Myers" \
       org.opencontainers.image.description="A local IBM Planning Analytics Spreadsheet Services (TM1 Web) runtime for development and tests. Contains no IBM software. Not affiliated with IBM." \
-      org.opencontainers.image.documentation="https://github.com/ajmyers/tm1-pa-developer-tools/blob/master/docker/tm1-web/README.md"
+      org.opencontainers.image.documentation="https://github.com/ajmyers/skipcheck-tm1/blob/master/docker/tm1-web/README.md"
 
 # fontconfig + fonts: TM1 Web renders charts and exports (Aspose, POI) with Java2D,
 # which needs at least one font on the system.

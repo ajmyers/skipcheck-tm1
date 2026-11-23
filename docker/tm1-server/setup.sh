@@ -19,10 +19,10 @@
 # script says what it reused.
 set -eu
 
-DEFAULT_BASE_URL=https://raw.githubusercontent.com/ajmyers/tm1-pa-developer-tools/master/docker/tm1-server
-GUIDE=https://github.com/ajmyers/tm1-pa-developer-tools/blob/master/docker/tm1-server/GETTING-STARTED.md
+DEFAULT_BASE_URL=https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/master/docker/tm1-server
+GUIDE=https://github.com/ajmyers/skipcheck-tm1/blob/master/docker/tm1-server/GETTING-STARTED.md
 DEFAULT_IMAGE=ghcr.io/ajmyers/tm1-server:latest
-ISSUES=https://github.com/ajmyers/tm1-pa-developer-tools/issues
+ISSUES=https://github.com/ajmyers/skipcheck-tm1/issues
 
 # --- Options: flags override TM1_SETUP_* environment variables -----------------
 DIR=${TM1_SETUP_DIR:-}
@@ -100,9 +100,9 @@ banner() {
 
      Website  https://skipcheck.io
      GitHub   https://github.com/ajmyers
-     Issues   https://github.com/ajmyers/tm1-pa-developer-tools/issues
+     Issues   https://github.com/ajmyers/skipcheck-tm1/issues
 
-   Useful? A star helps: https://github.com/ajmyers/tm1-pa-developer-tools
+   Useful? A star helps: https://github.com/ajmyers/skipcheck-tm1
    Need help with TM1? https://ajmyers.net
    Not affiliated with IBM. You need your own licensed copy of TM1.
   ------------------------------------------------------------------

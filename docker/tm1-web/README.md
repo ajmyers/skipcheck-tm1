@@ -117,7 +117,7 @@ The container port is fixed; map it to any host port with `-p <host>:9510`.
   an MDX request directly; rendering a universal report workbook in the browser
   hasn't been tested (it needs a workbook made with the Excel add-in).
 - **Native TM1 security only, for now.** CAM security needs a Cognos server; see
-  [#44](https://github.com/ajmyers/tm1-pa-developer-tools/issues/44).
+  [#44](https://github.com/ajmyers/skipcheck-tm1/issues/44).
 - **HTTP only.** IBM's `server.xml` is used as-is, so HTTPS on 9513 isn't set up.
   Liberty logs `CWWKG0058E ... ssl ... missing the required attribute keyStoreRef`
   at start because of that; it's harmless.

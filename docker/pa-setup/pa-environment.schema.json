@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/ajmyers/tm1-pa-developer-tools/master/docker/pa-setup/pa-environment.schema.json",
+  "$id": "https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/master/docker/pa-setup/pa-environment.schema.json",
   "title": "pa-environment.yaml",
   "description": "What pa-setup runs: a local IBM Planning Analytics environment in Docker. Every component is optional. Secrets (download links) go in .env, not here.",
   "type": "object",
