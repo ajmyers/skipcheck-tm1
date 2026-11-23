@@ -52,9 +52,12 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Test the Worker
+      # The page builders' dependencies (marked) are needed by the tests too
+      - name: Test the Worker and the page builders
         working-directory: api-site
-        run: npm test
+        run: |
+          npm ci
+          npm test
 
       - name: Build the themed Javadoc
         run: |
@@ -71,7 +74,6 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             export DOCS_VERSION="${GITHUB_REF_NAME#v}"
           fi
-          npm ci
           npm run assemble
 
       - name: Bundle the Worker (no deploy)

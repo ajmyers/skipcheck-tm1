@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { inline, parse, slug } from '../scripts/markdown.mjs';
 import { docsVersion, installCommands, packageOf } from '../scripts/packages.mjs';
-import { head, languagesOf, PROJECTS, regions } from '../scripts/site.mjs';
+import { head, languagesOf, PROJECTS, regions, SECTIONS } from '../scripts/site.mjs';
 
 test('inline Markdown is escaped, then marked up', () => {
 	assert.equal(inline('**Bold** and `a<b>` with [a link](docs/X.html) & more'), '<strong>Bold</strong> and <code>a&lt;b&gt;</code> with <a href="docs/X.html">a link</a> &amp; more');
@@ -88,15 +88,15 @@ test("an example's regions are read from its file, without their indentation", a
 	}
 });
 
-test('every project has a route on each zone, and the docs landing page and the old addresses have theirs', () => {
+test('every project, the Docker pages and the docs landing page have a route on each zone, and the old addresses theirs', () => {
 	const wrangler = readFileSync(fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)), 'utf8');
 	const patterns = [...wrangler.matchAll(/"pattern":\s*"([^"]+)"/g)].map((match) => match[1]);
 	for (const zone of ['skipcheck.io', 'skipcheck.dev']) {
-		for (const project of PROJECTS) assert.ok(patterns.includes('*' + zone + '/' + project.id + '*'), 'no route for ' + project.id + ' on ' + zone);
+		for (const section of SECTIONS) assert.ok(patterns.includes('*' + zone + '/' + section.id + '*'), 'no route for ' + section.id + ' on ' + zone);
 		assert.ok(patterns.includes('*' + zone + '/projects/tm1*'), 'no route for the old addresses on ' + zone);
-		assert.ok(patterns.includes('*' + zone + '/docs*'), 'no route for the docs landing page on ' + zone);
 	}
-	assert.equal(patterns.length, 2 * (PROJECTS.length + 2), 'a route that no project in scripts/site.mjs accounts for');
+	assert.ok(['tm1-client', 'pa-docker', 'docs'].every((id) => SECTIONS.some((section) => section.id === id)), SECTIONS.map((section) => section.id).join(', '));
+	assert.equal(patterns.length, 2 * (SECTIONS.length + 1), 'a route that SECTIONS in scripts/site.mjs does not account for');
 });
 
 test('a page with a description has the link preview image, and one without has none', () => {

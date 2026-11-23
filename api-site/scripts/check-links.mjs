@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Checks the links of the pages this site generates: every landing page and docs page in dist/.
-// A link to a project's path must be a file in dist/; any other local link must be one of the
-// site's own addresses listed below, since those pages live in ajmyers/skipcheck.io and can't be
-// seen from here. Run after the pages are built; it fails with the list of broken links.
+// A link to a path this site serves (a project's, the Docker pages', the docs landing page's)
+// must be a file in dist/; any other local link must be one of the site's own addresses listed
+// below, since those pages live in ajmyers/skipcheck.io and can't be seen from here. Run after the pages are built; it fails with the list of broken links.
 //
 // The Javadoc is left out: its links are javadoc's own, and there are thousands of them.
 //
@@ -11,11 +11,11 @@
 
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { distDir, PROJECTS } from './site.mjs';
+import { distDir, SECTIONS } from './site.mjs';
 
 // What these pages may link to on the site itself. Add an address here when a page starts to use
 // it, after checking that the site serves it.
-const SITE_PATHS = new Set(['/', '/styles.css', '/tokens.css', '/chrome.css', '/code.css', '/highlight.js', '/favicon.svg', '/projects/pa-docker/', '/projects/pa-docker/setup/']);
+const SITE_PATHS = new Set(['/', '/styles.css', '/tokens.css', '/chrome.css', '/code.css', '/highlight.js', '/favicon.svg', '/projects/pa-docker/setup/']);
 
 const exists = (file) =>
 	stat(file).then(
@@ -47,8 +47,8 @@ for await (const file of htmlFiles(distDir)) {
 			if (!ids.has(decodeURIComponent(target.hash.slice(1)))) broken.push(page + ': no #' + target.hash.slice(1) + ' on the page');
 			continue;
 		}
-		const project = PROJECTS.find((p) => target.pathname === '/' + p.id || target.pathname.startsWith('/' + p.id + '/'));
-		if (!project) {
+		const section = SECTIONS.find((s) => target.pathname === '/' + s.id || target.pathname.startsWith('/' + s.id + '/'));
+		if (!section) {
 			if (!SITE_PATHS.has(target.pathname)) broken.push(page + ': ' + link + " isn't one of the site's addresses in check-links.mjs");
 			continue;
 		}

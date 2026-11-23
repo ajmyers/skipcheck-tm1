@@ -7,6 +7,8 @@
 // nav reaches these pages without a rebuild. skipcheck.dev serves the same pages, each naming its
 // skipcheck.io address as canonical.
 //
+// The Docker pages, from the READMEs under docker/, are served the same way at /pa-docker/.
+//
 // The addresses these pages had before, under /projects/, are sent to the new ones. The theme stylesheet imports the site's tokens and chrome
 // styles the same way (api-site/theme/javadoc-theme.css).
 
@@ -128,7 +130,9 @@ async function partial(env, name) {
 //   /projects/tm1/guide/                /tm1-client/docs/
 //   /projects/<project>/                /<project>/
 //
-// The site's own pages under /projects/ (pa-docker) are not projects here, and are left alone.
+// The site's own pages under /projects/ are left alone: /projects/pa-docker/ (which the site sends to
+// /pa-docker/ here) and its setup page, /projects/pa-docker/setup/. Only a library (one with docs)
+// had its pages under /projects/.
 function formerAddress(pathname) {
 	const match = /^\/projects\/([^/]+)(\/.*)?$/.exec(pathname);
 	if (!match) return null;
@@ -139,7 +143,7 @@ function formerAddress(pathname) {
 		const owner = site.guide[(guide[1] ?? '').replace(/\.html$/, '')];
 		return owner ? '/' + owner + '/docs/java/' + guide[1] : '/tm1-client/docs/';
 	}
-	if (!site.projects.some((project) => project.id === name)) return null;
+	if (!site.projects.some((project) => project.id === name && project.docs)) return null;
 	const api = /^\/api(?:\/(.*))?$/.exec(rest);
 	return api ? '/' + name + '/api/java/' + (api[1] ?? '') : '/' + name + '/';
 }

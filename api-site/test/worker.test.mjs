@@ -14,14 +14,16 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const source = readFileSync(fileURLToPath(new URL('../src/worker.js', import.meta.url)), 'utf8');
 const importLine = "import csp from '../.generated/csp.json';";
 assert.ok(source.includes(importLine), 'worker.js no longer imports the CSP hashes as this test expects');
-// and ../.generated/site.json, which scripts/guide.mjs writes; here it's three projects and two types
+// and ../.generated/site.json, which scripts/reference.mjs writes; here it's three projects, the
+// Docker pages and two types
 const siteLine = "import site from '../.generated/site.json';";
 assert.ok(source.includes(siteLine), 'worker.js no longer imports the projects as this test expects');
 const projects = {
 	projects: [
-		{ id: 'tm1-client', landing: true },
-		{ id: 'tm1-testcontainers', landing: true },
-		{ id: 'tm1-csdl', landing: false },
+		{ id: 'tm1-client', landing: true, docs: true },
+		{ id: 'tm1-testcontainers', landing: true, docs: true },
+		{ id: 'tm1-csdl', landing: false, docs: true },
+		{ id: 'pa-docker', landing: true, docs: false },
 	],
 	guide: { CubeService: 'tm1-client', RequiresTm1: 'tm1-testcontainers' },
 };
@@ -180,9 +182,11 @@ test("anything that isn't a project's goes to the site, as under wrangler dev", 
 	assert.deepEqual(assetRequests, []);
 });
 
-test("the site's own pages under /projects/ go to the site too", async () => {
+test("the site's own pages under /projects/ go to the site too, though /pa-docker/ is served here", async () => {
 	site['/projects/pa-docker/'] = () => new Response('Docker');
+	site['/projects/pa-docker/setup/'] = () => new Response('Setup');
 	assert.equal(await (await get('/projects/pa-docker/')).text(), 'Docker');
+	assert.equal(await (await get('/projects/pa-docker/setup/')).text(), 'Setup');
 	assert.deepEqual(assetRequests, []);
 });
 
@@ -241,4 +245,17 @@ test('pages other than the Javadoc get the site\'s Copy buttons', async () => {
 	assets['/tm1-client/index.html'] = () => new Response('<html><head></head><body>x</body></html>', { headers: { 'Content-Type': 'text/html' } });
 	const html = await (await get('/tm1-client/')).text();
 	assert.ok(html.includes('<script src="/copy.js" defer></script>'), html);
+});
+
+test('the Docker pages are served at /pa-docker/, dressed like any page, with their folders given a slash', async () => {
+	assets['/pa-docker/index.html'] = () => new Response('<html><body><main>Docker</main></body></html>', { headers: { 'Content-Type': 'text/html' } });
+	assets['/pa-docker/tm1-server/getting-started/index.html'] = () => new Response('<html><body><main>Getting started</main></body></html>', { headers: { 'Content-Type': 'text/html' } });
+	const landing = await get('/pa-docker/');
+	assert.equal(await landing.text(), '<html><body><div class="masthead"><nav>Home</nav></div><main>Docker</main><footer>The end</footer></body></html>');
+	const page = await get('/pa-docker/tm1-server/getting-started/');
+	assert.equal(await page.text(), '<html><body><div class="masthead"><nav>Home</nav></div><main>Getting started</main><footer>The end</footer></body></html>');
+	assert.equal(page.headers.get('Link'), '<' + SITE + '/pa-docker/tm1-server/getting-started/>; rel="canonical"');
+	const bare = await get('/pa-docker/tm1-server');
+	assert.equal(bare.status, 301);
+	assert.equal(bare.headers.get('Location'), ORIGIN + '/pa-docker/tm1-server/');
 });

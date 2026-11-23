@@ -23,7 +23,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { inline, parse, slug } from './markdown.mjs';
 import { docsVersion, installHtml, packageOf } from './packages.mjs';
-import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, DOC_LANGUAGES, escape, head, languagesOf, PROJECTS, regions, repoDir, siteDir, tabGroup } from './site.mjs';
+import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, DOC_LANGUAGES, escape, head, languagesOf, PA_DOCKER, PROJECTS, regions, repoDir, siteDir, tabGroup } from './site.mjs';
 
 const version = await docsVersion();
 const github = 'https://github.com/' + /^githubRepo=(.+)$/m.exec(await readFile(path.join(repoDir, 'gradle.properties'), 'utf8'))[1].trim();
@@ -197,6 +197,13 @@ for (const { project, content } of landings) {
 	};
 	const main = landings.map(({ project, content }) => entry(project, content.meta.card));
 	const more = PROJECTS.filter((p) => !p.landing).map((project) => entry(project, project.summary ?? ''));
+	// The Docker images (docker.mjs builds their pages), for running TM1 to develop and test against
+	const dockerMeta = parse(await readFile(path.join(siteDir, 'content', PA_DOCKER.id + '.md'), 'utf8')).meta;
+	const docker =
+		'<li class="card"><div class="card-head"><h3>' + escape(PA_DOCKER.title) + '</h3><span class="badge">Docker</span></div><p>' + inline(dockerMeta.card) + '</p>' +
+		'<p class="card-links"><a href="/' + PA_DOCKER.id + '/">Overview</a> · ' +
+		PA_DOCKER.pages.filter((page) => !page.path.includes('/')).map((page) => '<a href="/' + PA_DOCKER.id + '/' + page.path + '/">' + escape(page.path) + '</a>').join(' · ') +
+		'</p></li>';
 	const body =
 		'<section class="hero wrap" aria-labelledby="title"><p class="kicker">Java · Python · .NET · TypeScript</p><h1 id="title">Docs</h1>' +
 		'<p class="lead">Every library, in each language it comes in. Each one has a page per type, with its members and examples in your language; ' +
@@ -207,8 +214,9 @@ for (const { project, content } of landings) {
 		(more.length > 0
 			? '<section id="more" class="section wrap" aria-labelledby="more-heading"><h2 id="more-heading" class="section-label">Also</h2><ul class="cards">' + more.join('') + '</ul></section>'
 			: '') +
-		'<section id="running" class="section wrap" aria-labelledby="running-heading"><h2 id="running-heading" class="section-label">Running TM1</h2><div class="steps">' +
-		'<p class="more">To run TM1, TM1 Web, Workspace or Cognos security on your own computer, for development and tests, see <a href="/projects/pa-docker/">Planning Analytics in Docker</a>.</p></div></section>';
+		'<section id="running" class="section wrap" aria-labelledby="running-heading"><h2 id="running-heading" class="section-label">Running TM1</h2><ul class="cards">' +
+		docker +
+		'</ul></section>';
 	await mkdir(path.join(distDir, 'docs'), { recursive: true });
 	await writeFile(
 		path.join(distDir, 'docs', 'index.html'),
