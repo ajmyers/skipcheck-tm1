@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { inline, parse, slug } from '../scripts/markdown.mjs';
 import { docsVersion, installCommands, packageOf } from '../scripts/packages.mjs';
-import { languagesOf, PROJECTS, regions } from '../scripts/site.mjs';
+import { head, languagesOf, PROJECTS, regions } from '../scripts/site.mjs';
 
 test('inline Markdown is escaped, then marked up', () => {
 	assert.equal(inline('**Bold** and `a<b>` with [a link](docs/X.html) & more'), '<strong>Bold</strong> and <code>a&lt;b&gt;</code> with <a href="docs/X.html">a link</a> &amp; more');
@@ -97,4 +97,14 @@ test('every project has a route on each zone, and the docs landing page and the 
 		assert.ok(patterns.includes('*' + zone + '/docs*'), 'no route for the docs landing page on ' + zone);
 	}
 	assert.equal(patterns.length, 2 * (PROJECTS.length + 2), 'a route that no project in scripts/site.mjs accounts for');
+});
+
+test('a page with a description has the link preview image, and one without has none', () => {
+	const page = head({ title: 'T', description: 'D', canonical: 'https://skipcheck.io/x/', styles: [], scripts: [] });
+	assert.match(page, /<meta property="og:image" content="https:\/\/skipcheck\.io\/og\.png">/);
+	assert.match(page, /<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">/);
+	assert.match(page, /<meta property="og:image:alt" content="[^"]+">/);
+	assert.match(page, /<meta name="twitter:card" content="summary_large_image">/);
+	const bare = head({ title: 'T', canonical: 'https://skipcheck.io/x/docs/', styles: [], scripts: [] });
+	assert.doesNotMatch(bare, /og:image|twitter:card/);
 });
