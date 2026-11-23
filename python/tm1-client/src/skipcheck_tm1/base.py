@@ -22,7 +22,7 @@ import math
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
-from typing import Annotated, Any, ClassVar
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar
 
 from pydantic import (
     BaseModel,
@@ -37,6 +37,9 @@ from pydantic import (
 )
 
 from .odata import Bind, duration, string_literal
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 __all__ = ["LenientDateTime", "Tm1Enum", "Tm1Model", "Tm1Patch", "iso_datetime", "to_odata"]
 
@@ -218,7 +221,7 @@ class Tm1Patch:
             self._values[name + "@odata.bind"] = [str(t) for t in targets]
             return self
 
-        def property(self, name: str, value: Any) -> Any:
+        def property(self, name: str, value: Any) -> Self:
             """A property ``$metadata`` doesn't declare, which an open type can have."""
             self._values[name] = value
             return self

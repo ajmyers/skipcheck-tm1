@@ -243,10 +243,14 @@ def emit_patches(spec: Spec) -> str:
         "",
         "from __future__ import annotations",
         "",
-        "from typing import Any",
+        "from typing import TYPE_CHECKING, Any",
         "",
         "from ..base import Tm1Patch",
         "from ..odata import ODataPath",
+        "",
+        "if TYPE_CHECKING:",
+        "    # A setter returns the builder it's called on, so a subtype's builder keeps its own setters",
+        "    from typing_extensions import Self",
         "",
     ]
     names_all = []
@@ -276,22 +280,22 @@ def emit_patches(spec: Spec) -> str:
                 names.field_name(p["name"]).rstrip("_") if names.field_name(p["name"]).rstrip("_") not in taken else names.field_name(p["name"]), taken
             )
             out.append("")
-            out.append(f"        def {m}(self, value: Any) -> {name}.Builder:")
+            out.append(f"        def {m}(self, value: Any) -> Self:")
             out.append(f"            return self._set({p['name']!r}, value)  # type: ignore[return-value]")
             methods += 1
         for n in t["navigationProperties"]:
             m = names.unique(names.field_name(n["name"]).rstrip("_"), taken)
             out.append("")
-            out.append(f"        def {m}(self, value: Any) -> {name}.Builder:")
+            out.append(f"        def {m}(self, value: Any) -> Self:")
             out.append(f"            return self._set({n['name']!r}, value)  # type: ignore[return-value]")
             if spec.is_entity(n["type"]):
                 bind = names.unique("bind_" + names.field_name(n["name"]).rstrip("_"), taken)
                 out.append("")
                 if n["collection"]:
-                    out.append(f"        def {bind}(self, *targets: ODataPath | str) -> {name}.Builder:")
+                    out.append(f"        def {bind}(self, *targets: ODataPath | str) -> Self:")
                     out.append(f"            return self._bind_all({n['name']!r}, targets)  # type: ignore[return-value]")
                 else:
-                    out.append(f"        def {bind}(self, target: ODataPath | str) -> {name}.Builder:")
+                    out.append(f"        def {bind}(self, target: ODataPath | str) -> Self:")
                     out.append(f"            return self._bind({n['name']!r}, target)  # type: ignore[return-value]")
             methods += 1
         if not methods:

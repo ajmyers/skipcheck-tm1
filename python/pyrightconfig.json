@@ -2,8 +2,9 @@
   // Type checking for the Python client and tm1-testcontainers, the counterpart of the Java
   // build's NullAway and Error Prone: tm1-client/tests/test_types.py runs it, so pytest fails on
   // a type error. The generated modules (_generated, and the sync flavor in _sync) are checked
-  // too: they are what callers import. Tests and the code generator aren't.
-  "include": ["tm1-client/src", "tm1-testcontainers/src"],
+  // too: they are what callers import. So are the guide's examples (examples/), which are never
+  // run: this is what keeps them from rotting. Tests and the code generator aren't.
+  "include": ["tm1-client/src", "tm1-testcontainers/src", "tm1-client/examples", "tm1-testcontainers/examples"],
   // The oldest Python the packages support (requires-python)
   "pythonVersion": "3.10",
   "typeCheckingMode": "standard",

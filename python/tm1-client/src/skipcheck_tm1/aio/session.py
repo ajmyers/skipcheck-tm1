@@ -27,7 +27,7 @@ import logging
 import time
 from collections.abc import AsyncIterator, Callable
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -50,6 +50,10 @@ from ..odata import ODataPath, ODataQuery
 from ..request import Tm1Request
 from ..timeouts import Tm1Timeouts
 from ..version import Tm1Capabilities, Tm1Dialect, Tm1Version
+
+if TYPE_CHECKING:
+    # For the checker only (pydantic brings it): a builder's methods return the builder they're called on
+    from typing_extensions import Self
 
 __all__ = ["AsyncTm1Session", "AsyncTm1SessionBatch", "AsyncTm1SessionBuilder"]
 
@@ -743,7 +747,7 @@ class AsyncTm1SessionBuilder:
     def __init__(self, settings: dict[str, Any] | None = None):
         self._settings: dict[str, Any] = dict(settings or {})
 
-    def copy(self) -> AsyncTm1SessionBuilder:
+    def copy(self) -> Self:
         """A copy of these settings, for the pool to build one session per identity."""
         return type(self)(self._settings)
 
@@ -751,76 +755,76 @@ class AsyncTm1SessionBuilder:
         """The settings so far, by name, as a new dict."""
         return dict(self._settings)
 
-    def _set(self, **values: Any) -> AsyncTm1SessionBuilder:
+    def _set(self, **values: Any) -> Self:
         self._settings.update(values)
         return self
 
-    def base_url(self, base_url: str) -> AsyncTm1SessionBuilder:
+    def base_url(self, base_url: str) -> Self:
         """The REST API's root, such as ``http://tm1:8010/api/v1/``."""
         self._settings.pop("address", None)
         return self._set(base_url=base_url)
 
-    def address(self, address: str) -> AsyncTm1SessionBuilder:
+    def address(self, address: str) -> Self:
         """The server's address, read by the dialect: ``http://tm1:8010``."""
         self._settings.pop("base_url", None)
         return self._set(address=address)
 
-    def dialect(self, dialect: Tm1Dialect) -> AsyncTm1SessionBuilder:
+    def dialect(self, dialect: Tm1Dialect) -> Self:
         """The kind of deployment, for :meth:`address`. :attr:`Tm1Dialect.V11` unless set."""
         return self._set(dialect=dialect)
 
-    def basic_auth(self, user: str, password: str | None) -> AsyncTm1SessionBuilder:
+    def basic_auth(self, user: str, password: str | None) -> Self:
         """Basic authentication, for TM1 security modes 1 and 2: shorthand for
         ``authenticator(auth.basic(user, password))``. A password of None counts as empty."""
         return self._set(authenticator=basic(user, password))
 
-    def authenticator(self, authenticator: Authenticator) -> AsyncTm1SessionBuilder:
+    def authenticator(self, authenticator: Authenticator) -> Self:
         """How to log in: TM1's own security, CAM, or credentials of your own. Asked for credentials
         on every login."""
         return self._set(authenticator=authenticator)
 
-    def impersonate(self, user: str) -> AsyncTm1SessionBuilder:
+    def impersonate(self, user: str) -> Self:
         """Logs in as the service account but acts as ``user`` (``TM1-Impersonate``, sent at
         login only). A name with characters outside ASCII goes out as UTF-8, which is how TM1
         (11.8) reads the header. Refuses a blank name, which TM1 would take as no impersonation
         at all, and one with a control character."""
         return self._set(impersonate=check_impersonated(user))
 
-    def without_impersonation(self) -> AsyncTm1SessionBuilder:
+    def without_impersonation(self) -> Self:
         """Logs in as the credentials' own user: no impersonation."""
         self._settings.pop("impersonate", None)
         return self
 
-    def session_context(self, session_context: str) -> AsyncTm1SessionBuilder:
+    def session_context(self, session_context: str) -> Self:
         """A label for the TM1 session, shown as its ``Context`` in ``Sessions`` and
         ``Threads``, such as the application's name; sent with the login. It's a setting of the
         session, not of a view: TM1 keeps one label per session. At most 250 characters; sent as
         UTF-8, as TM1 reads it."""
         return self._set(session_context=_check_session_context(session_context))
 
-    def timeouts(self, timeouts: Tm1Timeouts) -> AsyncTm1SessionBuilder:
+    def timeouts(self, timeouts: Tm1Timeouts) -> Self:
         """Timeouts by kind of work; :attr:`Tm1Timeouts.DEFAULTS` unless set."""
         return self._set(timeouts=timeouts)
 
-    def error_classifier(self, classifier: Tm1ErrorClassifier) -> AsyncTm1SessionBuilder:
+    def error_classifier(self, classifier: Tm1ErrorClassifier) -> Self:
         """How error responses are classified; :meth:`Tm1ErrorClassifier.defaults` unless set."""
         return self._set(error_classifier=classifier)
 
-    def http_client(self, client: httpx.AsyncClient) -> AsyncTm1SessionBuilder:
+    def http_client(self, client: httpx.AsyncClient) -> Self:
         """The HTTP client to send through (Java's ``webClient`` and ``connector``)."""
         return self._set(client=client)
 
-    def verify(self, verify: bool | str) -> AsyncTm1SessionBuilder:
+    def verify(self, verify: bool | str) -> Self:
         """Whether to check the server's certificate, or a CA bundle to check it with."""
         return self._set(verify=verify)
 
-    def check_capabilities(self, check: bool) -> AsyncTm1SessionBuilder:
+    def check_capabilities(self, check: bool) -> Self:
         """Whether a request is checked against the server's ``$metadata`` before it's sent, and
         refused with a :class:`~skipcheck_tm1.errors.Tm1UnsupportedOperationError` if the server
         doesn't define what it needs. On unless set."""
         return self._set(check_capabilities=check)
 
-    def clock(self, clock: Callable[[], float]) -> AsyncTm1SessionBuilder:
+    def clock(self, clock: Callable[[], float]) -> Self:
         """The clock refused logins are timed by, in seconds (Java's ``nanoTime``): tests pass
         one they move."""
         return self._set(clock=clock)
