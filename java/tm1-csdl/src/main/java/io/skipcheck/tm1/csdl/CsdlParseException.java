@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package io.skipcheck.tm1.csdl;
 
 /** A CSDL document couldn't be parsed: it's malformed, or not CSDL. */

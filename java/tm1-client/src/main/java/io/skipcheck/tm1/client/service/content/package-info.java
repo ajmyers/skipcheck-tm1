@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Services for the Applications contents tree: folders, documents, links and references
  * (plan phase 8).

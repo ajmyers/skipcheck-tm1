@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Spring Boot auto-configuration for the TM1 client: {@code tm1.*} properties,
  * {@link io.skipcheck.tm1.spring.boot.autoconfigure.Tm1ConnectionDetails} (so

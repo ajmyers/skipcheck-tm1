@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * The client's exceptions. Everything the client signals is a
  * {@link io.skipcheck.tm1.client.error.Tm1Exception}, unchecked, delivered through

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * A read-only model of OData CSDL XML ({@code $metadata}), and a parser for it.
  *

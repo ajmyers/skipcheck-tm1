@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * TM1 versions, as {@code Server.ProductVersion} reports them.
  *

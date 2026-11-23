@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Services for dimensions, hierarchies, elements, edges, levels, members and subsets
  * (plan phase 2).

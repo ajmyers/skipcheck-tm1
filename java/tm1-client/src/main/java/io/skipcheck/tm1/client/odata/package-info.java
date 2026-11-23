@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * OData v4 protocol support that knows nothing about TM1: building correctly encoded
  * resource paths and query options, the {@code $filter} expression language, JSON control

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package io.skipcheck.tm1.client.service.cube;
 
 /** Who sees a view, and so which of a cube's collections holds it. */
