@@ -252,8 +252,38 @@ val packageTestTypescript = tasks.register<ToolTask>("packageTestTypescript") {
 	)
 }
 
+val cleanPackageTestRepository = tasks.register<Delete>("cleanPackageTestRepository") {
+	delete(packages.dir("maven"))
+	unlessPrebuilt()
+}
+
+val packageJava = tasks.register("packageJava") {
+	description = "Publishes the Java libraries to a Maven repository in build/packages/maven."
+	dependsOn(provider { subprojects.mapNotNull { it.tasks.findByName("publishAllPublicationsToPackageTestRepository") } })
+}
+subprojects {
+	tasks.matching { it.name.endsWith("ToPackageTestRepository") }.configureEach {
+		mustRunAfter(cleanPackageTestRepository)
+		unlessPrebuilt()
+	}
+}
+
+val packageTestJava = tasks.register<ToolTask>("packageTestJava") {
+	group = "verification"
+	description = "Builds an application against the published Java libraries, by their BOM, and runs it."
+	dependsOn(cleanPackageTestRepository, packageJava)
+	directory = root
+	// A build of its own (package-tests/java), which takes the libraries from the repository above
+	commands = listOf(
+		listOf(
+			root.file(if (windows) "gradlew.bat" else "gradlew").asFile.path, "-p", "package-tests/java", "--project-cache-dir",
+			packageTests.dir("java-gradle").asFile.path, "--quiet", "run", "-PskipcheckVersion=$version",
+		),
+	)
+}
+
 tasks.register("packageTest") {
 	group = "verification"
 	description = "Builds every package as a release does, installs each somewhere clean, and runs it."
-	dependsOn(packageTestPython, packageTestDotnet, packageTestTypescript)
+	dependsOn(packageTestJava, packageTestPython, packageTestDotnet, packageTestTypescript)
 }
