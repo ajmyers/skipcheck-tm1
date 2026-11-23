@@ -1021,9 +1021,12 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
     const accented = alice + "_ë";
     await tm1.createUser(admin, accented, "p");
     try {
-      // fetch sends a header's characters as Latin-1 bytes; the UTF-8 bytes read as Latin-1 are the other way to write it
+      // A character that isn't ASCII goes out as "?", as Java's HttpClient writes it, so this sends
+      // what Java's test does. fetch would send it as a Latin-1 byte, and the UTF-8 bytes sent that
+      // way are a name TM1 accepts: issue 184.
+      const asJavaSends = (s: string): string => s.replace(/[^\x00-\x7f]/g, "?");
       const utf8AsLatin1 = Buffer.from(accented, "utf8").toString("latin1");
-      for (const written of [accented, utf8AsLatin1]) {
+      for (const written of [accented, utf8AsLatin1].map(asJavaSends)) {
         const refused = await impersonate(tm1.user, tm1.password, written);
         expect(refused.status).toBe(400);
         expect(refused.body).toContain("The user specified in the impersonation request does not exist.");
