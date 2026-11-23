@@ -100,7 +100,7 @@ val checkApiSite = tasks.register<ToolTask>("checkApiSite") {
 	group = "verification"
 	description = "Tests the docs site's Worker and page builders (api-site/test)."
 	directory = root.dir("api-site")
-	commands = listOf(listOf("node", "--test", "test/"))
+	commands = listOf(listOf("node", "--test", "test/worker.test.mjs", "test/site.test.mjs"))
 }
 
 tasks.register("checkAll") {

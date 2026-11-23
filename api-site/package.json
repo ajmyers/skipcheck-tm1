@@ -3,7 +3,7 @@
   "private": true,
   "description": "Builds and serves each project's landing page, docs and API reference at skipcheck.io/<project>/",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test \"test/*.test.mjs\"",
     "assemble": "node scripts/assemble.mjs && node scripts/guide.mjs && node scripts/pages.mjs && node scripts/check-links.mjs",
     "pages": "node scripts/guide.mjs && node scripts/pages.mjs && node scripts/check-links.mjs",
     "dev": "wrangler dev",
