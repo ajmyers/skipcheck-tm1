@@ -1,0 +1,4 @@
+# error: paw: needs ibm
+version: 1
+tm1: { servers: { tm1: {} } }
+paw: { acceptLicense: true }

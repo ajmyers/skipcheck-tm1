@@ -1,0 +1,4 @@
+# error: tm1.servers.tm1.seed: 24retail isn't available in tm1-testcontainers
+# pa-setup: accepts
+version: 1
+tm1: { servers: { tm1: { seed: 24retail } } }

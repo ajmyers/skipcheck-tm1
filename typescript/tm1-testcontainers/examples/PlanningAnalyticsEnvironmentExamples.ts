@@ -44,3 +44,12 @@ export async function camSecurity(): Promise<string[]> {
   return cubes.map((cube) => cube.Name!);
   // @end
 }
+
+export async function fromConfig(): Promise<string> {
+  // @start region = file
+  // The environment pa-setup runs from the same file, with random host ports
+  await using env = PlanningAnalyticsEnvironment.fromConfig("pa-environment.yaml").build();
+  await env.start();
+  return env.tm1("planning").getRestUrl();
+  // @end
+}

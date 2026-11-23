@@ -6,6 +6,7 @@ containers are wired, without starting any (and without Docker)."""
 from __future__ import annotations
 
 import base64
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +16,7 @@ from skipcheck_tm1_testcontainers import (
     KeycloakContainer,
     Namespace,
     Network,
+    PawSource,
     PlanningAnalyticsEnvironment,
     Tm1AdminServerContainer,
     Tm1Seed,
@@ -242,3 +244,87 @@ def test_refuses_missing_or_unsupported_parts() -> None:
         env.tm1_web()
     with pytest.raises(ValueError, match=r"\['a'\]"):
         env.tm1("b")
+
+
+# The pa-environment.yaml files from_config's tests read, shared with the other clients
+ROOT = Path(__file__).resolve().parents[3]
+FIXTURES = ROOT / "spec" / "conformance" / "pa-environment"
+EXAMPLES = ROOT / "docker" / "pa-setup" / "examples"
+
+
+def test_from_config_builds_the_example_with_everything() -> None:
+    env = (
+        PlanningAnalyticsEnvironment.from_config(EXAMPLES / "everything.yaml")
+        .tm1_source(Tm1Source.PrivateImage("tm1-server:test"))
+        .tm1_web_source(Tm1WebSource.PrivateImage("tm1-web:test"))
+        .cognos_source(CognosSource.PrivateImage("cognos-server:test"))
+        .build()
+    )
+    assert list(env.tm1_servers()) == ["planning", "reporting"]
+    assert env.tm1("planning").env_map["TM1_SEED"] == "sdata"
+    assert env.tm1("reporting").env_map["TM1_SEED"] == "empty"
+    assert env.admin_server() is not None
+    assert env.tm1_web().env_map["TM1_WEB_HEAP"] == "1g"
+    assert [u.name for u in env.cognos().users] == ["admin", "analyst", "viewer"]
+    assert env.cognos().get_user("analyst").groups == ("Analysts", "Readers")
+    assert env.cognos().env_map["COGNOS_MAX_MEMORY"] == "6144"
+    assert env.cognos().keycloak is env.keycloak()
+    # The sources set on the builder win over the file's ibm folder
+    assert env.tm1("planning").source == Tm1Source.PrivateImage("tm1-server:test")
+    planning = env.tm1("planning")
+    planning.configure()
+    assert planning.env_map["TM1_CAM_NAMESPACE"] == "LDAP"
+    assert planning.env_map["TM1_CAM_ADMINS"] == "admin"
+    assert planning.env_map["TM1_CAM_GROUPS"] == "Admins Analysts Readers"
+
+
+def test_from_config_maps_every_setting() -> None:
+    env = PlanningAnalyticsEnvironment.from_config(FIXTURES / "settings.yaml").build()
+    ibm = FIXTURES / "ibm"
+    planning = env.tm1("planning")
+    assert planning.env_map["TM1_SEED"] == "sdata"
+    assert planning.env_map["TM1_CFG_MaxThreads"] == "4"
+    assert planning.env_map["TM1_CFG_EnableNewHierarchyCreation"] == "True"
+    assert planning.env_map["TM1_CFG_DefaultMeasuresDimension"] == "Measures"
+    # adminServer: true, with one server
+    admin = env.admin_server()
+    assert admin is not None
+    assert planning.admin_server is admin
+    assert env.tm1_web().env_map["TM1_WEB_HEAP"] == "2g"
+    assert env.cognos().get_user("boss").groups == ("Admins", "Planners")
+    assert env.cognos().env_map["COGNOS_MAX_MEMORY"] == "8192"
+    planning.configure()
+    assert planning.env_map["TM1_CAM_NAMESPACE"] == "OIDC"
+    assert planning.env_map["TM1_CAM_ADMINS"] == "boss"
+    # ibm is every part's source; images are what they run
+    assert planning.source == Tm1Source.Bundle(ibm)
+    assert env.tm1_web().source == Tm1WebSource.Bundle(ibm)
+    assert env.cognos().source == CognosSource.Zip(ibm)
+    # The image a container runs, read without pulling it
+    assert planning.image == "registry.example.com/tm1-server:local"
+    assert admin.image == "registry.example.com/tm1-server:local"
+    assert env.tm1_web().image == "registry.example.com/tm1-web:local"
+    assert env.cognos().image == "registry.example.com/cognos-server:local"
+    assert env.keycloak().image == "registry.example.com/keycloak:26"
+
+
+def test_from_config_runs_paw_from_the_ibm_folder() -> None:
+    env = PlanningAnalyticsEnvironment.from_config(FIXTURES / "paw.yaml").build()
+    assert env.paw().source == PawSource(FIXTURES / "ibm" / "ipa_workspace_local_0.0.0.zip")
+    assert env.paw()._is_license_accepted()
+    assert env.paw().tm1_server is env.tm1("tm1")
+    assert env.admin_server() is None
+
+
+def test_from_config_refuses_what_it_cannot_run() -> None:
+    invalid = sorted((FIXTURES / "invalid").glob("*.yaml"))
+    assert invalid
+    for file in invalid:
+        first = file.read_text(encoding="utf-8").splitlines()[0]
+        assert first.startswith("# error: "), file
+        with pytest.raises(ValueError) as refused:
+            PlanningAnalyticsEnvironment.from_config(file)
+        assert str(refused.value).startswith(f"{file.name}: "), file
+        assert first[len("# error: ") :] in str(refused.value), file
+    with pytest.raises(ValueError, match="not found"):
+        PlanningAnalyticsEnvironment.from_config(FIXTURES / "missing.yaml")

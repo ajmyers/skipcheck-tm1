@@ -1,0 +1,28 @@
+# Every setting PlanningAnalyticsEnvironment.fromConfig maps, none of them at its default.
+# Ports, name and files are checked but ignored: Testcontainers places those itself.
+version: 1
+name: settings
+ibm: ibm
+files: ./databases
+images:
+  tm1Server: registry.example.com/tm1-server:local
+  tm1Web: registry.example.com/tm1-web:local
+  cognosServer: registry.example.com/cognos-server:local
+  keycloak: registry.example.com/keycloak:26
+tm1:
+  servers:
+    planning:
+      port: 8020
+      seed: sdata
+      cfg: { MaxThreads: 4, EnableNewHierarchyCreation: true, DefaultMeasuresDimension: Measures }
+  adminServer: true
+  adminPort: 5896
+tm1Web: { port: 9511, heap: 2g }
+cognos:
+  port: 9301
+  users:
+    - admin:adminpw:Admins
+    - { name: boss, password: bosspw, groups: [Admins, Planners] }
+  oidc: { keycloakPort: 8181 }
+  cam: { namespace: OIDC, admins: [boss] }
+  memory: 8192

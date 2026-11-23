@@ -1,0 +1,4 @@
+# error: port(s) 9300 used by more than one service
+version: 1
+tm1: { servers: { tm1: { port: 9300 } } }
+cognos: { users: [admin:adminpw] }

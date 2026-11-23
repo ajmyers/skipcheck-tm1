@@ -129,6 +129,12 @@ export class PawContainer implements Startable {
     return this;
   }
 
+  /** Whether {@link acceptLicense} or `PAW_ACCEPT_LICENSE=true` accepted IBM's license.
+   * @internal */
+  licenseAccepted(): boolean {
+    return this.#licenseAccepted;
+  }
+
   /** Sets one of `paw-local.sh`'s `PAW_*` settings, such as `PAW_JVM_ARGS` or `PAW_TM1WEB_URL`.
    * The TM1 server, ports, network and paths are set by this class.
    * @throws IllegalArgumentException if `name` doesn't start with `PAW_` */

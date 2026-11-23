@@ -1,0 +1,4 @@
+# error: tm1Web: unknown setting(s) colour
+version: 1
+tm1: { servers: { tm1: {} } }
+tm1Web: { port: 9510, colour: blue }

@@ -1,0 +1,4 @@
+# error: tm1Web: needs a TM1 server
+version: 1
+tm1Web: true
+cognos: { users: [admin:adminpw] }

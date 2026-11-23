@@ -1,0 +1,4 @@
+# error: cognos.users: TM1 in CAM security needs test users
+version: 1
+tm1: { servers: { tm1: {} } }
+cognos: true

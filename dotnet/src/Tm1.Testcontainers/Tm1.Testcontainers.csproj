@@ -11,6 +11,8 @@
     <ProjectReference Include="../Tm1.Client/Tm1.Client.csproj" />
     <PackageReference Include="Testcontainers" Version="4.*" />
     <PackageReference Include="xunit.extensibility.core" Version="2.9.3" />
+    <!-- PlanningAnalyticsEnvironment.FromConfig reads pa-setup's pa-environment.yaml -->
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
   <ItemGroup>
     <!-- PAW's runner script, embedded as the Java build copies it onto the classpath -->

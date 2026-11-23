@@ -6,10 +6,12 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, TypeVar
 
 from typing_extensions import Self
 
+from . import _pa_environment
 from ._container import Network
 from .cognos import NO_SOURCE_MESSAGE as NO_COGNOS_MESSAGE
 from .cognos import CognosContainer, KeycloakContainer, Namespace
@@ -38,20 +40,25 @@ class PlanningAnalyticsEnvironment:
     def __init__(self, b: PlanningAnalyticsEnvironment.Builder, network: Any) -> None:
         self._network = network
         self._owns_network = b._network is None
-        self._keycloak = KeycloakContainer().with_network(network) if b._keycloak is not None else None
+        self._keycloak = KeycloakContainer(b._keycloak_image).with_network(network) if b._keycloak is not None else None
         cognos: CognosContainer | None = None
         if b._cognos is not None:
-            cognos = CognosContainer(b._get(b._cognos_source, CognosSource.discover, NO_COGNOS_MESSAGE)).with_network(network)
+            cognos_source = b._get(
+                b._cognos_source, lambda ibm: CognosSource.Zip(ibm), CognosSource.discover, CognosSource.PrivateImage, b._cognos_image, NO_COGNOS_MESSAGE
+            )
+            cognos_image = b._cognos_image if _runs(b._cognos_image, isinstance(cognos_source, CognosSource.PrivateImage)) else None
+            cognos = CognosContainer(cognos_source, cognos_image).with_network(network)
             if self._keycloak is not None:
                 cognos.with_keycloak(self._keycloak)
             # First: the TM1 servers' CAM security is wired from the test users
             b._cognos(cognos)
         self._cognos = cognos
-        tm1_source = b._get(b._tm1_source, Tm1Source.discover, NO_TM1_MESSAGE)
-        self._admin_server = Tm1AdminServerContainer(tm1_source).with_network(network) if b._admin_server is not None or len(b._tm1) > 1 else None
+        tm1_source = b._get(b._tm1_source, lambda ibm: Tm1Source.Bundle(ibm), Tm1Source.discover, Tm1Source.PrivateImage, b._tm1_image, NO_TM1_MESSAGE)
+        tm1_image = b._tm1_image if _runs(b._tm1_image, isinstance(tm1_source, Tm1Source.PrivateImage)) else None
+        self._admin_server = Tm1AdminServerContainer(tm1_source, tm1_image).with_network(network) if b._admin_server is not None or len(b._tm1) > 1 else None
         servers: dict[str, Tm1ServerContainer] = {}
         for name in b._tm1:
-            server = Tm1ServerContainer(tm1_source).with_network(network).with_network_aliases(name).with_env("TM1_SERVER_NAME", name)
+            server = Tm1ServerContainer(tm1_source, tm1_image).with_network(network).with_network_aliases(name).with_env("TM1_SERVER_NAME", name)
             if self._admin_server is not None:
                 server.with_admin_server(self._admin_server)
             if cognos is not None:
@@ -61,7 +68,11 @@ class PlanningAnalyticsEnvironment:
         first = next(iter(servers.values()))
         web: Tm1WebContainer | None = None
         if b._tm1_web is not None:
-            web = Tm1WebContainer(b._get(b._tm1_web_source, Tm1WebSource.discover, NO_TM1_WEB_MESSAGE)).with_tm1_server(first)
+            web_source = b._get(
+                b._tm1_web_source, lambda ibm: Tm1WebSource.Bundle(ibm), Tm1WebSource.discover, Tm1WebSource.PrivateImage, b._tm1_web_image, NO_TM1_WEB_MESSAGE
+            )
+            web_image = b._tm1_web_image if _runs(b._tm1_web_image, isinstance(web_source, Tm1WebSource.PrivateImage)) else None
+            web = Tm1WebContainer(web_source, web_image).with_tm1_server(first)
             if self._admin_server is not None:
                 web.with_admin_server(self._admin_server)
             # List every server: start them all before TM1 Web
@@ -69,7 +80,7 @@ class PlanningAnalyticsEnvironment:
         self._tm1_web = web
         paw: PawContainer | None = None
         if b._paw is not None:
-            paw = PawContainer(b._get(b._paw_source, PawSource.discover, NO_PAW_MESSAGE)).with_tm1_server(first)
+            paw = PawContainer(b._get(b._paw_source, b._paw_from_ibm, PawSource.discover, None, None, NO_PAW_MESSAGE)).with_tm1_server(first)
             if self._admin_server is not None:
                 paw.with_admin_server(self._admin_server)
         self._paw = paw
@@ -85,6 +96,54 @@ class PlanningAnalyticsEnvironment:
     def builder() -> PlanningAnalyticsEnvironment.Builder:
         """Starts building an environment."""
         return PlanningAnalyticsEnvironment.Builder()
+
+    @staticmethod
+    def from_config(path: Path | str) -> PlanningAnalyticsEnvironment.Builder:
+        """Starts building the environment a ``pa-environment.yaml`` describes, the file
+        ``pa-setup`` reads (``docker/pa-setup``), so tests run what developers run. The file is
+        checked as ``pa-setup`` checks it, with its defaults. The builder comes back configured;
+        change it further, or call :meth:`Builder.build`.
+
+        How each setting maps:
+
+        * ``tm1.servers.<name>``: :meth:`Builder.tm1`, with ``seed`` as
+          :meth:`Tm1ServerContainer.with_seed` and each ``cfg`` parameter as ``TM1_CFG_<name>``,
+          written as ``pa-setup`` writes it (``true`` is ``True``);
+        * ``tm1.adminServer``: :meth:`Builder.admin_server`; with more than one server there's one
+          anyway, and ``false`` then fails, as in ``pa-setup``;
+        * ``tm1Web``: :meth:`Builder.tm1_web`, with ``heap`` as ``TM1_WEB_HEAP`` (``1g``);
+        * ``cognos``: :meth:`Builder.cognos`, with ``users`` as :meth:`CognosContainer.with_user`
+          and ``memory`` as ``COGNOS_MAX_MEMORY`` (``6144``); ``oidc`` adds
+          :meth:`Builder.keycloak`; ``cam`` is :meth:`Builder.cam_security`, by default LDAP with
+          the first user as administrator;
+        * ``paw``: :meth:`Builder.paw` with :meth:`PawContainer.accept_license`, which the file
+          must say (``acceptLicense: true``); the zip is ``zip`` in ``ibm``, or the newest there;
+        * ``ibm``: each part's source, the folder as :class:`Tm1Source.Bundle`,
+          :class:`Tm1WebSource.Bundle` and :class:`CognosSource.Zip`. A relative path is from the
+          file's folder; ``~`` is the user's home;
+        * ``images``: the image each part runs, as a container's image argument. A part with no
+          other source takes its image as the private image with IBM's software built in
+          (:class:`Tm1Source.PrivateImage` and the like).
+
+        A part's source is the one set on the builder, else ``ibm``, else what ``discover()``
+        finds (the variables pa-setup's ``.env`` sets, such as ``TM1_BUNDLE_URL``), else its
+        image as a private image.
+
+        Ignored, because they place things on the host that Testcontainers manages itself:
+        ``name`` (the compose project; the environment has its own network), every ``port``,
+        ``adminPort`` and ``keycloakPort`` (Testcontainers maps random host ports), and
+        ``files`` (the host folder pa-setup keeps databases in; each test environment starts from a
+        new database, or one copied in with :meth:`Tm1ServerContainer.with_data`). They're still
+        checked as ``pa-setup`` checks them.
+
+        Refused, because the environment can't run them yet: ``cognos`` without
+        ``tm1.servers``, ``paw`` with ``cognos``, and ``seed: 24retail``.
+
+        A ValueError if the file can't be read, isn't valid, or asks for what the environment can't
+        run; the message starts with the file's name and names the setting."""
+        if path is None:
+            raise ValueError("path must not be None")
+        return _pa_environment.read(path)
 
     def start(self) -> None:
         """Starts every part, each after what it depends on; PAW last."""
@@ -181,6 +240,14 @@ class PlanningAnalyticsEnvironment:
             self._paw_source: PawSource | None = None
             self._cognos_source: CognosSource | None = None
             self._network: Any = None
+            # From pa-environment.yaml (from_config): the IBM downloads folder, PAW's zip in it,
+            # and each part's image
+            self._ibm: Path | None = None
+            self._paw_zip: str | None = None
+            self._tm1_image: str | None = None
+            self._tm1_web_image: str | None = None
+            self._cognos_image: str | None = None
+            self._keycloak_image: str | None = None
 
         def tm1(self, name: str, customizer: Callable[[Tm1ServerContainer], Any] = _nothing) -> Self:
             """A TM1 server, its network alias and server name ``name``."""
@@ -277,14 +344,43 @@ class PlanningAnalyticsEnvironment:
                 raise RuntimeError("Cognos needs test users for CAM security: add them with with_user")
             return [users[0].name]
 
-        @staticmethod
-        def _get(configured: T | None, discover: Callable[[], T | None], message: str) -> T:
+        def _get(
+            self,
+            configured: T | None,
+            from_ibm: Callable[[Path], T],
+            discover: Callable[[], T | None],
+            private_image: Callable[[str], T] | None,
+            image: str | None,
+            message: str,
+        ) -> T:
+            """A part's source: the one set on the builder, else the file's ``ibm`` folder, else
+            what ``discover`` finds, else the file's image as a private image."""
             if configured is not None:
                 return configured
+            if self._ibm is not None:
+                if not self._ibm.is_dir():
+                    raise RuntimeError(f"ibm in pa-environment.yaml isn't a folder: {self._ibm}")
+                return from_ibm(self._ibm)
             found = discover()
+            if found is not None:
+                return found
+            if private_image is not None and image is not None:
+                return private_image(image)
+            raise RuntimeError(message)
+
+        def _paw_from_ibm(self, ibm: Path) -> PawSource:
+            if self._paw_zip is not None:
+                return PawSource(ibm / self._paw_zip)
+            found = PawSource.discover(lambda name: str(ibm) if name == PawSource.BUNDLE_DIR else None)
             if found is None:
-                raise RuntimeError(message)
+                raise RuntimeError(f"No PAW Local zip in {ibm}")
             return found
+
+
+def _runs(image: str | None, private_image: bool) -> bool:
+    """Whether a part runs pa-setup's image setting: not when its source is a private image, which
+    is the image."""
+    return image is not None and not private_image
 
 
 def _required(value: T) -> T:

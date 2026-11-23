@@ -1,0 +1,5 @@
+# error: paw.acceptLicense: PAW starts only once you accept IBM's license
+version: 1
+ibm: ../ibm
+tm1: { servers: { tm1: {} } }
+paw: true

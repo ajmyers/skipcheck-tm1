@@ -2,6 +2,7 @@
 
 package examples;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -76,6 +77,16 @@ final class PlanningAnalyticsEnvironmentExamples {
 			finally {
 				viewer.close().block(WAIT);
 			}
+		}
+		// @end
+	}
+
+	String fromConfig() {
+		// @start region = file
+		// The environment pa-setup runs from the same file, with random host ports
+		try (var env = PlanningAnalyticsEnvironment.fromConfig(Path.of("pa-environment.yaml")).build()) {
+			env.start();
+			return env.tm1("planning").getRestUrl();
 		}
 		// @end
 	}

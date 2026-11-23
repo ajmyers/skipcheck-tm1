@@ -18,6 +18,8 @@ errorprone-plugin = "5.2.0"
 nullaway = "0.14.4"
 jspecify = "1.0.1"
 testcontainers = "2.0.5"
+# YAML 1.1, as PyYAML: tm1-testcontainers reads pa-setup's pa-environment.yaml as pa_setup.py does
+snakeyaml = "2.7"
 # Keep reactor in step with what spring-webflux brings in
 reactor = "3.9.0"
 reactor-netty = "1.4.0"
@@ -59,6 +61,7 @@ jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
 javapoet = { module = "com.palantir.javapoet:javapoet", version.ref = "javapoet" }
 archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
 testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 
 # Gradle plugins, as dependencies of build-logic
 gradle-plugin-spring-boot = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "spring-boot" }

@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from skipcheck_tm1 import ODataQuery, Tm1Client, auth
 from skipcheck_tm1.model import Cube
 from skipcheck_tm1_testcontainers import CognosContainer, PlanningAnalyticsEnvironment, Tm1Seed
@@ -36,4 +38,12 @@ def cam_security() -> list[str | None]:
         with Tm1Client.builder().base_url(env.tm1("planning").rest_url).authenticator(viewer).build() as tm1:
             # The cubes the viewer's groups may see
             return [cube.name for cube in tm1.cubes.model_cubes(ODataQuery.none().select(Cube.NAME))]
+    # @end
+
+
+def from_config() -> str:
+    # @start region = file
+    # The environment pa-setup runs from the same file, with random host ports
+    with PlanningAnalyticsEnvironment.from_config(Path("pa-environment.yaml")).build() as env:
+        return env.tm1("planning").rest_url
     # @end

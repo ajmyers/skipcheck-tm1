@@ -205,6 +205,14 @@ public class PawContainer implements Startable {
 	}
 
 	/**
+	 * Whether {@link #acceptLicense()} or {@code PAW_ACCEPT_LICENSE=true} accepted IBM's
+	 * license.
+	 */
+	boolean licenseAccepted() {
+		return licenseAccepted;
+	}
+
+	/**
 	 * Sets one of {@code paw-local.sh}'s {@code PAW_*} settings, such as
 	 * {@code PAW_JVM_ARGS} or {@code PAW_TM1WEB_URL}. The TM1 server, ports, network and
 	 * paths are set by this class.

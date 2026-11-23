@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { readdirSync, readFileSync } from "node:fs";
+import { basename, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CognosContainer,
@@ -8,6 +10,7 @@ import {
   IllegalStateException,
   KeycloakContainer,
   Network,
+  PawSource,
   PlanningAnalyticsEnvironment,
   Tm1AdminServerContainer,
   Tm1Seed,
@@ -16,6 +19,7 @@ import {
   Tm1WebContainer,
   Tm1WebSource,
 } from "../src/index.js";
+import { Repo } from "./support/files.js";
 
 /** These need no Docker: they read the wiring before anything starts, as the Java tests do. */
 
@@ -177,6 +181,17 @@ describe("CognosContainer", () => {
   });
 });
 
+const fixture = (name: string): string => join(Repo.paEnvironmentFixtures, name);
+
+function thrown(action: () => unknown): Error {
+  try {
+    action();
+  } catch (e) {
+    return e as Error;
+  }
+  throw new Error("Nothing was thrown");
+}
+
 const builder = (): PlanningAnalyticsEnvironment.Builder =>
   PlanningAnalyticsEnvironment.builder().tm1Source(source).tm1WebSource(webSource).cognosSource(new CognosSource.PrivateImage("cognos-server:test"));
 
@@ -286,5 +301,90 @@ describe("PlanningAnalyticsEnvironment", () => {
     expect(env.network()).toBe(network);
     expect(env.tm1("a").getNetwork()).toBe(network);
     expect(env.isRunning()).toBe(false);
+  });
+
+  it("from config builds the example with everything", () => {
+    const env = PlanningAnalyticsEnvironment.fromConfig(join(Repo.paEnvironmentExamples, "everything.yaml"))
+      .tm1Source(new Tm1Source.PrivateImage("tm1-server:test"))
+      .tm1WebSource(new Tm1WebSource.PrivateImage("tm1-web:test"))
+      .cognosSource(new CognosSource.PrivateImage("cognos-server:test"))
+      .build();
+    expect([...env.tm1Servers().keys()]).toEqual(["planning", "reporting"]);
+    expect(env.tm1("planning").getEnvMap().get("TM1_SEED")).toBe("sdata");
+    expect(env.tm1("reporting").getEnvMap().get("TM1_SEED")).toBe("empty");
+    expect(env.adminServer()).toBeDefined();
+    expect(env.tm1Web().getEnvMap().get("TM1_WEB_HEAP")).toBe("1g");
+    expect(
+      env
+        .cognos()
+        .getUsers()
+        .map((u) => u.name),
+    ).toEqual(["admin", "analyst", "viewer"]);
+    expect(env.cognos().getUser("analyst").groups).toEqual(["Analysts", "Readers"]);
+    expect(env.cognos().getEnvMap().get("COGNOS_MAX_MEMORY")).toBe("6144");
+    expect(env.cognos().getKeycloak()).toBe(env.keycloak());
+    // The sources set on the builder win over the file's ibm folder
+    expect(env.tm1("planning").getSource()).toStrictEqual(new Tm1Source.PrivateImage("tm1-server:test"));
+    const planning = env.tm1("planning");
+    planning.configure();
+    expect(planning.getEnvMap().get("TM1_CAM_NAMESPACE")).toBe("LDAP");
+    expect(planning.getEnvMap().get("TM1_CAM_ADMINS")).toBe("admin");
+    expect(planning.getEnvMap().get("TM1_CAM_GROUPS")).toBe("Admins Analysts Readers");
+  });
+
+  it("from config maps every setting", () => {
+    const env = PlanningAnalyticsEnvironment.fromConfig(fixture("settings.yaml")).build();
+    const ibm = resolve(fixture("ibm"));
+    const planning = env.tm1("planning");
+    expect(planning.getEnvMap().get("TM1_SEED")).toBe("sdata");
+    expect(planning.getEnvMap().get("TM1_CFG_MaxThreads")).toBe("4");
+    expect(planning.getEnvMap().get("TM1_CFG_EnableNewHierarchyCreation")).toBe("True");
+    expect(planning.getEnvMap().get("TM1_CFG_DefaultMeasuresDimension")).toBe("Measures");
+    // adminServer: true, with one server
+    expect(env.adminServer()).toBeDefined();
+    expect(planning.getAdminServer()).toBe(env.adminServer());
+    expect(env.tm1Web().getEnvMap().get("TM1_WEB_HEAP")).toBe("2g");
+    expect(env.cognos().getUser("boss").groups).toEqual(["Admins", "Planners"]);
+    expect(env.cognos().getEnvMap().get("COGNOS_MAX_MEMORY")).toBe("8192");
+    planning.configure();
+    expect(planning.getEnvMap().get("TM1_CAM_NAMESPACE")).toBe("OIDC");
+    expect(planning.getEnvMap().get("TM1_CAM_ADMINS")).toBe("boss");
+    // ibm is every part's source; images are what they run
+    expect(planning.getSource()).toStrictEqual(new Tm1Source.Bundle(ibm));
+    expect(env.tm1Web().getSource()).toStrictEqual(new Tm1WebSource.Bundle(ibm));
+    expect(env.cognos().getSource()).toStrictEqual(new CognosSource.Zip(ibm));
+    expect(planning.getDockerImageName()).toBe("registry.example.com/tm1-server:local");
+    expect(env.adminServer()!.getDockerImageName()).toBe("registry.example.com/tm1-server:local");
+    expect(env.tm1Web().getDockerImageName()).toBe("registry.example.com/tm1-web:local");
+    expect(env.cognos().getDockerImageName()).toBe("registry.example.com/cognos-server:local");
+    expect(env.keycloak().getDockerImageName()).toBe("registry.example.com/keycloak:26");
+  });
+
+  it("from config runs PAW from the ibm folder", () => {
+    const env = PlanningAnalyticsEnvironment.fromConfig(fixture("paw.yaml")).build();
+    const ibm = resolve(fixture("ibm"));
+    expect(env.paw().getSource()).toStrictEqual(new PawSource(join(ibm, "ipa_workspace_local_0.0.0.zip")));
+    expect(env.paw().licenseAccepted()).toBe(true);
+    expect(env.paw().getTm1Server()).toBe(env.tm1("tm1"));
+    expect(env.adminServer()).toBeUndefined();
+  });
+
+  it("from config refuses what it cannot run", () => {
+    const invalid = readdirSync(fixture("invalid"))
+      .filter((f) => f.endsWith(".yaml"))
+      .sort()
+      .map((f) => join(fixture("invalid"), f));
+    expect(invalid.length).toBeGreaterThan(0);
+    for (const file of invalid) {
+      const first = readFileSync(file, "utf8").split(/\r?\n/)[0]!;
+      expect(first, file).toMatch(/^# error: /);
+      const error = thrown(() => PlanningAnalyticsEnvironment.fromConfig(file));
+      expect(error, file).toBeInstanceOf(IllegalArgumentException);
+      expect(error.message.startsWith(basename(file) + ": "), file + ": " + error.message).toBe(true);
+      expect(error.message, file).toContain(first.slice("# error: ".length));
+    }
+    const missing = thrown(() => PlanningAnalyticsEnvironment.fromConfig(fixture("missing.yaml")));
+    expect(missing).toBeInstanceOf(IllegalArgumentException);
+    expect(missing.message).toContain("not found");
   });
 });

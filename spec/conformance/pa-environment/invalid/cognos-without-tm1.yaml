@@ -1,0 +1,4 @@
+# error: cognos: PlanningAnalyticsEnvironment needs a TM1 server too
+# pa-setup: accepts
+version: 1
+cognos: { users: [admin:adminpw] }

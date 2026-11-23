@@ -1,0 +1,6 @@
+# error: two servers differ only in case
+version: 1
+tm1:
+  servers:
+    planning: {}
+    Planning: {}

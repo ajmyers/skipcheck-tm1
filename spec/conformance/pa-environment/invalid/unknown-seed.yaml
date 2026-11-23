@@ -1,0 +1,3 @@
+# error: tm1.servers.tm1.seed: one of empty, sdata, 24retail
+version: 1
+tm1: { servers: { tm1: { seed: sample } } }

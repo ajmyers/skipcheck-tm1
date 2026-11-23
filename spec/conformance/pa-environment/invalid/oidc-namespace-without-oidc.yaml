@@ -1,0 +1,6 @@
+# error: cognos.cam.namespace: oidc needs cognos.oidc
+version: 1
+tm1: { servers: { tm1: {} } }
+cognos:
+  users: [admin:adminpw]
+  cam: { namespace: oidc }
