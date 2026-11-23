@@ -107,6 +107,42 @@ checked as `pa-setup` checks it, with the same defaults and messages.
 - **Refused** with a `ValueError` naming the setting: `cognos` without `tm1.servers`, `paw` with
   `cognos`, and `seed: 24retail`, which the environment can't run yet.
 
+### Reusing a whole environment
+
+Cognos takes minutes to start and PAW longer. A `PlanningAnalyticsEnvironment` keeps its
+containers between runs when you ask for it with `reuse(True)` and have turned on Testcontainers
+reuse: `testcontainers.reuse.enable=true` in `~/.testcontainers.properties`, or
+`TESTCONTAINERS_REUSE_ENABLE=true`. Without the switch, `reuse(True)` has no effect.
+
+```python
+env = PlanningAnalyticsEnvironment.builder().tm1("planning").cognos(lambda c: c.with_user("admin", "adminpw", "Admins")).reuse(True).build()
+env.start()  # seconds, once a run with this configuration has started it
+```
+
+- **Each configuration has its own containers.** The environment's identity is a hash of its
+  configuration: every part's image, source, environment variables, command, network aliases,
+  labels, exposed ports, copied files and `docker create` arguments (`with_kwargs`, volumes), the
+  Cognos users and the CAM settings. Its containers carry it as the label
+  `io.skipcheck.tm1.environment`, and its network is named `tm1-environment-<identity>`, so the
+  reused containers still reach each other by name. A different configuration gets new
+  containers and never picks up another's.
+- **`stop()` and `close()` leave everything running**, PAW too, and so does leaving a `with`
+  block.
+- **What tests leave behind stays:** objects in TM1, sessions, Cognos's content store. Give
+  test objects unique names and delete them.
+- **Old configurations keep running.** Changing the configuration starts new containers; the
+  old ones stay until you remove them, and Cognos alone holds about 8 GB. To start clean:
+
+  ```sh
+  docker rm -f $(docker ps -aq --filter label=io.skipcheck.tm1.environment)
+  docker network rm $(docker network ls -q --filter label=io.skipcheck.tm1.environment)
+  ```
+
+- **PAW is one per Docker daemon** whatever the identity: IBM's compose files give its containers
+  fixed names. Each start runs IBM's compose files again, which takes about a minute.
+- **With your own `network(...)`,** reuse works only if it's the same network each run: a
+  container is found by everything it was created with, its network's name too.
+
 ## From the Java module
 
 | Java | Python |

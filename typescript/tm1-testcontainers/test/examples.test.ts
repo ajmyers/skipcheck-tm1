@@ -2,7 +2,7 @@
 
 import { Tm1Client, Tm1Version } from "@skipcheck/tm1-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DockerHost, Tm1ServerContainer, Tm1Source } from "../src/index.js";
+import { DockerHost, PlanningAnalyticsEnvironment, Tm1ServerContainer, Tm1Source } from "../src/index.js";
 import { RequiresTm1, requiresTm1 } from "../src/vitest.js";
 
 /** The Java module's examples that need nothing but the shared server's own source (the others
@@ -55,6 +55,30 @@ describe("Without the vitest helpers", () => {
     const response = await fetch(tm1.getRestUrl() + "Configuration/ProductVersion/$value", { headers: { Authorization: tm1.getAuthorization() } });
     expect(await response.text()).toBe(tm1.getTm1Version().toString());
   }); // the container, and anything the test did to it, is removed here
+});
+
+/** From Java's EnvironmentExampleTest, the one example there that needs only TM1. */
+describe("Reusing an environment", () => {
+  requiresTm1("a reused environment keeps its containers for the next run", async ({ skip }) => {
+    if (!DockerHost.reuseEnabled()) skip("Testcontainers reuse is off: set testcontainers.reuse.enable=true in ~/.testcontainers.properties");
+    // A configuration of its own, so it can't pick up a developer's reused environment
+    const builder = PlanningAnalyticsEnvironment.builder()
+      .tm1("reuse-test", (tm1) => tm1.withEnv("TM1_CFG_MaxThreads", "3"))
+      .reuse(true);
+    const first = builder.build();
+    await first.start();
+    const container = first.tm1("reuse-test").getContainerId();
+    await first.stop();
+    const second = builder.build();
+    try {
+      await second.start();
+      expect(second.tm1("reuse-test").getContainerId()).toBe(container);
+    } finally {
+      const docker = (await DockerHost.client()).container.dockerode;
+      await docker.getContainer(container).remove({ force: true, v: true });
+      await docker.getNetwork(await second.network().getId()).remove();
+    }
+  });
 });
 
 /** Java's PinnedVersionExampleTest: tests run against the TM1 version you mean. */

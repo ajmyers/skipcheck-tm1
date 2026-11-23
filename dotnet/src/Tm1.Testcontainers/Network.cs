@@ -13,32 +13,42 @@ namespace Skipcheck.Tm1.Testcontainers;
 /// the first container on it starts, and removed after the run (or by <see cref="DisposeAsync"/>).</summary>
 public sealed class Network : IAsyncDisposable
 {
+    private readonly Func<string> name;
     private readonly Lazy<INetwork> resource;
     private readonly Lock creating = new();
     private Task? created;
 
-    private Network(string name, Func<INetwork> build)
+    private Network(Func<string> name, Func<INetwork> build, bool reusable = false)
     {
-        Name = name;
+        this.name = name;
         resource = new Lazy<INetwork>(build, LazyThreadSafetyMode.ExecutionAndPublication);
+        IsReusable = reusable;
     }
 
     /// <summary>A new network, with a unique name.</summary>
     public static Network NewNetwork()
     {
         var name = "tm1-testcontainers-" + Guid.NewGuid().ToString("N")[..12];
-        return new Network(name, () => new NetworkBuilder().WithName(name).Build());
+        return new Network(() => name, () => new NetworkBuilder().WithName(name).Build());
     }
 
     /// <summary>A Testcontainers for .NET network, to share with containers made elsewhere.</summary>
     public static Network Of(INetwork network)
     {
         ArgumentNullException.ThrowIfNull(network);
-        return new Network(network.Name, () => network);
+        var name = network.Name;
+        return new Network(() => name, () => network);
     }
 
+    /// <summary>A reused environment's network, which keeps its Docker network for the next run; its name is read when it's
+    /// first needed, as the environment's identity is.</summary>
+    internal static Network Reusable(INetwork network) => new(() => network.Name, () => network, reusable: true);
+
     /// <summary>Its Docker name.</summary>
-    public string Name { get; }
+    public string Name => name();
+
+    /// <summary>Whether it's kept for later runs: a reused environment's network.</summary>
+    internal bool IsReusable { get; }
 
     /// <summary>The Testcontainers for .NET network.</summary>
     public INetwork Resource => resource.Value;

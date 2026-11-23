@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -12,7 +14,7 @@ from typing import Any, TypeVar
 from typing_extensions import Self
 
 from . import _pa_environment
-from ._container import Network
+from ._container import GenericContainer, Network, reuse_enabled
 from .cognos import NO_SOURCE_MESSAGE as NO_COGNOS_MESSAGE
 from .cognos import CognosContainer, KeycloakContainer, Namespace
 from .paw import NO_SOURCE_MESSAGE as NO_PAW_MESSAGE
@@ -25,6 +27,13 @@ from .web import Tm1WebContainer
 
 __all__ = ["PlanningAnalyticsEnvironment"]
 
+REUSE_LABEL = "io.skipcheck.tm1.environment"
+"""The label on a reused environment's containers and network. Its value is the environment's
+identity, a hash of its configuration."""
+
+NETWORK_PREFIX = "tm1-environment-"
+"""The start of a reused environment's network name; the identity follows."""
+
 T = TypeVar("T")
 Part = KeycloakContainer | CognosContainer | Tm1AdminServerContainer | Tm1ServerContainer | Tm1WebContainer | PawContainer
 
@@ -35,11 +44,45 @@ def _nothing(_: Any) -> None:
 
 class PlanningAnalyticsEnvironment:
     """TM1 servers, and optionally a shared Admin Server, TM1 Web, PAW, Cognos (CAM security) and
-    Keycloak (OIDC), on one network and wired to each other. Build one with :meth:`builder`."""
+    Keycloak (OIDC), on one network and wired to each other. Build one with :meth:`builder`.
 
-    def __init__(self, b: PlanningAnalyticsEnvironment.Builder, network: Any) -> None:
+    Cognos takes minutes to start, and PAW longer. With :meth:`Builder.reuse`, the environment
+    keeps its containers running between test runs, so the next run starts in seconds. Reuse also
+    needs your own switch, as for any reusable container: ``testcontainers.reuse.enable=true`` in
+    ``~/.testcontainers.properties``, or ``TESTCONTAINERS_REUSE_ENABLE=true`` (:func:`reuse_enabled`).
+    Without it, ``reuse`` has no effect. With both:
+
+    * The containers and the network are named after the environment's configuration (its
+      identity, a hash): the label ``io.skipcheck.tm1.environment`` on each container, and the
+      network ``tm1-environment-<identity>``. A run with the same configuration finds them; a
+      different configuration gets its own, and never another's.
+    * :meth:`stop` leaves them running, PAW too.
+    * What tests leave behind stays: objects they created in TM1, sessions, users in Cognos. Tests
+      should create uniquely named objects and delete them, as with
+      :meth:`Tm1ServerContainer.shared`.
+    * A configuration you no longer use keeps its containers running, and Cognos holds about 8 GB.
+      To start clean, remove them all:
+      ``docker rm -f $(docker ps -aq --filter label=io.skipcheck.tm1.environment)``, then
+      ``docker network rm $(docker network ls -q --filter label=io.skipcheck.tm1.environment)``.
+    * The identity covers each part's image, source, environment variables, command, network
+      aliases, labels, exposed ports, copied files and ``docker create`` arguments
+      (``with_kwargs``, volumes), the Cognos users and the CAM settings.
+    * PAW isn't a Testcontainers container: IBM's compose files give it fixed names, so there's one
+      per Docker host whatever the identity. Each start runs IBM's compose again, which takes about
+      a minute."""
+
+    def __init__(self, b: PlanningAnalyticsEnvironment.Builder, reuse_enabled: bool) -> None:
+        self._reused = b._reuse and reuse_enabled
+        self._identity_hash: str | None = None
+        given = b._network
+        if given is not None:
+            network = given
+        elif self._reused:
+            network = _ReusableNetwork(lambda: NETWORK_PREFIX + self._identity())
+        else:
+            network = Network.new_network()
         self._network = network
-        self._owns_network = b._network is None
+        self._owns_network = given is None
         self._keycloak = KeycloakContainer(b._keycloak_image).with_network(network) if b._keycloak is not None else None
         cognos: CognosContainer | None = None
         if b._cognos is not None:
@@ -147,6 +190,8 @@ class PlanningAnalyticsEnvironment:
 
     def start(self) -> None:
         """Starts every part, each after what it depends on; PAW last."""
+        if self._reused:
+            self._prepare_for_reuse()
         for part in self.containers():
             if part is not self._paw and not part.is_running:
                 part.start()
@@ -154,7 +199,10 @@ class PlanningAnalyticsEnvironment:
             self._paw.start()
 
     def stop(self) -> None:
-        """Stops every part, the dependents first, and removes the network if it made it."""
+        """Stops every part, the dependents first, and removes the network if it made it. A
+        :meth:`reused <Builder.reuse>` environment is left running for the next run."""
+        if self._reused:
+            return
         for part in reversed(self.containers()):
             part.stop()
         if self._owns_network and isinstance(self._network, Network):
@@ -207,6 +255,26 @@ class PlanningAnalyticsEnvironment:
         """The Docker network every part is on."""
         return self._network
 
+    def _identity(self) -> str:
+        """The environment's identity: a hash of every part's configuration, the same for the same
+        configuration in every run. Fixed the first time it's asked for, which :meth:`start` does
+        before anything starts."""
+        if self._identity_hash is None:
+            described = "".join(_describe(part) + "\n" for part in self.containers())
+            self._identity_hash = hashlib.sha256(described.encode()).hexdigest()[:16]
+        return self._identity_hash
+
+    def _prepare_for_reuse(self) -> None:
+        """Marks every container reusable, with the identity as a label. A container is found
+        again by a hash of everything it's created with (GenericContainer's reuse), its network's
+        name too, which is why a reused environment's network is named after its identity.
+        testcontainers-python adds no random network alias, so there's none to take away, as
+        Java must."""
+        identity = self._identity()
+        for part in self.containers():
+            if isinstance(part, GenericContainer):
+                part.with_reuse(True).with_label(REUSE_LABEL, identity)
+
     def containers(self) -> list[Part]:
         """Every part, in start order."""
         parts: list[Part] = []
@@ -240,6 +308,7 @@ class PlanningAnalyticsEnvironment:
             self._paw_source: PawSource | None = None
             self._cognos_source: CognosSource | None = None
             self._network: Any = None
+            self._reuse = False
             # From pa-environment.yaml (from_config): the IBM downloads folder, PAW's zip in it,
             # and each part's image
             self._ibm: Path | None = None
@@ -322,10 +391,27 @@ class PlanningAnalyticsEnvironment:
             self._network = _required(network)
             return self
 
+        def reuse(self, reuse: bool) -> Self:
+            """Keeps the containers running between test runs, when you've also turned on reuse
+            (``testcontainers.reuse.enable=true`` in ``~/.testcontainers.properties``, or
+            ``TESTCONTAINERS_REUSE_ENABLE=true``). A later run with the same configuration finds
+            them, and objects tests left behind are still there. Without the switch it has no
+            effect. See :class:`PlanningAnalyticsEnvironment` for what's reused and how to start
+            clean.
+
+            With your own :meth:`network`, reuse only works if it's the same network each run: a
+            container is found by everything it's created with, including its network's name."""
+            self._reuse = bool(reuse)
+            return self
+
         def build(self) -> PlanningAnalyticsEnvironment:
             """Creates the containers and wires them together. Nothing starts until
             :meth:`PlanningAnalyticsEnvironment.start`. A RuntimeError if a part needs one that's
             missing, or a source can't be found."""
+            return self._build(reuse_enabled())
+
+        def _build(self, reuse_enabled: bool) -> PlanningAnalyticsEnvironment:
+            """Builds, with the developer's reuse switch given, so tests needn't set it."""
             if not self._tm1:
                 raise RuntimeError("Add at least one TM1 server with tm1(name)")
             if self._keycloak is not None and self._cognos is None:
@@ -334,7 +420,7 @@ class PlanningAnalyticsEnvironment:
                 raise RuntimeError("CAM security through OIDC needs keycloak()")
             if self._paw is not None and self._cognos is not None:
                 raise RuntimeError("PAW with Cognos (CAM) security isn't supported yet: PAW logs users on with TM1's own security")
-            return PlanningAnalyticsEnvironment(self, self._network if self._network is not None else Network.new_network())
+            return PlanningAnalyticsEnvironment(self, reuse_enabled)
 
         def _cam_admins_for(self, cognos: CognosContainer) -> list[str]:
             if self._cam_admins:
@@ -375,6 +461,87 @@ class PlanningAnalyticsEnvironment:
             if found is None:
                 raise RuntimeError(f"No PAW Local zip in {ibm}")
             return found
+
+
+class _ReusableNetwork(Network):
+    """A reused environment's network: named after its identity, found if it's there and created
+    if not. It carries none of testcontainers' session labels, so the reaper doesn't remove it
+    after the run, and :meth:`close` keeps it for the next."""
+
+    def __init__(self, name: Callable[[], str]) -> None:
+        # Not Network's: it names the network with a random UUID
+        self._name = name
+        self._docker_client_kw: dict[str, Any] = {}
+        self._lazy_docker = None
+        self._docker_network_kw: dict[str, Any] = {}
+        self._network = None
+
+    @property  # type: ignore[override]
+    def name(self) -> str:
+        """``tm1-environment-<identity>``."""
+        return self._name()
+
+    def create(self) -> Self:
+        """Finds the network by its name, or creates it."""
+        client = self._docker.client
+        name = self.name
+        found = _find_network(client, name)
+        if found is None:
+            import docker.errors
+
+            try:
+                found = client.networks.create(name, check_duplicate=True, labels={REUSE_LABEL: name[len(NETWORK_PREFIX) :]})
+            except docker.errors.APIError as e:
+                # Another test run created it first
+                found = _find_network(client, name) if e.status_code == 409 else None
+                if found is None:
+                    raise
+        self._network = found
+        return self
+
+    def close(self) -> None:
+        """Keeps the network for the next run."""
+
+
+def _find_network(client: Any, name: str) -> Any:
+    # Docker's name filter matches part of a name, so check the whole
+    return next((n for n in client.networks.list(names=[name]) if n.name == name), None)
+
+
+def _describe(part: Part) -> str:
+    """One part's configuration, as far as it can be read before it starts: deterministic, so the
+    same configuration gives the same text in every run."""
+    if isinstance(part, PawContainer):
+        return f"PawContainer source={part.source!r} settings={sorted(part._settings.items())} tm1={_server_name(part.tm1_server)}"
+    labels = sorted((k, v) for k, v in part._labels.items() if k != REUSE_LABEL)
+    files = sorted((destination, _copied(transferable)) for transferable, destination, *_ in part._transferable_specs)
+    created = {"kwargs": part._kwargs, "volumes": part.volumes, "tmpfs": part.tmpfs, "extra_hosts": part._extra_hosts}
+    d = (
+        f"{type(part).__name__} image={part.image} aliases={sorted(part.network_aliases)} command={part.command_parts}"
+        f" ports={sorted(str(p) for p in part.ports)} env={sorted(part.env.items())} labels={labels} files={files}"
+        f" create={json.dumps(created, sort_keys=True, default=str)}"
+    )
+    if isinstance(part, Tm1ServerContainer):
+        d += f" source={part.source!r} cam={part.cam_namespace}{part._cam_admins}"
+    elif isinstance(part, Tm1AdminServerContainer):
+        d += f" source={part.source!r}"
+    elif isinstance(part, Tm1WebContainer):
+        d += f" source={part.source!r} tm1={_server_name(part.tm1_server)}"
+    elif isinstance(part, CognosContainer):
+        d += f" source={part.source!r} users={part.users_spec()}"
+    return d
+
+
+def _server_name(server: Tm1ServerContainer | None) -> str | None:
+    """A TM1 server's name in the environment, its ``TM1_SERVER_NAME``."""
+    return None if server is None else server.env.get("TM1_SERVER_NAME")
+
+
+def _copied(transferable: Any) -> str:
+    """What's copied into a container: a file's path, or a hash of bytes."""
+    if isinstance(transferable, bytes):
+        return "sha256:" + hashlib.sha256(transferable).hexdigest()
+    return str(transferable)
 
 
 def _runs(image: str | None, private_image: bool) -> bool:

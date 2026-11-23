@@ -45,6 +45,21 @@ export async function camSecurity(): Promise<string[]> {
   // @end
 }
 
+export async function reuse(): Promise<string> {
+  // @start region = reuse
+  // Cognos and the server keep running after the run, for the next one, when
+  // testcontainers.reuse.enable=true is set too
+  await using env = PlanningAnalyticsEnvironment.builder()
+    .tm1("planning")
+    .cognos((cognos) => cognos.withUser("admin", "adminpw", "Admins"))
+    .reuse(true)
+    .build();
+  await env.start(); // in seconds, once a run with this configuration has started it
+  return env.tm1("planning").getRestUrl();
+  // leaving the block left it running
+  // @end
+}
+
 export async function fromConfig(): Promise<string> {
   // @start region = file
   // The environment pa-setup runs from the same file, with random host ports

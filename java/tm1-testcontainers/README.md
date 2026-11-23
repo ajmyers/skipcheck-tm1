@@ -380,6 +380,45 @@ testcontainers.reuse.enable=true
 Objects tests leave behind then survive between runs too. Stop the container (`docker ps`,
 `docker rm -f`) to start fresh.
 
+### Reusing a whole environment
+
+Cognos takes minutes to start and PAW longer. A `PlanningAnalyticsEnvironment` keeps its
+containers between runs when you ask for it with `reuse(true)` and have turned on reuse as
+above. Without the switch, `reuse(true)` has no effect.
+
+```java
+var env = PlanningAnalyticsEnvironment.builder()
+	.tm1("planning")
+	.cognos(cognos -> cognos.withUser("admin", "adminpw", "Admins"))
+	.reuse(true)
+	.build();
+env.start(); // seconds, once a run with this configuration has started it
+```
+
+- **Each configuration has its own containers.** The environment's identity is a hash of its
+  configuration: every part's image, source, environment variables, command, network aliases,
+  labels, exposed ports and copied files, the Cognos users and the CAM settings. Its containers
+  carry it as the label `io.skipcheck.tm1.environment`, and its network is named
+  `tm1-environment-<identity>`, so the reused containers still reach each other by name. A
+  different configuration gets new containers and never picks up another's.
+- **`stop()` and `close()` leave everything running**, PAW too.
+- **What tests leave behind stays:** objects in TM1, sessions, Cognos's content store. Give
+  test objects unique names and delete them.
+- **Old configurations keep running.** Changing the configuration starts new containers; the
+  old ones stay until you remove them, and Cognos alone holds about 8 GB. To start clean:
+
+  ```sh
+  docker rm -f $(docker ps -aq --filter label=io.skipcheck.tm1.environment)
+  docker network rm $(docker network ls -q --filter label=io.skipcheck.tm1.environment)
+  ```
+
+- **Not seen by the identity:** a change made with `withCreateContainerCmdModifier`. Remove the
+  containers after changing one.
+- **PAW is one per Docker daemon** whatever the identity (see above). Each start runs IBM's
+  compose files again, which takes about a minute.
+- **With your own `network(...)`,** reuse works only if it's the same network each run:
+  Testcontainers matches a container by everything it was created with, its network's ID too.
+
 ## Not yet
 
 - Running test classes once per TM1 version, and pinning tests to a version range.

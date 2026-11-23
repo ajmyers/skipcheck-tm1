@@ -47,6 +47,7 @@ export abstract class GenericContainer implements Startable {
   readonly #extraHosts = new Map<string, string>();
   readonly #copies: { source: string; target: string }[] = [];
   readonly #binds: Bind[] = [];
+  readonly #labels = new Map<string, string>();
   #command: string[] = [];
   #hostname: string | undefined;
   #network: Network | undefined;
@@ -93,6 +94,23 @@ export abstract class GenericContainer implements Startable {
   /** What starts before it. */
   getDependencies(): readonly Startable[] {
     return this.#dependencies;
+  }
+
+  /** The labels set with {@link withLabel}. */
+  getLabels(): ReadonlyMap<string, string> {
+    return this.#labels;
+  }
+
+  /** Whether it asks to be kept for later runs ({@link withReuse}). */
+  isShouldBeReused(): boolean {
+    return this.#reuse;
+  }
+
+  /** The files and folders copied in with {@link withCopyFileToContainer}: the path in the
+   * container to the path on the host.
+   * @internal */
+  getCopiedFiles(): ReadonlyMap<string, string> {
+    return new Map(this.#copies.map((c) => [c.target, c.source]));
   }
 
   /** The bind mounts, `source:target[:ro]`, the source a host folder or a volume.
@@ -194,6 +212,12 @@ export abstract class GenericContainer implements Startable {
     return this;
   }
 
+  /** Adds a Docker label. */
+  withLabel(key: string, value: string): this {
+    this.#labels.set(key, value);
+    return this;
+  }
+
   /** Copies a host file or folder into the container before it starts. */
   withCopyFileToContainer(hostPath: string, containerPath: string): this {
     this.#copies.push({ source: hostPath, target: containerPath });
@@ -292,7 +316,10 @@ export abstract class GenericContainer implements Startable {
   }
 
   async #build(): Promise<TcGenericContainer> {
-    let c = new TcGenericContainer(this.#image).withEnvironment(Object.fromEntries(this.#env)).withLabels({ "io.skipcheck.tm1.testcontainers": "typescript" });
+    let c = new TcGenericContainer(this.#image).withEnvironment(Object.fromEntries(this.#env)).withLabels({
+      ...Object.fromEntries(this.#labels),
+      "io.skipcheck.tm1.testcontainers": "typescript",
+    });
     const platform = this.platform();
     if (platform !== undefined) c = c.withPlatform(platform);
     if (this.#command.length > 0) c = c.withCommand(this.#command);

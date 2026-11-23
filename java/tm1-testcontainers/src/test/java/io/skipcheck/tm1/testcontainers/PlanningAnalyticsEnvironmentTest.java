@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.lifecycle.Startable;
 
 import io.skipcheck.tm1.testcontainers.CognosContainer.Namespace;
 
@@ -115,6 +116,69 @@ class PlanningAnalyticsEnvironmentTest {
 		var env = builder().tm1("a").build();
 		assertThatIllegalStateException().isThrownBy(env::tm1Web).withMessageContaining("tm1Web()");
 		assertThatIllegalArgumentException().isThrownBy(() -> env.tm1("b")).withMessageContaining("[a]");
+	}
+
+	@Test
+	void reuseNeedsTheBuilderAndTheDevelopersSwitch() {
+		assertThat(builder().tm1("a").build(true).reused()).isFalse();
+		var notSwitchedOn = builder().tm1("a").reuse(true).build(false);
+		assertThat(notSwitchedOn.reused()).isFalse();
+		assertThat(notSwitchedOn.network()).isNotInstanceOf(PlanningAnalyticsEnvironment.ReusableNetwork.class);
+		var reused = builder().tm1("a").reuse(true).build(true);
+		assertThat(reused.reused()).isTrue();
+		// Not started, so not yet marked: start() does that
+		assertThat(reused.tm1("a").isShouldBeReused()).isFalse();
+	}
+
+	@Test
+	void aReusedEnvironmentsNetworkIsNamedAfterItsIdentity() {
+		var env = builder().tm1("planning").tm1Web().reuse(true).build(true);
+		assertThat(env.identity()).matches("[0-9a-f]{16}");
+		assertThat(env.network()).isInstanceOfSatisfying(PlanningAnalyticsEnvironment.ReusableNetwork.class,
+				network -> assertThat(network.getName()).isEqualTo("tm1-environment-" + env.identity()));
+		for (var server : env.tm1Servers().values()) {
+			assertThat(server.getNetwork()).isSameAs(env.network());
+		}
+		// The developer's own network is used as it is
+		var own = new PlanningAnalyticsEnvironment.ReusableNetwork(() -> "mine");
+		assertThat(builder().tm1("planning").network(own).reuse(true).build(true).network()).isSameAs(own);
+	}
+
+	@Test
+	void theIdentityIsTheSameForTheSameConfigurationAndDiffersOtherwise() {
+		assertThat(builder().tm1("planning").tm1Web().reuse(true).build(true).identity())
+			.isEqualTo(builder().tm1("planning").tm1Web().reuse(true).build(true).identity());
+		List<PlanningAnalyticsEnvironment.Builder> configurations = List.of(builder().tm1("planning"),
+				builder().tm1("reporting"), builder().tm1("planning", tm1 -> tm1.withSeed(Tm1Seed.SDATA)),
+				builder().tm1("planning", tm1 -> tm1.withEnv("TM1_CFG_MaxThreads", "4")),
+				builder().tm1("planning").tm1("reporting"), builder().tm1("planning").adminServer(),
+				builder().tm1("planning").tm1Web(),
+				builder().tm1("planning").tm1Web(web -> web.withEnv("TM1_WEB_HEAP", "2g")),
+				builder().tm1("planning").tm1Source(new Tm1Source.PrivateImage("tm1-server:other")),
+				builder().tm1("planning").cognos(c -> c.withUser("admin", "adminpw")),
+				builder().tm1("planning").cognos(c -> c.withUser("admin", "otherpw")),
+				builder().tm1("planning").cognos(c -> c.withUser("admin", "adminpw").withUser("boss", "bosspw")),
+				builder().tm1("planning")
+					.cognos(c -> c.withUser("admin", "adminpw").withUser("boss", "bosspw"))
+					.camSecurity(Namespace.LDAP, "boss"),
+				builder().tm1("planning").cognos(c -> c.withUser("admin", "adminpw")).keycloak());
+		List<String> identities = configurations.stream().map(b -> b.reuse(true).build(true).identity()).toList();
+		assertThat(identities).doesNotHaveDuplicates();
+	}
+
+	@Test
+	void startingAReusedEnvironmentMarksEveryContainerWithItsIdentity() {
+		var env = builder().tm1("planning").tm1("reporting").tm1Web().reuse(true).build(true);
+		env.prepareForReuse();
+		for (Startable part : env.containers()) {
+			var container = (GenericContainer<?>) part;
+			assertThat(container.isShouldBeReused()).as(container.toString()).isTrue();
+			assertThat(container.getLabels()).containsEntry("io.skipcheck.tm1.environment", env.identity());
+			// Testcontainers' random alias is gone: it would change every run
+			assertThat(container.getNetworkAliases()).noneMatch(alias -> alias.startsWith("tc-"));
+		}
+		assertThat(env.tm1("planning").getNetworkAliases()).containsExactly("planning");
+		assertThat(env.adminServer().orElseThrow().getNetworkAliases()).containsExactly("tm1-admin");
 	}
 
 	/** The image a container runs, without pulling it as getDockerImageName does. */

@@ -2,25 +2,39 @@
 
 package io.skipcheck.tm1.testcontainers;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.jspecify.annotations.Nullable;
+import org.testcontainers.DockerClientFactory;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.lifecycle.Startable;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.utility.TestcontainersConfiguration;
 
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.exception.ConflictException;
 import io.skipcheck.tm1.testcontainers.CognosContainer.Namespace;
 
 /**
@@ -64,10 +78,63 @@ import io.skipcheck.tm1.testcontainers.CognosContainer.Namespace;
  * With Cognos, each test user logs in to every server as themselves:
  *
  * {@snippet class = examples.PlanningAnalyticsEnvironmentExamples region = cam-security}
+ *
+ * <p>
+ * Cognos takes minutes to start, and PAW longer. With {@link Builder#reuse}, the
+ * environment keeps its containers running between test runs, so the next run starts in
+ * seconds:
+ *
+ * {@snippet class = examples.PlanningAnalyticsEnvironmentExamples region = reuse}
+ *
+ * <p>
+ * Reuse also needs your own switch, as for any Testcontainers container:
+ * {@code testcontainers.reuse.enable=true} in {@code ~/.testcontainers.properties}, or
+ * {@code TESTCONTAINERS_REUSE_ENABLE=true}. Without it, {@code reuse} has no effect. With
+ * both:
+ * <ul>
+ * <li>The containers and the network are named after the environment's configuration (its
+ * identity, a hash): the label {@code io.skipcheck.tm1.environment} on each container,
+ * and the network {@code tm1-environment-<identity>}. A run with the same configuration
+ * finds them; a different configuration gets its own, and never another's.
+ * <li>{@link #stop()} leaves them running, PAW too. Testcontainers doesn't remove
+ * reusable containers at the end of a run either.
+ * <li>What tests leave behind stays: objects they created in TM1, sessions, content saved
+ * in Cognos. Tests should create uniquely named objects and delete them, as with
+ * {@link Tm1ServerContainer#shared()}.
+ * <li>A configuration you no longer use keeps its containers running, and Cognos holds
+ * about 8 GB. To start clean, remove them all:
+ * {@code docker rm -f $(docker ps -aq --filter label=io.skipcheck.tm1.environment)}, then
+ * {@code docker network rm $(docker network ls -q --filter label=io.skipcheck.tm1.environment)}.
+ * <li>The identity covers each part's image, source, environment variables, command,
+ * network aliases, labels, exposed ports and copied files, the Cognos users and the CAM
+ * settings. A change made with {@code withCreateContainerCmdModifier} isn't seen: remove
+ * the containers after changing one.
+ * <li>PAW isn't a Testcontainers container: IBM's compose files give it fixed names, so
+ * there's one per Docker host whatever the identity. Each start runs IBM's compose again,
+ * which takes about a minute.
+ * </ul>
  */
 public final class PlanningAnalyticsEnvironment implements Startable {
 
+	/**
+	 * The label on a reused environment's containers and network. Its value is the
+	 * environment's identity, a hash of its configuration.
+	 */
+	static final String REUSE_LABEL = "io.skipcheck.tm1.environment";
+
+	/** The start of a reused environment's network name; the identity follows. */
+	static final String NETWORK_PREFIX = "tm1-environment-";
+
+	/** The network alias Testcontainers gives every container, different each run. */
+	private static final Pattern RANDOM_ALIAS = Pattern.compile("tc-[1-9A-HJ-NP-Za-km-z]{8}");
+
+	private static final Pattern IMAGE_NAME = Pattern.compile("imageName=([^,)]+)");
+
 	private final Network network;
+
+	private final boolean reused;
+
+	private @Nullable String identity;
 
 	private final boolean ownsNetwork;
 
@@ -83,9 +150,12 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 
 	private final @Nullable KeycloakContainer keycloak;
 
-	private PlanningAnalyticsEnvironment(Builder b, Network network) {
-		this.network = network;
-		this.ownsNetwork = b.network == null;
+	private PlanningAnalyticsEnvironment(Builder b, boolean reuseEnabled) {
+		this.reused = b.reuse && reuseEnabled;
+		Network given = b.network;
+		this.network = given != null ? given
+				: reused ? new ReusableNetwork(() -> NETWORK_PREFIX + identity()) : Network.newNetwork();
+		this.ownsNetwork = given == null;
 		this.keycloak = b.keycloak == null ? null : (b.keycloakImage == null ? new KeycloakContainer()
 				: new KeycloakContainer(DockerImageName.parse(b.keycloakImage)))
 			.withNetwork(network);
@@ -241,6 +311,9 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 	 */
 	@Override
 	public void start() {
+		if (reused) {
+			prepareForReuse();
+		}
 		List<Startable> containers = new ArrayList<>(containers());
 		containers.remove(paw);
 		Startables.deepStart(containers).join();
@@ -249,9 +322,15 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		}
 	}
 
-	/** Stops every part, the dependents first, and removes the network if it made it. */
+	/**
+	 * Stops every part, the dependents first, and removes the network if it made it. A
+	 * {@linkplain Builder#reuse reused} environment is left running for the next run.
+	 */
 	@Override
 	public void stop() {
+		if (reused) {
+			return;
+		}
 		List<Startable> all = new ArrayList<>(containers());
 		Collections.reverse(all);
 		for (Startable part : all) {
@@ -336,6 +415,115 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		return network;
 	}
 
+	/**
+	 * Whether the containers are kept for later runs: {@link Builder#reuse} and the
+	 * developer's Testcontainers reuse switch.
+	 */
+	boolean reused() {
+		return reused;
+	}
+
+	/**
+	 * The environment's identity: a hash of every part's configuration, the same for the
+	 * same configuration in every run. Fixed the first time it's asked for, which
+	 * {@link #start()} does before anything starts.
+	 */
+	synchronized String identity() {
+		if (identity == null) {
+			StringBuilder all = new StringBuilder();
+			for (Startable part : containers()) {
+				all.append(describe(part)).append('\n');
+			}
+			identity = sha256(all.toString()).substring(0, 16);
+		}
+		return identity;
+	}
+
+	/**
+	 * Marks every container reusable, with the identity as a label, and takes away the
+	 * random network alias Testcontainers adds: Testcontainers finds a container to reuse
+	 * by a hash of everything it would create it with, and a new alias each run would
+	 * never match.
+	 */
+	void prepareForReuse() {
+		String id = identity();
+		for (Startable part : containers()) {
+			if (part instanceof GenericContainer<?> container) {
+				container.withReuse(true).withLabel(REUSE_LABEL, id);
+				container.setNetworkAliases(container.getNetworkAliases()
+					.stream()
+					.filter(a -> !RANDOM_ALIAS.matcher(a).matches())
+					.toList());
+			}
+		}
+	}
+
+	/** One part's configuration, as far as it can be read before it starts. */
+	// getCopyToFileContainerPathMap is deprecated, but nothing else reads what withData
+	// copies in, and a changed database has to change the identity
+	@SuppressWarnings("deprecation")
+	private String describe(Startable part) {
+		if (part instanceof PawContainer paw) {
+			return "PawContainer source=" + paw.getSource() + " settings=" + new TreeMap<>(paw.settings()) + " tm1="
+					+ name(paw.getTm1Server());
+		}
+		GenericContainer<?> c = (GenericContainer<?>) part;
+		StringBuilder d = new StringBuilder(c.getClass().getSimpleName());
+		d.append(" image=").append(imageName(c));
+		d.append(" aliases=")
+			.append(new TreeSet<>(
+					c.getNetworkAliases().stream().filter(a -> !RANDOM_ALIAS.matcher(a).matches()).toList()));
+		d.append(" command=").append(Arrays.toString(c.getCommandParts()));
+		d.append(" ports=").append(new TreeSet<>(c.getExposedPorts()));
+		d.append(" env=").append(new TreeMap<>(c.getEnvMap()));
+		Map<String, String> labels = new TreeMap<>(c.getLabels());
+		labels.remove(REUSE_LABEL);
+		d.append(" labels=").append(labels);
+		Map<String, String> files = new TreeMap<>();
+		c.getCopyToFileContainerPathMap().forEach((from, to) -> files.put(to, from.getResolvedPath()));
+		d.append(" files=").append(files);
+		if (c instanceof Tm1ServerContainer tm1) {
+			d.append(" source=").append(tm1.getSource());
+			d.append(" cam=").append(tm1.getCamNamespace()).append(tm1.getCamAdmins());
+		}
+		else if (c instanceof Tm1AdminServerContainer admin) {
+			d.append(" source=").append(admin.getSource());
+		}
+		else if (c instanceof Tm1WebContainer web) {
+			d.append(" source=").append(web.getSource()).append(" tm1=").append(name(web.getTm1Server()));
+		}
+		else if (c instanceof CognosContainer cognos) {
+			d.append(" source=").append(cognos.getSource()).append(" users=").append(cognos.usersSpec());
+		}
+		return d.toString();
+	}
+
+	/** A TM1 server's name in this environment, its {@code TM1_SERVER_NAME}. */
+	private static @Nullable String name(@Nullable Tm1ServerContainer server) {
+		return server == null ? null : server.getEnvMap().get("TM1_SERVER_NAME");
+	}
+
+	/**
+	 * The image a container runs, without pulling it as {@code getDockerImageName} does.
+	 * RemoteDockerImage's toString names it; the rest of that string differs each run.
+	 * Should that change, the image is left out of the identity, and Testcontainers' own
+	 * hash of each container still tells images apart.
+	 */
+	private static String imageName(GenericContainer<?> container) {
+		Matcher name = IMAGE_NAME.matcher(container.getImage().toString());
+		return name.find() ? name.group(1) : "";
+	}
+
+	private static String sha256(String text) {
+		try {
+			return HexFormat.of()
+				.formatHex(MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)));
+		}
+		catch (NoSuchAlgorithmException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
 	/** Every part, in start order. */
 	List<Startable> containers() {
 		List<Startable> all = new ArrayList<>();
@@ -411,6 +599,8 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		private @Nullable CognosSource cognosSource;
 
 		private @Nullable Network network;
+
+		private boolean reuse;
 
 		// From pa-environment.yaml (fromConfig): the IBM downloads folder, PAW's zip in
 		// it,
@@ -611,6 +801,27 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		}
 
 		/**
+		 * Keeps the containers running between test runs, when you've also turned on
+		 * Testcontainers reuse ({@code testcontainers.reuse.enable=true} in
+		 * {@code ~/.testcontainers.properties}, or
+		 * {@code TESTCONTAINERS_REUSE_ENABLE=true}). A later run with the same
+		 * configuration finds them, and objects tests left behind are still there.
+		 * Without the switch it has no effect. See {@link PlanningAnalyticsEnvironment}
+		 * for what's reused and how to start clean.
+		 *
+		 * <p>
+		 * With your own {@link #network}, reuse only works if it's the same network each
+		 * run: Testcontainers finds a container by everything it's created with,
+		 * including its network's ID.
+		 * @param reuse whether to keep the containers
+		 * @return this builder
+		 */
+		public Builder reuse(boolean reuse) {
+			this.reuse = reuse;
+			return this;
+		}
+
+		/**
 		 * Creates the containers and wires them together. Nothing starts until
 		 * {@link PlanningAnalyticsEnvironment#start()}.
 		 * @return the environment
@@ -618,6 +829,11 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		 * can't be found
 		 */
 		public PlanningAnalyticsEnvironment build() {
+			return build(TestcontainersConfiguration.getInstance().environmentSupportsReuse());
+		}
+
+		/** Builds, with the developer's reuse switch given, so tests needn't set it. */
+		PlanningAnalyticsEnvironment build(boolean reuseEnabled) {
 			if (tm1.isEmpty()) {
 				throw new IllegalStateException("Add at least one TM1 server with tm1(name)");
 			}
@@ -631,7 +847,7 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 				throw new IllegalStateException(
 						"PAW with Cognos (CAM) security isn't supported yet: PAW logs users on with TM1's own security");
 			}
-			return new PlanningAnalyticsEnvironment(this, network != null ? network : Network.newNetwork());
+			return new PlanningAnalyticsEnvironment(this, reuseEnabled);
 		}
 
 		private String[] camAdmins(CognosContainer cognos) {
@@ -677,6 +893,75 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 			}
 			return PawSource.discover(name -> PawSource.BUNDLE_DIR.equals(name) ? ibm.toString() : null)
 				.orElseThrow(() -> new IllegalStateException("No PAW Local zip in " + ibm));
+		}
+
+	}
+
+	/**
+	 * A reused environment's network: named after its identity, found if it's there and
+	 * created if not. It carries none of Testcontainers' session labels, so
+	 * Testcontainers doesn't remove it after the run, and {@link #close()} keeps it for
+	 * the next.
+	 */
+	static final class ReusableNetwork implements Network {
+
+		private final Supplier<String> name;
+
+		private @Nullable String id;
+
+		ReusableNetwork(Supplier<String> name) {
+			this.name = name;
+		}
+
+		/**
+		 * The network's name.
+		 * @return {@code tm1-environment-<identity>}
+		 */
+		String getName() {
+			return name.get();
+		}
+
+		@Override
+		public synchronized String getId() {
+			if (id == null) {
+				id = findOrCreate(DockerClientFactory.instance().client(), getName());
+			}
+			return id;
+		}
+
+		/** Keeps the network for the next run. */
+		@Override
+		public void close() {
+		}
+
+		private static String findOrCreate(DockerClient docker, String name) {
+			Optional<String> found = find(docker, name);
+			if (found.isPresent()) {
+				return found.get();
+			}
+			try {
+				return docker.createNetworkCmd()
+					.withName(name)
+					.withCheckDuplicate(true)
+					.withLabels(Map.of(REUSE_LABEL, name.substring(NETWORK_PREFIX.length())))
+					.exec()
+					.getId();
+			}
+			catch (ConflictException e) {
+				// Another test run created it first
+				return find(docker, name).orElseThrow(() -> e);
+			}
+		}
+
+		private static Optional<String> find(DockerClient docker, String name) {
+			// The name filter matches part of a name, so check the whole
+			return docker.listNetworksCmd()
+				.withNameFilter(name)
+				.exec()
+				.stream()
+				.filter(network -> name.equals(network.getName()))
+				.map(network -> network.getId())
+				.findFirst();
 		}
 
 	}

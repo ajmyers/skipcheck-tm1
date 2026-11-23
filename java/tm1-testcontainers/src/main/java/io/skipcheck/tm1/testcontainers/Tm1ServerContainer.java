@@ -339,6 +339,11 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		return cognos == null ? null : camNamespace;
 	}
 
+	/** The Cognos test users made TM1 administrators by {@link #withCamSecurity}. */
+	List<String> getCamAdmins() {
+		return camAdmins;
+	}
+
 	/**
 	 * The {@code Authorization} header for the container's login: {@code Basic} with
 	 * {@link #getUsername()} and {@link #getPassword()}, or, in CAM security,

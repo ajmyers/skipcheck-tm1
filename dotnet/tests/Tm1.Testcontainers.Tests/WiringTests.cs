@@ -359,6 +359,83 @@ public class PlanningAnalyticsEnvironmentTests
         Assert.Contains("not found", Assert.Throws<ArgumentException>(() => PlanningAnalyticsEnvironment.FromConfig(Fixture("missing.yaml"))).Message);
     }
 
+    [Fact]
+    public void ReuseNeedsTheBuilderAndTheDevelopersSwitch()
+    {
+        Assert.False(Builder().Tm1("a").Build(true).Reused);
+        var notSwitchedOn = Builder().Tm1("a").Reuse(true).Build(false);
+        Assert.False(notSwitchedOn.Reused);
+        Assert.False(notSwitchedOn.Network.IsReusable);
+        var reused = Builder().Tm1("a").Reuse(true).Build(true);
+        Assert.True(reused.Reused);
+        // Not started, so not yet marked: StartAsync does that
+        Assert.False(((IGenericContainer)reused.Tm1("a")).ShouldBeReused);
+    }
+
+    [Fact]
+    public void AReusedEnvironmentsNetworkIsNamedAfterItsIdentity()
+    {
+        var env = Builder().Tm1("planning").Tm1Web().Reuse(true).Build(true);
+        Assert.Matches("^[0-9a-f]{16}$", env.Identity());
+        Assert.True(env.Network.IsReusable);
+        Assert.Equal("tm1-environment-" + env.Identity(), env.Network.Name);
+        Assert.IsType<PlanningAnalyticsEnvironment.ReusableNetwork>(env.Network.Resource);
+        foreach (var server in env.Tm1Servers.Values)
+        {
+            Assert.Same(env.Network, server.Network);
+        }
+        // The developer's own network is used as it is
+        var own = Network.Reusable(new PlanningAnalyticsEnvironment.ReusableNetwork(() => "mine"));
+        Assert.Same(own, Builder().Tm1("planning").Network(own).Reuse(true).Build(true).Network);
+    }
+
+    [Fact]
+    public void TheIdentityIsTheSameForTheSameConfigurationAndDiffersOtherwise()
+    {
+        Assert.Equal(
+            Builder().Tm1("planning").Tm1Web().Reuse(true).Build(true).Identity(),
+            Builder().Tm1("planning").Tm1Web().Reuse(true).Build(true).Identity()
+        );
+        PlanningAnalyticsEnvironment.EnvironmentBuilder[] configurations =
+        [
+            Builder().Tm1("planning"),
+            Builder().Tm1("reporting"),
+            Builder().Tm1("planning", tm1 => tm1.WithSeed(Tm1Seed.Sdata)),
+            Builder().Tm1("planning", tm1 => tm1.WithEnv("TM1_CFG_MaxThreads", "4")),
+            Builder().Tm1("planning").Tm1("reporting"),
+            Builder().Tm1("planning").AdminServer(),
+            Builder().Tm1("planning").Tm1Web(),
+            Builder().Tm1("planning").Tm1Web(web => web.WithEnv("TM1_WEB_HEAP", "2g")),
+            Builder().Tm1("planning").Tm1Source(new Tm1Source.PrivateImage("tm1-server:other")),
+            Builder().Tm1("planning").Cognos(c => c.WithUser("admin", "adminpw")),
+            Builder().Tm1("planning").Cognos(c => c.WithUser("admin", "otherpw")),
+            Builder().Tm1("planning").Cognos(c => c.WithUser("admin", "adminpw").WithUser("boss", "bosspw")),
+            Builder()
+                .Tm1("planning")
+                .Cognos(c => c.WithUser("admin", "adminpw").WithUser("boss", "bosspw"))
+                .CamSecurity(CognosContainer.Namespace.Ldap, "boss"),
+            Builder().Tm1("planning").Cognos(c => c.WithUser("admin", "adminpw")).Keycloak(),
+        ];
+        var identities = configurations.Select(b => b.Reuse(true).Build(true).Identity()).ToList();
+        Assert.Equal(identities.Count, identities.Distinct().Count());
+    }
+
+    [Fact]
+    public void StartingAReusedEnvironmentMarksEveryContainerWithItsIdentity()
+    {
+        var env = Builder().Tm1("planning").Tm1("reporting").Tm1Web().Reuse(true).Build(true);
+        env.PrepareForReuse();
+        foreach (var part in env.Containers())
+        {
+            var container = (IGenericContainer)part;
+            Assert.True(container.ShouldBeReused, part.ToString());
+            Assert.Equal(env.Identity(), container.Labels["io.skipcheck.tm1.environment"]);
+        }
+        // Testcontainers for .NET adds no random alias of its own (Java's tc-…), so the aliases stay as they were
+        Assert.Equal(["planning"], env.Tm1("planning").NetworkAliases);
+        Assert.Equal([Tm1AdminServerContainer.NetworkAlias], env.AdminServer!.NetworkAliases);
+    }
+
     private static PlanningAnalyticsEnvironment.EnvironmentBuilder Builder() =>
         PlanningAnalyticsEnvironment
             .Builder()

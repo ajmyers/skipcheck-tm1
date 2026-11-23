@@ -41,6 +41,18 @@ def cam_security() -> list[str | None]:
     # @end
 
 
+def reuse() -> str:
+    # @start region = reuse
+    # Cognos and the server keep running after the run, for the next one, when
+    # testcontainers.reuse.enable=true is set too
+    builder = PlanningAnalyticsEnvironment.builder().tm1("planning").cognos(lambda cognos: cognos.with_user("admin", "adminpw", "Admins")).reuse(True)
+    # Entering the block starts it, in seconds once a run with this configuration has started it
+    with builder.build() as env:
+        return env.tm1("planning").rest_url
+    # Leaving the block left it running
+    # @end
+
+
 def from_config() -> str:
     # @start region = file
     # The environment pa-setup runs from the same file, with random host ports
