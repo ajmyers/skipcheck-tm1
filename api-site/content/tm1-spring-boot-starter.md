@@ -18,11 +18,24 @@ Add the starter, set a few `tm1.*` properties, and inject a ready `Tm1Client`. S
    ::example HelloTm1Application hello-app
    Run it with `./gradlew bootRun` (or `mvn spring-boot:run`).
 
-Next: [the beans it creates](docs/Tm1AutoConfiguration.html), and a session per user from the pool; [logging in your own way](docs/Tm1ConnectionDetails.html), such as with CAM; and [tm1-spring-boot-testcontainers](/tm1-spring-boot-testcontainers/docs/), for a real TM1 in your Spring Boot tests.
+Next: [the beans it creates](docs/Tm1AutoConfiguration.html), and a session per user from the pool; [several servers](#several-servers), each by name; [logging in your own way](docs/Tm1ConnectionDetails.html), such as with CAM; and [tm1-spring-boot-testcontainers](/tm1-spring-boot-testcontainers/docs/), for a real TM1 in your Spring Boot tests.
+
+## Several servers
+
+Give each server a name under `tm1.servers`, with the same settings as `tm1`:
+
+::file java/tm1-spring-boot-starter/src/examples/java/examples/application-servers.yml yaml
+
+The starter builds a client for each, and a session pool for each that turns the pool on, with its metrics tagged `server` with the name. Ask for a server's client by its name, with `@Qualifier`:
+
+::example Tm1AutoConfigurationExamples servers
+
+The `tm1` settings are the server named `default`, the same as `tm1.servers.default`; set one or the other. Its client is the one you get without a qualifier. Every other server's is injected only by its name, even when there's just one. In Spring Boot tests, `Tm1EnvironmentServers` from tm1-spring-boot-testcontainers wires in each server of a `PlanningAnalyticsEnvironment` by its name. [Tm1ServersProperties](docs/Tm1ServersProperties.html) has the details.
 
 ## What's in it
 
 - **Auto-configuration:** a `Tm1Client` bean from `tm1.*` properties.
+- **Several servers:** a client per server under `tm1.servers.<name>`, injected by its name.
 - **Session pooling and impersonation:** a session per user, from a pool.
 - **Your own login:** replace the connection details, for example for CAM.
 - **Tests:** `@ServiceConnection` for a TM1 container, from tm1-spring-boot-testcontainers.

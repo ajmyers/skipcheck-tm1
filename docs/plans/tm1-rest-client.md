@@ -473,13 +473,13 @@ TI process failures are **not** exceptions: `ExecuteWithReturn` returns a
   observations apply.
 - **Works in servlet (MVC) apps too.** WebClient doesn't need a reactive web server, only
   `spring-webflux` plus a connector on the classpath.
-- **Named multi-server support** (`tm1.servers.<name>.*`) comes later, with #16.
+- **Named servers** (`tm1.servers.<name>.*`) came with #266: see below.
 
 **Dependency change:** `tm1-client` today declares `api(libs.spring.web)`, commented for
 `RestClient`. That becomes `api(spring-webflux)`, Reactor and `reactor-netty-http` (Q4).
 
 **Built in step 6 (#15).**
-- `Tm1ConnectionDetailsAutoConfiguration` reads `tm1.*` into `Tm1ConnectionDetails` (service root,
+- (Before #266) `Tm1ConnectionDetailsAutoConfiguration` reads `tm1.*` into `Tm1ConnectionDetails` (service root,
   authenticator, SSL bundle), only when `tm1.address` or `tm1.base-url` is set and no other
   connection details exist.
 - `Tm1AutoConfiguration`, ordered after it, creates the session, the client and, with
@@ -488,6 +488,18 @@ TI process failures are **not** exceptions: `ExecuteWithReturn` returns a
 - `Tm1MetricsAutoConfiguration` publishes the pool's stats through Micrometer.
 - `tm1-spring-boot-testcontainers` turns a `@ServiceConnection` `Tm1ServerContainer` into
   connection details.
+
+**Reworked in #266: one kind of server.**
+- Every server has a name. `tm1.servers.<name>.*` is one; `tm1.*` is the server named `default`,
+  the same as `tm1.servers.default.*` (setting both is an error).
+- `Tm1ServersRegistrar` registers each server's beans the same way: `<name>Tm1ConnectionDetails`,
+  `<name>Tm1Session`, `<name>Tm1Client`, `<name>Tm1SessionPool`, qualified by the name. The
+  default server's are the default candidates; the others' aren't. `Tm1ConnectionDetailsAutoConfiguration`
+  is gone.
+- A bean of yours under a server's bean name replaces the starter's. For the default server, so does a
+  default-candidate bean of the type under any name, which is how `@ServiceConnection` still works.
+- Pool metrics are tagged `server=<name>`, `default` included.
+- `Tm1EnvironmentServers` turns a `PlanningAnalyticsEnvironment`'s servers into `tm1.servers.<name>`.
 - Services aren't beans yet: none exist. Each will get its own `@ConditionalOnMissingBean` bean as
   the endpoint phases add them.
 
