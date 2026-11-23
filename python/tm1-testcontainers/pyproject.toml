@@ -7,7 +7,7 @@ name = "skipcheck-tm1-testcontainers"
 version = "0.1.0.dev0"
 description = "Testcontainers support for running IBM Planning Analytics (TM1) servers in tests"
 readme = "README.md"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
     # Tm1Version is part of this package's API (Tm1ServerContainer.with_expected_version)
