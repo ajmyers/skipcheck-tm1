@@ -4,7 +4,7 @@
 // (scripts/members.mjs).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkMembers, findMember, listFile, parseList, readList, stale } from '../scripts/members.mjs';
+import { checkMembers, findMember, guessMember, languageNames, listFile, parseList, readList, stale, withoutComments } from '../scripts/members.mjs';
 import { PROJECTS, repoDir } from '../scripts/site.mjs';
 
 const member = (name, kind = 'method', extra = {}) => ({ name, kind, static: false, signature: name, returns: '', params: [], endpoints: [], doc: '', deprecated: false, ...extra });
@@ -74,4 +74,18 @@ test("every list in the repository reads, and gives each line a reason", async (
 			for (const [key, entry] of await readList(repoDir, listFile(project, language))) assert.ok(entry.reason.length > 10, key + ' needs a reason');
 		}
 	}
+});
+
+test("a Java name a language's code has is that language's: a constant may be PascalCase where the type has no page", () => {
+	const names = languageNames([type('Tm1Client', [member('with_sandbox')])], 'const kind = Tm1ErrorKind.CredentialRejected;');
+	assert.ok(names.has('with_sandbox') && names.has('Tm1ErrorKind') && names.has('CredentialRejected'));
+	assert.equal(guessMember('typescript', member('CREDENTIAL_REJECTED', 'constant'), names), 'CredentialRejected');
+	assert.equal(guessMember('python', member('withSandbox'), names), 'with_sandbox');
+	// Nothing to go by: the parity rule's first name
+	assert.equal(guessMember('dotnet', member('close'), new Set()), 'CloseAsync');
+});
+
+test("a language's comments are left out of its names, which they may give as Java's", () => {
+	assert.equal(withoutComments('x = 1  # as Java\'s Mono\n"""Java\'s Flux"""\ny = "#1"', 'python').includes('Mono'), false);
+	assert.equal(withoutComments('/** Java\'s Mono */ const url = "http://x"; // Flux', 'typescript').trim(), 'const url = "http://x";');
 });

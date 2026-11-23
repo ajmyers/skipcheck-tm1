@@ -245,6 +245,11 @@ public final class ModelDoclet implements Doclet {
 				json.field("signature", (member.getKind() == ElementKind.FIELD)
 						? simple(member.asType()) + " " + member.getSimpleName() : member.getSimpleName().toString());
 				json.field("returns", simple(member.asType()));
+				// A constant's value, for {@value} in a comment
+				Object value = ((VariableElement) member).getConstantValue();
+				if (value != null) {
+					json.field("value", String.valueOf(value));
+				}
 				json.key("params").open('[').close(']');
 				json.key("endpoints").open('[').close(']');
 				json.field("doc", doc(member));

@@ -138,3 +138,46 @@ export function checkMembers({ language, javaTypes, counterparts, list, used }) 
 export function stale(list, used) {
 	return [...list].filter(([key]) => !used.has(key)).map(([key, entry]) => key + ' (line ' + entry.line + '): Java has no such member, or the language no such type: take its line out');
 }
+
+// ---- a language's names ------------------------------------------------------------
+
+const identifiers = (text) => text.match(/[A-Za-z_$][\w$]*/g) ?? [];
+
+/** Every name an API has: its types' names (each part of a nested one), its members' names, and
+ * the names its signatures use. */
+export function apiNames(api) {
+	const names = new Set();
+	for (const type of api) {
+		for (const part of type.name.split('.')) names.add(part);
+		for (const name of identifiers(type.signature ?? '')) names.add(name);
+		for (const member of type.members) {
+			names.add(member.name);
+			for (const name of identifiers(member.signature ?? '')) names.add(name);
+		}
+	}
+	return names;
+}
+
+/** Every name a language has: its API's (apiNames), and every name in its code (its sources and
+ * examples, without comments), which has what the extractor doesn't see (TypeScript's Tuples
+ * object) and TM1's own names (ID, in a string). */
+export function languageNames(types, code) {
+	const names = apiNames(types);
+	for (const name of identifiers(code)) names.add(name);
+	return names;
+}
+
+/** A Java member's likely name in a language that has no counterpart of its type to look in: the
+ * first of its candidates the language's names have, a constant's PascalCase too (TypeScript's
+ * Tm1ErrorKind.CredentialRejected), or else the first candidate. */
+export function guessMember(language, javaMember, names) {
+	const candidates = memberCandidates(language, javaMember, '');
+	if (/^[A-Z][A-Z0-9_]*$/.test(javaMember.name)) candidates.push(pascal(javaMember.name));
+	return candidates.find((name) => names?.has(name)) ?? candidates[0];
+}
+
+/** A language's source without its comments, which may name Java's types ("as Java's Mono"). */
+export function withoutComments(text, language) {
+	if (language === 'python') return text.replace(/"""[\s\S]*?"""|'''[\s\S]*?'''/g, ' ').replace(/#.*$/gm, '');
+	return text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
