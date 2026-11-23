@@ -192,6 +192,11 @@ Flux<String> list(Tm1Client tm1) {
   stale one ([api-site/README.md](api-site/README.md#walkthroughs-and-what-the-examples-print)).
 - Spring Java Format writes `region = list` with spaces, in the comment and the `{@snippet}`
   tag. Javadoc accepts both forms.
+- **Never write code into the site's Markdown.** Every code block on a landing page or
+  walkthrough comes from a directive: `::example` (a compiled example region, in every
+  language), `::file` (a file a test loads) or `::install` (generated from the build files).
+  A fenced code block in a content file fails the site's build, so code on the site is always
+  compiled and tested.
 
 **Document TM1's surprises where they bite.** When TM1 behaves differently from its
 `$metadata`, or from what a reader would expect, say so in the Javadoc of the method or type it

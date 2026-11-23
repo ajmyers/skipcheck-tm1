@@ -11,7 +11,8 @@
 //   **bold**, `code`, [text](address)
 //
 // Code is never written in a content file: it comes from a directive, which names an example
-// that is compiled or type-checked with its language's tests.
+// that is compiled or type-checked with its language's tests. A fenced code block (``` or ~~~)
+// fails the build, naming its line, so code can't be pasted in.
 
 import { escape } from './site.mjs';
 
@@ -52,7 +53,13 @@ export function parse(source) {
 		item = null;
 	};
 
-	for (const line of body.split('\n')) {
+	const offset = source.replaceAll('\r\n', '\n').split('\n').length - body.split('\n').length;
+	for (const [index, line] of body.split('\n').entries()) {
+		if (/^\s*(```|~~~)/.test(line)) {
+			throw new Error(
+				'line ' + (index + offset + 1) + ': a code block. Code comes from a directive (::example, ::file, ::install), never written into a content file, so it is compiled and tested',
+			);
+		}
 		const heading = /^## +(.+)$/.exec(line);
 		const marker = /^(\d+\.|-) +(.*)$/.exec(line);
 		const directive = /^\s*::([\w-]+)\s*(.*)$/.exec(line);

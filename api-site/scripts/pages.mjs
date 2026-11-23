@@ -117,7 +117,12 @@ async function blocks(project, list, page, { inItem = false } = {}) {
 const landings = [];
 for (const project of PROJECTS.filter((p) => p.landing)) {
 	const file = path.join(siteDir, 'content', project.id + '.md');
-	const content = parse(await readFile(file, 'utf8'));
+	let content;
+	try {
+		content = parse(await readFile(file, 'utf8'));
+	} catch (e) {
+		throw new Error(path.relative(repoDir, file) + ', ' + e.message, { cause: e });
+	}
 	for (const key of ['tagline', 'description', 'card']) {
 		if (!content.meta[key]) throw new Error(path.relative(repoDir, file) + ' has no ' + key + ' in its front matter');
 	}

@@ -17,7 +17,7 @@ You add TM1 to a Spring Boot application. The starter builds a TM1 client from y
    ::install
 2. **Tell it where TM1 is.** Put the server's address and your login in `application.yml`:
    ::file java/tm1-spring-boot-starter/src/examples/java/examples/application.yml yaml
-   Keep a real password out of the file, for example with `password: ${TM1_PASSWORD}` and an environment variable. [Tm1Properties](docs/Tm1Properties.html) lists every setting.
+   Keep a real password out of the file: Spring Boot can fill the setting from an environment variable, with a property placeholder. [Tm1Properties](docs/Tm1Properties.html) lists every setting.
 3. **Use the client.** The starter makes a `Tm1Client` bean. This application asks for it, and prints the server's version and its cubes when it starts. The server set up above has an empty database, so it has no cubes yet:
    ::example HelloTm1Application hello-app
    Run it with `./gradlew bootRun` (or `mvn spring-boot:run`).
