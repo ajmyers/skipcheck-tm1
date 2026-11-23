@@ -47,7 +47,7 @@ jobs:
           java-version: '27'
       - uses: gradle/actions/setup-gradle@v6
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
 

@@ -179,7 +179,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - uses: actions/setup-java@v6
@@ -219,7 +219,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
       - uses: actions/setup-java@v6
@@ -250,7 +250,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -377,7 +377,7 @@ jobs:
       # NuGet takes this job's identity token instead of a stored API key (trusted publishing)
       id-token: write
     steps:
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
       - uses: actions/download-artifact@v8
@@ -405,7 +405,7 @@ jobs:
       # records the commit and workflow that built each package (provenance)
       id-token: write
     steps:
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           # Trusted publishing needs npm 11.5.1 or later, which Node 24 brings
           node-version: '24'
