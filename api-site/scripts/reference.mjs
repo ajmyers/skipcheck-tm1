@@ -36,6 +36,7 @@ import { typedCode } from './doc-code.mjs';
 import { checkMembers, findMember, guessMember, javaIsms, javaOnlyNames, languageNames, listFile, readList, stale, typeCandidates, withoutComments } from './members.mjs';
 import { searchIndex } from './search.mjs';
 import { CANONICAL_ORIGIN, copyAssets, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, SECTIONS } from './site.mjs';
+import { typeHeader } from './type-page.mjs';
 import { examplesOf, typesUsed, walkthroughsOf } from './walkthroughs.mjs';
 
 const allowMissing = process.argv.includes('--allow-missing');
@@ -597,11 +598,6 @@ for (const project of PROJECTS) {
 				dotnet: 'using ' + type.package + ';',
 				typescript: 'import { ' + name.split('.')[0] + ' } from "' + tsPackage + '";',
 			}[language];
-			// The walkthroughs whose examples use it, in their own pages, whose tabs open in this language
-			const usedNote = usedIn.has(javaType.name)
-				? '<p class="note">Used in ' + (usedIn.get(javaType.name).length > 1 ? 'the walkthroughs ' : 'the walkthrough ') +
-					usedIn.get(javaType.name).map(({ project: p, walkthrough: w }) => '<a href="/' + p.id + '/walkthroughs/' + w.slug + '/">' + escape(w.meta.title) + '</a>').join(', ') + '.</p>'
-				: '';
 			const asyncNote =
 				language === 'python' && /Service$|^Tm1Client$|^Tm1Session$/.test(name)
 					? '<p class="note">The asyncio flavor, <code>skipcheck_tm1.aio</code>, has the same methods to <code>await</code>, on <code>Async' + escape(name) + '</code>.</p>'
@@ -612,11 +608,9 @@ for (const project of PROJECTS) {
 					: '';
 			const body =
 				(project.landing ? '<p class="crumbs"><a href="../../">' + escape(project.title) + '</a> · <a href="./">Docs</a> · ' : '<p class="crumbs"><a href="./">' + escape(project.title) + ' docs</a> · ') + escape(area.title) + '</p>' +
-				'<h1>' + escape(name) + '</h1>' +
-				'<pre class="import"><code class="lang-' + highlight + '">' + escape(importLine) + '</code></pre>' +
+				typeHeader({ name, importLine, highlight, uses: usedIn.get(javaType.name) }) +
 				'<div class="doc"><p>' + overview + '</p></div>' +
 				asyncNote +
-				usedNote +
 				(rows.length > 0 ? '<h2 id="members">Members</h2><table class="members">' + rows.join('') + '</table>' + details.join('') : '') +
 				javadocLink;
 			await writePage(project, language, name + '.html', name, body, nav, javaType.name, languages, counterparts);

@@ -48,7 +48,7 @@ needs its three counterparts before the build passes, and so does a new Java mem
 A walkthrough is a task, step by step, for someone new to a library. Readers find a project's
 walkthroughs on its landing page, under its quick start (the first one) and in their own section;
 on its docs home, in every language; in the docs search, by title or by words of the summary; and
-on the page of each type a walkthrough's examples use ("Used in"). That last list is worked out
+on the page of each type a walkthrough's examples use ("Used in", under the import line). That last list is worked out
 from the walkthroughs' Java example regions: the documented types a region names, and the services
 it reaches through one of `Tm1Client`'s accessors (`tm1.cellsets()` is `CellsetService`). Each step's code is a region
 of a `<Task>Walkthrough` examples class (`ConnectWalkthrough`, in every language), and under the
@@ -81,6 +81,7 @@ has one, and isn't required.
 | `scripts/assemble.mjs` | Copies each library's Javadoc into `dist/<project>/api/java/`, and hashes the inline scripts, event handlers and style attributes Javadoc writes, for the CSP. Empties `dist/` first, so it runs first. |
 | `scripts/extract.mjs` | Each project's API per language, into `.generated/api/`. |
 | `scripts/reference.mjs` | The reference pages and `.generated/site.json` for the Worker: the projects, and which one documents each type. |
+| `scripts/type-page.mjs` | The top of a type's page: its name, its import line, and the walkthroughs that use it, before the overview. |
 | `scripts/members.mjs` | Which member is which across languages, and the gate that each language has every Java member or lists it with the reason. |
 | `scripts/doc-code.mjs` | The gate that no doc comment the reference reads has code typed into it: a Javadoc `<pre>` or inline `{@snippet}`, a .NET `<code>`, a TypeScript fence or `@example`, a Python `::` block or doctest. |
 | `scripts/search.mjs` | The search index of each docs language, `search.json` beside its pages: every type and member, a short summary, and where it is. `reference.mjs` writes it from the data it renders the pages with. |
