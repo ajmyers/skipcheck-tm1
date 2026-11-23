@@ -14,6 +14,7 @@ import httpx
 import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Identity, Tm1Request, Tm1SessionClosedError, auth
+from skipcheck_tm1.aio import cognos as aio_cognos
 
 from ..conftest import BASE, target
 from .conftest import SERVER, Clock, Runtime
@@ -113,6 +114,54 @@ def test_logs_each_identity_in_as_itself(rt: Runtime, clock: Clock) -> None:
         "Basic YWRtaW46YXBwbGU=",
         "Basic Y2Fyb2w6Yw==",
     ]
+
+
+def test_gives_different_credentials_for_the_same_name_their_own_session(rt: Runtime, clock: Clock) -> None:
+    p = pool(rt, clock)
+    carol = p.session(Tm1Identity.with_credentials("carol", auth.basic("carol", "c")))
+    assert p.session(Tm1Identity.with_credentials("Carol", auth.basic("carol", "c"))) is carol, "the same credentials, made again"
+    rt.run(carol.execute(SERVER))
+
+    other = p.session(Tm1Identity.with_credentials("carol", auth.basic("carol", "wrong")))
+    assert other is not carol, "never the session someone else's credentials opened"
+    rt.run(other.execute(SERVER))
+    assert [r.headers["authorization"] for r in rt.fake.login_requests] == ["Basic Y2Fyb2w6Yw==", "Basic Y2Fyb2w6d3Jvbmc="], (
+        "each logs in with what it was given"
+    )
+
+
+def test_shares_a_session_for_the_same_authenticator_when_its_credentials_cant_be_compared(rt: Runtime, clock: Clock) -> None:
+    p = pool(rt, clock)
+    passport = auth.cam_passport(lambda: "p1")
+    dave = p.session(Tm1Identity.with_credentials("dave", passport))
+    assert p.session(Tm1Identity.with_credentials("dave", passport)) is dave
+    assert p.session(Tm1Identity.with_credentials("dave", auth.cam_passport(lambda: "p1"))) is not dave
+    assert auth.cam_passport("p1") == auth.cam_passport("p1")
+    assert auth.cam_passport("p1") != auth.cam_passport("p2")
+    logon = auth.cognos_logon if rt.flavor == "sync" else aio_cognos.cognos_logon
+    assert logon("http://cognos:9300", "LDAP", "dave", "d") == logon("http://cognos:9300", "LDAP", "dave", "d")
+    assert logon("http://cognos:9300", "LDAP", "dave", "d") != logon("http://cognos:9300", "LDAP", "dave", "other")
+
+
+def test_keeps_one_session_for_an_authenticator_of_the_callers_own_that_is_equal_but_cant_be_hashed(rt: Runtime, clock: Clock) -> None:
+    # Not in the Java tests: a Java object always has a hash code, and a Python one that defines == alone has none
+    class Token:
+        def __init__(self, token: str) -> None:
+            self.token = token
+
+        def authorization(self) -> str:
+            return "Bearer " + self.token
+
+        def describe(self) -> str:
+            return "Token"
+
+        def __eq__(self, other: object) -> bool:
+            return isinstance(other, Token) and self.token == other.token
+
+    p = pool(rt, clock)
+    erin = p.session(Tm1Identity.with_credentials("erin", Token("t1")))
+    assert p.session(Tm1Identity.with_credentials("erin", Token("t1"))) is erin
+    assert p.session(Tm1Identity.with_credentials("erin", Token("t2"))) is not erin
 
 
 def test_evicts_an_idle_session_and_closes_it_after_the_grace_period(rt: Runtime, clock: Clock) -> None:

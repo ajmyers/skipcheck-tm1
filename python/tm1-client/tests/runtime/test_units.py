@@ -461,6 +461,37 @@ def test_asks_for_a_fresh_passport_on_every_login() -> None:
     assert cam.describe() == "CAMPassport"
 
 
+def test_writes_a_passport_it_was_given() -> None:
+    cam = auth.cam_passport("p1")
+    assert cam.authorization() == "CAMPassport p1"
+    assert cam.authorization() == "CAMPassport p1", "the same one at each login: it isn't renewed"
+    assert cam.describe() == "CAMPassport"
+    assert "p1" not in repr(cam)
+
+
+def test_authenticators_that_hold_their_credentials_are_equal_when_the_credentials_are() -> None:
+    assert auth.basic("admin", "apple") == auth.basic("admin", "apple")
+    assert hash(auth.basic("admin", "apple")) == hash(auth.basic("admin", "apple"))
+    assert auth.basic("admin", "apple") != auth.basic("admin", "pear")
+    assert auth.cam_namespace("alice", "secret", "LDAP") == auth.cam_namespace("alice", "secret", "LDAP")
+    assert auth.cam_namespace("alice", "secret", "LDAP") != auth.cam_namespace("alice", "other", "LDAP")
+    assert auth.cam_passport("p1") == auth.cam_passport("p1") and hash(auth.cam_passport("p1")) == hash(auth.cam_passport("p1"))
+    assert auth.cam_passport("p1") != auth.cam_passport("p2")
+    supplier = auth.cam_passport(lambda: "p1")
+    assert supplier == supplier and supplier != auth.cam_passport(lambda: "p1"), "one that asks a supplier is equal only to itself"
+    assert auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d") == auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d")
+    assert hash(auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d")) == hash(auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d"))
+    assert auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d") != auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "other")
+    assert auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "d") != auth.cognos_logon("http://other:9300", "LDAP", "dave", "d")
+
+    def token() -> str:
+        return "t"
+
+    assert auth.cognos_id_token("http://cognos:9300", "LDAP", token) == auth.cognos_id_token("http://cognos:9300", "LDAP", token)
+    assert auth.cognos_id_token("http://cognos:9300", "LDAP", token) != auth.cognos_id_token("http://cognos:9300", "LDAP", lambda: "t")
+    assert "secret" not in repr(auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "secret"))
+
+
 def test_never_shows_credentials_in_its_repr() -> None:
     assert "apple" not in repr(auth.basic("admin", "apple")) and b64("admin:apple") not in repr(auth.basic("admin", "apple"))
     assert "secret" not in repr(auth.cam_namespace("alice", "secret", "LDAP"))

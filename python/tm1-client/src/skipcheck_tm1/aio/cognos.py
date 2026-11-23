@@ -93,13 +93,17 @@ class CognosPassports:
 
 def cognos_logon(dispatcher: str, namespace: str, user: str, password: str, *, http_client: Callable[[], Any] | None = None) -> Authenticator:
     """CAM security with a passport from Cognos, logging on with a user name and password:
-    a fresh passport for each login (Java's ``Tm1Authenticator.cognosLogon``)."""
+    a fresh passport for each login (Java's ``Tm1Authenticator.cognosLogon``). Two of these are
+    equal when they were made from the same address, namespace and credentials."""
     passports = CognosPassports.password(dispatcher, namespace, user, password, http_client=http_client)
-    return _Passport(passports, f"CAMPassport from Cognos {namespace}/{user}")
+    # Equal to another made from the same address, namespace and credentials, for the session pool
+    return _Passport(passports, f"CAMPassport from Cognos {namespace}/{user}", ("cognos_logon", dispatcher, namespace, user, password, http_client))
 
 
 def cognos_id_token(dispatcher: str, namespace: str, id_token: Callable[[], Any], *, http_client: Callable[[], Any] | None = None) -> Authenticator:
     """CAM security with a passport from Cognos for an OpenID Connect ID token (Java's
-    ``Tm1Authenticator.cognosIdToken``)."""
+    ``Tm1Authenticator.cognosIdToken``). It asks ``id_token`` for the token, so it's equal to
+    another only if that asks the same function: keep one and pass it each time."""
     passports = CognosPassports.id_token(dispatcher, namespace, id_token, http_client=http_client)
-    return _Passport(passports, f"CAMPassport from Cognos {namespace} (ID token)")
+    # The token comes from a function, so two of these are equal only if they ask the same one
+    return _Passport(passports, f"CAMPassport from Cognos {namespace} (ID token)", ("cognos_id_token", dispatcher, namespace, id_token, http_client))
