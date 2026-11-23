@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+
 #
 # Builds every commit this push would send that the remote doesn't have yet, one at a time and
 # oldest first, and refuses the push if one doesn't build. That's the rule "every commit builds on

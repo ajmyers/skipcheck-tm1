@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+
 # CI smoke test for the cognos-server image (run by .github/workflows/docker.yml).
 # CI has no IBM software, so this can't start Cognos. It checks that the image
 # contains no IBM software and has what Cognos needs, that the unpacker follows a

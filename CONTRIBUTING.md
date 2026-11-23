@@ -66,6 +66,10 @@ again. Generated code is never formatted, and neither are the recorded fixtures 
 `spec/conformance`. Rules a client doesn't follow are listed, each with its reason, in
 `python/ruff.toml`, `typescript/eslint.config.mjs` and `dotnet/Directory.Build.props`.
 
+**Every source file names its license.** Code, scripts, stylesheets and Dockerfiles start with
+`SPDX-License-Identifier: Apache-2.0`, in a comment. The pre-commit hook adds the line to what you
+stage; `scripts/license-headers.py --fix` adds it everywhere, and says which files get one.
+
 **Public API needs Javadoc.** In the published libraries, every public class, method, constructor
 and record component is documented, with `@param` and `@return`. `./gradlew build` runs Javadoc
 and fails on any gap. For a Lombok `@Getter`, put the `@return` line in the field's Javadoc;

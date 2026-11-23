@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 # Healthy once the REST API answers.
 # - server role: GET /api/v1/$metadata on the REST API's fixed container port 8010
 #   returns 200. TM1 serves $metadata without a login, so a 200 means the REST API is

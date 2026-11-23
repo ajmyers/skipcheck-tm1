@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Apply settings to a tm1web_config.xml, keeping the rest of the file as it is.
 
 Usage: configure-tm1-web.py <tm1web_config.xml>

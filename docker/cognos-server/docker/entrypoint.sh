@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+
 # cognos-server entrypoint. The container is a thin runtime shell around your own
 # IBM Cognos Analytics.
 #

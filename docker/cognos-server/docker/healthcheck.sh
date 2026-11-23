@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 # Healthy once Cognos answers GET /bi/v1/login, which needs no login:
 #   200  anonymous access is on, and it returned a session
 #   441  a namespace is configured, and it returned the logon prompt

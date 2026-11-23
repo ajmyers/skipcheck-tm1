@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1.7
+# SPDX-License-Identifier: Apache-2.0
+
 #
 # tm1-web: a runtime for IBM Planning Analytics Spreadsheet Services (TM1 Web) on
 # Linux x86-64.

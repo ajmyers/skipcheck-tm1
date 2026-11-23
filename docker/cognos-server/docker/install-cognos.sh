@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+
 # cognos-install: installs IBM Cognos Analytics from a user-supplied repository zip.
 #
 # Runs as `cognos-server install [SOURCE]`, and automatically from the entrypoint

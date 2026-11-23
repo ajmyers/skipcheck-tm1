@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 <#
 .SYNOPSIS
   tm1-server setup for Windows: installs and starts a local IBM Planning Analytics

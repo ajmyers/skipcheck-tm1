@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 # pa-setup: one command for a whole IBM Planning Analytics environment in Docker,
 # described by pa-environment.yaml in the current folder.
 #

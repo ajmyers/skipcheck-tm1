@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Make and fill in the cogstartup.xml template the container runs Cognos from.
 
 Usage:

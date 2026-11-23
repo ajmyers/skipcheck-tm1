@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Builds the guide: one page for each documented type of the client and the testcontainers
 // library, with each of its examples shown in Java, Python, .NET and TypeScript behind tabs that
 // switch together. Written into dist/projects/tm1/guide/, beside the Javadoc assemble.mjs puts in

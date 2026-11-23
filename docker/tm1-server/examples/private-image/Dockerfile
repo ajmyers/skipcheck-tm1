@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1.7
+# SPDX-License-Identifier: Apache-2.0
+
 #
 # A private tm1-server image with your licensed TM1 built in: no mounts, no install
 # on startup. Good for CI and teams. Push it ONLY to a private registry (it contains

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+
 """Compares what each client sent to a real TM1 for the same live conformance scenario.
 
 Each client's live run of a scenario (spec/conformance/live/<name>.json) writes its traffic to

@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+
 # tm1-install: installs TM1 Server from a user-supplied IBM bundle.
 #
 # Runs as `tm1-server install [SOURCE]`, and automatically from the entrypoint when

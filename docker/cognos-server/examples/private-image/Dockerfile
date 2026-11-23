@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1.7
+# SPDX-License-Identifier: Apache-2.0
+
 #
 # A private cognos-server image with your licensed Cognos built in: no install on
 # startup, and every container gets its own copy-on-write copy of the install, so

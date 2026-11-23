@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Turn a list of test users into LDIF for the embedded LDAP directory.
 
 Usage: users.py <base DN>    (writes LDIF to stdout, a summary to stderr)

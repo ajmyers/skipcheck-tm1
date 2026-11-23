@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Create a Keycloak realm for Cognos's OIDC namespace from the test users.
 
 Usage: keycloak-setup.py     (prints the COGNOS_OIDC_* settings for the namespace)
