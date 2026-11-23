@@ -234,12 +234,44 @@ describe("Tm1Capabilities", () => {
     expect(() => Tm1Capabilities.parse(metadata)).toThrow(Tm1ProtocolException);
   });
 
-  it("approximates an older schema without what came later, never a binding parameter", () => {
+  // The Java client's ApproximateSchemasTest, on this file's asOf: the approximate older servers
+  // the tests above (and Java's) are checked against are what they claim to be
+
+  it("the snapshot's own version changes nothing", () => {
     expect(asOf(SNAPSHOT, "11.8.35")).toBe(SNAPSHOT.replace(/(<Annotation Term="Core\.SchemaVersion">\s*<String>)[^<]*(<\/String>)/, "$111.8.35$2"));
-    const old = Tm1Capabilities.parse(asOf(SNAPSHOT, "11.0"));
-    expect(old.endpoints.size).toBeLessThan(current.endpoints.size);
-    for (const e of old.endpoints) expect(current.endpoints.has(e), e).toBe(true);
-    expect(old.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.Reserve"))).toBe(false);
+    expect(Tm1Capabilities.parse(asOf(SNAPSHOT, "11.8.35")).endpoints).toEqual(current.endpoints);
+  });
+
+  it("an older server lacks what came later", () => {
+    expect(older.schemaVersion).toBe("11.8.20");
+    // Cube.Reserve and Release arrived in 11.8.34; Load in 11.6.0
+    expect(older.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.Load"))).toBe(true);
+    expect(older.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.CheckRules"))).toBe(true);
+    expect(older.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.Reserve"))).toBe(false);
+    expect(older.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.Release"))).toBe(false);
+    // Encryption-at-rest configuration arrived in 11.8.35; data file encryption in 11.3.0
+    expect(older.supports(Tm1Capability.unboundOperation("DecryptDataFile"))).toBe(true);
+    expect(older.supports(Tm1Capability.unboundOperation("ConfigureEncryptionAtRest"))).toBe(false);
+  });
+
+  it("an old server lacks whole areas", () => {
+    const v10 = Tm1Capabilities.parse(asOf(SNAPSHOT, "10.2.2.0"));
+    // Git support arrived in 11.5.0
+    expect(v10.supports(Tm1Capability.entitySet("Cubes"))).toBe(true);
+    expect(v10.supports(Tm1Capability.entitySet("Dimensions"))).toBe(true);
+    expect(v10.supports(Tm1Capability.entitySet("GitPlans"))).toBe(false);
+    expect(v10.endpoints.size).toBeLessThan(current.endpoints.size);
+    for (const e of v10.endpoints) expect(current.endpoints.has(e), e).toBe(true);
+  });
+
+  it("never drops a binding parameter", () => {
+    const v10 = asOf(SNAPSHOT, "10.2.2.0");
+    const bound = [...v10.matchAll(/<(Action|Function) Name="(\w+)" IsBound="true">([\s\S]*?)<\/\1>/g)];
+    expect(bound.length).toBeGreaterThan(0);
+    for (const [, , name, body] of bound) expect(body, name).toMatch(/<Parameter Name="\w+" Type="[^"]+"/);
+    // And so it parses: a bound operation without one is refused (see "reports an operation it
+    // can't model as a parse error")
+    expect(() => Tm1Capabilities.parse(v10)).not.toThrow();
   });
 });
 
