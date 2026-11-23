@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The generator: deterministic output, and the sync and asyncio APIs alike member for member."""
 
 from __future__ import annotations
@@ -28,6 +30,14 @@ def test_generates_the_same_code_every_time(tmp_path: Path) -> None:
     built = ROOT / "src" / "skipcheck_tm1" / "_generated"
     for name, text in first.items():
         assert (built / name).read_text() == text, f"{name} is stale: reinstall or run tm1_pygen"
+
+
+def test_generated_code_starts_with_its_license() -> None:
+    package = ROOT / "src" / "skipcheck_tm1"
+    generated = [*(package / "_generated").glob("*.py"), *(package / "_sync").rglob("*.py")]
+    assert generated
+    for path in generated:
+        assert path.read_text().startswith("# SPDX-License-Identifier: Apache-2.0\n"), path
 
 
 def _classes(module: object) -> dict[str, type]:

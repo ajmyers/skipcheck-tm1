@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """ViewService against a real TM1: a port of the Java client's ViewServiceTm1Test."""
 
 from __future__ import annotations

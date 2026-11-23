@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Java's AdminServerWiringTest, CognosContainerTest and PlanningAnalyticsEnvironmentTest: how the
 containers are wired, without starting any (and without Docker)."""
 

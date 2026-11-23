@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The session: one logged-in connection to a TM1 server, and views of it.
 
 Like the Java client's ``Tm1Session``. It logs in lazily with ``GET ActiveSession`` and the

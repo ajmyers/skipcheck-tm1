@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The Getting started example of the client's guide."""
 
 from __future__ import annotations

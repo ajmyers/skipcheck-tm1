@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """What every service is: a set of methods over one session, as the Java client's services."""
 
 from __future__ import annotations

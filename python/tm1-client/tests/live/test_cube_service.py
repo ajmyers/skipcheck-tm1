@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """CubeService against a real TM1: a port of the Java client's CubeServiceTm1Test (see conftest.py for how to point it at a server).
 Dimensions are made through the raw session, so these tests depend only on the service they're
 about."""

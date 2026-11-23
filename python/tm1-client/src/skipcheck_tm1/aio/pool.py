@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Sessions on one TM1 server, one per :class:`~skipcheck_tm1.identity.Tm1Identity`, for
 applications that act on behalf of many users, as the Java client's ``Tm1SessionPool``. In
 TM1 identity is the session, so the number of sessions grows with the number of users; the

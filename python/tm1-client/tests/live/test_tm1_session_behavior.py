@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Pins how TM1 handles sessions, which Tm1Session's design relies on: a port of the Java client's
 Tm1SessionBehaviorTest.
 

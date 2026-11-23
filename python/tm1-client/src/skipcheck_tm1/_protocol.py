@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """What talking to TM1 means, without any I/O: requests as :class:`Call` values, answers as
 :class:`Reply` values, and the formats around them (URLs with TM1's query options, the session
 cookie, JSON ``$batch``, async results, ``$metadata`` capabilities).

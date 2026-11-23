@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """UserService, GroupService, SessionService, ThreadService and OidcKeyService, in both
 flavors, against a fake TM1: each method sends what the Java client's does."""
 

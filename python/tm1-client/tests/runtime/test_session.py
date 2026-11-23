@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The session, ported from the Java client's Tm1SessionTest, Tm1SessionReloginTest,
 Tm1SessionImpersonationTest, Tm1SessionViewsTest, Tm1SessionBatchTest and
 Tm1SessionCapabilitiesTest: the same behaviour, in both flavors."""

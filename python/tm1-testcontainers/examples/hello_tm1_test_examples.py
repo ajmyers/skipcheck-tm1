@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The Getting started example of the testcontainers guide: a pytest test, type-checked but never run here."""
 
 from __future__ import annotations

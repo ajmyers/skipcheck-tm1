@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Examples for ChoreService, quoted in the guide."""
 
 from __future__ import annotations

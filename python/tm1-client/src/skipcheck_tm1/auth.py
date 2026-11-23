@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """How a session logs in: the ``Authorization`` header of its first request.
 
 TM1 answers a login with a ``TM1SessionId`` cookie; later requests send only the cookie.

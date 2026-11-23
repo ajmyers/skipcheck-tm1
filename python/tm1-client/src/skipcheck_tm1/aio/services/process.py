@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Services for processes and chores (the Java client's ``io.skipcheck.tm1.client.service.process``)."""
 
 from __future__ import annotations

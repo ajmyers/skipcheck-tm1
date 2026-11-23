@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The requests resources make, as :class:`~skipcheck_tm1._protocol.Call` values: built once,
 sent by the sync session, the asyncio one, a batch, or as a TM1 async operation."""
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Reading the language-neutral API spec (``spec/tm1-api.json``), with the lookups every
 emitter needs. Nothing here is Python-specific: another language's generator can start
 from a copy of this module."""

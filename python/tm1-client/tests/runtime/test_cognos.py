@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """CAM passports from Cognos, as the Java client's CognosPassportsTest, in both flavors, against a
 stand-in for the Cognos dispatcher."""
 

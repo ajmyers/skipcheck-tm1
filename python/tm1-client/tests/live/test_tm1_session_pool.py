@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Tm1SessionPool against a real TM1: identities, eviction and close. A port of the Java client's
 Tm1SessionPoolTm1Test."""
 

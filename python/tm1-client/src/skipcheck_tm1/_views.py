@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """What the sync and asyncio sessions share and that sends nothing: poll intervals, the
 capability refusal, a batch's queue and how its answers are handed out."""
 

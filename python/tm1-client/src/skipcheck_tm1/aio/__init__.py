@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The asyncio flavor of the client. It's the source of truth: the sync flavor
 (``skipcheck_tm1``) is generated from it, so the two have the same API, the asyncio one with
 ``await`` on everything that sends a request::

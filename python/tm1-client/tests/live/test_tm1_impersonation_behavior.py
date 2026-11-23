@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Pins how TM1 handles ``TM1-Impersonate``, which the session pool relies on: a port of the Java
 client's Tm1ImpersonationBehaviorTest. Over bare HTTP, like test_tm1_session_behavior.py. Observed
 on 11.8.03500.6 with TM1's own security; CAM may behave differently."""

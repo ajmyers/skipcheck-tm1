@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Errors, as the Java client's ``io.skipcheck.tm1.client.error``.
 
 Every failure is a :class:`Tm1Error`, which says whether a retry could help

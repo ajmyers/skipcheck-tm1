@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """SandboxService and ChangeSetService against a real TM1: a port of the Java client's
 SandboxAndChangeSetTm1Test."""
 

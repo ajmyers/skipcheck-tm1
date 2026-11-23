@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Emits ``skipcheck_tm1/_generated/model.py``: an enum per CSDL enum type and a pydantic model
 per entity and complex type, the Python counterpart of the Java client's generated model."""
 

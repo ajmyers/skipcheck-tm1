@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Tm1Batch against TM1: many calls in one $batch, each with its own result. A port of the Java
 client's Tm1BatchTm1Test."""
 

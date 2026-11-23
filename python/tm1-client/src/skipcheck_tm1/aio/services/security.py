@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Services for security: users, groups, sessions, threads and OIDC keys (the Java client's
 ``io.skipcheck.tm1.client.service.security``)."""
 

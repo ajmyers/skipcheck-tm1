@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Examples for PlanningAnalyticsEnvironment, quoted in the guide. Test code, never run here."""
 
 from __future__ import annotations

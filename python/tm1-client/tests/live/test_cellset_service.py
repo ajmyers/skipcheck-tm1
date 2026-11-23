@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """CellsetService against a real TM1: a port of the Java client's CellsetServiceTm1Test. The cube is
 4 x 2, cell (row r, column c) holding r * 2 + c + 1."""
 

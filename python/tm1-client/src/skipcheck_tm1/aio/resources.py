@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Resources: typed handles on paths of the REST API, which the generated API is made of.
 
 A resource sends nothing until a method is called: ``tm1.api.cubes["Sales"]`` is a path;

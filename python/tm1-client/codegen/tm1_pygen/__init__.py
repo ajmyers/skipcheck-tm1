@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """tm1_pygen: generates the Python client's model and API from the language-neutral API spec
 (``spec/tm1-api.json``, exported from the ``$metadata`` snapshot by ``tm1-codegen``).
 
@@ -43,7 +45,7 @@ def generate(spec_path: str | Path, package_dir: str | Path) -> list[Path]:
     written = []
     for name, text in files.items():
         path = out / name
-        path.write_text(text, encoding="utf-8")
+        path.write_text(unasync.LICENSE + text, encoding="utf-8")
         written.append(path)
     aio = Path(package_dir) / "aio"
     if aio.is_dir():

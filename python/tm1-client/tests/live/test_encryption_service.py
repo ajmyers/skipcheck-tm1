@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """EncryptionService against a real TM1: a port of the Java client's EncryptionServiceTm1Test.
 
 It needs a server that isn't encrypted and lacks GSKit's ``gsk9capicmd_64``, as the
