@@ -1,99 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Builds the guide: one page for each documented type of the client and the testcontainers
-// library, with each of its examples shown in Java, Python, .NET and TypeScript behind tabs that
-// switch together. Written into dist/projects/tm1/guide/, beside the Javadoc assemble.mjs puts in
-// dist/ (run assemble first: it empties dist/).
+// Builds the docs pages: for each project that has them (site.mjs), one page for each documented
+// type, with each of its examples shown in Java, Python, .NET and TypeScript behind tabs that
+// switch together. Written into dist/<project>/docs/, beside the Javadoc assemble.mjs puts in dist/
+// (run assemble first: it empties dist/).
 //
 // There is one source for the prose and one for each example:
 //
 //   prose      the Javadoc of the Java type, where it quotes its examples with {@snippet}
-//   examples   a region of an examples file, the same name in every language:
-//                java        java/<module>/src/examples/java/examples/<Type>Examples.java
-//                python      python/<module>/examples/<type_examples>.py
-//                dotnet      dotnet/examples/<Module>.Examples/<Type>Examples.cs
-//                typescript  typescript/<module>/examples/<Type>Examples.ts
-//              marked "@start region = <name>" and "@end" in a comment, as Javadoc's snippets are
+//   examples   a region of an examples file, the same name in every language (site.mjs says where
+//              each language keeps them), marked "@start region = <name>" and "@end" in a comment,
+//              as Javadoc's snippets are
 //
 // Each language builds or type-checks its examples with its own tests, so an example that no
 // longer compiles fails there, not here. This script fails when a language lacks an example the
 // Java type quotes (--allow-missing lists them instead).
 //
+// It also writes .generated/site.json, which the Worker reads: the projects, and which project
+// documents each type, for the addresses the docs had before (/projects/tm1/guide/<Type>.html).
+//
 //   node scripts/guide.mjs [--allow-missing]
 
-import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, escape, generatedDir, head, languagesOf, PROJECTS, regions, repoDir, tabGroup } from './site.mjs';
 
-const siteDir = path.resolve(import.meta.dirname, '..');
-const repoDir = path.resolve(siteDir, '..');
-const out = path.join(siteDir, 'dist', 'projects', 'tm1', 'guide');
 const allowMissing = process.argv.includes('--allow-missing');
-
-// The libraries that exist in every language. Java's Spring Boot modules have no counterpart, and
-// their Javadoc is their documentation.
-const MODULES = [
-	{ id: 'tm1-client', title: 'Client', dotnet: 'Tm1.Client.Examples' },
-	{ id: 'tm1-testcontainers', title: 'Testcontainers', dotnet: 'Tm1.Testcontainers.Examples' },
-];
-
-const snake = (name) =>
-	name
-		.replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-		.replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
-		.toLowerCase();
-
-// highlight is the language's name in the site's highlighter (/highlight.js on skipcheck.io), which
-// colours a block marked lang-<name>
-const LANGUAGES = [
-	{ id: 'java', label: 'Java', highlight: 'java', file: (m, cls) => path.join('java', m.id, 'src', 'examples', 'java', 'examples', cls + '.java') },
-	{ id: 'python', label: 'Python', highlight: 'python', file: (m, cls) => path.join('python', m.id, 'examples', snake(cls) + '.py') },
-	{ id: 'dotnet', label: '.NET', highlight: 'csharp', file: (m, cls) => path.join('dotnet', 'examples', m.dotnet, cls + '.cs') },
-	{ id: 'typescript', label: 'TypeScript', highlight: 'typescript', file: (m, cls) => path.join('typescript', m.id, 'examples', cls + '.ts') },
-];
-
-const escape = (text) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
 // Where a snippet goes in the rendered Javadoc, until its tabs are built
 const placeholder = (index) => '@@snippet-' + index + '@@';
-
-// ---- examples ---------------------------------------------------------------
-
-const regionCache = new Map();
-
-/** The regions of an examples file, by name; an empty map if the file isn't there. */
-async function regions(file) {
-	if (regionCache.has(file)) return regionCache.get(file);
-	const found = new Map();
-	const text = await readFile(path.join(repoDir, file), 'utf8').catch(() => null);
-	if (text !== null) {
-		let name = null;
-		let lines = [];
-		for (const line of text.split('\n')) {
-			const start = /@start\s+region\s*=\s*"?([\w-]+)"?/.exec(line);
-			if (start) {
-				name = start[1];
-				lines = [];
-			} else if (/@end\b/.test(line) && name !== null) {
-				found.set(name, dedent(lines));
-				name = null;
-			} else if (name !== null) {
-				lines.push(line);
-			}
-		}
-	}
-	regionCache.set(file, found);
-	return found;
-}
-
-function dedent(lines) {
-	const text = lines.map((line) => line.replaceAll('\t', '    '));
-	const indents = text.filter((line) => line.trim() !== '').map((line) => line.length - line.trimStart().length);
-	const indent = indents.length > 0 ? Math.min(...indents) : 0;
-	return text
-		.map((line) => line.slice(indent).trimEnd())
-		.join('\n')
-		.trim();
-}
 
 // ---- Javadoc ----------------------------------------------------------------
 
@@ -173,21 +108,14 @@ async function* javaFiles(dir) {
 	}
 }
 
-function tabGroup(tabs) {
-	const buttons = tabs.map((tab) => '<button type="button" role="tab" data-lang="' + tab.language.id + '">' + tab.language.label + '</button>').join('');
-	const panels = tabs
-		.map((tab) => '<div role="tabpanel" data-lang="' + tab.language.id + '"><pre><code class="lang-' + tab.language.highlight + '">' + escape(tab.code) + '</code></pre></div>')
-		.join('');
-	// Javadoc puts a snippet inside the paragraph that introduces it: end that paragraph first
-	return '</p><div class="tabs"><div class="tablist" role="tablist" aria-label="Language">' + buttons + '</div>' + panels + '</div><p>';
-}
-
-function page(title, body) {
+function page(project, name, file, body) {
 	return (
-		'<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
-		'<title>' +
-		escape(title) +
-		' · TM1 client guide</title><link rel="stylesheet" href="guide.css"><script src="guide.js" defer></script><script src="/highlight.js" defer></script></head>' +
+		head({
+			title: name + ' · ' + project.title + ' docs · Skipcheck',
+			canonical: CANONICAL_ORIGIN + '/' + project.id + '/docs/' + file,
+			styles: ['../assets/docs.css'],
+			scripts: ['../assets/tabs.js', '/highlight.js'],
+		}) +
 		'<body><main class="guide">' +
 		body +
 		'</main></body></html>\n'
@@ -195,12 +123,14 @@ function page(title, body) {
 }
 
 const missing = new Set();
-const pages = [];
+const owners = {};
+let pageCount = 0;
 let examples = 0;
-for (const module of MODULES) {
-	const main = path.join(repoDir, 'java', module.id, 'src', 'main', 'java');
+for (const project of PROJECTS.filter((p) => p.guide)) {
+	const main = path.join(repoDir, 'java', project.id, 'src', 'main', 'java');
 	const files = [];
 	for await (const file of javaFiles(main)) files.push(file);
+	const pages = [];
 	for (const file of files.sort()) {
 		const source = await readFile(file, 'utf8');
 		const type = source.includes('{@snippet') ? typeJavadoc(source) : null;
@@ -209,18 +139,44 @@ for (const module of MODULES) {
 		let html = render(type.doc, snippets);
 		for (const [index, snippet] of snippets.entries()) {
 			const tabs = [];
-			for (const language of LANGUAGES) {
-				const where = language.file(module, snippet.cls);
+			for (const language of languagesOf(project)) {
+				const where = language.examples(project, snippet.cls);
 				const code = (await regions(where)).get(snippet.region);
 				if (code === undefined) missing.add(language.id + ': ' + where + ' region ' + snippet.region);
-				else tabs.push({ language, code });
+				else tabs.push({ language, html: codeBlock(code, language.highlight) });
 			}
-			html = html.replace(placeholder(index), () => tabGroup(tabs));
+			// Javadoc puts a snippet inside the paragraph that introduces it: end that paragraph first
+			html = html.replace(placeholder(index), () => '</p>' + tabGroup(tabs) + '<p>');
 			examples++;
 		}
 		const pkg = path.relative(main, path.dirname(file)).split(path.sep).join('.');
-		pages.push({ module, name: type.name, pkg, html });
+		pages.push({ name: type.name, pkg, html });
 	}
+
+	const out = path.join(distDir, project.id, 'docs');
+	await rm(out, { recursive: true, force: true });
+	await mkdir(out, { recursive: true });
+	await copyAssets(project);
+	const crumbs = '<p class="crumbs"><a href="../">' + escape(project.title) + '</a> · ';
+	for (const p of pages) {
+		const body = crumbs + '<a href="./">Docs</a></p><h1>' + escape(p.name) + '</h1><p class="package"><code>' + escape(p.pkg) + '</code></p><p>' + p.html + '</p>';
+		await writeFile(path.join(out, p.name + '.html'), page(project, p.name, p.name + '.html', body));
+		if (owners[p.name]) throw new Error(p.name + ' is documented by both ' + owners[p.name] + ' and ' + project.id);
+		owners[p.name] = project.id;
+	}
+	const items = pages
+		.sort((a, b) => a.name.localeCompare(b.name))
+		.map((p) => '<li><a href="' + p.name + '.html">' + escape(p.name) + '</a></li>')
+		.join('');
+	const intro =
+		crumbs +
+		'Docs</p><h1>' +
+		escape(project.title) +
+		' docs</h1><p>New here? Start with the <a href="../#quick-start">quick start</a>. Below is a page for each part of the library, with every example in ' +
+		'Java, Python, .NET and TypeScript: pick a language on any example and the rest follow. The text is the Java documentation, so names in it are ' +
+		'the Java ones: <code>modelCubes</code> is <code>model_cubes</code> in Python and <code>ModelCubesAsync</code> in .NET.</p>';
+	await writeFile(path.join(out, 'index.html'), page(project, 'Docs', '', intro + '<ul class="types">' + items + '</ul>'));
+	pageCount += pages.length;
 }
 
 if (missing.size > 0) {
@@ -230,34 +186,7 @@ if (missing.size > 0) {
 	console.warn(summary + ' (their tabs are left out):\n  ' + list.join('\n  '));
 }
 
-await rm(out, { recursive: true, force: true });
-await mkdir(out, { recursive: true });
-for (const p of pages) {
-	const body =
-		'<p class="crumbs"><a href="./">Guide</a> · ' +
-		escape(p.module.title) +
-		'</p><h1>' +
-		escape(p.name) +
-		'</h1><p class="package"><code>' +
-		escape(p.pkg) +
-		'</code></p><p>' +
-		p.html +
-		'</p>';
-	await writeFile(path.join(out, p.name + '.html'), page(p.name, body));
-}
-const index = MODULES.map((module) => {
-	const items = pages
-		.filter((p) => p.module === module)
-		.sort((a, b) => a.name.localeCompare(b.name))
-		.map((p) => '<li><a href="' + p.name + '.html">' + escape(p.name) + '</a></li>')
-		.join('');
-	return '<h2>' + escape(module.title) + '</h2><ul class="types">' + items + '</ul>';
-}).join('');
-const intro =
-	'<h1>TM1 client guide</h1><p>How to use the client and the testcontainers library, with every example in Java, Python, .NET and TypeScript. ' +
-	'Pick a language on any example and the rest follow. The text is the Java documentation, so names in it are the Java ones: ' +
-	'<code>modelCubes</code> is <code>model_cubes</code> in Python and <code>ModelCubesAsync</code> in .NET.</p>';
-await writeFile(path.join(out, 'index.html'), page('Guide', intro + index));
-await cp(path.join(siteDir, 'guide', 'guide.css'), path.join(out, 'guide.css'));
-await cp(path.join(siteDir, 'guide', 'guide.js'), path.join(out, 'guide.js'));
-console.log('Guide: ' + pages.length + ' pages, ' + examples + ' examples');
+await mkdir(generatedDir, { recursive: true });
+const site = { projects: PROJECTS.map((project) => ({ id: project.id, landing: project.landing })), guide: owners };
+await writeFile(path.join(generatedDir, 'site.json'), JSON.stringify(site, null, 2) + '\n');
+console.log('Docs: ' + pageCount + ' pages, ' + examples + ' examples');

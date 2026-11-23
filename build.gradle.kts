@@ -98,9 +98,9 @@ val checkScripts = tasks.register<PythonTask>("checkScripts") {
 
 val checkApiSite = tasks.register<ToolTask>("checkApiSite") {
 	group = "verification"
-	description = "Tests the API docs site's Worker (api-site/test)."
+	description = "Tests the docs site's Worker and page builders (api-site/test)."
 	directory = root.dir("api-site")
-	commands = listOf(listOf("node", "--test", "test/worker.test.mjs"))
+	commands = listOf(listOf("node", "--test", "test/"))
 }
 
 tasks.register("checkAll") {

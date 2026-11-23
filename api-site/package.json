@@ -1,11 +1,11 @@
 {
   "name": "skipcheck-io-docs",
   "private": true,
-  "description": "Serves the Java API docs at skipcheck.io/projects/<module>/api/ and the guide at skipcheck.io/projects/tm1/guide/",
+  "description": "Builds and serves each project's landing page, docs and API reference at skipcheck.io/<project>/",
   "scripts": {
-    "test": "node --test test/worker.test.mjs",
-    "assemble": "node scripts/assemble.mjs && node scripts/guide.mjs",
-    "guide": "node scripts/guide.mjs",
+    "test": "node --test test/",
+    "assemble": "node scripts/assemble.mjs && node scripts/guide.mjs && node scripts/pages.mjs && node scripts/check-links.mjs",
+    "pages": "node scripts/guide.mjs && node scripts/pages.mjs && node scripts/check-links.mjs",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },

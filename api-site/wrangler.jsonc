@@ -1,5 +1,5 @@
-// Cloudflare Worker for the Java API docs and the guide, served at
-// skipcheck.io/projects/<module>/api/ and skipcheck.io/projects/tm1/guide/ (and on skipcheck.dev).
+// Cloudflare Worker for the projects' pages: each one's landing page, docs and API reference, served
+// at skipcheck.io/<project>/ (and on skipcheck.dev).
 // The site itself (ajmyers/skipcheck.io) is a separate Worker on the skipcheck.io and skipcheck.dev
 // custom domains; a route takes precedence over a custom domain on the same hostname, so these
 // paths come here.
@@ -10,7 +10,7 @@
   "main": "src/worker.js",
   "compatibility_date": "2026-11-01",
   "assets": {
-    // Assembled from each library's build/docs/api-site by scripts/assemble.mjs
+    // Built by scripts/assemble.mjs, guide.mjs and pages.mjs
     "directory": "./dist",
     "binding": "ASSETS",
     // Every request goes through the Worker, which adds the site's masthead, footer and headers
@@ -25,26 +25,28 @@
     // as canonical: skipcheck.dev mirrors skipcheck.io, and search engines should index one copy
     "SITE_ORIGIN": "https://skipcheck.io"
   },
-  // One route per published library and zone: route patterns allow a wildcard only at the start of
-  // the hostname and the end of the path. The leading * takes the bare domain and www, both of
-  // which serve the site. scripts/assemble.mjs reads the module names from here, so this is the
-  // one list to update.
+  // One route per project and zone: route patterns allow a wildcard only at the start of the
+  // hostname and the end of the path. The leading * takes the bare domain and www, both of which
+  // serve the site. The projects are the ones in scripts/site.mjs; test/site.test.mjs fails when a
+  // project there has no route here.
   "routes": [
-    { "pattern": "*skipcheck.io/projects/tm1-client/api*", "zone_name": "skipcheck.io" },
-    { "pattern": "*skipcheck.io/projects/tm1-csdl/api*", "zone_name": "skipcheck.io" },
-    { "pattern": "*skipcheck.io/projects/tm1-testcontainers/api*", "zone_name": "skipcheck.io" },
-    { "pattern": "*skipcheck.io/projects/tm1-spring-boot-starter/api*", "zone_name": "skipcheck.io" },
-    { "pattern": "*skipcheck.io/projects/tm1-spring-boot-testcontainers/api*", "zone_name": "skipcheck.io" },
-    // The guide (scripts/guide.mjs), which covers the client and testcontainers in every language
-    { "pattern": "*skipcheck.io/projects/tm1/guide*", "zone_name": "skipcheck.io" },
+    { "pattern": "*skipcheck.io/tm1-client*", "zone_name": "skipcheck.io" },
+    { "pattern": "*skipcheck.io/tm1-testcontainers*", "zone_name": "skipcheck.io" },
+    { "pattern": "*skipcheck.io/tm1-spring-boot-starter*", "zone_name": "skipcheck.io" },
+    { "pattern": "*skipcheck.io/tm1-spring-boot-testcontainers*", "zone_name": "skipcheck.io" },
+    { "pattern": "*skipcheck.io/tm1-csdl*", "zone_name": "skipcheck.io" },
+    // Where these pages were before: /projects/<project>/..., and the guide at /projects/tm1/guide/.
+    // The Worker sends them to the addresses above. /projects/pa-docker/ is the site's, and
+    // doesn't match.
+    { "pattern": "*skipcheck.io/projects/tm1*", "zone_name": "skipcheck.io" },
 
     // The same on skipcheck.dev
-    { "pattern": "*skipcheck.dev/projects/tm1-client/api*", "zone_name": "skipcheck.dev" },
-    { "pattern": "*skipcheck.dev/projects/tm1-csdl/api*", "zone_name": "skipcheck.dev" },
-    { "pattern": "*skipcheck.dev/projects/tm1-testcontainers/api*", "zone_name": "skipcheck.dev" },
-    { "pattern": "*skipcheck.dev/projects/tm1-spring-boot-starter/api*", "zone_name": "skipcheck.dev" },
-    { "pattern": "*skipcheck.dev/projects/tm1-spring-boot-testcontainers/api*", "zone_name": "skipcheck.dev" },
-    { "pattern": "*skipcheck.dev/projects/tm1/guide*", "zone_name": "skipcheck.dev" }
+    { "pattern": "*skipcheck.dev/tm1-client*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/tm1-testcontainers*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/tm1-spring-boot-starter*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/tm1-spring-boot-testcontainers*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/tm1-csdl*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/projects/tm1*", "zone_name": "skipcheck.dev" }
   ],
   "workers_dev": false,
   "preview_urls": false

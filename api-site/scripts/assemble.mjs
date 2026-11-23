@@ -1,24 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Collects each library's themed Javadoc (./gradlew apiSiteJavadoc) into
-// dist/projects/<module>/api/, and works out the Content-Security-Policy hashes for the inline
+// dist/<project>/api/java/, and works out the Content-Security-Policy hashes for the inline
 // scripts, event handlers and style attributes Javadoc writes into its pages, so the Worker's CSP
 // can allow exactly those and nothing else inline.
 //
-// The modules are the ones wrangler.jsonc has routes for. Run from anywhere: node scripts/assemble.mjs
+// The libraries are the projects in site.mjs: every one has Javadoc. Run from anywhere:
+// node scripts/assemble.mjs
 
 import { createHash } from 'node:crypto';
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { distDir, PROJECTS, repoDir, siteDir } from './site.mjs';
 
-const siteDir = path.resolve(import.meta.dirname, '..');
-const repoDir = path.resolve(siteDir, '..');
-const dist = path.join(siteDir, 'dist');
+const dist = distDir;
 
-const wrangler = await readFile(path.join(siteDir, 'wrangler.jsonc'), 'utf8');
-// Each module has a route on every zone the docs are served on
-const modules = [...new Set([...wrangler.matchAll(/"pattern":\s*"[^"/]+\/projects\/([^/"]+)\/api\*"/g)].map((m) => m[1]))];
-if (modules.length === 0) throw new Error('No /projects/<module>/api* routes in wrangler.jsonc');
+const modules = PROJECTS.map((project) => project.id);
 
 await rm(dist, { recursive: true, force: true });
 for (const module of modules) {
@@ -26,7 +23,7 @@ for (const module of modules) {
 	if (!(await exists(path.join(built, 'index.html')))) {
 		throw new Error(`No Javadoc for ${module} at ${built}: run ./gradlew apiSiteJavadoc first`);
 	}
-	await cp(built, path.join(dist, 'projects', module, 'api'), { recursive: true });
+	await cp(built, path.join(dist, module, 'api', 'java'), { recursive: true });
 }
 
 // The browser hashes the attribute's value after decoding entities, and a script's text as written

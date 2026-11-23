@@ -1,4 +1,5 @@
-# Publish the Java API docs and the guide to skipcheck.io/projects/ (see api-site/README.md).
+# Publish each project's landing page, docs and API reference to skipcheck.io/<project>/ (see
+# api-site/README.md).
 #
 #   Every change: tests the Worker, builds the themed Javadoc and bundles the Worker; deploys
 #                 nothing. It runs as part of CI (ci.yml calls it), under the required ci-ok check.
@@ -65,7 +66,11 @@ jobs:
 
       - name: Assemble the site
         working-directory: api-site
+        # A release's pages name its version: the install steps, and no pre-release notice
         run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            export DOCS_VERSION="${GITHUB_REF_NAME#v}"
+          fi
           npm ci
           npm run assemble
 
