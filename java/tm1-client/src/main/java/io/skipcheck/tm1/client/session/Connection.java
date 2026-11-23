@@ -336,11 +336,18 @@ final class Connection {
 	}
 
 	private <T> Flux<T> page(Tm1Request<T> request, URI uri) {
+		return items(request,
+				exchange(request, uri, response -> ODataCollectionDecoder.decode(response.bodyToFlux(DataBuffer.class),
+						mapper, request.type(), request.method().name(), uri.toString())));
+	}
+
+	/**
+	 * The items of one decoded page, then those of the pages after it, if it has a next
+	 * link.
+	 */
+	private <T> Flux<T> items(Tm1Request<T> request, Flux<ODataCollectionDecoder.Event<T>> events) {
 		return Flux.defer(() -> {
 			String[] next = new String[1];
-			Flux<ODataCollectionDecoder.Event<T>> events = exchange(request, uri,
-					response -> ODataCollectionDecoder.decode(response.bodyToFlux(DataBuffer.class), mapper,
-							request.type(), request.method().name(), uri.toString()));
 			Flux<T> items = events.handle((event, sink) -> {
 				if (event instanceof ODataCollectionDecoder.Event.Item<T> item && item.value() != null) {
 					sink.next(item.value());
@@ -524,15 +531,11 @@ final class Connection {
 							method, uri.toString(), e));
 				}
 			}
-			case COLLECTION ->
-				ODataCollectionDecoder
-					.decode(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(body)), mapper, request.type(),
-							method, uri.toString())
-					.handle((event, sink) -> {
-						if (event instanceof ODataCollectionDecoder.Event.Item<T> item && item.value() != null) {
-							sink.next(item.value());
-						}
-					});
+			// A next link is followed with ordinary requests, as stream() does: the rest
+			// of the collection isn't part of the async result or the batch
+			case COLLECTION -> items(request,
+					ODataCollectionDecoder.decode(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(body)), mapper,
+							request.type(), method, uri.toString()));
 		};
 	}
 

@@ -131,6 +131,23 @@ class Tm1SessionAsyncTest {
 	}
 
 	@Test
+	void followsANextLinkInAResult() {
+		FakeTm1 tm1 = new FakeTm1()
+			.on("GET Cubes",
+					request -> Mono
+						.just(json(200, "{\"value\":[{\"Name\":\"a\"}],\"@odata.nextLink\":\"Cubes?$skiptoken=2\"}")))
+			.on("GET Cubes?$skiptoken=2", request -> Mono.just(json(200, "{\"value\":[{\"Name\":\"b\"}]}")));
+
+		StepVerifier
+			.create(tm1.session()
+				.withAsync(Duration.ofMillis(10))
+				.stream(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), JsonNode.class))
+				.map(cube -> cube.path("Name").asString()))
+			.expectNext("a", "b")
+			.verifyComplete();
+	}
+
+	@Test
 	void readsABigErrorBody() {
 		String big = "x".repeat(300_000);
 		FakeTm1 tm1 = new FakeTm1().on(RUN,
