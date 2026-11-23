@@ -794,6 +794,66 @@ describe("Tm1Session async", () => {
     expect(tm1.requests(RUN), "sent once").toHaveLength(1);
   });
 
+  it("reads a result bigger than the codec's buffer limit", async () => {
+    // The Java client's codecs refused to buffer more than 256 KB; nothing here has such a limit
+    const big = "x".repeat(300_000);
+    const tm1 = new ScriptedTm1().on(RUN, accepted).on(MONITOR, () => done("200 OK", `{"Text":"${big}"}`));
+    const result = await tm1
+      .session()
+      .withAsync(10)
+      .execute(REQUEST as Tm1Request<unknown>);
+    expect((result as { Text: string }).Text).toHaveLength(300_000);
+  });
+
+  it("reads a big collection TM1 gave at once", async () => {
+    const big = "x".repeat(300_000);
+    const tm1 = new ScriptedTm1().on("GET Cubes", () => ScriptedTm1.json(200, `{"value":[{"Name":"${big}"}]}`));
+    const cubes = await tm1
+      .session()
+      .withAsync(10)
+      .stream(Tm1Request.list<{ Name: string }>(ODataPath.of("Cubes"), ODataQuery.none()))
+      .toArray();
+    expect(cubes).toHaveLength(1);
+    expect(cubes[0]!.Name).toHaveLength(300_000);
+  });
+
+  it("reads a big error body", async () => {
+    const big = "x".repeat(300_000);
+    const tm1 = new ScriptedTm1().on(RUN, () => ScriptedTm1.json(500, `{"error":{"code":"174","message":"${big}"}}`));
+    const e = await failure(tm1.session().execute(REQUEST));
+    expect(e).toBeInstanceOf(Tm1ServerException);
+    expect((e as Tm1ServerException).error!.message).toHaveLength(300_000);
+  });
+
+  it("reads a big result and a big error body with Node's fetch", async () => {
+    // A real server, so the bodies come through fetchTransport, the default, in several chunks
+    const big = "x".repeat(300_000);
+    const server = createServer((request, response) => {
+      request.resume();
+      const path = request.url ?? "";
+      if (path.includes("ActiveSession?"))
+        response.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": "TM1SessionId=c1; Path=/api/; HttpOnly" }).end('{"ID":1}');
+      else if (path.includes("tm1.ExecuteWithReturn")) response.writeHead(202, { Location: "../_async('a1')" }).end();
+      else if (path.includes("_async"))
+        response.writeHead(200, { "Content-Type": "application/http" }).end(`HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{"Text":"${big}"}`);
+      else if (path.includes("Broken")) response.writeHead(500, { "Content-Type": "application/json" }).end(`{"error":{"code":"174","message":"${big}"}}`);
+      else response.writeHead(204).end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const root = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1/`;
+      const session = Tm1Session.builder().baseUrl(root).basicAuth("admin", "").build();
+      const result = await session.withAsync(10).execute(REQUEST as Tm1Request<unknown>);
+      expect((result as { Text: string }).Text).toHaveLength(300_000);
+      const e = await failure(session.execute(Tm1Request.get(ODataPath.of("Broken"), ODataQuery.none())));
+      expect(e).toBeInstanceOf(Tm1ServerException);
+      expect((e as Tm1ServerException).error!.message).toHaveLength(300_000);
+      await session.close();
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
   it("deletes the monitor when cancelled", async () => {
     const tm1 = new ScriptedTm1()
       .on(RUN, accepted)
