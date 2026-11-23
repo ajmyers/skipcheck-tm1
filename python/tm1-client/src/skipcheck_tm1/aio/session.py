@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
+import ssl
 import threading
 import time
 from collections.abc import AsyncIterator, Callable, Iterator
@@ -71,6 +73,15 @@ def _check_session_context(session_context: str | None) -> str | None:
     if session_context is not None and len(session_context) > 250:
         raise ValueError(f"TM1 keeps at most 250 characters of session context, got {len(session_context)}")
     return session_context
+
+
+def _ssl_context(verify: bool | str | ssl.SSLContext) -> bool | ssl.SSLContext:
+    """What httpx2 is given for ``verify``: a CA bundle's path (a file, or a directory as
+    OpenSSL's ``capath``) as a context that trusts only it, which httpx2 deprecates taking as a
+    string; anything else as it is."""
+    if not isinstance(verify, str):
+        return verify
+    return ssl.create_default_context(capath=verify) if os.path.isdir(verify) else ssl.create_default_context(cafile=verify)
 
 
 def _refusal(error: BaseException) -> bool:
@@ -413,7 +424,7 @@ class AsyncTm1Session:
         timeouts: Tm1Timeouts | None = None,
         error_classifier: Tm1ErrorClassifier | None = None,
         check_capabilities: bool = True,
-        verify: bool | str = True,
+        verify: bool | str | ssl.SSLContext = True,
         client: httpx2.AsyncClient | None = None,
         clock: Callable[[], float] | None = None,
     ):
@@ -432,7 +443,7 @@ class AsyncTm1Session:
             authenticator = basic(user, password)
         _check_session_context(session_context)
         timeouts = timeouts or Tm1Timeouts.DEFAULTS
-        http = client or runtime.HttpClient(verify=verify, timeout=httpx2.Timeout(timeouts.request, connect=timeouts.connect))
+        http = client or runtime.HttpClient(verify=_ssl_context(verify), timeout=httpx2.Timeout(timeouts.request, connect=timeouts.connect))
         self._connection = _AsyncConnection(
             base_url,
             authenticator,
@@ -917,8 +928,14 @@ class AsyncTm1SessionBuilder:
         """The HTTP client to send through (Java's ``webClient`` and ``connector``)."""
         return self._set(client=client)
 
-    def verify(self, verify: bool | str) -> Self:
-        """Whether to check the server's certificate, or a CA bundle to check it with."""
+    def verify(self, verify: bool | str | ssl.SSLContext) -> Self:
+        """How the server's certificate is checked. ``True`` (the default) checks it against the
+        operating system's trust store, as the .NET client does, so a company CA installed on
+        the machine is trusted; the Java client uses the JVM's trust store instead. That's
+        httpx2's default: ``truststore`` on Windows and macOS, OpenSSL's system CA files on
+        Linux, and ``SSL_CERT_FILE`` or ``SSL_CERT_DIR`` instead when either is set. A path
+        is a CA bundle (a PEM file, or a directory of them) to check it against instead, an
+        ``ssl.SSLContext`` is used as it is, and ``False`` doesn't check it."""
         return self._set(verify=verify)
 
     def check_capabilities(self, check: bool) -> Self:
