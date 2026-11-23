@@ -1,0 +1,42 @@
+# Java unit tests (java/tm1-client/src/test/java, less the live *Tm1Test and *BehaviorTest classes
+# and the service tests that record conformance calls) the .NET client deliberately doesn't have,
+# as: ClassName#methodName: reason, or ClassName: reason for a whole class. Every other one has a
+# test of the same name in Pascal case in tests/Tm1.Client.Tests, outside Live (JavaUnitParityTests).
+# A test belongs here only if it has no meaning in this client; "not ported" isn't a reason.
+
+# Java's architecture rules, checked with ArchUnit over Java's classes. This client keeps its own
+# rules for the same mistakes in ArchitectureTests (KeepsTheODataLayerFreeOfTm1 has Java's name).
+ArchitectureTest#neverBlocksOnAReactiveChain: Reactor's rule against block(); this client's rule is NeverBlocksOnATask
+ArchitectureTest#neverStartsWorkNobodySubscribedTo: Reactor's rule that nothing runs before a subscriber; this client's rule is NeverStartsWorkNobodyCanAwait
+ArchitectureTest#buildsRequestUrisRatherThanUsingUriTemplates: Spring WebClient's URI templates; this client's rule is BuildsRequestUrlsFromPathsOnly
+ArchitectureTest#logsThroughSlf4jOnly: SLF4J; this client's rule is LogsThroughILoggerOnly
+ArchitectureTest#servicesAreStatelessFinalClassesBuiltFromASession: Java's final classes; this client's rule is ServicesAreStatelessSealedClassesBuiltFromASession
+ArchitectureTest#serviceMethodsAreReactiveAndDeclareTheirEndpoints: Java's Mono and Flux return types; this client's rule is ServiceMethodsAreAsynchronousAndDeclareTheirEndpoints
+
+# The conformance recorder: Java records the fixtures in spec/conformance/calls, this client replays them
+ConformanceFixturesTest: checks every fixture has a Java test class that records it; this client records none and replays them all (ConformanceCallsTests)
+
+# Java's metadata snapshot tooling, over its CsdlDocument model of $metadata. This client doesn't
+# model CSDL: Tm1Capabilities.Parse reads only what capability checks need (Tm1CapabilitiesTests).
+ApproximateSchemasTest: Java's tooling that derives older schemas from the snapshot's CsdlDocument (Tm1CapabilitiesTests writes its older schema out instead)
+MetadataDriftTest: a live check that Java's committed snapshot matches the server's $metadata; the snapshot is Java's, and this client only reads it
+MetadataSnapshotTest: checks Java's CsdlDocument model of the snapshot (type counts, revisions, descriptions, signatures), which this client doesn't have
+MetadataSnapshotUpdateTest: Java's tool that writes the snapshot from a live server, run by hand
+
+# Java's generated model and its payload fixtures
+GeneratedModelTest: Java's generated classes (Jackson annotations, builders, typed patches); this client's generated model has its own tests in PayloadTests
+PayloadCaptureTest: Java's tool that captures the payloads under java/tm1-client/src/test/resources/payloads from a live server, run by hand; this client reads those files
+
+# Java's collection decoder parses a response incrementally from Reactor buffers, as demand
+# allows. This client reads each page of a collection whole and yields its items, page by page.
+ODataCollectionDecoderTest#releasesBuffersItHasntReadWhenCancelled: Reactor's pooled DataBuffers; this client reads a page into one array, with nothing to release
+ODataCollectionDecoderTest#asksForBuffersOnlyAsItemsAreTaken: Reactor's demand for buffers; this client reads a page whole
+ODataCollectionDecoderTest#givesTheSameResultHoweverTheBytesAreSplit: the incremental parse across buffer boundaries; this client parses a page whole, unsplit
+ODataCollectionDecoderTest#handlesMultibyteCharactersSplitAcrossBuffers: a character across buffer boundaries; this client decodes a page whole, unsplit
+ODataCollectionDecoderTest#streamsALargeCollectionWithoutReadingAheadOfDemand: Reactor's demand within a page; this client reads a page whole
+
+# Micrometer observations. This client has no observation registry (JavaParityRuntimeTests:
+# Tm1Session.Builder.observationRegistry); a caller observes requests by wrapping the HttpHandler.
+Tm1SessionPoolTest#observesEvictionsWithTheirReason: a Micrometer observation, which this client doesn't make (the reason is counted in Tm1SessionPoolStats)
+Tm1SessionReloginTest#observesTheReloginWithItsReason: a Micrometer observation, which this client doesn't make
+Tm1SessionTest#observesLoginAndClose: a Micrometer observation, which this client doesn't make

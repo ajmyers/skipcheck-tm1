@@ -42,10 +42,14 @@ public partial class LiveTestParityTests
         (javaClass.EndsWith("Tm1Test", StringComparison.Ordinal) ? javaClass[..^"Tm1Test".Length] : javaClass[..^"Test".Length]) + "LiveTests";
 
     /// <summary>live-excluded.txt: <c>Class</c> or <c>Class#method</c> → the reason.</summary>
-    public static Dictionary<string, string> Excluded()
+    public static Dictionary<string, string> Excluded() => Exclusions(File.ReadAllLines(ExcludedFile));
+
+    /// <summary>The lines of an exclusions file (this one, or JavaUnitParityTests' unit-excluded.txt):
+    /// <c>Class</c> or <c>Class#method</c> → the reason. Blank lines and <c>#</c> comments are skipped.</summary>
+    internal static Dictionary<string, string> Exclusions(IEnumerable<string> lines)
     {
         var result = new Dictionary<string, string>();
-        foreach (var line in File.ReadAllLines(ExcludedFile).Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith('#')))
+        foreach (var line in lines.Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith('#')))
         {
             var colon = line.IndexOf(':', StringComparison.Ordinal);
             Assert.True(colon > 0 && line[(colon + 1)..].Trim().Length > 0, $"'{line}' needs a reason: ClassName#methodName: reason");
@@ -128,5 +132,5 @@ public partial class LiveTestParityTests
 
     // @Test or @ParameterizedTest, any annotations after it, then the method
     [GeneratedRegex(@"@(?:Test|ParameterizedTest)\b(?:\([^)]*\))?(?:\s*@\w+(?:\((?:[^()""]|""[^""]*"")*\))?)*\s+(?:public\s+)?void\s+(?<name>\w+)\s*\(")]
-    private static partial Regex TestPattern();
+    internal static partial Regex TestPattern();
 }
