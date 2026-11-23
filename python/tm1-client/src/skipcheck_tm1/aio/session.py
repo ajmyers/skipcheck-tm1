@@ -662,19 +662,22 @@ class AsyncTm1Session:
     async def iterate(self, call: p.Call) -> AsyncIterator[Any]:
         """The items of a collection, page by page, following TM1's next links: what :meth:`stream`
         iterates, for a call rather than a request. On an async view, the first page may come as
-        an async result, and each page after it is asked for the same way. Can't join a batch."""
+        an async result, and each page after it is asked for with an ordinary request, as the other
+        clients do: a next link names a page TM1 has ready, not more work to wait for. Can't join a
+        batch."""
         if self._queue is not None:
             raise RuntimeError("A collection can't be iterated in a batch: use collect(), whose result is every item once the batch has run")
         # Running until the last item is taken or the iterator is closed, not only while a page is
         # fetched: a pool mustn't close the session between two pages
         with self._connection.busy():
             page = await self.execute(call)
+            pages = self.without_async()
             while True:
                 for item in page.items:
                     yield item
                 if page.next_link is None:
                     return
-                page = await self.execute(p.Call("GET", page.next_link, read=call.read, contextual=False))
+                page = await pages.execute(p.Call("GET", page.next_link, read=call.read, contextual=False))
 
     async def _send_async(self, method: str, url: str, content: bytes | None, headers: dict[str, str], accept: str) -> p.Reply:
         assert self._async_every is not None

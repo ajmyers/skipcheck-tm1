@@ -914,6 +914,9 @@ def test_follows_a_next_link_in_a_result(rt: Runtime) -> None:
     session = rt.session().with_async(0.01)
     assert [cube["Name"] for cube in streamed(rt, session, CUBES)] == ["a", "b"]
     assert [cube["Name"] for cube in rt.run(session.collect(CUBES))] == ["a", "b"]
+    assert [r.headers.get("Prefer") for r in requests_to(rt, "GET Cubes")] == ["respond-async", "respond-async"]
+    # The pages after it are ordinary requests
+    assert [r.headers.get("Prefer") for r in requests_to(rt, "GET Cubes?$skiptoken=2")] == [None, None]
 
 
 def test_follows_a_next_link_in_a_result_it_polled_for(rt: Runtime) -> None:
