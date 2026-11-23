@@ -34,7 +34,7 @@ export function lines(file: string): string[] {
  * implemented (in a service's endpoint table), excluded with a reason, or pending, under the same
  * rules, against the same inventory. */
 describe("coverage gate", () => {
-  it("accounts for every endpoint", () => {
+  it("every endpoint is accounted for", () => {
     const all = endpoints();
     const done = implemented();
     const excluded = new Map<string, string>();
