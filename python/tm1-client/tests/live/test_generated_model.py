@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The generated model, read straight from a real TM1 through the session: a port of the Java
 client's GeneratedModelTm1Test."""
 

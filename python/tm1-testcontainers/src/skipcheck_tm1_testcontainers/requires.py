@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Java's ``@Requires…`` annotations: their messages here, and as pytest markers (the
 ``mark`` of each, or ``@pytest.mark.requires_tm1`` and the others; see
 :mod:`skipcheck_tm1_testcontainers.plugin`)."""

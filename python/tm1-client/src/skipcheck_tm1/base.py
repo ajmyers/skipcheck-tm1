@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """What the generated model is built on: :class:`Tm1Model`, :class:`Tm1Enum` and the
 conversion of values to TM1's JSON.
 

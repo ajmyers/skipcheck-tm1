@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """MDX statements, and the model and control cube and dimension functions, against a real TM1: a
 port of the Java client's MdxAndModelTm1Test."""
 

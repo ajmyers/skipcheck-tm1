@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """ChoreService against a real TM1: a port of the Java client's ChoreServiceTm1Test. Its process
 creates the dimension its pName parameter names."""
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """MemberService against a real TM1: a port of the Java client's MemberServiceTm1Test. The
 dimension is conftest.py's world."""
 

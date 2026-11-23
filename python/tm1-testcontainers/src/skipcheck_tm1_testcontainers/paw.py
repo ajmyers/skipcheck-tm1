@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Planning Analytics Workspace Local in Docker: Java's ``PawContainer`` and ``PawSession``.
 
 IBM ships PAW Local as Docker images with compose files and scripts, in

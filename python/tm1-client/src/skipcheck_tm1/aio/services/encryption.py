@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Services for encryption at rest (the Java client's ``io.skipcheck.tm1.client.service.encryption``)."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Rules the library's code keeps, checked over its source: a port of the Java client's
 ArchitectureTest, which checks the same over the compiled classes. Each one is a mistake that's
 easy to make, passes most tests, and goes wrong in production; its ``because`` says why. The rules

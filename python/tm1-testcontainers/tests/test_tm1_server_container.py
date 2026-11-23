@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Java's Tm1ServerContainerTest: against a TM1 server in Docker, skipped without one."""
 
 from __future__ import annotations

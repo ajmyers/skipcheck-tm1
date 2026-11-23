@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The OData encoding every client must agree on (spec/conformance/odata-encoding.json), which
 the Java client's ODataConformanceTest reads too."""
 

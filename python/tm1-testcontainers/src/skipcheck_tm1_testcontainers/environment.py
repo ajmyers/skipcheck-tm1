@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Several Planning Analytics parts wired together: Java's ``PlanningAnalyticsEnvironment``."""
 
 from __future__ import annotations

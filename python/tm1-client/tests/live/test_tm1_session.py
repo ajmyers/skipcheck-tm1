@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Tm1Session against a real TM1: logging in, requests, and leaving no session behind. A port of
 the Java client's Tm1SessionTm1Test; they need an administrator's credentials, as the Java tests
 do."""

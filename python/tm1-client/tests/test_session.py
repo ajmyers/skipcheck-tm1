@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The session and the resources' safety rules, against a fake TM1."""
 
 from __future__ import annotations

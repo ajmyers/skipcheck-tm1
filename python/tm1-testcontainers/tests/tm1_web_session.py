@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Java's Tm1WebSession (a test helper there too): TM1 Web's DWR calls, as its pages make them."""
 
 from __future__ import annotations

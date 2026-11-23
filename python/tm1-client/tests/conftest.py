@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Shared fixtures: the spec, and a fake TM1 on httpx's MockTransport."""
 
 from __future__ import annotations

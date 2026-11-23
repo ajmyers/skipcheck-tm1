@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """SubsetService against a real TM1: a port of the Java client's SubsetServiceTm1Test."""
 
 from __future__ import annotations

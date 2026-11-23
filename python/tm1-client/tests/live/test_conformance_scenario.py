@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The live conformance scenarios (spec/conformance/live) against a real TM1: a port of the Java
 client's ConformanceScenarioTm1Test, run in both flavors. Each step must meet its expectation, and
 what the client sent is written to build/conformance-live for scripts/compare-live-traffic.py to

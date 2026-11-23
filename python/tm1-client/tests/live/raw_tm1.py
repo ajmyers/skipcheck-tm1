@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Bare HTTP to TM1, as the Java tests' RawTm1: for tests that pin how TM1 itself behaves,
 independent of the client.
 

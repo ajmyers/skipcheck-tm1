@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Version and capabilities read from a real TM1: a port of the Java client's
 Tm1CapabilitiesTm1Test."""
 

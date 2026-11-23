@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Ported from the Java client's error/Tm1ErrorsTest, odata/ODataQueryTest, FilterTest and
 ODataPathTest, version/Tm1VersionTest and Tm1DialectTest, session/Tm1TimeoutsTest,
 auth/Tm1AuthenticatorTest, Tm1RequestTest and Tm1OperationTest."""

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The runtime offers what the Java client's does, read from the Java sources: every public
 method of the session, version, error, auth, OData and request classes has a Python
 counterpart in snake case (a property for a no-argument accessor, a field for a record's

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """TM1 Git: putting a model under version control, and moving it between servers (the Java
 client's ``io.skipcheck.tm1.client.service.git``)."""
 

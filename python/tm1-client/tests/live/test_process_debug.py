@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """ProcessDebugService against a real TM1: a port of the Java client's ProcessDebugTm1Test. The
 process has three lines: nA = 1; nB = nA + 1; nC = nB + 1."""
 

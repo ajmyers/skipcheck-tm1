@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """OData v4 encoding: literals, path segments, query options and ``@odata.bind``.
 
 The rules match the Java client's ``io.skipcheck.tm1.client.odata`` package, so both send

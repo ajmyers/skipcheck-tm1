@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """What Testcontainers for Java's ``GenericContainer`` gives the Java classes and
 testcontainers-python's ``DockerContainer`` lacks: configuring without Docker (a container is
 set up before it connects, so wiring can be tested anywhere), dependencies started first,

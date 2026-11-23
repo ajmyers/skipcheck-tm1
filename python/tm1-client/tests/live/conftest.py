@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests against a real TM1: the Java client's ``*Tm1Test`` and ``*BehaviorTest`` classes, one file
 each (``CubeServiceTm1Test`` is test_cube_service.py, ``Tm1SessionBehaviorTest`` is
 test_tm1_session_behavior.py), with each test under its Java name in snake case. The offline

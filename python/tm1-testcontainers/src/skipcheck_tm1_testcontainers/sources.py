@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Where each product comes from: Java's ``Tm1Source``, ``CognosSource``, ``Tm1WebSource`` and
 ``PawSource``.
 

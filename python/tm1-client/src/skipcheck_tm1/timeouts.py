@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """How long a session waits, as the Java client's ``Tm1Timeouts``."""
 
 from __future__ import annotations

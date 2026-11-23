@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The async view against TM1: results through the monitor, and cancelling a run. A port of the
 Java client's Tm1SessionAsyncTm1Test."""
 

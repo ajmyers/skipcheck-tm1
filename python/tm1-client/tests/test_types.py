@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The type check, as part of the tests: ``pytest`` fails on a type error in either package's
 sources, as the Java build fails on a NullAway or Error Prone finding. Pyright, configured in
 python/pyrightconfig.json, over the hand-written and the generated modules alike (the tests run

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The services, one module per package of the Java client's ``service`` package."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Testcontainers for IBM Planning Analytics (TM1): TM1 Server, the Admin Server, TM1 Web,
 Planning Analytics Workspace, Cognos Analytics and Keycloak in Docker, for tests. The Python port
 of the Java ``tm1-testcontainers`` module, on testcontainers-python.

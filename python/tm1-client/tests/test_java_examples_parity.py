@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The guide's examples are the Java ones, file for file and region for region, read from the Java
 sources themselves (java/<module>/src/examples/java/examples/*.java):
 

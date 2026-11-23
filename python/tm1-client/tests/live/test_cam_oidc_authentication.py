@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Logging on to a TM1 in CAM security through Cognos's OpenID Connect namespace, with Keycloak as
 the provider: a password Cognos checks with Keycloak, and an ID token the application holds,
 exchanged at Cognos for a passport. A port of the Java client's CamOidcAuthenticationTm1Test."""

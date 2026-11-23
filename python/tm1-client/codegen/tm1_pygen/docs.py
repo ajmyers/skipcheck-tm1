@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Docstrings from the spec's Markdown-ish text."""
 
 from __future__ import annotations

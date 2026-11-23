@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Replays the Java client's recorded service calls (``spec/conformance/calls``) in both flavors:
 the same call, with the same arguments, must send exactly the requests the Java client sent and,
 given the answers it got, return the same result or fail the same way."""

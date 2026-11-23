@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The runtime in each flavor: sessions over the fake TM1, as the Java tests' ``FakeTm1``."""
 
 from __future__ import annotations

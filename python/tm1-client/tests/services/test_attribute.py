@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The attribute services (definitions per AttributeSet, translations per AttributeOwner), in
 both flavors, against a fake TM1."""
 

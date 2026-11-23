@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The few primitives the asyncio and sync flavors do differently.
 
 The asyncio code (:mod:`skipcheck_tm1.aio`) is the source of truth; the sync flavor

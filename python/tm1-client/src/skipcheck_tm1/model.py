@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The TM1 REST API's model: an enum or a pydantic model per CSDL type, generated from the
 API spec (see :mod:`skipcheck_tm1._generated.model`)."""
 

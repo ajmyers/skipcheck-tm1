@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """ServerService and LogService, in both flavors, against a fake TM1: each method sends what
 the Java client's does, and reads TM1's answer the same way."""
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The live conformance runner, offline: the processes, chores and server scenarios against a fake
 TM1 that answers as TM1 would, in both flavors (the Java client's ProcessAndServerScenariosTest,
 with the same fake)."""

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Every endpoint of the spec, called through the generated API against a fake TM1: each sends
 the request OData says it should (method, path, parameters).
 

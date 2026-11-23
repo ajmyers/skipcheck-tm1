@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The Python client offers what the Java client does, method for method, read from the Java
 sources themselves (java/tm1-client/src/main/java/.../service):
 

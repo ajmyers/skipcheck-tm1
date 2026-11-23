@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """The data services (cellsets, cells, member sets, sandboxes, change sets, drillthrough) and
 Tuples, in both flavors, against a fake TM1."""
 

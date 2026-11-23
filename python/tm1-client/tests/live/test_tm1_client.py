@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Connect, read ``Server``, close: a port of the Java client's Tm1ClientTm1Test."""
 
 from __future__ import annotations

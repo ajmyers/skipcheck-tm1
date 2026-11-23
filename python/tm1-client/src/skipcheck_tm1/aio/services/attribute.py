@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Attribute definitions, and the attribute values translated per locale
 (``LocalizedAttributes``), for every kind of TM1 object that has them (the Java client's
 ``io.skipcheck.tm1.client.service.attribute``). Attribute values in the default locale are cells
