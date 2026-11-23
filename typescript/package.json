@@ -13,7 +13,7 @@
   "scripts": {
     "generate": "npm run generate -w tm1-client",
     "build": "npm run build -w tm1-client && npm run build -w tm1-testcontainers",
-    "pretest": "npm run generate && npm run format:check && npm run lint",
+    "pretest": "npm run generate && npm run format:check && npm run lint && npm run typecheck",
     "test": "npm test -w tm1-client && npm test -w tm1-testcontainers",
     "typecheck": "npm run typecheck -w tm1-client && npm run typecheck -w tm1-testcontainers",
     "test:live": "npm run test:live -w tm1-client",

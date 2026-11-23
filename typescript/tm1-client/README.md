@@ -61,8 +61,7 @@ In a browser, the browser keeps TM1's session cookie (`credentials: "include"`, 
 
 ```sh
 npm ci
-npm test            # generates, then runs vitest
-npm run typecheck
+npm test            # generates, checks layout, lint and types, then runs vitest
 npm run build
 ```
 

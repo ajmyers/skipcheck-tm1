@@ -19,32 +19,24 @@
 #
 #   scripts/live-tests.sh                  # all four
 #   scripts/live-tests.sh python dotnet    # some
+#
+# The suites are Gradle tasks (build.gradle.kts), so the same runs on Windows, where there's no
+# bash: ./gradlew liveTest --continue, or some of :tm1-client:liveTest, liveTestPython,
+# liveTestDotnet, liveTestTypescript with compareLiveTraffic. This script is that, by suite name.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if [[ -z "${TM1_PRIVATE_IMAGE:-}${TM1_HOME_DIR:-}${TM1_INSTALL_VOLUME:-}${TM1_BUNDLE_DIR:-}${TM1_BUNDLE_URL:-}${TM1_URL:-}" ]]; then
-  echo "No TM1 configured: set one of TM1_PRIVATE_IMAGE, TM1_HOME_DIR, TM1_INSTALL_VOLUME, TM1_BUNDLE_DIR, TM1_BUNDLE_URL (or TM1_URL)" >&2
-  exit 2
-fi
-
 suites=("$@")
 [[ ${#suites[@]} -eq 0 ]] && suites=(java python dotnet typescript)
-failed=()
-rm -rf build/conformance-live
+tasks=()
 for suite in "${suites[@]}"; do
-  echo "== $suite"
   case "$suite" in
-    # --rerun: Gradle doesn't know a TM1 is an input, and would call the tests up to date
-    java) ./gradlew :tm1-client:test --rerun --tests '*Tm1Test' || failed+=(java) ;;
-    python) (cd python/tm1-client && python -m pytest tests/live -rs) || failed+=(python) ;;
-    dotnet) dotnet test dotnet/Tm1.slnx --filter 'FullyQualifiedName~.Live.' || failed+=(dotnet) ;;
-    typescript) (cd typescript && npm run test:live -w tm1-client && npm test -w tm1-testcontainers) || failed+=(typescript) ;;
+    java) tasks+=(:tm1-client:liveTest) ;;
+    python) tasks+=(liveTestPython) ;;
+    dotnet) tasks+=(liveTestDotnet) ;;
+    typescript) tasks+=(liveTestTypescript) ;;
     *) echo "Unknown suite: $suite (java, python, dotnet, typescript)" >&2; exit 2 ;;
   esac
 done
-echo "== conformance traffic"
-python3 scripts/compare-live-traffic.py build/conformance-live || failed+=(conformance)
-if [[ ${#failed[@]} -gt 0 ]]; then
-  echo "Failed: ${failed[*]}" >&2
-  exit 1
-fi
+# --continue: a suite that fails doesn't stop the ones after it, nor the comparison
+exec ./gradlew --continue "${tasks[@]}" compareLiveTraffic
