@@ -15,7 +15,7 @@ import { distDir, SECTIONS } from './site.mjs';
 
 // What these pages may link to on the site itself. Add an address here when a page starts to use
 // it, after checking that the site serves it.
-const SITE_PATHS = new Set(['/', '/styles.css', '/tokens.css', '/chrome.css', '/code.css', '/highlight.js', '/favicon.svg', '/projects/pa-docker/', '/projects/pa-docker/setup/']);
+const SITE_PATHS = new Set(['/', '/styles.css', '/tokens.css', '/chrome.css', '/code.css', '/highlight.js', '/favicon.svg', '/projects/pa-docker/setup/']);
 
 const exists = (file) =>
 	stat(file).then(
