@@ -1,14 +1,14 @@
 package examples;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Thread;
-import net.ajmyers.tm1.client.odata.Filter;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Thread;
+import io.skipcheck.tm1.client.odata.Filter;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.security.ThreadService}, quoted in
+ * Examples for {@link io.skipcheck.tm1.client.service.security.ThreadService}, quoted in
  * its Javadoc.
  */
 final class ThreadServiceExamples {

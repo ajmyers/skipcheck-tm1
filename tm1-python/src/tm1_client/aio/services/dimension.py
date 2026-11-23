@@ -1,5 +1,5 @@
 """Services for dimensions, hierarchies, elements, edges, levels, members and subsets (the Java
-client's ``net.ajmyers.tm1.client.service.dimension``)."""
+client's ``io.skipcheck.tm1.client.service.dimension``)."""
 
 from __future__ import annotations
 

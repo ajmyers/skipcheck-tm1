@@ -3,15 +3,15 @@ package examples;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.CellsetCell;
-import net.ajmyers.tm1.client.model.SandboxPatch;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.CellsetCell;
+import io.skipcheck.tm1.client.model.SandboxPatch;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.data.SandboxService}, quoted in its
+ * Examples for {@link io.skipcheck.tm1.client.service.data.SandboxService}, quoted in its
  * Javadoc.
  */
 final class SandboxServiceExamples {

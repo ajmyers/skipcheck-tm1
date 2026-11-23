@@ -3,8 +3,8 @@ package examples;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import net.ajmyers.tm1.client.auth.Tm1Authenticator;
-import net.ajmyers.tm1.spring.boot.autoconfigure.Tm1ConnectionDetails;
+import io.skipcheck.tm1.client.auth.Tm1Authenticator;
+import io.skipcheck.tm1.spring.boot.autoconfigure.Tm1ConnectionDetails;
 import reactor.core.publisher.Mono;
 
 /**

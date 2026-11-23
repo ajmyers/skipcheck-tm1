@@ -1,18 +1,18 @@
 package examples;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Attributes;
-import net.ajmyers.tm1.client.model.AttributesPatch;
-import net.ajmyers.tm1.client.model.LocalizedAttributes;
-import net.ajmyers.tm1.client.model.LocalizedAttributesPatch;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.client.service.attribute.AttributeOwner;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Attributes;
+import io.skipcheck.tm1.client.model.AttributesPatch;
+import io.skipcheck.tm1.client.model.LocalizedAttributes;
+import io.skipcheck.tm1.client.model.LocalizedAttributesPatch;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.service.attribute.AttributeOwner;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
 
 /**
  * Examples for
- * {@link net.ajmyers.tm1.client.service.attribute.LocalizedAttributeService}, quoted in
+ * {@link io.skipcheck.tm1.client.service.attribute.LocalizedAttributeService}, quoted in
  * its Javadoc.
  */
 final class LocalizedAttributeServiceExamples {

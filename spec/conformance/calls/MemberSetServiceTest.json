@@ -1,6 +1,6 @@
 {
 	"specVersion" : 1,
-	"source" : "net.ajmyers.tm1.client.service.data.MemberSetServiceTest",
+	"source" : "io.skipcheck.tm1.client.service.data.MemberSetServiceTest",
 	"session" : {
 		"productVersion" : "11.8.03500.6"
 	},

@@ -6,9 +6,9 @@ import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.testcontainers.RequiresTm1;
-import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.testcontainers.RequiresTm1;
+import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /**
  * The Getting started example on tm1-testcontainers' overview page: a JUnit test,

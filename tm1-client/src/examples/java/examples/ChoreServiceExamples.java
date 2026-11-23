@@ -4,19 +4,19 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Chore;
-import net.ajmyers.tm1.client.model.ChoreExecutionMode;
-import net.ajmyers.tm1.client.model.ChorePatch;
-import net.ajmyers.tm1.client.model.ChoreTask;
-import net.ajmyers.tm1.client.model.ChoreTaskParameterPatch;
-import net.ajmyers.tm1.client.model.ChoreTaskPatch;
-import net.ajmyers.tm1.client.odata.ODataPath;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Chore;
+import io.skipcheck.tm1.client.model.ChoreExecutionMode;
+import io.skipcheck.tm1.client.model.ChorePatch;
+import io.skipcheck.tm1.client.model.ChoreTask;
+import io.skipcheck.tm1.client.model.ChoreTaskParameterPatch;
+import io.skipcheck.tm1.client.model.ChoreTaskPatch;
+import io.skipcheck.tm1.client.odata.ODataPath;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.process.ChoreService}, quoted in its
- * Javadoc.
+ * Examples for {@link io.skipcheck.tm1.client.service.process.ChoreService}, quoted in
+ * its Javadoc.
  */
 final class ChoreServiceExamples {
 

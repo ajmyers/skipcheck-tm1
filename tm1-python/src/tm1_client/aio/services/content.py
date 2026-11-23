@@ -1,5 +1,5 @@
 """Services for the Applications contents tree: folders, documents, links and references (the
-Java client's ``net.ajmyers.tm1.client.service.content``)."""
+Java client's ``io.skipcheck.tm1.client.service.content``)."""
 
 from __future__ import annotations
 

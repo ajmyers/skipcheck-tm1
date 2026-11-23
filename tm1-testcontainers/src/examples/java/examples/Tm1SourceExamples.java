@@ -5,8 +5,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
 
-import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
-import net.ajmyers.tm1.testcontainers.Tm1Source;
+import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.testcontainers.Tm1Source;
 
 /**
  * Examples for {@link Tm1Source}, quoted in its Javadoc.

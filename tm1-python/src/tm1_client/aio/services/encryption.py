@@ -1,4 +1,4 @@
-"""Services for encryption at rest (the Java client's ``net.ajmyers.tm1.client.service.encryption``)."""
+"""Services for encryption at rest (the Java client's ``io.skipcheck.tm1.client.service.encryption``)."""
 
 from __future__ import annotations
 

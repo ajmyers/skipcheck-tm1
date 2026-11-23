@@ -1,5 +1,5 @@
 """Services for data: cellsets, cell writes, MDX, sandboxes, change sets and drillthrough (the
-Java client's ``net.ajmyers.tm1.client.service.data``)."""
+Java client's ``io.skipcheck.tm1.client.service.data``)."""
 
 from __future__ import annotations
 

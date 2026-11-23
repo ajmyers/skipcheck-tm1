@@ -47,7 +47,7 @@ sourceSets.test {
 	resources.srcDir("src/model")
 }
 
-// The model (net.ajmyers.tm1.client.model) is generated from the $metadata snapshot at build
+// The model (io.skipcheck.tm1.client.model) is generated from the $metadata snapshot at build
 // time by tm1-codegen (plan §8.1), into build/generated: never committed, never edited. A TM1
 // upgrade shows up as a diff of the snapshot, not of the generated code.
 val codegen = configurations.create("codegen") {
@@ -62,7 +62,7 @@ val generateModel = tasks.register<JavaExec>("generateModel") {
 	group = "build"
 	description = "Generates the model from the \$metadata snapshot."
 	classpath = codegen
-	mainClass = "net.ajmyers.tm1.codegen.Tm1Codegen"
+	mainClass = "io.skipcheck.tm1.codegen.Tm1Codegen"
 	inputs.file(snapshot).withPathSensitivity(PathSensitivity.RELATIVE)
 	outputs.dir(modelSources)
 	outputs.cacheIf { true }

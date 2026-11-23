@@ -1,11 +1,11 @@
 package examples;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.KeyProtectSettingsPatch;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.KeyProtectSettingsPatch;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.encryption.EncryptionService},
+ * Examples for {@link io.skipcheck.tm1.client.service.encryption.EncryptionService},
  * quoted in its Javadoc.
  */
 final class EncryptionServiceExamples {

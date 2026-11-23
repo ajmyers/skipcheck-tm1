@@ -3,11 +3,11 @@ package examples;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import net.ajmyers.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.Tm1Client;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.data.ChangeSetService}, quoted in
+ * Examples for {@link io.skipcheck.tm1.client.service.data.ChangeSetService}, quoted in
  * its Javadoc.
  */
 final class ChangeSetServiceExamples {

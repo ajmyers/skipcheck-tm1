@@ -39,7 +39,7 @@ tasks.register<JavaExec>("exportSpec") {
 	group = "build"
 	description = "Exports the language-neutral API spec (spec/tm1-api.json) from the \$metadata snapshot."
 	classpath = sourceSets.main.get().runtimeClasspath
-	mainClass = "net.ajmyers.tm1.codegen.Tm1Codegen"
+	mainClass = "io.skipcheck.tm1.codegen.Tm1Codegen"
 	args("spec", snapshot.path, spec.path)
 	inputs.file(snapshot)
 	outputs.file(spec)

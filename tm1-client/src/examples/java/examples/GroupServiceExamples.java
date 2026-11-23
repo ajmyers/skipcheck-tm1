@@ -2,15 +2,15 @@ package examples;
 
 import java.util.stream.Stream;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Group;
-import net.ajmyers.tm1.client.model.User;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Group;
+import io.skipcheck.tm1.client.model.User;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.security.GroupService}, quoted in
+ * Examples for {@link io.skipcheck.tm1.client.service.security.GroupService}, quoted in
  * its Javadoc.
  */
 final class GroupServiceExamples {

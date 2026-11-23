@@ -1,4 +1,4 @@
-"""Errors, as the Java client's ``net.ajmyers.tm1.client.error``.
+"""Errors, as the Java client's ``io.skipcheck.tm1.client.error``.
 
 Every failure is a :class:`Tm1Error`, which says whether a retry could help
 (:meth:`~Tm1Error.is_retryable`) and whether the request may have taken effect

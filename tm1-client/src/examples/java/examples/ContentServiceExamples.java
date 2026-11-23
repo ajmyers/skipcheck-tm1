@@ -5,22 +5,22 @@ import java.nio.file.Path;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.CubeReference;
-import net.ajmyers.tm1.client.model.CubeReferencePatch;
-import net.ajmyers.tm1.client.model.DocumentPatch;
-import net.ajmyers.tm1.client.model.Entry;
-import net.ajmyers.tm1.client.model.FolderPatch;
-import net.ajmyers.tm1.client.model.LinkPatch;
-import net.ajmyers.tm1.client.odata.ODataPath;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.client.service.content.ContentPath;
-import net.ajmyers.tm1.client.service.content.ContentScope;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.CubeReference;
+import io.skipcheck.tm1.client.model.CubeReferencePatch;
+import io.skipcheck.tm1.client.model.DocumentPatch;
+import io.skipcheck.tm1.client.model.Entry;
+import io.skipcheck.tm1.client.model.FolderPatch;
+import io.skipcheck.tm1.client.model.LinkPatch;
+import io.skipcheck.tm1.client.odata.ODataPath;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.service.content.ContentPath;
+import io.skipcheck.tm1.client.service.content.ContentScope;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.content.ContentService} and
+ * Examples for {@link io.skipcheck.tm1.client.service.content.ContentService} and
  * {@link ContentPath}, quoted in their Javadoc.
  */
 final class ContentServiceExamples {

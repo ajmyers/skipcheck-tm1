@@ -38,7 +38,7 @@ Builds use JDK 27 via Gradle toolchains; published libraries target Java 17 byte
 
 Pushing a tag like `v0.1.0` publishes everything at that version:
 
-- Libraries go to Maven Central as `net.ajmyers.tm1:<module>:0.1.0` ([`release.yml`](.github/workflows/release.yml)).
+- Libraries go to Maven Central as `io.skipcheck:<module>:0.1.0` ([`release.yml`](.github/workflows/release.yml)).
 - Docker images go to `ghcr.io/ajmyers/<image>:0.1.0` and `:latest` ([`docker.yml`](.github/workflows/docker.yml)). Every commit to `master` also publishes `:edge`. Pull requests build and smoke-test the images but don't push them.
 
 Each image has its own on/off switch, a repository variable named in `docker.yml` (e.g. `PUBLISH_DOCKER_TM1_SERVER`). Until it's set to `true`, that image is built and tested but never pushed:

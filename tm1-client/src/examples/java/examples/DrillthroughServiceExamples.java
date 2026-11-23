@@ -2,19 +2,19 @@ package examples;
 
 import java.util.List;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Cellset;
-import net.ajmyers.tm1.client.model.CellsetCell;
-import net.ajmyers.tm1.client.model.CubeDrillthrough;
-import net.ajmyers.tm1.client.model.ProcessParameterPatch;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.client.service.data.CellsetService;
-import net.ajmyers.tm1.client.service.data.DrillthroughService;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Cellset;
+import io.skipcheck.tm1.client.model.CellsetCell;
+import io.skipcheck.tm1.client.model.CubeDrillthrough;
+import io.skipcheck.tm1.client.model.ProcessParameterPatch;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.service.data.CellsetService;
+import io.skipcheck.tm1.client.service.data.DrillthroughService;
 import reactor.core.publisher.Flux;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.data.DrillthroughService}, quoted in
- * its Javadoc.
+ * Examples for {@link io.skipcheck.tm1.client.service.data.DrillthroughService}, quoted
+ * in its Javadoc.
  */
 final class DrillthroughServiceExamples {
 

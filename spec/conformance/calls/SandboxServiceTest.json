@@ -1,6 +1,6 @@
 {
 	"specVersion" : 1,
-	"source" : "net.ajmyers.tm1.client.service.data.SandboxServiceTest",
+	"source" : "io.skipcheck.tm1.client.service.data.SandboxServiceTest",
 	"session" : {
 		"productVersion" : "11.8.03500.6"
 	},

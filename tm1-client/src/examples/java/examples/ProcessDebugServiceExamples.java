@@ -3,18 +3,18 @@ package examples;
 import java.util.Map;
 import java.util.Objects;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.ProcessDebugContext;
-import net.ajmyers.tm1.client.model.ProcessDebugContextLineBreakpointPatch;
-import net.ajmyers.tm1.client.model.ProcessProcedure;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.client.service.process.ProcessDebugService;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.ProcessDebugContext;
+import io.skipcheck.tm1.client.model.ProcessDebugContextLineBreakpointPatch;
+import io.skipcheck.tm1.client.model.ProcessProcedure;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.service.process.ProcessDebugService;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.process.ProcessDebugService}, quoted
- * in its Javadoc.
+ * Examples for {@link io.skipcheck.tm1.client.service.process.ProcessDebugService},
+ * quoted in its Javadoc.
  */
 final class ProcessDebugServiceExamples {
 

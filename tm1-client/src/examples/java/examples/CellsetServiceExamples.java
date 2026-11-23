@@ -2,20 +2,20 @@ package examples;
 
 import java.util.List;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Cellset;
-import net.ajmyers.tm1.client.model.CellsetAxisTuple;
-import net.ajmyers.tm1.client.model.CellsetCell;
-import net.ajmyers.tm1.client.model.CellsetUpdatePatch;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.client.service.cube.ViewScope;
-import net.ajmyers.tm1.client.service.data.CellsetService;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Cellset;
+import io.skipcheck.tm1.client.model.CellsetAxisTuple;
+import io.skipcheck.tm1.client.model.CellsetCell;
+import io.skipcheck.tm1.client.model.CellsetUpdatePatch;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.service.cube.ViewScope;
+import io.skipcheck.tm1.client.service.data.CellsetService;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.data.CellsetService}, quoted in its
+ * Examples for {@link io.skipcheck.tm1.client.service.data.CellsetService}, quoted in its
  * Javadoc.
  */
 final class CellsetServiceExamples {

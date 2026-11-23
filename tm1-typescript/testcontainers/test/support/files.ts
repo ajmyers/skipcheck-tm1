@@ -56,7 +56,7 @@ function findRoot(): string {
 export const Repo = {
   root: findRoot(),
   get javaSources(): string {
-    return join(this.root, "tm1-testcontainers", "src", "main", "java", "net", "ajmyers", "tm1", "testcontainers");
+    return join(this.root, "tm1-testcontainers", "src", "main", "java", "io", "skipcheck", "tm1", "testcontainers");
   },
   get typescriptSources(): string {
     return join(this.root, "tm1-typescript", "testcontainers", "src");

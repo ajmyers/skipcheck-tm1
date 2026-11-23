@@ -1,6 +1,6 @@
 """Attribute definitions, and the attribute values translated per locale
 (``LocalizedAttributes``), for every kind of TM1 object that has them (the Java client's
-``net.ajmyers.tm1.client.service.attribute``). Attribute values in the default locale are cells
+``io.skipcheck.tm1.client.service.attribute``). Attribute values in the default locale are cells
 of the ``}…Attributes`` control cubes."""
 
 from __future__ import annotations

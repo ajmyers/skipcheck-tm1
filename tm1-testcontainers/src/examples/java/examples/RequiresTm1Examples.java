@@ -12,15 +12,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Dimension;
-import net.ajmyers.tm1.client.model.DimensionPatch;
-import net.ajmyers.tm1.client.model.ElementPatch;
-import net.ajmyers.tm1.client.model.ElementType;
-import net.ajmyers.tm1.client.model.HierarchyPatch;
-import net.ajmyers.tm1.client.version.Tm1Version;
-import net.ajmyers.tm1.testcontainers.RequiresTm1;
-import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Dimension;
+import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementType;
+import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.version.Tm1Version;
+import io.skipcheck.tm1.testcontainers.RequiresTm1;
+import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /**
  * Examples for {@link RequiresTm1}, quoted in its Javadoc: JUnit test classes, compiled

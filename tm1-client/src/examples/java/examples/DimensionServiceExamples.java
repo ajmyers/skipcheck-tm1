@@ -2,20 +2,20 @@ package examples;
 
 import java.util.List;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Dimension;
-import net.ajmyers.tm1.client.model.DimensionPatch;
-import net.ajmyers.tm1.client.model.EdgePatch;
-import net.ajmyers.tm1.client.model.ElementPatch;
-import net.ajmyers.tm1.client.model.ElementType;
-import net.ajmyers.tm1.client.model.Hierarchy;
-import net.ajmyers.tm1.client.model.HierarchyPatch;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Dimension;
+import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.EdgePatch;
+import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementType;
+import io.skipcheck.tm1.client.model.Hierarchy;
+import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.dimension.DimensionService}, quoted
+ * Examples for {@link io.skipcheck.tm1.client.service.dimension.DimensionService}, quoted
  * in its Javadoc.
  */
 final class DimensionServiceExamples {

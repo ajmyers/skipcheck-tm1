@@ -4,13 +4,13 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Cube;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.client.version.Tm1Version;
-import net.ajmyers.tm1.testcontainers.Tm1Seed;
-import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
-import net.ajmyers.tm1.testcontainers.Tm1Source;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Cube;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.version.Tm1Version;
+import io.skipcheck.tm1.testcontainers.Tm1Seed;
+import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.testcontainers.Tm1Source;
 
 /**
  * Examples for {@link Tm1ServerContainer}, quoted in its Javadoc. Test code, so it may

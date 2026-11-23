@@ -1,4 +1,4 @@
-"""Services for annotations on cube cells (the Java client's ``net.ajmyers.tm1.client.service.annotation``)."""
+"""Services for annotations on cube cells (the Java client's ``io.skipcheck.tm1.client.service.annotation``)."""
 
 from __future__ import annotations
 

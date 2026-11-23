@@ -9,7 +9,7 @@ image.
 > are skipped.
 
 ```kotlin
-testImplementation("net.ajmyers.tm1:tm1-testcontainers:<version>")
+testImplementation("io.skipcheck:tm1-testcontainers:<version>")
 ```
 
 Tested with TM1 Server 11.8.03500.6 (Planning Analytics 2.1.19), the only version we've had
@@ -59,23 +59,23 @@ TM1.
 
 ## Examples
 
-Each of these is a real test in [`src/test/java/.../examples`](src/test/java/net/ajmyers/tm1/testcontainers/examples),
+Each of these is a real test in [`src/test/java/.../examples`](src/test/java/io/skipcheck/tm1/testcontainers/examples),
 run on every build where TM1 is configured, so they always work as written.
 
 | You want to... | Example |
 |---|---|
-| Share one server across all your tests: injected into a test method, a constructor, or a static `@BeforeAll` that sets up a client once per class | [`SharedServerExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/SharedServerExampleTest.java) |
-| Give one test class its own server, with IBM's SData sample to read | [`SampleDatabaseExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/SampleDatabaseExampleTest.java) |
-| Run your own database (a fixture model in `src/test/resources`) | [`OwnDatabaseExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/OwnDatabaseExampleTest.java) |
-| Require one TM1 version, or skip tests on versions without a feature | [`PinnedVersionExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/PinnedVersionExampleTest.java) |
-| Run two servers at once, e.g. to test a migration or comparison | [`TwoServersExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/TwoServersExampleTest.java) |
-| Start a whole environment in one object: several servers, TM1 Web, Cognos with LDAP and OIDC | [`EnvironmentExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/EnvironmentExampleTest.java) |
-| Register several servers with one Admin Server, and list them all in TM1 Web | [`SharedAdminServerExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/SharedAdminServerExampleTest.java) |
-| Choose where TM1 comes from in code: install folder, bundle, download link, Docker volume or private image | [`ExplicitSourceExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/ExplicitSourceExampleTest.java) |
-| Skip the extension: plain assumptions and a throwaway server, e.g. for a test that damages its server | [`WithoutTheExtensionExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/WithoutTheExtensionExampleTest.java) |
-| Run TM1 Web against a TM1 server of its own | [`Tm1WebExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/Tm1WebExampleTest.java) |
-| Test Cognos (CAM) security: three users, three TM1 security profiles | [`CamSecurityExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/CamSecurityExampleTest.java) |
-| Log on to TM1 through OIDC: a password, or an ID token exchanged for a CAM passport | [`OidcExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/OidcExampleTest.java) |
+| Share one server across all your tests: injected into a test method, a constructor, or a static `@BeforeAll` that sets up a client once per class | [`SharedServerExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/SharedServerExampleTest.java) |
+| Give one test class its own server, with IBM's SData sample to read | [`SampleDatabaseExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/SampleDatabaseExampleTest.java) |
+| Run your own database (a fixture model in `src/test/resources`) | [`OwnDatabaseExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/OwnDatabaseExampleTest.java) |
+| Require one TM1 version, or skip tests on versions without a feature | [`PinnedVersionExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/PinnedVersionExampleTest.java) |
+| Run two servers at once, e.g. to test a migration or comparison | [`TwoServersExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/TwoServersExampleTest.java) |
+| Start a whole environment in one object: several servers, TM1 Web, Cognos with LDAP and OIDC | [`EnvironmentExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/EnvironmentExampleTest.java) |
+| Register several servers with one Admin Server, and list them all in TM1 Web | [`SharedAdminServerExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/SharedAdminServerExampleTest.java) |
+| Choose where TM1 comes from in code: install folder, bundle, download link, Docker volume or private image | [`ExplicitSourceExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/ExplicitSourceExampleTest.java) |
+| Skip the extension: plain assumptions and a throwaway server, e.g. for a test that damages its server | [`WithoutTheExtensionExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/WithoutTheExtensionExampleTest.java) |
+| Run TM1 Web against a TM1 server of its own | [`Tm1WebExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/Tm1WebExampleTest.java) |
+| Test Cognos (CAM) security: three users, three TM1 security profiles | [`CamSecurityExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/CamSecurityExampleTest.java) |
+| Log on to TM1 through OIDC: a password, or an ID token exchanged for a CAM passport | [`OidcExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/OidcExampleTest.java) |
 
 Spring Boot tests will connect with `@ServiceConnection` once #15 lands.
 
@@ -268,7 +268,7 @@ class WebsheetTest {
 
 For TM1 Web against a server of its own, `new Tm1WebContainer(source).withTm1Server(tm1)`
 gives the two containers a shared Docker network, and starting TM1 Web starts the server
-first (see [`Tm1WebExampleTest`](src/test/java/net/ajmyers/tm1/testcontainers/examples/Tm1WebExampleTest.java)).
+first (see [`Tm1WebExampleTest`](src/test/java/io/skipcheck/tm1/testcontainers/examples/Tm1WebExampleTest.java)).
 
 TM1 Web is found the same way as TM1, with `TM1_WEB_` settings: `TM1_WEB_PRIVATE_IMAGE`,
 `TM1_WEB_HOME_DIR` (an installed `tm1web` folder), `TM1_WEB_INSTALL_VOLUME`,

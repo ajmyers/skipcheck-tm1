@@ -1,13 +1,13 @@
 package examples;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Git;
-import net.ajmyers.tm1.client.service.git.GitCommitDetails;
-import net.ajmyers.tm1.client.service.git.GitCredentials;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Git;
+import io.skipcheck.tm1.client.service.git.GitCommitDetails;
+import io.skipcheck.tm1.client.service.git.GitCredentials;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.git.GitService}, quoted in its
+ * Examples for {@link io.skipcheck.tm1.client.service.git.GitService}, quoted in its
  * Javadoc.
  */
 final class GitServiceExamples {

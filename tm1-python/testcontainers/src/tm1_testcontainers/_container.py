@@ -31,7 +31,7 @@ from typing_extensions import Self
 
 __all__ = ["GenericContainer", "Network", "docker_available", "reuse_enabled"]
 
-REUSE_HASH_LABEL = "net.ajmyers.tm1.testcontainers.hash"
+REUSE_HASH_LABEL = "io.skipcheck.tm1.testcontainers.hash"
 
 
 class Network(_TcNetwork):

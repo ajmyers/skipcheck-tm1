@@ -2,15 +2,15 @@ package examples;
 
 import org.springframework.stereotype.Service;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Cube;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.client.session.Tm1Identity;
-import net.ajmyers.tm1.client.session.Tm1SessionPool;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Cube;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.session.Tm1Identity;
+import io.skipcheck.tm1.client.session.Tm1SessionPool;
 import reactor.core.publisher.Flux;
 
 /**
- * Examples for {@link net.ajmyers.tm1.spring.boot.autoconfigure.Tm1AutoConfiguration},
+ * Examples for {@link io.skipcheck.tm1.spring.boot.autoconfigure.Tm1AutoConfiguration},
  * quoted in its Javadoc: Spring components, compiled but never run.
  */
 final class Tm1AutoConfigurationExamples {

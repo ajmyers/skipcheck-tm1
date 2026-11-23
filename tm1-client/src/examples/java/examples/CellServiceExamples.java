@@ -5,13 +5,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.CubeUpdatePatch;
-import net.ajmyers.tm1.client.service.data.Tuples;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.CubeUpdatePatch;
+import io.skipcheck.tm1.client.service.data.Tuples;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.data.CellService}, quoted in its
+ * Examples for {@link io.skipcheck.tm1.client.service.data.CellService}, quoted in its
  * Javadoc.
  */
 final class CellServiceExamples {

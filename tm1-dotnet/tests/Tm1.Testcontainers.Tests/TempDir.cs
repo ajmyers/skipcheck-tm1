@@ -46,7 +46,7 @@ public static class Repo
 {
     public static string Root { get; } = Find();
 
-    public static string JavaSources => Path.Combine(Root, "tm1-testcontainers", "src", "main", "java", "net", "ajmyers", "tm1", "testcontainers");
+    public static string JavaSources => Path.Combine(Root, "tm1-testcontainers", "src", "main", "java", "io", "skipcheck", "tm1", "testcontainers");
 
     private static string Find()
     {

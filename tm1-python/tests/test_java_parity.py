@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-JAVA = ROOT / "tm1-client" / "src" / "main" / "java" / "net" / "ajmyers" / "tm1" / "client"
+JAVA = ROOT / "tm1-client" / "src" / "main" / "java" / "io" / "skipcheck" / "tm1" / "client"
 SERVICES = JAVA / "service"
 
 _METHOD = re.compile(r"^\s+public\s+(?:static\s+)?(?:<[^>]+>\s+)?(?:[\w.<>\[\]?, ]+?)\s+(\w+)\s*\(([^)]*)\)\s*(?:throws [\w., ]+)?\{", re.M)

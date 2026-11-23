@@ -2,22 +2,22 @@ package examples;
 
 import java.util.List;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.MDXView;
-import net.ajmyers.tm1.client.model.MDXViewPatch;
-import net.ajmyers.tm1.client.model.NativeView;
-import net.ajmyers.tm1.client.model.NativeViewPatch;
-import net.ajmyers.tm1.client.model.View;
-import net.ajmyers.tm1.client.model.ViewAxisSelectionPatch;
-import net.ajmyers.tm1.client.model.ViewTitlePatch;
-import net.ajmyers.tm1.client.odata.ODataPath;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.client.service.cube.ViewScope;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.MDXView;
+import io.skipcheck.tm1.client.model.MDXViewPatch;
+import io.skipcheck.tm1.client.model.NativeView;
+import io.skipcheck.tm1.client.model.NativeViewPatch;
+import io.skipcheck.tm1.client.model.View;
+import io.skipcheck.tm1.client.model.ViewAxisSelectionPatch;
+import io.skipcheck.tm1.client.model.ViewTitlePatch;
+import io.skipcheck.tm1.client.odata.ODataPath;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.service.cube.ViewScope;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.cube.ViewService}, quoted in its
+ * Examples for {@link io.skipcheck.tm1.client.service.cube.ViewService}, quoted in its
  * Javadoc.
  */
 final class ViewServiceExamples {

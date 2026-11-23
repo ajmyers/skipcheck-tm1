@@ -1,16 +1,16 @@
 package examples;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.AttributeDefinition;
-import net.ajmyers.tm1.client.model.AttributeDefinitionPatch;
-import net.ajmyers.tm1.client.model.AttributeType;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.client.service.attribute.AttributeSet;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.AttributeDefinition;
+import io.skipcheck.tm1.client.model.AttributeDefinitionPatch;
+import io.skipcheck.tm1.client.model.AttributeType;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.service.attribute.AttributeSet;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.attribute.AttributeService}, quoted
+ * Examples for {@link io.skipcheck.tm1.client.service.attribute.AttributeService}, quoted
  * in its Javadoc.
  */
 final class AttributeServiceExamples {

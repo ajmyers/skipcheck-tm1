@@ -1,10 +1,10 @@
 package examples;
 
-import net.ajmyers.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.Tm1Client;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.security.OidcKeyService}, quoted in
+ * Examples for {@link io.skipcheck.tm1.client.service.security.OidcKeyService}, quoted in
  * its Javadoc.
  */
 final class OidcKeyServiceExamples {

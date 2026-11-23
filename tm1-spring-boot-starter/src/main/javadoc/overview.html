@@ -13,10 +13,10 @@ configured from <code>tm1.*</code> properties.
 copy of TM1 Server.</p></li>
 
 <li><p><b>Add the starter to a Spring Boot 4 application.</b> Gradle:</p>
-<pre><code class="language-kotlin">implementation("net.ajmyers.tm1:tm1-spring-boot-starter:{{version}}")</code></pre>
+<pre><code class="language-kotlin">implementation("io.skipcheck:tm1-spring-boot-starter:{{version}}")</code></pre>
 <p>Maven:</p>
 <pre><code class="language-xml">&lt;dependency&gt;
-  &lt;groupId&gt;net.ajmyers.tm1&lt;/groupId&gt;
+  &lt;groupId&gt;io.skipcheck&lt;/groupId&gt;
   &lt;artifactId&gt;tm1-spring-boot-starter&lt;/artifactId&gt;
   &lt;version&gt;{{version}}&lt;/version&gt;
 &lt;/dependency&gt;</code></pre></li>
@@ -26,7 +26,7 @@ these are the defaults of a server set up with the link above:</p>
 {@snippet file = examples/application.yml lang = yaml}
 <p>For a server elsewhere, change the address. Keep a real password out of the file, for example
 with <code>password: ${TM1_PASSWORD}</code> and an environment variable.
-{@link net.ajmyers.tm1.spring.boot.autoconfigure.Tm1Properties} lists every property.</p></li>
+{@link io.skipcheck.tm1.spring.boot.autoconfigure.Tm1Properties} lists every property.</p></li>
 
 <li><p><b>Say hello.</b> The starter builds a <code>Tm1Client</code> from those settings; ask
 for it, and use it. This prints the server's version and lists its cubes when the application
@@ -42,9 +42,9 @@ starts:</p>
 <h1>Where next</h1>
 
 <ul>
-<li>{@link net.ajmyers.tm1.spring.boot.autoconfigure.Tm1AutoConfiguration}: the beans it creates,
+<li>{@link io.skipcheck.tm1.spring.boot.autoconfigure.Tm1AutoConfiguration}: the beans it creates,
 and a session per user from the pool.</li>
-<li>{@link net.ajmyers.tm1.spring.boot.autoconfigure.Tm1ConnectionDetails}: logging in your own
+<li>{@link io.skipcheck.tm1.spring.boot.autoconfigure.Tm1ConnectionDetails}: logging in your own
 way, such as with CAM.</li>
 <li><a href="https://ajmyers.net/projects/tm1-spring-boot-testcontainers/api/">tm1-spring-boot-testcontainers</a>:
 a real TM1 in your Spring Boot tests.</li>

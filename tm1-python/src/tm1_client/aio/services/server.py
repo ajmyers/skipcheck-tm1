@@ -1,4 +1,4 @@
-"""Services for the server and its logs (the Java client's ``net.ajmyers.tm1.client.service.server``)."""
+"""Services for the server and its logs (the Java client's ``io.skipcheck.tm1.client.service.server``)."""
 
 from __future__ import annotations
 

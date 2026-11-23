@@ -1,6 +1,6 @@
 """OData v4 encoding: literals, path segments, query options and ``@odata.bind``.
 
-The rules match the Java client's ``net.ajmyers.tm1.client.odata`` package, so both send
+The rules match the Java client's ``io.skipcheck.tm1.client.odata`` package, so both send
 the same requests for the same calls; ``tests/test_odata.py`` pins the cases they share.
 """
 

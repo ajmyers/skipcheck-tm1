@@ -6,9 +6,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Cube;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Cube;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 
 @SpringBootApplication
 public class HelloTm1Application {

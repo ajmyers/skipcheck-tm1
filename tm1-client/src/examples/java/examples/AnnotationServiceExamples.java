@@ -3,15 +3,15 @@ package examples;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Annotation;
-import net.ajmyers.tm1.client.model.AnnotationPatch;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Annotation;
+import io.skipcheck.tm1.client.model.AnnotationPatch;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.annotation.AnnotationService},
+ * Examples for {@link io.skipcheck.tm1.client.service.annotation.AnnotationService},
  * quoted in its Javadoc.
  */
 final class AnnotationServiceExamples {

@@ -1,16 +1,16 @@
 package examples;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Group;
-import net.ajmyers.tm1.client.model.User;
-import net.ajmyers.tm1.client.model.UserPatch;
-import net.ajmyers.tm1.client.odata.ODataPath;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Group;
+import io.skipcheck.tm1.client.model.User;
+import io.skipcheck.tm1.client.model.UserPatch;
+import io.skipcheck.tm1.client.odata.ODataPath;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.security.UserService}, quoted in its
- * Javadoc.
+ * Examples for {@link io.skipcheck.tm1.client.service.security.UserService}, quoted in
+ * its Javadoc.
  */
 final class UserServiceExamples {
 

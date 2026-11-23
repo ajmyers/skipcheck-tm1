@@ -13,16 +13,16 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.testcontainers.RequiresTm1;
-import net.ajmyers.tm1.testcontainers.Tm1Seed;
-import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
-import net.ajmyers.tm1.testcontainers.Tm1Source;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.testcontainers.RequiresTm1;
+import io.skipcheck.tm1.testcontainers.Tm1Seed;
+import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.testcontainers.Tm1Source;
 
 /**
  * Examples for {@code @ServiceConnection} on a {@link Tm1ServerContainer}, quoted in the
- * Javadoc of {@link net.ajmyers.tm1.spring.boot.testcontainers}: a Spring Boot test and a
- * development-time application, compiled but never run.
+ * Javadoc of {@link io.skipcheck.tm1.spring.boot.testcontainers}: a Spring Boot test and
+ * a development-time application, compiled but never run.
  */
 final class ServiceConnectionExamples {
 

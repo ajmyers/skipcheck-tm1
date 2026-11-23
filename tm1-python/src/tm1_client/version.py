@@ -1,4 +1,4 @@
-"""Versions and capabilities, as the Java client's ``net.ajmyers.tm1.client.version``:
+"""Versions and capabilities, as the Java client's ``io.skipcheck.tm1.client.version``:
 :class:`Tm1Version`, :class:`Tm1Capability` (something a request needs the server to have),
 :class:`Tm1Capabilities` (what a server's own ``$metadata`` has) and :class:`Tm1Dialect`
 (how an address becomes a service root)."""

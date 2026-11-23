@@ -2,14 +2,14 @@ package examples;
 
 import java.time.Duration;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.auth.Tm1Authenticator;
-import net.ajmyers.tm1.client.model.User;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.testcontainers.CognosContainer;
-import net.ajmyers.tm1.testcontainers.CognosSource;
-import net.ajmyers.tm1.testcontainers.Tm1ServerContainer;
-import net.ajmyers.tm1.testcontainers.Tm1Source;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.auth.Tm1Authenticator;
+import io.skipcheck.tm1.client.model.User;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.testcontainers.CognosContainer;
+import io.skipcheck.tm1.testcontainers.CognosSource;
+import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.testcontainers.Tm1Source;
 
 /**
  * Examples for {@link CognosContainer}, quoted in its Javadoc and

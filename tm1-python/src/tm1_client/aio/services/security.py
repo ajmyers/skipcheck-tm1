@@ -1,5 +1,5 @@
 """Services for security: users, groups, sessions, threads and OIDC keys (the Java client's
-``net.ajmyers.tm1.client.service.security``)."""
+``io.skipcheck.tm1.client.service.security``)."""
 
 from __future__ import annotations
 

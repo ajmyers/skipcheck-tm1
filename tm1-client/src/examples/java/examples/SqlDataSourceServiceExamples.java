@@ -1,12 +1,12 @@
 package examples;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.SQLDataSource;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.SQLDataSource;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.process.SqlDataSourceService},
+ * Examples for {@link io.skipcheck.tm1.client.service.process.SqlDataSourceService},
  * quoted in its Javadoc.
  */
 final class SqlDataSourceServiceExamples {

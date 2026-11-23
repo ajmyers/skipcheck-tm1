@@ -2,9 +2,9 @@ package examples;
 
 import java.util.function.Supplier;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.auth.CognosPassports;
-import net.ajmyers.tm1.client.auth.Tm1Authenticator;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.auth.CognosPassports;
+import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import reactor.core.publisher.Mono;
 
 /**

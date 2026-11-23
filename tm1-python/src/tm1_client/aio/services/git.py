@@ -1,5 +1,5 @@
 """TM1 Git: putting a model under version control, and moving it between servers (the Java
-client's ``net.ajmyers.tm1.client.service.git``)."""
+client's ``io.skipcheck.tm1.client.service.git``)."""
 
 from __future__ import annotations
 

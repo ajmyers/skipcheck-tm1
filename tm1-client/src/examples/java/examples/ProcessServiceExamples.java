@@ -4,18 +4,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.ErrorLogFile;
-import net.ajmyers.tm1.client.model.Process;
-import net.ajmyers.tm1.client.model.ProcessExecuteResult;
-import net.ajmyers.tm1.client.model.ProcessParameterPatch;
-import net.ajmyers.tm1.client.model.ProcessPatch;
-import net.ajmyers.tm1.client.model.ProcessVariableType;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.ErrorLogFile;
+import io.skipcheck.tm1.client.model.Process;
+import io.skipcheck.tm1.client.model.ProcessExecuteResult;
+import io.skipcheck.tm1.client.model.ProcessParameterPatch;
+import io.skipcheck.tm1.client.model.ProcessPatch;
+import io.skipcheck.tm1.client.model.ProcessVariableType;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.process.ProcessService}, quoted in
+ * Examples for {@link io.skipcheck.tm1.client.service.process.ProcessService}, quoted in
  * its Javadoc.
  */
 final class ProcessServiceExamples {

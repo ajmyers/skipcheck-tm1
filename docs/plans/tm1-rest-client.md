@@ -173,8 +173,8 @@ the dependency footprint at Spring WebFlux plus Jackson.
           │ beans for the session, each service and Tm1Client               R1
 ```
 
-**Packages** (`net.ajmyers.tm1.client`, proposed):
-`odata` (+ `odata.query`; the CSDL reader is its own module, `tm1-csdl`, package `net.ajmyers.tm1.csdl`, since phase 1), `session`, `auth`, `version`, `model` (generated; one package for now, split by area later if it gets unwieldy), `service` (one subpackage per area), `error`.
+**Packages** (`io.skipcheck.tm1.client`, proposed):
+`odata` (+ `odata.query`; the CSDL reader is its own module, `tm1-csdl`, package `io.skipcheck.tm1.csdl`, since phase 1), `session`, `auth`, `version`, `model` (generated; one package for now, split by area later if it gets unwieldy), `service` (one subpackage per area), `error`.
 
 ---
 

@@ -261,7 +261,7 @@ public abstract class GenericContainer<TSelf> : IStartable
     {
         var builder = new ContainerBuilder(DockerImageName)
             .WithEnvironment(env)
-            .WithLabel("net.ajmyers.tm1.testcontainers", "dotnet")
+            .WithLabel("io.skipcheck.tm1.testcontainers", "dotnet")
             .WithCreateParameterModifier(p =>
             {
                 p.Platform = "linux/amd64";

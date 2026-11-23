@@ -1,5 +1,5 @@
 """This package offers what the Java module does, read from the Java sources themselves
-(tm1-testcontainers/src/main/java/net/ajmyers/tm1/testcontainers), as tm1-python's own
+(tm1-testcontainers/src/main/java/io/skipcheck/tm1/testcontainers), as tm1-python's own
 test_java_parity.py does for the client:
 
 * each public Java type, nested ones too (``Tm1Source.PrivateImage``,
@@ -28,7 +28,7 @@ import tm1_testcontainers
 from tm1_testcontainers import plugin
 
 ROOT = Path(__file__).resolve().parents[3]
-JAVA = ROOT / "tm1-testcontainers" / "src" / "main" / "java" / "net" / "ajmyers" / "tm1" / "testcontainers"
+JAVA = ROOT / "tm1-testcontainers" / "src" / "main" / "java" / "io" / "skipcheck" / "tm1" / "testcontainers"
 
 JAVA_ONLY: dict[tuple[str, str], str] = {
     (

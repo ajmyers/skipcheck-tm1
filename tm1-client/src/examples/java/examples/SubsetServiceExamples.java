@@ -2,18 +2,18 @@ package examples;
 
 import java.util.List;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.Element;
-import net.ajmyers.tm1.client.model.Subset;
-import net.ajmyers.tm1.client.model.SubsetPatch;
-import net.ajmyers.tm1.client.odata.ODataPath;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.client.service.dimension.SubsetScope;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.Element;
+import io.skipcheck.tm1.client.model.Subset;
+import io.skipcheck.tm1.client.model.SubsetPatch;
+import io.skipcheck.tm1.client.odata.ODataPath;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.service.dimension.SubsetScope;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.dimension.SubsetService}, quoted in
+ * Examples for {@link io.skipcheck.tm1.client.service.dimension.SubsetService}, quoted in
  * its Javadoc.
  */
 final class SubsetServiceExamples {

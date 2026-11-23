@@ -20,7 +20,7 @@ import tm1_client.aio as aio
 from tm1_client import auth, errors, odata, version
 
 ROOT = Path(__file__).resolve().parents[3]
-JAVA = ROOT / "tm1-client" / "src" / "main" / "java" / "net" / "ajmyers" / "tm1" / "client"
+JAVA = ROOT / "tm1-client" / "src" / "main" / "java" / "io" / "skipcheck" / "tm1" / "client"
 
 SKIP_ALWAYS = {"toString", "equals", "hashCode", "compareTo"}
 

@@ -5,13 +5,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.auth.Tm1Authenticator;
-import net.ajmyers.tm1.client.model.Cube;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.testcontainers.CognosContainer;
-import net.ajmyers.tm1.testcontainers.PlanningAnalyticsEnvironment;
-import net.ajmyers.tm1.testcontainers.Tm1Seed;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.auth.Tm1Authenticator;
+import io.skipcheck.tm1.client.model.Cube;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.testcontainers.CognosContainer;
+import io.skipcheck.tm1.testcontainers.PlanningAnalyticsEnvironment;
+import io.skipcheck.tm1.testcontainers.Tm1Seed;
 
 /**
  * Examples for {@link PlanningAnalyticsEnvironment}, quoted in its Javadoc. Test code, so

@@ -283,7 +283,7 @@ export abstract class GenericContainer implements Startable {
   async #build(): Promise<TcGenericContainer> {
     let c = new TcGenericContainer(this.#image)
       .withEnvironment(Object.fromEntries(this.#env))
-      .withLabels({ "net.ajmyers.tm1.testcontainers": "typescript" })
+      .withLabels({ "io.skipcheck.tm1.testcontainers": "typescript" })
       // TM1 and IBM's other servers only exist for x86-64; on Apple Silicon they run under Rosetta
       .withPlatform("linux/amd64");
     if (this.#command.length > 0) c = c.withCommand(this.#command);

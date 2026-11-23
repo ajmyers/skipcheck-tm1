@@ -1,14 +1,14 @@
 package examples;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.CellsetAxis;
-import net.ajmyers.tm1.client.model.Member;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.CellsetAxis;
+import io.skipcheck.tm1.client.model.Member;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.data.MemberSetService}, quoted in
+ * Examples for {@link io.skipcheck.tm1.client.service.data.MemberSetService}, quoted in
  * its Javadoc.
  */
 final class MemberSetServiceExamples {

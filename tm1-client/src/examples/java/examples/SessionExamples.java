@@ -4,15 +4,15 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
-import net.ajmyers.tm1.client.Tm1Request;
-import net.ajmyers.tm1.client.auth.Tm1Authenticator;
-import net.ajmyers.tm1.client.model.MessageLogEntry;
-import net.ajmyers.tm1.client.model.SandboxPatch;
-import net.ajmyers.tm1.client.odata.ODataPath;
-import net.ajmyers.tm1.client.odata.ODataQuery;
-import net.ajmyers.tm1.client.service.data.CellService;
-import net.ajmyers.tm1.client.service.data.SandboxService;
-import net.ajmyers.tm1.client.session.Tm1Session;
+import io.skipcheck.tm1.client.Tm1Request;
+import io.skipcheck.tm1.client.auth.Tm1Authenticator;
+import io.skipcheck.tm1.client.model.MessageLogEntry;
+import io.skipcheck.tm1.client.model.SandboxPatch;
+import io.skipcheck.tm1.client.odata.ODataPath;
+import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.service.data.CellService;
+import io.skipcheck.tm1.client.service.data.SandboxService;
+import io.skipcheck.tm1.client.session.Tm1Session;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 

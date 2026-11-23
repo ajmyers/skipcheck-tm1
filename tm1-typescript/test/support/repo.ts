@@ -28,7 +28,7 @@ export const Repo = {
     return join(this.root, "tm1-client", "src", "model", "metadata", "tm1-schema-11.8.35.xml");
   },
   get javaClient(): string {
-    return join(this.root, "tm1-client", "src", "main", "java", "net", "ajmyers", "tm1", "client");
+    return join(this.root, "tm1-client", "src", "main", "java", "io", "skipcheck", "tm1", "client");
   },
   get javaServices(): string {
     return join(this.javaClient, "service");

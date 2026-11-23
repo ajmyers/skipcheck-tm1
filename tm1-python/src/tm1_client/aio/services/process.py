@@ -1,4 +1,4 @@
-"""Services for processes and chores (the Java client's ``net.ajmyers.tm1.client.service.process``)."""
+"""Services for processes and chores (the Java client's ``io.skipcheck.tm1.client.service.process``)."""
 
 from __future__ import annotations
 

@@ -1,16 +1,16 @@
 package examples;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.AdministrationSettings;
-import net.ajmyers.tm1.client.model.LogLevel;
-import net.ajmyers.tm1.client.model.Server;
-import net.ajmyers.tm1.client.model.ServerSettings;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.AdministrationSettings;
+import io.skipcheck.tm1.client.model.LogLevel;
+import io.skipcheck.tm1.client.model.Server;
+import io.skipcheck.tm1.client.model.ServerSettings;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.server.ServerService}, quoted in its
- * Javadoc.
+ * Examples for {@link io.skipcheck.tm1.client.service.server.ServerService}, quoted in
+ * its Javadoc.
  */
 final class ServerServiceExamples {
 

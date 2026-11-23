@@ -15,7 +15,7 @@ The Java client is the definition of how a call behaves. Its unit tests record e
 ```jsonc
 {
   "specVersion": 1,                                   // runners refuse a version they don't know
-  "source": "net.ajmyers.tm1.client.service.cube.CubeServiceTest",
+  "source": "io.skipcheck.tm1.client.service.cube.CubeServiceTest",
   "session": { "productVersion": "11.8.03500.6" },    // what every runner's fake reports
   "cases": [ {
     "id": "CubeServiceTest#getsACubeWithItsEtag#1",   // test class, test method, the call's number in it

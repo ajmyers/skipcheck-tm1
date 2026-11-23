@@ -2,15 +2,15 @@ package examples;
 
 import java.time.Duration;
 
-import net.ajmyers.tm1.client.Tm1Client;
-import net.ajmyers.tm1.client.model.LogLevel;
-import net.ajmyers.tm1.client.model.MessageLogEntry;
-import net.ajmyers.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.LogLevel;
+import io.skipcheck.tm1.client.model.MessageLogEntry;
+import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Examples for {@link net.ajmyers.tm1.client.service.server.LogService}, quoted in its
+ * Examples for {@link io.skipcheck.tm1.client.service.server.LogService}, quoted in its
  * Javadoc.
  */
 final class LogServiceExamples {
