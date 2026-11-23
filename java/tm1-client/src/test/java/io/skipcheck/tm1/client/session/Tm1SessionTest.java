@@ -21,6 +21,7 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 import io.micrometer.observation.tck.TestObservationRegistry;
 import io.micrometer.observation.tck.TestObservationRegistryAssert;
 import io.skipcheck.tm1.client.Tm1Request;
+import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.error.Tm1ApiException;
 import io.skipcheck.tm1.client.error.Tm1AuthenticationException;
 import io.skipcheck.tm1.client.error.Tm1ErrorKind;
@@ -42,6 +43,31 @@ class Tm1SessionTest {
 
 	private final FakeTm1 tm1 = new FakeTm1().on("GET Server?$select=Name",
 			r -> Mono.just(FakeTm1.json(200, "{\"Name\":\"tm1\"}")));
+
+	@Test
+	void givesUpOnAnAuthenticatorThatNeverAnswers() {
+		Tm1Authenticator never = new Tm1Authenticator() {
+			@Override
+			public Mono<String> authorization() {
+				return Mono.never();
+			}
+
+			@Override
+			public String describe() {
+				return "Never";
+			}
+		};
+		Tm1Session session = tm1.sessionWithOwnCredentials(Tm1Session.builder()
+			.authenticator(never)
+			.timeouts(Tm1Timeouts.builder().login(Duration.ofMillis(100)).build()));
+
+		StepVerifier.create(session.execute(SERVER))
+			.expectErrorSatisfies(e -> assertThat(e).isInstanceOfSatisfying(Tm1TransportException.class,
+					t -> assertThat(t.isRetryable()).as("nothing was sent to TM1").isTrue()))
+			.verify(Duration.ofSeconds(5));
+		StepVerifier.create(session.close()).expectComplete().verify(Duration.ofSeconds(5));
+		assertThat(tm1.requests(FakeTm1.LOGIN)).isEmpty();
+	}
 
 	@Test
 	void logsInOnceForConcurrentFirstRequestsAndSendsOnlyTheCookieAfterwards() {

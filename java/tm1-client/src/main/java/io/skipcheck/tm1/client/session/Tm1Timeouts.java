@@ -21,7 +21,9 @@ import org.jspecify.annotations.Nullable;
  *
  * @param connect how long to wait for a connection, including TLS. Default 10 s.
  * @param login how long to wait for a login response. Short, because a TM1 that is still
- * loading accepts connections and never answers. Default 30 s.
+ * loading accepts connections and never answers. The authenticator gets as long again to
+ * supply the credentials first, since it may ask another server, such as Cognos for a
+ * passport. Default 30 s.
  * @param request how long a request may go without receiving any data, unless the request
  * sets its own {@linkplain io.skipcheck.tm1.client.Tm1Request#withTimeout timeout}. This
  * is an idle timeout, not a limit on the whole response, so a large collection that keeps

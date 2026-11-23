@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -33,6 +34,7 @@ import io.skipcheck.tm1.client.error.Tm1ApiException;
 import io.skipcheck.tm1.client.error.Tm1ErrorClassifier;
 import io.skipcheck.tm1.client.error.Tm1ErrorKind;
 import io.skipcheck.tm1.client.error.Tm1ProtocolException;
+import io.skipcheck.tm1.client.error.Tm1TransportException;
 import io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException;
 import io.skipcheck.tm1.client.odata.ODataCollectionDecoder;
 import io.skipcheck.tm1.client.odata.ODataJson;
@@ -603,11 +605,17 @@ final class Connection {
 	private Mono<LoggedIn> login(@Nullable String seedCookie, String reason) {
 		URI uri = uri(LOGIN_PATH);
 		// The authenticator's own failures (say, a passport it couldn't get) reach the
-		// caller
-		// unchanged; only the login request's are mapped
+		// caller unchanged; only the login request's are mapped. It gets the login's
+		// timeout too: it may ask another server (Cognos, for a passport), and one that
+		// never answers would otherwise hold every request, and close(), for ever.
 		Mono<LoggedIn> login = authenticator.authorization()
 			.switchIfEmpty(Mono.error(() -> new IllegalStateException(
 					"The authenticator " + authenticator.describe() + " supplied no credentials")))
+			.timeout(timeouts.login(),
+					Mono.error(() -> new Tm1TransportException(Tm1TransportException.Phase.CONNECT, true, "GET",
+							uri.toString(),
+							new TimeoutException("The authenticator " + authenticator.describe()
+									+ " supplied no credentials within " + timeouts.login()))))
 			.flatMap(authorization -> sendLogin(uri, authorization, seedCookie));
 		return observe("tm1.session.login", "tm1 login", reason, login)
 			.doOnNext(session -> log.info("Logged in to TM1 at {} as {} (session {}, {})", root,
