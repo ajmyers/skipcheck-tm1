@@ -1,7 +1,7 @@
 # api-site
 
-Publishes the Javadoc of each library at `https://ajmyers.net/projects/<module>/api/`, styled to
-match the rest of ajmyers.net. Only the latest version lives here; every page links to javadoc.io
+Publishes the Javadoc of each library at `https://skipcheck.io/projects/<module>/api/`, styled to
+match the rest of skipcheck.io (and the same on skipcheck.dev, which mirrors it). Only the latest version lives here; every page links to javadoc.io
 for older ones.
 
 ## How it fits together
@@ -9,14 +9,14 @@ for older ones.
 | Piece | What |
 |---|---|
 | `apiSiteJavadoc` (Gradle, every library) | The library's Javadoc with `theme/javadoc-theme.css` added, into `<module>/build/docs/api-site`. A separate task, so the javadoc jar on Maven Central stays plain. Defined in `build-logic/.../tm1.java-library.gradle.kts`. |
-| `theme/javadoc-theme.css` | Maps Javadoc's CSS variables onto the site's design tokens, which it imports from `/tokens.css` and `/chrome.css` on ajmyers.net at view time. |
+| `theme/javadoc-theme.css` | Maps Javadoc's CSS variables onto the site's design tokens, which it imports from `/tokens.css` and `/chrome.css` on skipcheck.io at view time. |
 | `scripts/assemble.mjs` | Copies each module's output into `dist/projects/<module>/api/`, and hashes the inline scripts, event handlers and style attributes Javadoc writes, for the CSP. |
-| `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on ajmyers.net, cached for 5 minutes) into every page, sets the security headers, and serves the site's 404 page for missing paths. |
-| `wrangler.jsonc` | The Worker's config. Its routes (one per module) are the list of published modules. |
+| `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, and serves the site's 404 page for missing paths. |
+| `wrangler.jsonc` | The Worker's config. Its routes (one per module and zone) are the list of published modules. |
 | `.github/workflows/api-docs.yml` | Builds on pull requests; deploys on a release tag or a manual run. |
 
 Changes to the site's palette, fonts, masthead or footer reach the docs without a rebuild. The site
-side is in ajmyers/ajmyers.net: `public/tokens.css`, `public/chrome.css` and `public/partials/`.
+side is in ajmyers/skipcheck.io: `public/tokens.css`, `public/chrome.css` and `public/partials/`.
 
 ## The guide
 
@@ -47,13 +47,13 @@ npm run assemble   # the Javadoc, then the guide
 npm run dev        # http://localhost:8787/projects/tm1-client/api/ and /projects/tm1/guide/
 ```
 
-The local Worker passes any path outside `/projects/` through to ajmyers.net, so the site's styles,
+The local Worker passes any path outside `/projects/` through to skipcheck.io, so the site's styles,
 masthead and footer come from the live site. Opening `build/docs/api-site` straight from disk shows
 Javadoc's own look, since `/tokens.css` isn't there.
 
 ## Publishing a new module
 
-Add a route for it to `wrangler.jsonc`. `assemble.mjs` picks it up from there, and fails if the
+Add a route for it on each zone to `wrangler.jsonc`. `assemble.mjs` picks it up from there, and fails if the
 module has no `apiSiteJavadoc` output.
 
 ## Deploying
@@ -61,7 +61,7 @@ module has no `apiSiteJavadoc` output.
 The workflow deploys with `wrangler deploy`. It needs two repository secrets:
 
 - `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with **Workers Scripts: Edit** on the account and
-  **Workers Routes: Edit** on the ajmyers.net zone.
+  **Workers Routes: Edit** on the skipcheck.io and skipcheck.dev zones.
 - `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account ID.
 
 ## Limits and decisions

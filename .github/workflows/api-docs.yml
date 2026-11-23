@@ -1,11 +1,11 @@
-# Publish the Java API docs to ajmyers.net/projects/<module>/api/ (see api-site/README.md).
+# Publish the Java API docs and the guide to skipcheck.io/projects/ (see api-site/README.md).
 #
 #   Pull request: builds the themed Javadoc and bundles the Worker; deploys nothing.
 #   Tag v1.2.3:   deploys that version's docs, alongside the Maven Central release.
 #   Manual run:   deploys the chosen branch (e.g. master, before the first release).
 #
 # Repo secrets needed to deploy:
-#   CLOUDFLARE_API_TOKEN   - Workers Scripts: Edit (account) and Workers Routes: Edit (ajmyers.net)
+#   CLOUDFLARE_API_TOKEN   - Workers Scripts: Edit (account) and Workers Routes: Edit (skipcheck.io, skipcheck.dev)
 #   CLOUDFLARE_ACCOUNT_ID  - the Cloudflare account
 name: API Docs
 

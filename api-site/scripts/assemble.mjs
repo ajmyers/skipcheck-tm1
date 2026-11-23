@@ -16,7 +16,8 @@ const repoDir = path.resolve(siteDir, '..');
 const dist = path.join(siteDir, 'dist');
 
 const wrangler = await readFile(path.join(siteDir, 'wrangler.jsonc'), 'utf8');
-const modules = [...wrangler.matchAll(/"pattern":\s*"[^"/]+\/projects\/([^/"]+)\/api\*"/g)].map((m) => m[1]);
+// Each module has a route on every zone the docs are served on
+const modules = [...new Set([...wrangler.matchAll(/"pattern":\s*"[^"/]+\/projects\/([^/"]+)\/api\*"/g)].map((m) => m[1]))];
 if (modules.length === 0) throw new Error('No /projects/<module>/api* routes in wrangler.jsonc');
 
 await rm(dist, { recursive: true, force: true });

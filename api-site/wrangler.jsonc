@@ -1,10 +1,12 @@
-// Cloudflare Worker for the Java API docs, served at ajmyers.net/projects/<module>/api/.
-// The site itself (ajmyers/ajmyers.net) is a separate Worker on the ajmyers.net custom domain;
-// a route takes precedence over a custom domain on the same hostname, so these paths come here.
+// Cloudflare Worker for the Java API docs and the guide, served at
+// skipcheck.io/projects/<module>/api/ and skipcheck.io/projects/tm1/guide/ (and on skipcheck.dev).
+// The site itself (ajmyers/skipcheck.io) is a separate Worker on the skipcheck.io and skipcheck.dev
+// custom domains; a route takes precedence over a custom domain on the same hostname, so these
+// paths come here.
 // Deployed by .github/workflows/api-docs.yml; see README.md.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ajmyers-net-api-docs",
+  "name": "skipcheck-io-docs",
   "main": "src/worker.js",
   "compatibility_date": "2026-11-01",
   "assets": {
@@ -19,19 +21,30 @@
     "html_handling": "none"
   },
   "vars": {
-    // Where the masthead, footer, styles and 404 page come from
-    "SITE_ORIGIN": "https://ajmyers.net"
+    // Where the masthead, footer, styles and 404 page come from, and the address every page names
+    // as canonical: skipcheck.dev mirrors skipcheck.io, and search engines should index one copy
+    "SITE_ORIGIN": "https://skipcheck.io"
   },
-  // One route per published library: route patterns allow a wildcard only at the end of the path.
-  // scripts/assemble.mjs reads the module names from here, so this is the one list to update.
+  // One route per published library and zone: route patterns allow a wildcard only at the start of
+  // the hostname and the end of the path. The leading * takes the bare domain and www, both of
+  // which serve the site. scripts/assemble.mjs reads the module names from here, so this is the
+  // one list to update.
   "routes": [
-    { "pattern": "ajmyers.net/projects/tm1-client/api*", "zone_name": "ajmyers.net" },
-    { "pattern": "ajmyers.net/projects/tm1-csdl/api*", "zone_name": "ajmyers.net" },
-    { "pattern": "ajmyers.net/projects/tm1-testcontainers/api*", "zone_name": "ajmyers.net" },
-    { "pattern": "ajmyers.net/projects/tm1-spring-boot-starter/api*", "zone_name": "ajmyers.net" },
-    { "pattern": "ajmyers.net/projects/tm1-spring-boot-testcontainers/api*", "zone_name": "ajmyers.net" },
+    { "pattern": "*skipcheck.io/projects/tm1-client/api*", "zone_name": "skipcheck.io" },
+    { "pattern": "*skipcheck.io/projects/tm1-csdl/api*", "zone_name": "skipcheck.io" },
+    { "pattern": "*skipcheck.io/projects/tm1-testcontainers/api*", "zone_name": "skipcheck.io" },
+    { "pattern": "*skipcheck.io/projects/tm1-spring-boot-starter/api*", "zone_name": "skipcheck.io" },
+    { "pattern": "*skipcheck.io/projects/tm1-spring-boot-testcontainers/api*", "zone_name": "skipcheck.io" },
     // The guide (scripts/guide.mjs), which covers the client and testcontainers in every language
-    { "pattern": "ajmyers.net/projects/tm1/guide*", "zone_name": "ajmyers.net" }
+    { "pattern": "*skipcheck.io/projects/tm1/guide*", "zone_name": "skipcheck.io" },
+
+    // The same on skipcheck.dev
+    { "pattern": "*skipcheck.dev/projects/tm1-client/api*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/projects/tm1-csdl/api*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/projects/tm1-testcontainers/api*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/projects/tm1-spring-boot-starter/api*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/projects/tm1-spring-boot-testcontainers/api*", "zone_name": "skipcheck.dev" },
+    { "pattern": "*skipcheck.dev/projects/tm1/guide*", "zone_name": "skipcheck.dev" }
   ],
   "workers_dev": false,
   "preview_urls": false

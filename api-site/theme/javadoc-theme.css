@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
-/* ajmyers.net theme for Javadoc, added with --add-stylesheet by the apiSiteJavadoc task.
+/* skipcheck.io theme for Javadoc, added with --add-stylesheet by the apiSiteJavadoc task.
  *
- * It restyles the standard doclet's output (JDK 27) to match ajmyers.net. Colours, fonts and
+ * It restyles the standard doclet's output (JDK 27) to match skipcheck.io. Colours, fonts and
  * sizes come from the site's own tokens, imported below at view time from the same origin, so a
  * change to the site's palette, fonts or dark mode reaches the docs without a rebuild. The site's
  * masthead and footer are inserted by the docs Worker (api-site/src/worker.js) and styled by the

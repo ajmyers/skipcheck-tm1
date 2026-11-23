@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Serves the Java API docs (built by scripts/assemble.mjs into dist/) at
-// ajmyers.net/projects/<module>/api/, dressed as part of the site: every HTML page gets the site's
-// masthead and footer, fetched from ajmyers.net/partials/ and cached, so a change to the site's nav
-// reaches the docs without a rebuild. The theme stylesheet imports the site's tokens and chrome
+// Serves the Java API docs and the guide (built by scripts/assemble.mjs and scripts/guide.mjs into
+// dist/) at skipcheck.io/projects/<module>/api/ and /projects/tm1/guide/, dressed as part of the
+// site: every HTML page gets the site's masthead and footer, fetched from skipcheck.io/partials/
+// and cached, so a change to the site's nav reaches the docs without a rebuild. skipcheck.dev
+// serves the same pages, each naming its skipcheck.io address as canonical. The theme stylesheet imports the site's tokens and chrome
 // styles the same way (api-site/theme/javadoc-theme.css).
 
 import csp from '../.generated/csp.json';
@@ -34,7 +35,7 @@ export default {
 	async fetch(request, env) {
 		const url = new URL(request.url);
 
-		// In production only /projects/<module>/api* is routed here. Under `wrangler dev` everything
+		// In production only /projects/<module>/api* and the guide are routed here. Under `wrangler dev` everything
 		// is, so pass the rest (the site's /tokens.css, /chrome.css, links home) through to the site.
 		if (!url.pathname.startsWith('/projects/')) {
 			return fetch(new URL(url.pathname + url.search, env.SITE_ORIGIN), request);
@@ -72,6 +73,8 @@ export default {
 		secured.headers.delete('ETag');
 		secured.headers.delete('Last-Modified');
 		secured.headers.set('Cache-Control', 'no-cache');
+		// The pages are generated, so the canonical address goes in a header, not in each file
+		secured.headers.set('Link', `<${new URL(url.pathname, env.SITE_ORIGIN)}>; rel="canonical"`);
 		return secured;
 	},
 };
