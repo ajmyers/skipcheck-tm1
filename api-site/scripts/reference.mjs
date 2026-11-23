@@ -26,7 +26,9 @@
 
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { checkMembers, findMember, listFile, memberCandidates, readList, stale, typeCandidates } from './members.mjs';
+import { searchIndex } from './search.mjs';
 import { CANONICAL_ORIGIN, copyAssets, dedent, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, SECTIONS } from './site.mjs';
 
 const allowMissing = process.argv.includes('--allow-missing');
@@ -294,6 +296,7 @@ const fewer = [];
 // Every path the Worker serves: the projects, the Docker pages and the docs landing page
 const site = { projects: SECTIONS, guide: {} };
 let pageCount = 0;
+const indexSizes = [];
 
 for (const project of PROJECTS) {
 	const java = await api(project, 'java');
@@ -350,6 +353,8 @@ for (const project of PROJECTS) {
 		const byJavaSimple = new Map(here.map((t) => [t.name.split('.').at(-1), t]));
 		const byName = new Map(here.map((t) => [nameOf(t), t]));
 		const nav = navHtml(project, language, here, pageOf, nameOf);
+		// Each page's members, for the search index (search.mjs)
+		const searchable = new Map();
 
 		for (const javaType of here) {
 			const type = counterpartOf(javaType);
@@ -433,6 +438,7 @@ for (const project of PROJECTS) {
 			const rows = [];
 			const details = [];
 			const seen = new Map();
+			searchable.set(javaType.name, []);
 			for (const member of members) {
 				const count = (seen.get(member.name) ?? 0) + 1;
 				seen.set(member.name, count);
@@ -463,6 +469,7 @@ for (const project of PROJECTS) {
 				}
 				const kindLabel = member.kind === 'property' ? 'property' : member.kind === 'constructor' ? 'constructor' : member.static ? 'static' : '';
 				rows.push('<tr><td><a href="#' + escape(id) + '"><code>' + escape(member.name) + '</code></a>' + (kindLabel ? ' <span class="tag">' + kindLabel + '</span>' : '') + '</td><td>' + escape(summary(doc)) + '</td></tr>');
+				searchable.get(javaType.name).push({ name: member.name, anchor: id, summary: summary(doc), kind: member.kind });
 				const paramList = member.params.filter((p) => parts.params[p.name.replace(/^\.\.\.|^\*+/, '')]);
 				const endpoints = member.endpoints.length > 0 ? member.endpoints : (java?.endpoints ?? []);
 				// One card per member: its name, its signature, then what it does
@@ -514,6 +521,9 @@ for (const project of PROJECTS) {
 		const grouped = groupByArea(here);
 		const start = (project.start ?? []).map((n) => here.find((t) => t.name === n)).filter(Boolean);
 		const summaries = new Map(here.map((t) => [t.name, summary(javadocHtml(javadocParts(t.doc).description, { example: () => '', javaCode: () => '', link: (target, l) => escape(l || target.replace(/^.*[.#]/, '')) }))]));
+		const index = JSON.stringify(searchIndex(here.map((t) => ({ name: nameOf(t), page: pageOf(t), summary: summaries.get(t.name), members: searchable.get(t.name) }))));
+		await writeFile(path.join(distDir, project.id, 'docs', language, 'search.json'), index + '\n');
+		indexSizes.push({ at: project.id + ' ' + language, bytes: Buffer.byteLength(index), gzip: gzipSync(index).length });
 		let home =
 			(project.landing ? '<p class="crumbs"><a href="../../">' + escape(project.title) + '</a> · Docs</p>' : '') +
 			'<h1>' + escape(project.title) + ' docs <span class="lang">' + escape(label) + '</span></h1>' +
@@ -584,6 +594,21 @@ function switchHtml(project, language, javaName, languages, counterparts) {
 		'</div>'
 	);
 }
+/** The search box (assets/search.js), hidden until its script shows it. */
+function searchHtml(project, language) {
+	const label = LANGUAGES.find((l) => l.id === language).label;
+	return (
+		'<div class="search" role="search" hidden>' +
+		'<label class="visually-hidden" for="docs-search">Search the ' + escape(project.title) + ' docs in ' + escape(label) + '</label>' +
+		'<input id="docs-search" type="search" role="combobox" aria-expanded="false" aria-controls="docs-search-results" aria-autocomplete="list" aria-keyshortcuts="/" autocomplete="off" spellcheck="false" placeholder="Search ' + escape(label) + '" data-index="search.json">' +
+		'<kbd aria-hidden="true">/</kbd>' +
+		'<ul id="docs-search-results" role="listbox" aria-label="Results" hidden></ul>' +
+		'<p class="none" aria-hidden="true" hidden></p>' +
+		'<p class="visually-hidden" role="status" aria-live="polite"></p>' +
+		'</div>'
+	);
+}
+
 async function writePage(project, language, file, title, body, nav, javaName, languages, counterparts) {
 	// The breadcrumbs share the language bar, on its left
 	const crumbs = /^<p class="crumbs">[\s\S]*?<\/p>/.exec(body)?.[0] ?? null;
@@ -596,8 +621,9 @@ async function writePage(project, language, file, title, body, nav, javaName, la
 			canonical: CANONICAL_ORIGIN + '/' + project.id + '/docs/' + language + '/' + (file === 'index.html' ? '' : file),
 			styles: ['../../assets/docs.css'],
 			scripts: ['../../assets/docs.js', '/highlight.js'],
+			modules: ['../../assets/search.js'],
 		}) +
-		'<body data-lang="' + language + '"><div class="docs">' + nav + '<main class="guide"><div class="toolbar">' + (crumbs ?? '<span></span>') + switchHtml(project, language, javaName, languages, counterparts) + '</div>' + rest + '</main></div></body></html>\n';
+		'<body data-lang="' + language + '"><div class="docs">' + nav + '<main class="guide"><div class="toolbar">' + (crumbs ?? '<span></span>') + searchHtml(project, language) + switchHtml(project, language, javaName, languages, counterparts) + '</div>' + rest + '</main></div></body></html>\n';
 	await writeFile(path.join(dir, file), html);
 }
 
@@ -664,4 +690,6 @@ if (memberFaults.length > 0) {
 	if (!allowMissing) throw new Error(line + ':\n  ' + memberFaults.join('\n  '));
 	console.warn(line + ':\n  ' + memberFaults.join('\n  '));
 }
+const largest = indexSizes.sort((a, b) => b.bytes - a.bytes)[0];
+if (largest) console.log('Search: ' + indexSizes.length + ' indexes, the largest ' + largest.at + ', ' + Math.round(largest.bytes / 1024) + ' KB (' + Math.round(largest.gzip / 1024) + ' KB gzipped)');
 console.log('Docs: ' + pageCount + ' type pages, in ' + DOC_LANGUAGES.join(', '));

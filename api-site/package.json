@@ -1,6 +1,7 @@
 {
   "name": "skipcheck-io-docs",
   "private": true,
+  "type": "module",
   "description": "Builds and serves each project's landing page, docs and API reference at skipcheck.io/<project>/",
   "scripts": {
     "test": "node --test \"test/*.test.mjs\"",

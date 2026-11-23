@@ -197,8 +197,8 @@ export async function copyAssets(project) {
 	await cp(path.join(siteDir, 'assets'), to, { recursive: true });
 }
 
-/** The head of a generated page. styles and scripts are addresses, in order. */
-export function head({ title, description, canonical, styles, scripts }) {
+/** The head of a generated page. styles, scripts and modules (scripts that are ES modules) are addresses, in order. */
+export function head({ title, description, canonical, styles, scripts, modules = [] }) {
 	return (
 		'<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
 		'<title>' +
@@ -209,6 +209,7 @@ export function head({ title, description, canonical, styles, scripts }) {
 		'<link rel="icon" href="/favicon.svg" type="image/svg+xml"><meta name="color-scheme" content="light dark">' +
 		styles.map((href) => '<link rel="stylesheet" href="' + href + '">').join('') +
 		scripts.map((src) => '<script src="' + src + '" defer></script>').join('') +
+		modules.map((src) => '<script type="module" src="' + src + '"></script>').join('') +
 		(description ? '<meta property="og:type" content="website"><meta property="og:title" content="' + escape(title) + '"><meta property="og:description" content="' + escape(description) + '">' : '') +
 		(canonical ? '<meta property="og:url" content="' + escape(canonical) + '">' : '') +
 		(description ? SOCIAL_IMAGE_TAGS : '') +
