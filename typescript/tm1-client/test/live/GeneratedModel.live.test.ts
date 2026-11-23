@@ -1,4 +1,3 @@
-import { Tm1ServerContainer } from "@skipcheck/tm1-testcontainers";
 import { describe, expect } from "vitest";
 import {
   allOperations,
@@ -21,7 +20,7 @@ import {
   type MDXView,
   type Tm1Session,
 } from "../../src/index.js";
-import { liveReason, tm1Test } from "./live.js";
+import { Live, liveReason, tm1Test } from "./live.js";
 import { sessions } from "./raw-tm1.js";
 
 const rules = async (session: Tm1Session, cube: ODataPath): Promise<string | null | undefined> =>
@@ -37,7 +36,7 @@ describe("The generated model on TM1" + liveReason, () => {
     try {
       const server = await session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), Server));
       // What the container read as it started; a server at TM1_URL has only the session's reading
-      const version = process.env["TM1_URL"]?.trim() ? await session.version() : (await Tm1ServerContainer.shared()).getTm1Version();
+      const version = (await Live.target()).version ?? (await session.version());
       expect(server.ProductVersion).toBe(version.toString());
       expect(server["@odata.etag"], "TM1 sends no ETag for the Server singleton").toBeUndefined();
 

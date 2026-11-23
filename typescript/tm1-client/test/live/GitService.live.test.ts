@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { StartedTestContainer } from "testcontainers";
-import { Tm1ServerContainer } from "@skipcheck/tm1-testcontainers";
 import {
   DimensionPatch,
   ElementPatch,
@@ -55,9 +54,10 @@ class GitDaemon {
   static async start(): Promise<GitDaemon> {
     if (GIVEN) return new GitDaemon(GIVEN, undefined);
     const { GenericContainer, Wait } = await import("testcontainers");
-    const tm1 = await Tm1ServerContainer.shared();
+    const tm1 = (await Live.target()).containerId;
+    if (!tm1) throw new Error("The Git daemon shares the TM1 container's network: there's no container");
     const container = await new GenericContainer("alpine:3.21")
-      .withNetworkMode("container:" + tm1.getContainerId())
+      .withNetworkMode("container:" + tm1)
       .withCommand(["sh", "-c", SEED])
       .withWaitStrategy(Wait.forLogMessage(/Ready to rumble/))
       .withStartupTimeout(120_000)

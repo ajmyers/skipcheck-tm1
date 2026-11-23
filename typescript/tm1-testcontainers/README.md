@@ -52,7 +52,7 @@ Testcontainers for Node configures a container on its `GenericContainer`, whose 
 
 ### Sharing
 
-`shared()` gives one server per module graph: per test file, by default, since vitest isolates files. To share one across files, run them without isolation (`isolate: false`), or turn on reuse. Java's is one per JVM.
+`shared()` gives one server per module graph: per test file, by default, since vitest isolates files. Java's is one per JVM. To share one across files, start it once in a vitest `globalSetup` and `provide` its URL and login to the files, which is what the client's live tests do (`../tm1-client/test/live/global-setup.ts`); or run the files without isolation (`isolate: false`); or turn on reuse. A global setup runs in vitest's own process, so it imports from `@skipcheck/tm1-testcontainers`, not from `@skipcheck/tm1-testcontainers/vitest`.
 
 ### Reuse
 
@@ -78,4 +78,4 @@ TM1_PRIVATE_IMAGE=tm1-server-private:2.1.19 npm test -w testcontainers
 - **Configuration tests** need no Docker. `sources.test.ts` ports Java's `*SourceTest`; `wiring.test.ts` ports `AdminServerWiringTest`, `CognosContainerTest` and `PlanningAnalyticsEnvironmentTest`; `vitest-helpers.test.ts` checks the skip helpers.
 - **Container tests** are skipped without Docker or a source. `containers.test.ts` ports `Tm1ServerContainerTest`, `Tm1WebContainerTest` (with its `Tm1WebSession`) and `PawContainerTest`. `examples.test.ts` ports the Java examples that need only the shared server's source: `SharedServerExampleTest`, `WithoutTheExtensionExampleTest` and `PinnedVersionExampleTest`. The others need IBM's SData sample, Cognos or TM1 Web of their own, as in the .NET port, which doesn't port them either.
 
-The client's live tests (`../test/live`) run against the shared server when `TM1_URL` isn't set: see `Live.containerTarget`.
+The client's live tests (`../tm1-client/test/live`) run against one server for the whole run when `TM1_URL` isn't set, one file after the other: see `global-setup.ts` there.
