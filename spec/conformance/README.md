@@ -142,4 +142,4 @@ The runners are Java's `ConformanceScenarioTm1Test`, Python's `tests/live/test_c
 
 ### Adding a scenario
 
-Write `live/<name>.json` with the steps a service's live test covers, using only names from `names`, then run `scripts/live-tests.sh`.
+Write `live/<name>.json` with the steps a service's live test covers, using only names from `names`, then run `./gradlew liveTest --continue` (or `scripts/live-tests.sh`).
