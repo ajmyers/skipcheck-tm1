@@ -48,24 +48,14 @@ def capability_of(call: p.Call) -> Any:
     return None
 
 
-def items_only(call: p.Call) -> p.Call:
-    """A paged call read as its first page's items, for a batch, which can't follow links."""
-
-    def read(reply: p.Reply) -> Any:
-        page = call.read(reply)
-        if page.next_link is not None:
-            raise Tm1ProtocolError(f"{call.path}: TM1 sent more than one page, which a batch can't follow; ask for fewer with top=")
-        return page.items
-
-    return replace(call, read=read)
-
-
 class Queue:
     def __init__(self) -> None:
         self.entries: list[tuple[p.Call, p.Context, p.Deferred[Any]]] = []
+        self.paged: list[p.Deferred[Any]] = []
+        """The results of calls for a whole collection: a page, until the batch has read the rest."""
         self.ran = False
 
-    def add(self, call: p.Call, context: p.Context) -> p.Deferred[Any]:
+    def add(self, call: p.Call, context: p.Context, paged: bool = False) -> p.Deferred[Any]:
         if self.ran:
             raise RuntimeError(
                 "The batch has already run, so this call can't join it: a call whose request depends on "
@@ -82,6 +72,8 @@ class Queue:
                 raise ValueError(f"The request body isn't JSON, so it can't go in a batch: {call.method} {call.path}") from e
         deferred: p.Deferred[Any] = p.Deferred(call)
         self.entries.append((call, context, deferred))
+        if paged:
+            self.paged.append(deferred)
         return deferred
 
     def take(self) -> list[tuple[p.Call, p.Context, p.Deferred[Any]]]:

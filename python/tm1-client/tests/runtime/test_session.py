@@ -551,6 +551,43 @@ def test_fails_every_call_when_the_batchs_answer_cant_be_read(rt: Runtime) -> No
             deferred.result()
 
 
+def test_follows_a_next_link_in_an_answer(rt: Runtime) -> None:
+    answers(
+        rt,
+        {
+            "POST $batch": {"responses": [{"id": "1", "status": 200, "body": {"value": [{"Name": "a"}], "@odata.nextLink": "Cubes?$skiptoken=2"}}]},
+            "GET Cubes?$skiptoken=2": {"value": [{"Name": "b"}]},
+        },
+    )
+    batch = rt.session().with_sandbox("s").batch()
+    names = rt.run(batch.session.collect(CUBES))
+    rt.run(batch.run())
+    assert [cube["Name"] for cube in names.result()] == ["a", "b"]
+    assert [target(r) for r in rt.fake.requests] == ["POST $batch", "GET Cubes?$skiptoken=2"], "the link is followed as TM1 gave it"
+
+
+def test_fails_a_call_whose_later_page_fails(rt: Runtime) -> None:
+    answers(
+        rt,
+        {
+            "POST $batch": {
+                "responses": [
+                    {"id": "1", "status": 200, "body": {"value": [{"Name": "a"}], "@odata.nextLink": "Cubes?$skiptoken=2"}},
+                    {"id": "2", "status": 204},
+                ]
+            },
+            "GET Cubes?$skiptoken=2": json_response(500, {"error": {"code": "1", "message": "no more"}}),
+        },
+    )
+    batch = rt.session().batch()
+    names = rt.run(batch.session.collect(CUBES))
+    deleted = rt.run(batch.session.execute(Tm1Request.delete(ODataPath.of("Cubes").key("Old"))))
+    rt.run(batch.run())
+    with pytest.raises(Tm1ServerError):
+        names.result()
+    assert deleted.result() is None
+
+
 def test_splits_a_big_queue(rt: Runtime) -> None:
     rt.fake.respond = lambda r: {"responses": []}
     batch = rt.session().batch()
@@ -732,6 +769,32 @@ def test_reads_a_big_collection_tm1_gave_at_once(rt: Runtime) -> None:
     answers(rt, {"GET Cubes": {"value": [{"Name": big}]}})
     cubes = streamed(rt, rt.session().with_async(0.01), CUBES)
     assert [len(cube["Name"]) for cube in cubes] == [300_000]
+
+
+def test_follows_a_next_link_in_a_result(rt: Runtime) -> None:
+    answers(
+        rt,
+        {
+            "GET Cubes": {"value": [{"Name": "a"}], "@odata.nextLink": "Cubes?$skiptoken=2"},
+            "GET Cubes?$skiptoken=2": {"value": [{"Name": "b"}]},
+        },
+    )
+    session = rt.session().with_async(0.01)
+    assert [cube["Name"] for cube in streamed(rt, session, CUBES)] == ["a", "b"]
+    assert [cube["Name"] for cube in rt.run(session.collect(CUBES))] == ["a", "b"]
+
+
+def test_follows_a_next_link_in_a_result_it_polled_for(rt: Runtime) -> None:
+    # Not in the Java tests, where one decoder reads a result whether TM1 gave it at once or through the monitor
+    answers(
+        rt,
+        {
+            "GET Cubes": httpx.Response(202, headers={"Location": "_async('a1')"}),
+            MONITOR: done("200 OK", json.dumps({"value": [{"Name": "a"}], "@odata.nextLink": "Cubes?$skiptoken=2"})),
+            "GET Cubes?$skiptoken=2": {"value": [{"Name": "b"}]},
+        },
+    )
+    assert [cube["Name"] for cube in rt.run(rt.session().with_async(0.01).collect(CUBES))] == ["a", "b"]
 
 
 def test_reads_a_big_error_body(rt: Runtime) -> None:

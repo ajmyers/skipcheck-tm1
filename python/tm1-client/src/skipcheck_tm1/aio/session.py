@@ -35,7 +35,7 @@ import httpx
 
 from .. import _protocol as p
 from .._compat import AsyncIO as runtime
-from .._views import CAPABILITIES, Queue, as_call, capability_of, items_only, poll_interval, settle
+from .._views import CAPABILITIES, Queue, as_call, capability_of, poll_interval, settle
 from ..auth import Authenticator, basic
 from ..errors import (
     ODataError,
@@ -613,17 +613,21 @@ class AsyncTm1Session:
         return self.iterate(as_call(request))
 
     async def collect(self, request: Tm1Request[Any] | p.Call) -> Any:
-        """Every item of a collection, as a list; in a batch, the first page's (a ``Deferred``)."""
+        """Every item of a collection, as a list, following TM1's next links. In a batch, a
+        ``Deferred`` of that list: the first page comes in the batch's answer, and the pages after
+        it, if TM1 sent a next link, are fetched with ordinary requests on the same session when
+        the batch runs. TM1 (11.8) doesn't page, so that is untested against a server."""
         call = as_call(request)
         if self._queue is not None:
-            return await self.execute(items_only(call))
+            return self._queue.add(call, self._context, paged=True)
         return [item async for item in self.iterate(call)]
 
     async def iterate(self, call: p.Call) -> AsyncIterator[Any]:
         """The items of a collection, page by page, following TM1's next links: what :meth:`stream`
-        iterates, for a call rather than a request. Can't join a batch."""
+        iterates, for a call rather than a request. On an async view, the first page may come as
+        an async result, and each page after it is asked for the same way. Can't join a batch."""
         if self._queue is not None:
-            raise RuntimeError("A collection can't be iterated in a batch: use collect(), which returns its first page")
+            raise RuntimeError("A collection can't be iterated in a batch: use collect(), whose result is every item once the batch has run")
         page = await self.execute(call)
         while True:
             for item in page.items:
@@ -689,7 +693,9 @@ class AsyncTm1SessionBatch:
         print(a.result().name)
 
     TM1 (11.8) runs a batch's requests in order (a later one sees an earlier one's writes), and
-    carries on past failed ones: each result holds its own value or error. Multipart batches,
+    carries on past failed ones: each result holds its own value or error. A collection's result
+    is every item: if TM1 answers with a next link, :meth:`run` fetches the pages after the first
+    with ordinary requests, outside the batch. Multipart batches,
     ``atomicityGroup`` and ``dependsOn`` are refused, so none are used; 1000 requests in one
     batch work, and :meth:`run` splits a bigger queue.
 
@@ -749,6 +755,7 @@ class AsyncTm1SessionBatch:
         for entry in self._queue.take():
             if await self._supported(entry[0], entry[2]):
                 sendable.append(entry)
+        paged = {id(deferred) for deferred in self._queue.paged}
         for start in range(0, len(sendable), per_request):
             chunk = sendable[start : start + per_request]
             body = p.batch_body([(call, context) for call, context, _ in chunk])
@@ -760,6 +767,26 @@ class AsyncTm1SessionBatch:
                 # a response with no body, or one that isn't a batch response.
                 for _, _, deferred in chunk:
                     deferred._fail(e)
+            for call, _, deferred in chunk:
+                if id(deferred) in paged:
+                    await self._rest(call, deferred)
+
+    async def _rest(self, call: p.Call, deferred: p.Deferred[Any]) -> None:
+        """Makes a collection's result its every item. Its first page came in the batch; a next
+        link is followed with ordinary requests, as ``stream()`` does: the rest of the collection
+        isn't part of the batch. A page that fails fails the call."""
+        if deferred._error is not None:
+            return
+        page = deferred._value
+        items = list(page.items)
+        try:
+            while page.next_link is not None:
+                page = await self._sender.execute(p.Call("GET", page.next_link, read=call.read, contextual=False))
+                items.extend(page.items)
+        except Exception as e:  # noqa: BLE001
+            deferred._fail(e)
+            return
+        deferred._value = items
 
     async def _supported(self, call: p.Call, deferred: p.Deferred[Any]) -> bool:
         """Whether the server defines what the call requires. If it doesn't (or that can't be found
