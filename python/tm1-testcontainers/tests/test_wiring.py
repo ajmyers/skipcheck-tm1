@@ -218,6 +218,51 @@ def test_keycloak_adds_oidc() -> None:
     assert env.containers()[:2] == [env.keycloak(), env.cognos()]
 
 
+def paw_source() -> PawSource:
+    return PawSource(FIXTURES / "ibm" / "ipa_workspace_local_0.0.0.zip")
+
+
+def test_paw_logs_on_to_tm1_without_cognos() -> None:
+    env = builder().tm1("planning").paw(lambda paw: paw.accept_license()).paw_source(paw_source()).build()
+    settings = env.paw()._script_settings("10.0.0.2", "10.0.0.3", None)
+    assert settings["PAW_AUTH_MODE"] == "tm1"
+    assert settings["PAW_TM1_LOGIN_URL"] == "http://10.0.0.2:8010"
+    assert settings["PAW_TM1_ADMIN_URL"] == "http://10.0.0.3:5895"
+    assert not {"PAW_CAM_SERVLET", "PAW_CAM_GATEWAY", "PAW_CAM_NAMESPACE"} & settings.keys()
+
+
+def test_paw_with_cognos_logs_on_through_cam() -> None:
+    env = (
+        builder()
+        .tm1("planning")
+        .cognos(lambda cognos: cognos.with_user("admin", "adminpw"))
+        .paw(lambda paw: paw.accept_license())
+        .paw_source(paw_source())
+        .build()
+    )
+    assert env.paw().tm1_server is env.tm1("planning")
+    # The dispatcher on the network checks logons; browsers go to Cognos on the host
+    settings = env.paw()._script_settings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/")
+    assert settings["PAW_AUTH_MODE"] == "cam"
+    assert settings["PAW_CAM_SERVLET"] == "http://cognos:9300/p2pd/servlet/dispatch"
+    assert settings["PAW_CAM_GATEWAY"] == "http://localhost:9300/bi/v1/disp"
+    assert settings["PAW_CAM_NAMESPACE"] == "LDAP"
+    # The TM1 server's namespace
+    oidc = (
+        builder()
+        .tm1("planning")
+        .cognos(lambda cognos: cognos.with_user("admin", "adminpw"))
+        .keycloak()
+        .cam_security(Namespace.OIDC)
+        .paw(lambda paw: paw.accept_license())
+        .paw_source(paw_source())
+        .build()
+    )
+    assert oidc.paw()._script_settings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/")["PAW_CAM_NAMESPACE"] == "OIDC"
+    with pytest.raises(RuntimeError, match="Cognos"):
+        env.paw()._script_settings("10.0.0.2", "10.0.0.2", None)
+
+
 def test_customizers_see_the_wired_container_and_can_change_it() -> None:
     env = builder().tm1("planning", lambda tm1: tm1.with_seed(Tm1Seed.SDATA).with_env("TM1_CFG_MaxThreads", "4")).build()
     env_map = env.tm1("planning").env_map
@@ -234,8 +279,6 @@ def test_refuses_missing_or_unsupported_parts() -> None:
         builder().tm1("a").keycloak().build()
     with pytest.raises(RuntimeError, match="keycloak"):
         builder().tm1("a").cognos(lambda c: c.with_user("u", "p")).cam_security(Namespace.OIDC).build()
-    with pytest.raises(RuntimeError, match="PAW"):
-        builder().tm1("a").cognos(lambda c: c.with_user("u", "p")).paw(lambda paw: None).build()
     with pytest.raises(RuntimeError, match="test users"):
         builder().tm1("a").cognos(lambda c: None).build()
     with pytest.raises(ValueError, match="already"):
@@ -377,6 +420,15 @@ def test_from_config_runs_paw_from_the_ibm_folder() -> None:
     assert env.paw()._is_license_accepted()
     assert env.paw().tm1_server is env.tm1("tm1")
     assert env.admin_server() is None
+
+
+def test_from_config_runs_paw_with_cognos() -> None:
+    env = PlanningAnalyticsEnvironment.from_config(FIXTURES / "paw-cognos.yaml").build()
+    assert env.paw().tm1_server is env.tm1("tm1")
+    assert env.tm1("tm1").cognos is env.cognos()
+    settings = env.paw()._script_settings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/")
+    assert settings["PAW_AUTH_MODE"] == "cam"
+    assert settings["PAW_CAM_NAMESPACE"] == "LDAP"
 
 
 def test_from_config_refuses_what_it_cannot_run() -> None:

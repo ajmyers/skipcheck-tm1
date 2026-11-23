@@ -244,8 +244,8 @@ export class PlanningAnalyticsEnvironment implements Startable {
    * keeps databases in; each test environment starts from a new database, or one copied in with
    * {@link Tm1ServerContainer.withData}). They're still checked as `pa-setup` checks them.
    *
-   * Refused, because the environment can't run them yet: `cognos` without `tm1.servers`, `paw`
-   * with `cognos`, and `seed: 24retail`.
+   * Refused, because the environment can't run them yet: `cognos` without `tm1.servers`, and
+   * `seed: 24retail`.
    * @param path the file, usually `pa-environment.yaml`
    * @returns a builder configured from the file
    * @throws IllegalArgumentException if the file can't be read, isn't valid, or asks for what the
@@ -468,7 +468,8 @@ export namespace PlanningAnalyticsEnvironment {
       return this;
     }
 
-    /** Adds PAW, changed with `customizer` (to accept the license, say). */
+    /** Adds PAW, changed with `customizer` (to accept the license, say). With {@link cognos}, users
+     * log on to PAW through Cognos, in the CAM namespace. */
     paw(customizer: Customizer<PawContainer>): this {
       this.#parts.paw = customizer;
       return this;
@@ -559,9 +560,6 @@ export namespace PlanningAnalyticsEnvironment {
       if (p.keycloak !== undefined && p.cognos === undefined) throw new IllegalStateException("Keycloak gives Cognos its OIDC namespace: add cognos(...) too");
       if (p.camNamespace === CognosContainer.Namespace.OIDC && p.keycloak === undefined)
         throw new IllegalStateException("CAM security through OIDC needs keycloak()");
-      if (p.paw !== undefined && p.cognos !== undefined) {
-        throw new IllegalStateException("PAW with Cognos (CAM) security isn't supported yet: PAW logs users on with TM1's own security");
-      }
       return new PlanningAnalyticsEnvironment(p, reuseEnabled);
     }
   }

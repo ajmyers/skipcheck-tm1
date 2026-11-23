@@ -214,8 +214,6 @@ class _Reader:
         # What pa-setup runs and this environment can't
         if cam is not None and not servers:
             raise self.error("cognos: PlanningAnalyticsEnvironment needs a TM1 server too (tm1.servers); for Cognos alone, use CognosContainer")
-        if paw_port is not None and cam is not None:
-            raise self.error("paw: PlanningAnalyticsEnvironment can't run PAW with Cognos (CAM) security yet; remove paw or cognos")
         for name, server in servers.items():
             if server.seed == "24retail":
                 raise self.error(f"tm1.servers.{name}.seed: 24retail isn't available in tm1-testcontainers (Tm1Seed has empty and sdata)")

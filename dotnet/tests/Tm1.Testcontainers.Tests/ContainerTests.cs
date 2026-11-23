@@ -157,6 +157,52 @@ public class PawContainerTests(PawFixture fixture) : IClassFixture<PawFixture>
     }
 }
 
+/// <summary>Java's PawCamSecurityTest: PAW with Cognos (CAM) security, in a PlanningAnalyticsEnvironment. PAW and Cognos together need
+/// most of a developer machine's Docker memory, so nothing else should run beside it. Skipped without TM1, Cognos and PAW sources.</summary>
+public class PawCamSecurityTests
+{
+    [RequiresCognosAndPawFact]
+    public async Task LogsOnThroughCognosAndCallsTm1()
+    {
+        await using var env = PlanningAnalyticsEnvironment
+            .Builder()
+            .Tm1("planning")
+            .Cognos(cognos => cognos.WithUser("admin", "adminpw", "Admins").WithUser("viewer", "viewerpw", "Readers"))
+            .Paw(paw => paw.AcceptLicense())
+            .Build();
+        await env.StartAsync();
+        var url = env.Paw().Url;
+
+        // Browsers are sent to Cognos, as the host reaches it, to log on
+        using var anonymous = new PawSession(url);
+        var (_, page) = await anonymous.GetAsync("login");
+        Assert.Contains("extLoginUrl = \"" + env.Cognos().Url + "v1/disp?b_action=xts.run", page, StringComparison.Ordinal);
+
+        // A test user logs on with their Cognos password, and calls TM1 as themselves
+        using var viewer = new PawSession(url);
+        await viewer.LoginAsync("viewer", "viewerpw");
+        Assert.Contains("planning", await viewer.ServersAsync());
+        var (status, body) = await viewer.Tm1GetAsync("planning", "ActiveUser?$select=Name");
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("CAMID", body, StringComparison.Ordinal);
+        Assert.Contains("viewer", body, StringComparison.OrdinalIgnoreCase);
+
+        // Cognos checks the password
+        using var wrong = new PawSession(url);
+        await Assert.ThrowsAsync<System.IO.IOException>(() => wrong.LoginAsync("viewer", "not-the-password"));
+    }
+
+    /// <summary>Needs TM1, Cognos and PAW, as Java's @RequiresCognos with @RequiresPaw.</summary>
+    [AttributeUsage(AttributeTargets.Method)]
+    private sealed class RequiresCognosAndPawFactAttribute : RequiresTm1FactAttribute
+    {
+        public RequiresCognosAndPawFactAttribute()
+        {
+            Skip ??= new RequiresCognosFactAttribute().Skip ?? new RequiresPawFactAttribute().Skip;
+        }
+    }
+}
+
 /// <summary>Java's EnvironmentExampleTest#aReusedEnvironmentKeepsItsContainersForTheNextRun: skipped without a TM1 source, or
 /// with Testcontainers reuse off.</summary>
 public class EnvironmentExampleTests

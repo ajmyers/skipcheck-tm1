@@ -222,8 +222,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// environment has its own network), every <c>port</c>, <c>adminPort</c> and <c>keycloakPort</c> (Testcontainers maps random host
     /// ports), and <c>files</c> (the host folder pa-setup keeps databases in; each test environment starts from a new database, or one
     /// copied in with <see cref="Tm1ServerContainer.WithData"/>). They're still checked as <c>pa-setup</c> checks them.</para>
-    /// <para>Refused, because the environment can't run them yet: <c>cognos</c> without <c>tm1.servers</c>, <c>paw</c> with
-    /// <c>cognos</c>, and <c>seed: 24retail</c>.</para>
+    /// <para>Refused, because the environment can't run them yet: <c>cognos</c> without <c>tm1.servers</c>, and
+    /// <c>seed: 24retail</c>.</para>
     /// </remarks>
     /// <example><code>
     /// // The environment pa-setup runs from the same file, with random host ports
@@ -545,7 +545,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             return this;
         }
 
-        /// <summary>Adds PAW, changed with <paramref name="customizer"/> (to accept the license, say).</summary>
+        /// <summary>Adds PAW, changed with <paramref name="customizer"/> (to accept the license, say). With <see cref="Cognos"/>, users log
+        /// on to PAW through Cognos, in the CAM namespace.</summary>
         public EnvironmentBuilder Paw(Action<PawContainer> customizer)
         {
             PawCustomizer = customizer ?? throw new ArgumentNullException(nameof(customizer));
@@ -645,10 +646,6 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             if (CamNamespaceSet == CognosContainer.Namespace.Oidc && KeycloakCustomizer is null)
             {
                 throw new InvalidOperationException("CAM security through OIDC needs Keycloak()");
-            }
-            if (PawCustomizer is not null && CognosCustomizer is not null)
-            {
-                throw new InvalidOperationException("PAW with Cognos (CAM) security isn't supported yet: PAW logs users on with TM1's own security");
             }
             return new PlanningAnalyticsEnvironment(this, reuseEnabled);
         }

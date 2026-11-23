@@ -22,6 +22,12 @@ namespace Skipcheck.Tm1.Testcontainers;
 /// <c>docker/paw</c>, embedded in this library) in a <c>docker:cli</c> runner with the Docker
 /// socket, and joins PAW's containers to TM1's network. IBM's license must be accepted first
 /// (<c>PAW_ACCEPT_LICENSE=true</c>, or <see cref="AcceptLicense"/>).</summary>
+/// <remarks>When the TM1 server runs in Cognos (CAM) security (<see cref="Tm1ServerContainer.WithCamSecurity(CognosContainer, CognosContainer.Namespace, string[])"/>),
+/// PAW does too (<c>PAAuthMode=cam</c>), as pa-setup wires it: users log on through Cognos, in the TM1 server's namespace. PAW checks
+/// logons with Cognos's dispatcher on the network (<c>http://cognos:9300</c>), and sends browsers to Cognos's address on the host to log
+/// on. Tests log on with a Cognos test user's name and password, which PAW checks with Cognos. A browser that logs on through Cognos
+/// isn't sent back to PAW, though: Cognos hands logons back only to the addresses in IBM's <c>pmhub.html</c>, which
+/// <see cref="CognosContainer"/> doesn't install (pa-setup does, with <c>COGNOS_PMHUB_URLS</c>).</remarks>
 public class PawContainer : IStartable
 {
     /// <summary>The setting that accepts IBM's PAW license.</summary>
@@ -176,16 +182,9 @@ public class PawContainer : IStartable
                 adminAddress = address;
             }
             httpPort = FreePort();
-            var env = new Dictionary<string, string>(settings, StringComparer.Ordinal)
-            {
-                ["PAW_TM1_ADMIN_URL"] = $"http://{adminAddress}:{AdminPort}",
-                ["PAW_TM1_LOGIN_URL"] = $"http://{tm1Address}:{Tm1ServerContainer.RestPort}",
-                ["PAW_AUTH_MODE"] = "tm1",
-                ["PAW_HTTP_PORT"] = httpPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                ["PAW_HTTPS_PORT"] = FreePort().ToString(System.Globalization.CultureInfo.InvariantCulture),
-                ["PAW_NETWORK"] = PawNetwork,
-                ["PAW_WAIT"] = "0",
-            };
+            var env = ScriptSettings(tm1Address, adminAddress, server.Cognos?.Url);
+            env["PAW_HTTP_PORT"] = httpPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            env["PAW_HTTPS_PORT"] = FreePort().ToString(System.Globalization.CultureInfo.InvariantCulture);
             using var docker = DockerHost.Client();
             await RunScriptAsync(docker, "up", env, startupTimeout, cancellationToken).ConfigureAwait(false);
             await ConnectToNetworkAsync(docker, tm1NetworkId, cancellationToken).ConfigureAwait(false);
@@ -196,6 +195,40 @@ public class PawContainer : IStartable
         {
             starting.Release();
         }
+    }
+
+    /// <summary><c>paw-local.sh</c>'s settings for PAW against the TM1 server, without the ports: the caller's own, then this class's
+    /// wiring. With the server in CAM security, PAW logs users on through its Cognos and namespace.</summary>
+    /// <param name="tm1Address">The TM1 server's address on its network.</param>
+    /// <param name="adminAddress">The Admin Server's address on that network.</param>
+    /// <param name="cognosUrl">Cognos as the host sees it (<see cref="CognosContainer.Url"/>), where PAW sends browsers to log on; null
+    /// unless the server is in CAM security.</param>
+    internal Dictionary<string, string> ScriptSettings(string tm1Address, string adminAddress, string? cognosUrl)
+    {
+        var server = Tm1Server ?? throw new InvalidOperationException("No TM1 server: set one with WithTm1Server");
+        var env = new Dictionary<string, string>(settings, StringComparer.Ordinal)
+        {
+            ["PAW_TM1_ADMIN_URL"] = $"http://{adminAddress}:{AdminPort}",
+            ["PAW_TM1_LOGIN_URL"] = $"http://{tm1Address}:{Tm1ServerContainer.RestPort}",
+            ["PAW_NETWORK"] = PawNetwork,
+            ["PAW_WAIT"] = "0",
+        };
+        if (server.Cognos is not { } cognos || server.CamNamespace is not { } @namespace)
+        {
+            env["PAW_AUTH_MODE"] = "tm1";
+            return env;
+        }
+        if (cognosUrl is null)
+        {
+            throw new InvalidOperationException("PAW in CAM security needs Cognos's address on the host");
+        }
+        // As pa-setup: the dispatcher on the network checks logons; the gateway, Cognos as browsers reach it, is where PAW sends them
+        // to log on
+        env["PAW_AUTH_MODE"] = "cam";
+        env["PAW_CAM_SERVLET"] = cognos.NetworkUrl + "/p2pd/servlet/dispatch";
+        env["PAW_CAM_GATEWAY"] = cognosUrl + "v1/disp";
+        env["PAW_CAM_NAMESPACE"] = @namespace.Id();
+        return env;
     }
 
     /// <inheritdoc/>

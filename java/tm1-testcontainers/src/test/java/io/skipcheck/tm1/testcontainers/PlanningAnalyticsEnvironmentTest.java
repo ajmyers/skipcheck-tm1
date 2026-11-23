@@ -87,6 +87,43 @@ class PlanningAnalyticsEnvironmentTest {
 	}
 
 	@Test
+	void pawLogsOnToTm1WithoutCognos() {
+		var env = builder().tm1("planning").paw(PawContainer::acceptLicense).pawSource(pawSource()).build();
+		assertThat(env.paw().scriptSettings("10.0.0.2", "10.0.0.3", null)).containsEntry("PAW_AUTH_MODE", "tm1")
+			.containsEntry("PAW_TM1_LOGIN_URL", "http://10.0.0.2:8010")
+			.containsEntry("PAW_TM1_ADMIN_URL", "http://10.0.0.3:5895")
+			.doesNotContainKeys("PAW_CAM_SERVLET", "PAW_CAM_GATEWAY", "PAW_CAM_NAMESPACE");
+	}
+
+	@Test
+	void pawWithCognosLogsOnThroughCam() {
+		var env = builder().tm1("planning")
+			.cognos(cognos -> cognos.withUser("admin", "adminpw"))
+			.paw(PawContainer::acceptLicense)
+			.pawSource(pawSource())
+			.build();
+		assertThat(env.paw().getTm1Server()).isSameAs(env.tm1("planning"));
+		// The dispatcher on the network checks logons; browsers go to Cognos on the host
+		assertThat(env.paw().scriptSettings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/"))
+			.containsEntry("PAW_AUTH_MODE", "cam")
+			.containsEntry("PAW_CAM_SERVLET", "http://cognos:9300/p2pd/servlet/dispatch")
+			.containsEntry("PAW_CAM_GATEWAY", "http://localhost:9300/bi/v1/disp")
+			.containsEntry("PAW_CAM_NAMESPACE", "LDAP");
+		// The TM1 server's namespace
+		var oidc = builder().tm1("planning")
+			.cognos(cognos -> cognos.withUser("admin", "adminpw"))
+			.keycloak()
+			.camSecurity(Namespace.OIDC)
+			.paw(PawContainer::acceptLicense)
+			.pawSource(pawSource())
+			.build();
+		assertThat(oidc.paw().scriptSettings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/"))
+			.containsEntry("PAW_CAM_NAMESPACE", "OIDC");
+		assertThatIllegalStateException().isThrownBy(() -> env.paw().scriptSettings("10.0.0.2", "10.0.0.2", null))
+			.withMessageContaining("Cognos");
+	}
+
+	@Test
 	void customizersSeeTheWiredContainerAndCanChangeIt() {
 		var env = builder().tm1("planning", tm1 -> tm1.withSeed(Tm1Seed.SDATA).withEnv("TM1_CFG_MaxThreads", "4"))
 			.build();
@@ -104,10 +141,6 @@ class PlanningAnalyticsEnvironmentTest {
 		assertThatIllegalStateException()
 			.isThrownBy(() -> builder().tm1("a").cognos(c -> c.withUser("u", "p")).camSecurity(Namespace.OIDC).build())
 			.withMessageContaining("keycloak");
-		assertThatIllegalStateException()
-			.isThrownBy(() -> builder().tm1("a").cognos(c -> c.withUser("u", "p")).paw(paw -> {
-			}).build())
-			.withMessageContaining("PAW");
 		assertThatIllegalStateException().isThrownBy(() -> builder().tm1("a").cognos(c -> {
 		}).build()).withMessageContaining("test users");
 		assertThatIllegalArgumentException().isThrownBy(() -> builder().tm1("a").tm1("a"))
@@ -188,6 +221,10 @@ class PlanningAnalyticsEnvironmentTest {
 		return name.group(1);
 	}
 
+	private static PawSource pawSource() {
+		return new PawSource(fixture("ibm").resolve("ipa_workspace_local_0.0.0.zip"));
+	}
+
 	private static Path fixture(String name) {
 		return Path.of(System.getProperty("tm1.paEnvironment.fixtures")).resolve(name);
 	}
@@ -255,6 +292,16 @@ class PlanningAnalyticsEnvironmentTest {
 		assertThat(env.paw().licenseAccepted()).isTrue();
 		assertThat(env.paw().getTm1Server()).isSameAs(env.tm1("tm1"));
 		assertThat(env.adminServer()).isEmpty();
+	}
+
+	@Test
+	void fromConfigRunsPawWithCognos() {
+		var env = PlanningAnalyticsEnvironment.fromConfig(fixture("paw-cognos.yaml")).build();
+		assertThat(env.paw().getTm1Server()).isSameAs(env.tm1("tm1"));
+		assertThat(env.tm1("tm1").getCognos()).isSameAs(env.cognos());
+		assertThat(env.paw().scriptSettings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/"))
+			.containsEntry("PAW_AUTH_MODE", "cam")
+			.containsEntry("PAW_CAM_NAMESPACE", "LDAP");
 	}
 
 	@Test

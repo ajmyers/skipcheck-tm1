@@ -8,6 +8,7 @@ pa-setup's: [`docker/pa-setup`](../../../docker/pa-setup/README.md).
 |---|---|
 | `settings.yaml` | Every setting the environment maps, with values other than the defaults |
 | `paw.yaml` | PAW, its license, and its zip in the `ibm` folder |
+| `paw-cognos.yaml` | PAW with Cognos: PAW logs users on through Cognos |
 | `ibm/` | The `ibm` folder of both: an empty stand-in for the PAW Local zip |
 | `invalid/*.yaml` | Files `fromConfig` refuses. The first line is `# error: <part of the message>` |
 

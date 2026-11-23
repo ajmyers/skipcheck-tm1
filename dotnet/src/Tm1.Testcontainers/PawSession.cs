@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -108,13 +109,34 @@ internal sealed partial class PawSession : IDisposable
                         cookies[pair[0].Trim()] = pair[1].Trim().Trim('"');
                     }
                 }
-                return (response.StatusCode, await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                return (response.StatusCode, await ReadTextAsync(response.Content, cancellationToken).ConfigureAwait(false));
             }
             catch (HttpRequestException e)
             {
                 throw new IOException(e.Message, e);
             }
         }
+    }
+
+    /// <summary>A body as text, in the charset its <c>Content-Type</c> names, or UTF-8 if it names one .NET doesn't know.
+    /// PAW in CAM security answers its logon form with such a charset, and <c>ReadAsStringAsync</c> throws on it.</summary>
+    internal static async Task<string> ReadTextAsync(HttpContent content, CancellationToken cancellationToken)
+    {
+        var bytes = await content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        var encoding = Encoding.UTF8;
+        var charset = content.Headers.ContentType?.CharSet?.Trim('"', ' ');
+        if (!string.IsNullOrEmpty(charset))
+        {
+            try
+            {
+                encoding = Encoding.GetEncoding(charset);
+            }
+            catch (ArgumentException)
+            {
+                // Not a charset .NET knows: UTF-8, as a browser would assume for PAW's pages
+            }
+        }
+        return encoding.GetString(bytes);
     }
 
     [GeneratedRegex("\"Name\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")]

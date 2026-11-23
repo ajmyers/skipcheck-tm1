@@ -192,6 +192,8 @@ function thrown(action: () => unknown): Error {
   throw new Error("Nothing was thrown");
 }
 
+const pawSource = (): PawSource => new PawSource(join(fixture("ibm"), "ipa_workspace_local_0.0.0.zip"));
+
 const builder = (): PlanningAnalyticsEnvironment.Builder =>
   PlanningAnalyticsEnvironment.builder().tm1Source(source).tm1WebSource(webSource).cognosSource(new CognosSource.PrivateImage("cognos-server:test"));
 
@@ -275,13 +277,6 @@ describe("PlanningAnalyticsEnvironment", () => {
         .camSecurity(CognosContainer.Namespace.OIDC)
         .build(),
     ).toThrow("keycloak()");
-    expect(() =>
-      builder()
-        .tm1("a")
-        .cognos((c) => c.withUser("u", "p"))
-        .paw(() => undefined)
-        .build(),
-    ).toThrow("PAW");
     expect(() =>
       builder()
         .tm1("a")
@@ -440,6 +435,54 @@ describe("PlanningAnalyticsEnvironment", () => {
     expect(env.paw().licenseAccepted()).toBe(true);
     expect(env.paw().getTm1Server()).toBe(env.tm1("tm1"));
     expect(env.adminServer()).toBeUndefined();
+  });
+
+  it("from config runs PAW with Cognos", () => {
+    const env = PlanningAnalyticsEnvironment.fromConfig(fixture("paw-cognos.yaml")).build();
+    expect(env.paw().getTm1Server()).toBe(env.tm1("tm1"));
+    expect(env.tm1("tm1").getCognos()).toBe(env.cognos());
+    const settings = env.paw().scriptSettings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/");
+    expect(settings["PAW_AUTH_MODE"]).toBe("cam");
+    expect(settings["PAW_CAM_NAMESPACE"]).toBe("LDAP");
+  });
+
+  it("PAW logs on to TM1 without Cognos", () => {
+    const env = builder()
+      .tm1("planning")
+      .paw((paw) => paw.acceptLicense())
+      .pawSource(pawSource())
+      .build();
+    const settings = env.paw().scriptSettings("10.0.0.2", "10.0.0.3", undefined);
+    expect(settings).toMatchObject({ PAW_AUTH_MODE: "tm1", PAW_TM1_LOGIN_URL: "http://10.0.0.2:8010", PAW_TM1_ADMIN_URL: "http://10.0.0.3:5895" });
+    expect(Object.keys(settings).filter((key) => key.startsWith("PAW_CAM_"))).toEqual([]);
+  });
+
+  it("PAW with Cognos logs on through CAM", () => {
+    const env = builder()
+      .tm1("planning")
+      .cognos((cognos) => cognos.withUser("admin", "adminpw"))
+      .paw((paw) => paw.acceptLicense())
+      .pawSource(pawSource())
+      .build();
+    expect(env.paw().getTm1Server()).toBe(env.tm1("planning"));
+    // The dispatcher on the network checks logons; browsers go to Cognos on the host
+    expect(env.paw().scriptSettings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/")).toMatchObject({
+      PAW_AUTH_MODE: "cam",
+      PAW_CAM_SERVLET: "http://cognos:9300/p2pd/servlet/dispatch",
+      PAW_CAM_GATEWAY: "http://localhost:9300/bi/v1/disp",
+      PAW_CAM_NAMESPACE: "LDAP",
+    });
+    // The TM1 server's namespace
+    const oidc = builder()
+      .tm1("planning")
+      .cognos((cognos) => cognos.withUser("admin", "adminpw"))
+      .keycloak()
+      .camSecurity(CognosContainer.Namespace.OIDC)
+      .paw((paw) => paw.acceptLicense())
+      .pawSource(pawSource())
+      .build();
+    expect(oidc.paw().scriptSettings("10.0.0.2", "10.0.0.2", "http://localhost:9300/bi/")["PAW_CAM_NAMESPACE"]).toBe("OIDC");
+    expect(() => env.paw().scriptSettings("10.0.0.2", "10.0.0.2", undefined)).toThrow("Cognos");
   });
 
   it("from config refuses what it cannot run", () => {

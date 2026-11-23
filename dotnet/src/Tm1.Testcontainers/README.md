@@ -88,7 +88,7 @@ It returns the builder, configured, so you can still change it before `Build()`.
 - **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`, `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `Keycloak()`, `cam` as `CamSecurity`, `memory`) and `paw` (`acceptLicense`, `zip`).
 - **Sources:** a part's source set on the builder wins; then `ibm`, the folder of IBM downloads; then the settings above (pa-setup's `.env` sets the same `*_URL` names); then the part's `images` entry, as a private image with IBM's software built in. With another source, an `images` entry is the image the part runs.
 - **Ignored:** `name`, every port, and `files`. Testcontainers gives the environment its own network, random host ports and a new database each time.
-- **Refused** with a message naming the setting: `cognos` without `tm1.servers`, `paw` with `cognos`, and `seed: 24retail`, which the environment can't run yet.
+- **Refused** with a message naming the setting: `cognos` without `tm1.servers`, and `seed: 24retail`, which the environment can't run yet.
 - **YAML** is read with [YamlDotNet](https://github.com/aaubry/YamlDotNet), as YAML 1.1, the way pa-setup's PyYAML reads it: `yes`, `no`, `on` and `off` are booleans too.
 
 ### PAW

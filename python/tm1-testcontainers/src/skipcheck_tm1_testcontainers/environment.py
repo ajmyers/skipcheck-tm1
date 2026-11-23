@@ -178,7 +178,7 @@ class PlanningAnalyticsEnvironment:
         checked as ``pa-setup`` checks them.
 
         Refused, because the environment can't run them yet: ``cognos`` without
-        ``tm1.servers``, ``paw`` with ``cognos``, and ``seed: 24retail``.
+        ``tm1.servers``, and ``seed: 24retail``.
 
         A ValueError if the file can't be read, isn't valid, or asks for what the environment can't
         run; the message starts with the file's name and names the setting."""
@@ -338,8 +338,8 @@ class PlanningAnalyticsEnvironment:
         def paw(self, customizer: Callable[[PawContainer], Any]) -> Self:
             """Adds PAW, logging users on to the first TM1 server and listing every one. IBM's
             license must be accepted (:meth:`PawContainer.accept_license` in the customizer, or
-            ``PAW_ACCEPT_LICENSE=true``). Not available with Cognos yet: PAW logs users on with
-            TM1's own security."""
+            ``PAW_ACCEPT_LICENSE=true``). With :meth:`cognos`, users log on to PAW through Cognos,
+            in the CAM namespace (:meth:`cam_security`)."""
             self._paw = _required(customizer)
             return self
 
@@ -416,8 +416,6 @@ class PlanningAnalyticsEnvironment:
                 raise RuntimeError("Keycloak gives Cognos its OIDC namespace: add cognos(...) too")
             if self._cam_namespace is Namespace.OIDC and self._keycloak is None:
                 raise RuntimeError("CAM security through OIDC needs keycloak()")
-            if self._paw is not None and self._cognos is not None:
-                raise RuntimeError("PAW with Cognos (CAM) security isn't supported yet: PAW logs users on with TM1's own security")
             return PlanningAnalyticsEnvironment(self, reuse_enabled)
 
         def _cam_admins_for(self, cognos: CognosContainer) -> list[str]:

@@ -60,7 +60,8 @@ final class PawSession {
 	}
 
 	/**
-	 * Logs on as a user of the TM1 server PAW authenticates against.
+	 * Logs on as a user PAW authenticates: a user of its TM1 server, or a Cognos user
+	 * when PAW runs in CAM security.
 	 * @return this session
 	 * @throws IOException if PAW doesn't answer, or refuses the logon
 	 */

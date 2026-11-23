@@ -220,9 +220,6 @@ class PaEnvironmentFile {
     if (cam !== undefined && servers.size === 0) {
       throw this.error("cognos: PlanningAnalyticsEnvironment needs a TM1 server too (tm1.servers); for Cognos alone, use CognosContainer");
     }
-    if (pawPort !== undefined && cam !== undefined) {
-      throw this.error("paw: PlanningAnalyticsEnvironment can't run PAW with Cognos (CAM) security yet; remove paw or cognos");
-    }
     for (const [name, s] of servers) {
       if (s.seed === "24retail") {
         throw this.error("tm1.servers." + name + ".seed: 24retail isn't available in tm1-testcontainers (Tm1Seed has empty and sdata)");
