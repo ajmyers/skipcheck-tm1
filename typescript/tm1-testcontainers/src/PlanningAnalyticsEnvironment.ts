@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { CognosContainer } from "./CognosContainer.js";
 import { CognosSource } from "./CognosSource.js";
-import type { Startable } from "./GenericContainer.js";
+import { DockerHost } from "./docker.js";
+import { GenericContainer, type Startable } from "./GenericContainer.js";
 import { KeycloakContainer } from "./KeycloakContainer.js";
 import { Messages } from "./messages.js";
 import { readPaEnvironment, type FileSources } from "./PaEnvironmentFile.js";
@@ -46,10 +48,49 @@ type Customizer<T> = (part: T) => unknown;
  *   yet.
  * - Sources are discovered from the environment, as for each container, unless set with
  *   `tm1Source(...)` and so on. {@link start} starts parts in dependency order, in parallel where
- *   it can; {@link stop} stops everything and removes the network. */
+ *   it can; {@link stop} stops everything and removes the network.
+ *
+ * Cognos takes minutes to start, and PAW longer. With
+ * {@link PlanningAnalyticsEnvironment.Builder.reuse}, the environment keeps its containers running
+ * between test runs, so the next run starts in seconds:
+ *
+ * ```ts
+ * // Cognos and the server keep running after the run, for the next one, when
+ * // testcontainers.reuse.enable=true is set too
+ * await using env = PlanningAnalyticsEnvironment.builder()
+ *   .tm1("planning")
+ *   .cognos((cognos) => cognos.withUser("admin", "adminpw", "Admins"))
+ *   .reuse(true)
+ *   .build();
+ * await env.start(); // in seconds, once a run with this configuration has started it
+ * ```
+ *
+ * Reuse also needs your own switch, as for any reused container: `testcontainers.reuse.enable=true`
+ * in `~/.testcontainers.properties`, or `TESTCONTAINERS_REUSE_ENABLE=true`. Without it, `reuse` has
+ * no effect. With both:
+ * - The containers and the network are named after the environment's configuration (its identity,
+ *   a hash): the label `io.skipcheck.tm1.environment` on each container, and the network
+ *   `tm1-environment-<identity>`. A run with the same configuration finds them; a different
+ *   configuration gets its own, and never another's.
+ * - {@link stop} (and `await using`) leaves them running, PAW too. Ryuk doesn't remove reused
+ *   containers at the end of a run either.
+ * - What tests leave behind stays: objects they created in TM1, sessions, users in Cognos. Tests
+ *   should create uniquely named objects and delete them, as with
+ *   {@link Tm1ServerContainer.shared}.
+ * - A configuration you no longer use keeps its containers running, and Cognos holds about 8 GB. To
+ *   start clean, remove them all: `docker rm -f $(docker ps -aq --filter label=io.skipcheck.tm1.environment)`,
+ *   then `docker network rm $(docker network ls -q --filter label=io.skipcheck.tm1.environment)`.
+ * - The identity covers each part's image, source, environment variables, command, network aliases,
+ *   labels, exposed ports and copied files, the Cognos users and the CAM settings, and the name of a
+ *   network given with {@link PlanningAnalyticsEnvironment.Builder.network}.
+ * - PAW isn't a Testcontainers container: IBM's compose files give it fixed names, so there's one
+ *   per Docker host whatever the identity. Each start runs IBM's compose again, which takes about a
+ *   minute. */
 export class PlanningAnalyticsEnvironment implements Startable {
   readonly #network: Network;
   readonly #ownsNetwork: boolean;
+  readonly #reused: boolean;
+  #identity: string | undefined;
   readonly #tm1Servers: ReadonlyMap<string, Tm1ServerContainer>;
   readonly #adminServer: Tm1AdminServerContainer | undefined;
   readonly #tm1Web: Tm1WebContainer | undefined;
@@ -58,7 +99,16 @@ export class PlanningAnalyticsEnvironment implements Startable {
   readonly #keycloak: KeycloakContainer | undefined;
 
   /** @internal */
-  constructor(parts: BuilderParts, network: Network) {
+  constructor(parts: BuilderParts, reuseEnabled: boolean) {
+    this.#reused = parts.reuse && reuseEnabled;
+    const network =
+      parts.network ??
+      (this.#reused
+        ? Network.reusable(
+            () => NETWORK_PREFIX + this.identity(),
+            () => ({ [REUSE_LABEL]: this.identity() }),
+          )
+        : Network.newNetwork());
     this.#network = network;
     this.#ownsNetwork = parts.network === undefined;
     this.#keycloak = parts.keycloak === undefined ? undefined : new KeycloakContainer(parts.keycloakImage).withNetwork(network);
@@ -207,6 +257,7 @@ export class PlanningAnalyticsEnvironment implements Startable {
 
   /** Starts everything, what's depended on first and in parallel where it can, then PAW. */
   async start(): Promise<void> {
+    if (this.#reused) this.prepareForReuse();
     await Promise.all(
       this.containers()
         .filter((c) => c !== this.#paw)
@@ -215,8 +266,11 @@ export class PlanningAnalyticsEnvironment implements Startable {
     if (this.#paw) await this.#paw.start();
   }
 
-  /** Stops everything, last started first, and removes the network it made. */
+  /** Stops everything, last started first, and removes the network it made. A
+   * {@link PlanningAnalyticsEnvironment.Builder.reuse reused} environment is left running for the
+   * next run. */
   async stop(): Promise<void> {
+    if (this.#reused) return;
     for (const part of this.containers().reverse()) await part.stop();
     if (this.#ownsNetwork) await this.#network.close();
   }
@@ -278,6 +332,43 @@ export class PlanningAnalyticsEnvironment implements Startable {
     return this.#network;
   }
 
+  /** Whether the containers are kept for later runs: {@link PlanningAnalyticsEnvironment.Builder.reuse}
+   * and the developer's reuse switch ({@link DockerHost.reuseEnabled}).
+   * @internal */
+  reused(): boolean {
+    return this.#reused;
+  }
+
+  /** The environment's identity: a hash of every part's configuration, the same for the same
+   * configuration in every run. Fixed the first time it's asked for, which {@link start} does
+   * before anything starts.
+   * @internal */
+  identity(): string {
+    if (this.#identity === undefined) {
+      const lines = this.containers().map((part) => describe(part));
+      // A network of the developer's own: Testcontainers for Node's reuse hash leaves the network
+      // out, so without its name a container on last run's network would be picked up
+      if (!this.#ownsNetwork) lines.push("network=" + this.#network.getName());
+      this.#identity = createHash("sha256")
+        .update(lines.map((l) => l + "\n").join(""), "utf8")
+        .digest("hex")
+        .slice(0, 16);
+    }
+    return this.#identity;
+  }
+
+  /** Marks every container reusable, with the identity as a label. Testcontainers for Node finds
+   * a container to reuse by a hash of what it creates it with, labels included, so the label keeps
+   * configurations apart. Neither it nor this library adds a random network alias, as
+   * Testcontainers for Java does, so there's none to take away.
+   * @internal */
+  prepareForReuse(): void {
+    const id = this.identity();
+    for (const part of this.containers()) {
+      if (part instanceof GenericContainer) part.withReuse(true).withLabel(REUSE_LABEL, id);
+    }
+  }
+
   /** Every part, in start order: Keycloak, Cognos, the Admin Server, the TM1 servers, TM1 Web, PAW.
    * @internal */
   containers(): Startable[] {
@@ -321,6 +412,8 @@ export interface BuilderParts {
   cognosSource?: CognosSource;
   /** The network the containers share, if given rather than made. */
   network?: Network;
+  /** Whether to keep the containers between test runs ({@link PlanningAnalyticsEnvironment.Builder.reuse}). */
+  reuse: boolean;
   /** From pa-environment.yaml ({@link PlanningAnalyticsEnvironment.fromConfig}): the IBM downloads
    * folder, absolute. */
   ibm?: string;
@@ -336,6 +429,13 @@ export interface BuilderParts {
   keycloakImage?: string;
 }
 
+/** The label on a reused environment's containers and network. Its value is the environment's
+ * identity, a hash of its configuration. */
+const REUSE_LABEL = "io.skipcheck.tm1.environment";
+
+/** The start of a reused environment's network name; the identity follows. */
+const NETWORK_PREFIX = "tm1-environment-";
+
 const SERVER_NAME = /^[A-Za-z0-9_-]+$/;
 const none = (): void => {};
 
@@ -343,7 +443,7 @@ const none = (): void => {};
 export namespace PlanningAnalyticsEnvironment {
   /** Builds a {@link PlanningAnalyticsEnvironment}, as Java's `PlanningAnalyticsEnvironment.Builder`. */
   export class Builder {
-    readonly #parts: BuilderParts = { tm1: new Map(), camNamespace: CognosContainer.Namespace.LDAP, camAdmins: [] };
+    readonly #parts: BuilderParts = { tm1: new Map(), camNamespace: CognosContainer.Namespace.LDAP, camAdmins: [], reuse: false };
 
     /** Adds a TM1 server named `name` (its server name and network alias), changed with
      * `customizer` once wired.
@@ -425,6 +525,21 @@ export namespace PlanningAnalyticsEnvironment {
       return this;
     }
 
+    /** Keeps the containers running between test runs, when you've also turned on reuse
+     * (`testcontainers.reuse.enable=true` in `~/.testcontainers.properties`, or
+     * `TESTCONTAINERS_REUSE_ENABLE=true`). A later run with the same configuration finds them, and
+     * objects tests left behind are still there. Without the switch it has no effect. See
+     * {@link PlanningAnalyticsEnvironment} for what's reused and how to start clean.
+     *
+     * With your own {@link network}, reuse only works if it's the same network each run: its name
+     * is part of the environment's identity.
+     * @param reuse whether to keep the containers
+     * @returns this builder */
+    reuse(reuse: boolean): this {
+      this.#parts.reuse = reuse;
+      return this;
+    }
+
     /** The sources and images read from pa-environment.yaml.
      * @internal */
     withFileSources(sources: FileSources): this {
@@ -434,7 +549,11 @@ export namespace PlanningAnalyticsEnvironment {
 
     /** The environment, wired.
      * @throws IllegalStateException if parts are missing, or don't go together */
-    build(): PlanningAnalyticsEnvironment {
+    build(): PlanningAnalyticsEnvironment;
+    /** Builds, with the developer's reuse switch given, so tests needn't set it.
+     * @internal */
+    build(reuseEnabled: boolean): PlanningAnalyticsEnvironment;
+    build(reuseEnabled: boolean = DockerHost.reuseEnabled()): PlanningAnalyticsEnvironment {
       const p = this.#parts;
       if (p.tm1.size === 0) throw new IllegalStateException("Add at least one TM1 server with tm1(name)");
       if (p.keycloak !== undefined && p.cognos === undefined) throw new IllegalStateException("Keycloak gives Cognos its OIDC namespace: add cognos(...) too");
@@ -443,9 +562,51 @@ export namespace PlanningAnalyticsEnvironment {
       if (p.paw !== undefined && p.cognos !== undefined) {
         throw new IllegalStateException("PAW with Cognos (CAM) security isn't supported yet: PAW logs users on with TM1's own security");
       }
-      return new PlanningAnalyticsEnvironment(p, p.network ?? Network.newNetwork());
+      return new PlanningAnalyticsEnvironment(p, reuseEnabled);
     }
   }
+}
+
+/** One part's configuration, as far as it can be read before it starts: one line of the identity. */
+function describe(part: Startable): string {
+  if (part instanceof PawContainer) {
+    return "PawContainer source=" + source(part.getSource()) + " settings=" + sorted(part.settings()) + " tm1=" + String(serverName(part.getTm1Server()));
+  }
+  if (!(part instanceof GenericContainer)) throw new IllegalStateException("Not a container: " + String(part));
+  const d = [
+    part.constructor.name,
+    "image=" + part.getDockerImageName(),
+    "aliases=" + JSON.stringify([...part.getNetworkAliases()].sort()),
+    "command=" + JSON.stringify(part.getCommandParts()),
+    "ports=" + JSON.stringify([...part.getExposedPorts()].sort((a, b) => a - b)),
+    "env=" + sorted(part.getEnvMap()),
+    "labels=" + sorted(new Map([...part.getLabels()].filter(([k]) => k !== REUSE_LABEL))),
+    "files=" + sorted(part.getCopiedFiles()),
+  ];
+  if (part instanceof Tm1ServerContainer) {
+    d.push("source=" + source(part.getSource()), "cam=" + String(part.getCamNamespace()?.name) + JSON.stringify(part.getCamAdmins()));
+  } else if (part instanceof Tm1AdminServerContainer) {
+    d.push("source=" + source(part.getSource()));
+  } else if (part instanceof Tm1WebContainer) {
+    d.push("source=" + source(part.getSource()), "tm1=" + String(serverName(part.getTm1Server())));
+  } else if (part instanceof CognosContainer) {
+    d.push("source=" + source(part.getSource()), "users=" + part.usersSpec());
+  }
+  return d.join(" ");
+}
+
+/** A source as its class and settings: not its description, which leaves out a URL's query. */
+function source(s: object): string {
+  return s.constructor.name + JSON.stringify(s);
+}
+
+function sorted(map: ReadonlyMap<string, string>): string {
+  return JSON.stringify([...map].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+}
+
+/** A TM1 server's name in the environment, its `TM1_SERVER_NAME`. */
+function serverName(server: Tm1ServerContainer | undefined): string | undefined {
+  return server?.getEnvMap().get("TM1_SERVER_NAME");
 }
 
 function camAdmins(parts: BuilderParts, cognos: CognosContainer): string[] {

@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -226,6 +227,11 @@ public class PawContainer implements Startable {
 		}
 		settings.put(name, Objects.requireNonNull(value, "value"));
 		return this;
+	}
+
+	/** The settings set with {@link #withSetting}. */
+	Map<String, String> settings() {
+		return Collections.unmodifiableMap(settings);
 	}
 
 	/**

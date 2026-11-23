@@ -303,6 +303,79 @@ describe("PlanningAnalyticsEnvironment", () => {
     expect(env.isRunning()).toBe(false);
   });
 
+  it("reuse needs the builder and the developer's switch", () => {
+    expect(builder().tm1("a").build(true).reused()).toBe(false);
+    const notSwitchedOn = builder().tm1("a").reuse(true).build(false);
+    expect(notSwitchedOn.reused()).toBe(false);
+    expect(notSwitchedOn.network().getName()).toMatch(/^tm1-testcontainers-/);
+    const reused = builder().tm1("a").reuse(true).build(true);
+    expect(reused.reused()).toBe(true);
+    // Not started, so not yet marked: start() does that
+    expect(reused.tm1("a").isShouldBeReused()).toBe(false);
+  });
+
+  it("a reused environment's network is named after its identity", () => {
+    const env = builder().tm1("planning").tm1Web().reuse(true).build(true);
+    expect(env.identity()).toMatch(/^[0-9a-f]{16}$/);
+    expect(env.network().getName()).toBe("tm1-environment-" + env.identity());
+    expect(env.network().isCreated()).toBe(false);
+    for (const server of env.tm1Servers().values()) expect(server.getNetwork()).toBe(env.network());
+    // The developer's own network is used as it is
+    const own = Network.newNetwork();
+    expect(builder().tm1("planning").network(own).reuse(true).build(true).network()).toBe(own);
+  });
+
+  it("the identity is the same for the same configuration and differs otherwise", () => {
+    expect(builder().tm1("planning").tm1Web().reuse(true).build(true).identity()).toBe(builder().tm1("planning").tm1Web().reuse(true).build(true).identity());
+    const configurations = [
+      builder().tm1("planning"),
+      builder().tm1("reporting"),
+      builder().tm1("planning", (tm1) => tm1.withSeed(Tm1Seed.SDATA)),
+      builder().tm1("planning", (tm1) => tm1.withEnv("TM1_CFG_MaxThreads", "4")),
+      builder().tm1("planning").tm1("reporting"),
+      builder().tm1("planning").adminServer(),
+      builder().tm1("planning").tm1Web(),
+      builder()
+        .tm1("planning")
+        .tm1Web((web) => web.withEnv("TM1_WEB_HEAP", "2g")),
+      builder().tm1("planning").tm1Source(new Tm1Source.PrivateImage("tm1-server:other")),
+      builder()
+        .tm1("planning")
+        .cognos((c) => c.withUser("admin", "adminpw")),
+      builder()
+        .tm1("planning")
+        .cognos((c) => c.withUser("admin", "otherpw")),
+      builder()
+        .tm1("planning")
+        .cognos((c) => c.withUser("admin", "adminpw").withUser("boss", "bosspw")),
+      builder()
+        .tm1("planning")
+        .cognos((c) => c.withUser("admin", "adminpw").withUser("boss", "bosspw"))
+        .camSecurity(CognosContainer.Namespace.LDAP, "boss"),
+      builder()
+        .tm1("planning")
+        .cognos((c) => c.withUser("admin", "adminpw"))
+        .keycloak(),
+      // Testcontainers for Node's own reuse hash leaves out the network, so the identity has it
+      builder().tm1("planning").network(Network.newNetwork()),
+    ];
+    const identities = configurations.map((b) => b.reuse(true).build(true).identity());
+    expect(new Set(identities).size).toBe(identities.length);
+  });
+
+  it("starting a reused environment marks every container with its identity", () => {
+    const env = builder().tm1("planning").tm1("reporting").tm1Web().reuse(true).build(true);
+    env.prepareForReuse();
+    for (const part of env.containers()) {
+      const container = part as Tm1ServerContainer;
+      expect(container.isShouldBeReused(), String(container)).toBe(true);
+      expect(container.getLabels().get("io.skipcheck.tm1.environment")).toBe(env.identity());
+    }
+    // No random alias to take away: neither Testcontainers for Node nor this library adds one
+    expect(env.tm1("planning").getNetworkAliases()).toEqual(["planning"]);
+    expect(env.adminServer()!.getNetworkAliases()).toEqual([Tm1AdminServerContainer.NETWORK_ALIAS]);
+  });
+
   it("from config builds the example with everything", () => {
     const env = PlanningAnalyticsEnvironment.fromConfig(join(Repo.paEnvironmentExamples, "everything.yaml"))
       .tm1Source(new Tm1Source.PrivateImage("tm1-server:test"))

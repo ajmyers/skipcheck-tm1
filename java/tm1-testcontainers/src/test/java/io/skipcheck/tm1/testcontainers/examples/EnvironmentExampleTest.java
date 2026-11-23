@@ -3,12 +3,16 @@
 package io.skipcheck.tm1.testcontainers.examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import org.junit.jupiter.api.Test;
+import org.testcontainers.DockerClientFactory;
+import org.testcontainers.utility.TestcontainersConfiguration;
 
 import io.skipcheck.tm1.testcontainers.CognosContainer.Namespace;
 import io.skipcheck.tm1.testcontainers.PlanningAnalyticsEnvironment;
 import io.skipcheck.tm1.testcontainers.RequiresCognos;
+import io.skipcheck.tm1.testcontainers.RequiresTm1;
 import io.skipcheck.tm1.testcontainers.RequiresTm1Web;
 import io.skipcheck.tm1.testcontainers.Tm1Seed;
 import io.skipcheck.tm1.testcontainers.Tm1WebSession;
@@ -61,6 +65,32 @@ class EnvironmentExampleTest {
 					assertThat(viewer.get("ActiveUser/Groups?$select=Name")).contains("CAMID(\\\"OIDC:g:readers\\\")");
 				}
 			}
+		}
+	}
+
+	@Test
+	@RequiresTm1
+	void aReusedEnvironmentKeepsItsContainersForTheNextRun() {
+		assumeTrue(TestcontainersConfiguration.getInstance().environmentSupportsReuse(),
+				"Testcontainers reuse is off: set testcontainers.reuse.enable=true in ~/.testcontainers.properties");
+		// A configuration of its own, so it can't pick up a developer's reused
+		// environment
+		var builder = PlanningAnalyticsEnvironment.builder()
+			.tm1("reuse-test", tm1 -> tm1.withEnv("TM1_CFG_MaxThreads", "3"))
+			.reuse(true);
+		var first = builder.build();
+		first.start();
+		String container = first.tm1("reuse-test").getContainerId();
+		first.stop();
+		var second = builder.build();
+		try {
+			second.start();
+			assertThat(second.tm1("reuse-test").getContainerId()).isEqualTo(container);
+		}
+		finally {
+			var docker = DockerClientFactory.instance().client();
+			docker.removeContainerCmd(container).withForce(true).withRemoveVolumes(true).exec();
+			docker.removeNetworkCmd(second.network().getId()).exec();
 		}
 	}
 

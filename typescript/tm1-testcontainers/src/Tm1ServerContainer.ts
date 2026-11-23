@@ -189,6 +189,12 @@ export class Tm1ServerContainer extends GenericContainer {
     return this.#cognos === undefined ? undefined : this.#camNamespace;
   }
 
+  /** The Cognos test users made TM1 administrators by {@link withCamSecurity}.
+   * @internal */
+  getCamAdmins(): readonly string[] {
+    return this.#camAdmins;
+  }
+
   /** The `Authorization` header for the container's login: `Basic` with {@link getUsername} and
    * {@link getPassword}, or, in CAM security, `CAMNamespace` for that Cognos user. */
   getAuthorization(): string {

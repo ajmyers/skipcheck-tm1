@@ -3,11 +3,18 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Docker.DotNet;
+using Docker.DotNet.Models;
+using DotNet.Testcontainers.Networks;
 
 namespace Skipcheck.Tm1.Testcontainers;
 
@@ -24,16 +31,65 @@ namespace Skipcheck.Tm1.Testcontainers;
 ///     .Build();
 /// await env.StartAsync();
 /// </code></example>
+/// <remarks>
+/// <para>Cognos takes minutes to start, and PAW longer. With <see cref="EnvironmentBuilder.Reuse"/>, the environment keeps its
+/// containers running between test runs, so the next run starts in seconds:</para>
+/// <code>
+/// // Cognos and the server keep running after the run, for the next one, when testcontainers.reuse.enable=true is set too
+/// await using var env = PlanningAnalyticsEnvironment
+///     .Builder()
+///     .Tm1("planning")
+///     .Cognos(cognos => cognos.WithUser("admin", "adminpw", "Admins"))
+///     .Reuse(true)
+///     .Build();
+/// await env.StartAsync(); // in seconds, once a run with this configuration has started it
+/// var url = env.Tm1("planning").RestUrl;
+/// // disposing left it running
+/// </code>
+/// <para>Reuse also needs your own switch, as for any reused container: <c>testcontainers.reuse.enable=true</c> in
+/// <c>~/.testcontainers.properties</c>, or <c>TESTCONTAINERS_REUSE_ENABLE=true</c>. Without it, <c>Reuse</c> has no effect. With
+/// both:</para>
+/// <list type="bullet">
+/// <item>The containers and the network are named after the environment's configuration (its identity, a hash): the label
+/// <c>io.skipcheck.tm1.environment</c> on each container, and the network <c>tm1-environment-&lt;identity&gt;</c>. A run with the
+/// same configuration finds them; a different configuration gets its own, and never another's.</item>
+/// <item><see cref="StopAsync"/> and disposing leave them running, PAW too. Testcontainers doesn't remove reusable containers
+/// at the end of a run either.</item>
+/// <item>What tests leave behind stays: objects they created in TM1, sessions, users in Cognos. Tests should create uniquely
+/// named objects and delete them, as with <see cref="Tm1ServerContainer.SharedAsync"/>.</item>
+/// <item>A configuration you no longer use keeps its containers running, and Cognos holds about 8 GB. To start clean, remove
+/// them all: <c>docker rm -f $(docker ps -aq --filter label=io.skipcheck.tm1.environment)</c>, then
+/// <c>docker network rm $(docker network ls -q --filter label=io.skipcheck.tm1.environment)</c>.</item>
+/// <item>The identity covers each part's image, source, environment variables, command, network aliases, labels, exposed
+/// ports, mounts and copied files, the Cognos users and the CAM settings. What a container subclass sets that the classes here
+/// don't show (its host name, say) isn't seen: remove the containers after changing one.</item>
+/// <item>PAW isn't a Testcontainers container: IBM's compose files give it fixed names, so there's one per Docker host
+/// whatever the identity. Each start runs IBM's compose again, which takes about a minute.</item>
+/// </list>
+/// </remarks>
 public sealed partial class PlanningAnalyticsEnvironment : IStartable
 {
+    /// <summary>The label on a reused environment's containers and network. Its value is the environment's identity, a hash
+    /// of its configuration.</summary>
+    internal const string ReuseLabel = "io.skipcheck.tm1.environment";
+
+    /// <summary>The start of a reused environment's network name; the identity follows.</summary>
+    internal const string NetworkPrefix = "tm1-environment-";
+
+    private readonly bool reused;
+    private readonly Lock identifying = new();
+    private string? identity;
     private readonly bool ownsNetwork;
     private readonly Tm1WebContainer? tm1Web;
     private readonly PawContainer? paw;
     private readonly CognosContainer? cognos;
     private readonly KeycloakContainer? keycloak;
 
-    private PlanningAnalyticsEnvironment(EnvironmentBuilder b, Network network)
+    private PlanningAnalyticsEnvironment(EnvironmentBuilder b, bool reuseEnabled)
     {
+        reused = b.ReuseSet && reuseEnabled;
+        var network = b.NetworkSet
+            ?? (reused ? Testcontainers.Network.Reusable(new ReusableNetwork(() => NetworkPrefix + Identity())) : Testcontainers.Network.NewNetwork());
         Network = network;
         ownsNetwork = b.NetworkSet is null;
         keycloak = b.KeycloakCustomizer is null
@@ -139,7 +195,7 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
 
     /// <summary>Starts building the environment a <c>pa-environment.yaml</c> describes, the file <c>pa-setup</c> reads
     /// (<c>docker/pa-setup</c>), so tests run what developers run. The file is checked as <c>pa-setup</c> checks it, with its
-    /// defaults. The builder comes back configured; change it further, or call <see cref="EnvironmentBuilder.Build"/>.</summary>
+    /// defaults. The builder comes back configured; change it further, or call <see cref="EnvironmentBuilder.Build()"/>.</summary>
     /// <remarks>
     /// <para>How each setting maps:</para>
     /// <list type="bullet">
@@ -188,6 +244,10 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// <summary>Starts everything, what's depended on first, then PAW.</summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
+        if (reused)
+        {
+            PrepareForReuse();
+        }
         await Task.WhenAll(Containers().Where(c => c != paw).Select(c => c.StartAsync(cancellationToken))).ConfigureAwait(false);
         if (paw is not null)
         {
@@ -195,9 +255,14 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         }
     }
 
-    /// <summary>Stops everything, last started first, and removes the network it made.</summary>
+    /// <summary>Stops everything, last started first, and removes the network it made. A reused environment
+    /// (<see cref="EnvironmentBuilder.Reuse"/>) is left running for the next run.</summary>
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
+        if (reused)
+        {
+            return;
+        }
         foreach (var part in Enumerable.Reverse(Containers()))
         {
             await part.StopAsync(cancellationToken).ConfigureAwait(false);
@@ -245,6 +310,88 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
 
     /// <summary>The network everything is on.</summary>
     public Network Network { get; }
+
+    /// <summary>Whether the containers are kept for later runs: <see cref="EnvironmentBuilder.Reuse"/> and the developer's
+    /// reuse switch.</summary>
+    internal bool Reused => reused;
+
+    /// <summary>The environment's identity: a hash of every part's configuration, the same for the same configuration in every
+    /// run. Fixed the first time it's asked for, which <see cref="StartAsync"/> does before anything starts.</summary>
+    internal string Identity()
+    {
+        lock (identifying)
+        {
+            if (identity is null)
+            {
+                var all = new StringBuilder();
+                foreach (var part in Containers())
+                {
+                    all.Append(Describe(part)).Append('\n');
+                }
+                identity = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(all.ToString())))[..16];
+            }
+            return identity;
+        }
+    }
+
+    /// <summary>Marks every container reusable, with the identity as a label. Testcontainers for .NET finds a container to
+    /// reuse by a hash of what it creates it with; the label puts in that hash what it leaves out (the copied files, the
+    /// mounts, each part's source). Unlike Testcontainers for Java, it adds no random network alias, so there's none to take
+    /// away.</summary>
+    internal void PrepareForReuse()
+    {
+        var id = Identity();
+        foreach (var part in Containers())
+        {
+            if (part is IGenericContainer container)
+            {
+                container.MarkReused(ReuseLabel, id);
+            }
+        }
+    }
+
+    /// <summary>One part's configuration, as far as it can be read before it starts.</summary>
+    private static string Describe(IStartable part)
+    {
+        if (part is PawContainer paw)
+        {
+            return "PawContainer source=" + paw.Source + " settings=" + Map(paw.PawSettings) + " tm1=" + ServerName(paw.Tm1Server);
+        }
+        var c = (IGenericContainer)part;
+        var d = new StringBuilder(part.GetType().Name);
+        d.Append(" image=").Append(c.DockerImageName);
+        d.Append(" aliases=").Append(List(c.NetworkAliases.Order(StringComparer.Ordinal)));
+        d.Append(" command=").Append(List(c.CommandParts));
+        d.Append(" ports=").Append(List(c.ExposedPorts.Order().Select(p => p.ToString(CultureInfo.InvariantCulture))));
+        d.Append(" env=").Append(Map(c.EnvMap));
+        d.Append(" labels=").Append(Map(c.Labels.Where(l => l.Key != ReuseLabel)));
+        d.Append(" files=").Append(List(c.Copies.Select(f => f.Target + "=" + f.Source).Order(StringComparer.Ordinal)));
+        d.Append(" mounts=").Append(List(c.Binds.Order(StringComparer.Ordinal)));
+        switch (part)
+        {
+            case Tm1ServerContainer tm1:
+                d.Append(" source=").Append(tm1.Source).Append(" cam=").Append(tm1.CamNamespace?.Id()).Append(List(tm1.CamAdmins));
+                break;
+            case Tm1AdminServerContainer admin:
+                d.Append(" source=").Append(admin.Source);
+                break;
+            case Tm1WebContainer web:
+                d.Append(" source=").Append(web.Source).Append(" tm1=").Append(ServerName(web.Tm1Server));
+                break;
+            case CognosContainer cognos:
+                d.Append(" source=").Append(cognos.Source).Append(" users=").Append(cognos.UsersSpec());
+                break;
+        }
+        return d.ToString();
+    }
+
+    /// <summary>A TM1 server's name in this environment, its <c>TM1_SERVER_NAME</c>.</summary>
+    private static string? ServerName(Tm1ServerContainer? server) => server?.EnvMap.GetValueOrDefault("TM1_SERVER_NAME");
+
+    private static string List(IEnumerable<string> items) => "[" + string.Join(", ", items) + "]";
+
+    private static string Map(IEnumerable<KeyValuePair<string, string>> map) =>
+        "{" + string.Join(", ", map.OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => e.Key + "=" + e.Value)) + "}";
 
     /// <summary>Every part, in start order: Keycloak, Cognos, the Admin Server, the TM1 servers, TM1 Web, PAW.</summary>
     internal List<IStartable> Containers()
@@ -342,6 +489,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         internal CognosSource? CognosSourceSet { get; private set; }
 
         internal Testcontainers.Network? NetworkSet { get; private set; }
+
+        internal bool ReuseSet { get; private set; }
 
         // From pa-environment.yaml (FromConfig): the IBM downloads folder, PAW's zip in it, and each part's image
         internal string? Ibm { get; set; }
@@ -463,9 +612,27 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             return this;
         }
 
+        /// <summary>Keeps the containers running between test runs, when you've also turned on reuse
+        /// (<c>testcontainers.reuse.enable=true</c> in <c>~/.testcontainers.properties</c>, or <c>TESTCONTAINERS_REUSE_ENABLE=true</c>).
+        /// A later run with the same configuration finds them, and objects tests left behind are still there. Without the switch
+        /// it has no effect. See <see cref="PlanningAnalyticsEnvironment"/> for what's reused and how to start clean.</summary>
+        /// <remarks>With your own <see cref="Network"/>, reuse only works if it's the same network each run: Testcontainers for
+        /// .NET finds a container by a hash that leaves its network out, so a container found would still be on the network it
+        /// was created on.</remarks>
+        /// <param name="reuse">Whether to keep the containers.</param>
+        /// <returns>This builder.</returns>
+        public EnvironmentBuilder Reuse(bool reuse)
+        {
+            ReuseSet = reuse;
+            return this;
+        }
+
         /// <summary>The environment, wired.</summary>
         /// <exception cref="InvalidOperationException">Parts are missing, or don't go together.</exception>
-        public PlanningAnalyticsEnvironment Build()
+        public PlanningAnalyticsEnvironment Build() => Build(DockerHost.ReuseEnabled());
+
+        /// <summary>Builds, with the developer's reuse switch given, so tests needn't set it.</summary>
+        internal PlanningAnalyticsEnvironment Build(bool reuseEnabled)
         {
             if (Tm1Names.Count == 0)
             {
@@ -483,7 +650,7 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             {
                 throw new InvalidOperationException("PAW with Cognos (CAM) security isn't supported yet: PAW logs users on with TM1's own security");
             }
-            return new PlanningAnalyticsEnvironment(this, NetworkSet ?? Testcontainers.Network.NewNetwork());
+            return new PlanningAnalyticsEnvironment(this, reuseEnabled);
         }
 
         internal string[] CamAdmins(CognosContainer cognos)
@@ -536,5 +703,55 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
 
         [GeneratedRegex("^[A-Za-z0-9_-]+$")]
         private static partial Regex ServerName();
+    }
+
+    /// <summary>A reused environment's Docker network: named after its identity, found if it's there and created if not. It
+    /// carries none of Testcontainers' session labels, so Testcontainers' resource reaper doesn't remove it after the run, and
+    /// disposing keeps it for the next.</summary>
+    internal sealed class ReusableNetwork(Func<string> name) : INetwork
+    {
+        /// <summary>The network's name: <c>tm1-environment-&lt;identity&gt;</c>.</summary>
+        public string Name => name();
+
+        /// <summary>Finds the network, or creates it.</summary>
+        public async Task CreateAsync(CancellationToken ct = default)
+        {
+            var networkName = Name;
+            using var docker = DockerHost.Client();
+            if (await FindAsync(docker, networkName, ct).ConfigureAwait(false))
+            {
+                return;
+            }
+            try
+            {
+                var labels = new Dictionary<string, string>(StringComparer.Ordinal) { [ReuseLabel] = networkName[NetworkPrefix.Length..] };
+                await docker.Networks.CreateNetworkAsync(new NetworksCreateParameters { Name = networkName, Labels = labels }, ct).ConfigureAwait(false);
+            }
+            catch (DockerApiException e) when (e.StatusCode == HttpStatusCode.Conflict)
+            {
+                // Another test run created it first
+                if (!await FindAsync(docker, networkName, ct).ConfigureAwait(false))
+                {
+                    throw;
+                }
+            }
+        }
+
+        /// <summary>Keeps the network for the next run.</summary>
+        public Task DeleteAsync(CancellationToken ct = default) => Task.CompletedTask;
+
+        /// <summary>Keeps the network for the next run.</summary>
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        private static async Task<bool> FindAsync(IDockerClient docker, string networkName, CancellationToken ct)
+        {
+            // The name filter matches part of a name, so check the whole
+            var filters = new Dictionary<string, IDictionary<string, bool>>(StringComparer.Ordinal)
+            {
+                ["name"] = new Dictionary<string, bool>(StringComparer.Ordinal) { [networkName] = true },
+            };
+            var networks = await docker.Networks.ListNetworksAsync(new NetworksListParameters { Filters = filters }, ct).ConfigureAwait(false);
+            return networks.Any(n => n.Name == networkName);
+        }
     }
 }

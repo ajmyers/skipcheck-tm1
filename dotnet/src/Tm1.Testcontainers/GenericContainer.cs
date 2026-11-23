@@ -19,7 +19,7 @@ namespace Skipcheck.Tm1.Testcontainers;
 /// wiring without Docker), and it's built with Testcontainers for .NET's <see cref="ContainerBuilder"/>
 /// when it starts. <see cref="Container"/> is the started container, for anything not wrapped here.</summary>
 /// <typeparam name="TSelf">The container's own type, which the <c>With…</c> methods return.</typeparam>
-public abstract class GenericContainer<TSelf> : IStartable
+public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     where TSelf : GenericContainer<TSelf>
 {
     private readonly Dictionary<string, string> env = new(StringComparer.Ordinal);
@@ -28,6 +28,7 @@ public abstract class GenericContainer<TSelf> : IStartable
     private readonly List<IStartable> dependencies = [];
     private readonly Dictionary<string, string> extraHosts = new(StringComparer.Ordinal);
     private readonly List<(string Source, string Target)> copies = [];
+    private readonly Dictionary<string, string> labels = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim starting = new(1, 1);
     private string[] command = [];
     private string? hostname;
@@ -157,6 +158,20 @@ public abstract class GenericContainer<TSelf> : IStartable
         return Self;
     }
 
+    bool IGenericContainer.ShouldBeReused => reuse;
+
+    IReadOnlyDictionary<string, string> IGenericContainer.Labels => labels;
+
+    IReadOnlyList<(string Source, string Target)> IGenericContainer.Copies => copies;
+
+    IReadOnlyList<string> IGenericContainer.Binds => Binds;
+
+    void IGenericContainer.MarkReused(string label, string value)
+    {
+        reuse = true;
+        labels[label] = value;
+    }
+
     /// <summary>Copies a host file or folder into the container before it starts.</summary>
     public TSelf WithCopyFileToContainer(string hostPath, string containerPath)
     {
@@ -269,6 +284,7 @@ public abstract class GenericContainer<TSelf> : IStartable
         var builder = new ContainerBuilder(DockerImageName)
             .WithEnvironment(env)
             .WithLabel("io.skipcheck.tm1.testcontainers", "dotnet")
+            .WithLabel(labels)
             .WithCreateParameterModifier(p =>
             {
                 if (Platform is not null)
@@ -323,4 +339,34 @@ public abstract class GenericContainer<TSelf> : IStartable
     }
 
     private sealed record WaitFor(string Path, int Port, Predicate<HttpStatusCode> Ok, TimeSpan Timeout);
+}
+
+/// <summary>What <see cref="PlanningAnalyticsEnvironment"/> reads and sets on each of its containers, whatever its type.</summary>
+internal interface IGenericContainer
+{
+    string DockerImageName { get; }
+
+    IReadOnlyDictionary<string, string> EnvMap { get; }
+
+    IReadOnlyList<string> CommandParts { get; }
+
+    IReadOnlyList<int> ExposedPorts { get; }
+
+    IReadOnlyList<string> NetworkAliases { get; }
+
+    /// <summary>Its labels, besides the one every container of this library has.</summary>
+    IReadOnlyDictionary<string, string> Labels { get; }
+
+    /// <summary>The host files and folders copied in, and where to.</summary>
+    IReadOnlyList<(string Source, string Target)> Copies { get; }
+
+    /// <summary>The bind mounts, <c>source:target[:ro]</c>.</summary>
+    IReadOnlyList<string> Binds { get; }
+
+    /// <summary>Whether it's kept for later runs, as Java's <c>isShouldBeReused()</c>: <see cref="GenericContainer{TSelf}.WithReuse"/>,
+    /// whatever the developer's switch says.</summary>
+    bool ShouldBeReused { get; }
+
+    /// <summary>Marks it reusable, with <paramref name="label"/> set to <paramref name="value"/>.</summary>
+    void MarkReused(string label, string value);
 }

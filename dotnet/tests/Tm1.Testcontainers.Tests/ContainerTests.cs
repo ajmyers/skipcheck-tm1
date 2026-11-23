@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Docker.DotNet.Models;
 using Skipcheck.Tm1.Client.Version;
 using Skipcheck.Tm1.Testcontainers.Xunit;
 
@@ -153,5 +154,43 @@ public class PawContainerTests(PawFixture fixture) : IClassFixture<PawFixture>
         Assert.True(fixture.Paw.IsRunning);
         Assert.StartsWith("http://", fixture.Paw.Url, StringComparison.Ordinal);
         Assert.EndsWith("/", fixture.Paw.Url, StringComparison.Ordinal);
+    }
+}
+
+/// <summary>Java's EnvironmentExampleTest#aReusedEnvironmentKeepsItsContainersForTheNextRun: skipped without a TM1 source, or
+/// with Testcontainers reuse off.</summary>
+public class EnvironmentExampleTests
+{
+    [RequiresTm1AndReuseFact]
+    public async Task AReusedEnvironmentKeepsItsContainersForTheNextRun()
+    {
+        // A configuration of its own, so it can't pick up a developer's reused environment
+        var builder = PlanningAnalyticsEnvironment.Builder().Tm1("reuse-test", tm1 => tm1.WithEnv("TM1_CFG_MaxThreads", "3")).Reuse(true);
+        var first = builder.Build();
+        await first.StartAsync();
+        var container = first.Tm1("reuse-test").ContainerId;
+        await first.StopAsync();
+        var second = builder.Build();
+        try
+        {
+            await second.StartAsync();
+            Assert.Equal(container, second.Tm1("reuse-test").ContainerId);
+        }
+        finally
+        {
+            using var docker = DockerHost.Client();
+            await docker.Containers.RemoveContainerAsync(container, new ContainerRemoveParameters { Force = true, RemoveVolumes = true });
+            await docker.Networks.DeleteNetworkAsync(second.Network.Name);
+        }
+    }
+
+    /// <summary>A TM1 test that also needs the developer's reuse switch, as Java's assumeTrue on it.</summary>
+    [AttributeUsage(AttributeTargets.Method)]
+    private sealed class RequiresTm1AndReuseFactAttribute : RequiresTm1FactAttribute
+    {
+        public RequiresTm1AndReuseFactAttribute()
+        {
+            Skip ??= DockerHost.ReuseEnabled() ? null : "Testcontainers reuse is off: set testcontainers.reuse.enable=true in ~/.testcontainers.properties";
+        }
     }
 }

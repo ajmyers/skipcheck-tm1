@@ -124,6 +124,9 @@ public class PawContainer : IStartable
         return this;
     }
 
+    /// <summary>The settings set with <see cref="WithSetting"/>.</summary>
+    internal IReadOnlyDictionary<string, string> PawSettings => settings;
+
     /// <summary>How long the first start (which loads IBM's images) may take.</summary>
     public PawContainer WithStartupTimeout(TimeSpan timeout)
     {

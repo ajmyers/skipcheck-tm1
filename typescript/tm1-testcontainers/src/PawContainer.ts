@@ -135,6 +135,12 @@ export class PawContainer implements Startable {
     return this.#licenseAccepted;
   }
 
+  /** The settings set with {@link withSetting}.
+   * @internal */
+  settings(): ReadonlyMap<string, string> {
+    return this.#settings;
+  }
+
   /** Sets one of `paw-local.sh`'s `PAW_*` settings, such as `PAW_JVM_ARGS` or `PAW_TM1WEB_URL`.
    * The TM1 server, ports, network and paths are set by this class.
    * @throws IllegalArgumentException if `name` doesn't start with `PAW_` */

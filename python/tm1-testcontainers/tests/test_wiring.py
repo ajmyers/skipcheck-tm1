@@ -6,6 +6,7 @@ containers are wired, without starting any (and without Docker)."""
 from __future__ import annotations
 
 import base64
+import re
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,8 @@ from skipcheck_tm1_testcontainers import (
     Tm1WebContainer,
     Tm1WebSource,
 )
+from skipcheck_tm1_testcontainers._container import GenericContainer
+from skipcheck_tm1_testcontainers.environment import _ReusableNetwork
 
 SOURCE = Tm1Source.PrivateImage("tm1-server:test")
 
@@ -244,6 +247,66 @@ def test_refuses_missing_or_unsupported_parts() -> None:
         env.tm1_web()
     with pytest.raises(ValueError, match=r"\['a'\]"):
         env.tm1("b")
+
+
+def test_reuse_needs_the_builder_and_the_developers_switch() -> None:
+    assert not builder().tm1("a")._build(True)._reused
+    not_switched_on = builder().tm1("a").reuse(True)._build(False)
+    assert not not_switched_on._reused
+    assert not isinstance(not_switched_on.network(), _ReusableNetwork)
+    reused = builder().tm1("a").reuse(True)._build(True)
+    assert reused._reused
+    # Not started, so not yet marked: start() does that
+    assert not reused.tm1("a").should_be_reused
+
+
+def test_a_reused_environments_network_is_named_after_its_identity() -> None:
+    env = builder().tm1("planning").tm1_web().reuse(True)._build(True)
+    assert re.fullmatch("[0-9a-f]{16}", env._identity())
+    network = env.network()
+    assert isinstance(network, _ReusableNetwork)
+    assert network.name == "tm1-environment-" + env._identity()
+    for server in env.tm1_servers().values():
+        assert server.network is network
+    # The developer's own network is used as it is
+    own = _ReusableNetwork(lambda: "mine")
+    assert builder().tm1("planning").network(own).reuse(True)._build(True).network() is own
+
+
+def test_the_identity_is_the_same_for_the_same_configuration_and_differs_otherwise() -> None:
+    assert builder().tm1("planning").tm1_web().reuse(True)._build(True)._identity() == builder().tm1("planning").tm1_web().reuse(True)._build(True)._identity()
+    configurations = [
+        builder().tm1("planning"),
+        builder().tm1("reporting"),
+        builder().tm1("planning", lambda tm1: tm1.with_seed(Tm1Seed.SDATA)),
+        builder().tm1("planning", lambda tm1: tm1.with_env("TM1_CFG_MaxThreads", "4")),
+        builder().tm1("planning").tm1("reporting"),
+        builder().tm1("planning").admin_server(),
+        builder().tm1("planning").tm1_web(),
+        builder().tm1("planning").tm1_web(lambda web: web.with_env("TM1_WEB_HEAP", "2g")),
+        builder().tm1("planning").tm1_source(Tm1Source.PrivateImage("tm1-server:other")),
+        builder().tm1("planning").cognos(lambda c: c.with_user("admin", "adminpw")),
+        builder().tm1("planning").cognos(lambda c: c.with_user("admin", "otherpw")),
+        builder().tm1("planning").cognos(lambda c: c.with_user("admin", "adminpw").with_user("boss", "bosspw")),
+        builder().tm1("planning").cognos(lambda c: c.with_user("admin", "adminpw").with_user("boss", "bosspw")).cam_security(Namespace.LDAP, "boss"),
+        builder().tm1("planning").cognos(lambda c: c.with_user("admin", "adminpw")).keycloak(),
+    ]
+    identities = [b.reuse(True)._build(True)._identity() for b in configurations]
+    assert len(set(identities)) == len(identities)
+
+
+def test_starting_a_reused_environment_marks_every_container_with_its_identity() -> None:
+    env = builder().tm1("planning").tm1("reporting").tm1_web().reuse(True)._build(True)
+    env._prepare_for_reuse()
+    for part in env.containers():
+        assert isinstance(part, GenericContainer)
+        assert part.should_be_reused, part
+        assert part._labels["io.skipcheck.tm1.environment"] == env._identity()
+    # Only the aliases the environment gives: nothing random that would change every run
+    assert env.tm1("planning").network_aliases == ["planning"]
+    admin = env.admin_server()
+    assert admin is not None
+    assert admin.network_aliases == ["tm1-admin"]
 
 
 # The pa-environment.yaml files from_config's tests read, shared with the other clients

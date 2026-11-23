@@ -50,6 +50,23 @@ public static class PlanningAnalyticsEnvironmentExamples
         // @end
     }
 
+    public static async Task<string> Reuse()
+    {
+        // @start region = reuse
+        // Cognos and the server keep running after the run, for the next one, when
+        // testcontainers.reuse.enable=true is set too
+        await using var env = PlanningAnalyticsEnvironment
+            .Builder()
+            .Tm1("planning")
+            .Cognos(cognos => cognos.WithUser("admin", "adminpw", "Admins"))
+            .Reuse(true)
+            .Build();
+        await env.StartAsync(); // in seconds, once a run with this configuration has started it
+        return env.Tm1("planning").RestUrl;
+        // disposing leaves it running
+        // @end
+    }
+
     public static async Task<string> FromConfig()
     {
         // @start region = file
