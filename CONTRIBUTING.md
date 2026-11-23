@@ -56,15 +56,15 @@ the start of a line for a block tag and breaks the comment, which the check also
 | Java | Spring Java Format | `./gradlew format` | `./gradlew build` | Error Prone, NullAway |
 | Python | Ruff | `ruff format python && ruff check --fix python` | `pytest` (`tests/test_format.py`) | Ruff |
 | TypeScript | Prettier | `npm run format` | `npm test` | ESLint, strict `tsc` |
-| .NET | CSharpier | `dotnet csharpier format tm1-dotnet` | `dotnet build` | .NET analyzers, warnings as errors |
+| .NET | CSharpier | `dotnet csharpier format dotnet` | `dotnet build` | .NET analyzers, warnings as errors |
 
 The pre-commit hook formats what you stage in all four, and refuses the commit if a formatter
 can't run or a file still isn't formatted. Install the tools once: `pip install -e
-'./python/tm1-client[test]'`, `npm ci` in `tm1-typescript`, and `dotnet tool restore` in `tm1-dotnet`.
+'./python/tm1-client[test]'`, `npm ci` in `tm1-typescript`, and `dotnet tool restore` in `dotnet`.
 The pre-push hook runs the same checks on every commit that touches a client, and CI runs them
 again. Generated code is never formatted, and neither are the recorded fixtures in
 `spec/conformance`. Rules a client doesn't follow are listed, each with its reason, in
-`python/ruff.toml`, `tm1-typescript/eslint.config.mjs` and `tm1-dotnet/Directory.Build.props`.
+`python/ruff.toml`, `tm1-typescript/eslint.config.mjs` and `dotnet/Directory.Build.props`.
 
 **Public API needs Javadoc.** In the published libraries, every public class, method, constructor
 and record component is documented, with `@param` and `@return`. `./gradlew build` runs Javadoc

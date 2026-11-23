@@ -13,7 +13,7 @@ namespace Skipcheck.Tm1.Client.Tests;
 /// reason, or pending, under the same rules, against the same inventory.</summary>
 public class CoverageGateTests
 {
-    private static readonly string Coverage = Path.Combine(Repo.Root, "tm1-dotnet", "coverage");
+    private static readonly string Coverage = Path.Combine(Repo.Root, "dotnet", "coverage");
 
     public static IReadOnlySet<string> Endpoints()
     {

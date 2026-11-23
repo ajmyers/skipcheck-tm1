@@ -1,6 +1,6 @@
 # @skipcheck/tm1-testcontainers
 
-The TypeScript port of the Java [`tm1-testcontainers`](../../java/tm1-testcontainers) module, built on [Testcontainers for Node](https://node.testcontainers.org/) (`testcontainers` on npm). It runs TM1 and the rest of Planning Analytics in Docker for tests. It reads the same settings in the same order and uses the same images, mounts and cache volume as the Java module (and the [Python](../../python/tm1-testcontainers) and [.NET](../../tm1-dotnet/src/Tm1.Testcontainers) ports), so a bundle unpacked for the Java tests is reused here.
+The TypeScript port of the Java [`tm1-testcontainers`](../../java/tm1-testcontainers) module, built on [Testcontainers for Node](https://node.testcontainers.org/) (`testcontainers` on npm). It runs TM1 and the rest of Planning Analytics in Docker for tests. It reads the same settings in the same order and uses the same images, mounts and cache volume as the Java module (and the [Python](../../python/tm1-testcontainers) and [.NET](../../dotnet/src/Tm1.Testcontainers) ports), so a bundle unpacked for the Java tests is reused here.
 
 The images contain no IBM software. A source supplies it, from an environment variable: `TM1_PRIVATE_IMAGE`, `TM1_HOME_DIR`, `TM1_INSTALL_VOLUME`, `TM1_BUNDLE_DIR` (with `TM1_BUNDLE`) or `TM1_BUNDLE_URL` (with `TM1_BUNDLE_SHA256`). If several are set, the first in this list wins. A bundle URL is never logged with its query string or credentials.
 

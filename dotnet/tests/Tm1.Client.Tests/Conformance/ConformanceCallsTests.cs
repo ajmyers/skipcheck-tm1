@@ -20,7 +20,7 @@ public class ConformanceCallsTests
 {
     private static readonly string Calls = Path.Combine(Repo.Conformance, "calls");
 
-    private static readonly string UnsupportedFile = Path.Combine(Repo.Root, "tm1-dotnet", "conformance", "unsupported.txt");
+    private static readonly string UnsupportedFile = Path.Combine(Repo.Root, "dotnet", "conformance", "unsupported.txt");
 
     private static readonly Lazy<IReadOnlyDictionary<string, (JsonObject Session, JsonObject Case)>> All = new(Load);
 

@@ -64,7 +64,7 @@ Each runner rebuilds a query with its own query builder (`select`, `expand`, `Fi
 
 ### What each runner checks
 
-For every case, in each client (`python/tm1-client/tests/test_conformance_calls.py` in both flavours, `tm1-dotnet/tests/.../Conformance/ConformanceCallsTests.cs`, `tm1-typescript/test/conformance/calls.test.ts`):
+For every case, in each client (`python/tm1-client/tests/test_conformance_calls.py` in both flavours, `dotnet/tests/.../Conformance/ConformanceCallsTests.cs`, `tm1-typescript/test/conformance/calls.test.ts`):
 
 1. It decodes the arguments and calls the service's method by its own name for Java's (`model_cubes`, `ModelCubesAsync`, `modelCubes`), binding them by Java's parameter names (TypeScript, positionally in Java's order, which its ports keep).
 2. It answers each request with the recorded answers, in order; within an `unordered` group, with the answer of the group's equal request not yet answered.
@@ -101,7 +101,7 @@ A case a language can't express goes in that client's `conformance/unsupported.t
 
    Keep a group to what's really in flight at once: everything else stays in order. Assert what Java does as you would anyway; the fixture holds the rest.
 2. Record: `./gradlew :tm1-client:test --tests '*<Name>ServiceTest' -PrecordConformance`. It writes `spec/conformance/calls/<Name>ServiceTest.json`. Only a whole class records, and only if all its tests pass.
-3. Run each runner: `pytest tests/test_conformance_calls.py` (python/tm1-client), `dotnet test --filter FullyQualifiedName~Conformance` (tm1-dotnet), `npx vitest run test/conformance` (tm1-typescript).
+3. Run each runner: `pytest tests/test_conformance_calls.py` (python/tm1-client), `dotnet test --filter FullyQualifiedName~Conformance` (dotnet), `npx vitest run test/conformance` (tm1-typescript).
 4. Where a client differs, fix the client, not the fixture.
 
 Without `-PrecordConformance`, the Java build fails if a class's recording differs from its fixture. It also fails if a fixture belongs to no test class (`ConformanceFixturesTest`). A change of Java's behaviour therefore shows up first as a failing Java build, then, once re-recorded, as a fixture diff every other client has to match.

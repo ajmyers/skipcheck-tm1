@@ -5,7 +5,7 @@
 #   *.java                     ./gradlew format (Spring Java Format: layout, imports)
 #   python/**/*.py         ruff format, and ruff's import order
 #   tm1-typescript/**          prettier (*.ts, *.mts, *.mjs, *.json)
-#   tm1-dotnet/**/*.cs         dotnet csharpier
+#   dotnet/**/*.cs         dotnet csharpier
 #
 # Then it checks them, and refuses the commit if a file still isn't formatted or a formatter
 # couldn't run: unformatted code shouldn't get into a commit. The message says what to install.
@@ -39,7 +39,7 @@ while IFS= read -r -d '' file; do
 		python/*.py) kind=python ;;
 		tm1-typescript/package-lock.json) continue ;;
 		tm1-typescript/*.ts | tm1-typescript/*.mts | tm1-typescript/*.mjs | tm1-typescript/*.json) kind=typescript ;;
-		tm1-dotnet/*.cs) kind=dotnet ;;
+		dotnet/*.cs) kind=dotnet ;;
 		*) continue ;;
 	esac
 	if [[ -n "$(git diff --name-only -- "$file")" ]]; then
@@ -115,10 +115,10 @@ if [[ ${#typescript[@]} -gt 0 ]]; then
 fi
 
 if [[ ${#dotnet[@]} -gt 0 ]]; then
-	if ! (cd tm1-dotnet && { dotnet csharpier --version > /dev/null 2>&1 || dotnet tool restore > /dev/null 2>&1; } && dotnet csharpier --version > /dev/null 2>&1); then
-		refuse .NET "CSharpier isn't installed: (cd tm1-dotnet && dotnet tool restore)"
-	elif ! output="$(cd tm1-dotnet && within tm1-dotnet "${dotnet[@]}" | xargs -0 dotnet csharpier format 2>&1 \
-		&& within tm1-dotnet "${dotnet[@]}" | xargs -0 dotnet csharpier check 2>&1)"; then
+	if ! (cd dotnet && { dotnet csharpier --version > /dev/null 2>&1 || dotnet tool restore > /dev/null 2>&1; } && dotnet csharpier --version > /dev/null 2>&1); then
+		refuse .NET "CSharpier isn't installed: (cd dotnet && dotnet tool restore)"
+	elif ! output="$(cd dotnet && within dotnet "${dotnet[@]}" | xargs -0 dotnet csharpier format 2>&1 \
+		&& within dotnet "${dotnet[@]}" | xargs -0 dotnet csharpier check 2>&1)"; then
 		refuse .NET "CSharpier failed" "$output"
 	fi
 fi

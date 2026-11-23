@@ -78,8 +78,8 @@ ports() {
 		rm -f "$worktree/tm1-typescript/node_modules"
 		[[ $status -eq 0 ]] || return 1
 	fi
-	if grep -q '^tm1-dotnet/' <<< "$changed"; then
-		(cd "$worktree/tm1-dotnet" && dotnet tool restore > /dev/null && dotnet csharpier check .) || return 1
+	if grep -q '^dotnet/' <<< "$changed"; then
+		(cd "$worktree/dotnet" && dotnet tool restore > /dev/null && dotnet csharpier check .) || return 1
 	fi
 	return 0
 }
