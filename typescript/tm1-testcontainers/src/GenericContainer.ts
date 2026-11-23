@@ -269,6 +269,13 @@ export abstract class GenericContainer implements Startable {
    * @internal */
   configure(): void {}
 
+  /** The platform to run the image for. TM1 and IBM's other servers only exist for x86-64, so on
+   * Apple Silicon they run under Rosetta; a container whose image is built for the machine says
+   * `undefined`, as the Java module sets no platform for it. */
+  protected platform(): string | undefined {
+    return "linux/amd64";
+  }
+
   /** Runs once what it depends on is running, before {@link configure}. */
   protected async dependenciesStarted(): Promise<void> {}
 
@@ -281,11 +288,9 @@ export abstract class GenericContainer implements Startable {
   }
 
   async #build(): Promise<TcGenericContainer> {
-    let c = new TcGenericContainer(this.#image)
-      .withEnvironment(Object.fromEntries(this.#env))
-      .withLabels({ "io.skipcheck.tm1.testcontainers": "typescript" })
-      // TM1 and IBM's other servers only exist for x86-64; on Apple Silicon they run under Rosetta
-      .withPlatform("linux/amd64");
+    let c = new TcGenericContainer(this.#image).withEnvironment(Object.fromEntries(this.#env)).withLabels({ "io.skipcheck.tm1.testcontainers": "typescript" });
+    const platform = this.platform();
+    if (platform !== undefined) c = c.withPlatform(platform);
     if (this.#command.length > 0) c = c.withCommand(this.#command);
     if (this.#ports.length > 0) c = c.withExposedPorts(...this.#ports);
     if (this.#binds.length > 0) c = c.withBindMounts(this.#binds.map((b) => ({ source: b.source, target: b.target, mode: b.readOnly ? "ro" : "rw" })));

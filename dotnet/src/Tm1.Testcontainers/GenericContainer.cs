@@ -238,6 +238,11 @@ public abstract class GenericContainer<TSelf> : IStartable
     protected internal virtual void Configure() { }
 
     /// <summary>Runs once what it depends on is running, before <see cref="Configure"/>.</summary>
+    /// <summary>The platform to run the image for. TM1 and IBM's other servers only exist for x86-64, so on
+    /// Apple Silicon they run under Rosetta; a container whose image is built for the machine says
+    /// <c>null</c>, as the Java module sets no platform for it.</summary>
+    private protected virtual string? Platform => "linux/amd64";
+
     private protected virtual Task DependenciesStartedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>Runs once it's ready.</summary>
@@ -264,7 +269,10 @@ public abstract class GenericContainer<TSelf> : IStartable
             .WithLabel("io.skipcheck.tm1.testcontainers", "dotnet")
             .WithCreateParameterModifier(p =>
             {
-                p.Platform = "linux/amd64";
+                if (Platform is not null)
+                {
+                    p.Platform = Platform;
+                }
                 p.HostConfig ??= new HostConfig();
                 p.HostConfig.Binds = [.. p.HostConfig.Binds ?? [], .. Binds];
             });

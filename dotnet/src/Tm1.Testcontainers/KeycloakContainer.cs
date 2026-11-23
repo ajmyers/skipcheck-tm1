@@ -33,6 +33,9 @@ public partial class KeycloakContainer : GenericContainer<KeycloakContainer>
 
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
+    /// <summary>Keycloak's image is built for every platform, so it runs as the machine's own.</summary>
+    private protected override string? Platform => null;
+
     /// <summary>Keycloak in <see cref="DefaultImage"/>, or <c>KEYCLOAK_IMAGE</c> if set.</summary>
     public KeycloakContainer()
         : this(Settings.Text(Settings.Get(Image)) ?? DefaultImage) { }

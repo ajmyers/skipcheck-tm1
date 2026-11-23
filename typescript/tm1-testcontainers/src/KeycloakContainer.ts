@@ -27,6 +27,11 @@ export class KeycloakContainer extends GenericContainer {
   /** The client an app gets ID tokens with, by the password grant. */
   static readonly APP_CLIENT = "tm1-app";
 
+  /** Keycloak's image is built for every platform, so it runs as the machine's own. */
+  protected override platform(): string | undefined {
+    return undefined;
+  }
+
   /** Keycloak in `image`; {@link DEFAULT_IMAGE}, or `KEYCLOAK_IMAGE` if set, by default. */
   constructor(image: string = Settings.text(Settings.get(KeycloakContainer.IMAGE)) ?? KeycloakContainer.DEFAULT_IMAGE) {
     super(image);
