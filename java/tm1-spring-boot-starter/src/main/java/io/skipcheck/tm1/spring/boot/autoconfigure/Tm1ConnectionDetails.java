@@ -9,13 +9,16 @@ import org.springframework.boot.ssl.SslBundle;
 import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 
 /**
- * How to connect to a TM1 server: the source of truth for the auto-configured session and
- * pool. By default it comes from the {@code tm1.*} properties; a bean of your own, or
- * {@code @ServiceConnection} on a {@code Tm1ServerContainer} (with
- * {@code tm1-spring-boot-testcontainers}), takes its place.
+ * How to connect to a TM1 server: the source of truth for the server's auto-configured
+ * session and pool. By default it comes from the server's properties, {@code tm1.*} or
+ * {@code tm1.servers.<name>.*}. A bean of yours named {@code <name>Tm1ConnectionDetails}
+ * takes its place, for any server. For the default server, so does a bean of yours under
+ * any other name, or {@code @ServiceConnection} on a {@code Tm1ServerContainer} (with
+ * {@code tm1-spring-boot-testcontainers}); see {@link Tm1AutoConfiguration}.
  *
  * <p>
- * A bean of your own, for credentials the properties can't describe:
+ * A bean of your own for the default server, for credentials the properties can't
+ * describe:
  *
  * {@snippet class = examples.Tm1ConnectionDetailsExamples region = own-bean}
  */

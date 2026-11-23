@@ -9,7 +9,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
- * The {@code tm1.*} properties.
+ * The {@code tm1.*} properties: the server named {@code default}, the one a plain
+ * {@code Tm1Client} injection gets. Each {@code tm1.servers.<name>.*} has the same
+ * properties ({@link Tm1ServersProperties}). The starter binds these itself when it
+ * creates the server's beans; there's no bean of this type.
  *
  * <pre class="code">
  * tm1:

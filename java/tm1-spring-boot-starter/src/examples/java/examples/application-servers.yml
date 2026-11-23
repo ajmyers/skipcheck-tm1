@@ -1,0 +1,12 @@
+# src/main/resources/application.yml
+tm1:
+  servers:
+    # Each server under a name of your choosing, with the same settings as tm1
+    planning:
+      address: http://localhost:8010
+      user: admin
+      password: ""
+    reporting:
+      address: http://localhost:8011
+      user: admin
+      password: ""

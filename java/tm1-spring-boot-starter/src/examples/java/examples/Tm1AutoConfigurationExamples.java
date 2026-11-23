@@ -2,6 +2,7 @@
 
 package examples;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import io.skipcheck.tm1.client.Tm1Client;
@@ -55,6 +56,33 @@ final class Tm1AutoConfigurationExamples {
 				.cubes()
 				.modelCubes(ODataQuery.none().select(Cube.NAME))
 				.map(Cube::name));
+		}
+
+	}
+	// @end
+
+	// @start region = servers
+	// With tm1.servers.planning.* and tm1.servers.reporting.*: a client for each
+	@Service
+	static class Reconciliation {
+
+		private final Tm1Client planning;
+
+		private final Tm1Client reporting;
+
+		Reconciliation(@Qualifier("planning") Tm1Client planning, @Qualifier("reporting") Tm1Client reporting) {
+			this.planning = planning;
+			this.reporting = reporting;
+		}
+
+		// The cubes planning has and reporting doesn't
+		Flux<String> notYetReported() {
+			return cubes(reporting).collectList()
+				.flatMapMany(reported -> cubes(planning).filter(cube -> !reported.contains(cube)));
+		}
+
+		private static Flux<String> cubes(Tm1Client tm1) {
+			return tm1.cubes().modelCubes(ODataQuery.none().select(Cube.NAME)).map(Cube::name);
 		}
 
 	}

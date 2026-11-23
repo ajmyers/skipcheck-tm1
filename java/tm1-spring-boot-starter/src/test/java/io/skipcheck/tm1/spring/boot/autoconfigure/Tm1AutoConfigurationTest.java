@@ -17,8 +17,8 @@ import io.skipcheck.tm1.client.session.Tm1SessionPool;
 
 class Tm1AutoConfigurationTest {
 
-	private final ApplicationContextRunner runner = new ApplicationContextRunner().withConfiguration(
-			AutoConfigurations.of(Tm1ConnectionDetailsAutoConfiguration.class, Tm1AutoConfiguration.class));
+	private final ApplicationContextRunner runner = new ApplicationContextRunner()
+		.withConfiguration(AutoConfigurations.of(Tm1AutoConfiguration.class));
 
 	@Test
 	void doesNothingUntilAServerIsConfigured() {
