@@ -1,7 +1,9 @@
 # Publish the Java API docs and the guide to skipcheck.io/projects/ (see api-site/README.md).
 #
 #   Pull request: builds the themed Javadoc and bundles the Worker; deploys nothing.
-#   Tag v1.2.3:   deploys that version's docs, alongside the Maven Central release.
+#   Tag v1.2.3:   deploys that version's docs, alongside the Maven Central release. The release
+#                 workflow calls this one for a tag, after its gate: a tag doesn't start it
+#                 directly, or docs would ship for a release that didn't.
 #   Manual run:   deploys the chosen branch (e.g. master, before the first release).
 #
 # Repo secrets needed to deploy:
@@ -10,8 +12,7 @@
 name: API Docs
 
 on:
-  push:
-    tags: ['v*']
+  workflow_call:
   pull_request:
     paths:
       - 'api-site/**'

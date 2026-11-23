@@ -4,6 +4,9 @@
 #   Push to master: publishes :edge and :sha-<short sha>.
 #   Tag v1.2.3:     publishes :1.2.3, :1.2 and :latest (same tags as the Maven release).
 #                   Pre-release tags (v1.2.3-rc.1) publish only :1.2.3-rc.1.
+#                   The release workflow calls this one for a tag, after its gate: a tag
+#                   doesn't start it directly, or images would ship from a commit whose
+#                   checks failed.
 #
 # Publishing is switched on per image with a repository variable (Settings -> Secrets
 # and variables -> Actions -> Variables), named in the image's matrix entry:
@@ -36,8 +39,8 @@ name: Docker
 on:
   push:
     branches: [master]
-    tags: ['v*']
   pull_request:
+  workflow_call:
 
 concurrency:
   # A pull request's newer push replaces the run before it; a push to master or a tag has a group
