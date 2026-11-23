@@ -63,7 +63,7 @@ public interface Tm1Authenticator {
 	static Tm1Authenticator basic(String user, @Nullable String password) {
 		Objects.requireNonNull(user, "user");
 		String value = "Basic " + base64(user + ":" + (password == null ? "" : password));
-		return new Fixed(value, "Basic " + user);
+		return new FixedAuthenticator(value, "Basic " + user);
 	}
 
 	/**
@@ -79,7 +79,7 @@ public interface Tm1Authenticator {
 		Objects.requireNonNull(password, "password");
 		Objects.requireNonNull(namespace, "namespace");
 		String value = "CAMNamespace " + base64(user + ":" + password + ":" + namespace);
-		return new Fixed(value, "CAMNamespace " + namespace + "/" + user);
+		return new FixedAuthenticator(value, "CAMNamespace " + namespace + "/" + user);
 	}
 
 	/**
@@ -93,7 +93,7 @@ public interface Tm1Authenticator {
 	 */
 	static Tm1Authenticator camPassport(String passport) {
 		Objects.requireNonNull(passport, "passport");
-		return new Fixed("CAMPassport " + passport, "CAMPassport");
+		return new FixedAuthenticator("CAMPassport " + passport, "CAMPassport");
 	}
 
 	/**
@@ -141,7 +141,7 @@ public interface Tm1Authenticator {
 	 */
 	static Tm1Authenticator cognosLogon(String dispatcher, String namespace, String user, String password) {
 		Tm1Authenticator passports = camPassport(CognosPassports.password(dispatcher, namespace, user, password));
-		return new Described(passports, "CAMPassport from Cognos " + namespace + "/" + user,
+		return new DescribedAuthenticator(passports, "CAMPassport from Cognos " + namespace + "/" + user,
 				List.of(dispatcher, namespace, user, password));
 	}
 
@@ -157,98 +157,12 @@ public interface Tm1Authenticator {
 	 */
 	static Tm1Authenticator cognosIdToken(String dispatcher, String namespace, Supplier<Mono<String>> idToken) {
 		Tm1Authenticator passports = camPassport(CognosPassports.idToken(dispatcher, namespace, idToken));
-		return new Described(passports, "CAMPassport from Cognos " + namespace + " (ID token)",
+		return new DescribedAuthenticator(passports, "CAMPassport from Cognos " + namespace + " (ID token)",
 				List.of(dispatcher, namespace, idToken));
 	}
 
 	private static String base64(String text) {
 		return Base64.getEncoder().encodeToString(text.getBytes(StandardCharsets.UTF_8));
-	}
-
-	/** Credentials that don't change: Basic and CAMNamespace. */
-	final class Fixed implements Tm1Authenticator {
-
-		private final String value;
-
-		private final String description;
-
-		private Fixed(String value, String description) {
-			this.value = value;
-			this.description = description;
-		}
-
-		@Override
-		public Mono<String> authorization() {
-			return Mono.just(value);
-		}
-
-		@Override
-		public String describe() {
-			return description;
-		}
-
-		/** The description only: never the credentials. */
-		@Override
-		public String toString() {
-			return "Tm1Authenticator[" + description + "]";
-		}
-
-		/** Equal when the credentials are. */
-		@Override
-		public boolean equals(@Nullable Object other) {
-			return this == other || (other instanceof Fixed fixed && value.equals(fixed.value));
-		}
-
-		@Override
-		public int hashCode() {
-			return value.hashCode();
-		}
-
-	}
-
-	/** Another authenticator under its own description: the ones that ask Cognos. */
-	final class Described implements Tm1Authenticator {
-
-		private final Tm1Authenticator authenticator;
-
-		private final String description;
-
-		/** What it was made from, which is what makes two of them equal. */
-		private final List<Object> madeFrom;
-
-		private Described(Tm1Authenticator authenticator, String description, List<Object> madeFrom) {
-			this.authenticator = authenticator;
-			this.description = description;
-			this.madeFrom = madeFrom;
-		}
-
-		@Override
-		public Mono<String> authorization() {
-			return authenticator.authorization();
-		}
-
-		@Override
-		public String describe() {
-			return description;
-		}
-
-		/** The description only: never the credentials. */
-		@Override
-		public String toString() {
-			return "Tm1Authenticator[" + description + "]";
-		}
-
-		/** Equal when they were made from the same address, namespace and credentials. */
-		@Override
-		public boolean equals(@Nullable Object other) {
-			return this == other || (other instanceof Described described && madeFrom.equals(described.madeFrom));
-		}
-
-		@Override
-		public int hashCode() {
-			return madeFrom.hashCode();
-		}
-
 	}
 
 }
