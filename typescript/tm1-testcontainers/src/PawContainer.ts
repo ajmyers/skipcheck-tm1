@@ -220,6 +220,7 @@ export class PawContainer implements Startable {
     }
   }
 
+  /** Stops it, for `await using`: the same as {@link stop}. */
   async [Symbol.asyncDispose](): Promise<void> {
     await this.stop();
   }
@@ -297,6 +298,7 @@ export class PawContainer implements Startable {
     throw new IllegalStateException(`PAW wasn't ready within ${READY_TIMEOUT / 60_000} minutes: ${last}`);
   }
 
+  /** Where PAW comes from, and its address once it runs, for logs. */
   toString(): string {
     return "PawContainer[" + this.#source.describe() + (this.#running ? ", " + this.getUrl() : "") + "]";
   }

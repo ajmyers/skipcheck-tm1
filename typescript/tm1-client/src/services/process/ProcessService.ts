@@ -32,6 +32,8 @@ const PROCESSES = ODataPath.of("Processes");
  * ```
  */
 export class ProcessService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     list: ["EntitySet Processes"],
     get: ["EntitySet Processes"],

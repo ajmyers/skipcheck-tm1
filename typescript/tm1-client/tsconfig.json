@@ -9,5 +9,5 @@
       "@skipcheck/tm1-testcontainers/vitest": ["../tm1-testcontainers/src/vitest.ts"]
     }
   },
-  "include": ["src", "test", "codegen", "vitest.config.ts"]
+  "include": ["src", "test", "examples", "codegen", "vitest.config.ts"]
 }

@@ -41,6 +41,8 @@ const SUBSETS = ["Navigation Hierarchy/Subsets", "Navigation Hierarchy/PrivateSu
  * ```
  */
 export class SubsetService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     list: SUBSETS,
     get: SUBSETS,
@@ -127,6 +129,8 @@ export class SubsetService extends Tm1Service {
    * is public and keeps whether it's static or dynamic; with them, it's private if `makePrivate`, and
    * static, holding the elements the subset has now, if `makeStatic`. Returns the copy. */
   saveAs(dimension: string, hierarchy: string, scope: SubsetScope, subset: string, newName: string, options?: Tm1CallOptions): Promise<Subset>;
+  /** `tm1.SaveAs`, choosing whether the copy is private (`makePrivate`) and whether it's static,
+   * holding the elements the subset has now (`makeStatic`). Returns the copy. */
   saveAs(
     dimension: string,
     hierarchy: string,

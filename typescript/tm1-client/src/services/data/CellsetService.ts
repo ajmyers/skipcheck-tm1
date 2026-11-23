@@ -56,6 +56,8 @@ const PAGES_IN_FLIGHT = 2;
  * ```
  */
 export class CellsetService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     execute: ["ActionImport ExecuteMDX"],
     executeStatement: ["ActionImport ExecuteMDXStatement"],
@@ -197,6 +199,8 @@ export class CellsetService extends Tm1Service {
    * the name; or with `overwrite` (replacing a view that has the name) and `makePrivate`. Needs
    * schema 11.0.0. */
   saveViewAs(id: string, name: string, options?: Tm1CallOptions): Promise<View>;
+  /** `tm1.SaveViewAs`, choosing whether to replace a view that has the name (`overwrite`) and
+   * whether the view is private (`makePrivate`). */
   saveViewAs(id: string, name: string, overwrite: boolean, makePrivate: boolean, options?: Tm1CallOptions): Promise<View>;
   saveViewAs(id: string, name: string, overwrite?: boolean | Tm1CallOptions, makePrivate?: boolean, options?: Tm1CallOptions): Promise<View> {
     const body: Record<string, unknown> = { Name: required(name, "name") };

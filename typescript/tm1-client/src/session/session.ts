@@ -13,6 +13,8 @@ import { fetchTransport, type Tm1Transport } from "./transport.js";
 
 /** What every call takes last: a signal that cancels it (Java's cancelling a subscription). */
 export interface Tm1CallOptions {
+  /** Aborting it cancels the call: the request is abandoned, and the promise rejects with the
+   * signal's reason. */
   readonly signal?: AbortSignal;
 }
 
@@ -49,10 +51,12 @@ export class Tm1Session implements AsyncDisposable {
     return this.connection.root;
   }
 
+  /** The sandbox this view's requests run in, if any: its name, or undefined for base data. */
   sandbox(): string | undefined {
     return this.sandboxName;
   }
 
+  /** The change set this view's writes are recorded in, if any: its ID, or undefined. */
   changeSet(): string | undefined {
     return this.changeSetId;
   }
@@ -62,26 +66,41 @@ export class Tm1Session implements AsyncDisposable {
     return this.asyncEvery;
   }
 
+  /** Whether {@link close} has been called. */
   isClosed(): boolean {
     return this.connection.isClosed;
   }
 
   // Views
 
+  /** A view of this session whose requests run in sandbox `name`: each gets TM1's `!sandbox` query
+   * option, unless the request sets its own. The view shares this session's login, cookie and
+   * connections, so it costs nothing; closing either closes both. Derived rather than set on the
+   * session, so one caller's sandbox can't leak into another caller's requests. TM1 evaluates `NON
+   * EMPTY` and filters in the request's sandbox, so every request of an operation needs it,
+   * cellset reads and deletes included; a service given this view gets that for free. @throws
+   * RangeError if `name` is blank */
   withSandbox(name: string): Tm1Session {
     if (typeof name !== "string" || !name.trim()) throw new RangeError("sandbox name is blank");
     return new Tm1Session(this.connection, name, this.changeSetId, this.asyncEvery, this.queue);
   }
 
+  /** A view of this session whose requests run outside any sandbox, in base data: this session if
+   * it has no sandbox. */
   withoutSandbox(): Tm1Session {
     return this.sandboxName === undefined ? this : new Tm1Session(this.connection, undefined, this.changeSetId, this.asyncEvery, this.queue);
   }
 
+  /** A view of this session whose writes are recorded in change set `id` (from `BeginChangeSet`):
+   * each request gets TM1's `!ChangeSet` query option, unless it sets its own, so `UndoChangeSet`
+   * can revert them together. Like {@link withSandbox}, the view shares this session's login and
+   * connections; it keeps the sandbox, if any. @throws RangeError if `id` is blank */
   withChangeSet(id: string): Tm1Session {
     if (typeof id !== "string" || !id.trim()) throw new RangeError("change set ID is blank");
     return new Tm1Session(this.connection, this.sandboxName, id, this.asyncEvery, this.queue);
   }
 
+  /** A view of this session whose writes go into no change set: this session if it has none. */
   withoutChangeSet(): Tm1Session {
     return this.changeSetId === undefined ? this : new Tm1Session(this.connection, this.sandboxName, undefined, this.asyncEvery, this.queue);
   }
@@ -92,6 +111,8 @@ export class Tm1Session implements AsyncDisposable {
     return new Tm1Session(this.connection, this.sandboxName, this.changeSetId, every, this.queue);
   }
 
+  /** A view of this session whose requests run synchronously, as usual: this session if it isn't
+   * async. */
   withoutAsync(): Tm1Session {
     return this.asyncEvery === undefined ? this : new Tm1Session(this.connection, this.sandboxName, this.changeSetId, undefined, this.queue);
   }
@@ -122,14 +143,20 @@ export class Tm1Session implements AsyncDisposable {
     return this.connection.close();
   }
 
+  /** Ends the session on the server, for `await using`: the same as {@link close}. */
   [Symbol.asyncDispose](): Promise<void> {
     return this.close();
   }
 
+  /** The server's product version, such as `11.8.03500.6`, read from `Server.ProductVersion` once
+   * per login. Logs in first if needed. */
   version(options?: Tm1CallOptions): Promise<Tm1Version> {
     return this.connection.versionOf(options?.signal);
   }
 
+  /** What the server supports, from its own `$metadata`. Fetched once per server version and shared
+   * by every session built from the same settings, a pool's included. A request that declares
+   * {@link Tm1Request.requires} is checked against it before it's sent. */
   capabilities(options?: Tm1CallOptions): Promise<Tm1Capabilities> {
     return this.connection.capabilities(options?.signal);
   }
@@ -274,6 +301,8 @@ export class Tm1Session implements AsyncDisposable {
     }
   }
 
+  /** The session, its service root and its view (sandbox, change set, async), for logs. No
+   * credentials. */
   toString(): string {
     return `Tm1Session[${this.connection.root}${this.sandboxName === undefined ? "" : ", sandbox=" + this.sandboxName}${this.changeSetId === undefined ? "" : ", changeSet=" + this.changeSetId}]`;
   }
@@ -328,6 +357,7 @@ function readPage<T>(request: Tm1Request<T>, reply: Reply): Page<T> {
  * earlier one's writes) and carries on past failed ones: each request's promise gets its own result
  * or error. */
 export class Tm1SessionBatch {
+  /** How many requests {@link run} sends in each `$batch`. */
   static readonly DEFAULT_PER_REQUEST = 500;
 
   /** @internal */
@@ -337,6 +367,7 @@ export class Tm1SessionBatch {
     readonly session: Tm1Session,
   ) {}
 
+  /** How many requests have joined. */
   size(): number {
     return this.queue.count();
   }
@@ -368,12 +399,15 @@ export class BatchQueue {
   private readonly entries: Entry[] = [];
   private ran = false;
 
+  /** A queue whose `$batch` requests `sender` sends. */
   constructor(private readonly sender: Tm1Session) {}
 
+  /** How many requests are queued. */
   count(): number {
     return this.entries.length;
   }
 
+  /** Queues a request, and returns its result, there once the batch has run. */
   add<T>(view: Tm1Session, request: Tm1Request<T>, read: (reply: Reply) => unknown): Promise<unknown> {
     if (request.response === "Bytes" || request.body instanceof Uint8Array) throw new TypeError("Raw bytes can't go in a JSON batch: " + request.toString());
     if (this.ran)
@@ -402,6 +436,7 @@ export class BatchQueue {
     return result;
   }
 
+  /** Sends the queued requests, at most `perRequest` to each `$batch`. */
   async run(perRequest: number, signal: AbortSignal | undefined): Promise<void> {
     if (this.ran) throw new Error("The batch has already run");
     this.ran = true;
@@ -496,10 +531,14 @@ export class Tm1SessionBuilder {
     return this;
   }
 
+  /** Basic authentication, for TM1 security modes 1 and 2: shorthand for
+   * `authenticator(Tm1Authenticator.basic(user, password))`. A null password counts as empty. */
   basicAuth(user: string, password?: string | null): this {
     return this.authenticator(Tm1Authenticator.basic(user, password));
   }
 
+  /** How to log in: TM1's own security, CAM, or credentials of your own. Asked for credentials on
+   * every login. */
   authenticator(authenticator: Tm1Authenticator): this {
     if (!(authenticator instanceof Tm1Authenticator)) throw new TypeError("authenticator is a Tm1Authenticator");
     this.authenticatorValue = authenticator;
@@ -518,6 +557,7 @@ export class Tm1SessionBuilder {
     return this;
   }
 
+  /** Logs in as the credentials' own user: no impersonation. */
   withoutImpersonation(): this {
     this.impersonated = undefined;
     return this;
@@ -533,11 +573,13 @@ export class Tm1SessionBuilder {
     return this;
   }
 
+  /** Timeouts by kind of work; {@link Tm1Timeouts.DEFAULTS} unless set. */
   timeouts(timeouts: Tm1Timeouts): this {
     this.timeoutsValue = timeouts;
     return this;
   }
 
+  /** How error responses are classified; {@link Tm1ErrorClassifier.defaults} unless set. */
   errorClassifier(classifier: Tm1ErrorClassifier): this {
     this.classifier = classifier;
     return this;
@@ -572,6 +614,8 @@ export class Tm1SessionBuilder {
     return this.root ?? "(no base URL)";
   }
 
+  /** The session. Nothing is sent to TM1 until the first request. @throws Error if the base URL or
+   * credentials aren't set */
   build(): Tm1Session {
     const root = this.root;
     if (root === undefined) throw new Error("baseUrl is required");

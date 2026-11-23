@@ -4,6 +4,8 @@ export type ContentScope = "Public" | "Private";
 
 const NAVIGATION: Readonly<Record<ContentScope, string>> = { Public: "Contents", Private: "PrivateContents" };
 
+/** Who sees an entry, as values: `ContentScope.Public`. {@link ContentScope.navigation} names the
+ * folder's collection that holds it. */
 export const ContentScope = {
   /** Everyone: `…/Contents('id')`. */
   Public: "Public",

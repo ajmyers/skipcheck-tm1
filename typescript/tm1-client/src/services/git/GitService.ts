@@ -48,6 +48,8 @@ const PLANS = ODataPath.of("GitPlans");
  * ```
  */
 export class GitService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     init: ["ActionImport GitInit"],
     uninit: ["ActionImport GitUninit"],

@@ -37,14 +37,19 @@ function call(fn: string, parameters: Tm1Map<unknown> | undefined): string {
 export class ODataPath {
   private constructor(private readonly segments: readonly string[]) {}
 
+  /** A path starting at an entity set, singleton or operation import, such as `Cubes`. @throws
+   * RangeError if `name` isn't an OData identifier */
   static of(name: string): ODataPath {
     return new ODataPath([identifier(name)]);
   }
 
+  /** The service's metadata document, `$metadata`: its CSDL XML. A path of its own, since
+   * `$metadata` isn't an identifier {@link of} accepts. */
   static metadata(): ODataPath {
     return new ODataPath(["$metadata"]);
   }
 
+  /** The service's batch endpoint, `$batch`: a path of its own, as for {@link metadata}. */
   static batch(): ODataPath {
     return new ODataPath(["$batch"]);
   }
@@ -57,6 +62,9 @@ export class ODataPath {
     return new ODataPath(link.split("/").map((s) => ODataEncoding.linkSegment(s)));
   }
 
+  /** A function import called from the service root, such as `ModelCubes()` or
+   * `TailMessageLog(Top=10)`. @param name the import's name, unqualified @param parameters the
+   * parameter names and values, in order, as for {@link function} */
   static functionImport(name: string, parameters?: Tm1Map<unknown>): ODataPath {
     return new ODataPath([call(identifier(name), parameters)]);
   }
@@ -71,42 +79,58 @@ export class ODataPath {
     return this.appendToLast("(" + keyValue(value) + ")");
   }
 
+  /** Adds a navigation property or structural property segment, such as `Views`. The name is an
+   * OData identifier. */
   nav(property: string): ODataPath {
     return this.append(identifier(property));
   }
 
+  /** Adds a type-cast segment, such as `tm1.NativeView`: the namespace-qualified type name. */
   cast(qualifiedType: string): ODataPath {
     return this.append(qualified(qualifiedType));
   }
 
+  /** Adds a bound action segment, such as `tm1.Reserve`: the namespace-qualified action name.
+   * Actions are invoked with POST. */
   action(qualifiedName: string): ODataPath {
     return this.append(qualified(qualifiedName));
   }
 
+  /** Adds a bound function call with literal parameters, such as
+   * `tm1.GetPartition(Begin=0,End=99)`. Use parameter aliases (in {@link ODataQuery}) for complex
+   * or collection parameters. @param qualifiedName the namespace-qualified function name @param
+   * parameters the parameter names and values, in order; each value is written as an OData
+   * literal, or as the alias's name if it's an {@link ODataPath.Alias} */
   function(qualifiedName: string, parameters?: Tm1Map<unknown>): ODataPath {
     return this.append(call(qualified(qualifiedName), parameters));
   }
 
+  /** Adds `$value`: a property's or media entity's raw value. */
   value(): ODataPath {
     return this.append("$value");
   }
 
+  /** Adds `$count`: the number of items in a collection, as plain text. */
   count(): ODataPath {
     return this.append("$count");
   }
 
+  /** Adds `$ref`: references to entities rather than the entities themselves. */
   ref(): ODataPath {
     return this.append("$ref");
   }
 
+  /** Whether `other` is the same path. */
   equals(other: unknown): boolean {
     return other instanceof ODataPath && other.toString() === this.toString();
   }
 
+  /** The encoded path, without a leading slash, such as `Cubes('Sales')/Views`. */
   toString(): string {
     return this.segments.join("/");
   }
 
+  /** The encoded path, where a path is written into JSON: an `@odata.bind` reference. */
   toJSON(): string {
     return this.toString();
   }
@@ -123,6 +147,7 @@ export class ODataPath {
   }
 }
 
+/** The parameter alias of {@link ODataPath}, nested as in Java. */
 export namespace ODataPath {
   /** A parameter alias, `@p`: a function's structured argument, given as JSON in the query
    * (`Fn(p=@p)?@p={…}`). */

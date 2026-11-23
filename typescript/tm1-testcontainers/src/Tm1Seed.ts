@@ -25,6 +25,7 @@ export class Tm1Seed {
     return [Tm1Seed.EMPTY, Tm1Seed.SDATA];
   }
 
+  /** The seed's name, as Java's enum constant. */
   toString(): string {
     return this.name;
   }

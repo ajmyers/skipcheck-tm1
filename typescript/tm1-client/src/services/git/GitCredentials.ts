@@ -14,6 +14,12 @@ export class GitCredentials {
   readonly #privateKey: string | null;
   readonly #passphrase: string | null;
 
+  /** How TM1 signs in to the Git remote: nothing (a public or `git://` remote), a user name and
+   * password or token (HTTPS), or an SSH key pair. TM1 doesn't keep them, so every call that
+   * reaches the remote takes them again. {@link toString} leaves the secrets out. @param username
+   * the user name, for HTTPS @param password the password or access token, for HTTPS @param
+   * publicKey the SSH public key @param privateKey the SSH private key @param passphrase the
+   * private key's passphrase */
   constructor(
     username: string | null | undefined,
     password: string | null | undefined,
@@ -78,6 +84,7 @@ export class GitCredentials {
     putIfSet(parameters, "Passphrase", this.#passphrase);
   }
 
+  /** Whether `other` holds the same credentials. */
   equals(other: unknown): boolean {
     return (
       other instanceof GitCredentials &&

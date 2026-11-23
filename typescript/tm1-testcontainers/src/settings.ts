@@ -59,11 +59,13 @@ export const Settings = {
 /** A wrong argument: Java's `IllegalArgumentException`. A source that's set but wrong throws it,
  * so the test fails rather than skips. */
 export class IllegalArgumentException extends Error {
+  /** The exception's name, as Java's class. */
   override readonly name = "IllegalArgumentException";
 }
 
 /** A call at the wrong time, or a part that's missing: Java's `IllegalStateException`. */
 export class IllegalStateException extends Error {
+  /** The exception's name, as Java's class. */
   override readonly name = "IllegalStateException";
 }
 

@@ -44,6 +44,8 @@ const CUBES = ODataPath.of("Cubes");
  * ```
  */
 export class CubeService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     list: ["EntitySet Cubes"],
     modelCubes: ["FunctionImport ModelCubes"],

@@ -33,6 +33,8 @@ const ROWSETS = ODataPath.of("Rowsets");
  * ```
  */
 export class DrillthroughService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     scripts: ["Navigation CellsetCell/DrillthroughScripts"],
     execute: ["Action CubeDrillthrough/Execute"],

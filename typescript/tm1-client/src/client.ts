@@ -54,37 +54,69 @@ import type { Tm1Dialect } from "./version/index.js";
 export class Tm1Client implements AsyncDisposable {
   /** The session, which sends any request (`Tm1Request`). */
   readonly session: Tm1Session;
+  /** Dimensions. The service, on this client's session. */
   readonly dimensions: DimensionService;
+  /** Hierarchies. The service, on this client's session. */
   readonly hierarchies: HierarchyService;
+  /** Elements. The service, on this client's session. */
   readonly elements: ElementService;
+  /** Edges. The service, on this client's session. */
   readonly edges: EdgeService;
+  /** Levels. The service, on this client's session. */
   readonly levels: LevelService;
+  /** Members. The service, on this client's session. */
   readonly members: MemberService;
+  /** Subsets. The service, on this client's session. */
   readonly subsets: SubsetService;
+  /** Attribute definitions. The service, on this client's session. */
   readonly attributes: AttributeService;
+  /** Translated attribute values. The service, on this client's session. */
   readonly localizedAttributes: LocalizedAttributeService;
+  /** Cubes. The service, on this client's session. */
   readonly cubes: CubeService;
+  /** Views. The service, on this client's session. */
   readonly views: ViewService;
+  /** Cellsets. The service, on this client's session. */
   readonly cellsets: CellsetService;
+  /** Cell writes. The service, on this client's session. */
   readonly cells: CellService;
+  /** Member sets. The service, on this client's session. */
   readonly memberSets: MemberSetService;
+  /** Sandboxes. The service, on this client's session. */
   readonly sandboxes: SandboxService;
+  /** Change sets. The service, on this client's session. */
   readonly changeSets: ChangeSetService;
+  /** Drillthrough. The service, on this client's session. */
   readonly drillthrough: DrillthroughService;
+  /** Processes. The service, on this client's session. */
   readonly processes: ProcessService;
+  /** Process debugging. The service, on this client's session. */
   readonly processDebugging: ProcessDebugService;
+  /** Chores. The service, on this client's session. */
   readonly chores: ChoreService;
+  /** Users. The service, on this client's session. */
   readonly users: UserService;
+  /** Groups. The service, on this client's session. */
   readonly groups: GroupService;
+  /** Server sessions. The service, on this client's session. */
   readonly sessions: SessionService;
+  /** Server threads. The service, on this client's session. */
   readonly threads: ThreadService;
+  /** The server. The service, on this client's session. */
   readonly server: ServerService;
+  /** The server's logs. The service, on this client's session. */
   readonly logs: LogService;
+  /** The contents tree. The service, on this client's session. */
   readonly contents: ContentService;
+  /** Annotations on cube cells. The service, on this client's session. */
   readonly annotations: AnnotationService;
+  /** TM1 Git. The service, on this client's session. */
   readonly git: GitService;
+  /** Encryption at rest. The service, on this client's session. */
   readonly encryption: EncryptionService;
+  /** The cached OpenID Connect keys. The service, on this client's session. */
   readonly oidcKeys: OidcKeyService;
+  /** The ODBC data sources on TM1's host. The service, on this client's session. */
   readonly sqlDataSources: SqlDataSourceService;
 
   private constructor(session: Tm1Session) {
@@ -144,6 +176,7 @@ export class Tm1Client implements AsyncDisposable {
     return new Tm1Client(this.session.withAsync(every));
   }
 
+  /** A client on a synchronous view of this client's session ({@link Tm1Session.withoutAsync}). */
   withoutAsync(): Tm1Client {
     return new Tm1Client(this.session.withoutAsync());
   }
@@ -169,10 +202,12 @@ export class Tm1Client implements AsyncDisposable {
     return this.session.close();
   }
 
+  /** Ends the session on the server, for `await using`: the same as {@link close}. */
   [Symbol.asyncDispose](): Promise<void> {
     return this.close();
   }
 
+  /** The client and its service root, for logs. */
   toString(): string {
     return `Tm1Client[${this.session.serviceRoot()}]`;
   }
@@ -189,10 +224,13 @@ export class Tm1Batch {
     this.client = Tm1Client.of(batch.session);
   }
 
+  /** How many requests have joined. */
   size(): number {
     return this.batch.size();
   }
 
+  /** Sends the queued requests ({@link Tm1SessionBatch.run}), at most `perRequest` to a `$batch`
+   * request. Resolves when every call has its result. */
   run(perRequest?: number, options?: Tm1CallOptions): Promise<void> {
     return this.batch.run(perRequest, options);
   }
@@ -202,46 +240,59 @@ export class Tm1Batch {
 export class Tm1ClientBuilder {
   private readonly sessionBuilder = new Tm1SessionBuilder();
 
+  /** The service root, such as `http://localhost:8010/api/v1/`. See {@link
+   * Tm1SessionBuilder.baseUrl}. */
   baseUrl(baseUrl: string): this {
     this.sessionBuilder.baseUrl(baseUrl);
     return this;
   }
 
+  /** The server's address, such as `http://tm1:8010`. See {@link Tm1SessionBuilder.address}. */
   address(address: string): this {
     this.sessionBuilder.address(address);
     return this;
   }
 
+  /** The kind of deployment. See {@link Tm1SessionBuilder.dialect}. */
   dialect(dialect: Tm1Dialect): this {
     this.sessionBuilder.dialect(dialect);
     return this;
   }
 
+  /** Logs in with TM1's own security, as `user` with `password`. See {@link
+   * Tm1SessionBuilder.basicAuth}. */
   basicAuth(user: string, password?: string | null): this {
     this.sessionBuilder.basicAuth(user, password);
     return this;
   }
 
+  /** Supplies the credentials for each login. See {@link Tm1SessionBuilder.authenticator}. */
   authenticator(authenticator: Tm1Authenticator): this {
     this.sessionBuilder.authenticator(authenticator);
     return this;
   }
 
+  /** Logs in as the service account but acts as TM1 user `user`. See {@link
+   * Tm1SessionBuilder.impersonate}. */
   impersonate(user: string): this {
     this.sessionBuilder.impersonate(user);
     return this;
   }
 
+  /** The session context sent to TM1: a label it shows for the session. See {@link
+   * Tm1SessionBuilder.sessionContext}. */
   sessionContext(sessionContext: string): this {
     this.sessionBuilder.sessionContext(sessionContext);
     return this;
   }
 
+  /** The timeouts. See {@link Tm1SessionBuilder.timeouts}. */
   timeouts(timeouts: Tm1Timeouts): this {
     this.sessionBuilder.timeouts(timeouts);
     return this;
   }
 
+  /** The classifier for error responses. See {@link Tm1SessionBuilder.errorClassifier}. */
   errorClassifier(classifier: Tm1ErrorClassifier): this {
     this.sessionBuilder.errorClassifier(classifier);
     return this;
@@ -253,11 +304,14 @@ export class Tm1ClientBuilder {
     return this;
   }
 
+  /** Whether a request the server doesn't define is refused before it's sent. See {@link
+   * Tm1SessionBuilder.checkCapabilities}. */
   checkCapabilities(check: boolean): this {
     this.sessionBuilder.checkCapabilities(check);
     return this;
   }
 
+  /** The client. Nothing is sent to TM1 until the first request. */
   build(): Tm1Client {
     return Tm1Client.of(this.sessionBuilder.build());
   }

@@ -43,6 +43,8 @@ const BYTE_ORDER_MARK = "﻿";
  * ```
  */
 export class LogService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     messageLogEntries: ["EntitySet MessageLogEntries"],
     messageLog: ["FunctionImport MessageLog"],

@@ -31,6 +31,7 @@ export class PawSource {
     return "PAW Local zip " + this.zip;
   }
 
+  /** The description ({@link describe}), for logs. */
   toString(): string {
     return this.describe();
   }

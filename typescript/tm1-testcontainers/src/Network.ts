@@ -61,10 +61,12 @@ export class Network implements AsyncDisposable {
     await (await started).stop();
   }
 
+  /** Removes the network, for `await using`: the same as {@link close}. */
   async [Symbol.asyncDispose](): Promise<void> {
     await this.close();
   }
 
+  /** The network's name, for logs. */
   toString(): string {
     return "Network[" + this.#name + "]";
   }

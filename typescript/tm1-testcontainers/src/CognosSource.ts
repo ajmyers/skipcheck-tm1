@@ -28,10 +28,12 @@ export abstract class CognosSource {
   /** A short description for logs and messages. Never includes a URL's credentials or query. */
   abstract describe(): string;
 
+  /** The description ({@link describe}), for logs. */
   toString(): string {
     return this.describe();
   }
 
+  /** How Node prints it: the class and its description, never a URL's credentials or query. */
   [inspect.custom](): string {
     return this.constructor.name + "[" + this.describe() + "]";
   }
@@ -62,6 +64,7 @@ export abstract class CognosSource {
   }
 }
 
+/** The types nested in {@link CognosSource}, as in Java. */
 export namespace CognosSource {
   /** An image built on `cognos-server` with Cognos inside, from a **private** registry. */
   export class PrivateImage extends CognosSource {
@@ -116,7 +119,9 @@ export namespace CognosSource {
 
   /** A download link for IBM's Cognos Analytics zip; never logged with its credentials or query. */
   export class ZipUrl extends CognosSource {
+    /** The download link. */
     readonly url: URL;
+    /** The zip's expected SHA-256, if the download is to be checked. */
     readonly sha256: string | undefined;
     readonly #text: string;
 

@@ -18,6 +18,8 @@ import { Tm1Service, type Tm1Endpoints } from "../service.js";
  * ```
  */
 export class OidcKeyService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     keys: ["FunctionImport GetOIDCKeys"],
     remove: ["ActionImport RemoveOIDCKeyFromCache"],

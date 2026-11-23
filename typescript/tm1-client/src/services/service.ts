@@ -8,6 +8,7 @@ export type Tm1Endpoints<S> = { readonly [K in keyof S]?: readonly string[] };
 /** What every service is: methods over one session. A client over a view of the session (a
  * sandbox, a batch) makes services over that view. */
 export abstract class Tm1Service {
+  /** A service sending its requests through `session`. */
   constructor(
     /** The session the requests go through. */
     protected readonly session: Tm1Session,

@@ -127,6 +127,7 @@ export abstract class GenericContainer implements Startable {
 
   /** Sets an environment variable, or several. */
   withEnv(name: string, value: string): this;
+  /** Sets several environment variables at once. */
   withEnv(variables: Readonly<Record<string, string>> | ReadonlyMap<string, string>): this;
   withEnv(name: string | Readonly<Record<string, string>> | ReadonlyMap<string, string>, value?: string): this {
     if (typeof name === "string") {
@@ -245,6 +246,7 @@ export abstract class GenericContainer implements Startable {
     await c.stop();
   }
 
+  /** Stops it, for `await using`: the same as {@link stop}. */
   async [Symbol.asyncDispose](): Promise<void> {
     await this.stop();
   }

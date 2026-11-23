@@ -63,6 +63,7 @@ export class AttributeOwner {
     return this.#path;
   }
 
+  /** The owner's path, for logs. */
   toString(): string {
     return this.#path.toString();
   }

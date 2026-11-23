@@ -1,6 +1,8 @@
 /** Who sees a view, and so which of a cube's collections holds it: the Java client's `ViewScope`.
  * {@link ViewScope.navigation} names the collection. */
 export type ViewScope = "Public" | "Private";
+/** Who sees a view, as values: `ViewScope.Public`. {@link ViewScope.navigation} names the cube's
+ * collection that holds it. */
 export const ViewScope = {
   /** Everyone: `Cubes('c')/Views`. */
   Public: "Public",

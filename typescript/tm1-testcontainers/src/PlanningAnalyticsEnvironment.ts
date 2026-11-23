@@ -117,6 +117,7 @@ export class PlanningAnalyticsEnvironment implements Startable {
     if (this.#ownsNetwork) await this.#network.close();
   }
 
+  /** Stops it, for `await using`: the same as {@link stop}. */
   async [Symbol.asyncDispose](): Promise<void> {
     await this.stop();
   }
@@ -190,24 +191,38 @@ export class PlanningAnalyticsEnvironment implements Startable {
 /** What a builder collects.
  * @internal */
 export interface BuilderParts {
+  /** Each TM1 server's settings, by server name. */
   tm1: Map<string, Customizer<Tm1ServerContainer>>;
+  /** The separate Admin Server's settings, if there is one. */
   adminServer?: Customizer<Tm1AdminServerContainer>;
+  /** TM1 Web's settings, if it's in the environment. */
   tm1Web?: Customizer<Tm1WebContainer>;
+  /** PAW's settings, if it's in the environment. */
   paw?: Customizer<PawContainer>;
+  /** Cognos's settings, if it's in the environment. */
   cognos?: Customizer<CognosContainer>;
+  /** Keycloak's settings, if it's in the environment. */
   keycloak?: Customizer<KeycloakContainer>;
+  /** The Cognos namespace TM1's users log on through. */
   camNamespace: CognosContainer.Namespace;
+  /** The Cognos test users who are TM1 administrators. */
   camAdmins: string[];
+  /** Where TM1 comes from, if given rather than discovered. */
   tm1Source?: Tm1Source;
+  /** Where TM1 Web comes from, if given rather than discovered. */
   tm1WebSource?: Tm1WebSource;
+  /** Where PAW comes from, if given rather than discovered. */
   pawSource?: PawSource;
+  /** Where Cognos comes from, if given rather than discovered. */
   cognosSource?: CognosSource;
+  /** The network the containers share, if given rather than made. */
   network?: Network;
 }
 
 const SERVER_NAME = /^[A-Za-z0-9_-]+$/;
 const none = (): void => {};
 
+/** The types nested in {@link PlanningAnalyticsEnvironment}, as in Java. */
 export namespace PlanningAnalyticsEnvironment {
   /** Builds a {@link PlanningAnalyticsEnvironment}, as Java's `PlanningAnalyticsEnvironment.Builder`. */
   export class Builder {

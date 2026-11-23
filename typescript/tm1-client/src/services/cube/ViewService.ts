@@ -38,6 +38,8 @@ const VIEWS = ["Navigation Cube/Views", "Navigation Cube/PrivateViews"] as const
  * ```
  */
 export class ViewService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     list: VIEWS,
     get: VIEWS,

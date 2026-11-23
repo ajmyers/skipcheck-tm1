@@ -31,6 +31,7 @@ export abstract class Tm1WebSource {
   /** A short description for logs and messages. Never includes a URL's query string. */
   abstract describe(): string;
 
+  /** The description ({@link describe}), for logs. */
   toString(): string {
     return this.describe();
   }
@@ -70,6 +71,7 @@ export abstract class Tm1WebSource {
   }
 }
 
+/** The types nested in {@link Tm1WebSource}, as in Java. */
 export namespace Tm1WebSource {
   /** An image built on `tm1-web` with TM1 Web inside, from a **private** registry. It contains IBM
    * software, so it must never be pushed anywhere public. */

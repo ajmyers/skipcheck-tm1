@@ -31,6 +31,8 @@ const CHORES = ODataPath.of("Chores");
  * ```
  */
 export class ChoreService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     list: ["EntitySet Chores"],
     get: ["EntitySet Chores"],

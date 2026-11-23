@@ -27,6 +27,8 @@ const LOGGERS = ODataPath.of("Loggers");
  * ```
  */
 export class ServerService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     server: ["Singleton Server"],
     staticConfiguration: ["Singleton StaticConfiguration"],

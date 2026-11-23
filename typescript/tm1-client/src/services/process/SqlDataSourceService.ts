@@ -17,6 +17,8 @@ const SOURCES = ODataPath.of("SQLDataSources");
  * ```
  */
 export class SqlDataSourceService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     list: ["EntitySet SQLDataSources"],
     get: ["EntitySet SQLDataSources"],

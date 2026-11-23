@@ -3,6 +3,7 @@
  * sent until it's iterated, except in a batch, where the request joins the batch at once; each
  * iteration sends it again. */
 export class Tm1Stream<T> implements AsyncIterable<T> {
+  /** A stream that gets a new iterator from `source` each time it's iterated. */
   constructor(private readonly source: () => AsyncIterator<T>) {}
 
   /** A stream of items already at hand. */
@@ -17,6 +18,7 @@ export class Tm1Stream<T> implements AsyncIterable<T> {
     return new Tm1Stream(() => generator()[Symbol.asyncIterator]());
   }
 
+  /** Starts the stream: what `for await` calls. */
   [Symbol.asyncIterator](): AsyncIterator<T> {
     return this.source();
   }
@@ -34,6 +36,7 @@ export class Tm1Stream<T> implements AsyncIterable<T> {
     return undefined;
   }
 
+  /** A stream of each item passed through `fn`. */
   map<U>(fn: (item: T) => U): Tm1Stream<U> {
     const self = this;
     return Tm1Stream.from(async function* () {
@@ -41,6 +44,7 @@ export class Tm1Stream<T> implements AsyncIterable<T> {
     });
   }
 
+  /** A stream of the items `predicate` accepts. */
   filter(predicate: (item: T) => boolean): Tm1Stream<T> {
     const self = this;
     return Tm1Stream.from(async function* () {

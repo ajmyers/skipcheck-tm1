@@ -42,6 +42,8 @@ export type ContentSource = Uint8Array | ArrayBuffer | Blob | ReadableStream<Uin
  * ```
  */
 export class ContentService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     roots: ["EntitySet Contents"],
     get: ["EntitySet Contents"],

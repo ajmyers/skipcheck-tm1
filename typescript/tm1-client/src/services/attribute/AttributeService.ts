@@ -32,6 +32,8 @@ const SETS = [
  * ```
  */
 export class AttributeService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     list: SETS,
     get: SETS,

@@ -1,5 +1,6 @@
 /** Something that writes itself as an OData literal. */
 export interface ODataLiteral {
+  /** The literal, exactly as it should appear before percent-encoding. */
   odataLiteral(): string;
 }
 

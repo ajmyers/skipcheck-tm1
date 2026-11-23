@@ -10,7 +10,11 @@ import { schema } from "./generated/schema.js";
 
 /** @internal The shape of the generated schema.ts. */
 export interface Tm1Schema {
+  /** The enums, by name: their qualified name, their members, and the member an unknown value reads
+   * as. */
   enums: Record<string, { qualifiedName: string; members: string[]; fallback: string }>;
+  /** The entity and complex types, by name: their qualified name, base type, `@odata.type` and
+   * subtypes, and each property's type. */
   types: Record<
     string,
     {

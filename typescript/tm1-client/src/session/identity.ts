@@ -86,10 +86,13 @@ export class Tm1Identity {
     }
   }
 
+  /** Whether `other` is the same identity: the same kind and name. Credentials don't count, so a
+   * pool finds a user's session whatever passport they come with. */
   equals(other: unknown): boolean {
     return this === other || (other instanceof Tm1Identity && other.key() === this.key());
   }
 
+  /** The identity, for logs: its kind and name, never credentials. */
   toString(): string {
     switch (this.kindValue) {
       case "ServiceAccount":
@@ -102,11 +105,13 @@ export class Tm1Identity {
   }
 }
 
+/** The kinds of {@link Tm1Identity}, nested as in Java. */
 export namespace Tm1Identity {
   /** The kinds of identity: the pool's own credentials, those credentials impersonating a user,
    * or a user's own credentials. */
   export type Kind = "ServiceAccount" | "Impersonating" | "OwnCredentials";
 
+  /** The kinds of identity, as values: `Tm1Identity.Kind.Impersonating`. */
   // The value beside the type of the same name: used by callers, not in this file
   // eslint-disable-next-line no-useless-assignment
   export const Kind = {

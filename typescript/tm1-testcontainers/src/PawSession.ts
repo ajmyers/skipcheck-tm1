@@ -3,7 +3,9 @@ const NAME = /"Name"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
 
 /** An HTTP answer: its status and body. */
 export interface PawResponse {
+  /** The HTTP status. */
   status: number;
+  /** The body, as text. */
   body: string;
 }
 
@@ -15,6 +17,7 @@ export class PawSession {
   readonly #url: string;
   readonly #cookies = new Map<string, string>();
 
+  /** A session on the PAW at `url`, not yet logged on. */
   constructor(url: string) {
     this.#url = url;
   }

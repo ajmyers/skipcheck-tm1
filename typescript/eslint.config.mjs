@@ -2,6 +2,7 @@
 // Prone. Layout is Prettier's (.prettierrc.json), so no rule here is about layout. `npm test` runs
 // both checks first, as `./gradlew build` runs checkFormat.
 import js from "@eslint/js";
+import jsdoc from "eslint-plugin-jsdoc";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
@@ -19,6 +20,41 @@ export default tseslint.config(
       "@typescript-eslint/no-empty-object-type": ["error", { allowInterfaces: "with-single-extends" }],
       // "_" names a value that has to be bound but isn't used
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
+    },
+  },
+  {
+    // The public API is documented, as the Java build fails on a public class, method or
+    // constructor without Javadoc. Presence only: how a comment is written is the writer's.
+    files: ["tm1-client/src/**", "tm1-testcontainers/src/**"],
+    plugins: { jsdoc },
+    rules: {
+      "jsdoc/require-jsdoc": [
+        "error",
+        {
+          publicOnly: true,
+          enableFixer: false,
+          checkConstructors: true,
+          checkGetters: true,
+          checkSetters: true,
+          require: { ClassDeclaration: true, FunctionDeclaration: true, MethodDefinition: false },
+          contexts: [
+            // Every member of an exported class but the private ones. An overloaded method is
+            // documented on its signatures, which is what a caller sees, not on the implementation
+            // that follows them
+            'MethodDefinition:not([accessibility="private"]):not([key.type="PrivateIdentifier"]):not(MethodDefinition[value.type="TSEmptyBodyFunctionExpression"] + MethodDefinition) > FunctionExpression',
+            'MethodDefinition:not([accessibility="private"]) > TSEmptyBodyFunctionExpression',
+            'PropertyDefinition:not([accessibility="private"]):not([key.type="PrivateIdentifier"])',
+            'TSAbstractMethodDefinition:not([accessibility="private"]) > TSEmptyBodyFunctionExpression',
+            "TSInterfaceDeclaration",
+            "TSTypeAliasDeclaration",
+            "TSEnumDeclaration",
+            "TSModuleDeclaration",
+            "TSMethodSignature",
+            "TSPropertySignature",
+            "ExportNamedDeclaration > VariableDeclaration",
+          ],
+        },
+      ],
     },
   },
   {

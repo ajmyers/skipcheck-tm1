@@ -5,12 +5,15 @@ import type { Tm1Session, Tm1SessionBuilder } from "./session.js";
 /** The pool's clock and timers, in milliseconds (Java's Reactor `Scheduler`): {@link Tm1Clock.system}
  * by default; tests pass one they move by hand. */
 export interface Tm1Clock {
+  /** The time now, in milliseconds. */
   now(): number;
   /** Runs `callback` after `ms`; the handle cancels it. */
   setTimeout(callback: () => void, ms: number): unknown;
+  /** Cancels a timer {@link setTimeout} started. */
   clearTimeout(handle: unknown): void;
 }
 
+/** The clocks at hand: {@link Tm1Clock.system}. */
 export const Tm1Clock = {
   /** The real clock. Its timers don't keep a Node process alive (as Java's daemon threads don't). */
   system: {
@@ -183,10 +186,12 @@ export class Tm1SessionPool implements AsyncDisposable {
     return this.closeAll;
   }
 
+  /** Closes the pool, for `await using`: the same as {@link close}. */
   [Symbol.asyncDispose](): Promise<void> {
     return this.close();
   }
 
+  /** The pool, its service root and how many sessions it holds, for logs. */
   toString(): string {
     return `Tm1SessionPool[${this.serviceRoot()}, ${this.entries.size} sessions]`;
   }
@@ -249,6 +254,7 @@ export class Tm1SessionPool implements AsyncDisposable {
   }
 }
 
+/** The types nested in {@link Tm1SessionPool}, as in Java: its statistics and its builder. */
 export namespace Tm1SessionPool {
   /** What a pool holds and has done (Java's `Tm1SessionPool.Stats`). */
   export interface Stats {

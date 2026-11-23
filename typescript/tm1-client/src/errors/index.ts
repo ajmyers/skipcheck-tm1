@@ -37,6 +37,8 @@ export type Tm1ErrorKind =
   /** None of the above. */
   | "Other";
 
+/** What a TM1 error means, as values: `Tm1ErrorKind.NotFound`. More specific than the HTTP status,
+ * since TM1 reports many different failures with the same status and code. */
 export const Tm1ErrorKind = {
   NotFound: "NotFound",
   AlreadyExists: "AlreadyExists",
@@ -72,10 +74,17 @@ export class ODataError {
   readonly code: string;
   /** TM1's message, or empty. */
   readonly message: string;
+  /** What the error applies to, or undefined. */
   readonly target: string | undefined;
+  /** Further errors, or empty. */
   readonly details: readonly ODataError[];
+  /** Server-specific details as TM1 sent them, or undefined. */
   readonly innerError: unknown;
 
+  /** An OData error response body: `{"error":{"code":"278","message":"..."}}`. TM1 uses code `278`
+   * for most errors (not found, bad request, precondition failed and not implemented alike), so
+   * the code alone rarely identifies an error: see {@link Tm1ErrorClassifier}. A null code or
+   * message reads as empty. */
   constructor(code: string | null | undefined, message: string | null | undefined, target?: string, details?: readonly ODataError[], innerError?: unknown) {
     this.code = code ?? "";
     this.message = message ?? "";
@@ -125,6 +134,7 @@ export class ODataError {
     return ODataError.fromText(s);
   }
 
+  /** Whether `other` is the same error: code, message, target, details and inner error alike. */
   equals(other: unknown): boolean {
     return (
       other instanceof ODataError &&
@@ -137,6 +147,7 @@ export class ODataError {
     );
   }
 
+  /** The error's code and message, for logs. */
   toString(): string {
     return `ODataError[code=${this.code}, message=${this.message}]`;
   }
@@ -265,6 +276,10 @@ export class Tm1ServerException extends Tm1ApiException {}
  * handshake, connect timeout), so it didn't apply; or the response didn't arrive whole (`Response`:
  * a timeout, a dropped connection), so it may have. */
 export class Tm1TransportException extends Tm1Exception {
+  /** An exception for a request that got no complete response. @param phase how far the request got
+   * @param idempotent whether the request is safe to repeat (GET, PUT, DELETE), which makes a
+   * response-phase failure retryable @param method the request's HTTP method @param url the
+   * request's URL, without credentials @param cause the underlying failure, if any */
   constructor(
     /** Where the request failed (Java's `phase()`). */
     readonly phase: "Connect" | "Response",
@@ -288,6 +303,7 @@ export class Tm1TransportException extends Tm1Exception {
     return this.phase === "Connect" || this.idempotent;
   }
 
+  /** False only if the request was never sent. */
   mayHaveApplied(): boolean {
     return this.phase === "Response";
   }
@@ -296,17 +312,24 @@ export class Tm1TransportException extends Tm1Exception {
 /** TM1 answered with something this client can't read: not JSON, a login without a cookie, an async
  * result that isn't an HTTP message. The request may have applied. */
 export class Tm1ProtocolException extends Tm1Exception {
+  /** The error TM1 reported in the response, if it reported one. */
   readonly error: ODataError | undefined;
 
+  /** An exception for a response that couldn't be read. @param message what was wrong with the
+   * response; the method and URL are appended @param error the error TM1 reported in the response,
+   * if any @param method the request's HTTP method, if known @param url the request's URL, without
+   * credentials, if known @param cause the underlying failure, such as a parse error */
   constructor(message: string, error?: ODataError, method?: string, url?: string, cause?: unknown) {
     super(message + describe(method, url), method, url, cause);
     this.error = error;
   }
 
+  /** False: the same request would get the same answer. */
   isRetryable(): boolean {
     return false;
   }
 
+  /** True: the server got the request and started answering. */
   mayHaveApplied(): boolean {
     return true;
   }
@@ -315,6 +338,8 @@ export class Tm1ProtocolException extends Tm1Exception {
 /** A request this client refuses to send because the server's `$metadata` lacks what it needs (a
  * function, an entity set, a property) or its version is too old; nothing was sent. */
 export class Tm1UnsupportedOperationException extends Tm1Exception {
+  /** Creates the exception. @param message the full message @param missing what's missing, such as
+   * `Cube.Reserve` */
   constructor(
     message: string,
     /** What's missing, such as `Cube.Reserve`. */
@@ -323,10 +348,12 @@ export class Tm1UnsupportedOperationException extends Tm1Exception {
     super(message, undefined, undefined);
   }
 
+  /** False: the server won't gain the operation by trying again. */
   isRetryable(): boolean {
     return false;
   }
 
+  /** False: nothing was sent. */
   mayHaveApplied(): boolean {
     return false;
   }
@@ -334,6 +361,7 @@ export class Tm1UnsupportedOperationException extends Tm1Exception {
 
 /** Using a session, or a pool, after it was closed. */
 export class Tm1SessionClosedException extends Error {
+  /** An exception for a closed session or pool at `serviceRoot`. */
   constructor(readonly serviceRoot: string) {
     super(`The TM1 session at ${serviceRoot} is closed`);
     this.name = "Tm1SessionClosedException";
@@ -364,6 +392,7 @@ export class Tm1ErrorClassifier {
 
   private constructor(private readonly rules: readonly Tm1ErrorClassifier.Rule[]) {}
 
+  /** The rules this client knows about. */
   static defaults(): Tm1ErrorClassifier {
     return (Tm1ErrorClassifier.defaultRules ??= Tm1ErrorClassifier.makeDefaults());
   }
@@ -373,6 +402,8 @@ export class Tm1ErrorClassifier {
     return new Tm1ErrorClassifier([rule, ...this.rules]);
   }
 
+  /** Classifies an error response; `error` may be undefined if the body wasn't an OData error. The
+   * first matching rule's kind, or else the kind for the status (`Other` if it has none). */
   classify(status: number, error: ODataError | undefined): Tm1ErrorKind {
     for (const rule of this.rules) if (rule.matches(status, error)) return rule.kind;
     switch (status) {
@@ -395,6 +426,7 @@ export class Tm1ErrorClassifier {
   }
 }
 
+/** The rule type and builder of {@link Tm1ErrorClassifier}, nested as in Java. */
 export namespace Tm1ErrorClassifier {
   /** A rule: the status, code and message to match (any undefined matches anything; at least one is
    * needed), and the kind it means. */

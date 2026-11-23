@@ -75,22 +75,26 @@ export const RequiresPaw = {
 
 /** What a `requiresTm1` test gets: the shared TM1 server, started on first use. */
 export interface Tm1Fixtures {
+  /** The shared TM1 server, started on first use. */
   tm1: Tm1ServerContainer;
 }
 
 /** What a `requiresCognos` test gets: the discovered Cognos source (Cognos tests start their own
  * Cognos, with their own users), and the shared TM1 server. */
 export interface CognosFixtures extends Tm1Fixtures {
+  /** Where Cognos comes from, as discovered. */
   cognosSource: CognosSource;
 }
 
 /** What a `requiresTm1Web` test gets: the shared TM1 Web, and the shared TM1 server it lists. */
 export interface Tm1WebFixtures extends Tm1Fixtures {
+  /** The shared TM1 Web, started on first use. */
   tm1Web: Tm1WebContainer;
 }
 
 /** What a `requiresPaw` test gets: the shared PAW, and the shared TM1 server it logs on to. */
 export interface PawFixtures extends Tm1Fixtures {
+  /** The shared PAW, started on first use. */
   paw: PawContainer;
 }
 

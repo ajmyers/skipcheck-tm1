@@ -57,6 +57,7 @@ export class AttributeSet {
     return this.#path;
   }
 
+  /** The set's collection, for logs. */
   toString(): string {
     return this.#path.toString();
   }

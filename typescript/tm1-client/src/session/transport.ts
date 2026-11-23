@@ -1,9 +1,12 @@
 /** A request as the session sends it. */
 export interface Tm1HttpRequest {
+  /** The HTTP method. */
   readonly method: string;
+  /** The whole URL, already encoded. */
   readonly url: string;
   /** Header names as given; `Cookie` carries `TM1SessionId` unless the transport keeps cookies. */
   readonly headers: Readonly<Record<string, string>>;
+  /** The body, or undefined for none. */
   readonly body: Uint8Array | undefined;
   /** Aborted at the request's timeout or when the caller cancels. */
   readonly signal: AbortSignal;
@@ -16,20 +19,26 @@ export interface Tm1HttpRequest {
 
 /** An answer: a status, headers (lower-case names; `set-cookie` values joined by newlines) and a body. */
 export interface Tm1HttpResponse {
+  /** The HTTP status. */
   readonly status: number;
+  /** The headers, by lower-case name. */
   readonly headers: Readonly<Record<string, string>>;
+  /** The whole body; empty for none. */
   readonly body: Uint8Array;
 }
 
 /** What sends a session's requests (Java's `WebClient`, .NET's `HttpMessageHandler`). A failure to
  * get any response is thrown; an error status is an answer. */
 export interface Tm1Transport {
+  /** Sends a request and resolves with TM1's answer, whatever its status. A header value's
+   * characters go out as one byte each, as `fetch` sends them. */
   send(request: Tm1HttpRequest): Promise<Tm1HttpResponse>;
   /** True when the transport keeps cookies itself, as a browser does (`credentials: "include"`):
    * the session then never sends `Cookie` nor needs to read `Set-Cookie`. */
   readonly keepsCookies?: boolean;
 }
 
+/** Options for {@link fetchTransport}. */
 export interface FetchTransportOptions {
   /** The `fetch` to send with; the global one by default. */
   fetch?: typeof globalThis.fetch;

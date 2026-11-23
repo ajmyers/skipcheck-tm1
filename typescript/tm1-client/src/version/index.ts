@@ -8,6 +8,8 @@ export class Tm1Version {
     private readonly parts: readonly number[],
   ) {}
 
+  /** Parses a version such as `11.8.03500.6`. Surrounding whitespace is ignored. @throws RangeError
+   * if the text isn't dot-separated numbers */
   static parse(text: string): Tm1Version {
     const trimmed = String(text).trim();
     if (!/^\d+(\.\d+)*$/.test(trimmed)) {
@@ -21,14 +23,18 @@ export class Tm1Version {
     return new Tm1Version(trimmed, parts);
   }
 
+  /** True if this version is the same as or newer than `other`. */
   isAtLeast(other: Tm1Version | string): boolean {
     return this.compareTo(other) >= 0;
   }
 
+  /** True if this version is older than `other`. */
   isBefore(other: Tm1Version | string): boolean {
     return this.compareTo(other) < 0;
   }
 
+  /** Negative, zero or positive as this version is older than, the same as or newer than `other`,
+   * comparing number by number. */
   compareTo(other: Tm1Version | string): number {
     const o = typeof other === "string" ? Tm1Version.parse(other) : other;
     const length = Math.max(this.parts.length, o.parts.length);
@@ -40,15 +46,19 @@ export class Tm1Version {
     return 0;
   }
 
+  /** Whether `other` is the same version, number by number: `11.8.03500.6` equals `11.8.3500.6`. */
   equals(other: unknown): boolean {
     return other instanceof Tm1Version && this.compareTo(other) === 0;
   }
 
+  /** The version exactly as parsed, such as `11.8.03500.6`. */
   toString(): string {
     return this.text;
   }
 }
 
+/** What a {@link Tm1Capability} names: an entity set, a singleton, a bound or unbound operation, or
+ * a property. */
 export type Tm1CapabilityKind = "EntitySet" | "Singleton" | "BoundOperation" | "UnboundOperation" | "Property";
 
 function simple(qualified: string): string {
@@ -57,6 +67,9 @@ function simple(qualified: string): string {
 
 /** Something a request needs the server's `$metadata` to define, as the Java client's `Tm1Capability`. */
 export class Tm1Capability {
+  /** Something a request needs the server to define in its `$metadata`; made by the static methods.
+   * Names are qualified by namespace or alias (`tm1.Cube` or `ibm.tm1.api.v1.Cube`), as in
+   * `$metadata`. */
   constructor(
     readonly kind: Tm1CapabilityKind,
     readonly type: string | null,
@@ -66,34 +79,47 @@ export class Tm1Capability {
     if ((kind === "BoundOperation" || kind === "Property") && type === null) throw new TypeError(kind + " needs the type it belongs to");
   }
 
+  /** An entity set, such as `GitPlans`. */
   static entitySet(name: string): Tm1Capability {
     return new Tm1Capability("EntitySet", null, name);
   }
 
+  /** A singleton, such as `ActiveSession`. */
   static singleton(name: string): Tm1Capability {
     return new Tm1Capability("Singleton", null, name);
   }
 
+  /** An action or function bound to a type, or to one of its base types. @param bindingType the
+   * qualified type, such as `tm1.Cube` @param operation the qualified operation name, such as
+   * `tm1.Reserve` */
   static boundOperation(bindingType: string, operation: string): Tm1Capability {
     return new Tm1Capability("BoundOperation", bindingType, operation);
   }
 
+  /** An action or function import, invoked from the service root, such as `ExecuteMDX`. */
   static unboundOperation(name: string): Tm1Capability {
     return new Tm1Capability("UnboundOperation", null, name);
   }
 
+  /** A structural or navigation property of a type, or of one of its base types. @param type the
+   * qualified type, such as `tm1.Cube` @param property the property's name, such as `Rules` */
   static property(type: string, property: string): Tm1Capability {
     return new Tm1Capability("Property", type, property);
   }
 
+  /** A copy recording the schema version that added it: the version from `Core.Revisions`, such as
+   * `11.8.34`. */
   since(schemaVersion: string): Tm1Capability {
     return new Tm1Capability(this.kind, this.type, this.name, schemaVersion);
   }
 
+  /** The schema version that added it, or undefined if not known. */
   addedInVersion(): string | undefined {
     return this.addedIn ?? undefined;
   }
 
+  /** How it reads in messages, with aliases and namespaces dropped: `Cube.Reserve`, `entity set
+   * GitPlans`. */
   describe(): string {
     switch (this.kind) {
       case "EntitySet":
@@ -107,6 +133,7 @@ export class Tm1Capability {
     }
   }
 
+  /** The capability, as {@link describe} reads, for logs. */
   toString(): string {
     return `Tm1Capability[${this.describe()}]`;
   }
@@ -278,6 +305,7 @@ export class Tm1Capabilities {
     return new Tm1Capabilities(version, productVersion, endpoints, types, bound, sets, singletons, imports, aliases);
   }
 
+  /** A copy that knows the server's product version, for the message of a refusal. */
   withProductVersion(productVersion: Tm1Version | undefined): Tm1Capabilities {
     return new Tm1Capabilities(
       this.schemaVersion,
@@ -292,6 +320,7 @@ export class Tm1Capabilities {
     );
   }
 
+  /** Whether the server's `$metadata` defines `capability`. */
   supports(capability: Tm1Capability): boolean {
     switch (capability.kind) {
       case "EntitySet":
@@ -319,6 +348,7 @@ export class Tm1Capabilities {
     return new Tm1UnsupportedOperationException(message, missing);
   }
 
+  /** How much the server defines, for logs. */
   toString(): string {
     return `Tm1Capabilities[schema ${this.schemaVersion ?? "unknown"}, product ${this.productVersion?.toString() ?? "unknown"}]`;
   }
@@ -344,6 +374,7 @@ export class Tm1Capabilities {
 /** How a server's address becomes its REST API's service root, as the Java client's `Tm1Dialect`:
  * {@link Tm1Dialect.V11} turns `http://tm1:8010` into `http://tm1:8010/api/v1/`. */
 export abstract class Tm1Dialect {
+  /** TM1 11 on-premises: the REST API is at `http(s)://host:port/api/v1/`. */
   static readonly V11: Tm1Dialect = new (class extends Tm1Dialect {
     name(): string {
       return "TM1 11";
@@ -369,6 +400,7 @@ export abstract class Tm1Dialect {
 
   abstract serviceRoot(address: string): string;
 
+  /** The dialect's name. */
   toString(): string {
     return `Tm1Dialect[${this.name()}]`;
   }

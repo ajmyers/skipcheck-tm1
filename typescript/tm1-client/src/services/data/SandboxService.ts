@@ -24,6 +24,8 @@ const SANDBOXES = ODataPath.of("Sandboxes");
  * ```
  */
 export class SandboxService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     list: ["EntitySet Sandboxes"],
     get: ["EntitySet Sandboxes"],
@@ -81,6 +83,9 @@ export class SandboxService extends Tm1Service {
    * cells changed in base data since, whether to wait for a lock rather than fail
    * (`allowQueueing`), and whether to empty the sandbox once published (`cleanAfter`). */
   publish(name: string, options?: Tm1CallOptions): Promise<void>;
+  /** `tm1.Publish`, saying what to do with cells changed in base data since (`conflicts`), whether
+   * to wait for a lock rather than fail (`allowQueueing`), and whether to empty the sandbox once
+   * published (`cleanAfter`). */
   publish(name: string, conflicts: ConflictResolution, allowQueueing: boolean, cleanAfter: boolean, options?: Tm1CallOptions): Promise<void>;
   publish(
     name: string,
@@ -97,6 +102,9 @@ export class SandboxService extends Tm1Service {
    * do with cells the target changed too, whether to wait for a lock rather than fail
    * (`allowQueueing`), and whether to empty this sandbox once merged (`cleanAfter`). */
   merge(name: string, target: string, options?: Tm1CallOptions): Promise<void>;
+  /** `tm1.Merge`, saying what to do with cells the target changed too (`conflicts`), whether to
+   * wait for a lock rather than fail (`allowQueueing`), and whether to empty this sandbox once
+   * merged (`cleanAfter`). */
   merge(name: string, target: string, conflicts: ConflictResolution, allowQueueing: boolean, cleanAfter: boolean, options?: Tm1CallOptions): Promise<void>;
   merge(
     name: string,

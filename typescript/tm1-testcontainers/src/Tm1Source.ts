@@ -36,6 +36,7 @@ export abstract class Tm1Source {
   /** A short description for logs and messages. Never includes a URL's query string. */
   abstract describe(): string;
 
+  /** The description ({@link describe}), for logs. */
   toString(): string {
     return this.describe();
   }
@@ -66,6 +67,7 @@ export abstract class Tm1Source {
   }
 }
 
+/** The types nested in {@link Tm1Source}, as in Java. */
 export namespace Tm1Source {
   /** An image built on `tm1-server` with TM1 inside, from a **private** registry. It contains IBM
    * software, so it must never be pushed anywhere public. */

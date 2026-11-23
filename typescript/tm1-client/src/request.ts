@@ -6,6 +6,7 @@ import type { Tm1Capability } from "./version/index.js";
  * streamed item by item, text, bytes, or nothing. */
 export type Tm1Response = "Single" | "Collection" | "Text" | "Bytes" | "None";
 
+/** How a request's answer is read, as values: `Tm1Response.Collection`. */
 export const Tm1Response = {
   Single: "Single",
   Collection: "Collection",
@@ -30,11 +31,17 @@ interface Parts<T> {
  * and what callers can send for anything without a service, as the Java client's `Tm1Request`.
  * Immutable: each `with…` returns a new request. */
 export class Tm1Request<T> {
+  /** The HTTP method. */
   readonly method: string;
+  /** The resource path, relative to the service root. */
   readonly path: ODataPath;
+  /** The query options, possibly {@link ODataQuery.none}. */
   readonly query: ODataQuery;
+  /** The headers this request adds, in the order they were added. */
   readonly headers: Readonly<Record<string, string>>;
+  /** The body, serialized as JSON when sent, or null for none. */
   readonly body: unknown;
+  /** How the response body is read. */
   readonly response: Tm1Response;
   /** What reads the answer (Java's `Class<T>`); undefined reads JSON as is. */
   readonly type: Tm1Model<T> | undefined;
@@ -76,14 +83,17 @@ export class Tm1Request<T> {
     });
   }
 
+  /** `GET` of one entity or value, read as `type`. */
   static get<T = unknown>(path: ODataPath, query?: ODataQuery | null, type?: Tm1Model<T>): Tm1Request<T> {
     return Tm1Request.make("GET", path, query, undefined, "Single", type);
   }
 
+  /** `GET` of a collection, read item by item as `itemType`. */
   static list<T = unknown>(path: ODataPath, query?: ODataQuery | null, itemType?: Tm1Model<T>): Tm1Request<T> {
     return Tm1Request.make("GET", path, query, undefined, "Collection", itemType);
   }
 
+  /** `GET` of raw bytes, such as a document's `Content`. */
   static bytes(path: ODataPath): Tm1Request<Uint8Array> {
     return Tm1Request.make<Uint8Array>("GET", path, undefined, undefined, "Bytes");
   }
@@ -94,10 +104,13 @@ export class Tm1Request<T> {
     return Tm1Request.make<void>("PUT", path, undefined, content, "None").withHeader("Content-Type", contentType);
   }
 
+  /** `GET` of plain text, such as `Configuration/ProductVersion/$value`. */
   static text(path: ODataPath): Tm1Request<string> {
     return Tm1Request.make<string>("GET", path, undefined, undefined, "Text");
   }
 
+  /** `POST` whose response is a collection, read item by item as `itemType`: an action returning
+   * `Collection(...)`, such as `tm1.CheckRules`. The body is the parameters, written as JSON. */
   static postList<T = unknown>(path: ODataPath, body: unknown, itemType?: Tm1Model<T>): Tm1Request<T> {
     if (body === undefined || body === null) throw new TypeError("body is required");
     return Tm1Request.make("POST", path, undefined, body, "Collection", itemType);
@@ -108,11 +121,13 @@ export class Tm1Request<T> {
     return Tm1Request.make("POST", path, undefined, body ?? {}, type ? "Single" : "None", type);
   }
 
+  /** `PATCH`: change the properties in `body`, leaving the rest as they are. */
   static patch(path: ODataPath, body: unknown): Tm1Request<void> {
     if (body === undefined || body === null) throw new TypeError("body is required");
     return Tm1Request.make<void>("PATCH", path, undefined, body, "None");
   }
 
+  /** `DELETE` of the entity at `path`. */
   static delete(path: ODataPath): Tm1Request<void> {
     return Tm1Request.make<void>("DELETE", path, undefined, undefined, "None");
   }
@@ -137,10 +152,12 @@ export class Tm1Request<T> {
     });
   }
 
+  /** A copy with these query options instead. */
   withQuery(query: ODataQuery | null | undefined): Tm1Request<T> {
     return this.copy({ query: query ?? ODataQuery.none() });
   }
 
+  /** A copy with a header added or replaced, such as `If-Match`. */
   withHeader(name: string, value: string): Tm1Request<T> {
     if (typeof name !== "string" || typeof value !== "string") throw new TypeError("a header is a name and a value");
     return this.copy({ headers: { ...this.headers, [name]: value } });
@@ -163,6 +180,7 @@ export class Tm1Request<T> {
     return this.requirementValue;
   }
 
+  /** A copy sent with `If-Match: etag`, failing with 412 if the entity has changed since. */
   ifMatch(etag: string): Tm1Request<T> {
     return this.withHeader("If-Match", etag);
   }
@@ -191,6 +209,7 @@ export class Tm1Request<T> {
     }
   }
 
+  /** `METHOD relative-uri`, unencoded, for logs. */
   toString(): string {
     return `${this.method} ${this.relativeUri()}`;
   }

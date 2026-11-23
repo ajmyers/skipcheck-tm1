@@ -16,9 +16,13 @@ import type { Tm1HttpResponse, Tm1Transport } from "./transport.js";
 /** @internal An answer, with its text. */
 export interface Reply extends Tm1HttpResponse {}
 
+/** @internal The cookie TM1 names a session by. */
 export const COOKIE = "TM1SessionId";
+/** @internal The header naming the user to act as, read at login only. */
 export const IMPERSONATE = "TM1-Impersonate";
+/** @internal The header labelling the session. */
 export const SESSION_CONTEXT = "TM1-SessionContext";
+/** @internal What every request accepts. */
 export const JSON_ACCEPT = "application/json";
 const LOGIN_PATH = "ActiveSession?$select=ID";
 const CLOSE_PATH = "ActiveSession/tm1.Close";
@@ -27,6 +31,7 @@ const utf8 = new TextEncoder();
 // sends such bytes in the transaction log, for a password's hash.
 const decoder = new TextDecoder();
 
+/** @internal A body as text, read as UTF-8. */
 export function textOf(body: Uint8Array): string {
   return decoder.decode(body).replace(/^\uFEFF/, "");
 }
@@ -74,6 +79,8 @@ class Attempt {
 export class CapabilitiesCache {
   private readonly byServer = new Map<string, Promise<Tm1Capabilities>>();
 
+  /** The capabilities of the server at `serviceRoot` on `version`: read with `fetch` the first
+   * time, then kept. */
   get(serviceRoot: string, version: Tm1Version, fetch: () => Promise<Tm1Capabilities>): Promise<Tm1Capabilities> {
     const key = serviceRoot + " " + version.toString();
     let entry = this.byServer.get(key);
@@ -100,12 +107,14 @@ function abortError(signal: AbortSignal): unknown {
  * {@link Tm1Timeouts.refusedLogin}, so requests meanwhile fail at once rather than pile up sessions
  * on TM1. */
 export class Connection {
+  /** The service root, ending in `/`. */
   readonly root: string;
   private attempt: Attempt | undefined;
   private version: { read: Promise<Tm1Version>; for: Attempt } | undefined;
   private closed = false;
   private closing: Promise<void> | undefined;
 
+  /** @internal A connection to the service root `root`, logging in with `authenticator`. */
   constructor(
     root: string,
     readonly authenticator: Tm1Authenticator,
@@ -121,6 +130,7 @@ export class Connection {
     this.root = root.endsWith("/") ? root : root + "/";
   }
 
+  /** Whether the session was closed. */
   get isClosed(): boolean {
     return this.closed;
   }
@@ -133,6 +143,7 @@ export class Connection {
     return this.root + relative;
   }
 
+  /** The ID of the session on TM1, logging in first if needed. */
   async loginId(signal?: AbortSignal): Promise<number> {
     return (await this.wait(this.current().login, signal)).id;
   }
@@ -344,6 +355,7 @@ export class Connection {
     );
   }
 
+  /** The reply, or the exception for its error status. */
   check(method: string, url: string, reply: Reply): Reply {
     if (reply.status >= 400) throw Tm1ApiException.fromBody(reply.status, reply.body, method, url, this.classifier);
     return reply;

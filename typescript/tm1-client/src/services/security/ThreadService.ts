@@ -26,6 +26,8 @@ const THREADS = ODataPath.of("Threads");
  * with that class's `session` property, so it keeps its session to itself.
  */
 export class ThreadService {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     list: ["EntitySet Threads"],
     get: ["EntitySet Threads"],
@@ -35,6 +37,7 @@ export class ThreadService {
 
   readonly #session: Tm1Session;
 
+  /** A service sending its requests through `session`. */
   constructor(session: Tm1Session) {
     if (!session) throw new TypeError("session is required");
     this.#session = session;

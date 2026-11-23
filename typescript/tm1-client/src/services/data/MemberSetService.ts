@@ -32,6 +32,8 @@ const MEMBER_SETS = ODataPath.of("MemberSets");
  * ```
  */
 export class MemberSetService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     execute: ["ActionImport ExecuteMDXSetExpression"],
     list: ["EntitySet MemberSets"],

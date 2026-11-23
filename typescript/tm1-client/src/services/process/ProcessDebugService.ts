@@ -56,6 +56,8 @@ export type ProcessDebugWork<R> = AsyncIterable<R> | PromiseLike<R | void> | R |
  * ```
  */
 export class ProcessDebugService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     debug: ["Action Process/Debug"],
     debugging: ["Action Process/Debug", "EntitySet ProcessDebugContexts"],

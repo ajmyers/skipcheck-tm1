@@ -142,6 +142,9 @@ export class Tm1ServerContainer extends GenericContainer {
    * administrators, groups and this container's own login go through it; LDAP otherwise.
    * @throws IllegalArgumentException if no admin is given */
   withCamSecurity(cognos: CognosContainer, ...admins: string[]): this;
+  /** Runs TM1 in Cognos (CAM) security through `namespace`: TM1's administrators, groups and this
+   * container's own login go through it. {@link CognosContainer.Namespace.OIDC} needs {@link
+   * CognosContainer.withKeycloak}. @throws IllegalArgumentException if no admin is given */
   withCamSecurity(cognos: CognosContainer, namespace: CognosContainer.Namespace, ...admins: string[]): this;
   withCamSecurity(cognos: CognosContainer, ...rest: (string | CognosContainer.Namespace)[]): this {
     if (!(cognos instanceof CognosContainer)) throw new TypeError("cognos must be a CognosContainer");
@@ -253,6 +256,7 @@ export class Tm1ServerContainer extends GenericContainer {
     this.log(`TM1 ${version.toString()} is up at ${this.getRestUrl()} (${this.#source.describe()})`);
   }
 
+  /** Stops and removes the container, and forgets the version it read. */
   override async stop(): Promise<void> {
     this.#version = undefined;
     await super.stop();

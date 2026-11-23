@@ -186,6 +186,7 @@ export class CognosContainer extends GenericContainer {
   }
 }
 
+/** The types nested in {@link CognosContainer}, as in Java. */
 export namespace CognosContainer {
   /** A Cognos namespace TM1 can log users on through, as the Java enum. */
   export class Namespace {
@@ -231,6 +232,8 @@ export namespace CognosContainer {
 
   /** A test user in the LDAP namespace. */
   export class User {
+    /** A test user: the name they log on with, their password, and the Cognos groups they're in
+     * (copied). */
     readonly groups: readonly string[];
 
     constructor(

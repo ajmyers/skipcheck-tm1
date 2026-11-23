@@ -8,6 +8,8 @@ const NAVIGATION: Readonly<Record<SubsetScope, string>> = {
   Session: "SessionSubsets",
 };
 
+/** Who sees a subset, as values: `SubsetScope.Public`. {@link SubsetScope.navigation} names the
+ * hierarchy's collection that holds it. */
 export const SubsetScope = {
   /** Everyone: `Hierarchies('h')/Subsets`. */
   Public: "Public",

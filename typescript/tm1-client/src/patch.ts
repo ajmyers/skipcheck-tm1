@@ -23,10 +23,12 @@ export abstract class Tm1Patch {
     return out;
   }
 
+  /** Whether `other` is a patch of the same type that sets the same properties to the same values. */
   equals(other: unknown): boolean {
     return other instanceof Tm1Patch && other.constructor === this.constructor && JSON.stringify(other) === JSON.stringify(this);
   }
 
+  /** The patch's type and the JSON it sends, for logs. */
   toString(): string {
     return `${this.constructor.name}${JSON.stringify(this)}`;
   }

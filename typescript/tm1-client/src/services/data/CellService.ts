@@ -38,6 +38,8 @@ const UPDATE_CELLS = [
  * ```
  */
 export class CellService extends Tm1Service {
+  /** The endpoints each method implements, by method name, as coverage-gate IDs: the Java client's
+   * `@Tm1Endpoint`. */
   static readonly endpoints = {
     update: ["Action Cube/Update", "Navigation CellDescriptor/Tuple"],
     updateCells: UPDATE_CELLS,
@@ -57,6 +59,9 @@ export class CellService extends Tm1Service {
    * `Tuple` and a `Value` in every update (400 otherwise); on a leaf a `ReferenceCube` and
    * `ReferenceCell` didn't change what's written, and they don't copy that cell's value. */
   updateCells(cube: string, updates: readonly CubeUpdatePatch[], options?: Tm1CallOptions): Promise<void>;
+  /** `tm1.UpdateCells` with an order: `ByLevel` writes leaves before the consolidations above them,
+   * so a spread to a consolidation isn't overwritten. TM1 (11.8) requires a `Tuple` and a `Value`
+   * in every update (400 otherwise). */
   updateCells(cube: string, updates: readonly CubeUpdatePatch[], order: UpdateOrder, options?: Tm1CallOptions): Promise<void>;
   updateCells(cube: string, updates: readonly CubeUpdatePatch[], order?: UpdateOrder | Tm1CallOptions, options?: Tm1CallOptions): Promise<void> {
     const body: Record<string, unknown> = { Updates: [...required(updates, "updates")] };

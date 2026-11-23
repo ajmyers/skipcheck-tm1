@@ -18,6 +18,7 @@ export abstract class Tm1Authenticator {
   /** Who logs in, without secrets, for logs and errors. */
   abstract describe(): string;
 
+  /** The description only: never the credentials. */
   toString(): string {
     return `Tm1Authenticator[${this.describe()}]`;
   }
