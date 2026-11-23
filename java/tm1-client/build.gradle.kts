@@ -2,6 +2,9 @@
 
 plugins {
 	id("tm1.java-library")
+	// ExampleOutput (src/testFixtures), which records what the examples print, for this module's
+	// tests and the other modules'
+	`java-test-fixtures`
 }
 
 description = "Java client for the IBM Planning Analytics (TM1) REST API"
@@ -80,10 +83,20 @@ sourceSets.main {
 	java.srcDir(generateModel)
 }
 
+// The test fixtures are the tests' own: none of their variants (classes, sources) is published
+val javaComponent = components["java"] as AdhocComponentWithVariants
+afterEvaluate {
+	configurations.matching { it.name.startsWith("testFixtures") && it.name.endsWith("Elements") }.forEach { fixtures ->
+		javaComponent.withVariantsFromConfiguration(fixtures) { skip() }
+	}
+}
+
 // The language-neutral API spec, which ApiSpecInventoryTest holds to this client's coverage gate
 tasks.withType<Test>().configureEach {
 	val spec = rootDir.resolve("spec/tm1-api.json")
 	systemProperty("tm1.spec", spec.path)
+	// Where ExampleOutput reads the examples and writes what they printed (api-site/example-output)
+	systemProperty("tm1.repo", rootDir.path)
 	inputs.file(spec).withPathSensitivity(PathSensitivity.RELATIVE)
 	// Conformance fixtures (spec/conformance/calls): the tests check them, or with
 	// -PrecordConformance rewrite them from what the tests record
