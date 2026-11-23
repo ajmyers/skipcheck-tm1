@@ -26,6 +26,9 @@ With compose, the [`tm1-server` compose file](../tm1-server/compose.yaml) adds T
 when you ask for the `web` profile: `docker compose --profile web up -d`. It installs
 TM1 Web from the same bundles folder as TM1.
 
+With [`pa-setup`](../pa-setup/README.md), a `tm1Web` section in `pa-environment.yaml` runs
+it next to any number of TM1 servers on a shared Admin Server, and next to PAW and Cognos.
+
 ## What you mount
 
 | Path | What | Required |
@@ -116,8 +119,9 @@ The container port is fixed; map it to any host port with `-p <host>:9510`.
   there, add `--add-host <tm1 hostname>:<tm1 ip>`. Checked by sending the evalservice
   an MDX request directly; rendering a universal report workbook in the browser
   hasn't been tested (it needs a workbook made with the Excel add-in).
-- **Native TM1 security only, for now.** CAM security needs a Cognos server; see
-  [#44](https://github.com/ajmyers/skipcheck-tm1/issues/44).
+- **Tested with native TM1 security only.** [`pa-setup`](../pa-setup/README.md) can run TM1
+  Web next to TM1 servers in Cognos (CAM) security, and sets Cognos up to send browsers back
+  to TM1 Web after logon, but logging on to TM1 Web through Cognos hasn't been tested.
 - **HTTP only.** IBM's `server.xml` is used as-is, so HTTPS on 9513 isn't set up.
   Liberty logs `CWWKG0058E ... ssl ... missing the required attribute keyStoreRef`
   at start because of that; it's harmless.

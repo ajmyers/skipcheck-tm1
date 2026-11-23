@@ -15,6 +15,10 @@ instructions on Mac, Windows and Linux, or let the setup script do them:
 The interactive guide at <https://skipcheck.io/tm1/> shows only the steps for your
 choices. This README is the reference.
 
+**More than one TM1 server, or TM1 Web, PAW or Cognos?** Use [`pa-setup`](../pa-setup/README.md):
+you describe the environment in one file, `pa-environment.yaml`, and one command starts it
+and prints every address and login. It runs this image, so the settings below still apply.
+
 The shortest path: put your IBM bundle (`tm1server-*-linuxi38664h_bundle.tar.gz`)
 in [`bundles/`](bundles/README.md), run `docker compose up -d`, and TM1 is at
 http://localhost:8010 (user `admin`, no password).
@@ -111,6 +115,9 @@ these in a `.env` file to use another source (see [`.env.example`](.env.example)
 | `TM1_SERVER_IMAGE` | A private image with TM1 built in |
 
 To fill the volume from a pipe instead: `... | docker compose run --rm -T --no-deps tm1 install -`.
+
+This compose file is one fixed layout. For another (more servers, other ports, Cognos,
+PAW), [`pa-setup`](../pa-setup/README.md) writes a compose project from `pa-environment.yaml`.
 
 **Your files.** Each server's config, database and logs are in
 `tm1-files/<server>/{config,data,logs}` (or set `TM1_FILES_DIR`), created on first
@@ -270,7 +277,9 @@ docker run -d --name tm1 --network pa -p 8010:8010 \
   ghcr.io/ajmyers/tm1-server
 ```
 
-Or run both with [`examples/cam-security/compose.yaml`](examples/cam-security/compose.yaml).
+Or run both with [`examples/cam-security/compose.yaml`](examples/cam-security/compose.yaml),
+or with [`pa-setup`](../pa-setup/README.md): a `cognos` section in `pa-environment.yaml`
+sets all of this up for every TM1 server, with Keycloak for OIDC if you ask for it.
 
 - **`TM1_CAM_URI`** sets `IntegratedSecurityMode=5`, `ServerCAMURI`
   (`…/p2pd/servlet/dispatch`), `ClientCAMURI` (`…/bi/v1/disp`) and `CAMUseSSL`.
@@ -314,7 +323,7 @@ its own Admin Server together.
 
 **Several TM1 servers:** run one container with `admin`, and give each TM1
 server `TM1_ADMIN_HOST=<that container's name>`, all on the same Docker network.
-This is what `compose.yaml` does. TM1 servers register under their in-network
+This is what `compose.yaml` does, and [`pa-setup`](../pa-setup/README.md) with more than one server. TM1 servers register under their in-network
 names (e.g. `http://tm1:8010`), so the addresses the Admin Server lists work
 from other containers on the network (TM1 Web, PAW), not from your machine.
 From your machine, use each server's published port.

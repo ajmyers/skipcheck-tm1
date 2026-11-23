@@ -16,6 +16,10 @@ For tests, [`tm1-testcontainers`](../../java/tm1-testcontainers/README.md#planni
 
 ## Quick start
 
+**The easy way is [`pa-setup`](../pa-setup/README.md):** a `paw` section in
+`pa-environment.yaml` runs PAW with your TM1 servers, and through Cognos if you have one.
+It runs this script for you. To run it by hand instead:
+
 Start TM1 first (see [tm1-server](../tm1-server/README.md)), so there's a
 `tm1-admin` and a `tm1` container. Then, from this folder:
 
@@ -101,7 +105,8 @@ PAW goes on the network of the running `tm1-admin` container, or on
 ## Limits
 
 - **One PAW per Docker daemon.** IBM's compose files give every container a fixed
-  name (`pa-gateway`, `mongo`, ...), under the compose project `paw`.
+  name (`pa-gateway`, `mongo`, ...), under the compose project `paw`. That holds whether
+  it's started here, by `pa-setup` or by `PawContainer`.
 - **Heavy.** About 30 containers, using around 15 GB of RAM in total. Give Docker
   Desktop well over that. From `up` to a working PAW takes about a minute
   (more on the first start).
