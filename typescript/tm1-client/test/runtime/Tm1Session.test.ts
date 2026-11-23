@@ -1110,6 +1110,20 @@ describe("Tm1Session capabilities", () => {
     await expect(tm1.session().capabilities()).rejects.toBeInstanceOf(Tm1ProtocolException);
   });
 
+  it("reports $metadata it can't model", async () => {
+    // A bound operation with no binding parameter, which the model refuses
+    const tm1 = scripted().on(METADATA, () =>
+      ScriptedTm1.xml(
+        '<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"><edmx:DataServices>' +
+          '<Schema Namespace="ibm.tm1.api.v1" xmlns="http://docs.oasis-open.org/odata/ns/edm"><Action Name="Reserve" IsBound="true"/></Schema>' +
+          "</edmx:DataServices></edmx:Edmx>",
+      ),
+    );
+    const e = await failure(tm1.session().capabilities());
+    expect(e).toBeInstanceOf(Tm1ProtocolException);
+    expect((e as Tm1ProtocolException).url).toBe(ROOT + "$metadata");
+  });
+
   it("doesn't keep a failed read", async () => {
     const tm1 = scripted().onEach(
       VERSION,

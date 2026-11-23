@@ -2,7 +2,18 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ODataPath, ODataQuery, Tm1Capabilities, Tm1Capability, Tm1Dialect, Tm1Operation, Tm1Request, Tm1Session, Tm1Version } from "../../src/index.js";
+import {
+  ODataPath,
+  ODataQuery,
+  Tm1Capabilities,
+  Tm1Capability,
+  Tm1Dialect,
+  Tm1Operation,
+  Tm1ProtocolException,
+  Tm1Request,
+  Tm1Session,
+  Tm1Version,
+} from "../../src/index.js";
 import { Repo } from "../support/repo.js";
 
 const SNAPSHOT = readFileSync(Repo.snapshot, "utf8");
@@ -187,6 +198,29 @@ describe("Tm1Capabilities", () => {
     expect(current.check(Tm1Capability.entitySet("Bananas"), "http://tm1:8010/api/v1/")!.message).toBe(
       "entity set Bananas isn't defined by the TM1 server at http://tm1:8010/api/v1/ (the server reports schema 11.8.35, product version 11.8.03500.6)",
     );
+  });
+
+  /** A CSDL document whose one schema holds `body`. */
+  const csdl = (body: string): string =>
+    `<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"><edmx:DataServices>` +
+    `<Schema Namespace="ibm.tm1.api.v1" Alias="tm1" xmlns="http://docs.oasis-open.org/odata/ns/edm">${body}</Schema></edmx:DataServices></edmx:Edmx>`;
+
+  it("reports an operation it can't model as a parse error", () => {
+    // Bound to nothing: an operation is bound to its first parameter
+    const boundToNothing = csdl('<Action Name="Reserve" IsBound="true"/>');
+    expect(() => Tm1Capabilities.parse(boundToNothing)).toThrow(Tm1ProtocolException);
+    expect(() => Tm1Capabilities.parse(boundToNothing)).toThrow(/Reserve/);
+  });
+
+  it.each([
+    ["a binding parameter with no type", csdl('<Action Name="Reserve" IsBound="true"><Parameter Name="Cube"/></Action>')],
+    ["a character reference that is no character", csdl('<EntityType Name="Cu&#x110000;be"/>')],
+    ["text that isn't XML", "{}"],
+    ["XML that isn't CSDL", "<html>Not metadata</html>"],
+    ["nothing", ""],
+    ["an element left open", '<edmx:Edmx Version="4.0"><edmx:DataServices>'],
+  ])("reports %s as a parse error, never a raw exception", (_, metadata) => {
+    expect(() => Tm1Capabilities.parse(metadata)).toThrow(Tm1ProtocolException);
   });
 
   it("approximates an older schema without what came later, never a binding parameter", () => {
