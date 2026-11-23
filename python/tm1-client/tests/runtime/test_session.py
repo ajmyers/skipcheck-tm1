@@ -1250,6 +1250,11 @@ def names_and_types(items: list[Any]) -> list[tuple[str, str]]:
     return [(item["Name"], item["Type"]) for item in items]
 
 
+def test_decodes_collections_of_primitives(rt: Runtime) -> None:
+    strings = Tm1Request.list(ODataPath.of("Elements"), ODataQuery.none(), str)
+    assert read(rt, rt.session(), in_pieces(b'{"value":["a",null,"b"]}'), strings) == ["a", "b"]
+
+
 def test_fails_on_an_error_instead_of_a_collection(rt: Runtime) -> None:
     rt.fake.respond = lambda r: in_pieces(b'{"error":{"code":"278","message":"Boom"}}')
     error = rt.raises(Tm1ProtocolError, lambda: rt.session().collect(ELEMENTS))

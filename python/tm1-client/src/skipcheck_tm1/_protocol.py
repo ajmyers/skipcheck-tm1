@@ -59,8 +59,9 @@ class Reply:
 
 
 def collection(reply: Reply, method: str | None = None, url: str | None = None) -> tuple[list[Any], str | None]:
-    """The items and next link of one page of a collection. A body that isn't a page fails with the
-    protocol error the Java client's collection decoder gives, in its words."""
+    """The items and next link of one page of a collection. A null item is left out, as the other
+    clients leave it out. A body that isn't a page fails with the protocol error the Java client's
+    collection decoder gives, in its words."""
     content = reply.content
     if reply.status == 204 or not content.strip():
         raise Tm1ProtocolError("The response was empty", None, method, url)
@@ -84,7 +85,7 @@ def collection(reply: Reply, method: str | None = None, url: str | None = None) 
     if not isinstance(doc, dict) or not isinstance(doc.get("value"), list):
         raise Tm1ProtocolError(f"Expected a JSON object with a 'value' array, got {str(doc)[:200]}", None, method, url)
     next_link = doc.get("@odata.nextLink")
-    return list(doc["value"]), next_link if isinstance(next_link, str) else None
+    return [item for item in doc["value"] if item is not None], next_link if isinstance(next_link, str) else None
 
 
 def _ignore(reply: Reply) -> None:
