@@ -38,3 +38,26 @@ export async function walkthroughsOf(project) {
 	cache.set(project.id, list);
 	return list;
 }
+
+/** The examples a walkthrough shows (::example <Class> <region>), as { cls, region }, in order. */
+export function examplesOf(walkthrough) {
+	const found = [];
+	const visit = (blocks) => {
+		for (const block of blocks) {
+			if (block.type === 'directive' && block.name === 'example') found.push({ cls: block.args[0], region: block.args[1] });
+			else if (block.items) for (const item of block.items) visit(item);
+		}
+	};
+	for (const section of walkthrough.sections) visit(section.blocks);
+	return found;
+}
+
+/** The documented Java types a piece of example code uses: those it names (types, by their simple
+ * names), and those it reaches through an accessor (accessors: a method's name to the type it
+ * returns, as Tm1Client's cellsets() returns CellsetService). */
+export function typesUsed(code, types, accessors) {
+	const found = new Set();
+	for (const name of types) if (new RegExp('(?<![\\w.])' + name + '(?!\\w)').test(code)) found.add(name);
+	for (const [method, type] of accessors) if (new RegExp('\\.' + method + '\\(\\)').test(code)) found.add(type);
+	return found;
+}

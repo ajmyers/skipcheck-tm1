@@ -6,8 +6,9 @@
 // the search box. Matching and ranking are in assets/search-rank.js, which reads this shape:
 //
 //   { "types":   [[name, page, summary], ...],
-//     "members": [[name, type, summary, anchor?], ...] }    type: the index of its type in types;
+//     "members": [[name, type, summary, anchor?], ...],    type: the index of its type in types;
 //                                                           anchor: on its page, when not its name
+//     "walkthroughs": [[title, page, summary], ...] }      the project's walkthroughs, if it has any
 //
 // Arrays rather than objects, and no constructors (a constructor is its type, by name), keep the
 // largest index (the TM1 client's) small enough to load on the first keystroke.
@@ -28,8 +29,9 @@ export function shorten(text, length = SUMMARY_LENGTH) {
  * The index of a list of types, in the order given. Each type is { name, page, summary, members },
  * each member { name, anchor, summary, kind }. A member named twice (an overload) is listed once,
  * at its first anchor: the reader is looking for the name, and lands on the first of them.
+ * walkthroughs are { title, page, summary }: found by their title, or by words of their summary.
  */
-export function searchIndex(types) {
+export function searchIndex(types, walkthroughs = []) {
 	const index = { types: [], members: [] };
 	for (const type of types) {
 		const at = index.types.push([type.name, type.page, shorten(type.summary)]) - 1;
@@ -42,5 +44,6 @@ export function searchIndex(types) {
 			index.members.push(entry);
 		}
 	}
+	if (walkthroughs.length > 0) index.walkthroughs = walkthroughs.map((w) => [w.title, w.page, shorten(w.summary)]);
 	return index;
 }

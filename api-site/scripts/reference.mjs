@@ -32,7 +32,7 @@ import { gzipSync } from 'node:zlib';
 import { checkMembers, findMember, guessMember, javaIsms, javaOnlyNames, languageNames, listFile, readList, stale, typeCandidates, withoutComments } from './members.mjs';
 import { searchIndex } from './search.mjs';
 import { CANONICAL_ORIGIN, copyAssets, dedent, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, SECTIONS } from './site.mjs';
-import { walkthroughsOf } from './walkthroughs.mjs';
+import { examplesOf, typesUsed, walkthroughsOf } from './walkthroughs.mjs';
 
 const allowMissing = process.argv.includes('--allow-missing');
 
@@ -332,6 +332,28 @@ const overviews = [];
 let pageCount = 0;
 const indexSizes = [];
 
+// The walkthroughs that use each Java type, by its name, for "Used in" on the type's page in every
+// language: worked out from the walkthroughs' Java example regions, which name a type or reach a
+// service through one of Tm1Client's accessors (tm1.cellsets() is CellsetService)
+const usedIn = new Map();
+{
+	const documentedTypes = [];
+	for (const project of PROJECTS) documentedTypes.push(...((await api(project, 'java')) ?? []).filter((t) => !t.package.endsWith('.model')));
+	const names = documentedTypes.map((t) => t.name).filter((name) => !name.includes('.'));
+	const client = documentedTypes.find((t) => t.name === 'Tm1Client');
+	const accessors = new Map((client?.members ?? []).filter((m) => m.kind === 'method' && !m.static && m.params.length === 0 && names.includes(m.returns)).map((m) => [m.name, m.returns]));
+	const java = LANGUAGES.find((l) => l.id === 'java');
+	for (const project of PROJECTS) {
+		for (const walkthrough of await walkthroughsOf(project)) {
+			const used = new Set();
+			for (const { cls, region } of examplesOf(walkthrough)) {
+				for (const name of typesUsed((await regions(java.examples(project, cls))).get(region) ?? '', names, accessors)) used.add(name);
+			}
+			for (const name of used) usedIn.set(name, [...(usedIn.get(name) ?? []), { project, walkthrough }]);
+		}
+	}
+}
+
 for (const project of PROJECTS) {
 	const java = await api(project, 'java');
 	if (!java) throw new Error('No API for ' + project.id + ': run ./gradlew docsModel and the extractors first (npm run assemble does both)');
@@ -592,6 +614,11 @@ for (const project of PROJECTS) {
 				dotnet: 'using ' + type.package + ';',
 				typescript: 'import { ' + name.split('.')[0] + ' } from "' + tsPackage + '";',
 			}[language];
+			// The walkthroughs whose examples use it, in their own pages, whose tabs open in this language
+			const usedNote = usedIn.has(javaType.name)
+				? '<p class="note">Used in ' + (usedIn.get(javaType.name).length > 1 ? 'the walkthroughs ' : 'the walkthrough ') +
+					usedIn.get(javaType.name).map(({ project: p, walkthrough: w }) => '<a href="/' + p.id + '/walkthroughs/' + w.slug + '/">' + escape(w.meta.title) + '</a>').join(', ') + '.</p>'
+				: '';
 			const asyncNote =
 				language === 'python' && /Service$|^Tm1Client$|^Tm1Session$/.test(name)
 					? '<p class="note">The asyncio flavor, <code>skipcheck_tm1.aio</code>, has the same methods to <code>await</code>, on <code>Async' + escape(name) + '</code>.</p>'
@@ -606,6 +633,7 @@ for (const project of PROJECTS) {
 				'<pre class="import"><code class="lang-' + highlight + '">' + escape(importLine) + '</code></pre>' +
 				'<div class="doc"><p>' + overview + '</p></div>' +
 				asyncNote +
+				usedNote +
 				(rows.length > 0 ? '<h2 id="members">Members</h2><table class="members">' + rows.join('') + '</table>' + details.join('') : '') +
 				javadocLink;
 			await writePage(project, language, name + '.html', name, body, nav, javaType.name, languages, counterparts);
@@ -619,21 +647,27 @@ for (const project of PROJECTS) {
 		const start = (project.start ?? []).map((n) => here.find((t) => t.name === n)).filter(Boolean);
 		const summaries = new Map(here.map((t) => [t.name, summary(javadocHtml(javadocParts(t.doc).description, { example: () => '', javaCode: () => '', link: (target, l) => escape(l || target.replace(/^.*[.#]/, '')) }))]));
 		for (const entry of overviews) if (entry.project === project.id && entry.language === language) entry.summary = summaries.get(entry.java);
-		const index = JSON.stringify(searchIndex(here.map((t) => ({ name: nameOf(t), page: pageOf(t), summary: summaries.get(t.name), members: searchable.get(t.name) }))));
+		// The walkthroughs, which pages.mjs builds: their examples are in every language, behind tabs
+		// that open in the language last chosen, this one when it's read here
+		const walkthroughs = await walkthroughsOf(project);
+		const walkthroughPage = (w) => '../../walkthroughs/' + w.slug + '/';
+		const index = JSON.stringify(
+			searchIndex(
+				here.map((t) => ({ name: nameOf(t), page: pageOf(t), summary: summaries.get(t.name), members: searchable.get(t.name) })),
+				walkthroughs.map((w) => ({ title: w.meta.title, page: walkthroughPage(w), summary: w.meta.summary })),
+			),
+		);
 		await writeFile(path.join(distDir, project.id, 'docs', language, 'search.json'), index + '\n');
 		indexSizes.push({ at: project.id + ' ' + language, bytes: Buffer.byteLength(index), gzip: gzipSync(index).length });
 		let home =
 			(project.landing ? '<p class="crumbs"><a href="../../">' + escape(project.title) + '</a> · Docs</p>' : '') +
 			'<h1>' + escape(project.title) + ' docs <span class="lang">' + escape(label) + '</span></h1>' +
-			'<p class="lead">Every part of the library, with its members and examples in ' + escape(label) + '.' + (project.landing ? ' New here? Start with the <a href="../../#quick-start">quick start</a>.' : '') + '</p>';
+			'<p class="lead">Every part of the library, with its members and examples in ' + escape(label) + '.' + (project.landing ? ' New here? Start with the <a href="../../#quick-start">quick start</a>' + (walkthroughs.length > 0 ? ', then the walkthrough <a href="' + walkthroughPage(walkthroughs[0]) + '">' + escape(walkthroughs[0].meta.title) + '</a>' : '') + '.' : '') + '</p>';
 		if (start.length > 0) {
 			home += '<h2>Start here</h2><ul class="start">' + start.map((t) => '<li><a href="' + pageOf(t) + '"><strong>' + escape(nameOf(t)) + '</strong><span>' + escape(summaries.get(t.name)) + '</span></a></li>').join('') + '</ul>';
 		}
-		// The walkthroughs, which pages.mjs builds: their examples are in every language, behind tabs
-		// that open in the language last chosen, this one when it's read here
-		const walkthroughs = await walkthroughsOf(project);
 		if (walkthroughs.length > 0) {
-			home += '<h2 id="walkthroughs">Walkthroughs</h2><ul class="start">' + walkthroughs.map((w) => '<li><a href="../../walkthroughs/' + w.slug + '/"><strong>' + escape(w.meta.title) + '</strong><span>' + escape(w.meta.summary) + '</span></a></li>').join('') + '</ul>';
+			home += '<h2 id="walkthroughs">Walkthroughs</h2><ul class="start">' + walkthroughs.map((w) => '<li><a href="' + walkthroughPage(w) + '"><strong>' + escape(w.meta.title) + '</strong><span>' + escape(w.meta.summary) + '</span></a></li>').join('') + '</ul>';
 		}
 		home += grouped
 			.map(({ area, list }) => '<h2 id="' + area.id + '">' + escape(area.title) + '</h2><ul class="areas">' + list.map((t) => '<li><a href="' + pageOf(t) + '"><code>' + escape(nameOf(t)) + '</code></a><span>' + escape(summaries.get(t.name)) + '</span></li>').join('') + '</ul>')

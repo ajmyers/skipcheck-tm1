@@ -124,3 +124,28 @@ test('nothing to search for finds nothing, and the results are limited', () => {
 	assert.deepEqual(search(python, 'nothing'), []);
 	assert.equal(search(python, 'e', 3).length, 3);
 });
+
+test("a project's walkthroughs are in its index, after the types, and only when it has some", () => {
+	const walkthroughs = [{ title: 'Read and write cells', page: '../../walkthroughs/cells/', summary: 'Read values from a cube with MDX, write a value, and read it back.' }];
+	assert.deepEqual(searchIndex([], walkthroughs).walkthroughs, [['Read and write cells', '../../walkthroughs/cells/', 'Read values from a cube with MDX, write a value, and read it back.']]);
+	assert.equal('walkthroughs' in searchIndex([]), false);
+});
+
+test('a walkthrough is found by the words of its title, or less well by those of its summary', () => {
+	const index = prepare(
+		searchIndex(
+			[page('CellsetService', ['execute']), page('ProcessService', ['execute_with_return'])],
+			[
+				{ title: 'Read and write cells', page: '../../walkthroughs/cells/', summary: 'Read values from a cube with MDX, write a value, and read it back.' },
+				{ title: 'Run a process and read its result', page: '../../walkthroughs/processes/', summary: 'Create a TurboIntegrator process and run it.' },
+			],
+		),
+	);
+	const [cells] = search(index, 'write cells').filter((r) => r.kind === 'walkthrough');
+	assert.equal(cells.name, 'Read and write cells');
+	assert.equal(cells.href, '../../walkthroughs/cells/');
+	assert.deepEqual(names(search(index, 'run a process')).slice(0, 1), ['Run a process and read its result']);
+	assert.ok(names(search(index, 'mdx')).includes('Read and write cells'), 'by a word of its summary');
+	assert.ok(names(search(index, 'process')).indexOf('ProcessService') < names(search(index, 'process')).indexOf('Run a process and read its result'), 'a type first');
+	assert.deepEqual(search(index, 'ProcessService.run').filter((r) => r.kind === 'walkthrough'), [], 'not for a member of a type');
+});

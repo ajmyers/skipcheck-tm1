@@ -60,6 +60,14 @@ export function matchName(nameWords, queryWords) {
 
 /** An index as search() reads it: each name split into words once. */
 export function prepare(index) {
+	const walkthroughs = (index.walkthroughs ?? []).map(([title, page, summary]) => ({
+		kind: 'walkthrough',
+		name: title,
+		words: words(title),
+		summaryWords: words(summary),
+		summary,
+		href: page,
+	}));
 	const types = index.types.map(([name, page, summary]) => ({ kind: 'type', name, words: words(name), summary, href: page }));
 	const members = index.members.map(([name, type, summary, anchor = name]) => ({
 		kind: 'member',
@@ -69,7 +77,7 @@ export function prepare(index) {
 		summary,
 		href: types[type].href + '#' + anchor,
 	}));
-	return { types, members };
+	return { types, members, walkthroughs };
 }
 
 /**
@@ -97,6 +105,14 @@ export function search(prepared, query, limit = 12) {
 		if (typeWords.length > 0 && !matchName(member.type.words, typeWords)) continue;
 		// "Tm1Client." lists the type's members
 		consider(member, memberWords.length > 0 ? matchName(member.words, memberWords) : INSIDE);
+	}
+	// A walkthrough by its title, as a member by its name; or, less well, when every word of the query
+	// starts a word of its summary: "mdx" finds Read and write cells
+	if (dot < 0) {
+		for (const walkthrough of prepared.walkthroughs ?? []) {
+			const inSummary = queryWords.every((word) => walkthrough.summaryWords.some((w) => w.startsWith(word)));
+			consider(walkthrough, matchName(walkthrough.words, queryWords) || (inSummary ? INSIDE : 0));
+		}
 	}
 	found.sort(
 		(a, b) =>

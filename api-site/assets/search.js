@@ -44,11 +44,13 @@ function start() {
 		const link = document.createElement('a');
 		link.href = entry.href;
 		link.tabIndex = -1;
-		const name = document.createElement('code');
+		// A walkthrough's title is words, not a name in the code
+		const name = document.createElement(entry.kind === 'walkthrough' ? 'span' : 'code');
+		if (entry.kind === 'walkthrough') name.className = 'title';
 		name.textContent = entry.name;
 		const where = document.createElement('span');
 		where.className = 'where';
-		where.textContent = entry.kind === 'type' ? 'type' : entry.type.name;
+		where.textContent = entry.kind === 'type' ? 'type' : entry.kind === 'walkthrough' ? 'walkthrough' : entry.type.name;
 		link.append(name, where);
 		if (entry.summary) {
 			const summary = document.createElement('span');
