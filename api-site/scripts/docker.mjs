@@ -176,7 +176,7 @@ async function build() {
 		'<section class="hero wrap" aria-labelledby="title"><p class="kicker">' + escape(meta.kicker) + '</p><h1 id="title">' + escape(PA_DOCKER.title) + '</h1>' +
 		'<p class="role-line">' + inline(meta.tagline) + '</p>' +
 		lead.blocks.map((block) => '<p class="lead">' + inline(block.text) + '</p>').join('') +
-		'<p class="actions"><a class="button primary" href="/projects/pa-docker/setup/">Set it up</a><a class="button" href="' + github + '/tree/' + ref + '/docker">Source on GitHub</a></p>' +
+		'<p class="actions"><a class="button primary" href="/pa-docker/setup/">Set it up</a><a class="button" href="' + github + '/tree/' + ref + '/docker">Source on GitHub</a></p>' +
 		'<div class="callout" role="note"><p>' + inline(meta.callout) + '</p></div></section>';
 	for (const { title, blocks: list } of rest) body += section(title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), title, '<div class="steps">' + blocks(list) + '</div>');
 	body += section(

@@ -8,7 +8,7 @@ Add the starter, set a few `tm1.*` properties, and inject a ready `Tm1Client`. S
 
 ## Quick start
 
-1. **Have a TM1 server to talk to.** To run one on your own computer, follow [Run Planning Analytics on your own computer](/projects/pa-docker/setup/). You need your own licensed copy of TM1 Server.
+1. **Have a TM1 server to talk to.** To run one on your own computer, follow [Run Planning Analytics on your own computer](/pa-docker/setup/). You need your own licensed copy of TM1 Server.
 2. **Add the starter to a Spring Boot 4 application.**
    ::install
 3. **Tell it where TM1 is.** The starter connects with the `tm1` settings in `application.yml`; these are the defaults of a server set up with the link above:

@@ -35,7 +35,7 @@ test('a link to any other file in the repository is that file on GitHub', () => 
 });
 
 test('anchors, other sites and site paths are left as they are', () => {
-	for (const href of ['#roles', 'https://www.keycloak.org', 'http://localhost:8010', '/projects/pa-docker/setup/']) assert.equal(linkTarget(href, source, repo), href);
+	for (const href of ['#roles', 'https://www.keycloak.org', 'http://localhost:8010', '/pa-docker/setup/']) assert.equal(linkTarget(href, source, repo), href);
 });
 
 test("a link to a file that isn't in the repository fails the build", () => {

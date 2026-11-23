@@ -30,7 +30,7 @@ import { CANONICAL_ORIGIN, distDir, DOC_LANGUAGES, generatedDir, LANGUAGES, lang
 import { walkthroughsOf } from './walkthroughs.mjs';
 
 const ORIGIN = CANONICAL_ORIGIN;
-const SETUP = ORIGIN + '/projects/pa-docker/setup/';
+const SETUP = ORIGIN + '/pa-docker/setup/';
 
 const decode = (text) =>
 	text

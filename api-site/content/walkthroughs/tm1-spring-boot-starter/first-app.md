@@ -9,7 +9,7 @@ You add TM1 to a Spring Boot application. The starter builds a TM1 client from y
 ## Before you start
 
 - **A Spring Boot 4 application.** [start.spring.io](https://start.spring.io) makes one.
-- **A TM1 server.** [Run Planning Analytics on your own computer](/projects/pa-docker/setup/) starts one on `http://localhost:8010`, with the login `admin` and no password. You need your own licensed copy of TM1 Server.
+- **A TM1 server.** [Run Planning Analytics on your own computer](/pa-docker/setup/) starts one on `http://localhost:8010`, with the login `admin` and no password. You need your own licensed copy of TM1 Server.
 
 ## Steps
 
