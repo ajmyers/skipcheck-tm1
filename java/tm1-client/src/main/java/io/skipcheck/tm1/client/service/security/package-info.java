@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Services for security and runtime: users, groups, sessions and threads (plan phase 6).
  */

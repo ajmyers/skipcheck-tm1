@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Encryption at rest: the model's files encrypted with a key from a key management
  * service (plan phase 9).

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package io.skipcheck.tm1.codegen;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -82,6 +84,16 @@ class ModelGeneratorTest {
 		assertThat(ModelGenerator.constantName("NativeView")).isEqualTo("NATIVE_VIEW");
 		assertThat(ModelGenerator.constantName("MDX")).isEqualTo("MDX");
 		assertThat(ModelGenerator.constantName("2D")).isEqualTo("_2D");
+	}
+
+	@Test
+	void startsEveryFileWithItsLicense(@TempDir Path out) throws Exception {
+		sample().writeTo(out);
+		try (Stream<Path> files = Files.walk(out)) {
+			assertThat(files.filter(Files::isRegularFile)).isNotEmpty()
+				.allSatisfy(file -> assertThat(Files.readString(file))
+					.startsWith("// SPDX-License-Identifier: Apache-2.0\n"));
+		}
 	}
 
 	@Test

@@ -16,11 +16,17 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.work.DisableCachingByDefault
 import java.nio.charset.StandardCharsets
 
+/** The first line of every Java source: its license, as scripts/license-headers.py writes it for every language. */
+const val LICENSE_LINE = "// SPDX-License-Identifier: Apache-2.0"
+
+/** Whether a source starts with the license line. */
+fun hasLicenseLine(source: String): Boolean = source.lineSequence().firstOrNull() == LICENSE_LINE
+
 /**
  * Fails when a Java file isn't laid out the way Spring Java Format lays it out, or has an unused
- * import, imports out of order, or a fully qualified type name in code (see JavaImports). Cacheable, and only reruns when
- * a source file changes. `./gradlew format` fixes the layout and the imports, except fully
- * qualified names.
+ * import, imports out of order, or a fully qualified type name in code (see JavaImports), or doesn't
+ * start with the license line. Cacheable, and only reruns when a source file changes.
+ * `./gradlew format` fixes the layout, the imports (except fully qualified names) and the license line.
  *
  * Our own task around Spring Java Format's formatter, rather than its Gradle plugin, because the
  * plugin's tasks don't support the configuration cache (0.0.48 calls Task.project while running).
@@ -46,7 +52,11 @@ abstract class CheckJavaFormat : DefaultTask() {
 		val reportFile = report.get().asFile
 		reportFile.parentFile.mkdirs()
 		reportFile.writeText(files.joinToString("\n", postfix = "\n") { it.path })
+		val unlicensed = files.filter { !hasLicenseLine(it.readText()) }
 		val failures = mutableListOf<String>()
+		if (unlicensed.isNotEmpty()) {
+			failures += "These files don't start with \"$LICENSE_LINE\" (run ./gradlew format):\n" + unlicensed.joinToString("\n") { "  " + it.path }
+		}
 		if (unformatted.isNotEmpty()) {
 			failures += "These files aren't formatted (run ./gradlew format):\n" + unformatted.joinToString("\n") { "  " + it.path }
 		}
@@ -59,7 +69,10 @@ abstract class CheckJavaFormat : DefaultTask() {
 	}
 }
 
-/** Formats Java files in place with Spring Java Format, after removing unused imports and ordering the rest. */
+/**
+ * Formats Java files in place with Spring Java Format, after adding the license line where it's missing,
+ * removing unused imports and ordering the rest.
+ */
 @DisableCachingByDefault(because = "Changes the source files in place")
 abstract class FormatJava : DefaultTask() {
 
@@ -73,7 +86,8 @@ abstract class FormatJava : DefaultTask() {
 	fun format() {
 		for (file in source.files) {
 			val text = file.readText()
-			val cleaned = JavaImports.sortImports(JavaImports.removeUnusedImports(text))
+			val licensed = if (hasLicenseLine(text) || text.isBlank()) text else LICENSE_LINE + "\n\n" + text
+			val cleaned = JavaImports.sortImports(JavaImports.removeUnusedImports(licensed))
 			if (cleaned != text) {
 				file.writeText(cleaned)
 			}

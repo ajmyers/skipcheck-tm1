@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * The services: one per REST resource family, in a subpackage per area (plan §6).
  *

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * The generator behind {@code tm1-client}'s model: it reads the committed
  * {@code $metadata} snapshot with {@code tm1-csdl} and writes Java sources at build time

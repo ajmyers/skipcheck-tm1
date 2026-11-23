@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package examples;
 
 import io.skipcheck.tm1.client.Tm1Client;

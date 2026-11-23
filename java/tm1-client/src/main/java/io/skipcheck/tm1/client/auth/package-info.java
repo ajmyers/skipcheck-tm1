@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * How the client authenticates to TM1:
  * {@link io.skipcheck.tm1.client.auth.Tm1Authenticator} and its implementations for TM1's
