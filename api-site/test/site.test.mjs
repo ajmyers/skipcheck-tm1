@@ -12,7 +12,7 @@ import { inline, parse, slug } from '../scripts/markdown.mjs';
 import { docsVersion, installCommands, packageOf } from '../scripts/packages.mjs';
 import { judge, sourceHash } from '../scripts/output.mjs';
 import { head, languagesOf, PROJECTS, regions, SECTIONS } from '../scripts/site.mjs';
-import { walkthroughsOf } from '../scripts/walkthroughs.mjs';
+import { examplesOf, typesUsed, walkthroughsOf } from '../scripts/walkthroughs.mjs';
 
 test('inline Markdown is escaped, then marked up', () => {
 	assert.equal(inline('**Bold** and `a<b>` with [a link](docs/X.html) & more'), '<strong>Bold</strong> and <code>a&lt;b&gt;</code> with <a href="docs/X.html">a link</a> &amp; more');
@@ -146,4 +146,16 @@ test('every walkthrough has its front matter, and a lead before its steps', asyn
 		}
 	}
 	assert.ok(count >= 3, 'the walkthroughs were not found');
+});
+
+test("a walkthrough's examples are read from its steps, and the types they use from their code", async () => {
+	const client = PROJECTS.find((project) => project.id === 'tm1-client');
+	const [connect] = await walkthroughsOf(client);
+	assert.deepEqual(
+		examplesOf(connect).map(({ cls, region }) => cls + ' ' + region),
+		['ConnectWalkthrough connect', 'ConnectWalkthrough version', 'ConnectWalkthrough list-cubes', 'ConnectWalkthrough close'],
+	);
+	const accessors = new Map([['cellsets', 'CellsetService'], ['session', 'Tm1Session']]);
+	const code = 'Cellset cellset = tm1.cellsets().execute(mdx, ODataQuery.none());\nTm1ClientBuilder b;\nx.ODataQueryFoo();';
+	assert.deepEqual([...typesUsed(code, ['Tm1Client', 'ODataQuery', 'Cellset', 'Tm1Session'], accessors)].sort(), ['Cellset', 'CellsetService', 'ODataQuery']);
 });

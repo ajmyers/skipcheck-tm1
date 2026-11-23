@@ -44,7 +44,12 @@ needs its three counterparts before the build passes, and so does a new Java mem
 
 ## Walkthroughs, and what the examples print
 
-A walkthrough is a task, step by step, for someone new to a library. Each step's code is a region
+A walkthrough is a task, step by step, for someone new to a library. Readers find a project's
+walkthroughs on its landing page, under its quick start (the first one) and in their own section;
+on its docs home, in every language; in the docs search, by title or by words of the summary; and
+on the page of each type a walkthrough's examples use ("Used in"). That last list is worked out
+from the walkthroughs' Java example regions: the documented types a region names, and the services
+it reaches through one of `Tm1Client`'s accessors (`tm1.cellsets()` is `CellsetService`). Each step's code is a region
 of a `<Task>Walkthrough` examples class (`ConnectWalkthrough`, in every language), and under the
 code is what it printed when it ran against a real TM1. That output is never typed by hand:
 
