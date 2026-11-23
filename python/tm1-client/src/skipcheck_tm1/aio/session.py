@@ -24,9 +24,11 @@ from it (``tm1_pygen.unasync``).
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import threading
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterator
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -136,6 +138,22 @@ class _AsyncConnection:
         self.lock = runtime.Lock()
         self.version: Tm1Version | None = None
         self.version_for = -1
+        self.running = 0
+        """Requests running now: see :meth:`busy`."""
+        self._counting = threading.Lock()
+
+    @contextlib.contextmanager
+    def busy(self) -> Iterator[None]:
+        """Counts a request as running until the block ends: answered in full, failed or cancelled.
+        The pool reads the count, so as not to close a session under a request. The lock is for
+        the sync flavor, whose requests run on the caller's threads."""
+        with self._counting:
+            self.running += 1
+        try:
+            yield
+        finally:
+            with self._counting:
+                self.running -= 1
 
     def url(self, relative: str) -> str:
         return str(httpx.URL(self.base_url).join(relative))
@@ -294,17 +312,19 @@ class _AsyncConnection:
         accept: str,
         timeout: float | None = None,
     ) -> p.Reply:
-        """Sends a request on the logged-in session, logging in again and replaying it once on a 401."""
-        cookie = await self.logged_in()
-        response = await self._send_once(method, url, content, headers, accept, timeout, cookie)
-        if response.status_code == 401:
-            seed = p.session_cookie(response.headers.get_list("set-cookie"))
-            log.info("TM1 session at %s expired or was closed on the server; logging in again", self.base_url)
-            cookie = await self.logged_in(expired=cookie, seed=seed)
+        """Sends a request on the logged-in session, logging in again and replaying it once on a 401.
+        It counts as running from here, the wait for a login included, until its answer is read."""
+        with self.busy():
+            cookie = await self.logged_in()
             response = await self._send_once(method, url, content, headers, accept, timeout, cookie)
             if response.status_code == 401:
-                raise Tm1ApiError.of_kind(401, Tm1ErrorKind.UNAUTHENTICATED, None, method, url)
-        return p.Reply(response.status_code, {k.lower(): v for k, v in response.headers.items()}, response.content)
+                seed = p.session_cookie(response.headers.get_list("set-cookie"))
+                log.info("TM1 session at %s expired or was closed on the server; logging in again", self.base_url)
+                cookie = await self.logged_in(expired=cookie, seed=seed)
+                response = await self._send_once(method, url, content, headers, accept, timeout, cookie)
+                if response.status_code == 401:
+                    raise Tm1ApiError.of_kind(401, Tm1ErrorKind.UNAUTHENTICATED, None, method, url)
+            return p.Reply(response.status_code, {k.lower(): v for k, v in response.headers.items()}, response.content)
 
     async def product_version(self) -> Tm1Version:
         """The server's version, read from ``Server`` inside the session (an anonymous read
@@ -566,6 +586,13 @@ class AsyncTm1Session:
         refuses requests with ``Tm1SessionClosedError``."""
         await self._connection.close()
 
+    def _is_busy(self) -> bool:
+        """Whether a request is running on the session, through any view of it: sent, or waiting
+        for the login, and not yet answered in full, failed or cancelled. An async request counts
+        until its result is read, and a collection until its last item is taken or its iterator
+        is closed. For the pool."""
+        return self._connection.running > 0
+
     def __repr__(self) -> str:
         sandbox = "" if self._context.sandbox is None else f", sandbox={self._context.sandbox}"
         change_set = "" if self._context.change_set is None else f", changeSet={self._context.change_set}"
@@ -602,14 +629,16 @@ class AsyncTm1Session:
             # What the call requires is checked when the batch runs: the check may read the
             # server's $metadata, and queueing sends nothing
             return self._queue.add(call, self._context)
-        await self._check(call)
-        url = self._connection.url(p.target(call, self._context))
-        content, headers = call.body()
-        if self._async_every is not None and not call.raw:
-            reply = await self._send_async(call.method, url, content, headers, call.accept)
-        else:
-            reply = await self._connection.send(call.method, url, content, headers, call.accept, call.timeout)
-        return call.read(self._connection.check(call.method, url, reply))
+        # Running for the whole of it, so an async request counts while it's polled
+        with self._connection.busy():
+            await self._check(call)
+            url = self._connection.url(p.target(call, self._context))
+            content, headers = call.body()
+            if self._async_every is not None and not call.raw:
+                reply = await self._send_async(call.method, url, content, headers, call.accept)
+            else:
+                reply = await self._connection.send(call.method, url, content, headers, call.accept, call.timeout)
+            return call.read(self._connection.check(call.method, url, reply))
 
     def stream(self, request: Tm1Request[Any] | p.Call) -> AsyncIterator[Any]:
         """The items of a collection, fetching pages as they're needed (Java's ``stream``). A page
@@ -636,13 +665,16 @@ class AsyncTm1Session:
         an async result, and each page after it is asked for the same way. Can't join a batch."""
         if self._queue is not None:
             raise RuntimeError("A collection can't be iterated in a batch: use collect(), whose result is every item once the batch has run")
-        page = await self.execute(call)
-        while True:
-            for item in page.items:
-                yield item
-            if page.next_link is None:
-                return
-            page = await self.execute(p.Call("GET", page.next_link, read=call.read, contextual=False))
+        # Running until the last item is taken or the iterator is closed, not only while a page is
+        # fetched: a pool mustn't close the session between two pages
+        with self._connection.busy():
+            page = await self.execute(call)
+            while True:
+                for item in page.items:
+                    yield item
+                if page.next_link is None:
+                    return
+                page = await self.execute(p.Call("GET", page.next_link, read=call.read, contextual=False))
 
     async def _send_async(self, method: str, url: str, content: bytes | None, headers: dict[str, str], accept: str) -> p.Reply:
         assert self._async_every is not None

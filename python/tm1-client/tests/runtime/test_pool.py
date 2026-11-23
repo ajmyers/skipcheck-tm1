@@ -6,13 +6,16 @@ these tests call ``evict_expired()``, which is when this pool does it."""
 
 from __future__ import annotations
 
+import asyncio
+import threading
 from typing import Any
 
+import httpx
 import pytest
 
-from skipcheck_tm1 import Tm1Identity, Tm1SessionClosedError, auth
+from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Identity, Tm1Request, Tm1SessionClosedError, auth
 
-from ..conftest import target
+from ..conftest import BASE, target
 from .conftest import SERVER, Clock, Runtime
 
 CLOSE = "POST ActiveSession/tm1.Close"
@@ -23,8 +26,8 @@ def clock() -> Clock:
     return Clock()
 
 
-def pool(rt: Runtime, clock: Clock, **settings: Any) -> Any:
-    builder = rt.Pool.builder(rt.builder()).clock(clock)
+def pool(rt: Runtime, clock: Clock, sessions: Any = None, **settings: Any) -> Any:
+    builder = rt.Pool.builder(sessions or rt.builder()).clock(clock)
     for name, value in settings.items():
         builder = getattr(builder, name)(value)
     return builder.build()
@@ -32,6 +35,59 @@ def pool(rt: Runtime, clock: Clock, **settings: Any) -> Any:
 
 def closes(rt: Runtime) -> int:
     return sum(1 for r in rt.fake.requests if target(r) == CLOSE)
+
+
+class Held:
+    """A fake TM1 that doesn't answer ``GET Server?$select=Name`` until it's told to, and a request
+    for it that runs meanwhile: Java's ``Sinks.One`` of a response, and its ``subscribe``."""
+
+    def __init__(self, rt: Runtime) -> None:
+        self.rt = rt
+        self.result: list[Any] = []
+        self.started: Any
+        self.release: Any
+        if rt.flavor == "sync":
+            self.started, self.release = threading.Event(), threading.Event()
+
+            def handler(request: httpx.Request) -> httpx.Response:
+                if target(request) == "GET Server?$select=Name":
+                    self.started.set()
+                    assert self.release.wait(10)
+                return rt.fake.handler(request)
+
+            self.http: Any = httpx.Client(transport=httpx.MockTransport(handler))
+        else:
+            self.started, self.release = asyncio.Event(), asyncio.Event()
+
+            async def waiting(request: httpx.Request) -> httpx.Response:
+                if target(request) == "GET Server?$select=Name":
+                    self.started.set()
+                    await self.release.wait()
+                return rt.fake.handler(request)
+
+            self.http = httpx.AsyncClient(transport=httpx.MockTransport(waiting))
+        rt.clients.append(self.http)
+
+    def sessions(self) -> Any:
+        return self.rt.Session.builder().base_url(BASE).basic_auth("admin", "apple").http_client(self.http)
+
+    def start(self, session: Any) -> None:
+        """Sends the request, and returns once TM1 has it."""
+        if self.rt.loop is None:
+            self.thread = threading.Thread(target=lambda: self.result.append(session.execute(SERVER)), daemon=True)
+            self.thread.start()
+            assert self.started.wait(5)
+        else:
+            self.task = self.rt.loop.create_task(session.execute(SERVER))
+            self.rt.loop.run_until_complete(asyncio.wait_for(self.started.wait(), 5))
+
+    def answer(self) -> None:
+        """Lets TM1 answer, and waits for the request to end."""
+        self.release.set()
+        if self.rt.loop is None:
+            self.thread.join(5)
+        else:
+            self.result.append(self.rt.loop.run_until_complete(self.task))
 
 
 def test_keeps_one_session_per_identity_matching_names_as_tm1_does(rt: Runtime, clock: Clock) -> None:
@@ -82,6 +138,64 @@ def test_keeps_a_session_thats_in_use(rt: Runtime, clock: Clock) -> None:
     for _ in range(5):
         clock.advance(9 * 60)
         assert p.session(Tm1Identity.impersonating("alice")) is alice
+
+
+def test_keeps_a_session_while_a_request_is_running_on_it(rt: Runtime, clock: Clock) -> None:
+    held = Held(rt)
+    p = pool(rt, clock, sessions=held.sessions())
+    alice = p.session(Tm1Identity.impersonating("alice"))
+    held.start(alice)
+    try:
+        clock.advance(25 * 60)
+        rt.run(p.evict_expired())
+        assert p.stats().evicted_idle == 0, "a running request is use"
+        assert not alice.is_closed
+    finally:
+        held.answer()
+    assert held.result == [{}]
+    clock.advance(12 * 60)
+    rt.run(p.evict_expired())
+    assert p.stats().evicted_idle == 1, "idle once it has finished"
+    clock.advance(30)
+    rt.run(p.evict_expired())
+    assert alice.is_closed
+
+
+def test_closes_an_evicted_session_only_once_its_requests_have_finished(rt: Runtime, clock: Clock) -> None:
+    held = Held(rt)
+    p = pool(rt, clock, sessions=held.sessions(), max_age=30 * 60)
+    alice = p.session(Tm1Identity.impersonating("alice"))
+    held.start(alice)
+    try:
+        clock.advance(40 * 60)
+        rt.run(p.evict_expired())
+        assert p.stats().evicted_age == 1, "out of the pool at its age"
+        assert p.session(Tm1Identity.impersonating("alice")) is not alice, "so the next caller gets a new one"
+        clock.advance(31)
+        rt.run(p.evict_expired())
+        assert not alice.is_closed, "but open for the request still running"
+        assert p.stats().closing == 1
+    finally:
+        held.answer()
+    assert held.result == [{}]
+    rt.run(p.evict_expired())
+    assert alice.is_closed
+    assert p.stats().closing == 0
+
+
+def test_counts_a_collection_as_running_until_its_iterator_is_finished_or_closed(rt: Runtime, clock: Clock) -> None:
+    # Not in the Java tests, where a stream is one subscription: here its pages are separate requests
+    pages = {"GET Cubes": {"value": [{"Name": "a"}], "@odata.nextLink": "Cubes?$skiptoken=2"}, "GET Cubes?$skiptoken=2": {"value": [{"Name": "b"}]}}
+    rt.fake.respond = lambda r: pages[target(r)]
+    session = pool(rt, clock).session()
+    cubes = session.stream(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), dict))
+    step = (lambda: next(cubes)) if rt.flavor == "sync" else (lambda: rt.run(cubes.__anext__()))
+    assert not session._is_busy(), "nothing is sent until the first item is asked for"
+    assert step() == {"Name": "a"}
+    assert session._is_busy(), "between two pages"
+    assert step() == {"Name": "b"}
+    rt.run(cubes.close() if rt.flavor == "sync" else cubes.aclose())
+    assert not session._is_busy()
 
 
 def test_evicts_a_session_past_its_maximum_age_even_if_in_use(rt: Runtime, clock: Clock) -> None:
