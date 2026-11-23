@@ -2,7 +2,7 @@
 
 """Ported from the Java client's error/Tm1ErrorsTest, odata/ODataQueryTest, FilterTest and
 ODataPathTest, version/Tm1VersionTest and Tm1DialectTest, session/Tm1TimeoutsTest,
-auth/Tm1AuthenticatorTest, Tm1RequestTest and Tm1OperationTest."""
+auth/Tm1AuthenticatorTest, Tm1RequestTest and Tm1OperationTest, and metadata/OperationCatalogTest."""
 
 from __future__ import annotations
 
@@ -46,6 +46,9 @@ from skipcheck_tm1.errors import (
 )
 from skipcheck_tm1.model import Tm1Operations
 from skipcheck_tm1.odata import Alias, ODataLiterals, Raw
+from skipcheck_tm1.version import Tm1Capabilities
+
+from ..conftest import SNAPSHOT
 
 # Tm1ErrorsTest
 
@@ -583,7 +586,26 @@ def test_needs_exactly_one_of_a_binding_and_an_import() -> None:
         Tm1Operation(Tm1Operation.Kind.FUNCTION, "tm1.F", None, None)
 
 
-def test_has_one_descriptor_per_operation_endpoint(spec: dict[str, object]) -> None:
+# OperationCatalogTest
+
+
+def test_has_one_descriptor_per_operation_endpoint_of_the_coverage_gate(spec: dict[str, object]) -> None:
     operations = {e["id"] for e in spec["endpoints"] if e["kind"] in ("Action", "Function", "ActionImport", "FunctionImport")}  # type: ignore[index]
     assert sorted(op.endpoint() for op in Tm1Operations.ALL) == sorted(operations)
-    assert len(Tm1Operations.ALL) == 105
+    assert len({op.endpoint() for op in Tm1Operations.ALL}) == len(Tm1Operations.ALL) == 105
+
+
+def test_every_capability_is_one_the_snapshot_has() -> None:
+    snapshot = Tm1Capabilities.parse(SNAPSHOT.read_bytes())
+    assert [op.endpoint() for op in Tm1Operations.ALL if not snapshot.supports(op.capability())] == []
+
+
+def test_carries_revisions_parameters_and_return_types() -> None:
+    assert Tm1Operations.CHORE_ACTIVATE.deprecated_in == "11.8.3"
+    mdx = Tm1Operations.EXECUTE_MDX
+    assert mdx.kind is Tm1Operation.Kind.ACTION
+    assert mdx.import_name == "ExecuteMDX"
+    assert mdx.parameters == (Tm1Operation.Parameter("MDX", "Edm.String", False),)
+    assert mdx.return_type == "tm1.Cellset"
+    assert mdx.added_in == "10.2.2.1"
+    assert any(op.deprecated() for op in Tm1Operations.ALL)
