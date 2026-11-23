@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 #
-# Formats the Java files a commit stages (./gradlew format: layout, unused imports, import order)
-# and stages them again, so checkFormat rarely has anything to fail on.
+# Formats the files a commit stages, each with its language's formatter, and stages them again:
 #
-# It never blocks a commit: if anything goes wrong it warns, and the commit goes through as staged;
-# the build's checkFormat is the backstop. It leaves alone:
-#   - a file with unstaged changes too, since re-staging it would commit those changes as well;
+#   *.java                     ./gradlew format (Spring Java Format: layout, imports)
+#   tm1-python/**/*.py         ruff format, and ruff's import order
+#   tm1-typescript/**          prettier (*.ts, *.mts, *.mjs, *.json)
+#   tm1-dotnet/**/*.cs         dotnet csharpier
+#
+# Then it checks them, and refuses the commit if a file still isn't formatted or a formatter
+# couldn't run: unformatted code shouldn't get into a commit. The message says what to install.
+# Each build checks the layout again (./gradlew build, pytest, npm test, dotnet build), and so do
+# the pre-push hook and CI.
+#
+# It leaves alone:
+#   - a file with unstaged changes too, since re-staging it would commit those changes as well.
+#     It says so; the checks after it still see the file;
 #   - rebases, merges and cherry-picks, which replay commits that were formatted when made;
 #   - CI, and any commit made with SKIP_FORMAT_HOOK=1.
 # Before formatting, it saves what was staged to refs/format-hook/backup (with a reflog), so
@@ -16,36 +25,109 @@
 warn() { echo "[format hook] $*" >&2; }
 
 [[ -n "$SKIP_FORMAT_HOOK" || -n "$CI" || -n "$GITHUB_ACTIONS" ]] && exit 0
-cd "$(git rev-parse --show-toplevel)" || exit 0
+top="$(git rev-parse --show-toplevel)" || exit 0
+cd "$top" || exit 0
 
 for state in rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD; do
 	[[ -e "$(git rev-parse --git-path "$state")" ]] && exit 0
 done
 
-files=()
+java=() python=() typescript=() dotnet=()
 while IFS= read -r -d '' file; do
+	case "$file" in
+		*.java) kind=java ;;
+		tm1-python/*.py) kind=python ;;
+		tm1-typescript/package-lock.json) continue ;;
+		tm1-typescript/*.ts | tm1-typescript/*.mts | tm1-typescript/*.mjs | tm1-typescript/*.json) kind=typescript ;;
+		tm1-dotnet/*.cs) kind=dotnet ;;
+		*) continue ;;
+	esac
 	if [[ -n "$(git diff --name-only -- "$file")" ]]; then
 		warn "not formatting $file: it has unstaged changes too"
-	else
-		files+=("$file")
+		continue
 	fi
-done < <(git diff --cached --name-only -z --diff-filter=ACMR -- '*.java')
-[[ ${#files[@]} -eq 0 ]] && exit 0
+	case "$kind" in
+		java) java+=("$file") ;;
+		python) python+=("$file") ;;
+		typescript) typescript+=("$file") ;;
+		dotnet) dotnet+=("$file") ;;
+	esac
+done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+all=("${java[@]}" "${python[@]}" "${typescript[@]}" "${dotnet[@]}")
+[[ ${#all[@]} -eq 0 ]] && exit 0
 
 # The files are fully staged, so the index alone records them as they were
-tree="$(git write-tree)" || { warn "couldn't snapshot the index; committing unformatted"; exit 0; }
+tree="$(git write-tree)" || { warn "couldn't snapshot the index"; exit 1; }
 parent=()
 git rev-parse -q --verify HEAD > /dev/null && parent=(-p HEAD)
 backup="$(git commit-tree "$tree" "${parent[@]}" -m "format hook: staged files before formatting")" \
-	&& git update-ref --create-reflog -m "before formatting ${#files[@]} file(s)" refs/format-hook/backup "$backup" \
-	|| { warn "couldn't save a backup; committing unformatted"; exit 0; }
+	&& git update-ref --create-reflog -m "before formatting ${#all[@]} file(s)" refs/format-hook/backup "$backup" \
+	|| { warn "couldn't save a backup"; exit 1; }
 
-if ! output="$(./gradlew -q format -PformatFiles="$(IFS=,; echo "${files[*]}")" 2>&1)"; then
-	warn "formatting failed; committing unformatted"
-	echo "$output" | tail -15 >&2
-	git checkout -- "${files[@]}"
-	exit 0
+failed=()
+refuse() {
+	failed+=("$1")
+	warn "$2"
+	[[ -n "${3:-}" ]] && echo "$3" | tail -15 >&2
+}
+
+# Paths as seen from a subfolder
+within() {
+	local prefix="$1/"
+	shift
+	local file
+	for file in "$@"; do printf '%s\0' "${file#"$prefix"}"; done
+}
+
+if [[ ${#java[@]} -gt 0 ]]; then
+	if ! output="$(./gradlew -q format -PformatFiles="$(IFS=,; echo "${java[*]}")" 2>&1)"; then
+		refuse Java "./gradlew format failed" "$output"
+		git checkout -- "${java[@]}"
+	fi
 fi
 
-git add -- "${files[@]}" || warn "couldn't stage the formatted files"
+if [[ ${#python[@]} -gt 0 ]]; then
+	if command -v ruff > /dev/null; then
+		ruff=(ruff)
+	elif python3 -m ruff --version > /dev/null 2>&1; then
+		ruff=(python3 -m ruff)
+	else
+		ruff=()
+	fi
+	if [[ ${#ruff[@]} -eq 0 ]]; then
+		refuse Python "ruff isn't installed: pip install -e './tm1-python[test]'"
+	else
+		# Import order is lint to ruff, layout to us: fix it here, then lay out
+		"${ruff[@]}" check -q --select I --fix "${python[@]}" > /dev/null 2>&1
+		if ! output="$("${ruff[@]}" format "${python[@]}" 2>&1 && "${ruff[@]}" format --check "${python[@]}" 2>&1)"; then
+			refuse Python "ruff format failed" "$output"
+		fi
+	fi
+fi
+
+if [[ ${#typescript[@]} -gt 0 ]]; then
+	if [[ ! -x tm1-typescript/node_modules/.bin/prettier ]]; then
+		refuse TypeScript "prettier isn't installed: (cd tm1-typescript && npm ci)"
+	elif ! output="$(cd tm1-typescript && within tm1-typescript "${typescript[@]}" | xargs -0 node_modules/.bin/prettier --log-level warn --write 2>&1 \
+		&& within tm1-typescript "${typescript[@]}" | xargs -0 node_modules/.bin/prettier --log-level warn --check 2>&1)"; then
+		refuse TypeScript "prettier failed" "$output"
+	fi
+fi
+
+if [[ ${#dotnet[@]} -gt 0 ]]; then
+	if ! (cd tm1-dotnet && { dotnet csharpier --version > /dev/null 2>&1 || dotnet tool restore > /dev/null 2>&1; } && dotnet csharpier --version > /dev/null 2>&1); then
+		refuse .NET "CSharpier isn't installed: (cd tm1-dotnet && dotnet tool restore)"
+	elif ! output="$(cd tm1-dotnet && within tm1-dotnet "${dotnet[@]}" | xargs -0 dotnet csharpier format 2>&1 \
+		&& within tm1-dotnet "${dotnet[@]}" | xargs -0 dotnet csharpier check 2>&1)"; then
+		refuse .NET "CSharpier failed" "$output"
+	fi
+fi
+
+git add -- "${all[@]}" || { warn "couldn't stage the formatted files"; exit 1; }
+
+if [[ ${#failed[@]} -gt 0 ]]; then
+	warn "commit refused: ${failed[*]} files couldn't be formatted or checked."
+	warn "Fix what's above and commit again, or commit as staged with SKIP_FORMAT_HOOK=1."
+	exit 1
+fi
 exit 0

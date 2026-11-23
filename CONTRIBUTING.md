@@ -48,6 +48,24 @@ fully qualified type names in code; `format` fixes all but the last. In a Javado
 write `@` as `&#64;` inside `<pre class="code">`, as Spring does: the formatter takes an `@` at
 the start of a line for a block tag and breaks the comment, which the check also reports.
 
+**The other clients have the same guard rails.** Each has a formatter that decides the layout, at
+160 columns, and its ordinary build or test command fails on a file the formatter would change:
+
+| | Formatter | Fix | Checked by | Lint |
+|---|---|---|---|---|
+| Java | Spring Java Format | `./gradlew format` | `./gradlew build` | Error Prone, NullAway |
+| Python | Ruff | `ruff format tm1-python && ruff check --fix tm1-python` | `pytest` (`tests/test_format.py`) | Ruff |
+| TypeScript | Prettier | `npm run format` | `npm test` | ESLint, strict `tsc` |
+| .NET | CSharpier | `dotnet csharpier format tm1-dotnet` | `dotnet build` | .NET analyzers, warnings as errors |
+
+The pre-commit hook formats what you stage in all four, and refuses the commit if a formatter
+can't run or a file still isn't formatted. Install the tools once: `pip install -e
+'./tm1-python[test]'`, `npm ci` in `tm1-typescript`, and `dotnet tool restore` in `tm1-dotnet`.
+The pre-push hook runs the same checks on every commit that touches a client, and CI runs them
+again. Generated code is never formatted, and neither are the recorded fixtures in
+`spec/conformance`. Rules a client doesn't follow are listed, each with its reason, in
+`tm1-python/ruff.toml`, `tm1-typescript/eslint.config.mjs` and `tm1-dotnet/Directory.Build.props`.
+
 **Public API needs Javadoc.** In the published libraries, every public class, method, constructor
 and record component is documented, with `@param` and `@return`. `./gradlew build` runs Javadoc
 and fails on any gap. For a Lombok `@Getter`, put the `@return` line in the field's Javadoc;
