@@ -96,6 +96,57 @@ describe("Tm1SessionPool", () => {
     }
   });
 
+  it("gives different credentials for the same name their own session", async () => {
+    const carol = pool.session(Tm1Identity.withCredentials("carol", Tm1Authenticator.basic("carol", "c")));
+    expect(pool.session(Tm1Identity.withCredentials("Carol", Tm1Authenticator.basic("carol", "c"))), "the same credentials, made again").toBe(carol);
+    await carol.execute(SERVER);
+
+    const other = pool.session(Tm1Identity.withCredentials("carol", Tm1Authenticator.basic("carol", "wrong")));
+    expect(other, "never the session someone else's credentials opened").not.toBe(carol);
+    await other.execute(SERVER);
+    expect(
+      tm1.requests(ScriptedTm1.LOGIN).map((r) => r.authorization),
+      "each logs in with what it was given",
+    ).toEqual(["Basic Y2Fyb2w6Yw==", "Basic Y2Fyb2w6d3Jvbmc="]);
+    expect(pool.stats().held).toBe(2);
+    expect(pool.session(Tm1Identity.withCredentials("carol", Tm1Authenticator.basic("carol", "c"))), "and the first is still its own").toBe(carol);
+  });
+
+  it("shares a session for the same authenticator when its credentials can't be compared", () => {
+    const passport = Tm1Authenticator.camPassport(() => "p1");
+    const dave = pool.session(Tm1Identity.withCredentials("dave", passport));
+    expect(pool.session(Tm1Identity.withCredentials("dave", passport))).toBe(dave);
+    expect(
+      pool.session(
+        Tm1Identity.withCredentials(
+          "dave",
+          Tm1Authenticator.camPassport(() => "p1"),
+        ),
+      ),
+    ).not.toBe(dave);
+    expect(Tm1Authenticator.camPassport("p1").equals(Tm1Authenticator.camPassport("p1"))).toBe(true);
+    expect(Tm1Authenticator.camPassport("p1").equals(Tm1Authenticator.camPassport("p2"))).toBe(false);
+    const logon = Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "d");
+    expect(logon.equals(Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "d"))).toBe(true);
+    expect(logon.equals(Tm1Authenticator.cognosLogon("http://cognos:9300", "LDAP", "dave", "other"))).toBe(false);
+  });
+
+  it("evicts each of a name's sessions on its own", async () => {
+    await pool.close();
+    pool = build((b) => b.maxSize(2));
+    const right = Tm1Identity.withCredentials("carol", Tm1Authenticator.camPassport("p1"));
+    const renewed = Tm1Identity.withCredentials("carol", Tm1Authenticator.camPassport("p2"));
+    const first = pool.session(right);
+    const second = pool.session(renewed);
+    pool.session(Tm1Identity.impersonating("bob"));
+
+    expect(pool.stats().evictedSize, "the least recently used of the two").toBe(1);
+    expect(pool.session(renewed)).toBe(second);
+    expect(pool.session(right), "a new one for the passport whose session was evicted").not.toBe(first);
+    expect(right.equals(renewed)).toBe(false);
+    expect(right.equals(Tm1Identity.withCredentials("Carol", Tm1Authenticator.camPassport("p1")))).toBe(true);
+  });
+
   it("keeps a session while a request is running on it", async () => {
     const answer = new Pending();
     tm1.on("GET Server", answer.reply);
