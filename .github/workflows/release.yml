@@ -13,10 +13,9 @@
 # Repo secrets needed:
 #   MAVEN_CENTRAL_USERNAME / MAVEN_CENTRAL_PASSWORD  - Central Portal user token
 #   SIGNING_KEY / SIGNING_KEY_PASSWORD               - ASCII-armored GPG private key
-#   NPM_TOKEN                                        - npm granular token, read and write on @skipcheck
-# PyPI and NuGet need none: each trusts this workflow by name (PyPI: each project's Publishing
-# settings; NuGet: the account's Trusted Publishing policy for Skipcheck.*), so renaming this file
-# breaks publishing. NuGet also needs the repository variable NUGET_USER, the nuget.org user name.
+# PyPI, NuGet and npm need none: each trusts this workflow by name (PyPI: each project's Publishing
+# settings; NuGet: the account's Trusted Publishing policy for Skipcheck.*; npm: each package's
+# Trusted Publisher setting), so renaming this file breaks publishing. NuGet also needs the repository variable NUGET_USER, the nuget.org user name.
 name: Release
 
 on:
@@ -194,7 +193,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      # For npm's provenance: the packages say which commit and workflow built them
+      # npm takes this job's identity token instead of a stored token (trusted publishing), and
+      # records the commit and workflow that built each package (provenance)
       id-token: write
     defaults:
       run:
@@ -203,7 +203,8 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          # Trusted publishing needs npm 11.5.1 or later, which Node 24 brings
+          node-version: '24'
           registry-url: https://registry.npmjs.org
           cache: npm
           cache-dependency-path: typescript/package-lock.json
@@ -252,6 +253,4 @@ jobs:
 
       - name: Publish ${{ steps.plan.outputs.version }} to npm
         if: steps.plan.outputs.publish == 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --tag "${{ steps.plan.outputs.tag }}" -w tm1-client -w tm1-testcontainers
