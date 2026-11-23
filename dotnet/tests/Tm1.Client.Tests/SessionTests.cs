@@ -222,12 +222,16 @@ public class SessionTests
         Assert.Empty(_tm1.Requests);
     }
 
+    /// <summary>The Java client's <c>ApiSpecInventoryTest</c>: the spec the coverage gate counts lists
+    /// the endpoints of the snapshot it was made from, so every client is held to one inventory.</summary>
     [Fact]
-    public void ReadsTheSnapshotIntoTheSpecsInventory()
+    public void SpecListsTheEndpointsTheCoverageGateCounts()
     {
         var caps = Version.Tm1Capabilities.Parse(File.ReadAllText(Repo.Snapshot));
         Assert.Equal("11.8.35", caps.SchemaVersion);
         Assert.True(caps.Endpoints.SetEquals(CoverageGateTests.Endpoints()));
+        using var spec = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Repo.Spec));
+        Assert.Equal(caps.SchemaVersion, spec.RootElement.GetProperty("source").GetProperty("schemaVersion").GetString());
     }
 
     [Fact]
