@@ -7,7 +7,9 @@ these tests call ``evict_expired()``, which is when this pool does it."""
 from __future__ import annotations
 
 import asyncio
+import logging
 import threading
+import time
 from typing import Any
 
 import httpx
@@ -280,6 +282,50 @@ def test_sweeps_expired_sessions(rt: Runtime, clock: Clock) -> None:
     clock.advance(30)
     rt.run(p.evict_expired())
     assert alice.is_closed
+
+
+def test_sweeps_expired_sessions_on_its_own(rt: Runtime, clock: Clock) -> None:
+    # Java's pool sweeps on its scheduler; this one sweeps while sweep_forever() runs, as a task or a thread
+    p = pool(rt, clock, sweep_interval=0.01)
+    alice = p.session(Tm1Identity.impersonating("alice"))
+    rt.run(alice.execute(SERVER))
+    if rt.loop is None:
+        sweeper = threading.Thread(target=p.sweep_forever, daemon=True)
+        sweeper.start()
+
+        def wait() -> None:
+            time.sleep(0.1)
+    else:
+        sweeper = rt.loop.create_task(p.sweep_forever())
+
+        def wait() -> None:
+            rt.run(asyncio.sleep(0.1))
+
+    try:
+        clock.advance(11 * 60)
+        wait()
+        assert p.stats().held == 0
+        clock.advance(30)
+        wait()
+        assert alice.is_closed
+    finally:
+        rt.run(p.close())
+        if rt.loop is None:
+            sweeper.join(5)
+        else:
+            rt.run(asyncio.wait_for(sweeper, 5))
+
+
+def test_observes_evictions_with_their_reason(rt: Runtime, clock: Clock, caplog: pytest.LogCaptureFixture) -> None:
+    # Java observes evictions with Micrometer; this pool logs them to ``skipcheck_tm1`` with their reason
+    caplog.set_level(logging.DEBUG, logger="skipcheck_tm1")
+    p = pool(rt, clock)
+    p.session(Tm1Identity.impersonating("alice"))
+    clock.advance(10 * 60)
+    p.session(Tm1Identity.impersonating("alice"))
+    evictions = [r.getMessage() for r in caplog.records if r.name == "skipcheck_tm1" and r.getMessage().startswith("Evicting the TM1 session")]
+    assert len(evictions) == 1
+    assert "(idle)" in evictions[0]
 
 
 def test_closes_every_session_at_once_including_those_in_their_grace_period(rt: Runtime, clock: Clock) -> None:
