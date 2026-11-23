@@ -19,6 +19,8 @@ export default defineConfig({
     ],
   },
   test: {
+    // With TEST_RESULTS set (./gradlew checkTypescript sets it), a JUnit report too, for scripts/test-summary.py
+    reporters: process.env.TEST_RESULTS ? ["default", ["junit", { outputFile: `${process.env.TEST_RESULTS}/tm1-client.xml` }]] : ["default"],
     testTimeout: 20_000,
     // The live tests' setup may start TM1 in Docker: a bundle's first install takes minutes
     hookTimeout: 10 * 60_000,
