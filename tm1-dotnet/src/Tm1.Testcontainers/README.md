@@ -1,6 +1,6 @@
 # Skipcheck.Tm1.Testcontainers
 
-The .NET port of the Java [`tm1-testcontainers`](../../../tm1-testcontainers) module, built on [Testcontainers for .NET](https://dotnet.testcontainers.org/). It runs TM1 and the rest of Planning Analytics in Docker for tests. It reads the same settings in the same order and uses the same images, mounts and cache volume as the Java module, so a bundle unpacked for the Java tests is reused here.
+The .NET port of the Java [`tm1-testcontainers`](../../../java/tm1-testcontainers) module, built on [Testcontainers for .NET](https://dotnet.testcontainers.org/). It runs TM1 and the rest of Planning Analytics in Docker for tests. It reads the same settings in the same order and uses the same images, mounts and cache volume as the Java module, so a bundle unpacked for the Java tests is reused here.
 
 The images contain no IBM software. A source supplies it: `TM1_PRIVATE_IMAGE`, `TM1_HOME_DIR`, `TM1_INSTALL_VOLUME`, `TM1_BUNDLE_DIR` (with `TM1_BUNDLE`) or `TM1_BUNDLE_URL` (with `TM1_BUNDLE_SHA256`). You can set each one as an environment variable or as an `AppContext` switch, which is .NET's counterpart of a Java system property.
 

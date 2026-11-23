@@ -19,8 +19,8 @@ from skipcheck_tm1.aio import AsyncTm1Client, AsyncTm1Session
 REPO = Path(__file__).resolve().parents[2]
 SPEC = REPO / "spec" / "tm1-api.json"
 CONFORMANCE = REPO / "spec" / "conformance"
-PAYLOADS = REPO / "tm1-client" / "src" / "test" / "resources" / "payloads"
-SNAPSHOT = REPO / "tm1-client" / "src" / "model" / "metadata" / "tm1-schema-11.8.35.xml"
+PAYLOADS = REPO / "java" / "tm1-client" / "src" / "test" / "resources" / "payloads"
+SNAPSHOT = REPO / "java" / "tm1-client" / "src" / "model" / "metadata" / "tm1-schema-11.8.35.xml"
 BASE = "http://tm1:8010/api/v1/"
 
 

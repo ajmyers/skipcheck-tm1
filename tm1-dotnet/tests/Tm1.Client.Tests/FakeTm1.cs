@@ -21,11 +21,11 @@ public static class Repo
 
     public static string Conformance => Path.Combine(Root, "spec", "conformance");
 
-    public static string Payloads => Path.Combine(Root, "tm1-client", "src", "test", "resources", "payloads", "11.8.35");
+    public static string Payloads => Path.Combine(Root, "java", "tm1-client", "src", "test", "resources", "payloads", "11.8.35");
 
-    public static string Snapshot => Path.Combine(Root, "tm1-client", "src", "model", "metadata", "tm1-schema-11.8.35.xml");
+    public static string Snapshot => Path.Combine(Root, "java", "tm1-client", "src", "model", "metadata", "tm1-schema-11.8.35.xml");
 
-    public static string JavaServices => Path.Combine(Root, "tm1-client", "src", "main", "java", "io", "skipcheck", "tm1", "client", "service");
+    public static string JavaServices => Path.Combine(Root, "java", "tm1-client", "src", "main", "java", "io", "skipcheck", "tm1", "client", "service");
 
     private static string Find()
     {

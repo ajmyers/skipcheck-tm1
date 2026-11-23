@@ -54,7 +54,7 @@ describe("coverage gate", () => {
   });
 
   it("excludes what the Java client excludes", () => {
-    const java = readFileSync(join(Repo.root, "tm1-client", "src", "test", "resources", "metadata", "coverage-excluded.txt"), "utf8");
+    const java = readFileSync(join(Repo.root, "java", "tm1-client", "src", "test", "resources", "metadata", "coverage-excluded.txt"), "utf8");
     const ids = (text: string): string[] =>
       text
         .split("\n")

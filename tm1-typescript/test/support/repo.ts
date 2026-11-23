@@ -22,13 +22,13 @@ export const Repo = {
     return join(this.root, "spec", "conformance");
   },
   get payloads(): string {
-    return join(this.root, "tm1-client", "src", "test", "resources", "payloads", "11.8.35");
+    return join(this.root, "java", "tm1-client", "src", "test", "resources", "payloads", "11.8.35");
   },
   get snapshot(): string {
-    return join(this.root, "tm1-client", "src", "model", "metadata", "tm1-schema-11.8.35.xml");
+    return join(this.root, "java", "tm1-client", "src", "model", "metadata", "tm1-schema-11.8.35.xml");
   },
   get javaClient(): string {
-    return join(this.root, "tm1-client", "src", "main", "java", "io", "skipcheck", "tm1", "client");
+    return join(this.root, "java", "tm1-client", "src", "main", "java", "io", "skipcheck", "tm1", "client");
   },
   get javaServices(): string {
     return join(this.javaClient, "service");

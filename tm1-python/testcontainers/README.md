@@ -2,7 +2,7 @@
 
 Run tests against a real IBM Planning Analytics (TM1) server in Docker, with
 [testcontainers-python](https://testcontainers-python.readthedocs.io). The Python port of the
-Java [`tm1-testcontainers`](../../tm1-testcontainers/README.md) module: the same classes, sources,
+Java [`tm1-testcontainers`](../../java/tm1-testcontainers/README.md) module: the same classes, sources,
 settings, images, mounts and messages, named the Python way. Built on the
 [`tm1-server`](../../docker/tm1-server) image.
 

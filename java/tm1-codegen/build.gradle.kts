@@ -23,7 +23,7 @@ sourceSets.main {
 	resources.include("tm1-overlay.json")
 }
 
-val snapshot = rootDir.resolve("tm1-client/src/model/metadata/tm1-schema-11.8.35.xml")
+val snapshot = rootDir.resolve("java/tm1-client/src/model/metadata/tm1-schema-11.8.35.xml")
 val spec = rootDir.resolve("spec/tm1-api.json")
 
 tasks.test {

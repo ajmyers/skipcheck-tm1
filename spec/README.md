@@ -3,7 +3,7 @@
 Every client in this repository (Java, Python, .NET, TypeScript, and any added later) is generated from the same files, and has its coverage counted against the same list of endpoints.
 
 ```
-tm1-client/src/model/metadata/tm1-schema-<v>.xml   TM1's $metadata, as captured (the source of truth)
+java/tm1-client/src/model/metadata/tm1-schema-<v>.xml   TM1's $metadata, as captured (the source of truth)
 spec/tm1-overlay.json                              what TM1 does differently from its $metadata (hand-written)
         │  tm1-codegen  (./gradlew :tm1-codegen:exportSpec)
         ▼
@@ -35,7 +35,7 @@ Every client has a coverage gate over this list. An endpoint is implemented, exc
 
 | Client | Gate | Lists | Implemented |
 |---|---|---|---|
-| Java | `tm1-client` `CoverageGateTest` | `tm1-client/src/test/resources/metadata/coverage-*.txt` | 240 (2 excluded as duplicates) |
+| Java | `tm1-client` `CoverageGateTest` | `java/tm1-client/src/test/resources/metadata/coverage-*.txt` | 240 (2 excluded as duplicates) |
 | Python (sync and asyncio, counted separately) | `tm1-python/tests/test_coverage_gate.py` | `tm1-python/coverage/*.txt` | 242 each (the generated `tm1.api`; the services match Java's 240) |
 | .NET | `tm1-dotnet/tests/.../CoverageGateTests.cs` | `tm1-dotnet/coverage/*.txt` | as Java's: 240, the same 2 excluded |
 | TypeScript | `tm1-typescript/test/coverage-gate.test.ts` | `tm1-typescript/coverage/*.txt` | as Java's: 240, the same 2 excluded |

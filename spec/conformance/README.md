@@ -76,7 +76,7 @@ A case a language can't express goes in that client's `conformance/unsupported.t
 
 ### Adding cases
 
-1. Write the Java unit test in `tm1-client/src/test/java/…/<package>/<Name>ServiceTest.java`:
+1. Write the Java unit test in `java/tm1-client/src/test/java/…/<package>/<Name>ServiceTest.java`:
 
    ```java
    @RegisterExtension

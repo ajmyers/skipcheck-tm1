@@ -1,6 +1,6 @@
 """The generated model: reading what TM1 sends, and writing only what was set.
 
-The payloads are the Java client's (tm1-client/src/test/resources/payloads), captured from a
+The payloads are the Java client's (java/tm1-client/src/test/resources/payloads), captured from a
 real TM1: both clients must read them the same and write them back unchanged.
 """
 

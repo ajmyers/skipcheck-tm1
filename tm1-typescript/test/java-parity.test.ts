@@ -129,7 +129,7 @@ function problems(file: string): string[] {
 }
 
 /** The TypeScript client offers what the Java client does, method for method, read from the Java
- * sources (tm1-client/src/main/java/.../service), as the Python and .NET clients' parity tests:
+ * sources (java/tm1-client/src/main/java/.../service), as the Python and .NET clients' parity tests:
  * each Java class is an export of the same name; each public method has the same name, implements
  * the same `@Tm1Endpoint` IDs (in the class's `endpoints` table), and takes Java's parameters, by
  * Java's names, in order (an `ODataQuery` is `query`; overloads become optional parameters or

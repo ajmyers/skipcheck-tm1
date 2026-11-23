@@ -9,7 +9,7 @@ using Skipcheck.Tm1.Client.Services;
 namespace Skipcheck.Tm1.Client.Tests;
 
 /// <summary>The .NET client offers what the Java client does, method for method, read from the
-/// Java sources (tm1-client/src/main/java/.../service), as the Python client's test_java_parity.py:
+/// Java sources (java/tm1-client/src/main/java/.../service), as the Python client's test_java_parity.py:
 /// each Java class is a class of the same name in <c>Skipcheck.Tm1.Client.Services</c>; each public
 /// method is named in Pascal case, with <c>Async</c> when Java returns a <c>Mono</c> or <c>Flux</c>
 /// (<c>modelCubes</c> → <c>ModelCubesAsync</c>), implements the same <c>@Tm1Endpoint</c> IDs, and

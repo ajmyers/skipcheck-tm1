@@ -1,7 +1,7 @@
 # tm1-testcontainers
 
 Run tests against a real IBM Planning Analytics (TM1) server in Docker, with
-[Testcontainers](https://testcontainers.com). Built on the [`tm1-server`](../docker/tm1-server)
+[Testcontainers](https://testcontainers.com). Built on the [`tm1-server`](../../docker/tm1-server)
 image.
 
 > **No IBM software is included.** You supply your own licensed TM1 Server for Linux, and
@@ -87,7 +87,7 @@ here too. If several are set, the first in this list wins.
 
 | Setting | TM1 comes from | Start time |
 |---|---|---|
-| `TM1_PRIVATE_IMAGE` | An image with TM1 built in, from a **private** registry ([how to build one](../docker/tm1-server/examples/private-image/Dockerfile)) | ~3 s |
+| `TM1_PRIVATE_IMAGE` | An image with TM1 built in, from a **private** registry ([how to build one](../../docker/tm1-server/examples/private-image/Dockerfile)) | ~3 s |
 | `TM1_HOME_DIR` | An installed `tm1_64` folder (the one with `bin64/tm1s.exe`), mounted read-only | ~3 s |
 | `TM1_INSTALL_VOLUME` | A Docker volume holding an install, e.g. compose's `tm1_tm1-install` | ~3 s |
 | `TM1_BUNDLE_DIR` (+ `TM1_BUNDLE`) | A folder holding IBM's `tm1server-*-linuxi38664h_bundle.tar.gz` (and the file to use, if there are several) | ~15 s the first time, then ~5 s |
@@ -108,7 +108,7 @@ build. By default the image's tag matches this library's version, and `edge` for
 
 **Apple Silicon:** TM1 runs under Rosetta, as with compose. Turn on *Use Rosetta for
 x86_64/amd64 emulation* in Docker Desktop (see the [getting-started
-guide](../docker/tm1-server/GETTING-STARTED.md#step-1-install-docker)).
+guide](../../docker/tm1-server/GETTING-STARTED.md#step-1-install-docker)).
 
 ## A whole environment
 
@@ -168,7 +168,7 @@ through its `withTm1Server`.
 
 ## Cognos (CAM) security
 
-`CognosContainer` runs IBM Cognos Analytics on the [`cognos-server`](../docker/cognos-server)
+`CognosContainer` runs IBM Cognos Analytics on the [`cognos-server`](../../docker/cognos-server)
 image, with test users you list. `Tm1ServerContainer.withCamSecurity` runs TM1 in CAM
 security against it, so each test user logs on to TM1 with their own identity and groups:
 
@@ -235,7 +235,7 @@ Cognos is found from these settings, first match wins:
 
 | Setting | Cognos comes from | Start time |
 |---|---|---|
-| `COGNOS_PRIVATE_IMAGE` | An image with Cognos built in, kept **private** or local ([how to build one](../docker/cognos-server/examples/private-image/Dockerfile)). Recommended. | ~2 min |
+| `COGNOS_PRIVATE_IMAGE` | An image with Cognos built in, kept **private** or local ([how to build one](../../docker/cognos-server/examples/private-image/Dockerfile)). Recommended. | ~2 min |
 | `COGNOS_INSTALL_VOLUME` | A Docker volume holding an install. Cognos writes into it, so one container at a time. | ~2 min |
 | `COGNOS_ZIP_DIR` (+ `COGNOS_ZIP`) | A folder holding IBM's `casrv-*-linuxi38664h.zip` | ~3 min, installing every time |
 | `COGNOS_ZIP_URL` (+ `COGNOS_ZIP_SHA256`) | A download link for the zip | download + ~3 min |
@@ -249,7 +249,7 @@ each container its own copy-on-write copy. `COGNOS_SERVER_IMAGE` swaps the
 ## TM1 Web
 
 `Tm1WebContainer` runs TM1 Web (Planning Analytics Spreadsheet Services) on the
-[`tm1-web`](../docker/tm1-web) image, pointed at a `Tm1ServerContainer`'s Admin Server.
+[`tm1-web`](../../docker/tm1-web) image, pointed at a `Tm1ServerContainer`'s Admin Server.
 `@RequiresTm1Web` works like `@RequiresTm1` (it includes it), skips tests unless a TM1 Web
 source is configured too, and injects one shared TM1 Web wired to the shared TM1 server:
 
@@ -286,7 +286,7 @@ tests use a small DWR client to prove TM1 Web can list and log on to the server.
 
 `PawContainer` runs IBM Planning Analytics Workspace (PAW) Local against a TM1 server.
 IBM ships PAW Local as Docker images in `ipa_workspace_local_<release>.<build>.zip`.
-`PawContainer` uses them as they are, through [`docker/paw`](../docker/paw/README.md)'s
+`PawContainer` uses them as they are, through [`docker/paw`](../../docker/paw/README.md)'s
 `paw-local.sh`, run inside a small Linux container. So it works the same on Windows, macOS and
 Linux, and the host needs only Docker. Users log on to PAW as users of the TM1 server.
 

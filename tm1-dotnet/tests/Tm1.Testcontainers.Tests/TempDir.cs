@@ -46,15 +46,15 @@ public static class Repo
 {
     public static string Root { get; } = Find();
 
-    public static string JavaSources => Path.Combine(Root, "tm1-testcontainers", "src", "main", "java", "io", "skipcheck", "tm1", "testcontainers");
+    public static string JavaSources => Path.Combine(Root, "java", "tm1-testcontainers", "src", "main", "java", "io", "skipcheck", "tm1", "testcontainers");
 
     private static string Find()
     {
         var dir = AppContext.BaseDirectory;
-        while (dir is not null && !Directory.Exists(Path.Combine(dir, "tm1-testcontainers")))
+        while (dir is not null && !File.Exists(Path.Combine(dir, "settings.gradle.kts")))
         {
             dir = Path.GetDirectoryName(dir);
         }
-        return dir ?? throw new InvalidOperationException("Can't find the repository root (tm1-testcontainers)");
+        return dir ?? throw new InvalidOperationException("Can't find the repository root (settings.gradle.kts)");
     }
 }

@@ -20,7 +20,7 @@ import skipcheck_tm1.aio as aio
 from skipcheck_tm1 import auth, errors, odata, version
 
 ROOT = Path(__file__).resolve().parents[3]
-JAVA = ROOT / "tm1-client" / "src" / "main" / "java" / "io" / "skipcheck" / "tm1" / "client"
+JAVA = ROOT / "java" / "tm1-client" / "src" / "main" / "java" / "io" / "skipcheck" / "tm1" / "client"
 
 SKIP_ALWAYS = {"toString", "equals", "hashCode", "compareTo"}
 

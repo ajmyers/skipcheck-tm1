@@ -1,5 +1,5 @@
 """The Python client offers what the Java client does, method for method, read from the Java
-sources themselves (tm1-client/src/main/java/.../service):
+sources themselves (java/tm1-client/src/main/java/.../service):
 
 * each Java service class is a Python class of the same name, in the module named after its
   package (``service/cube/CubeService.java`` → ``skipcheck_tm1.aio.services.cube.CubeService``);
@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-JAVA = ROOT / "tm1-client" / "src" / "main" / "java" / "io" / "skipcheck" / "tm1" / "client"
+JAVA = ROOT / "java" / "tm1-client" / "src" / "main" / "java" / "io" / "skipcheck" / "tm1" / "client"
 SERVICES = JAVA / "service"
 
 _METHOD = re.compile(r"^\s+public\s+(?:static\s+)?(?:<[^>]+>\s+)?(?:[\w.<>\[\]?, ]+?)\s+(\w+)\s*\(([^)]*)\)\s*(?:throws [\w., ]+)?\{", re.M)

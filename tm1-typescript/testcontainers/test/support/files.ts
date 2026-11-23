@@ -44,9 +44,9 @@ export function without(values: Record<string, string>, ...names: string[]): Rec
 
 function findRoot(): string {
   let dir = dirname(fileURLToPath(import.meta.url));
-  while (!existsSync(join(dir, "tm1-testcontainers"))) {
+  while (!existsSync(join(dir, "settings.gradle.kts"))) {
     const parent = dirname(dir);
-    if (parent === dir) throw new Error("Can't find the repository root (tm1-testcontainers)");
+    if (parent === dir) throw new Error("Can't find the repository root (settings.gradle.kts)");
     dir = parent;
   }
   return dir;
@@ -56,7 +56,7 @@ function findRoot(): string {
 export const Repo = {
   root: findRoot(),
   get javaSources(): string {
-    return join(this.root, "tm1-testcontainers", "src", "main", "java", "io", "skipcheck", "tm1", "testcontainers");
+    return join(this.root, "java", "tm1-testcontainers", "src", "main", "java", "io", "skipcheck", "tm1", "testcontainers");
   },
   get typescriptSources(): string {
     return join(this.root, "tm1-typescript", "testcontainers", "src");
