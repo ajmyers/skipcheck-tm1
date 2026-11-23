@@ -22,17 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * {@linkplain PawContainer#shared() shared PAW}, which logs users on to the shared TM1
  * server:
  *
- * <pre class="code">
- * &#64;RequiresPaw
- * class WorkspaceTest {
- *
- *     &#64;Test
- *     void opensPaw(PawContainer paw, Tm1ServerContainer tm1) {
- *         String url = paw.getUrl();   // http://localhost:54321/
- *         ...
- *     }
- * }
- * </pre>
+ * {@snippet class = examples.RequiresTm1Examples region = paw}
  */
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)

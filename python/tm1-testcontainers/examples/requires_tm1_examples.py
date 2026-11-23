@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
-"""Examples for RequiresTm1, quoted in the guide: pytest tests, type-checked but never run here."""
+"""Examples for RequiresTm1, RequiresTm1Web, RequiresPaw and RequiresCognos, quoted in the guide: pytest
+tests, type-checked but never run here."""
 
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ import pytest
 
 from skipcheck_tm1 import Tm1Client, Tm1Error, Tm1Version
 from skipcheck_tm1.model import DimensionPatch, ElementPatch, ElementType, HierarchyPatch
-from skipcheck_tm1_testcontainers import Tm1ServerContainer
+from skipcheck_tm1_testcontainers import CognosContainer, CognosSource, PawContainer, Tm1ServerContainer, Tm1WebContainer
 
 # @start region = test-class
 # Every test in the module needs TM1, and is skipped without one
@@ -53,4 +54,31 @@ def test_needs_a_recent_server(tm1_server: Tm1ServerContainer) -> None:
     if not tm1_server.tm1_version.is_at_least(introduced_in):
         pytest.skip(f"needs TM1 {introduced_in} or newer")
     # ...
+    # @end
+
+
+# @start region = tm1-web
+@pytest.mark.requires_tm1_web
+def test_opens_a_websheet(tm1_web: Tm1WebContainer) -> None:
+    # http://localhost:54321/tm1web/, which lists the shared TM1 server
+    assert tm1_web.url.endswith("/tm1web/")
+    # ...
+    # @end
+
+
+# @start region = paw
+@pytest.mark.requires_paw
+def test_opens_paw(paw: PawContainer) -> None:
+    # http://localhost:54321/, which logs on to the shared TM1 server
+    assert paw.url.startswith("http://")
+    # ...
+    # @end
+
+
+# @start region = cognos
+@pytest.mark.requires_cognos
+def test_readers_can_only_read(cognos: CognosSource) -> None:
+    # No shared Cognos: each test starts its own, with the users it needs
+    with CognosContainer(cognos).with_user("viewer", "viewerpw", "Readers"):
+        ...
     # @end

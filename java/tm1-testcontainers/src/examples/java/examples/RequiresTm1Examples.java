@@ -3,6 +3,7 @@
 package examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.time.Duration;
@@ -21,12 +22,20 @@ import io.skipcheck.tm1.client.model.ElementPatch;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.HierarchyPatch;
 import io.skipcheck.tm1.client.version.Tm1Version;
+import io.skipcheck.tm1.testcontainers.CognosContainer;
+import io.skipcheck.tm1.testcontainers.CognosSource;
+import io.skipcheck.tm1.testcontainers.PawContainer;
+import io.skipcheck.tm1.testcontainers.RequiresCognos;
+import io.skipcheck.tm1.testcontainers.RequiresPaw;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
+import io.skipcheck.tm1.testcontainers.RequiresTm1Web;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.testcontainers.Tm1WebContainer;
 
 /**
- * Examples for {@link RequiresTm1}, quoted in its Javadoc: JUnit test classes, compiled
- * but never run.
+ * Examples for {@link RequiresTm1}, {@link RequiresTm1Web}, {@link RequiresPaw} and
+ * {@link RequiresCognos}, quoted in their Javadoc: JUnit test classes, compiled but never
+ * run.
  */
 final class RequiresTm1Examples {
 
@@ -88,6 +97,50 @@ final class RequiresTm1Examples {
 			Tm1Version introducedIn = Tm1Version.parse("11.8.03000");
 			assumeTrue(tm1.getTm1Version().isAtLeast(introducedIn), "needs TM1 " + introducedIn + " or newer");
 			// ...
+		}
+
+	}
+	// @end
+
+	// @start region = tm1-web
+	@RequiresTm1Web
+	static class WebsheetTest {
+
+		@Test
+		void opensAWebsheet(Tm1WebContainer web) {
+			// http://localhost:54321/tm1web/, which lists the shared TM1 server
+			assertTrue(web.getUrl().endsWith("/tm1web/"));
+			// ...
+		}
+
+	}
+	// @end
+
+	// @start region = paw
+	@RequiresPaw
+	static class WorkspaceTest {
+
+		@Test
+		void opensPaw(PawContainer paw) {
+			// http://localhost:54321/, which logs on to the shared TM1 server
+			assertTrue(paw.getUrl().startsWith("http://"));
+			// ...
+		}
+
+	}
+	// @end
+
+	// @start region = cognos
+	@RequiresCognos
+	static class CamSecurityTest {
+
+		@Test
+		void readersCanOnlyRead(CognosSource cognosSource) {
+			// No shared Cognos: each test starts its own, with the users it needs
+			try (var cognos = new CognosContainer(cognosSource).withUser("viewer", "viewerpw", "Readers")) {
+				cognos.start();
+				// ...
+			}
 		}
 
 	}

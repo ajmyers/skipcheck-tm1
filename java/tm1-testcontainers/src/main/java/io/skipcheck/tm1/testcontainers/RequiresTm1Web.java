@@ -20,17 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * {@link Tm1WebContainer} parameter to get the {@linkplain Tm1WebContainer#shared()
  * shared TM1 Web}, which lists and logs on to the shared TM1 server:
  *
- * <pre class="code">
- * &#64;RequiresTm1Web
- * class WebsheetTest {
- *
- *     &#64;Test
- *     void opensAWebsheet(Tm1WebContainer web, Tm1ServerContainer tm1) {
- *         String url = web.getUrl();   // http://localhost:54321/tm1web/
- *         ...
- *     }
- * }
- * </pre>
+ * {@snippet class = examples.RequiresTm1Examples region = tm1-web}
  */
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
