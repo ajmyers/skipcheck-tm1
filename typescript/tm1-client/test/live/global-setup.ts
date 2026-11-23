@@ -40,7 +40,7 @@ const env = (name: string): string | undefined => {
 export default async function setup(project: TestProject): Promise<(() => Promise<void>) | void> {
   const url = env("TM1_URL");
   if (url) {
-    const target = { url, user: env("TM1_USER") ?? "admin", password: env("TM1_PASSWORD") ?? "apple", namespace: env("TM1_NAMESPACE") };
+    const target = { url, user: env("TM1_USER") ?? "admin", password: process.env["TM1_PASSWORD"] ?? "apple", namespace: env("TM1_NAMESPACE") };
     project.provide("liveTm1", { target: { ...target, containerId: undefined, version: undefined } });
     return;
   }
