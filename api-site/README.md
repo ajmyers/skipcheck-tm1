@@ -83,6 +83,7 @@ has one, and isn't required.
 | `scripts/members.mjs` | Which member is which across languages, and the gate that each language has every Java member or lists it with the reason. |
 | `scripts/search.mjs` | The search index of each docs language, `search.json` beside its pages: every type and member, a short summary, and where it is. `reference.mjs` writes it from the data it renders the pages with. |
 | `scripts/pages.mjs` | The landing pages and the walkthroughs. |
+| `scripts/sitemap.mjs` | `/docs/sitemap.xml`: every generated page but the Javadoc, for search engines. skipcheck.io's `robots.txt` names it. |
 | `scripts/walkthroughs.mjs` | Each project's walkthroughs, from `content/walkthroughs/`. |
 | `scripts/output.mjs` | What the examples printed (`example-output/`), and the checks on it. |
 | `scripts/docker.mjs` | The Docker pages, from the READMEs. |

@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { inline, parse, slug } from '../scripts/markdown.mjs';
 import { docsVersion, installCommands, packageOf } from '../scripts/packages.mjs';
 import { judge, sourceHash } from '../scripts/output.mjs';
+import { addressOf, sitemapXml } from '../scripts/sitemap.mjs';
 import { head, languagesOf, PROJECTS, regions, SECTIONS } from '../scripts/site.mjs';
 import { examplesOf, typesUsed, walkthroughsOf } from '../scripts/walkthroughs.mjs';
 
@@ -158,4 +159,14 @@ test("a walkthrough's examples are read from its steps, and the types they use f
 	const accessors = new Map([['cellsets', 'CellsetService'], ['session', 'Tm1Session']]);
 	const code = 'Cellset cellset = tm1.cellsets().execute(mdx, ODataQuery.none());\nTm1ClientBuilder b;\nx.ODataQueryFoo();';
 	assert.deepEqual([...typesUsed(code, ['Tm1Client', 'ODataQuery', 'Cellset', 'Tm1Session'], accessors)].sort(), ['Cellset', 'CellsetService', 'ODataQuery']);
+});
+
+test("a page's address in the sitemap is its folder for an index.html, and its file otherwise", () => {
+	assert.equal(addressOf('tm1-client/index.html'), 'https://skipcheck.io/tm1-client/');
+	assert.equal(addressOf('tm1-client/walkthroughs/cells/index.html'), 'https://skipcheck.io/tm1-client/walkthroughs/cells/');
+	assert.equal(addressOf('tm1-client/docs/java/CubeService.html'), 'https://skipcheck.io/tm1-client/docs/java/CubeService.html');
+	assert.equal(
+		sitemapXml(['https://skipcheck.io/a/?x=1&y=2']),
+		'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://skipcheck.io/a/?x=1&amp;y=2</loc></url>\n</urlset>\n',
+	);
 });

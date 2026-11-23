@@ -5,8 +5,8 @@
   "description": "Builds and serves each project's landing page, docs and API reference at skipcheck.io/<project>/",
   "scripts": {
     "test": "node --test \"test/*.test.mjs\"",
-    "assemble": "node scripts/assemble.mjs && node scripts/extract.mjs && node scripts/reference.mjs && node scripts/pages.mjs && node scripts/docker.mjs && node scripts/llms.mjs && node scripts/check-links.mjs",
-    "pages": "node scripts/extract.mjs && node scripts/reference.mjs && node scripts/pages.mjs && node scripts/docker.mjs && node scripts/llms.mjs && node scripts/check-links.mjs",
+    "assemble": "node scripts/assemble.mjs && node scripts/extract.mjs && node scripts/reference.mjs && node scripts/pages.mjs && node scripts/docker.mjs && node scripts/llms.mjs && node scripts/sitemap.mjs && node scripts/check-links.mjs",
+    "pages": "node scripts/extract.mjs && node scripts/reference.mjs && node scripts/pages.mjs && node scripts/docker.mjs && node scripts/llms.mjs && node scripts/sitemap.mjs && node scripts/check-links.mjs",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },
