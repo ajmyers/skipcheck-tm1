@@ -33,10 +33,11 @@ def docker(tmp_path: Path) -> Path:
     return folder
 
 
-def environment(docker: Path | None, **extra: str) -> dict[str, str]:
+def environment(path: Path, **extra: str) -> dict[str, str]:
+    """The environment for a launcher, with a folder first on the path (or, with only=True, alone on it)."""
+    only = extra.pop("only", "")
     kept = {k: v for k, v in os.environ.items() if not k.startswith(("PA_", "DOCKER_"))}
-    # Without the fake, a path with the system's tools but no docker
-    kept["PATH"] = f"{docker}{os.pathsep}{kept['PATH']}" if docker else "/usr/bin:/bin"
+    kept["PATH"] = str(path) if only else f"{path}{os.pathsep}{kept['PATH']}"
     kept.update(extra)
     return kept
 
@@ -92,7 +93,10 @@ def test_says_so_when_docker_isnt_running(setup: list[str], docker: Path, tmp_pa
 
 
 def test_setup_sh_says_so_when_docker_isnt_installed(tmp_path: Path) -> None:
-    result = run(["/bin/sh", str(SETUP / "setup.sh"), "up"], tmp_path, environment(None))
+    # A path with nothing on it: the real docker, where there is one, must not be found and run
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    result = run(["/bin/sh", str(SETUP / "setup.sh"), "up"], tmp_path, environment(empty, only="yes"))
     assert result.returncode == 1 and "pa-setup needs Docker" in result.stderr
 
 

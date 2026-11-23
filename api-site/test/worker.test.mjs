@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Tests of the Worker (src/worker.js) in Node: node --test test/, or npm test. What the Workers
+// Tests of the Worker (src/worker.js) in Node: npm test. What the Workers
 // runtime provides is stood in for here: the bundler's JSON import, HTMLRewriter, the assets
 // binding and the site the Worker fetches its masthead, footer and 404 page from.
 import assert from 'node:assert/strict';
