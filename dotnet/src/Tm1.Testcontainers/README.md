@@ -41,6 +41,34 @@ Testcontainers for .NET configures containers through immutable builders. Each c
 
 Reuse follows the same switch as Java: set `testcontainers.reuse.enable=true` in `~/.testcontainers.properties`, or `TESTCONTAINERS_REUSE_ENABLE=true`. Without it, Testcontainers' Ryuk removes the containers once the run ends.
 
+### Reusing a whole environment
+
+Cognos takes minutes to start and PAW longer. A `PlanningAnalyticsEnvironment` keeps its containers between runs when you ask for it with `Reuse(true)` and have turned on reuse as above. Without the switch, `Reuse(true)` has no effect.
+
+```csharp
+await using var env = PlanningAnalyticsEnvironment
+    .Builder()
+    .Tm1("planning")
+    .Cognos(cognos => cognos.WithUser("admin", "adminpw", "Admins"))
+    .Reuse(true)
+    .Build();
+await env.StartAsync(); // seconds, once a run with this configuration has started it
+```
+
+- **Each configuration has its own containers.** The environment's identity is a hash of its configuration: every part's image, source, environment variables, command, network aliases, labels, exposed ports, mounts and copied files, the Cognos users and the CAM settings. Its containers carry it as the label `io.skipcheck.tm1.environment`, and its network is named `tm1-environment-<identity>`, so the reused containers still reach each other by name. A different configuration gets new containers and never picks up another's. The label matters more here than in Java: Testcontainers for .NET's own reuse hash leaves out copied files and mounts, and the label puts them back in.
+- **`StopAsync()` and disposing leave everything running**, PAW too.
+- **What tests leave behind stays:** objects in TM1, sessions, Cognos's content store. Give test objects unique names and delete them.
+- **Old configurations keep running.** Changing the configuration starts new containers; the old ones stay until you remove them, and Cognos alone holds about 8 GB. To start clean:
+
+  ```sh
+  docker rm -f $(docker ps -aq --filter label=io.skipcheck.tm1.environment)
+  docker network rm $(docker network ls -q --filter label=io.skipcheck.tm1.environment)
+  ```
+
+- **Not seen by the identity:** what a container subclass sets that the classes here don't show, such as its host name. Remove the containers after changing one.
+- **PAW is one per Docker daemon** whatever the identity: IBM's compose files give its containers fixed names. Each start runs IBM's compose files again, which takes about a minute.
+- **With your own `Network(...)`,** reuse works only if it's the same network each run. Testcontainers for .NET's reuse hash leaves the network out, so a container it finds is still on the network it was created on.
+
 ### Image tag
 
 The image tag is the library's version. For a development build it's `edge`: Java's `-SNAPSHOT`, .NET's `-dev` and a published `-dev.1`.
@@ -71,4 +99,4 @@ It returns the builder, configured, so you can still change it before `Build()`.
 
 - **`JavaParityTests`** reads the Java sources and checks that every public type, nested record, constant, constructor and method has a .NET counterpart. It also checks that the `[…Fact]` skip messages match Java's word for word.
 - **Configuration tests** need no Docker. They port Java's `*SourceTest`, `AdminServerWiringTest`, `CognosContainerTest` and `PlanningAnalyticsEnvironmentTest`.
-- **Container tests** are skipped without Docker or a source. They port `Tm1ServerContainerTest`, `Tm1WebContainerTest` (with its `Tm1WebSession`) and `PawContainerTest`.
+- **Container tests** are skipped without Docker or a source. They port `Tm1ServerContainerTest`, `Tm1WebContainerTest` (with its `Tm1WebSession`), `PawContainerTest`, and `EnvironmentExampleTest`'s reuse test, which is also skipped with reuse off.

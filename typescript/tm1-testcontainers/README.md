@@ -79,6 +79,32 @@ Testcontainers for Node configures a container on its `GenericContainer`, whose 
 
 Reuse follows the Java switch: set `testcontainers.reuse.enable=true` in `~/.testcontainers.properties`, or `TESTCONTAINERS_REUSE_ENABLE=true`. Testcontainers for Node reuses any container that asks for it. This library only asks when the switch is on, so the shared container is otherwise removed (by Ryuk) once the run ends, as in Java.
 
+### Reusing a whole environment
+
+Cognos takes minutes to start and PAW longer. A `PlanningAnalyticsEnvironment` keeps its containers between runs when you ask for it with `reuse(true)` and have turned on reuse as above. Without the switch, `reuse(true)` has no effect.
+
+```ts
+await using env = PlanningAnalyticsEnvironment.builder()
+  .tm1("planning")
+  .cognos((cognos) => cognos.withUser("admin", "adminpw", "Admins"))
+  .reuse(true)
+  .build();
+await env.start(); // seconds, once a run with this configuration has started it
+```
+
+- **Each configuration has its own containers.** The environment's identity is a hash of its configuration: every part's image, source, environment variables, command, network aliases, labels, exposed ports and copied files, the Cognos users and the CAM settings. Its containers carry it as the label `io.skipcheck.tm1.environment`, and its network is named `tm1-environment-<identity>`, so the reused containers still reach each other by name. A different configuration gets new containers and never picks up another's.
+- **`stop()` and `await using` leave everything running**, PAW too.
+- **What tests leave behind stays:** objects in TM1, sessions, Cognos's content store. Give test objects unique names and delete them.
+- **Old configurations keep running.** Changing the configuration starts new containers; the old ones stay until you remove them, and Cognos alone holds about 8 GB. To start clean:
+
+  ```sh
+  docker rm -f $(docker ps -aq --filter label=io.skipcheck.tm1.environment)
+  docker network rm $(docker network ls -q --filter label=io.skipcheck.tm1.environment)
+  ```
+
+- **PAW is one per Docker daemon** whatever the identity. Each start runs IBM's compose files again, which takes about a minute.
+- **With your own `network(...)`,** reuse works only if it's the same network each run. Testcontainers for Node matches a container by a hash of what it creates it with, and that hash leaves out the network, so the network's name is part of the identity here: a network with a new name each run (`Network.newNetwork()`) gets new containers each run.
+
 ### Image tag
 
 The image tag is the library's version. For a development build it's `edge`: Java's `-SNAPSHOT`, npm's `-dev` and a published `-dev.1` (this package is `0.1.0-dev`). `TM1_SERVER_IMAGE`, `TM1_WEB_IMAGE`, `COGNOS_SERVER_IMAGE` and `KEYCLOAK_IMAGE` swap the images.
@@ -97,6 +123,6 @@ TM1_PRIVATE_IMAGE=tm1-server-private:2.1.19 npm test -w testcontainers
 
 - **`test/java-parity.test.ts`** reads the Java sources and checks that every public type, nested record and enum, constant, constructor and method has its TypeScript counterpart, with Java's parameter names in order, and that what does I/O returns a `Promise`. It also checks that the skip messages match Java's word for word.
 - **Configuration tests** need no Docker. `sources.test.ts` ports Java's `*SourceTest`; `wiring.test.ts` ports `AdminServerWiringTest`, `CognosContainerTest` and `PlanningAnalyticsEnvironmentTest`; `vitest-helpers.test.ts` checks the skip helpers.
-- **Container tests** are skipped without Docker or a source. `containers.test.ts` ports `Tm1ServerContainerTest`, `Tm1WebContainerTest` (with its `Tm1WebSession`) and `PawContainerTest`. `examples.test.ts` ports the Java examples that need only the shared server's source: `SharedServerExampleTest`, `WithoutTheExtensionExampleTest` and `PinnedVersionExampleTest`. The others need IBM's SData sample, Cognos or TM1 Web of their own, as in the .NET port, which doesn't port them either.
+- **Container tests** are skipped without Docker or a source. `containers.test.ts` ports `Tm1ServerContainerTest`, `Tm1WebContainerTest` (with its `Tm1WebSession`) and `PawContainerTest`. `examples.test.ts` ports the Java examples that need only the shared server's source: `SharedServerExampleTest`, `WithoutTheExtensionExampleTest`, `PinnedVersionExampleTest`, and `EnvironmentExampleTest`'s `aReusedEnvironmentKeepsItsContainersForTheNextRun` (skipped also when the reuse switch is off). The others need IBM's SData sample, Cognos or TM1 Web of their own, as in the .NET port, which doesn't port them either.
 
 The client's live tests (`../tm1-client/test/live`) run against one server for the whole run when `TM1_URL` isn't set, one file after the other: see `global-setup.ts` there.
