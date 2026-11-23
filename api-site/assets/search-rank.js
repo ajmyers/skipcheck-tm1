@@ -7,6 +7,9 @@
 // ModelCubesAsync are all "model cubes ...". So a query matches case-insensitively, with or
 // without separators, and by any word: "cubes" finds model_cubes and ModelCubes alike. A query
 // with a dot ("Tm1Client.model") is a type, then a member of it.
+//
+// The Docker pages' index (headingIndex in scripts/search.mjs) has pages and their headings instead
+// of types: a page is found by its title or summary, as a walkthrough is, and a heading by its words.
 
 /** A name's words, in lower case: Tm1Client is tm1 client, ODataQuery o data query. */
 export function words(name) {
@@ -27,8 +30,8 @@ const PART = 2; // words, the last in part: modelc for ModelCubes, cubes for Cub
 //                 or the starts of some of its words, in order: get cubes for getModelCubes
 const INSIDE = 1; // anywhere in it: data for metadata
 const TYPE_BONUS = 1;
-// On a tie: the library's types, then TM1's, then the rest
-const KIND_ORDER = (kind) => (kind === 'type' ? 0 : kind === 'model' ? 1 : 2);
+// On a tie: the library's types, then TM1's, a Docker page before its headings, then the rest
+const KIND_ORDER = (kind) => ({ type: 0, model: 1, page: 2 })[kind] ?? 3;
 
 /** How well a name (as its words) matches a query (as its words). */
 export function matchName(nameWords, queryWords) {
@@ -70,9 +73,9 @@ export function prepare(index) {
 		summary,
 		href: page,
 	}));
-	const types = index.types.map(([name, page, summary]) => ({ kind: 'type', name, words: words(name), summary, href: page }));
+	const types = (index.types ?? []).map(([name, page, summary]) => ({ kind: 'type', name, words: words(name), summary, href: page }));
 	const model = (index.model ?? []).map(([name, page, summary]) => ({ kind: 'model', name, words: words(name), summary, href: page }));
-	const members = index.members.map(([name, type, summary, anchor = name]) => ({
+	const members = (index.members ?? []).map(([name, type, summary, anchor = name]) => ({
 		kind: 'member',
 		name,
 		words: words(name),
@@ -80,7 +83,9 @@ export function prepare(index) {
 		summary,
 		href: types[type].href + '#' + anchor,
 	}));
-	return { types, model, members, walkthroughs };
+	const pages = (index.pages ?? []).map(([title, address, summary]) => ({ kind: 'page', name: title, words: words(title), summaryWords: words(summary), summary, href: address }));
+	const headings = (index.headings ?? []).map(([text, page, id]) => ({ kind: 'heading', name: text, words: words(text), page: pages[page], href: pages[page].href + '#' + id }));
+	return { types, model, members, walkthroughs, pages, headings };
 }
 
 /**
@@ -111,13 +116,16 @@ export function search(prepared, query, limit = 12) {
 		// "Tm1Client." lists the type's members
 		consider(member, memberWords.length > 0 ? matchName(member.words, memberWords) : INSIDE);
 	}
-	// A walkthrough by its title, as a member by its name; or, less well, when every word of the query
-	// starts a word of its summary: "mdx" finds Read and write cells
-	if (dot < 0) {
-		for (const walkthrough of prepared.walkthroughs ?? []) {
-			const inSummary = queryWords.every((word) => walkthrough.summaryWords.some((w) => w.startsWith(word)));
-			consider(walkthrough, matchName(walkthrough.words, queryWords) || (inSummary ? INSIDE : 0));
+	// A walkthrough or a page by its title, as a member by its name; or, less well, when every word of
+	// the query starts a word of its summary: "mdx" finds Read and write cells. A heading by its words,
+	// in any order: "docker install" finds Step 1: Install Docker. A dot is a type's member only in an
+	// index with types: in the Docker pages' it's part of a heading ("R. Use the published image").
+	if (dot < 0 || prepared.types.length === 0) {
+		const startsAWord = (list) => queryWords.every((word) => list.some((w) => w.startsWith(word)));
+		for (const titled of [...(prepared.walkthroughs ?? []), ...(prepared.pages ?? [])]) {
+			consider(titled, matchName(titled.words, queryWords) || (startsAWord(titled.summaryWords) ? INSIDE : 0));
 		}
+		for (const heading of prepared.headings ?? []) consider(heading, matchName(heading.words, queryWords) || (startsAWord(heading.words) ? INSIDE : 0));
 	}
 	found.sort(
 		(a, b) =>

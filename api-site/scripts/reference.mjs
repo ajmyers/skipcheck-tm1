@@ -35,7 +35,7 @@ import { gzipSync } from 'node:zlib';
 import { typedCode } from './doc-code.mjs';
 import { checkMembers, findMember, guessMember, javaIsms, javaOnlyNames, languageNames, listFile, readList, stale, typeCandidates, withoutComments } from './members.mjs';
 import { searchIndex } from './search.mjs';
-import { CANONICAL_ORIGIN, copyAssets, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, SECTIONS } from './site.mjs';
+import { CANONICAL_ORIGIN, copyAssets, distDir, DOC_LANGUAGES, escape, generatedDir, head, LANGUAGES, PROJECTS, regions, repoDir, searchBox, SECTIONS } from './site.mjs';
 import { typeHeader } from './type-page.mjs';
 import { examplesOf, typesUsed, walkthroughsOf } from './walkthroughs.mjs';
 
@@ -722,19 +722,10 @@ function switchHtml(project, language, javaName, languages, counterparts) {
 		'</div>'
 	);
 }
-/** The search box (assets/search.js), hidden until its script shows it. */
+/** The search box of a page in one language, over that language's index beside it. */
 function searchHtml(project, language) {
 	const label = LANGUAGES.find((l) => l.id === language).label;
-	return (
-		'<div class="search" role="search" hidden>' +
-		'<label class="visually-hidden" for="docs-search">Search the ' + escape(project.title) + ' docs in ' + escape(label) + '</label>' +
-		'<input id="docs-search" type="search" role="combobox" aria-expanded="false" aria-controls="docs-search-results" aria-autocomplete="list" aria-keyshortcuts="/" autocomplete="off" spellcheck="false" placeholder="Search ' + escape(label) + '" data-index="search.json">' +
-		'<kbd aria-hidden="true">/</kbd>' +
-		'<ul id="docs-search-results" role="listbox" aria-label="Results" hidden></ul>' +
-		'<p class="none" aria-hidden="true" hidden></p>' +
-		'<p class="visually-hidden" role="status" aria-live="polite"></p>' +
-		'</div>'
-	);
+	return searchBox({ label: 'Search the ' + project.title + ' docs in ' + label, placeholder: 'Search ' + label, index: 'search.json' });
 }
 
 async function writePage(project, language, file, title, body, nav, javaName, languages, counterparts) {

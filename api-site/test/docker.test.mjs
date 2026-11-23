@@ -62,8 +62,9 @@ test('a README renders as its title, its first paragraph and the rest, with ids,
 		'```',
 		'',
 	].join('\n');
-	const { title, summary, html } = render(markdown, 'docker/tm1-web/README.md', repo);
+	const { title, summary, html, headings } = render(markdown, 'docker/tm1-web/README.md', repo);
 	assert.equal(title, 'tm1-web');
+	assert.deepEqual(headings, [{ text: 'Ports', id: 'ports' }], 'for the search: the headings under the title, by their text and id');
 	assert.equal(summary, 'Runs <strong>TM1 Web</strong> next to <a href="/pa-docker/tm1-server/">tm1-server</a>.');
 	assert.ok(!html.includes('<h1'), html);
 	assert.ok(html.includes('<h2 id="ports">Ports</h2>'), html);

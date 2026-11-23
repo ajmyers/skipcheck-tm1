@@ -52,3 +52,21 @@ export function searchIndex(types, walkthroughs = [], model = []) {
 	if (model.length > 0) index.model = model.map((t) => [t.name, t.page, shorten(t.summary)]);
 	return index;
 }
+
+/**
+ * The index of the Docker pages (docker.mjs), /pa-docker/search.json: each page by its title and
+ * summary, and each of its headings, at its anchor. pages are { title, address, summary, headings },
+ * each heading { text, id }. Its own index, not part of a docs language's: the Docker pages have no
+ * language, and their headings are setup steps, not names in the code. The shape:
+ *
+ *   { "pages":    [[title, address, summary], ...],
+ *     "headings": [[text, page, id], ...] }               page: the index of its page in pages
+ */
+export function headingIndex(pages) {
+	const index = { pages: [], headings: [] };
+	for (const page of pages) {
+		const at = index.pages.push([page.title, page.address, shorten(page.summary)]) - 1;
+		for (const heading of page.headings ?? []) index.headings.push([heading.text, at, heading.id]);
+	}
+	return index;
+}

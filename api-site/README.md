@@ -9,7 +9,7 @@ Builds and serves each project's pages on skipcheck.io (and on skipcheck.dev, wh
 | `/<project>/docs/model/` | TM1's own types (Cube, Dimension...), the same in every language. | `scripts/reference.mjs`, from `spec/tm1-api.json` |
 | `/<project>/walkthroughs/<slug>/` | A task done step by step, such as connecting and listing cubes, with each step's code in every language and what it printed. Listed on the landing page and the docs home. | `scripts/pages.mjs`, from `content/walkthroughs/<project>/<slug>.md` |
 | `/docs/` | The docs landing page: every project, its languages, and links to its docs in each. The masthead's Docs link opens it. | `scripts/pages.mjs`, from the same content files as the landing pages |
-| `/pa-docker/` | Planning Analytics in Docker: a landing page, and a page per image and for `pa-setup` (`/pa-docker/tm1-server/`...). The setup page, `/pa-docker/setup/`, is the site's: the Worker passes it through. | `scripts/docker.mjs`, from `content/pa-docker.md` and the READMEs under `docker/` |
+| `/pa-docker/` | Planning Analytics in Docker: a landing page, and a page per image and for `pa-setup` (`/pa-docker/tm1-server/`...), with a search box over their titles and headings. The setup page, `/pa-docker/setup/`, is the site's: the Worker passes it through. | `scripts/docker.mjs`, from `content/pa-docker.md` and the READMEs under `docker/` |
 | `/llms.txt`, `/llms-full.txt` | The docs for coding agents, as the [llms.txt convention](https://llmstxt.org) has them: a list of the pages, each with a line saying what's there, and the full text of the landing pages, the walkthroughs and every type's overview in Markdown. | `scripts/llms.mjs`, from the same sources as the pages |
 | `/<project>/release.json` | The version the pages describe, and whether it's a release: the site's home page reads it for each project's badge. | `scripts/pages.mjs` |
 | `/<project>/api/java/` | The Javadoc, themed, linked from each Java page. | `./gradlew apiSiteJavadoc`, collected by `scripts/assemble.mjs` |
@@ -84,7 +84,7 @@ has one, and isn't required.
 | `scripts/type-page.mjs` | The top of a type's page: its name, its import line, and the walkthroughs that use it, before the overview. |
 | `scripts/members.mjs` | Which member is which across languages, and the gate that each language has every Java member or lists it with the reason. |
 | `scripts/doc-code.mjs` | The gate that no doc comment the reference reads has code typed into it: a Javadoc `<pre>` or inline `{@snippet}`, a .NET `<code>`, a TypeScript fence or `@example`, a Python `::` block or doctest. |
-| `scripts/search.mjs` | The search index of each docs language, `search.json` beside its pages: every type and member, the walkthroughs and the TM1 types the pages link to, a short summary, and where it is. `reference.mjs` writes it from the data it renders the pages with. |
+| `scripts/search.mjs` | The search index of each docs language, `search.json` beside its pages: every type and member, the walkthroughs and the TM1 types the pages link to, a short summary, and where it is. `reference.mjs` writes it from the data it renders the pages with. And `/pa-docker/search.json`, the Docker pages' titles and headings, which `docker.mjs` writes. |
 | `scripts/pages.mjs` | The landing pages and the walkthroughs. |
 | `scripts/sitemap.mjs` | `/docs/sitemap.xml`: every generated page but the Javadoc, for search engines. skipcheck.io's `robots.txt` names it. |
 | `scripts/walkthroughs.mjs` | Each project's walkthroughs, from `content/walkthroughs/`. |
@@ -93,7 +93,7 @@ has one, and isn't required.
 | `scripts/prompts.mjs` | The prompts for coding agents, one per landing page and language. |
 | `scripts/llms.mjs` | `llms.txt` and `llms-full.txt`, from the content files, the examples and the overviews `reference.mjs` writes to `.generated/reference.json`. |
 | `scripts/check-links.mjs` | Checks every link on the landing and docs pages, every entry of the search indexes, every address in `llms.txt`, `llms-full.txt` and the prompts, and that a prompt's install commands are `packages.mjs`'s. |
-| `assets/` | The generated pages' own styles and script, copied to `/<project>/assets/`: `docs.css` (the reference's layout), `docs.js` (the reference's language memory), `search.js` and `search-rank.js` (the reference's search box, and how it matches and ranks), `tabs.css` and `tabs.js` (the landing pages' language tabs), `readme.css` (what the Docker pages add to `docs.css`). A language chosen anywhere is remembered and followed everywhere. |
+| `assets/` | The generated pages' own styles and script, copied to `/<project>/assets/`: `docs.css` (the reference's layout), `docs.js` (the reference's language memory), `search.js` and `search-rank.js` (the search box of the reference and the Docker pages, and how it matches and ranks), `tabs.css` and `tabs.js` (the landing pages' language tabs), `readme.css` (what the Docker pages add to `docs.css`). A language chosen anywhere is remembered and followed everywhere. |
 | `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, serves the site's 404 page for missing paths, and sends the addresses these pages had under `/projects/` to the new ones. The site's own pages under these paths (`site` in `SECTIONS`: the setup page, `/pa-docker/setup/`) it passes through to the site. |
 | `wrangler.jsonc` | The Worker's config: a route per project, for `/docs/` and for `/pa-docker/` on each zone, and one per zone for the old addresses. |
 | `test/` | `npm test` here, or `./gradlew checkApiSite`: the Worker, the Markdown, the install steps against the real build files, that every project has its routes, the extractors and the member gate. |
@@ -161,7 +161,10 @@ The workflow deploys with `wrangler deploy`. It needs two repository secrets:
   reader first uses the box: the largest, the TM1 client's in .NET, is about 69 KB (18 KB
   gzipped), 11 KB of it TM1's 136 types. It finds names only, not the text of the pages. TM1's
   types are there by name, without their properties, which have no anchors and would make the
-  index several times larger. A name matches by its words, whatever
+  index several times larger. The Docker pages have an index of their own, of their titles and
+  headings (4 KB, 1.4 KB gzipped), not a part of each docs language's: they have no language, so
+  each language's index would carry a copy, and a reader on them is setting up a server, not
+  looking up a name in the code. A name matches by its words, whatever
   the language's casing, so `cubes` finds `model_cubes` and `ModelCubesAsync`.
 - **The theme follows the OS.** The site has no light/dark switch, so the theme hides Javadoc's.
 - **Pages are never revalidated against the Javadoc file.** A page is the file plus the site's

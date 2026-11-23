@@ -208,6 +208,23 @@ export async function copyAssets(project) {
 	await cp(path.join(siteDir, 'assets'), to, { recursive: true });
 }
 
+/**
+ * A search box (assets/search.js), hidden until its script shows it: label names it for a screen
+ * reader, and index is the address of its index (search.mjs), loaded when the reader first uses it.
+ */
+export function searchBox({ label, placeholder, index }) {
+	return (
+		'<div class="search" role="search" hidden>' +
+		'<label class="visually-hidden" for="docs-search">' + escape(label) + '</label>' +
+		'<input id="docs-search" type="search" role="combobox" aria-expanded="false" aria-controls="docs-search-results" aria-autocomplete="list" aria-keyshortcuts="/" autocomplete="off" spellcheck="false" placeholder="' + escape(placeholder) + '" data-index="' + escape(index) + '">' +
+		'<kbd aria-hidden="true">/</kbd>' +
+		'<ul id="docs-search-results" role="listbox" aria-label="Results" hidden></ul>' +
+		'<p class="none" aria-hidden="true" hidden></p>' +
+		'<p class="visually-hidden" role="status" aria-live="polite"></p>' +
+		'</div>'
+	);
+}
+
 /** The head of a generated page. styles, scripts and modules (scripts that are ES modules) are addresses, in order. */
 export function head({ title, description, canonical, styles, scripts, modules = [] }) {
 	return (

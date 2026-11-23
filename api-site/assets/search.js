@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The docs pages' search box: a combobox (the ARIA pattern, with a list of options) over the
-// page's language's index, search.json beside the page, loaded when the reader first uses the
-// box. "/" focuses it; the arrow keys move through the results, Enter opens one, Escape closes
+// page's language's index, search.json beside the page, loaded when the reader first uses the box.
+// The Docker pages have one too, over their headings. "/" focuses it; the arrow keys move through the results, Enter opens one, Escape closes
 // the list and then clears the box. The box is in the page, hidden, so without this script there
 // is no box that does nothing. Matching and ranking are in search-rank.js.
 import { prepare, search } from './search-rank.js';
@@ -44,13 +44,14 @@ function start() {
 		const link = document.createElement('a');
 		link.href = entry.href;
 		link.tabIndex = -1;
-		// A walkthrough's title is words, not a name in the code
-		const name = document.createElement(entry.kind === 'walkthrough' ? 'span' : 'code');
-		if (entry.kind === 'walkthrough') name.className = 'title';
+		// A walkthrough's title, a page's or a heading is words, not a name in the code
+		const words = entry.kind === 'walkthrough' || entry.kind === 'page' || entry.kind === 'heading';
+		const name = document.createElement(words ? 'span' : 'code');
+		if (words) name.className = 'title';
 		name.textContent = entry.name;
 		const where = document.createElement('span');
 		where.className = 'where';
-		where.textContent = { type: 'type', model: 'TM1 type', walkthrough: 'walkthrough' }[entry.kind] ?? entry.type.name;
+		where.textContent = { type: 'type', model: 'TM1 type', walkthrough: 'walkthrough', page: 'page' }[entry.kind] ?? (entry.kind === 'heading' ? entry.page.name : entry.type.name);
 		link.append(name, where);
 		if (entry.summary) {
 			const summary = document.createElement('span');
