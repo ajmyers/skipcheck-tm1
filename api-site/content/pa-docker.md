@@ -14,3 +14,9 @@ Run IBM Planning Analytics locally for development, testing and learning: TM1 Se
 3. **Open it.** The setup ends by listing every address and login, for example TM1 at `http://localhost:8010/api/v1/`.
 
 Change `pa-environment.yaml` and run the command again to add or remove parts; your data is kept. Only want one TM1 server? [Getting started with tm1-server](tm1-server/getting-started/) walks you through it on Mac, Windows or Linux.
+
+## Let an agent do it
+
+Hand this prompt to a coding agent. It checks Docker, asks what you want to run and where your IBM downloads are, sets it up with the instructions it names, and tells you where to log in.
+
+::prompt

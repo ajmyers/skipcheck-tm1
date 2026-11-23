@@ -15,7 +15,7 @@ const source = readFileSync(fileURLToPath(new URL('../src/worker.js', import.met
 const importLine = "import csp from '../.generated/csp.json';";
 assert.ok(source.includes(importLine), 'worker.js no longer imports the CSP hashes as this test expects');
 // and ../.generated/site.json, which scripts/reference.mjs writes; here it's three projects, the
-// Docker pages and two types
+// Docker pages, the docs for agents and two types
 const siteLine = "import site from '../.generated/site.json';";
 assert.ok(source.includes(siteLine), 'worker.js no longer imports the projects as this test expects');
 const projects = {
@@ -24,6 +24,8 @@ const projects = {
 		{ id: 'tm1-testcontainers', landing: true, docs: true },
 		{ id: 'tm1-csdl', landing: false, docs: true },
 		{ id: 'pa-docker', landing: true, docs: false },
+		{ id: 'llms.txt', landing: false, docs: false, file: true },
+		{ id: 'llms-full.txt', landing: false, docs: false, file: true },
 	],
 	guide: { CubeService: 'tm1-client', RequiresTm1: 'tm1-testcontainers' },
 };
@@ -258,4 +260,16 @@ test('the Docker pages are served at /pa-docker/, dressed like any page, with th
 	const bare = await get('/pa-docker/tm1-server');
 	assert.equal(bare.status, 301);
 	assert.equal(bare.headers.get('Location'), ORIGIN + '/pa-docker/tm1-server/');
+});
+
+test('the docs for agents are served at the root as they are: no masthead, no redirect, the security headers', async () => {
+	for (const path of ['/llms.txt', '/llms-full.txt']) {
+		assets[path] = () => new Response('# Skipcheck docs\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+		const response = await get(path);
+		assert.equal(response.status, 200, path);
+		assert.equal(await response.text(), '# Skipcheck docs\n', path);
+		assert.equal(response.headers.get('Content-Type'), 'text/plain; charset=utf-8', path);
+		assert.ok(response.headers.get('Content-Security-Policy'), path);
+	}
+	assert.deepEqual(siteRequests, [], 'no masthead or footer for a text file');
 });

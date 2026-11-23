@@ -126,14 +126,17 @@ export const PA_DOCKER = {
 	],
 };
 
-// Every first path segment the Worker serves, and what's there: the libraries, the Docker pages
-// and the docs landing page. reference.mjs writes it into .generated/site.json for the Worker;
-// wrangler.jsonc has a route for each (test/site.test.mjs checks), and check-links.mjs looks for
-// their links in dist/. landing: /<id>/ is a page; without one it opens the project's docs.
+// Every first path segment the Worker serves, and what's there: the libraries, the Docker pages,
+// the docs landing page, and the docs for coding agents (llms.mjs). reference.mjs writes it into
+// .generated/site.json for the Worker; wrangler.jsonc has a route for each (test/site.test.mjs
+// checks), and check-links.mjs looks for their links in dist/. landing: /<id>/ is a page; a library
+// without one opens at its docs. file: /<id> is a file, served as it is.
 export const SECTIONS = [
 	...PROJECTS.map((project) => ({ id: project.id, landing: project.landing, docs: true })),
 	{ id: PA_DOCKER.id, landing: true, docs: false },
 	{ id: 'docs', landing: true, docs: false },
+	{ id: 'llms.txt', landing: false, docs: false, file: true },
+	{ id: 'llms-full.txt', landing: false, docs: false, file: true },
 ];
 
 export const languagesOf = (project) => LANGUAGES.filter((language) => project.languages.includes(language.id));

@@ -22,6 +22,12 @@ Step by step, with the code in your language:
 
 ::walkthroughs
 
+## Build it with an agent
+
+Hand this prompt to a coding agent to build a first prototype. It names the package, how to install it, the docs and the walkthroughs, and asks you for anything it can't work out.
+
+::prompt
+
 ## What's in it
 
 - **One server per test run:** started on first use, handed to each test that asks for it, and skipped, not failed, when it can't start. In Java that is the `@RequiresTm1` annotation; the other languages have the same as a fixture.

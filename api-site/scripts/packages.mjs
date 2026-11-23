@@ -16,6 +16,7 @@
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { inline } from './markdown.mjs';
 import { codeBlock, repoDir } from './site.mjs';
 
 const read = (file) => readFile(path.join(repoDir, file), 'utf8');
@@ -86,14 +87,16 @@ export function installCommands(language, name, { version, release }, test) {
 	throw new Error('No such language: ' + language);
 }
 
+/** What else installing takes, as inline Markdown, or null: a Java pre-release isn't published. */
+export function installNote(language, { release }) {
+	return language === 'java' && !release ? 'Not on Maven Central yet: build it from source with `./gradlew publishToMavenLocal`, and add `mavenLocal()` to your repositories.' : null;
+}
+
 /** A tab panel's content: what the package needs, then the commands. */
 export function installHtml(language, pkg, version, test) {
 	const blocks = installCommands(language, pkg.name, version, test)
 		.map((block) => '<p class="caption">' + block.caption + '</p>' + codeBlock(block.code, block.highlight))
 		.join('');
-	const snapshot =
-		language === 'java' && !version.release
-			? '<p class="needs">Not on Maven Central yet: build it from source with <code>./gradlew publishToMavenLocal</code>, and add <code>mavenLocal()</code> to your repositories.</p>'
-			: '';
-	return '<p class="needs">Needs ' + pkg.needs + '.</p>' + blocks + snapshot;
+	const note = installNote(language, version);
+	return '<p class="needs">Needs ' + pkg.needs + '.</p>' + blocks + (note ? '<p class="needs">' + inline(note) + '</p>' : '');
 }

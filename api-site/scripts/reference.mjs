@@ -21,8 +21,8 @@
 //
 // It fails when a language lacks an example the Java documentation quotes, or a Java member its
 // members-excluded.txt doesn't list, or when an overview in another language names what only Java
-// has (--allow-missing lists them instead), and writes
-// .generated/site.json for the Worker.
+// has (--allow-missing lists them instead), and writes .generated/site.json for the Worker and
+// .generated/reference.json, each type's overview in each language, for llms-full.txt (llms.mjs).
 //
 //   node scripts/reference.mjs [--allow-missing]
 
@@ -327,6 +327,8 @@ const fewer = [];
 const javaWords = [];
 // Every path the Worker serves: the projects, the Docker pages and the docs landing page
 const site = { projects: SECTIONS, guide: {} };
+// Each type's overview in each language, for llms-full.txt (llms.mjs)
+const overviews = [];
 let pageCount = 0;
 const indexSizes = [];
 
@@ -608,6 +610,7 @@ for (const project of PROJECTS) {
 				javadocLink;
 			await writePage(project, language, name + '.html', name, body, nav, javaType.name, languages, counterparts);
 			pageCount++;
+			overviews.push({ project: project.id, language, java: javaType.name, name, page: pageOf(javaType), area: area.title, overview });
 			if (project.id === 'tm1-client' || project.id === 'tm1-testcontainers') site.guide[javaType.name] ??= project.id;
 		}
 
@@ -615,6 +618,7 @@ for (const project of PROJECTS) {
 		const grouped = groupByArea(here);
 		const start = (project.start ?? []).map((n) => here.find((t) => t.name === n)).filter(Boolean);
 		const summaries = new Map(here.map((t) => [t.name, summary(javadocHtml(javadocParts(t.doc).description, { example: () => '', javaCode: () => '', link: (target, l) => escape(l || target.replace(/^.*[.#]/, '')) }))]));
+		for (const entry of overviews) if (entry.project === project.id && entry.language === language) entry.summary = summaries.get(entry.java);
 		const index = JSON.stringify(searchIndex(here.map((t) => ({ name: nameOf(t), page: pageOf(t), summary: summaries.get(t.name), members: searchable.get(t.name) }))));
 		await writeFile(path.join(distDir, project.id, 'docs', language, 'search.json'), index + '\n');
 		indexSizes.push({ at: project.id + ' ' + language, bytes: Buffer.byteLength(index), gzip: gzipSync(index).length });
@@ -773,6 +777,7 @@ if (missing.size > 0) {
 
 await mkdir(generatedDir, { recursive: true });
 await writeFile(path.join(generatedDir, 'site.json'), JSON.stringify(site, null, 2) + '\n');
+await writeFile(path.join(generatedDir, 'reference.json'), JSON.stringify(overviews) + '\n');
 if (fewer.length > 0) {
 	const line = fewer.length + " page(s) have fewer examples than Java's: quote each example from an examples region, which every language has";
 	if (!allowMissing) throw new Error(line + ':\n  ' + fewer.join('\n  '));

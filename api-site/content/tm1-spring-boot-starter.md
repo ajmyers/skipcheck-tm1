@@ -36,6 +36,12 @@ The `tm1` settings are the server named `default`, the same as `tm1.servers.defa
 
 ::walkthroughs
 
+## Build it with an agent
+
+Hand this prompt to a coding agent to build a first prototype. It names the package, how to install it, the docs and the walkthroughs, and asks you for anything it can't work out.
+
+::prompt
+
 ## What's in it
 
 - **Auto-configuration:** a `Tm1Client` bean from `tm1.*` properties.
