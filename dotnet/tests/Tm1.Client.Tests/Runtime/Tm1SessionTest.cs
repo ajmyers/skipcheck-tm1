@@ -149,6 +149,98 @@ public class Tm1SessionTest
         Assert.Equal(["a", "b", "c"], names);
     }
 
+    /// <summary>Java's <c>releasesBuffersItHasntReadWhenCancelled</c>, for what .NET holds instead of
+    /// pooled buffers: the response, and with it the connection, of a body that was still arriving.</summary>
+    [Fact]
+    public async Task ReleasesAResponseItHasntReadWhenCancelled()
+    {
+        var arriving = new Tracked("{\"value\":[{\"Name\":\"a\"},", stalls: true);
+        _tm1.On("GET Cubes", _ => arriving.Response());
+        using var cancel = new CancellationTokenSource();
+        var cubes = _tm1.Session().StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes")), cancel.Token).ToListAsync(cancel.Token).AsTask();
+        await arriving.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(arriving.Released);
+
+        cancel.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cubes.WaitAsync(TimeSpan.FromSeconds(5)));
+        await ScriptedTm1.Eventually(() => arriving.Released, "for the response to be released");
+    }
+
+    [Fact]
+    public async Task ReleasesTheResponseOfAStreamThatFails()
+    {
+        var broken = new Tracked("{\"value\":[{\"Name\":\"a\"},");
+        _tm1.On("GET Cubes", _ => broken.Response());
+        await Assert.ThrowsAsync<Tm1ProtocolException>(async () =>
+            await _tm1.Session().StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"))).ToListAsync()
+        );
+        Assert.True(broken.Released);
+    }
+
+    /// <summary>Java's <c>asksForBuffersOnlyAsItemsAreTaken</c>, for .NET's unit of reading, the page:
+    /// it reads a page whole and releases its response, and asks for the next only when its items
+    /// have been taken.</summary>
+    [Fact]
+    public async Task AsksForPagesOnlyAsItemsAreTaken()
+    {
+        var first = new Tracked("{\"value\":[{\"Name\":\"a\"},{\"Name\":\"b\"}],\"@odata.nextLink\":\"Cubes?$skiptoken=2\"}");
+        _tm1.On("GET Cubes", _ => first.Response()).On("GET Cubes?$skiptoken=2", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"c\"}]}"));
+        var taken = new List<string?>();
+        await foreach (var cube in _tm1.Session().StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes"))))
+        {
+            taken.Add(cube.GetProperty("Name").GetString());
+            Assert.True(first.Released); // nothing is held while the caller works
+            Assert.Empty(_tm1.Requests("GET Cubes?$skiptoken=2")); // no more than the items taken need
+            if (taken.Count == 2)
+            {
+                break;
+            }
+        }
+        Assert.Equal(["a", "b"], taken);
+        Assert.Empty(_tm1.Requests("GET Cubes?$skiptoken=2")); // stopped early: the next page was never asked for
+    }
+
+    /// <summary>A response body that says when it's released, and can stall part-way like a slow connection.</summary>
+    private sealed class Tracked(string start, bool stalls = false) : HttpContent
+    {
+        private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Started => _started.Task;
+
+        public bool Released { get; private set; }
+
+        public HttpResponseMessage Response()
+        {
+            Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = this };
+        }
+
+        protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context) =>
+            SerializeToStreamAsync(stream, context, CancellationToken.None);
+
+        protected override async Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context, CancellationToken cancellationToken)
+        {
+            await stream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(start), cancellationToken);
+            _started.TrySetResult();
+            if (stalls)
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            Released = true;
+            base.Dispose(disposing);
+        }
+    }
+
     [Fact]
     public async Task RefusesToStreamASingleResponse() =>
         await Assert.ThrowsAsync<ArgumentException>(async () => await _tm1.Session().StreamAsync(Server).ToListAsync());
