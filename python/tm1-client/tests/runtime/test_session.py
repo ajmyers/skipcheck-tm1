@@ -559,7 +559,7 @@ def test_reports_a_refused_impersonation_whatever_the_wording(rt: Runtime) -> No
     assert error.kind is Tm1ErrorKind.IMPERSONATION_REFUSED
 
 
-def test_names_both_causes_of_a_401_when_impersonating(rt: Runtime) -> None:
+def test_names_both_causes_of_a401_when_impersonating(rt: Runtime) -> None:
     rt.fake.on_login = lambda r: json_response(401)
     error = rt.raises(Tm1AuthenticationError, lambda: rt.session(rt.builder().impersonate("bob")).execute(SERVER))
     assert error.kind is Tm1ErrorKind.CREDENTIAL_REJECTED
