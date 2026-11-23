@@ -9,7 +9,7 @@ namespace Skipcheck.Tm1.Client.Tests.Live;
 
 /// <summary>AnnotationService against a real TM1: a port of the Java client's
 /// AnnotationServiceTm1Test. Comments on cells, found by cube, cell and ID, and their facets.</summary>
-public class AnnotationLiveTests
+public class AnnotationServiceLiveTests
 {
     private const string Cube = "}ClientGroups";
 

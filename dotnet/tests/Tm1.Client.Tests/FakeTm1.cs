@@ -27,6 +27,8 @@ public static class Repo
 
     public static string JavaServices => Path.Combine(Root, "java", "tm1-client", "src", "main", "java", "io", "skipcheck", "tm1", "client", "service");
 
+    public static string JavaTests => Path.Combine(Root, "java", "tm1-client", "src", "test", "java");
+
     private static string Find()
     {
         var dir = AppContext.BaseDirectory;

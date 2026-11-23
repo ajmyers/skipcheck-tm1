@@ -26,6 +26,18 @@ public sealed class Tm1FactAttribute : FactAttribute
     }
 }
 
+/// <summary>A <see cref="Tm1FactAttribute"/> with a case per row of data.</summary>
+public sealed class Tm1TheoryAttribute : TheoryAttribute
+{
+    public Tm1TheoryAttribute()
+    {
+        if (!Live.Configured)
+        {
+            Skip = Live.Reason;
+        }
+    }
+}
+
 public static class Live
 {
     private static readonly string? Running = Environment.GetEnvironmentVariable("TM1_URL");

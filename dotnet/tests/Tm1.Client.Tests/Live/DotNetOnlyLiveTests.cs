@@ -4,8 +4,11 @@ using Skipcheck.Tm1.Client.Model;
 
 namespace Skipcheck.Tm1.Client.Tests.Live;
 
+// Not a port of a Java test class: live tests only the .NET client has. Every other *LiveTests file
+// here is a port of the Java class it's named after (LiveTestParityTests).
+
 /// <summary>The client against a real TM1: the server's <c>$metadata</c> against the spec, and cubes.</summary>
-public class ServerLiveTests
+public class DotNetOnlyLiveTests
 {
     [Tm1Fact]
     public async Task TheServerHasWhatTheSpecSays()

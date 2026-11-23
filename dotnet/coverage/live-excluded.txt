@@ -1,0 +1,4 @@
+# Java live tests (the *Tm1Test and *BehaviorTest classes of java/tm1-client) the .NET client
+# deliberately doesn't port, as: ClassName#methodName: reason, or ClassName: reason for a whole
+# class. Every other one has its test in tests/Tm1.Client.Tests/Live (LiveTestParityTests).
+# "Needs Cognos" isn't a reason: those are ported, and skip without a Cognos source.

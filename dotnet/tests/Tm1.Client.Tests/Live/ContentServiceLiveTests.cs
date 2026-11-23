@@ -14,7 +14,7 @@ using Skipcheck.Tm1.Client.Services;
 namespace Skipcheck.Tm1.Client.Tests.Live;
 
 /// <summary>ContentService against a real TM1: a port of the Java client's ContentServiceTm1Test.</summary>
-public class ContentLiveTests
+public class ContentServiceLiveTests
 {
     private static string Text(byte[] content) => Encoding.UTF8.GetString(content);
 

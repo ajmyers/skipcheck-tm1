@@ -9,7 +9,7 @@ namespace Skipcheck.Tm1.Client.Tests.Live;
 /// The image has no GSKit command line, so the local key file provider can't make a key, and nothing
 /// here gets encrypted: the test pins how TM1 says so. (Java starts a TM1 of its own for this; nothing
 /// here changes the server, so it shares the one the other live tests use.)</summary>
-public class EncryptionLiveTests
+public class EncryptionServiceLiveTests
 {
     private static readonly LocalKeyFileProviderSettingsPatch Local = LocalKeyFileProviderSettingsPatch.Builder().KeyRef("/tmp/tm1-client.key").Build();
 
