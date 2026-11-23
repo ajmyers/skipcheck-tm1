@@ -11,7 +11,8 @@
 // The version shown is the release being documented: DOCS_VERSION (the release workflow sets it
 // from the tag), or else the version in gradle.properties. Each ecosystem writes a pre-release its
 // own way (0.1.0-SNAPSHOT, 0.1.0.dev0, 0.1.0-dev), so before a release the commands ask for the
-// latest pre-release instead of naming a version that may not be published.
+// latest pre-release instead of naming a version that may not be published: pip --pre, dotnet
+// --prerelease, and npm's dev tag, which the release workflow publishes pre-releases under.
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -79,7 +80,8 @@ export function installCommands(language, name, { version, release }, test) {
 	}
 	if (language === 'typescript') {
 		const flag = test ? 'npm install --save-dev ' : 'npm install ';
-		return [{ caption: 'Terminal', code: flag + name + (release ? '@' + version : ''), highlight: 'sh' }];
+		// Pre-releases go out under npm's dev tag (release.yml); latest is for releases only
+		return [{ caption: 'Terminal', code: flag + name + (release ? '@' + version : '@dev'), highlight: 'sh' }];
 	}
 	throw new Error('No such language: ' + language);
 }

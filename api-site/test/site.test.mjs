@@ -70,7 +70,8 @@ test('a release is installed at its version, a pre-release as the latest pre-rel
 	assert.deepEqual(code('dotnet', 'Skipcheck.Tm1.Client', release, false), ['dotnet add package Skipcheck.Tm1.Client --version 1.2.3']);
 	assert.deepEqual(code('dotnet', 'Skipcheck.Tm1.Client', snapshot, false), ['dotnet add package Skipcheck.Tm1.Client --prerelease']);
 	assert.deepEqual(code('typescript', '@skipcheck/tm1-client', release, false), ['npm install @skipcheck/tm1-client@1.2.3']);
-	assert.deepEqual(code('typescript', '@skipcheck/tm1-testcontainers', snapshot, true), ['npm install --save-dev @skipcheck/tm1-testcontainers']);
+	assert.deepEqual(code('typescript', '@skipcheck/tm1-client', snapshot, false), ['npm install @skipcheck/tm1-client@dev']);
+	assert.deepEqual(code('typescript', '@skipcheck/tm1-testcontainers', snapshot, true), ['npm install --save-dev @skipcheck/tm1-testcontainers@dev']);
 	const [gradle, maven] = code('java', 'io.skipcheck:tm1-testcontainers', release, true);
 	assert.equal(gradle, 'testImplementation("io.skipcheck:tm1-testcontainers:1.2.3")');
 	assert.ok(maven.includes('<artifactId>tm1-testcontainers</artifactId>') && maven.includes('<version>1.2.3</version>') && maven.includes('<scope>test</scope>'), maven);
