@@ -882,6 +882,92 @@ def test_reads_a_big_error_body(rt: Runtime) -> None:
     assert len(error.error.message) == 300_000
 
 
+# ODataCollectionDecoderTest, for what this client holds while a collection is read: an HTTP response
+
+
+class Body(httpx.SyncByteStream, httpx.AsyncByteStream):
+    """A response body, as from the network, that records whether the client closed it."""
+
+    def __init__(self, content: bytes, opened: list[Body]) -> None:
+        self.content = content
+        self.closed = False
+        opened.append(self)
+
+    def __iter__(self) -> Any:
+        yield self.content
+
+    async def __aiter__(self) -> Any:
+        yield self.content
+
+    def close(self) -> None:
+        self.closed = True
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+ELEMENTS = Tm1Request.list(ODataPath.of("Elements"), ODataQuery.none(), dict)
+
+
+def from_the_network(rt: Runtime, routes: dict[str, Any]) -> list[Body]:
+    """Answers each request with a body the client has to close, and returns those it was given."""
+    opened: list[Body] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        status, content = routes[target(request)]
+        return httpx.Response(status, stream=Body(content, opened), headers={"Content-Type": "application/json"})
+
+    rt.fake.respond = respond
+    return opened
+
+
+def first_then_stop(rt: Runtime, session: Any, request: Any) -> Any:
+    """The first item of a stream, which is then closed: Java's ``thenCancel``."""
+    if rt.flavor == "sync":
+        items = session.stream(request)
+        first = next(items)
+        items.close()
+        return first
+
+    async def take() -> Any:
+        items = session.stream(request)
+        first = await items.__anext__()
+        await items.aclose()
+        return first
+
+    return rt.run(take())
+
+
+TWO_PAGES = {
+    "GET Elements": (200, json.dumps({"value": [{"Name": "Q1"}, {"Name": "Q2"}], "@odata.nextLink": "Elements?$skiptoken=2"}).encode()),
+    "GET Elements?$skiptoken=2": (200, json.dumps({"value": [{"Name": "Q3"}]}).encode()),
+}
+
+
+def test_releases_the_response_when_a_stream_is_cancelled(rt: Runtime) -> None:
+    # Java held pooled buffers it hadn't read; what this client could hold is a response left open
+    opened = from_the_network(rt, TWO_PAGES)
+    assert first_then_stop(rt, rt.session(), ELEMENTS) == {"Name": "Q1"}
+    assert len(opened) == 1 and all(body.closed for body in opened), "closed, whether or not its items were all taken"
+
+
+def test_asks_for_pages_only_as_items_are_taken(rt: Runtime) -> None:
+    from_the_network(rt, TWO_PAGES)
+    session = rt.session()
+    first_then_stop(rt, session, ELEMENTS)
+    assert [target(r) for r in rt.fake.requests] == ["GET Elements"], "no more than the first item needs"
+    assert [e["Name"] for e in streamed(rt, session, ELEMENTS)] == ["Q1", "Q2", "Q3"]
+
+
+@pytest.mark.parametrize(
+    "status,content,error", [(200, b'{"value":[{"Name":"Q1"},', Tm1ProtocolError), (500, b'{"error":{"code":"1","message":"no"}}', Tm1ServerError)]
+)
+def test_releases_the_response_when_a_stream_fails(rt: Runtime, status: int, content: bytes, error: type[Exception]) -> None:
+    opened = from_the_network(rt, {"GET Elements": (status, content)})
+    rt.raises(error, lambda: rt.session().collect(ELEMENTS))
+    assert len(opened) == 1 and all(body.closed for body in opened)
+
+
 # Tm1Dialect, through a session
 
 

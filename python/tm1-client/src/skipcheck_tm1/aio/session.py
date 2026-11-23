@@ -612,7 +612,10 @@ class AsyncTm1Session:
         return call.read(self._connection.check(call.method, url, reply))
 
     def stream(self, request: Tm1Request[Any] | p.Call) -> AsyncIterator[Any]:
-        """The items of a collection, fetching pages as they're needed (Java's ``stream``)."""
+        """The items of a collection, fetching pages as they're needed (Java's ``stream``). A page
+        is asked for only once the items before it have been taken, and each response is read whole
+        and closed before its items are given, so a stream that is stopped early, or fails, leaves
+        no response open."""
         if isinstance(request, Tm1Request) and request.response is not Tm1Request.Response.COLLECTION:
             raise ValueError(f"Only collection requests are streamed: use execute() for {request}")
         return self.iterate(as_call(request))
