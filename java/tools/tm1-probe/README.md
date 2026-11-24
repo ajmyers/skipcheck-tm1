@@ -95,6 +95,10 @@ With several servers, each one creates the same fixtures and finds its own paths
 every Nth type in name order. Identical servers give identical answers, so the file doesn't
 depend on how many there were.
 
+### Nested values
+
+A structured value a type carries (a complex property, `Parameters` or `DataSource`, or a nested navigation in the case's base, an annotation's `ApplicationContext`) is probed field by field: from the base's value (else the fixture's, else the case's `values`), one field of the first member is changed, sent in a create and a PATCH, read back and compared, and recorded by path (`Parameters/Prompt`). A field that's a navigation is bound and nested, and read back expanded. A property whose value carries navigations (a view's axes) is compared by what they point at, as it reads back without them otherwise.
+
 ### Coverage
 
 Every setter the clients' create and patch types offer must be verified by the probe or listed in [`spec/conformance/probe-coverage.json`](../../../spec/conformance/probe-coverage.json), with why (`ProbeCoverageTest`). For a new TM1 version, a failure there names each writable property or type the cases don't reach yet: add a case, or list it with a reason.
@@ -115,6 +119,7 @@ A case in [`write-cases.json`](src/main/resources/io/skipcheck/tm1/probe/write-c
 | `secrets` | properties TM1 never reads back, checked by signing in |
 | `singleton`, `skip` | one object, patched setting by setting (nested ones by path, `Administration/Language`), read back and set back; `skip` leaves paths alone, such as what the probe's own connection depends on |
 | (cases') `nest` | per entity type, how a nested entity of it is made: a case's id, or a body with `{name}` for a type without a case, or one not found by a name (a member, a task, an edge, a translation) |
+| `values` by path | a nested value's field (`"DataSource/asciiDelimiterChar": ";"`), a target for a navigation in it (`"Rows/Subset@odata.bind"`), a nested entity for one (`"Titles/Subset"`), or `{"$member": {…}}` for a field that only changes with others, which replaces the whole member (a data source's `Type`) |
 | `generate` | `false` while the generators don't use the case yet ([#338](https://github.com/ajmyers/skipcheck-tm1/issues/338)): its writes are recorded, and `tm1-codegen` skips them |
 
 ## The file

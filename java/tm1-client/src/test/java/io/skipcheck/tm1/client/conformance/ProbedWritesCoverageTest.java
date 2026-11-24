@@ -67,6 +67,10 @@ class ProbedWritesCoverageTest {
 					String suffix = write.equals("post") ? "Create" : "Patch";
 					JsonNode properties = writes.path(id).path(write);
 					for (String property : properties.propertyNames()) {
+						// A nested field (Columns/Subset) is sent in its holder's value
+						if (property.contains("/")) {
+							continue;
+						}
 						if (properties.path(property).path("outcome").asString().equals("applied")
 								&& !written.getOrDefault(type + suffix, Set.of()).contains(property)) {
 							missing.add(probe.getFileName() + ": " + id + " " + suffix + " " + property);

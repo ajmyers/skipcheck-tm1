@@ -131,6 +131,17 @@
         },
         "Text" : {
           "outcome" : "applied"
+        },
+        "ApplicationContext/Value" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "248"
+        },
+        "ApplicationContext/Facet" : {
+          "outcome" : "untested"
+        },
+        "ApplicationContext/Facet@odata.bind" : {
+          "outcome" : "unread"
         }
       },
       "patch" : {
@@ -148,6 +159,15 @@
         },
         "Text" : {
           "outcome" : "applied"
+        },
+        "ApplicationContext/Value" : {
+          "outcome" : "unread"
+        },
+        "ApplicationContext/Facet" : {
+          "outcome" : "untested"
+        },
+        "ApplicationContext/Facet@odata.bind" : {
+          "outcome" : "unread"
         },
         "ID" : {
           "outcome" : "ignored"
@@ -293,6 +313,9 @@
         },
         "StartTime" : {
           "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -315,6 +338,11 @@
         },
         "StartTime" : {
           "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         }
       },
       "patchNull" : {
@@ -410,10 +438,26 @@
       "post" : {
         "Parameters" : {
           "outcome" : "applied"
+        },
+        "Parameters/Name" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "248"
+        },
+        "Parameters/Value" : {
+          "outcome" : "applied"
         }
       },
       "patch" : {
         "Parameters" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Name" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "248"
+        },
+        "Parameters/Value" : {
           "outcome" : "applied"
         },
         "Step" : {
@@ -524,6 +568,9 @@
         },
         "ViewStorageMinTime" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -563,6 +610,11 @@
         },
         "ViewStorageMinTime" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         }
       },
       "patchNull" : {
@@ -613,7 +665,7 @@
               "outcome" : "ignored"
             },
             "nested" : {
-              "outcome" : "untested"
+              "outcome" : "ignored"
             }
           },
           "patch" : {
@@ -621,7 +673,7 @@
               "outcome" : "ignored"
             },
             "nested" : {
-              "outcome" : "untested"
+              "outcome" : "ignored"
             }
           }
         },
@@ -742,6 +794,9 @@
         },
         "UniqueName" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -755,6 +810,11 @@
         },
         "UniqueName" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         }
       },
       "patchNull" : {
@@ -979,6 +1039,12 @@
         },
         "UniqueName" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
+        },
+        "Attributes/SkipcheckProbeAlias" : {
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -1001,6 +1067,16 @@
         },
         "UniqueName" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Attributes/SkipcheckProbeAlias" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         }
       },
       "patchNull" : {
@@ -1137,17 +1213,27 @@
       "required" : [ ],
       "post" : {
         "Attributes" : {
-          "outcome" : "untested"
+          "outcome" : "ignored"
         },
         "ID" : {
+          "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
           "outcome" : "ignored"
         }
       },
       "patch" : {
         "Attributes" : {
-          "outcome" : "untested"
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         },
         "ID" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
           "code" : "278"
@@ -1340,6 +1426,9 @@
         },
         "Visible" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -1374,6 +1463,11 @@
         },
         "Visible" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         }
       },
       "patchNull" : {
@@ -1546,7 +1640,7 @@
         "Levels" : {
           "post" : {
             "bind" : {
-              "outcome" : "untested"
+              "outcome" : "ignored"
             },
             "nested" : {
               "outcome" : "ignored"
@@ -1554,7 +1648,7 @@
           },
           "patch" : {
             "bind" : {
-              "outcome" : "untested"
+              "outcome" : "ignored"
             },
             "nested" : {
               "outcome" : "ignored"
@@ -1690,22 +1784,37 @@
       "required" : [ "URL" ],
       "post" : {
         "Attributes" : {
-          "outcome" : "untested"
+          "outcome" : "ignored"
         },
         "URL" : {
           "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
         }
       },
       "patch" : {
         "Attributes" : {
-          "outcome" : "untested"
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         },
         "URL" : {
           "outcome" : "rejected",
           "status" : 400,
           "code" : "278"
         },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
         "ID" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Name" : {
           "outcome" : "rejected",
           "status" : 400,
           "code" : "278"
@@ -1785,10 +1894,30 @@
       "post" : {
         "Attributes" : {
           "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Attributes/SkipcheckProbeCubeAttribute" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         }
       },
       "patch" : {
         "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Attributes/SkipcheckProbeCubeAttribute" : {
           "outcome" : "rejected",
           "status" : 400,
           "code" : "278"
@@ -1823,6 +1952,9 @@
         },
         "MDX" : {
           "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -1833,6 +1965,11 @@
         },
         "MDX" : {
           "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         }
       },
       "patchNull" : {
@@ -1905,13 +2042,13 @@
           "outcome" : "ignored"
         },
         "Columns" : {
-          "outcome" : "untested"
+          "outcome" : "applied"
         },
         "FormatString" : {
           "outcome" : "applied"
         },
         "Rows" : {
-          "outcome" : "untested"
+          "outcome" : "applied"
         },
         "SuppressEmptyColumns" : {
           "outcome" : "applied"
@@ -1920,7 +2057,36 @@
           "outcome" : "applied"
         },
         "Titles" : {
-          "outcome" : "untested"
+          "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
+        },
+        "Columns/Subset" : {
+          "outcome" : "applied"
+        },
+        "Columns/Subset@odata.bind" : {
+          "outcome" : "applied"
+        },
+        "Rows/Subset" : {
+          "outcome" : "applied"
+        },
+        "Rows/Subset@odata.bind" : {
+          "outcome" : "applied"
+        },
+        "Titles/Subset" : {
+          "outcome" : "applied"
+        },
+        "Titles/Subset@odata.bind" : {
+          "outcome" : "applied"
+        },
+        "Titles/Selected" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Titles/Selected@odata.bind" : {
+          "outcome" : "applied"
         }
       },
       "patch" : {
@@ -1930,13 +2096,13 @@
           "code" : "278"
         },
         "Columns" : {
-          "outcome" : "untested"
+          "outcome" : "applied"
         },
         "FormatString" : {
           "outcome" : "applied"
         },
         "Rows" : {
-          "outcome" : "untested"
+          "outcome" : "applied"
         },
         "SuppressEmptyColumns" : {
           "outcome" : "applied"
@@ -1945,7 +2111,38 @@
           "outcome" : "applied"
         },
         "Titles" : {
-          "outcome" : "untested"
+          "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Columns/Subset" : {
+          "outcome" : "applied"
+        },
+        "Columns/Subset@odata.bind" : {
+          "outcome" : "applied"
+        },
+        "Rows/Subset" : {
+          "outcome" : "applied"
+        },
+        "Rows/Subset@odata.bind" : {
+          "outcome" : "applied"
+        },
+        "Titles/Subset" : {
+          "outcome" : "applied"
+        },
+        "Titles/Subset@odata.bind" : {
+          "outcome" : "applied"
+        },
+        "Titles/Selected" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Titles/Selected@odata.bind" : {
+          "outcome" : "applied"
         }
       },
       "patchNull" : {
@@ -2068,6 +2265,63 @@
         },
         "VariablesUIData" : {
           "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
+        },
+        "DataSource/Type" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiDecimalSeparator" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiDelimiterChar" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiDelimiterType" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiHeaderRecords" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiQuoteCharacter" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiThousandSeparator" : {
+          "outcome" : "applied"
+        },
+        "DataSource/dataSourceNameForClient" : {
+          "outcome" : "applied"
+        },
+        "DataSource/dataSourceNameForServer" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Name" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Prompt" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Type" : {
+          "outcome" : "ignored"
+        },
+        "Parameters/Value" : {
+          "outcome" : "applied"
+        },
+        "Variables/EndByte" : {
+          "outcome" : "applied"
+        },
+        "Variables/Name" : {
+          "outcome" : "applied"
+        },
+        "Variables/Position" : {
+          "outcome" : "applied"
+        },
+        "Variables/StartByte" : {
+          "outcome" : "applied"
+        },
+        "Variables/Type" : {
+          "outcome" : "applied"
         }
       },
       "patch" : {
@@ -2107,6 +2361,65 @@
           "outcome" : "applied"
         },
         "VariablesUIData" : {
+          "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "DataSource/Type" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiDecimalSeparator" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiDelimiterChar" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiDelimiterType" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiHeaderRecords" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiQuoteCharacter" : {
+          "outcome" : "applied"
+        },
+        "DataSource/asciiThousandSeparator" : {
+          "outcome" : "applied"
+        },
+        "DataSource/dataSourceNameForClient" : {
+          "outcome" : "applied"
+        },
+        "DataSource/dataSourceNameForServer" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Name" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Prompt" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Type" : {
+          "outcome" : "ignored"
+        },
+        "Parameters/Value" : {
+          "outcome" : "applied"
+        },
+        "Variables/EndByte" : {
+          "outcome" : "applied"
+        },
+        "Variables/Name" : {
+          "outcome" : "applied"
+        },
+        "Variables/Position" : {
+          "outcome" : "applied"
+        },
+        "Variables/StartByte" : {
+          "outcome" : "applied"
+        },
+        "Variables/Type" : {
           "outcome" : "applied"
         }
       },
@@ -2259,6 +2572,48 @@
         },
         "VariablesUIData" : {
           "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
+        },
+        "DataSource/Type" : {
+          "outcome" : "applied"
+        },
+        "DataSource/dataSourceNameForClient" : {
+          "outcome" : "applied"
+        },
+        "DataSource/dataSourceNameForServer" : {
+          "outcome" : "applied"
+        },
+        "DataSource/view" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Name" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Prompt" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Type" : {
+          "outcome" : "ignored"
+        },
+        "Parameters/Value" : {
+          "outcome" : "applied"
+        },
+        "Variables/EndByte" : {
+          "outcome" : "applied"
+        },
+        "Variables/Name" : {
+          "outcome" : "applied"
+        },
+        "Variables/Position" : {
+          "outcome" : "applied"
+        },
+        "Variables/StartByte" : {
+          "outcome" : "applied"
+        },
+        "Variables/Type" : {
+          "outcome" : "applied"
         }
       },
       "patch" : {
@@ -2298,6 +2653,50 @@
           "outcome" : "applied"
         },
         "VariablesUIData" : {
+          "outcome" : "applied"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "DataSource/Type" : {
+          "outcome" : "applied"
+        },
+        "DataSource/dataSourceNameForClient" : {
+          "outcome" : "applied"
+        },
+        "DataSource/dataSourceNameForServer" : {
+          "outcome" : "applied"
+        },
+        "DataSource/view" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Name" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Prompt" : {
+          "outcome" : "applied"
+        },
+        "Parameters/Type" : {
+          "outcome" : "ignored"
+        },
+        "Parameters/Value" : {
+          "outcome" : "applied"
+        },
+        "Variables/EndByte" : {
+          "outcome" : "applied"
+        },
+        "Variables/Name" : {
+          "outcome" : "applied"
+        },
+        "Variables/Position" : {
+          "outcome" : "applied"
+        },
+        "Variables/StartByte" : {
+          "outcome" : "applied"
+        },
+        "Variables/Type" : {
           "outcome" : "applied"
         }
       },
@@ -2542,7 +2941,7 @@
           "outcome" : "applied"
         },
         "Administration/FileRetry/FileRetryFileSpec" : {
-          "outcome" : "untested"
+          "outcome" : "applied"
         },
         "Administration/Java/ClassPath" : {
           "outcome" : "applied"
@@ -2575,7 +2974,7 @@
           "outcome" : "applied"
         },
         "Administration/StartupChores" : {
-          "outcome" : "untested"
+          "outcome" : "applied"
         },
         "Administration/TM1Web/ExcelWebPublishEnabled" : {
           "outcome" : "applied"
@@ -2797,6 +3196,9 @@
         },
         "UniqueName" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -2816,6 +3218,11 @@
         },
         "UniqueName" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         }
       },
       "patchNull" : {
@@ -2931,6 +3338,9 @@
         },
         "UniqueName" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -2950,6 +3360,11 @@
         },
         "UniqueName" : {
           "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         }
       },
       "patchNull" : {

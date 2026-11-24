@@ -173,6 +173,8 @@ public final class WriteProbe {
 	 */
 	private final class Shape {
 
+		final String type;
+
 		final String collection;
 
 		final JsonNode base;
@@ -194,6 +196,7 @@ public final class WriteProbe {
 		private int next;
 
 		Shape(JsonNode c) {
+			type = c.path("type").asString();
 			c.path("names").forEach(n -> names.add(n.asString()));
 			collection = c.path("collection").asString().replace("{p}", prefix);
 			base = c.path("base");
@@ -347,8 +350,13 @@ public final class WriteProbe {
 		ObjectNode defaults = readBack(minimal.where(), select);
 		shape.remove(minimal);
 		ArrayNode required = result.putArray("required");
+		Set<String> notRequired = new TreeSet<>();
+		c.path("notRequired").forEach(n -> notRequired.add(n.asString()));
 		for (String key : sortedFields(shape.base)) {
-			if (key.startsWith("@")) {
+			// A case's notRequired: what only its own fixture needs (a native view's
+			// titles,
+			// on a cube with a dimension on no other axis)
+			if (key.startsWith("@") || notRequired.contains(key)) {
 				continue;
 			}
 			String n = shape.fresh();
@@ -386,6 +394,7 @@ public final class WriteProbe {
 			shape.remove(m);
 		}
 
+		probeNested(c, type, shape, read, post, patch);
 		probeKeys(type, shape, select, patch);
 		probeSecrets(c, shape, post, patch);
 		result.set("navigations", probeNavigations(type, shape, c));
@@ -490,6 +499,10 @@ public final class WriteProbe {
 	 */
 	private JsonNode tryPost(Shape shape, String select, String property, JsonNode value,
 			@Nullable JsonNode defaultValue) {
+		List<String> navs = carried(shape.type, property);
+		if (!navs.isEmpty()) {
+			return tryPostLinks(shape, property, value, navs);
+		}
 		String name = shape.fresh();
 		ObjectNode body = shape.body(name);
 		body.set(property, value);
@@ -510,6 +523,10 @@ public final class WriteProbe {
 
 	/** A PATCH of one property on a fresh object, compared with what it read before. */
 	private JsonNode tryPatch(Shape shape, String select, String property, JsonNode value) {
+		List<String> navs = carried(shape.type, property);
+		if (!navs.isEmpty()) {
+			return tryPatchLinks(shape, property, value, navs);
+		}
 		Made made = shape.post(shape.fresh());
 		if (!made.ok()) {
 			shape.remove(made);
@@ -528,6 +545,127 @@ public final class WriteProbe {
 	}
 
 	/**
+	 * The navigations a property's structured value carries (a view axis's
+	 * {@code Subset}, a title's {@code Selected}): a value like that reads back without
+	 * them unless they're expanded, so it's compared by what they point at.
+	 */
+	private List<String> carried(String type, String property) {
+		Optional<CsdlProperty> declared = declaredProperty(type, property);
+		if (declared.isEmpty() || declared.get().type().isPrimitive()) {
+			return List.of();
+		}
+		List<String> navs = new ArrayList<>();
+		for (CsdlStructuredType level : metadata.typeHierarchy(metadata.qualify(declared.get().type().name()))) {
+			level.navigationProperties().forEach(n -> navs.add(n.name()));
+		}
+		return navs;
+	}
+
+	/**
+	 * Per member, what each navigation it carries points at, as read with them expanded.
+	 */
+	private @Nullable List<Map<String, String>> links(String at, String property, List<String> navs) {
+		StringBuilder expand = new StringBuilder();
+		for (String nav : navs) {
+			expand.append(expand.isEmpty() ? "" : ",")
+				.append(property)
+				.append('/')
+				.append(nav)
+				.append("($select=Name)");
+		}
+		ProbeClient.Answer answer = client.get(at + "?$select=" + property + "&$expand=" + expand);
+		if (!answer.ok() || answer.body() == null) {
+			return null;
+		}
+		JsonNode value = answer.body().path(property);
+		List<Map<String, String>> out = new ArrayList<>();
+		for (JsonNode member : value.isArray() ? value : NODES.arrayNode().add(value)) {
+			Map<String, String> keys = new TreeMap<>();
+			for (String nav : navs) {
+				if (member.path(nav).isObject()) {
+					keys.put(nav, memberKey(member.path(nav)));
+				}
+			}
+			out.add(keys);
+		}
+		return out;
+	}
+
+	/**
+	 * Per member, what each navigation sent points at: a binding's key, or a nested
+	 * entity's Name.
+	 */
+	private static List<Map<String, String>> sentLinks(JsonNode value, List<String> navs) {
+		List<Map<String, String>> out = new ArrayList<>();
+		for (JsonNode member : value.isArray() ? value : NODES.arrayNode().add(value)) {
+			Map<String, String> keys = new TreeMap<>();
+			for (String nav : navs) {
+				if (member.path(nav + "@odata.bind").isString()) {
+					keys.put(nav, keyOf(member.path(nav + "@odata.bind").asString()));
+				}
+				else if (member.path(nav).path("Name").isString()) {
+					keys.put(nav, member.path(nav).path("Name").asString());
+				}
+			}
+			out.add(keys);
+		}
+		return out;
+	}
+
+	/**
+	 * Applied when every navigation sent points where it was sent to (one nested without
+	 * a name is counted only), ignored when nothing changed, else transformed.
+	 */
+	private static JsonNode linkOutcome(@Nullable List<Map<String, String>> got,
+			@Nullable List<Map<String, String>> baseline, List<Map<String, String>> sent) {
+		ObjectNode result = NODES.objectNode();
+		if (got == null) {
+			return result.put("outcome", "unread");
+		}
+		if (got.equals(baseline)) {
+			return result.put("outcome", "ignored");
+		}
+		boolean matches = got.size() == sent.size();
+		for (int i = 0; matches && i < sent.size(); i++) {
+			for (Map.Entry<String, String> e : sent.get(i).entrySet()) {
+				matches &= e.getValue().equals(got.get(i).get(e.getKey()));
+			}
+		}
+		return result.put("outcome", matches ? "applied" : "transformed");
+	}
+
+	private JsonNode tryPostLinks(Shape shape, String property, JsonNode value, List<String> navs) {
+		String name = shape.fresh();
+		ObjectNode body = shape.body(name);
+		body.set(property, value);
+		Made made = shape.post(name, body);
+		List<Map<String, String>> got = made.ok() ? links(made.where(), property, navs) : null;
+		shape.remove(made);
+		if (!made.answer().ok()) {
+			return outcome(made.answer());
+		}
+		Made again = shape.post(name);
+		List<Map<String, String>> baseline = again.ok() ? links(again.where(), property, navs) : null;
+		shape.remove(again);
+		return linkOutcome(got, baseline, sentLinks(value, navs));
+	}
+
+	private JsonNode tryPatchLinks(Shape shape, String property, JsonNode value, List<String> navs) {
+		Made made = shape.post(shape.fresh());
+		if (!made.ok()) {
+			shape.remove(made);
+			return outcome(made.answer());
+		}
+		List<Map<String, String>> baseline = links(made.where(), property, navs);
+		ObjectNode body = NODES.objectNode();
+		body.set(property, value);
+		ProbeClient.Answer answer = client.send("PATCH", made.where(), body);
+		List<Map<String, String>> got = answer.ok() ? links(made.where(), property, navs) : null;
+		shape.remove(made);
+		return answer.ok() ? linkOutcome(got, baseline, sentLinks(value, navs)) : outcome(answer);
+	}
+
+	/**
 	 * A transformed write, logged with what was sent and what came back, for a person to
 	 * judge; the report keeps the outcome only, as a value read back (a timestamp) can
 	 * differ run to run.
@@ -542,6 +680,294 @@ public final class WriteProbe {
 	}
 
 	/**
+	 * The fields of every structured value the type carries: a complex property
+	 * ({@code Parameters}, {@code DataSource}) or a nested navigation in the case's base
+	 * (an annotation's {@code ApplicationContext}). Starting from the fixture's value
+	 * (else the base's, else the case's {@code values}), one field of its first member at
+	 * a time is changed, sent in a create and a PATCH, read back, and compared, by path:
+	 * {@code Parameters/Prompt}; a field that's a navigation is bound and read back
+	 * expanded ({@code Columns/Subset@odata.bind}).
+	 */
+	private void probeNested(JsonNode c, String type, Shape shape, JsonNode read, ObjectNode post, ObjectNode patch) {
+		for (Holder holder : holders(type, shape, read, c.path("values"))) {
+			String element = holder.elementType();
+			JsonNode start = holder.start();
+			JsonNode first = start.isArray() ? start.path(0) : start;
+			// Declared fields, and an open type's undeclared ones the value holds
+			TreeSet<String> fields = new TreeSet<>();
+			for (CsdlStructuredType level : metadata.typeHierarchy(qualified(element))) {
+				level.properties().forEach(p -> fields.add(p.name()));
+			}
+			first.propertyNames().forEach(f -> {
+				if (!f.contains("@")) {
+					fields.add(f);
+				}
+			});
+			for (String field : fields) {
+				Optional<CsdlProperty> declared = declaredProperty(element, field);
+				if (declared.isPresent() && !declared.get().type().isPrimitive()
+						&& metadata.enumType(metadata.qualify(declared.get().type().name())).isEmpty()) {
+					continue;
+				}
+				String path = holder.property() + "/" + field;
+				// A value the case gives by path, else one made up from what's held
+				JsonNode given = c.path("values").has(path) ? substitute(c.path("values").path(path), "") : null;
+				JsonNode changed;
+				JsonNode value;
+				if (given != null && given.path("$member").isObject()) {
+					// A field that only changes with others (a data source's Type and its
+					// settings): the whole first member, replaced
+					value = given.path("$member").get(field);
+					changed = withMember(start, given.path("$member"));
+				}
+				else {
+					value = given != null ? given : madeUp(element, field, first.get(field));
+					changed = value == null ? null : with(start, field, value);
+				}
+				if (value == null || changed == null) {
+					post.putObject(path).put("outcome", "untested");
+					patch.putObject(path).put("outcome", "untested");
+					continue;
+				}
+				post.set(path, nestedPost(shape, holder, start, changed, field, value, null, false));
+				patch.set(path, nestedPatch(shape, holder, start, changed, field, value, null, false));
+			}
+			for (CsdlStructuredType level : metadata.typeHierarchy(qualified(element))) {
+				for (CsdlNavigationProperty nav : level.navigationProperties()) {
+					// The case's value for the path (a target fitting this holder: a
+					// subset
+					// of the dimension on this axis), else the cases' target for the type
+					String path = holder.property() + "/" + nav.name() + "@odata.bind";
+					String target = c.path("values").path(path).isString()
+							? text(c.path("values").path(path).asString(), "")
+							: target(cases.path("targets").path(simple(nav.type().name())));
+					String nestedPath = holder.property() + "/" + nav.name();
+					JsonNode nestedValue = c.path("values").path(nestedPath);
+					if (nestedValue.isObject()) {
+						JsonNode sent = substitute(nestedValue, "");
+						JsonNode withNested = withNav(start, nav.name(), sent);
+						post.set(nestedPath,
+								nestedPost(shape, holder, start, withNested, nav.name(), sent, null, true));
+						patch.set(nestedPath,
+								nestedPatch(shape, holder, start, withNested, nav.name(), sent, null, true));
+					}
+					else {
+						post.putObject(nestedPath).put("outcome", "untested");
+						patch.putObject(nestedPath).put("outcome", "untested");
+					}
+					if (target == null) {
+						post.putObject(path).put("outcome", "untested");
+						patch.putObject(path).put("outcome", "untested");
+						continue;
+					}
+					ObjectNode bound = NODES.objectNode();
+					bound.put(nav.name() + "@odata.bind", target);
+					JsonNode changed = withBinding(start, nav.name(), bound);
+					post.set(path, nestedPost(shape, holder, start, changed, nav.name(), null, keyOf(target), false));
+					patch.set(path, nestedPatch(shape, holder, start, changed, nav.name(), null, keyOf(target), false));
+				}
+			}
+		}
+	}
+
+	/**
+	 * A structured value a type carries: the property, whether it's a navigation, the
+	 * element type, and the value to start from.
+	 */
+	private record Holder(String property, boolean navigation, String elementType, JsonNode start) {
+	}
+
+	private List<Holder> holders(String type, Shape shape, JsonNode read, JsonNode values) {
+		List<Holder> holders = new ArrayList<>();
+		JsonNode base = substitute(shape.base, "");
+		for (CsdlStructuredType level : metadata.typeHierarchy(qualified(type))) {
+			for (CsdlProperty p : level.properties()) {
+				if (p.type().isPrimitive() || metadata.enumType(metadata.qualify(p.type().name())).isPresent()) {
+					continue;
+				}
+				// The base's value first, which a create takes; else the fixture's, which
+				// can read back without what a navigation in it holds (a view's axes)
+				JsonNode start = structured(base.get(p.name()));
+				if (start == null) {
+					start = structured(read.get(p.name()));
+				}
+				if (start == null) {
+					start = structured(substitute(values.path(p.name()), ""));
+				}
+				if (start != null) {
+					holders.add(new Holder(p.name(), false, simple(p.type().name()), start));
+				}
+			}
+			for (CsdlNavigationProperty n : level.navigationProperties()) {
+				JsonNode start = structured(base.get(n.name()));
+				if (start != null) {
+					holders.add(new Holder(n.name(), true, simple(n.type().name()), start));
+				}
+			}
+		}
+		holders.sort(Comparator.comparing(Holder::property));
+		return holders;
+	}
+
+	/** A value to change a field of: an object, or a list whose first member is one. */
+	private static @Nullable JsonNode structured(@Nullable JsonNode value) {
+		if (value == null) {
+			return null;
+		}
+		if (value.isObject() && !value.isEmpty()) {
+			return clean(value);
+		}
+		if (value.isArray() && value.size() > 0 && value.path(0).isObject()) {
+			ArrayNode out = NODES.arrayNode();
+			value.forEach(v -> out.add(v.isObject() ? stripLinks(v) : v));
+			return out;
+		}
+		return null;
+	}
+
+	/** An object without its annotations, but keeping its bindings. */
+	private static ObjectNode stripLinks(JsonNode v) {
+		ObjectNode out = NODES.objectNode();
+		v.properties().forEach(e -> {
+			if (!e.getKey().startsWith("@")) {
+				out.set(e.getKey(), e.getValue().deepCopy());
+			}
+		});
+		return out;
+	}
+
+	/** The value with its first member replaced. */
+	private static JsonNode withMember(JsonNode start, JsonNode member) {
+		JsonNode copy = start.deepCopy();
+		if (copy.isArray()) {
+			((ArrayNode) copy).set(0, member.deepCopy());
+			return copy;
+		}
+		return member.deepCopy();
+	}
+
+	/**
+	 * The value with its first member's navigation nested instead (a binding dropped).
+	 */
+	private static JsonNode withNav(JsonNode start, String nav, JsonNode nested) {
+		JsonNode copy = start.deepCopy();
+		ObjectNode first = (ObjectNode) (copy.isArray() ? copy.get(0) : copy);
+		first.remove(nav + "@odata.bind");
+		first.set(nav, nested.deepCopy());
+		return copy;
+	}
+
+	/** The value with its first member's field set. */
+	private static JsonNode with(JsonNode start, String field, JsonNode value) {
+		JsonNode copy = start.deepCopy();
+		ObjectNode first = (ObjectNode) (copy.isArray() ? copy.get(0) : copy);
+		first.set(field, value);
+		return copy;
+	}
+
+	/**
+	 * The value with its first member's navigation bound instead (nested form dropped).
+	 */
+	private static JsonNode withBinding(JsonNode start, String nav, ObjectNode bound) {
+		JsonNode copy = start.deepCopy();
+		ObjectNode first = (ObjectNode) (copy.isArray() ? copy.get(0) : copy);
+		first.remove(nav);
+		first.remove(nav + "@odata.bind");
+		first.setAll(bound);
+		return copy;
+	}
+
+	/** The structured value as read back: its first member, navigations expanded. */
+	private @Nullable JsonNode readNested(String at, Holder holder, @Nullable String nav, boolean whole) {
+		// A navigation expanded: by its name, or in full to compare a nested entity sent
+		String expand = nav == null ? "" : whole ? nav : nav + "($select=Name)";
+		ProbeClient.Answer answer;
+		JsonNode value;
+		if (holder.navigation()) {
+			answer = client.get(at + "/" + holder.property() + (expand.isEmpty() ? "" : "?$expand=" + expand));
+			value = answer.body() == null ? null : answer.body().path("value");
+		}
+		else {
+			answer = client.get(at + "?$select=" + holder.property()
+					+ (expand.isEmpty() ? "" : "&$expand=" + holder.property() + "/" + expand));
+			value = answer.body() == null ? null : answer.body().get(holder.property());
+		}
+		if (!answer.ok() || value == null) {
+			return null;
+		}
+		return value.isArray() ? value.get(0) : value;
+	}
+
+	private JsonNode nestedPost(Shape shape, Holder holder, JsonNode start, JsonNode changed, String field,
+			@Nullable JsonNode value, @Nullable String key, boolean whole) {
+		String name = shape.fresh();
+		ObjectNode body = shape.body(name);
+		body.set(holder.property(), changed);
+		Made made = shape.post(name, body);
+		JsonNode got = made.ok() ? readNested(made.where(), holder, key == null && !whole ? null : field, whole) : null;
+		shape.remove(made);
+		if (!made.answer().ok()) {
+			return outcome(made.answer());
+		}
+		ObjectNode baselineBody = shape.body(name);
+		baselineBody.set(holder.property(), start);
+		Made again = shape.post(name, baselineBody);
+		JsonNode baseline = again.ok() ? readNested(again.where(), holder, key == null && !whole ? null : field, whole)
+				: null;
+		shape.remove(again);
+		return nestedOutcome(got, baseline, field, value, key, shape.collection + " " + holder.property(), "POST",
+				whole);
+	}
+
+	private JsonNode nestedPatch(Shape shape, Holder holder, JsonNode start, JsonNode changed, String field,
+			@Nullable JsonNode value, @Nullable String key, boolean whole) {
+		String name = shape.fresh();
+		ObjectNode body = shape.body(name);
+		body.set(holder.property(), start);
+		Made made = shape.post(name, body);
+		if (!made.ok()) {
+			shape.remove(made);
+			return outcome(made.answer());
+		}
+		JsonNode baseline = readNested(made.where(), holder, key == null && !whole ? null : field, whole);
+		ObjectNode change = NODES.objectNode();
+		change.set(holder.property(), changed);
+		ProbeClient.Answer answer = client.send("PATCH", made.where(), change);
+		JsonNode got = answer.ok() ? readNested(made.where(), holder, key == null && !whole ? null : field, whole)
+				: null;
+		shape.remove(made);
+		if (!answer.ok()) {
+			return outcome(answer);
+		}
+		return nestedOutcome(got, baseline, field, value, key, shape.collection + " " + holder.property(), "PATCH",
+				whole);
+	}
+
+	private JsonNode nestedOutcome(@Nullable JsonNode got, @Nullable JsonNode baseline, String field,
+			@Nullable JsonNode value, @Nullable String key, String where, String method, boolean whole) {
+		ObjectNode result = NODES.objectNode();
+		if (got == null) {
+			return result.put("outcome", "unread");
+		}
+		if (whole && value != null) {
+			// A nested entity: what it holds of what was sent, as read expanded
+			JsonNode now = got.path(field);
+			JsonNode was = baseline == null ? null : baseline.path(field);
+			return result.put("outcome", contains(now, value) ? "applied" : same(now, was) ? "ignored" : "transformed");
+		}
+		if (key != null) {
+			String now = got.path(field).isObject() ? memberKey(got.path(field)) : null;
+			String was = baseline != null && baseline.path(field).isObject() ? memberKey(baseline.path(field)) : null;
+			return result.put("outcome",
+					key.equals(now) ? "applied" : Objects.equals(now, was) ? "ignored" : "transformed");
+		}
+		return logged(
+				classify(got.get(field), value == null ? NODES.nullNode() : value,
+						baseline == null ? null : baseline.get(field)),
+				where, field, method, value == null ? NODES.nullNode() : value, got.get(field));
+	}
+
+	/**
 	 * The case's keys other than {@code Name} (a rename has its own try): each changed in
 	 * a PATCH of a fresh object, which is then looked for where it was. {@code ignored}
 	 * when it's still there with the key it had, {@code applied} when it isn't, or
@@ -549,7 +975,8 @@ public final class WriteProbe {
 	 */
 	private void probeKeys(String type, Shape shape, String select, ObjectNode patch) {
 		for (String key : shape.keys) {
-			if (key.equals("Name")) {
+			// A rename has its own try, where the object is found by its name
+			if (key.equals("Name") && shape.renames()) {
 				continue;
 			}
 			Made made = shape.post(shape.fresh());
@@ -1013,9 +1440,15 @@ public final class WriteProbe {
 					NODES.stringNode(current == null || current.isNull() ? "Probe" : current.asString() + "X");
 				case "Edm.Duration" -> NODES.stringNode("P2DT00H00M00S");
 				case "Edm.DateTimeOffset" -> NODES.stringNode("2027-02-03T04:05:00Z");
-				default -> null;
+				// A type of TM1's own, such as PrimitiveType: by the value held
+				default -> fromCurrent(current);
 			};
 		}
+		return fromCurrent(current);
+	}
+
+	/** A value made from the one held: flipped, one more, or with an X added. */
+	private static @Nullable JsonNode fromCurrent(@Nullable JsonNode current) {
 		if (current == null || current.isNull()) {
 			return null;
 		}

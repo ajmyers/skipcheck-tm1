@@ -5331,23 +5331,23 @@
 					],
 					"properties" : {
 						"Attributes" : "ignored",
-						"Columns" : "untested",
+						"Columns" : "applied",
 						"FormatString" : "applied",
-						"Rows" : "untested",
+						"Rows" : "applied",
 						"SuppressEmptyColumns" : "applied",
 						"SuppressEmptyRows" : "applied",
-						"Titles" : "untested"
+						"Titles" : "applied"
 					}
 				},
 				"patch" : {
 					"properties" : {
 						"Attributes" : "rejected",
-						"Columns" : "untested",
+						"Columns" : "applied",
 						"FormatString" : "applied",
-						"Rows" : "untested",
+						"Rows" : "applied",
 						"SuppressEmptyColumns" : "applied",
 						"SuppressEmptyRows" : "applied",
-						"Titles" : "untested"
+						"Titles" : "applied"
 					},
 					"nullRefused" : [
 						"Attributes",
