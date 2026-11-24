@@ -12,7 +12,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
-SUPPORTED_SPEC_VERSION = 1
+SUPPORTED_SPEC_VERSION = 2
 
 
 @dataclass

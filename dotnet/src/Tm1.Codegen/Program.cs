@@ -14,7 +14,7 @@ namespace Skipcheck.Tm1.Codegen;
 
 public static class Program
 {
-    public const int SupportedSpecVersion = 1;
+    public const int SupportedSpecVersion = 2;
 
     public static int Main(string[] args)
     {

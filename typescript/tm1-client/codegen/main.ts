@@ -13,7 +13,7 @@ import { emitOperations } from "./emit-operations.js";
 import { emitPatches } from "./emit-patches.js";
 import { HEADER, Spec, type SpecDocument } from "./spec.js";
 
-export const SUPPORTED_SPEC_VERSION = 1;
+export const SUPPORTED_SPEC_VERSION = 2;
 
 export function generate(doc: SpecDocument): Record<string, string> {
   if (doc.specVersion !== SUPPORTED_SPEC_VERSION) {
