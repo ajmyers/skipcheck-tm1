@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,6 +32,7 @@ class WriteProbeTest {
 			    <Property Name="Dropped" Type="Edm.Boolean"/>
 			    <Property Name="Refused" Type="Edm.Int32"/>
 			    <Property Name="Derived" Type="Edm.String"/>
+			    <Property Name="Normalised" Type="Edm.String"/>
 			    <Property Name="Items" Type="Collection(tm1.Item)"/>
 			   </EntityType>
 			   <EntityContainer Name="API"><EntitySet Name="Things" EntityType="tm1.Thing"/></EntityContainer>
@@ -48,15 +50,17 @@ class WriteProbeTest {
 
 	/**
 	 * A server where Kept is applied, Dropped ignored, Refused refused, Derived made from
-	 * the name, a PATCH of Name ignored, and a PATCH of Items replaces them.
+	 * the name, Normalised stored upper case, a PATCH of Name ignored, and a PATCH of
+	 * Items replaces them.
 	 */
 	static final class Things implements FakeTm1.Handler {
 
 		final Map<String, ObjectNode> things = new LinkedHashMap<>();
 
 		Things() {
-			things.put("PSource", (ObjectNode) ProbeClient.JSON.readTree("""
-					{"Name": "PSource", "Kept": "k", "Dropped": true, "Refused": 5, "Derived": "d", "Items": []}"""));
+			things.put("PSource", (ObjectNode) ProbeClient.JSON.readTree(
+					"""
+							{"Name": "PSource", "Kept": "k", "Dropped": true, "Refused": 5, "Derived": "d", "Normalised": "n", "Items": []}"""));
 		}
 
 		@Override
@@ -72,6 +76,7 @@ class WriteProbeTest {
 				thing.put("Dropped", false);
 				thing.put("Refused", 0);
 				thing.put("Derived", "derived-" + name);
+				thing.put("Normalised", body.path("Normalised").asString("").toUpperCase(Locale.ROOT));
 				thing.set("Items", body.has("Items") ? body.get("Items") : ProbeClient.JSON.createArrayNode());
 				things.put(name, thing);
 				return new FakeTm1.Reply(201, thing);
@@ -96,6 +101,9 @@ class WriteProbeTest {
 					}
 					if (body.has("Kept")) {
 						thing.set("Kept", body.get("Kept"));
+					}
+					if (body.has("Normalised")) {
+						thing.put("Normalised", body.get("Normalised").asString().toUpperCase(Locale.ROOT));
 					}
 					if (body.has("Items")) {
 						thing.set("Items", body.get("Items"));
@@ -130,12 +138,15 @@ class WriteProbeTest {
 		assertThat(thing.path("required").size()).isZero();
 		for (String method : List.of("post", "patch")) {
 			JsonNode m = thing.path(method);
-			assertThat(m.propertyNames()).containsExactly("Derived", "Dropped", "Items", "Kept", "Refused");
+			assertThat(m.propertyNames()).containsExactly("Derived", "Dropped", "Items", "Kept", "Normalised",
+					"Refused");
 			assertThat(outcome(m.path("Kept"))).as(method).isEqualTo("applied");
 			assertThat(outcome(m.path("Dropped"))).as(method).isEqualTo("ignored");
 			assertThat(outcome(m.path("Refused"))).as(method).isEqualTo("rejected");
 			assertThat(m.path("Refused").path("status").asInt()).isEqualTo(400);
-			assertThat(outcome(m.path("Derived"))).as(method).isEqualTo("transformed");
+			// Made from the name, whatever was sent: the same as without it
+			assertThat(outcome(m.path("Derived"))).as(method).isEqualTo("ignored");
+			assertThat(outcome(m.path("Normalised"))).as(method).isEqualTo("transformed");
 			// The fixture holds the default, and no collection value can be made up
 			assertThat(outcome(m.path("Items"))).as(method).isEqualTo("untested");
 		}

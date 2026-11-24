@@ -50,11 +50,12 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>
  * An outcome is {@code applied} (read back as sent), {@code ignored} (2xx, read back as
- * the default), {@code transformed} (2xx, read back as neither, such as a name-derived
- * {@code UniqueName} or normalised line ends), {@code rejected} (with the status and
- * TM1's error code) or {@code untested} (no value to send: the fixture holds the default,
- * and none can be made up). Values sent come from the case's {@code values}, else the
- * fixture where it differs from the default, else one made up from the property's type.
+ * the same object reads without it), {@code transformed} (2xx, read back as neither, such
+ * as a name-derived {@code UniqueName} or normalised line ends), {@code rejected} (with
+ * the status and TM1's error code) or {@code untested} (no value to send: the fixture
+ * holds the default, and none can be made up). Values sent come from the case's
+ * {@code values}, else the fixture where it differs from the default, else one made up
+ * from the property's type.
  *
  * <p>
  * The collection cases PATCH a collection on an object created with some members, and
@@ -216,7 +217,7 @@ public final class WriteProbe {
 			}
 			else {
 				post.set(property, tryPost(collection, base, select, property, value, defaults.get(property)));
-				patch.set(property, tryPatch(collection, base, select, property, value, defaults.get(property)));
+				patch.set(property, tryPatch(collection, base, select, property, value));
 			}
 			String n = fresh(collection);
 			client.send("POST", collection, withName(base, n));
@@ -245,26 +246,42 @@ public final class WriteProbe {
 		return result;
 	}
 
+	/**
+	 * A create of the base plus one property, read back and compared with what a create
+	 * of the base alone, under the same name, reads: so a value derived from the name (a
+	 * {@code UniqueName}) reads as ignored, not changed. The create with the property
+	 * comes first: TM1 can refuse a name just deleted when it comes back different (an
+	 * element of another type, code 272). If the baseline is refused, the default is the
+	 * baseline.
+	 */
 	private JsonNode tryPost(String collection, JsonNode base, String select, String property, JsonNode value,
 			@Nullable JsonNode defaultValue) {
 		String name = fresh(collection);
 		ObjectNode body = withName(base, name);
 		body.set(property, value);
 		ProbeClient.Answer answer = client.send("POST", collection, body);
-		JsonNode result = answer.ok() ? classify(readBack(collection, name, select).get(property), value, defaultValue)
-				: outcome(answer);
+		JsonNode got = answer.ok() ? readBack(collection, name, select).get(property) : null;
 		delete(collection, name);
-		return result;
+		if (!answer.ok()) {
+			return outcome(answer);
+		}
+		JsonNode baseline = defaultValue;
+		if (client.send("POST", collection, withName(base, name)).ok()) {
+			baseline = readBack(collection, name, select).get(property);
+		}
+		delete(collection, name);
+		return classify(got, value, baseline);
 	}
 
-	private JsonNode tryPatch(String collection, JsonNode base, String select, String property, JsonNode value,
-			@Nullable JsonNode defaultValue) {
+	/** A PATCH of one property on a fresh object, compared with what it read before. */
+	private JsonNode tryPatch(String collection, JsonNode base, String select, String property, JsonNode value) {
 		String name = fresh(collection);
 		client.send("POST", collection, withName(base, name));
+		JsonNode baseline = readBack(collection, name, select).get(property);
 		ObjectNode body = NODES.objectNode();
 		body.set(property, value);
 		ProbeClient.Answer answer = client.send("PATCH", path(collection, name), body);
-		JsonNode result = answer.ok() ? classify(readBack(collection, name, select).get(property), value, defaultValue)
+		JsonNode result = answer.ok() ? classify(readBack(collection, name, select).get(property), value, baseline)
 				: outcome(answer);
 		delete(collection, name);
 		return result;
