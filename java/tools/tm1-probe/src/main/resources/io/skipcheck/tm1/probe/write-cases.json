@@ -626,7 +626,8 @@
 			"values": {
 				"Expression": "x = 1",
 				"VariableName": "x"
-			}
+			},
+			"freeSource": true
 		},
 		{
 			"id": "ProcessDebugContextLineBreakpoint",
@@ -685,7 +686,8 @@
 			"values": {
 				"Expression": "x = 1",
 				"LineNumber": 3
-			}
+			},
+			"freeSource": true
 		},
 		{
 			"id": "ProcessDebugContextLockBreakpoint",
@@ -745,7 +747,8 @@
 				"Expression": "x = 1",
 				"LockMode": "Read",
 				"ObjectName": "{p}Titled"
-			}
+			},
+			"freeSource": true
 		},
 		{
 			"id": "ProcessReference",

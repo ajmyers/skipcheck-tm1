@@ -3298,9 +3298,7 @@
       "type" : "ProcessDebugContextDataBreakpoint",
       "generate" : false,
       "postRead" : {
-        "outcome" : "rejected",
-        "status" : 409,
-        "code" : "278"
+        "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
@@ -3376,9 +3374,7 @@
       "type" : "ProcessDebugContextLineBreakpoint",
       "generate" : false,
       "postRead" : {
-        "outcome" : "rejected",
-        "status" : 409,
-        "code" : "278"
+        "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
@@ -3476,9 +3472,7 @@
       "type" : "ProcessDebugContextLockBreakpoint",
       "generate" : false,
       "postRead" : {
-        "outcome" : "rejected",
-        "status" : 409,
-        "code" : "278"
+        "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"

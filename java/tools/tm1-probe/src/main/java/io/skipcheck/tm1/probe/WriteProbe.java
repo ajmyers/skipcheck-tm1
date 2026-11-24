@@ -429,11 +429,27 @@ public final class WriteProbe {
 		// The read body as a create
 		String name = shape.fresh();
 		ObjectNode body = merge(substitute(shape.base, name), read);
+		// The read's keys are the source's: the try's own in their place (a name, a
+		// number
+		// the caller picks), and none where TM1 assigns it
 		if (shape.named) {
 			body.put("Name", name);
 		}
+		if (shape.numbered != null) {
+			body.put(shape.numbered, Integer.parseInt(name));
+		}
+		if (shape.assigned != null) {
+			body.remove(shape.assigned);
+		}
+		if (c.path("freeSource").asBoolean(false)) {
+			// The source is the case's own (made by prepare), and TM1 takes one object in
+			// its
+			// place (a breakpoint per line, variable or lock): it goes first
+			client.send("DELETE", from, null);
+		}
 		Made made = shape.post(name, body);
-		result.set("postRead", outcome(made.answer()));
+		result.set("postRead", made.answer().ok() ? outcome(made.answer())
+				: refused(made.answer(), "POST", shape.collection, "(the read body)", body));
 		shape.remove(made);
 
 		// The least a create needs

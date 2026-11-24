@@ -122,6 +122,7 @@ A case in [`write-cases.json`](src/main/resources/io/skipcheck/tm1/probe/write-c
 | `values` by path | a nested value's field (`"DataSource/asciiDelimiterChar": ";"`), a target for a navigation in it (`"Rows/Subset@odata.bind"`), a nested entity for one (`"Titles/Subset"`), or `{"$member": {…}}` for a field that only changes with others, which replaces the whole member (a data source's `Type`) |
 | `numbered` | a key the caller picks as a number (a breakpoint's `ID`): a fresh one each try, and the object found by it |
 | `prepare`, `finish` | steps run once before the case and once after, whatever happens: what its objects live in, such as a debug session. A step can `capture` a field of its answer (`{"field": "ID", "as": "context"}`, used as `{context}`), and a finishing step can repeat `until` a field has a value (`Status` is `Complete`) |
+| `freeSource` | the source is the case's own (made by `prepare`): it's deleted before the read is posted back, where TM1 takes one object in a place (a breakpoint per line, variable or lock) |
 | `selectType` | the type whose properties are selected, where the one posted reads as another (a document reads as a `DocumentReference`); a property outside it is recorded `unread` |
 | `notRequired` | what only the case's own fixture needs, left out of what a create requires (a native view's titles, on a cube with a third dimension) |
 | `generate` | `false` while the generators don't use the case yet ([#338](https://github.com/ajmyers/skipcheck-tm1/issues/338)): its writes are recorded, and `tm1-codegen` skips them |
