@@ -250,129 +250,40 @@ def _model(spec: Spec, t: dict[str, Any]) -> list[str]:
     return out
 
 
-WRITES = {"applied", "writeOnly", "transformed", "untested"}
+BIND = "@odata.bind"
+
+# How a binding's paths are made, by the write plan's ``by`` and whether it's a collection
+_HELPERS = {
+    ("key", False): "by_key",
+    ("key", True): "by_keys",
+    ("uniqueName", False): "in_hierarchy",
+    ("uniqueName", True): "all_in_hierarchy",
+}
 
 
-def _writes(outcome: str | None) -> bool:
-    return outcome is None or outcome in WRITES
-
-
-def creates(t: dict[str, Any], prop: str, spec: Spec | None = None) -> bool:
-    """Whether a POST of ``t`` takes ``prop``, by the probe's writes (yes, for a type it has none for). For
-    the root of a hierarchy without its own, whether every subtype with writes takes it, so each
-    subtype's create offers at least what its root's does."""
-    w = t.get("write")
-    if w is None and spec is not None:
-        probed = [d for d in spec.derived(t) if d.get("write")]
-        return all(creates(d, prop) for d in probed)
-    return w is None or _writes(w["create"]["properties"].get(prop))
-
-
-def patches(t: dict[str, Any], prop: str) -> bool:
-    """Whether ``builder(read)`` copies ``prop`` into a patch of ``t``: a PATCH applies it, and it isn't a
-    collection a PATCH appends to (copying one would add its members again), ignores or rejects. A
-    collection a PATCH replaces is copied: the read holds all of it. As the Java generator."""
-    w = t.get("write")
-    if w is None:
-        return True
-    collection = w.get("collections", {}).get(prop)
-    return _writes(w["patch"]["properties"].get(prop)) and collection not in ("appends", "ignored", "rejected")
-
-
-def _offers_in_patch(w: dict[str, Any], prop: str) -> bool:
-    if prop == "Name":
-        return w["patch"].get("rename", "applied") == "applied"
-    outcome = w["patch"]["properties"].get(prop)
-    collection = w.get("collections", {}).get(prop)
-    return outcome not in ("rejected", "ignored") and collection not in ("rejected", "ignored")
-
-
-def offers_in_patch(spec: Spec, t: dict[str, Any], prop: str) -> bool:
-    """Whether a patch of ``t`` offers ``prop``: not if a PATCH rejects or ignores it, by the probe, nor
-    ``Name`` where a PATCH doesn't rename; for the root of a hierarchy without writes of its own, if
-    every probed subtype's patch offers it. As the Java generator."""
-    w = t.get("write")
-    if w is not None:
-        return _offers_in_patch(w, prop)
-    probed = [d["write"] for d in spec.derived(t) if d.get("write")]
-    return all(_offers_in_patch(d, prop) for d in probed)
-
-
-def creatable(spec: Spec, t: dict[str, Any]) -> bool:
-    """Whether a type gets a create: the probe has writes for it, or a subtype it's the root of does."""
-    if t["kind"] != "entity":
-        return False
-    if t.get("write"):
-        return True
-    return any(d.get("write") for d in spec.derived(t))
+def _plan(spec: Spec, t: dict[str, Any], create: bool) -> dict[str, Any]:
+    """The write plan for a create or patch of ``t`` (the spec's ``builders``), which the Java generator
+    works out once: what it offers, what ``builder(read)`` copies and binds, how a root dispatches."""
+    return spec.builders[t["name"] + ("Create" if create else "Patch")]
 
 
 def _copied(spec: Spec, t: dict[str, Any], create: bool) -> list[str]:
-    """What ``builder(read)`` copies, as code: the structural properties a write of ``t`` sets, of the
-    type and its base, each a name, or, for a structured value, ``(name, its write type)``, whose own
-    ``builder(read)`` converts it. A value whose type has subtypes isn't copied into a create (which
-    one to make the read can't say). For a patch, not a collection a PATCH appends to. As the Java
-    generator's ``from``."""
-    out: list[str] = []
-    seen: set[str] = set()
-    for level in spec.chain(t):
-        for s in _writable(spec, level, t, create):
-            name = s.json
-            if s.navigation or not s.set or name in seen or (not create and not patches(t, name)):
-                continue
-            seen.add(name)
-            value = _value_type(spec, s.prop)
-            if value is None:
-                out.append(repr(name))
-            elif value.endswith("Create") and spec.derived(spec.type_by_name[s.prop["type"]]):
-                continue
-            else:
-                out.append(f"({name!r}, {value})")
-    return out
-
-
-def _read_binding(spec: Spec, n: dict[str, Any]) -> tuple[str, str, str, str] | None:
-    """How ``builder(read)`` binds a navigation the read holds (for a patch, a single-valued one only:
-    see ``_bindings``): ``(name, helper, collection, key)``, by
-    key for a target in an entity set, by ``UniqueName`` for an element or a member; None for any
-    other (a subset, public or private, or a view, whose cube the read doesn't say). As the Java
-    generator's ``readBinding``."""
-    target = spec.type_by_name.get(n["type"])
-    if target is None or target["kind"] != "entity":
-        return None
-    key: list[str] = []
-    entity_set = None
-    # The type first, then its bases, as the Java generator looks
-    for level in reversed(spec.chain(target)):
-        if level["kind"] == "entity" and level.get("key") and not key:
-            key = level["key"]
-        if entity_set is None:
-            entity_set = next((s["name"] for s in spec.container["entitySets"] if s["entityType"] == level["qualifiedName"]), None)
-    many = n["collection"]
-    if entity_set is not None and len(key) == 1:
-        return (n["name"], "by_keys" if many else "by_key", entity_set, key[0])
-    if target["name"] in ("Element", "Member"):
-        return (n["name"], "all_in_hierarchy" if many else "in_hierarchy", target["name"] + "s", "UniqueName")
-    return None
+    """What ``builder(read)`` copies, as code: each a name, or, for a structured value, ``(name, its write
+    type)``, whose own ``builder(read)`` converts it."""
+    copy = _plan(spec, t, create)["fromRead"]["copy"]
+    return [repr(c["json"]) if c["via"] is None else f"({c['json']!r}, {c['value']})" for c in copy]
 
 
 def _bindings(spec: Spec, t: dict[str, Any], create: bool) -> tuple[tuple[str, str, str, str], ...]:
-    out: list[tuple[str, str, str, str]] = []
-    for level in spec.chain(t):
-        for s in _writable(spec, level, t, create):
-            # A patch from a read binds no collection: sent back, it would replace or append to what's
-            # there, whichever TM1 does for it, on an unrelated change
-            if s.navigation and s.bind and (create or not s.prop["collection"]) and all(b[0] != s.json for b in out):
-                binding = _read_binding(spec, s.prop)
-                if binding is not None:
-                    out.append(binding)
-    return tuple(out)
+    """The navigations ``builder(read)`` binds: ``(name, helper, collection, key)`` each."""
+    bindings = _plan(spec, t, create)["fromRead"]["bindings"]
+    return tuple((b["json"], _HELPERS[(b["by"], b["collection"])], b["set"], b["key"]) for b in bindings)
 
 
-def _declared(spec: Spec, t: dict[str, Any]) -> tuple[str, ...] | None:
-    if any(level["open"] for level in spec.chain(t)):
-        return tuple(p["name"] for level in spec.chain(t) for p in level["properties"] + level["navigationProperties"])
-    return None
+def _declared(spec: Spec, t: dict[str, Any], create: bool) -> tuple[str, ...] | None:
+    """An open type's declared names, which the copy of undeclared properties skips; None for another."""
+    undeclared = _plan(spec, t, create)["fromRead"]["undeclared"]
+    return None if undeclared is None else tuple(undeclared)
 
 
 def _read_doc(create: bool) -> tuple[str, ...]:
@@ -387,7 +298,7 @@ def _read_doc(create: bool) -> tuple[str, ...]:
 def _copy_call(spec: Spec, t: dict[str, Any], create: bool) -> str:
     copied = _copied(spec, t, create)
     names_code = "(" + ", ".join(copied) + ("," if len(copied) == 1 else "") + ")"
-    return f"cls.Builder(cls)._copy(read, {names_code}, {_declared(spec, t)!r}, {_bindings(spec, t, create)!r})"
+    return f"cls.Builder(cls)._copy(read, {names_code}, {_declared(spec, t, create)!r}, {_bindings(spec, t, create)!r})"
 
 
 def _builder_method(spec: Spec, t: dict[str, Any], name: str, create: bool) -> list[str]:
@@ -411,10 +322,9 @@ def _builder_method(spec: Spec, t: dict[str, Any], name: str, create: bool) -> l
                 '        own, what this one takes."""',
             ]
         out += ["        if read is None:", "            return cls.Builder(cls)"]
-        for sub in subtypes:
-            write = sub["name"] + ("Create" if create else "Patch")
-            if (has_create if create else has_patch)(spec, sub):
-                out += [f"        if isinstance(read, _read.{sub['name']}):", f"            return {write}.builder(read)"]
+        for case in _plan(spec, t, create)["dispatch"]:
+            sub = spec.type_by_name[case["type"]]
+            out += [f"        if isinstance(read, _read.{sub['name']}):", f"            return {case['builder']}.builder(read)"]
         if create:
             out.append('        raise ValueError(f"A {type(read).__name__} has no create: TM1 makes none of its type")')
         else:
@@ -429,26 +339,14 @@ def _builder_method(spec: Spec, t: dict[str, Any], name: str, create: bool) -> l
     return out
 
 
-BIND = "@odata.bind"
-
-
-def verified_only(spec: Spec) -> bool:
-    """Whether the spec lists the write types and setters to generate (its ``offers``): then only
-    those, which the probe verified or the overlay keeps, are generated, as by the Java generator
-    (#338). A spec without them gets a patch for every type, offering what the writes don't refuse."""
-    return bool(spec.offers)
-
-
 def has_patch(spec: Spec, t: dict[str, Any]) -> bool:
-    """Whether a type gets a patch: every type does, unless the offers say which."""
-    return not verified_only(spec) or t["name"] + "Patch" in spec.offers
+    """Whether a type gets a patch: the write plan has one."""
+    return t["name"] + "Patch" in spec.builders
 
 
 def has_create(spec: Spec, t: dict[str, Any]) -> bool:
-    """Whether a type gets a create: one the offers list; without offers, as :func:`creatable`."""
-    if verified_only(spec):
-        return t["kind"] == "entity" and t["name"] + "Create" in spec.offers
-    return creatable(spec, t)
+    """Whether a type gets a create: the write plan has one."""
+    return t["name"] + "Create" in spec.builders
 
 
 @dataclass
@@ -460,6 +358,7 @@ class _Setter:
     navigation: bool
     set: bool
     bind: bool
+    value: str | None
 
     @property
     def json(self) -> str:
@@ -467,29 +366,14 @@ class _Setter:
 
 
 def _writable(spec: Spec, level: dict[str, Any], t: dict[str, Any], create: bool) -> list[_Setter]:
-    """The setters a write of ``t`` has for ``level``'s properties (``t``'s own, or its root's): with
-    offers, what they list for it; else, for a create, what a POST takes, and for a patch, what a PATCH
-    doesn't reject or ignore, navigations included."""
-    out: list[_Setter] = []
-    if verified_only(spec):
-        offered = spec.offers.get(t["name"] + ("Create" if create else "Patch"), {})
-        for p in level["properties"]:
-            if p["type"] != "Edm.Stream" and p["name"] in offered:
-                out.append(_Setter(p, False, True, False))
-        for n in level["navigationProperties"]:
-            nested = n["name"] in offered
-            bind = spec.is_entity(n["type"]) and n["name"] + BIND in offered
-            if nested or bind:
-                out.append(_Setter(n, True, nested, bind))
-        return out
-    for p in level["properties"]:
-        if p["type"] != "Edm.Stream" and (creates(t, p["name"], spec) if create else offers_in_patch(spec, t, p["name"])):
-            out.append(_Setter(p, False, True, False))
-    # A navigation a PATCH ignores or rejects (a cube's Dimensions) isn't offered either
-    for n in level["navigationProperties"]:
-        if create or offers_in_patch(spec, t, n["name"]):
-            out.append(_Setter(n, True, True, spec.is_entity(n["type"])))
-    return out
+    """The setters a write of ``t`` has for ``level``'s properties (``t``'s own, or its root's), as the
+    write plan lists them."""
+    declared = {p["name"]: p for p in level["properties"] + level["navigationProperties"]}
+    return [
+        _Setter(declared[s["json"]], s["navigation"], s["set"], s["bind"], s["value"])
+        for s in _plan(spec, t, create)["setters"]
+        if s["declaredOn"] == level["qualifiedName"]
+    ]
 
 
 def _method_names(spec: Spec, level: dict[str, Any]) -> dict[str, tuple[str, str]]:
@@ -509,24 +393,11 @@ def _method_names(spec: Spec, level: dict[str, Any]) -> dict[str, tuple[str, str
     return out
 
 
-def _value_type(spec: Spec, ref: dict[str, Any]) -> str | None:
-    """The write type a setter of a structured value takes, as the Java generator: a complex type's
-    ``Patch``; an entity's ``Create`` where it has one (a nested entity is new), else its ``Patch``.
-    None for a primitive, for one TM1 sends otherwise than declared, and without offers."""
-    if not verified_only(spec) or ref.get("departure"):
-        return None
-    t = spec.type_by_name.get(ref["type"])
-    if t is None:
-        return None
-    write = t["name"] + ("Create" if t["kind"] == "entity" and t["name"] + "Create" in spec.offers else "Patch")
-    return write if write in spec.offers else None
-
-
 def _setter(spec: Spec, s: _Setter, method_names: dict[str, tuple[str, str]]) -> list[str]:
     m, bind = method_names[s.json]
     out: list[str] = []
     if s.set:
-        value = _value_type(spec, s.prop)
+        value = s.value
         tp = "Any" if value is None else f"Sequence[{value}] | None" if s.prop["collection"] else f"{value} | None"
         out += [
             "",
@@ -554,7 +425,7 @@ def _setters(spec: Spec, t: dict[str, Any], create: bool) -> list[str]:
         root_names = _method_names(spec, root)
         for s in _writable(spec, root, t, create):
             have = inherited.get(s.json)
-            missing = _Setter(s.prop, s.navigation, s.set and not (have and have.set), s.bind and not (have and have.bind))
+            missing = _Setter(s.prop, s.navigation, s.set and not (have and have.set), s.bind and not (have and have.bind), s.value)
             if missing.set or missing.bind:
                 out += _setter(spec, missing, root_names)
     own = _method_names(spec, t)
@@ -619,10 +490,7 @@ def emit_patches(spec: Spec) -> str:
         name = t["name"] + "Create"
         names_all.append(name)
         base = spec.type_by_name[t["baseType"]]["name"] + "Create" if t.get("baseType") else "Tm1Patch"
-        if verified_only(spec):
-            has = "as the probe verified"
-        else:
-            has = "as the probe found" if t.get("write") else "all, as the probe has no writes for this type"
+        has = "as the probe verified"
         out += ["", "", f"class {name}({base}):"]
         out.append(f'    """A create of ``{t["name"]}``, for a POST: only the properties set are sent, and only those TM1')
         out.append(f"    applies in a create are offered ({has}). ``build()`` checks what a create needs. As the Java")
@@ -637,11 +505,11 @@ def emit_patches(spec: Spec) -> str:
         out += setters
         if t["open"]:
             out += _property()
-        required = (t.get("write") or {}).get("create", {}).get("required", [])
+        required = _plan(spec, t, True)["required"]
         if required:
             out.append("")
             out.append("        def build(self) -> Any:")
-            out.append("            for needed in " + repr(tuple(r.replace("@odata.bind", "") for r in required)) + ":")
+            out.append("            for needed in " + repr(tuple(required)) + ":")
             out.append('                if needed not in self._values and needed + "@odata.bind" not in self._values:')
             out.append(f'                    raise ValueError(f"A {t["name"]} create needs {{needed}}: TM1 refuses one without it")')
             out.append("            return super().build()")
