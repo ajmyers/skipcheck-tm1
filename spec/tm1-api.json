@@ -12955,5 +12955,1521 @@
 			"name" : "StaticConfiguration",
 			"type" : "ibm.tm1.api.v1.ServerSettings"
 		}
-	]
+	],
+	"offers" : {
+		"AccessSettingsPatch" : {
+			"Authentication" : {
+				"verified" : "applied"
+			},
+			"CAM" : {
+				"verified" : "applied"
+			},
+			"CAPI" : {
+				"verified" : "applied"
+			},
+			"HTTP" : {
+				"verified" : "applied"
+			},
+			"LDAP" : {
+				"verified" : "applied"
+			},
+			"Network" : {
+				"verified" : "applied"
+			},
+			"SSL" : {
+				"verified" : "applied"
+			}
+		},
+		"AdministrationSettingsPatch" : {
+			"AdminHost" : {
+				"verified" : "applied"
+			},
+			"AllowReadOnlyChoreReschedule" : {
+				"verified" : "applied"
+			},
+			"AuditLog" : {
+				"verified" : "applied"
+			},
+			"Clients" : {
+				"verified" : "applied"
+			},
+			"DebugLog" : {
+				"verified" : "applied"
+			},
+			"DisableSandboxing" : {
+				"verified" : "applied"
+			},
+			"DownTime" : {
+				"verified" : "applied"
+			},
+			"EnableSandboxDimension" : {
+				"verified" : "applied"
+			},
+			"EventLog" : {
+				"verified" : "applied"
+			},
+			"ExternalDatabase" : {
+				"verified" : "applied"
+			},
+			"FileRetry" : {
+				"verified" : "applied"
+			},
+			"Java" : {
+				"verified" : "applied"
+			},
+			"Language" : {
+				"verified" : "applied"
+			},
+			"MaskUserNameInServerTools" : {
+				"verified" : "applied"
+			},
+			"PerfMonActive" : {
+				"verified" : "applied"
+			},
+			"PerformanceMonitorOn" : {
+				"verified" : "applied"
+			},
+			"RunningInBackground" : {
+				"verified" : "applied"
+			},
+			"ServerLog" : {
+				"verified" : "applied"
+			},
+			"ServerName" : {
+				"verified" : "applied"
+			},
+			"StartupChores" : {
+				"verified" : "applied"
+			},
+			"TM1Web" : {
+				"verified" : "applied"
+			},
+			"TopLog" : {
+				"verified" : "applied"
+			},
+			"UnicodeUpperLowerCase" : {
+				"verified" : "applied"
+			}
+		},
+		"AnnotationCreate" : {
+			"ApplicationContext" : {
+				"verified" : "minimal create"
+			},
+			"DimensionalContext@odata.bind" : {
+				"verified" : "minimal create"
+			},
+			"Text" : {
+				"verified" : "applied"
+			}
+		},
+		"AnnotationPatch" : {
+			"Text" : {
+				"verified" : "applied"
+			}
+		},
+		"ApplicationContextFacetValueCreate" : {
+			"Facet@odata.bind" : {
+				"kept" : "an annotation's application context: the minimal create sends it and TM1 takes it; its Value changes only with the annotation's dimensional context"
+			},
+			"Value" : {
+				"kept" : "an annotation's application context: the minimal create sends it and TM1 takes it; its Value changes only with the annotation's dimensional context"
+			}
+		},
+		"AttributeDefinitionCreate" : {
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"Type" : {
+				"verified" : "applied"
+			}
+		},
+		"AttributesPatch" : { },
+		"AuditLogSettingsPatch" : {
+			"Enable" : {
+				"verified" : "applied"
+			},
+			"MaxFileSizeKilobytes" : {
+				"verified" : "applied"
+			},
+			"MaxQueryMemoryKilobytes" : {
+				"verified" : "applied"
+			},
+			"UpdateInterval" : {
+				"verified" : "applied"
+			}
+		},
+		"AuthenticationSettingsPatch" : {
+			"IntegratedSecurityMode" : {
+				"kept" : "reads back as Mixed on a server without Windows integrated security"
+			},
+			"MaximumLoginAttempts" : {
+				"verified" : "applied"
+			},
+			"SecurityPackageName" : {
+				"verified" : "applied"
+			},
+			"ServicePrincipalName" : {
+				"verified" : "applied"
+			}
+		},
+		"CAMSettingsPatch" : {
+			"CAMUseSSL" : {
+				"verified" : "applied"
+			},
+			"ClientPingCAMPassport" : {
+				"verified" : "applied"
+			},
+			"ClientURI" : {
+				"verified" : "applied"
+			},
+			"CreateNewCAMClients" : {
+				"verified" : "applied"
+			},
+			"PortalVariableFile" : {
+				"verified" : "applied"
+			},
+			"ServerCAMURIRetryAttempts" : {
+				"verified" : "applied"
+			},
+			"ServerURIs" : {
+				"verified" : "applied"
+			}
+		},
+		"CAPISettingsPatch" : {
+			"ClientMessagePort" : {
+				"verified" : "applied"
+			},
+			"ClientVersionMaximum" : {
+				"verified" : "applied"
+			},
+			"ClientVersionMinimum" : {
+				"verified" : "applied"
+			},
+			"ClientVersionPrecision" : {
+				"verified" : "applied"
+			},
+			"MessageCompression" : {
+				"verified" : "applied"
+			},
+			"Port" : {
+				"verified" : "applied"
+			},
+			"ProgressMessage" : {
+				"verified" : "applied"
+			}
+		},
+		"CellsetUpdatePatch" : {
+			"Ordinal" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			},
+			"ReferenceCell" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			},
+			"ReferenceCell@odata.bind" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			},
+			"ReferenceCube" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			},
+			"ReferenceCube@odata.bind" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			},
+			"Value" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			}
+		},
+		"ChoreCreate" : {
+			"Active" : {
+				"verified" : "applied"
+			},
+			"DSTSensitive" : {
+				"verified" : "applied"
+			},
+			"ExecutionMode" : {
+				"verified" : "applied"
+			},
+			"Frequency" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"StartTime" : {
+				"verified" : "applied"
+			},
+			"Tasks" : {
+				"verified" : "applied"
+			}
+		},
+		"ChorePatch" : {
+			"Active" : {
+				"verified" : "applied"
+			},
+			"DSTSensitive" : {
+				"verified" : "applied"
+			},
+			"ExecutionMode" : {
+				"verified" : "applied"
+			},
+			"Frequency" : {
+				"verified" : "applied"
+			},
+			"StartTime" : {
+				"verified" : "applied"
+			},
+			"Tasks" : {
+				"verified" : "applied"
+			}
+		},
+		"ChoreReferenceCreate" : {
+			"Chore@odata.bind" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			}
+		},
+		"ChoreTaskCreate" : {
+			"Parameters" : {
+				"verified" : "applied"
+			},
+			"Process@odata.bind" : {
+				"verified" : "minimal create"
+			}
+		},
+		"ChoreTaskParameterPatch" : {
+			"Name" : {
+				"kept" : "names the process parameter: the minimal create sends it and TM1 takes it; a name the process lacks is refused"
+			},
+			"Value" : {
+				"verified" : "applied"
+			}
+		},
+		"ChoreTaskPatch" : {
+			"Parameters" : {
+				"verified" : "applied"
+			},
+			"Process@odata.bind" : {
+				"verified" : "replaces"
+			}
+		},
+		"ClientSettingsPatch" : {
+			"ClientPropertiesSyncInterval" : {
+				"verified" : "applied"
+			},
+			"PasswordMinimumLength" : {
+				"verified" : "applied"
+			},
+			"RetainNonCAMGroupMembership" : {
+				"kept" : "applies only with CAM security, which the probe server lacks"
+			}
+		},
+		"CubeCreate" : {
+			"AllowPersistentHolds" : {
+				"verified" : "applied"
+			},
+			"CalculationThresholdForStorage" : {
+				"verified" : "applied"
+			},
+			"CellSecurityMostRestrictive" : {
+				"verified" : "applied"
+			},
+			"Dimensions@odata.bind" : {
+				"verified" : "applied"
+			},
+			"DrillthroughRules" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"PrivateViews" : {
+				"verified" : "applied"
+			},
+			"Rules" : {
+				"verified" : "applied"
+			},
+			"ViewStorageMaxMemory" : {
+				"verified" : "applied"
+			},
+			"Views" : {
+				"verified" : "applied"
+			}
+		},
+		"CubePatch" : {
+			"AllowPersistentHolds" : {
+				"verified" : "applied"
+			},
+			"CalculationThresholdForStorage" : {
+				"verified" : "applied"
+			},
+			"CellSecurityMostRestrictive" : {
+				"verified" : "applied"
+			},
+			"DrillthroughRules" : {
+				"verified" : "applied"
+			},
+			"Rules" : {
+				"verified" : "applied"
+			},
+			"ViewStorageMaxMemory" : {
+				"verified" : "applied"
+			}
+		},
+		"CubeReferenceCreate" : {
+			"Cube@odata.bind" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			}
+		},
+		"CubeUpdatePatch" : {
+			"ReferenceCell" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			},
+			"ReferenceCell@odata.bind" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			},
+			"ReferenceCube" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			},
+			"ReferenceCube@odata.bind" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			},
+			"Tuple" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			},
+			"Tuple@odata.bind" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			},
+			"Value" : {
+				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+			}
+		},
+		"DebugLogSettingsPatch" : {
+			"LoggingDirectory" : {
+				"verified" : "applied"
+			}
+		},
+		"DimensionCreate" : {
+			"DefaultHierarchy" : {
+				"verified" : "applied"
+			},
+			"Hierarchies" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			}
+		},
+		"DimensionPatch" : {
+			"DefaultHierarchy" : {
+				"verified" : "applied"
+			}
+		},
+		"DimensionReferenceCreate" : {
+			"Dimension@odata.bind" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			}
+		},
+		"DocumentCreate" : {
+			"Name" : {
+				"verified" : "minimal create"
+			}
+		},
+		"EdgeCreate" : {
+			"ComponentName" : {
+				"verified" : "minimal create"
+			},
+			"ParentName" : {
+				"verified" : "minimal create"
+			},
+			"Weight" : {
+				"verified" : "applied"
+			}
+		},
+		"EdgePatch" : {
+			"Weight" : {
+				"verified" : "applied"
+			}
+		},
+		"ElementCreate" : {
+			"Components" : {
+				"verified" : "applied"
+			},
+			"Components@odata.bind" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"Parents" : {
+				"verified" : "applied"
+			},
+			"Parents@odata.bind" : {
+				"verified" : "applied"
+			},
+			"Type" : {
+				"verified" : "applied"
+			}
+		},
+		"ElementPatch" : {
+			"Components" : {
+				"verified" : "applied"
+			},
+			"Components@odata.bind" : {
+				"verified" : "applied"
+			},
+			"Type" : {
+				"verified" : "applied"
+			}
+		},
+		"EncryptionAtRestProviderSettingsPatch" : {
+			"KeyRef" : {
+				"unverified" : "an encryption key provider: probing it needs a key store"
+			}
+		},
+		"EntryCreate" : {
+			"Name" : {
+				"verified" : "minimal create"
+			}
+		},
+		"EventLogSettingsPatch" : {
+			"Enable" : {
+				"verified" : "applied"
+			},
+			"ScanFrequency" : {
+				"verified" : "applied"
+			},
+			"ThresholdForPooledMemoryInMB" : {
+				"verified" : "applied"
+			},
+			"ThresholdForThreadBlockingNumber" : {
+				"verified" : "applied"
+			},
+			"ThresholdForThreadRunningTime" : {
+				"verified" : "applied"
+			},
+			"ThresholdForThreadWaitingTime" : {
+				"verified" : "applied"
+			}
+		},
+		"ExternalDatabaseSettingsPatch" : {
+			"ODBCLibraryPath" : {
+				"verified" : "applied"
+			},
+			"ODBCTimeoutInSeconds" : {
+				"verified" : "applied"
+			},
+			"SQLFetchType" : {
+				"verified" : "applied"
+			},
+			"SQLRowsetSize" : {
+				"verified" : "applied"
+			},
+			"TM1ConnectorforSAP" : {
+				"verified" : "applied"
+			},
+			"UseNewConnectorforSAP" : {
+				"verified" : "applied"
+			}
+		},
+		"FileRetrySettingsPatch" : {
+			"FileRetryCount" : {
+				"verified" : "applied"
+			},
+			"FileRetryDelayMilliseconds" : {
+				"verified" : "applied"
+			},
+			"FileRetryFileSpec" : {
+				"verified" : "applied"
+			}
+		},
+		"FolderCreate" : {
+			"Contents" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"PrivateContents" : {
+				"verified" : "applied"
+			}
+		},
+		"GitConfigurationPatch" : { },
+		"GroupCreate" : {
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"Users" : {
+				"verified" : "applied"
+			},
+			"Users@odata.bind" : {
+				"verified" : "applied"
+			}
+		},
+		"GroupPatch" : {
+			"Users" : {
+				"verified" : "applied"
+			},
+			"Users@odata.bind" : {
+				"verified" : "applied"
+			}
+		},
+		"HTTPSettingsPatch" : {
+			"OriginAllowList" : {
+				"verified" : "applied"
+			},
+			"Port" : {
+				"verified" : "applied"
+			},
+			"RequestEntityMaxSizeInKB" : {
+				"verified" : "applied"
+			},
+			"SessionMaxRequests" : {
+				"verified" : "applied"
+			},
+			"SessionTimeout" : {
+				"verified" : "applied"
+			}
+		},
+		"HierarchyCreate" : {
+			"ComponentsSortSense" : {
+				"verified" : "applied"
+			},
+			"ComponentsSortType" : {
+				"verified" : "applied"
+			},
+			"Elements" : {
+				"verified" : "applied"
+			},
+			"ElementsSortSense" : {
+				"verified" : "applied"
+			},
+			"ElementsSortType" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"PrivateSubsets" : {
+				"verified" : "applied"
+			},
+			"Subsets" : {
+				"verified" : "applied"
+			}
+		},
+		"HierarchyPatch" : {
+			"ComponentsSortSense" : {
+				"verified" : "applied"
+			},
+			"ComponentsSortType" : {
+				"verified" : "applied"
+			},
+			"Edges" : {
+				"verified" : "replaces"
+			},
+			"Elements" : {
+				"verified" : "applied"
+			},
+			"ElementsSortSense" : {
+				"verified" : "applied"
+			},
+			"ElementsSortType" : {
+				"verified" : "applied"
+			}
+		},
+		"JavaSettingsPatch" : {
+			"ClassPath" : {
+				"verified" : "applied"
+			},
+			"JVMArgs" : {
+				"verified" : "applied"
+			},
+			"JVMPath" : {
+				"verified" : "applied"
+			}
+		},
+		"JobQueuingSettingsPatch" : {
+			"Enable" : {
+				"verified" : "applied"
+			},
+			"MaxWaitTime" : {
+				"verified" : "applied"
+			},
+			"ThreadPoolSize" : {
+				"verified" : "applied"
+			},
+			"ThreadSleepTime" : {
+				"verified" : "applied"
+			}
+		},
+		"KeyProtectSettingsPatch" : {
+			"AuthEndpoint" : {
+				"unverified" : "an encryption key provider: probing it needs a key store"
+			},
+			"AuthRef" : {
+				"unverified" : "an encryption key provider: probing it needs a key store"
+			},
+			"InstanceID" : {
+				"unverified" : "an encryption key provider: probing it needs a key store"
+			},
+			"KeyRef" : {
+				"unverified" : "an encryption key provider: probing it needs a key store"
+			},
+			"ServiceEndpoint" : {
+				"unverified" : "an encryption key provider: probing it needs a key store"
+			}
+		},
+		"LDAPSettingsPatch" : {
+			"Enable" : {
+				"verified" : "applied"
+			},
+			"Host" : {
+				"verified" : "applied"
+			},
+			"PasswordFile" : {
+				"verified" : "applied"
+			},
+			"PasswordKeyFile" : {
+				"verified" : "applied"
+			},
+			"Port" : {
+				"verified" : "applied"
+			},
+			"SearchBase" : {
+				"verified" : "applied"
+			},
+			"SearchField" : {
+				"verified" : "applied"
+			},
+			"SkipSSLCRLVerification" : {
+				"verified" : "applied"
+			},
+			"SkipSSLCertVerification" : {
+				"verified" : "applied"
+			},
+			"UseServerAccount" : {
+				"verified" : "applied"
+			},
+			"VerifyServerSSLCert" : {
+				"verified" : "applied"
+			},
+			"WellKnownUserName" : {
+				"verified" : "applied"
+			}
+		},
+		"LinkCreate" : {
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"URL" : {
+				"verified" : "applied"
+			}
+		},
+		"LocalKeyFileProviderSettingsPatch" : {
+			"KeyRef" : {
+				"unverified" : "an encryption key provider: probing it needs a key store"
+			}
+		},
+		"LocalizedAttributesCreate" : {
+			"Attributes" : {
+				"verified" : "applied"
+			},
+			"LocaleID" : {
+				"verified" : "minimal create"
+			}
+		},
+		"LockingSettingsPatch" : {
+			"PullInvalidationSubsets" : {
+				"verified" : "applied"
+			},
+			"SubsetElementLockBreathing" : {
+				"verified" : "applied"
+			},
+			"UseLocalCopiesForPublicDynamicSubsets" : {
+				"verified" : "applied"
+			}
+		},
+		"LoggerPatch" : {
+			"Level" : {
+				"verified" : "applied"
+			}
+		},
+		"MDXViewCreate" : {
+			"MDX" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			}
+		},
+		"MDXViewPatch" : {
+			"MDX" : {
+				"verified" : "applied"
+			}
+		},
+		"MTCubeLoadSettingsPatch" : {
+			"Enabled" : {
+				"verified" : "applied"
+			},
+			"MinFileSize" : {
+				"verified" : "applied"
+			},
+			"UseBookmarkFiles" : {
+				"verified" : "applied"
+			},
+			"Weight" : {
+				"verified" : "applied"
+			}
+		},
+		"MTFeedersSettingsPatch" : {
+			"AtStartup" : {
+				"verified" : "applied"
+			},
+			"Enabled" : {
+				"verified" : "applied"
+			}
+		},
+		"MTQSettingsPatch" : {
+			"ImmediateCheckForSplit" : {
+				"verified" : "applied"
+			},
+			"MTFeeders" : {
+				"verified" : "applied"
+			},
+			"MTFeedersAtStartup" : {
+				"verified" : "applied"
+			},
+			"MTQQuery" : {
+				"verified" : "applied"
+			},
+			"NumberOfThreadsToUse" : {
+				"verified" : "applied"
+			},
+			"OperationProgressCheckSkipLoopSize" : {
+				"verified" : "applied"
+			},
+			"SingleCellConsolidation" : {
+				"verified" : "applied"
+			},
+			"UseAllThreads" : {
+				"verified" : "applied"
+			}
+		},
+		"MemorySettingsPatch" : {
+			"ApplyMaximumViewSizeToEntireTransaction" : {
+				"verified" : "applied"
+			},
+			"CacheFriendlyMalloc" : {
+				"verified" : "applied"
+			},
+			"DisableMemoryCache" : {
+				"verified" : "applied"
+			},
+			"LockPagesInMemory" : {
+				"verified" : "applied"
+			},
+			"MaximumMemoryForSubsetUndoKB" : {
+				"verified" : "applied"
+			},
+			"MaximumUserSandboxSizeMB" : {
+				"verified" : "applied"
+			},
+			"MaximumViewSizeMB" : {
+				"verified" : "applied"
+			}
+		},
+		"ModellingSettingsPatch" : {
+			"DefaultMeasuresDimension" : {
+				"verified" : "applied"
+			},
+			"EnableNewHierarchyCreation" : {
+				"verified" : "applied"
+			},
+			"MDXSelectCalculatedMemberInputs" : {
+				"verified" : "applied"
+			},
+			"Rules" : {
+				"verified" : "applied"
+			},
+			"Spreading" : {
+				"verified" : "applied"
+			},
+			"Startup" : {
+				"verified" : "applied"
+			},
+			"Synchronization" : {
+				"verified" : "applied"
+			},
+			"TI" : {
+				"verified" : "applied"
+			},
+			"UserDefinedCalculations" : {
+				"verified" : "applied"
+			}
+		},
+		"NativeViewCreate" : {
+			"Columns" : {
+				"verified" : "applied"
+			},
+			"FormatString" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"Rows" : {
+				"verified" : "applied"
+			},
+			"SuppressEmptyColumns" : {
+				"verified" : "applied"
+			},
+			"SuppressEmptyRows" : {
+				"verified" : "applied"
+			},
+			"Titles" : {
+				"verified" : "applied"
+			}
+		},
+		"NativeViewPatch" : {
+			"Columns" : {
+				"verified" : "applied"
+			},
+			"FormatString" : {
+				"verified" : "applied"
+			},
+			"Rows" : {
+				"verified" : "applied"
+			},
+			"SuppressEmptyColumns" : {
+				"verified" : "applied"
+			},
+			"SuppressEmptyRows" : {
+				"verified" : "applied"
+			},
+			"Titles" : {
+				"verified" : "applied"
+			}
+		},
+		"NetworkSettingsPatch" : {
+			"IPAddress" : {
+				"verified" : "applied"
+			},
+			"IPVersion" : {
+				"verified" : "applied"
+			},
+			"IdleConnectionTimeOut" : {
+				"verified" : "applied"
+			},
+			"NetRecvBlockingWaitLimit" : {
+				"verified" : "applied"
+			},
+			"NetRecvMaxClientIOWaitWithinAPIs" : {
+				"verified" : "applied"
+			},
+			"ReceiveProgressResponseTimeout" : {
+				"verified" : "applied"
+			}
+		},
+		"PerformanceSettingsPatch" : {
+			"JobQueuing" : {
+				"verified" : "applied"
+			},
+			"Locking" : {
+				"verified" : "applied"
+			},
+			"MTCubeLoad" : {
+				"verified" : "applied"
+			},
+			"MTFeeders" : {
+				"verified" : "applied"
+			},
+			"MTQ" : {
+				"verified" : "applied"
+			},
+			"Memory" : {
+				"verified" : "applied"
+			},
+			"PrivilegeGenerationOptimization" : {
+				"verified" : "applied"
+			},
+			"Stargate" : {
+				"verified" : "applied"
+			},
+			"ViewCalculation" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessCreate" : {
+			"Code" : {
+				"kept" : "TM1 normalises line endings to CRLF; the code is otherwise as sent"
+			},
+			"DataProcedure" : {
+				"verified" : "applied"
+			},
+			"DataSource" : {
+				"verified" : "applied"
+			},
+			"EpilogProcedure" : {
+				"verified" : "applied"
+			},
+			"HasSecurityAccess" : {
+				"verified" : "applied"
+			},
+			"MetadataProcedure" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"Parameters" : {
+				"verified" : "applied"
+			},
+			"PrologProcedure" : {
+				"verified" : "applied"
+			},
+			"UIData" : {
+				"verified" : "applied"
+			},
+			"Variables" : {
+				"verified" : "applied"
+			},
+			"VariablesUIData" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessDataSourcePatch" : {
+			"Type" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessDebugContextBreakpointCreate" : {
+			"Enabled" : {
+				"verified" : "applied"
+			},
+			"Expression" : {
+				"verified" : "applied"
+			},
+			"HitCount" : {
+				"verified" : "applied"
+			},
+			"HitMode" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessDebugContextBreakpointPatch" : {
+			"Enabled" : {
+				"verified" : "applied"
+			},
+			"Expression" : {
+				"verified" : "applied"
+			},
+			"HitCount" : {
+				"verified" : "applied"
+			},
+			"HitMode" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessDebugContextDataBreakpointCreate" : {
+			"Enabled" : {
+				"verified" : "applied"
+			},
+			"Expression" : {
+				"verified" : "applied"
+			},
+			"HitCount" : {
+				"verified" : "applied"
+			},
+			"HitMode" : {
+				"verified" : "applied"
+			},
+			"VariableName" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessDebugContextDataBreakpointPatch" : {
+			"Enabled" : {
+				"verified" : "applied"
+			},
+			"Expression" : {
+				"verified" : "applied"
+			},
+			"HitCount" : {
+				"verified" : "applied"
+			},
+			"HitMode" : {
+				"verified" : "applied"
+			},
+			"VariableName" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessDebugContextLineBreakpointCreate" : {
+			"Enabled" : {
+				"verified" : "applied"
+			},
+			"Expression" : {
+				"verified" : "applied"
+			},
+			"HitCount" : {
+				"verified" : "applied"
+			},
+			"HitMode" : {
+				"verified" : "applied"
+			},
+			"LineNumber" : {
+				"verified" : "applied"
+			},
+			"Procedure" : {
+				"verified" : "applied"
+			},
+			"ProcessName" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessDebugContextLineBreakpointPatch" : {
+			"Enabled" : {
+				"verified" : "applied"
+			},
+			"Expression" : {
+				"verified" : "applied"
+			},
+			"HitCount" : {
+				"verified" : "applied"
+			},
+			"HitMode" : {
+				"verified" : "applied"
+			},
+			"LineNumber" : {
+				"verified" : "applied"
+			},
+			"Procedure" : {
+				"verified" : "applied"
+			},
+			"ProcessName" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessDebugContextLockBreakpointCreate" : {
+			"Enabled" : {
+				"verified" : "applied"
+			},
+			"Expression" : {
+				"verified" : "applied"
+			},
+			"HitCount" : {
+				"verified" : "applied"
+			},
+			"HitMode" : {
+				"verified" : "applied"
+			},
+			"LockMode" : {
+				"verified" : "applied"
+			},
+			"ObjectName" : {
+				"verified" : "applied"
+			},
+			"ObjectType" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessDebugContextLockBreakpointPatch" : {
+			"Enabled" : {
+				"verified" : "applied"
+			},
+			"Expression" : {
+				"verified" : "applied"
+			},
+			"HitCount" : {
+				"verified" : "applied"
+			},
+			"HitMode" : {
+				"verified" : "applied"
+			},
+			"LockMode" : {
+				"verified" : "applied"
+			},
+			"ObjectName" : {
+				"verified" : "applied"
+			},
+			"ObjectType" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessParameterPatch" : {
+			"Name" : {
+				"verified" : "applied"
+			},
+			"Prompt" : {
+				"verified" : "applied"
+			},
+			"Value" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessPatch" : {
+			"Code" : {
+				"kept" : "TM1 normalises line endings to CRLF; the code is otherwise as sent"
+			},
+			"DataProcedure" : {
+				"verified" : "applied"
+			},
+			"DataSource" : {
+				"verified" : "applied"
+			},
+			"EpilogProcedure" : {
+				"verified" : "applied"
+			},
+			"HasSecurityAccess" : {
+				"verified" : "applied"
+			},
+			"MetadataProcedure" : {
+				"verified" : "applied"
+			},
+			"Parameters" : {
+				"verified" : "applied"
+			},
+			"PrologProcedure" : {
+				"verified" : "applied"
+			},
+			"UIData" : {
+				"verified" : "applied"
+			},
+			"Variables" : {
+				"verified" : "applied"
+			},
+			"VariablesUIData" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessReferenceCreate" : {
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"Process@odata.bind" : {
+				"verified" : "applied"
+			}
+		},
+		"ProcessVariablePatch" : {
+			"EndByte" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "applied"
+			},
+			"Position" : {
+				"verified" : "applied"
+			},
+			"StartByte" : {
+				"verified" : "applied"
+			},
+			"Type" : {
+				"verified" : "applied"
+			}
+		},
+		"RulesSettingsPatch" : {
+			"AllowSeparateNandCRules" : {
+				"verified" : "applied"
+			},
+			"AutomaticallyAddCubeDependencies" : {
+				"verified" : "applied"
+			},
+			"ForceReevaluationOfFeedersForFedCellsOnDataChange" : {
+				"verified" : "applied"
+			},
+			"RulesOverwriteCellsOnLoad" : {
+				"verified" : "applied"
+			}
+		},
+		"SSLSettingsPatch" : {
+			"CertAuthority" : {
+				"verified" : "applied"
+			},
+			"CertRevocationFile" : {
+				"verified" : "applied"
+			},
+			"CertificateFile" : {
+				"unverified" : "TM1 never returns it, so the probe can't set it back after a try"
+			},
+			"CertificateID" : {
+				"verified" : "applied"
+			},
+			"ClientExportServerCertificate" : {
+				"unverified" : "TM1 never returns it, so the probe can't set it back after a try"
+			},
+			"ClientExportServerKeyID" : {
+				"verified" : "applied"
+			},
+			"Enable" : {
+				"verified" : "applied"
+			},
+			"KeyFile" : {
+				"verified" : "applied"
+			},
+			"KeyLabel" : {
+				"verified" : "applied"
+			},
+			"KeyStashFile" : {
+				"verified" : "applied"
+			},
+			"NIST_SP800_131A_MODE" : {
+				"verified" : "applied"
+			},
+			"PrivateKeyPwdFile" : {
+				"unverified" : "TM1 never returns it, so the probe can't set it back after a try"
+			},
+			"PwdKeyFile" : {
+				"unverified" : "TM1 never returns it, so the probe can't set it back after a try"
+			},
+			"TLSCipherList" : {
+				"verified" : "applied"
+			}
+		},
+		"SandboxCreate" : {
+			"IncludeInSandboxDimension" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			}
+		},
+		"SandboxPatch" : {
+			"IncludeInSandboxDimension" : {
+				"verified" : "applied"
+			}
+		},
+		"ServerLogSettingsPatch" : {
+			"Enable" : {
+				"verified" : "applied"
+			},
+			"LogReleaseLineCount" : {
+				"verified" : "applied"
+			}
+		},
+		"ServerSettingsPatch" : {
+			"Access" : {
+				"verified" : "applied"
+			},
+			"Administration" : {
+				"verified" : "applied"
+			},
+			"EncryptionAtRest" : {
+				"unverified" : "encryption at rest: probing it needs a key store"
+			},
+			"Modelling" : {
+				"verified" : "applied"
+			},
+			"Performance" : {
+				"verified" : "applied"
+			}
+		},
+		"SpreadingSettingsPatch" : {
+			"ProportionSpreadToZeroCells" : {
+				"verified" : "applied"
+			},
+			"SpreadingPrecision" : {
+				"verified" : "applied"
+			}
+		},
+		"StargateSettingsPatch" : {
+			"AllRuleCalcStargateOptimization" : {
+				"verified" : "applied"
+			},
+			"UseStargateForRules" : {
+				"verified" : "applied"
+			},
+			"ZeroWeightOptimization" : {
+				"verified" : "applied"
+			}
+		},
+		"StartupSettingsPatch" : {
+			"LoadPrivateSubsetsOnStartup" : {
+				"verified" : "applied"
+			},
+			"MaximumCubeLoadThreads" : {
+				"verified" : "applied"
+			},
+			"PersistentFeeders" : {
+				"verified" : "applied"
+			}
+		},
+		"SubsetCreate" : {
+			"Alias" : {
+				"verified" : "applied"
+			},
+			"Elements@odata.bind" : {
+				"verified" : "applied"
+			},
+			"ExpandAbove" : {
+				"verified" : "applied"
+			},
+			"Expression" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			}
+		},
+		"SubsetPatch" : {
+			"Alias" : {
+				"verified" : "applied"
+			},
+			"Elements@odata.bind" : {
+				"verified" : "applied"
+			},
+			"ExpandAbove" : {
+				"verified" : "applied"
+			},
+			"Expression" : {
+				"verified" : "applied"
+			}
+		},
+		"SubsetReferenceCreate" : {
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"Subset@odata.bind" : {
+				"verified" : "applied"
+			}
+		},
+		"SynchronizationSettingsPatch" : {
+			"MaximumSynchAttempts" : {
+				"verified" : "applied"
+			},
+			"SyncUnitSize" : {
+				"verified" : "applied"
+			}
+		},
+		"TISettingsPatch" : {
+			"CognosTM1InterfacePath" : {
+				"verified" : "applied"
+			},
+			"EnableTIDebugging" : {
+				"verified" : "applied"
+			},
+			"MaximumTILockObjects" : {
+				"verified" : "applied"
+			},
+			"UseExcelSerialDate" : {
+				"verified" : "applied"
+			}
+		},
+		"TM1WebSettingsPatch" : {
+			"ExcelWebPublishEnabled" : {
+				"verified" : "applied"
+			}
+		},
+		"TopLogSettingsPatch" : {
+			"Enable" : {
+				"verified" : "applied"
+			},
+			"ScanFrequency" : {
+				"verified" : "applied"
+			},
+			"ScanMode" : {
+				"verified" : "applied"
+			}
+		},
+		"UserCreate" : {
+			"FriendlyName" : {
+				"verified" : "applied"
+			},
+			"Groups" : {
+				"verified" : "applied"
+			},
+			"Groups@odata.bind" : {
+				"verified" : "applied"
+			},
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"Password" : {
+				"verified" : "applied"
+			}
+		},
+		"UserPatch" : {
+			"Enabled" : {
+				"verified" : "applied"
+			},
+			"FriendlyName" : {
+				"verified" : "applied"
+			},
+			"Groups" : {
+				"verified" : "applied"
+			},
+			"Groups@odata.bind" : {
+				"verified" : "applied"
+			},
+			"Password" : {
+				"verified" : "applied"
+			}
+		},
+		"VaultSettingsPatch" : {
+			"AuthRef" : {
+				"unverified" : "an encryption key provider: probing it needs a key store"
+			},
+			"KeyRef" : {
+				"unverified" : "an encryption key provider: probing it needs a key store"
+			},
+			"ServiceEndpoint" : {
+				"unverified" : "an encryption key provider: probing it needs a key store"
+			}
+		},
+		"ViewAxisSelectionPatch" : {
+			"Subset" : {
+				"verified" : "applied"
+			},
+			"Subset@odata.bind" : {
+				"verified" : "applied"
+			}
+		},
+		"ViewCalculationSettingsPatch" : {
+			"CalculationThresholdForStorage" : {
+				"verified" : "applied"
+			},
+			"CheckFeedersMaximumCells" : {
+				"verified" : "applied"
+			},
+			"MagnitudeDifferenceToBeZero" : {
+				"verified" : "applied"
+			},
+			"ViewConsolidationOptimization" : {
+				"verified" : "applied"
+			},
+			"ViewConsolidationOptimizationMethod" : {
+				"verified" : "applied"
+			}
+		},
+		"ViewCreate" : {
+			"Name" : {
+				"verified" : "minimal create"
+			}
+		},
+		"ViewPatch" : { },
+		"ViewReferenceCreate" : {
+			"Name" : {
+				"verified" : "minimal create"
+			},
+			"View@odata.bind" : {
+				"verified" : "applied"
+			}
+		},
+		"ViewTitlePatch" : {
+			"Selected@odata.bind" : {
+				"verified" : "applied"
+			},
+			"Subset" : {
+				"verified" : "applied"
+			},
+			"Subset@odata.bind" : {
+				"verified" : "applied"
+			}
+		}
+	}
 }

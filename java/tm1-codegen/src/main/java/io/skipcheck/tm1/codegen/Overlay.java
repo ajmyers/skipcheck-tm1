@@ -37,9 +37,12 @@ import tools.jackson.databind.json.JsonMapper;
  * @param writeOnly properties TM1 takes in a write but never sends back, by
  * {@code Type/Property}, with a note: the write probe reads them as ignored, so
  * {@link Writes} counts them as written
+ * @param writes setters a write type offers though the probe doesn't verify them, by
+ * {@code Builder.Setter}, or a whole write type by {@code Builder}: why ({@link Offers})
  */
 public record Overlay(Map<String, String> departures, Map<String, String> lenientDates,
-		Map<String, EndpointNote> endpoints, Map<String, UndeclaredType> undeclared, Map<String, String> writeOnly) {
+		Map<String, EndpointNote> endpoints, Map<String, UndeclaredType> undeclared, Map<String, String> writeOnly,
+		Map<String, WriteException> writes) {
 
 	private static final Pattern CODE = Pattern.compile("`([^`]*)`");
 
@@ -50,6 +53,32 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 		endpoints = Collections.unmodifiableMap(new LinkedHashMap<>(endpoints));
 		undeclared = Collections.unmodifiableMap(new LinkedHashMap<>(undeclared));
 		writeOnly = Collections.unmodifiableMap(new LinkedHashMap<>(writeOnly));
+		writes = Collections.unmodifiableMap(new LinkedHashMap<>(writes));
+	}
+
+	/**
+	 * Why a write type offers a setter the probe doesn't verify.
+	 *
+	 * @param kind {@code kept}: the probe tried it, and what it found is accounted for
+	 * (TM1 transforms it as it should, or it needs a configuration the probe server
+	 * lacks); {@code unverified}: the probe can't try it
+	 * @param note why, in Markdown
+	 */
+	public record WriteException(String kind, String note) {
+
+		/** The kinds. */
+		public static final List<String> KINDS = List.of("kept", "unverified");
+
+		/**
+		 * Checks the kind.
+		 * @throws IllegalArgumentException if it isn't one of {@link #KINDS}
+		 */
+		public WriteException {
+			if (!KINDS.contains(kind)) {
+				throw new IllegalArgumentException("A write exception is kept or unverified, not " + kind);
+			}
+		}
+
 	}
 
 	/**
@@ -78,7 +107,7 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 	}
 
 	/** An overlay that changes nothing. */
-	public static final Overlay NONE = new Overlay(Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+	public static final Overlay NONE = new Overlay(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
 
 	/**
 	 * The overlay bundled with the generator: {@code spec/tm1-overlay.json}, copied onto
@@ -129,7 +158,16 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 		root.path("writeOnly")
 			.properties()
 			.forEach(e -> writeOnly.put(e.getKey(), e.getValue().path("note").asString("")));
-		return new Overlay(departures, lenient, endpoints, undeclared, writeOnly);
+		Map<String, WriteException> writes = new LinkedHashMap<>();
+		root.path("writes").properties().forEach(e -> {
+			List<String> kinds = new ArrayList<>(e.getValue().propertyNames());
+			if (kinds.size() != 1) {
+				throw new IllegalArgumentException(
+						"The overlay's writes entry " + e.getKey() + " needs one of kept or unverified, with why");
+			}
+			writes.put(e.getKey(), new WriteException(kinds.get(0), e.getValue().path(kinds.get(0)).asString()));
+		});
+		return new Overlay(departures, lenient, endpoints, undeclared, writeOnly, writes);
 	}
 
 	/**

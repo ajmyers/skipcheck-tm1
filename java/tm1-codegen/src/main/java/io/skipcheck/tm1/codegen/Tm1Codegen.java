@@ -39,7 +39,7 @@ public final class Tm1Codegen {
 			Path snapshot = Path.of(args[1]);
 			Model model = Model.of(snapshot);
 			String spec = new ApiSpecExporter(model.metadata(), model.overlay(), snapshot.getFileName().toString(),
-					model.undeclared(), model.writes(), model.probe())
+					model.undeclared(), model.writes(), model.offers(), model.probe())
 				.export();
 			Path out = Path.of(args[2]);
 			if (out.getParent() != null) {
@@ -62,7 +62,8 @@ public final class Tm1Codegen {
 	 * beside it ({@code tm1-probe-<schema>.json}) found undeclared, what it found writes
 	 * do, and the bundled overlay.
 	 */
-	record Model(CsdlDocument metadata, Overlay overlay, Undeclared undeclared, Writes writes, @Nullable String probe) {
+	record Model(CsdlDocument metadata, Overlay overlay, Undeclared undeclared, Writes writes, Offers offers,
+			@Nullable String probe) {
 
 		static Model of(Path snapshot) throws IOException {
 			CsdlDocument metadata = read(snapshot);
@@ -71,12 +72,13 @@ public final class Tm1Codegen {
 			Path dir = snapshot.toAbsolutePath().getParent();
 			Path probe = dir == null ? null : dir.resolve("tm1-probe-" + version + ".json");
 			if (probe == null || !Files.exists(probe)) {
-				return new Model(metadata, overlay, Undeclared.NONE, Writes.NONE, null);
+				return new Model(metadata, overlay, Undeclared.NONE, Writes.NONE, Offers.NONE, null);
 			}
 			String json = Files.readString(probe, StandardCharsets.UTF_8);
 			Undeclared undeclared = Undeclared.read(json, overlay, metadata);
-			return new Model(undeclared.applyTo(metadata), undeclared.applyTo(overlay), undeclared,
-					Writes.read(json, overlay), probe.getFileName().toString());
+			CsdlDocument withUndeclared = undeclared.applyTo(metadata);
+			return new Model(withUndeclared, undeclared.applyTo(overlay), undeclared, Writes.read(json, overlay),
+					Offers.of(json, withUndeclared, overlay), probe.getFileName().toString());
 		}
 
 	}

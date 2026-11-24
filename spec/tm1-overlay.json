@@ -1,5 +1,5 @@
 {
-	"$comment": "What TM1 does differently from its own $metadata, shared by every client's code generator. Notes are Markdown; each generator renders them in its own doc format. Keys are Type/Property for properties and coverage-gate endpoint IDs for endpoints.",
+	"$comment": "What TM1 does differently from its own $metadata, shared by every client's code generator. Notes are Markdown; each generator renders them in its own doc format. Keys are Type/Property for properties and coverage-gate endpoint IDs for endpoints. writes: setters a write type offers though the probe doesn't verify them, by Builder.Setter (or a whole write type by Builder), each kept (the probe tried it, and what it found is accounted for) or unverified (the probe can't try it), with why.",
 	"departures": {
 		"CAMSettings/ClientPingCAMPassport": {
 			"read": "json",
@@ -60,5 +60,61 @@
 			"type": "Edm.Int64"
 		}
 	},
-	"writeOnly": {}
+	"writeOnly": {},
+	"writes": {
+		"ApplicationContextFacetValueCreate": {
+			"kept": "an annotation's application context: the minimal create sends it and TM1 takes it; its Value changes only with the annotation's dimensional context"
+		},
+		"AuthenticationSettingsPatch.IntegratedSecurityMode": {
+			"kept": "reads back as Mixed on a server without Windows integrated security"
+		},
+		"CellsetUpdatePatch": {
+			"kept": "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+		},
+		"ChoreTaskParameterPatch.Name": {
+			"kept": "names the process parameter: the minimal create sends it and TM1 takes it; a name the process lacks is refused"
+		},
+		"ClientSettingsPatch.RetainNonCAMGroupMembership": {
+			"kept": "applies only with CAM security, which the probe server lacks"
+		},
+		"CubeUpdatePatch": {
+			"kept": "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+		},
+		"EncryptionAtRestProviderSettingsPatch": {
+			"unverified": "an encryption key provider: probing it needs a key store"
+		},
+		"GitConfigurationPatch": {
+			"kept": "an operation's parameters (tm1.GitInit, tm1.GitDeploy), not an entity write"
+		},
+		"KeyProtectSettingsPatch": {
+			"unverified": "an encryption key provider: probing it needs a key store"
+		},
+		"LocalKeyFileProviderSettingsPatch": {
+			"unverified": "an encryption key provider: probing it needs a key store"
+		},
+		"ProcessCreate.Code": {
+			"kept": "TM1 normalises line endings to CRLF; the code is otherwise as sent"
+		},
+		"ProcessPatch.Code": {
+			"kept": "TM1 normalises line endings to CRLF; the code is otherwise as sent"
+		},
+		"ServerSettingsPatch.EncryptionAtRest": {
+			"unverified": "encryption at rest: probing it needs a key store"
+		},
+		"SSLSettingsPatch.CertificateFile": {
+			"unverified": "TM1 never returns it, so the probe can't set it back after a try"
+		},
+		"SSLSettingsPatch.ClientExportServerCertificate": {
+			"unverified": "TM1 never returns it, so the probe can't set it back after a try"
+		},
+		"SSLSettingsPatch.PrivateKeyPwdFile": {
+			"unverified": "TM1 never returns it, so the probe can't set it back after a try"
+		},
+		"SSLSettingsPatch.PwdKeyFile": {
+			"unverified": "TM1 never returns it, so the probe can't set it back after a try"
+		},
+		"VaultSettingsPatch": {
+			"unverified": "an encryption key provider: probing it needs a key store"
+		}
+	}
 }
