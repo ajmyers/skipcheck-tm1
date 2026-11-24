@@ -332,7 +332,8 @@ def _copied(spec: Spec, t: dict[str, Any], create: bool) -> list[str]:
 
 
 def _read_binding(spec: Spec, n: dict[str, Any]) -> tuple[str, str, str, str] | None:
-    """How ``builder(read)`` binds a navigation the read holds: ``(name, helper, collection, key)``, by
+    """How ``builder(read)`` binds a navigation the read holds (for a patch, a single-valued one only:
+    see ``_bindings``): ``(name, helper, collection, key)``, by
     key for a target in an entity set, by ``UniqueName`` for an element or a member; None for any
     other (a subset, public or private, or a view, whose cube the read doesn't say). As the Java
     generator's ``readBinding``."""
@@ -359,7 +360,9 @@ def _bindings(spec: Spec, t: dict[str, Any], create: bool) -> tuple[tuple[str, s
     out: list[tuple[str, str, str, str]] = []
     for level in spec.chain(t):
         for s in _writable(spec, level, t, create):
-            if s.navigation and s.bind and all(b[0] != s.json for b in out):
+            # A patch from a read binds no collection: sent back, it would replace or append to what's
+            # there, whichever TM1 does for it, on an unrelated change
+            if s.navigation and s.bind and (create or not s.prop["collection"]) and all(b[0] != s.json for b in out):
                 binding = _read_binding(spec, s.prop)
                 if binding is not None:
                     out.append(binding)
@@ -372,11 +375,13 @@ def _declared(spec: Spec, t: dict[str, Any]) -> tuple[str, ...] | None:
     return None
 
 
-_READ_DOC = (
-    "        A navigation the read holds expanded is bound, where its targets' paths follow from it: an entity",
-    "        set's by key, an element's or member's by its ``UniqueName``; one it doesn't hold, or a subset or a",
-    '        view (whose path the read can\'t tell), isn\'t, nor are nested ones or nulls."""',
-)
+def _read_doc(create: bool) -> tuple[str, ...]:
+    return (
+        "        A navigation the read holds expanded is bound, where its targets' paths follow from it: an entity",
+        "        set's by key, an element's or member's by its ``UniqueName``; one it doesn't hold, or holds empty, or",
+        "        a subset or a view (whose path the read can't tell), isn't, nor are nested ones or nulls" + ('."""' if create else ", nor a"),
+        *(() if create else ('        collection, which a PATCH would replace or append to."""',)),
+    )
 
 
 def _copy_call(spec: Spec, t: dict[str, Any], create: bool) -> str:
@@ -418,7 +423,7 @@ def _builder_method(spec: Spec, t: dict[str, Any], name: str, create: bool) -> l
     what = "a POST applies, to recreate it" if create else "a PATCH applies, leaving out collections a PATCH appends to"
     out += [
         f'        """A builder with nothing set; or, given an entity read from TM1, one holding what it holds that {what}.',
-        *_READ_DOC,
+        *_read_doc(create),
         f"        return {_copy_call(spec, t, create)}  # type: ignore[no-any-return]",
     ]
     return out

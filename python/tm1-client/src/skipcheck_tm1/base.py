@@ -270,11 +270,11 @@ def _field(read: Any, name: str) -> Any:
 
 def read_binding(how: str, collection: str, value: Any, key: str) -> str | list[str] | None:
     """The path, or paths, a write's ``builder(read)`` binds a navigation the read holds to (``value``,
-    as TM1's JSON): None where one can't be made, and for a collection where any can't. ``how`` is
-    ``by_key`` (or ``by_keys``), an entity in the set ``collection`` by its ``key`` property:
-    ``Dimensions('Region')``; or ``in_hierarchy`` (or ``all_in_hierarchy``), an element or member by
-    its ``UniqueName``, in ``collection`` (``Elements``, ``Members``) of its hierarchy. As the Java
-    model's ``ReadBindings``."""
+    as TM1's JSON): None where one can't be made, and for a collection where any can't, or there are
+    none. ``how`` is ``by_key`` (or ``by_keys``), an entity in the set ``collection`` by its ``key``
+    property: ``Dimensions('Region')``; or ``in_hierarchy`` (or ``all_in_hierarchy``), an element or
+    member by its ``UniqueName``, in ``collection`` (``Elements``, ``Members``) of its hierarchy. As
+    the Java model's ``ReadBindings``."""
 
     def one(v: Any) -> str | None:
         k = v.get(key) if isinstance(v, dict) else None
@@ -286,6 +286,8 @@ def read_binding(how: str, collection: str, value: Any, key: str) -> str | list[
     if how in ("by_key", "in_hierarchy"):
         return one(value)
     paths = [one(v) for v in value]
+    if not paths:
+        return None
     return None if any(p is None for p in paths) else [p for p in paths if p is not None]
 
 
