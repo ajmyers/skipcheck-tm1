@@ -27,8 +27,8 @@ public static class HierarchyServiceExamples
                     ElementCreate.Builder().Name("South").Type(ElementType.Numeric).Build(),
                 ])
                 .Edges([
-                    EdgePatch.Builder().ParentName("Smith").ComponentName("North").Weight(1.0).Build(),
-                    EdgePatch.Builder().ParentName("Smith").ComponentName("South").Weight(1.0).Build(),
+                    EdgeCreate.Builder().ParentName("Smith").ComponentName("North").Weight(1.0).Build(),
+                    EdgeCreate.Builder().ParentName("Smith").ComponentName("South").Weight(1.0).Build(),
                 ])
                 .Build()
         );
@@ -48,8 +48,8 @@ public static class HierarchyServiceExamples
             "Version",
             [all, actual, budget],
             [
-                EdgePatch.Builder().ParentName("All Versions").ComponentName("Actual").Weight(1.0).Build(),
-                EdgePatch.Builder().ParentName("All Versions").ComponentName("Budget").Weight(1.0).Build(),
+                EdgeCreate.Builder().ParentName("All Versions").ComponentName("Actual").Weight(1.0).Build(),
+                EdgeCreate.Builder().ParentName("All Versions").ComponentName("Budget").Weight(1.0).Build(),
             ]
         );
         // @end

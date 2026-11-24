@@ -17,7 +17,7 @@ public static class LocalizedAttributeServiceExamples
         // locale's translations are created once: TM1 can't change them here.
         return await tm1.LocalizedAttributes.CreateAsync(
             AttributeOwner.Element("Region", "Region", "North"),
-            LocalizedAttributesPatch.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Property("Long Name", "Région Nord").Build()).Build()
+            LocalizedAttributesCreate.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Property("Long Name", "Région Nord").Build()).Build()
         );
         // @end
     }

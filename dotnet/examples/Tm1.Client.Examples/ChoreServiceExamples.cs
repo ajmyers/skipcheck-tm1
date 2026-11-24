@@ -16,7 +16,7 @@ public static class ChoreServiceExamples
         // @start region = create
         // A daily chore at 02:00 UTC, inactive until it's switched on. A task gives
         // every parameter of its process a value.
-        var loadActuals = ChoreTaskPatch
+        var loadActuals = ChoreTaskCreate
             .Builder()
             .BindProcess(ODataPath.Of("Processes").Key("Load Sales"))
             .Parameters([
@@ -43,7 +43,7 @@ public static class ChoreServiceExamples
     {
         // @start region = add-task
         // A task goes at the end; TM1 numbers the steps from 0
-        var loadForecast = ChoreTaskPatch
+        var loadForecast = ChoreTaskCreate
             .Builder()
             .BindProcess(ODataPath.Of("Processes").Key("Load Sales"))
             .Parameters([

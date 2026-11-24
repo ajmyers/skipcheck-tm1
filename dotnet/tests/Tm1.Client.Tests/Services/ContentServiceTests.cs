@@ -89,10 +89,10 @@ public class ContentServiceTests
         var tm1 = _tm1.Client();
         var planning = ContentPath.Applications().Child("Planning");
         _tm1.Respond = _ => new Dictionary<string, object?> { ["@odata.type"] = "#ibm.tm1.api.v1.DocumentReference", ["ID"] = "notes.txt.blob" };
-        var made = await tm1.Contents.CreateAsync(planning, ContentScope.Public, DocumentPatch.Builder().Name("notes.txt").Build());
+        var made = await tm1.Contents.CreateAsync(planning, ContentScope.Public, DocumentCreate.Builder().Name("notes.txt").Build());
         Assert.IsType<DocumentReference>(made);
         Assert.Equal(("POST Contents('Applications')/Contents('Planning')/Contents", "notes.txt"), (Sent, _tm1.Last.Json.GetProperty("Name").GetString()));
-        await tm1.Contents.CreateAsync(planning, ContentScope.Private, FolderPatch.Builder().Name("mine").Build());
+        await tm1.Contents.CreateAsync(planning, ContentScope.Private, FolderCreate.Builder().Name("mine").Build());
         Assert.Equal("POST Contents('Applications')/Contents('Planning')/PrivateContents", Sent);
 
         var other = ContentPath.Applications().Child("Other");

@@ -119,7 +119,7 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
         {
             var id = context.Id!;
             await Assert.ThrowsAsync<ArgumentException>(() =>
-                Debug.AddBreakpointAsync(id, ProcessDebugContextLineBreakpointPatch.Builder().ProcessName(_process).LineNumber(2).Build())
+                Debug.AddBreakpointAsync(id, ProcessDebugContextLineBreakpointCreate.Builder().ProcessName(_process).LineNumber(2).Build())
             );
             await Debug.AddBreakpointAsync(id, Line(1, 2));
             await Debug.AddBreakpointAsync(id, Line(2, 3));
@@ -143,6 +143,13 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
         Assert.Equal(ProcessDebugContextStatus.Complete, (await Debug.GetAsync(id)).Status);
     }
 
-    private ProcessDebugContextLineBreakpointPatch Line(int id, int line) =>
-        ProcessDebugContextLineBreakpointPatch.Builder().Id(id).ProcessName(_process).Procedure(ProcessProcedure.Prolog).LineNumber(line).Enabled(true).Build();
+    private ProcessDebugContextLineBreakpointCreate Line(int id, int line) =>
+        ProcessDebugContextLineBreakpointCreate
+            .Builder()
+            .Id(id)
+            .ProcessName(_process)
+            .Procedure(ProcessProcedure.Prolog)
+            .LineNumber(line)
+            .Enabled(true)
+            .Build();
 }

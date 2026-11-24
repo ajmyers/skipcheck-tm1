@@ -131,10 +131,7 @@ public sealed class ProcessServiceLiveTests : IAsyncLifetime
         ProcessCreate
             .Builder()
             .Name(name)
-            .Parameters([
-                ProcessParameterPatch.Builder().Name("pName").Value("").Type(ProcessVariableType.String).Build(),
-                ProcessParameterPatch.Builder().Name("pCount").Value(0).Type(ProcessVariableType.Numeric).Build(),
-            ])
+            .Parameters([ProcessParameterPatch.Builder().Name("pName").Value("").Build(), ProcessParameterPatch.Builder().Name("pCount").Value(0).Build()])
             .PrologProcedure(prolog)
             .Build();
 }

@@ -17,12 +17,12 @@ namespace Skipcheck.Tm1.Client.Services;
 /// <para>Create a daily chore with one task (a daily chore at 02:00 UTC, inactive until it's switched
 /// on; a task gives every parameter of its process a value):</para>
 /// <code>
-/// var loadActuals = ChoreTaskPatch.Builder()
+/// var loadActuals = ChoreTaskCreate.Builder()
 ///     .BindProcess(ODataPath.Of("Processes").Key("Load Sales"))
 ///     .Parameters([ChoreTaskParameterPatch.Builder().Name("pVersion").Value("Actual").Build(),
 ///         ChoreTaskParameterPatch.Builder().Name("pYear").Value(2026).Build()])
 ///     .Build();
-/// await tm1.Chores.CreateAsync(ChorePatch.Builder()
+/// await tm1.Chores.CreateAsync(ChoreCreate.Builder()
 ///     .Name("Nightly Load")
 ///     .StartTime(DateTimeOffset.Parse("2026-01-01T02:00:00Z"))
 ///     .DstSensitive(false)
@@ -86,7 +86,7 @@ public sealed class ChoreService : Tm1Service
     /// <summary><c>POST Chores('name')/Tasks</c>: adds a task at the end. TM1 (11.8) needs a value for
     /// every parameter of the task's process.</summary>
     [Tm1Endpoint("Navigation Chore/Tasks")]
-    public Task<ChoreTask> AddTaskAsync(string name, ChoreTaskPatch task, CancellationToken cancellationToken = default) =>
+    public Task<ChoreTask> AddTaskAsync(string name, ChoreTaskCreate task, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<ChoreTask>(ChorePath(name).Nav("Tasks"), Require(task, nameof(task))), cancellationToken);
 
     /// <summary><c>PATCH Chores('name')/Tasks(step)</c>: changes a task, such as its parameter values.</summary>

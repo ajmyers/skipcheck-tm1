@@ -29,12 +29,12 @@ public static class ContentServiceExamples
         // @start region = application
         // An application: a folder with a link and a reference to a cube
         var planning = ContentPath.Applications().Child("Planning");
-        await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderPatch.Builder().Name("Planning").Build());
-        await tm1.Contents.CreateAsync(planning, ContentScope.Public, LinkPatch.Builder().Name("Guide").Url("https://example.com/planning-guide").Build());
+        await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderCreate.Builder().Name("Planning").Build());
+        await tm1.Contents.CreateAsync(planning, ContentScope.Public, LinkCreate.Builder().Name("Guide").Url("https://example.com/planning-guide").Build());
         return await tm1.Contents.CreateAsync(
             planning,
             ContentScope.Public,
-            CubeReferencePatch.Builder().Name("Sales").BindCube(ODataPath.Of("Cubes").Key("Sales")).Build()
+            CubeReferenceCreate.Builder().Name("Sales").BindCube(ODataPath.Of("Cubes").Key("Sales")).Build()
         );
         // @end
     }
@@ -45,7 +45,7 @@ public static class ContentServiceExamples
         // A document made in an application is a reference to one TM1 keeps in Blobs; the
         // reference, as CreateAsync returns it, is where its content goes
         var planning = ContentPath.Applications().Child("Planning");
-        var reference = await tm1.Contents.CreateAsync(planning, ContentScope.Public, DocumentPatch.Builder().Name("notes.txt").Build());
+        var reference = await tm1.Contents.CreateAsync(planning, ContentScope.Public, DocumentCreate.Builder().Name("notes.txt").Build());
         await tm1.Contents.UploadAsync(planning.Child(reference), await File.ReadAllBytesAsync(file));
         // @end
     }

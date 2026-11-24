@@ -30,7 +30,7 @@ namespace Skipcheck.Tm1.Client.Services;
 /// <code>
 /// var line = await tm1.ProcessDebugging.DebuggingAsync("Load Sales", new Dictionary&lt;string, object?&gt;(), async context =>
 /// {
-///     await tm1.ProcessDebugging.AddBreakpointAsync(context.Id!, ProcessDebugContextBreakpointPatch.Builder()
+///     await tm1.ProcessDebugging.AddBreakpointAsync(context.Id!, ProcessDebugContextBreakpointCreate.Builder()
 ///         .Id(1).Enabled(true).HitMode(ProcessDebugContextHitMode.BreakAlways).Build());
 ///     await tm1.ProcessDebugging.ResumeAsync(context.Id!);
 ///     return await tm1.ProcessDebugging.CallStackAsync(context.Id!).FirstAsync();
@@ -187,13 +187,13 @@ public sealed class ProcessDebugService : Tm1Service
     ) => Session.StreamAsync(Tm1Request.List<ProcessDebugContextBreakpoint>(ContextPath(id).Nav("Breakpoints"), query), cancellationToken);
 
     /// <summary><c>POST ProcessDebugContexts('id')/Breakpoints</c>: adds a breakpoint (a line, data or
-    /// object breakpoint, by its patch's type). It needs an <c>ID</c> of 0 or more: TM1 stores one
+    /// object breakpoint, by its create's type). It needs an <c>ID</c> of 0 or more: TM1 stores one
     /// without as -1, which can't be changed or removed, so one without is refused here with an
     /// <see cref="ArgumentException"/>.</summary>
     [Tm1Endpoint("Navigation ProcessDebugContext/Breakpoints")]
     public Task<ProcessDebugContextBreakpoint> AddBreakpointAsync(
         string id,
-        ProcessDebugContextBreakpointPatch breakpoint,
+        ProcessDebugContextBreakpointCreate breakpoint,
         CancellationToken cancellationToken = default
     )
     {

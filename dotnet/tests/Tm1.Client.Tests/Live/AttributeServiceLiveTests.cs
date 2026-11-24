@@ -19,8 +19,8 @@ public class AttributeServiceLiveTests
 
     private static AttributeDefinitionCreate StringAttribute(string name) => AttributeDefinitionCreate.Builder().Name(name).Type(AttributeType.String).Build();
 
-    private static LocalizedAttributesPatch French(string attribute, string value) =>
-        LocalizedAttributesPatch.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Property(attribute, value).Build()).Build();
+    private static LocalizedAttributesCreate French(string attribute, string value) =>
+        LocalizedAttributesCreate.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Property(attribute, value).Build()).Build();
 
     private static async Task<string?> Value(Tm1Client tm1, AttributeOwner owner, string attribute)
     {
@@ -107,12 +107,12 @@ public class AttributeServiceLiveTests
     {
         await using var made = await Dimension();
         var (tm1, d) = (made.Tm1, made.Name);
-        var caption = LocalizedAttributesPatch.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Caption("Nord").Build()).Build();
+        var caption = LocalizedAttributesCreate.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Caption("Nord").Build()).Build();
         // Caption isn't an attribute until it's defined
         await Assert.ThrowsAsync<Tm1BadRequestException>(() => tm1.LocalizedAttributes.CreateAsync(AttributeOwner.Element(d, d, "North"), caption));
         // POST isn't supported on a member's
         await Assert.ThrowsAsync<Tm1BadRequestException>(() =>
-            tm1.LocalizedAttributes.CreateAsync(AttributeOwner.Member(d, d, "North"), LocalizedAttributesPatch.Builder().LocaleID("fr").Build())
+            tm1.LocalizedAttributes.CreateAsync(AttributeOwner.Member(d, d, "North"), LocalizedAttributesCreate.Builder().LocaleID("fr").Build())
         );
     }
 }

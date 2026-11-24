@@ -32,8 +32,13 @@ public class ServerServiceTests
         Assert.Equal("GET Configuration", $"{_tm1.Last.Method} {_tm1.Last.Target}");
 
         _tm1.Respond = _ => null;
-        await tm1.Server.UpdateStaticConfigurationAsync(ServerSettingsPatch.Builder().ServerName("Planning").Build());
-        Assert.Equal(("PATCH", "StaticConfiguration", """{"ServerName":"Planning"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
+        await tm1.Server.UpdateStaticConfigurationAsync(
+            ServerSettingsPatch.Builder().Administration(AdministrationSettingsPatch.Builder().ServerName("Planning").Build()).Build()
+        );
+        Assert.Equal(
+            ("PATCH", "StaticConfiguration", """{"Administration":{"ServerName":"Planning"}}"""),
+            (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text)
+        );
     }
 
     [Fact]
@@ -52,5 +57,14 @@ public class ServerServiceTests
         _tm1.Respond = _ => null;
         await tm1.Server.SetLoggerLevelAsync("TM1.Server", LogLevel.Debug);
         Assert.Equal(("PATCH", "Loggers('TM1.Server')", """{"Level":"Debug"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
+    }
+
+    [Fact]
+    public async Task UpdatesALoggerWithAPatch()
+    {
+        var tm1 = _tm1.Client();
+        _tm1.Respond = _ => null;
+        await tm1.Server.UpdateLoggerAsync("TM1.Process", LoggerPatch.Builder().Level(LogLevel.Debug).Build());
+        Assert.Equal(("PATCH", "Loggers('TM1.Process')", """{"Level":"Debug"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
     }
 }

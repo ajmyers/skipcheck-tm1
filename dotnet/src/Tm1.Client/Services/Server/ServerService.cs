@@ -84,4 +84,10 @@ public sealed class ServerService : Tm1Service
         var body = new Dictionary<string, object?> { ["Level"] = json };
         return Session.ExecuteAsync(Tm1Request.Patch(Loggers.Key(Require(name, nameof(name))), body), cancellationToken);
     }
+
+    /// <summary><c>PATCH Loggers('name')</c>: changes a logger, at once. TM1 (11.8) changes only its
+    /// <c>Level</c>, which <see cref="SetLoggerLevelAsync"/> sets as well.</summary>
+    [Tm1Endpoint("EntitySet Loggers")]
+    public Task UpdateLoggerAsync(string name, LoggerPatch patch, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Tm1Request.Patch(Loggers.Key(Require(name, nameof(name))), Require(patch, nameof(patch))), cancellationToken);
 }

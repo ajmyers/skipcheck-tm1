@@ -97,7 +97,7 @@ public sealed class ContentService : Tm1Service
     /// gives it content. Returns the entry as made, with the <c>ID</c> to find it by.</summary>
     [Tm1Endpoint("Navigation Folder/Contents")]
     [Tm1Endpoint("Navigation Folder/PrivateContents")]
-    public Task<Entry> CreateAsync(ContentPath folder, ContentScope scope, EntryPatch entry, CancellationToken cancellationToken = default) =>
+    public Task<Entry> CreateAsync(ContentPath folder, ContentScope scope, EntryCreate entry, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(
             Tm1Request.Post<Entry>(Require(folder, nameof(folder)).Path().Nav(scope.Navigation()), Require(entry, nameof(entry))),
             cancellationToken

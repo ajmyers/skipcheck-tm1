@@ -39,7 +39,7 @@ public class EdgeServiceTests
         };
         Assert.Equal(2.0, (await tm1.Edges.GetAsync("Region", "Region", "Total", "O'Brien")).Weight);
         Assert.Equal(("GET", Edge), (_tm1.Last.Method, _tm1.Last.Target));
-        await tm1.Edges.CreateAsync("Region", "Region", EdgePatch.Builder().ParentName("Total").ComponentName("West").Weight(1.0).Build());
+        await tm1.Edges.CreateAsync("Region", "Region", EdgeCreate.Builder().ParentName("Total").ComponentName("West").Weight(1.0).Build());
         Assert.Equal(("POST", Edges, """{"ParentName":"Total","ComponentName":"West","Weight":1}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => null;

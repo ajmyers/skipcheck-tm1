@@ -177,8 +177,29 @@ public static class ConformanceLive
         }
     }
 
-    /// <summary>Runs the scenario; the steps whose expectation failed. Its <c>finally</c> steps always run.</summary>
-    public static async Task<List<string>> Run(Tm1Client client, Traffic traffic, JsonObject scenario, IReadOnlyDictionary<string, string> names)
+    /// <summary>Keeps what a step's <c>"save"</c> names from its result, <c>{"note": "ID"}</c>: the result's
+    /// <c>ID</c> as the name <c>note</c>, for the steps after it, such as an ID TM1 made up. Why it can't, or
+    /// null.</summary>
+    public static string? Save(JsonNode step, JsonObject outcome, Dictionary<string, string> names)
+    {
+        foreach (var (name, field) in step["save"]?.AsObject() ?? [])
+        {
+            var result = outcome["result"];
+            var json = result is JsonObject m && m.ContainsKey("$model") ? m["json"] : result;
+            var key = field!.GetValue<string>();
+            if ((json as JsonObject)?[key] is not JsonValue value || value.GetValueKind() == System.Text.Json.JsonValueKind.Null)
+            {
+                return $"no {key} to save as {name} in {result?.ToJsonString() ?? "null"}";
+            }
+            names[name] = value.GetValueKind() == System.Text.Json.JsonValueKind.String ? value.GetValue<string>() : value.ToJsonString();
+        }
+        return null;
+    }
+
+    /// <summary>Runs the scenario; the steps whose expectation failed. Its <c>finally</c> steps always run.
+    /// What a step saves joins <paramref name="names"/>, so the traffic written after it has TM1's made-up
+    /// values as their placeholders too.</summary>
+    public static async Task<List<string>> Run(Tm1Client client, Traffic traffic, JsonObject scenario, Dictionary<string, string> names)
     {
         var failures = new List<string>();
         try
@@ -186,7 +207,8 @@ public static class ConformanceLive
             foreach (var (step, i) in scenario["steps"]!.AsArray().Select((s, i) => (s!, i)))
             {
                 traffic.Step = $"steps[{i}]";
-                var why = Check(Substitute(step["expect"], names)!.AsObject(), await Outcome(client, step, names));
+                var outcome = await Outcome(client, step, names);
+                var why = Check(Substitute(step["expect"], names)!.AsObject(), outcome) ?? Save(step, outcome, names);
                 if (why is not null)
                 {
                     failures.Add($"step {i} {step["service"]}.{step["method"]}: {why}");

@@ -15,7 +15,8 @@ namespace Skipcheck.Tm1.Client.Tests;
 /// <summary>What every generated create and patch builder offers, which every client's builders must
 /// match (<c>spec/conformance/builders.json</c>), as the Java BuilderManifestTest. Each builder is
 /// driven to find what it offers: a setter on a builder of its own gives the name it writes, and a
-/// property is required when a builder with every other setter called refuses to build.</summary>
+/// property is required when a builder with every other setter called refuses to build, and a setter of a
+/// structured value takes the write type its parameter is (<c>"Edges": "EdgeCreate[]"</c>).</summary>
 public class BuilderManifestTests
 {
     private const string BindSuffix = "@odata.bind";
@@ -58,6 +59,7 @@ public class BuilderManifestTests
             .ToList();
         // Each setter on a builder of its own: the name it writes
         var wrote = new Dictionary<MethodInfo, string>();
+        var valueTypes = new SortedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var m in setters)
         {
             var b = Fresh();
@@ -65,6 +67,10 @@ public class BuilderManifestTests
             var added = Values(b).Keys.Where(k => !initial.ContainsKey(k)).ToList();
             Assert.True(added.Count == 1, $"{patch.Name}.{m.Name} writes one property: {string.Join(",", added)}");
             wrote[m] = added[0];
+            if (ValueType(m) is { } value)
+            {
+                valueTypes[added[0]] = value;
+            }
         }
         // A property is required when a builder with every other setter called refuses to build
         var required = new List<string>();
@@ -94,7 +100,31 @@ public class BuilderManifestTests
             ["open"] = open,
             ["required"] = new JsonArray(required.Select(r => (JsonNode?)JsonValue.Create(r)).ToArray()),
             ["setters"] = new JsonArray(wrote.Values.Order(StringComparer.Ordinal).Select(s => (JsonNode?)JsonValue.Create(s)).ToArray()),
+            ["values"] = new JsonObject(valueTypes.Select(v => KeyValuePair.Create(v.Key, (JsonNode?)JsonValue.Create(v.Value)))),
         };
+    }
+
+    /// <summary>The write type a setter takes, as <c>XPatch</c> or <c>XCreate</c>, with <c>[]</c> for a
+    /// collection of them; null for anything else (a primitive, a binding's path).</summary>
+    private static string? ValueType(MethodInfo m)
+    {
+        if (m.GetParameters() is not [var parameter])
+        {
+            return null;
+        }
+        var t = parameter.ParameterType;
+        var suffix = "";
+        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+        {
+            t = t.GetGenericArguments()[0];
+            suffix = "[]";
+        }
+        return
+            t.Namespace == typeof(Cube).Namespace
+            && typeof(Tm1Patch).IsAssignableFrom(t)
+            && (t.Name.EndsWith("Patch", StringComparison.Ordinal) || t.Name.EndsWith("Create", StringComparison.Ordinal))
+            ? t.Name + suffix
+            : null;
     }
 
     private static object?[] Arguments(MethodInfo m) =>

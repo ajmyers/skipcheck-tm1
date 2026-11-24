@@ -19,9 +19,9 @@ internal static class LiveDimension
 
     public static ElementCreate Text(string name) => ElementCreate.Builder().Name(name).Type(ElementType.String).Build();
 
-    public static EdgePatch Edge(string parent, string component) => EdgePatch.Builder().ParentName(parent).ComponentName(component).Weight(1.0).Build();
+    public static EdgeCreate Edge(string parent, string component) => EdgeCreate.Builder().ParentName(parent).ComponentName(component).Weight(1.0).Build();
 
-    public static DimensionCreate DimensionOf(string name, IReadOnlyList<ElementCreate> elements, IReadOnlyList<EdgePatch>? edges = null)
+    public static DimensionCreate DimensionOf(string name, IReadOnlyList<ElementCreate> elements, IReadOnlyList<EdgeCreate>? edges = null)
     {
         var hierarchy = HierarchyCreate.Builder().Name(name).Elements(elements);
         if (edges is { Count: > 0 })

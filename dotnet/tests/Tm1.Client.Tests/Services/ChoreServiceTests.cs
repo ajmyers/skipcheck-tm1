@@ -28,7 +28,7 @@ public class ChoreServiceTests
         Assert.Equal("W/\"3\"", (await tm1.Chores.GetAsync("Nightly Load", ODataQuery.None().Expand("Tasks"))).ETag);
         Assert.Equal("Chores('Nightly%20Load')?$expand=Tasks", _tm1.Last.Target);
 
-        var task = ChoreTaskPatch
+        var task = ChoreTaskCreate
             .Builder()
             .BindProcess(ODataPath.Of("Processes").Key("Load Sales"))
             .Parameters([ChoreTaskParameterPatch.Builder().Name("pYear").Value(2026).Build()])
@@ -59,7 +59,7 @@ public class ChoreServiceTests
         Assert.Equal("Chores('c')/Tasks", _tm1.Last.Target);
 
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Step"] = 2 };
-        var added = await tm1.Chores.AddTaskAsync("c", ChoreTaskPatch.Builder().BindProcess(ODataPath.Of("Processes").Key("p")).Build());
+        var added = await tm1.Chores.AddTaskAsync("c", ChoreTaskCreate.Builder().BindProcess(ODataPath.Of("Processes").Key("p")).Build());
         Assert.Equal(2L, added.Step);
         Assert.Equal(("POST", "Chores('c')/Tasks", """{"Process@odata.bind":"Processes('p')"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
