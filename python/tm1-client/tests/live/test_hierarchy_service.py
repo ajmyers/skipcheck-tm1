@@ -13,6 +13,7 @@ from skipcheck_tm1 import (
     ODataQuery,
     Tm1Client,
     Tm1PreconditionFailedError,
+    Tm1Request,
 )
 from skipcheck_tm1.model import (
     Hierarchy,
@@ -96,7 +97,9 @@ def test_replaces_the_structure_deleting_what_it_doesnt_list(tm1: Tm1Client, reg
 def test_updates_only_when_the_etag_is_current_and_ignores_visible(tm1: Tm1Client, region: str) -> None:
     d = region
     etag = tm1.hierarchies.get(d, d).etag
-    tm1.hierarchies.update(d, d, HierarchyPatch.builder().visible(False).build(), etag)
+    tm1.hierarchies.update(d, d, HierarchyPatch.builder().elements_sort_type("ByInput").build(), etag)
+    # HierarchyPatch doesn't offer Visible, as TM1 ignores it: sent as it is, to pin it
+    tm1.session.execute(Tm1Request.patch(ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d), {"Visible": False}))
     assert tm1.hierarchies.get(d, d).visible is True, "TM1 accepts Visible in a PATCH and ignores it"
     tm1.hierarchies.replace_structure(d, d, [numeric("North")], [])
     with pytest.raises(Tm1PreconditionFailedError):

@@ -14,6 +14,7 @@ from skipcheck_tm1._generated.operations import Tm1Operations
 from skipcheck_tm1.model import (
     Cube,
     CubeCreate,
+    CubePatch,
     Dimension,
     DimensionCreate,
     Element,
@@ -104,9 +105,9 @@ def test_creates_a_dimension_and_a_cube_from_patches_then_patches_and_clears_its
             elements = list(s.stream(Tm1Request.list(dimension.nav("Hierarchies").key(name).nav("Elements"), ODataQuery.none(), Element)))
             assert sorted((e.name, e.type) for e in elements) == [("North", ElementType.NUMERIC), ("South", ElementType.NUMERIC)]
 
-            s.execute(Tm1Request.patch(cube, CubeCreate.builder().rules("SKIPCHECK;").build()))
+            s.execute(Tm1Request.patch(cube, CubePatch.builder().rules("SKIPCHECK;").build()))
             assert "SKIPCHECK" in (rules(s) or "")
-            s.execute(Tm1Request.patch(cube, CubeCreate.builder().rules(None).build()))
+            s.execute(Tm1Request.patch(cube, CubePatch.builder().rules(None).build()))
             assert not rules(s), "an explicit null clears them"
         finally:
             _quietly(s, Tm1Request.delete(cube))

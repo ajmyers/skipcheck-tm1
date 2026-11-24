@@ -166,9 +166,9 @@ class GeneratedModelTm1Test {
 			assertThat(elements).extracting(Element::name, Element::type)
 				.containsExactlyInAnyOrder(tuple("North", ElementType.NUMERIC), tuple("South", ElementType.NUMERIC));
 
-			session.execute(Tm1Request.patch(cube, CubeCreate.builder().rules("SKIPCHECK;").build())).block(WAIT);
+			session.execute(Tm1Request.patch(cube, CubePatch.builder().rules("SKIPCHECK;").build())).block(WAIT);
 			assertThat(rules(session, cube)).contains("SKIPCHECK");
-			session.execute(Tm1Request.patch(cube, CubeCreate.builder().rules(null).build())).block(WAIT);
+			session.execute(Tm1Request.patch(cube, CubePatch.builder().rules(null).build())).block(WAIT);
 			assertThat(rules(session, cube)).as("an explicit null clears them").isNullOrEmpty();
 		}
 		finally {
