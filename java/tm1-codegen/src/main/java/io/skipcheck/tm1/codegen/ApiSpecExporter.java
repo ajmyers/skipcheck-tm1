@@ -69,6 +69,8 @@ public final class ApiSpecExporter {
 
 	private final Writes writes;
 
+	private final Offers offers;
+
 	private final @Nullable String probe;
 
 	private final String snapshot;
@@ -112,6 +114,24 @@ public final class ApiSpecExporter {
 	 */
 	public ApiSpecExporter(CsdlDocument metadata, Overlay overlay, String snapshot, Undeclared undeclared,
 			Writes writes, @Nullable String probe) {
+		this(metadata, overlay, snapshot, undeclared, writes, Offers.NONE, probe);
+	}
+
+	/**
+	 * An exporter, with what a probe found, and the write types the clients generate.
+	 * @param metadata the {@code $metadata} document, with the undeclared properties
+	 * added
+	 * @param overlay what TM1 does differently from it, with the undeclared properties'
+	 * departures
+	 * @param snapshot the snapshot's file name, recorded in the spec
+	 * @param undeclared the undeclared properties, marked in the spec
+	 * @param writes what writes do, exported as each type's write section
+	 * @param offers the write types and their setters, exported as {@code offers}
+	 * @param probe the probe file's name, recorded in the spec, or null if there's none
+	 */
+	public ApiSpecExporter(CsdlDocument metadata, Overlay overlay, String snapshot, Undeclared undeclared,
+			Writes writes, Offers offers, @Nullable String probe) {
+		this.offers = Objects.requireNonNull(offers, "offers");
 		this.writes = Objects.requireNonNull(writes, "writes");
 		this.metadata = Objects.requireNonNull(metadata, "metadata");
 		this.overlay = Objects.requireNonNull(overlay, "overlay");
@@ -147,6 +167,13 @@ public final class ApiSpecExporter {
 		root.set("operations", operations());
 		metadata.entityContainer().ifPresent(c -> root.set("container", container(c)));
 		root.set("endpoints", endpoints());
+		if (!offers.builders().isEmpty()) {
+			ObjectNode out = root.putObject("offers");
+			offers.builders().forEach((builder, setters) -> {
+				ObjectNode b = out.putObject(builder);
+				setters.forEach((setter, offer) -> b.putObject(setter).put(offer.kind(), offer.why()));
+			});
+		}
 		DefaultPrettyPrinter printer = new DefaultPrettyPrinter().withObjectIndenter(new DefaultIndenter("\t", "\n"))
 			.withArrayIndenter(new DefaultIndenter("\t", "\n"));
 		return JsonMapper.builder().build().writer().with(printer).writeValueAsString(root) + "\n";
