@@ -425,6 +425,9 @@ class WriteProbeTest {
 		@Override
 		public FakeTm1.Reply handle(String method, String target, @Nullable JsonNode body) {
 			String path = target.replaceAll("\\?.*", "");
+			if (path.equals("ActiveUser")) {
+				return FakeTm1.Reply.ok("{\"Name\": \"Admin\"}");
+			}
 			if (path.equals("Settings")) {
 				if (method.equals("PATCH") && body != null) {
 					if (body.has("Admin")) {

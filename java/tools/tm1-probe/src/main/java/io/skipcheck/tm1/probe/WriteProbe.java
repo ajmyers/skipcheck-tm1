@@ -561,12 +561,18 @@ public final class WriteProbe {
 
 	private void probeLeaves(String at, String type, String prefixPath, JsonNode current, JsonNode values,
 			Set<String> skip, ObjectNode out) {
-		for (String property : sortedFields(current)) {
+		// Every field the type declares, not only what the read returned: TM1 leaves some
+		// out of a read (an SSL key file's password)
+		TreeSet<String> fields = new TreeSet<>(current.propertyNames());
+		for (CsdlStructuredType level : metadata.typeHierarchy(qualified(type))) {
+			level.properties().forEach(p -> fields.add(p.name()));
+		}
+		for (String property : fields) {
 			String here = prefixPath + property;
 			if (skip.contains(here)) {
 				continue;
 			}
-			JsonNode original = current.get(property);
+			JsonNode original = current.has(property) ? current.get(property) : NODES.nullNode();
 			Optional<CsdlProperty> declared = declaredProperty(type, property);
 			if (original.isObject() && declared.isPresent()) {
 				probeLeaves(at, simple(declared.get().type().name()), here + "/", original, values, skip, out);
@@ -579,14 +585,28 @@ public final class WriteProbe {
 			}
 			ProbeClient.Answer answer = client.send("PATCH", at, nested(here, value));
 			if (!answer.ok()) {
-				out.set(here, outcome(answer));
+				out.set(here, refused(answer, "PATCH", at, here, nested(here, value)));
 				continue;
 			}
 			ProbeClient.Answer back = client.get(at);
 			JsonNode got = back.body() == null ? null : back.body().at("/" + here);
+			if (got == null || got.isMissingNode()) {
+				// TM1 took it, but never returns it
+				out.putObject(here).put("outcome", "unread");
+				client.send("PATCH", at, nested(here, original));
+				continue;
+			}
 			out.set(here, logged(classify(got == null || got.isMissingNode() ? null : got, value, original), at, here,
 					"PATCH", value, got));
 			client.send("PATCH", at, nested(here, original));
+			// A setting the server's own access depends on: stop at once if the probe can
+			// no
+			// longer get in, naming it, rather than record what an unreachable server
+			// says
+			if (!client.get("ActiveUser").ok()) {
+				throw new IllegalStateException(
+						"After a PATCH of " + here + " and setting it back, the probe can't reach " + at + ": stopped");
+			}
 		}
 	}
 
