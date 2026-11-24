@@ -586,27 +586,35 @@ public final class WriteProbe {
 			ProbeClient.Answer answer = client.send("PATCH", at, nested(here, value));
 			if (!answer.ok()) {
 				out.set(here, refused(answer, "PATCH", at, here, nested(here, value)));
+				stillReaches(at, here);
 				continue;
 			}
 			ProbeClient.Answer back = client.get(at);
-			JsonNode got = back.body() == null ? null : back.body().at("/" + here);
-			if (got == null || got.isMissingNode()) {
+			client.send("PATCH", at, nested(here, original));
+			// Checked on every path, before a failed read-back is taken for anything else
+			stillReaches(at, here);
+			if (!back.ok() || back.body() == null) {
+				throw new IllegalStateException("After a PATCH of " + here + ", " + at + " can't be read: stopped");
+			}
+			JsonNode got = back.body().at("/" + here);
+			if (got.isMissingNode()) {
 				// TM1 took it, but never returns it
 				out.putObject(here).put("outcome", "unread");
-				client.send("PATCH", at, nested(here, original));
 				continue;
 			}
-			out.set(here, logged(classify(got == null || got.isMissingNode() ? null : got, value, original), at, here,
-					"PATCH", value, got));
-			client.send("PATCH", at, nested(here, original));
-			// A setting the server's own access depends on: stop at once if the probe can
-			// no
-			// longer get in, naming it, rather than record what an unreachable server
-			// says
-			if (!client.get("ActiveUser").ok()) {
-				throw new IllegalStateException(
-						"After a PATCH of " + here + " and setting it back, the probe can't reach " + at + ": stopped");
-			}
+			out.set(here, logged(classify(got, value, original), at, here, "PATCH", value, got));
+		}
+	}
+
+	/**
+	 * Stops the probe, naming the setting, if it can no longer sign in after one was
+	 * written and set back: what a server's own access depends on (its security, its
+	 * network) mustn't be read as an outcome.
+	 */
+	private void stillReaches(String at, String here) {
+		if (!client.get("ActiveUser").ok()) {
+			throw new IllegalStateException(
+					"After a PATCH of " + here + " and setting it back, the probe can't reach " + at + ": stopped");
 		}
 	}
 
