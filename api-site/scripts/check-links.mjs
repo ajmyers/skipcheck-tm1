@@ -28,7 +28,9 @@ const repository = /^githubRepo=(.+)$/m.exec(await readFile(path.join(repoDir, '
 // What these pages may link to on the site itself. Add an address here when a page starts to use
 // it, after checking that the site serves it. One under a section's path must be among the
 // section's site paths (site in site.mjs), or the Worker wouldn't pass it through to the site.
-const SITE_PATHS = new Set(['/', '/styles.css', '/tokens.css', '/chrome.css', '/code.css', '/highlight.js', '/favicon.svg', '/pa-docker/setup/']);
+const SITE_PATHS = new Set(['/', '/styles.css', '/tokens.css', '/chrome.css', '/code.css', '/highlight.js', '/favicon.svg', '/pa-docker/setup/',
+	// tm1cm's pages, served by a Worker deployed from ajmyers/tm1cm (docs-site/ there), which checks them
+	'/tm1cm/', '/tm1cm/docs/', '/tm1cm/walkthroughs/first-project/']);
 
 const exists = (file) =>
 	stat(file).then(
