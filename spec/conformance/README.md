@@ -6,8 +6,17 @@ The Java client is the definition of how a call behaves. Its unit tests record e
 |---|---|---|
 | `odata-encoding.json` | Paths and literals every client must encode identically | Hand |
 | `writes.json` | Writes made from what was read (`builder(read)` on the create and patch types) that every client must produce identically | Hand |
+| `builders.json` | What every generated create and patch builder offers: each `XPatch` and `XCreate`, its `@odata.type`, the JSON names its setters write, what its `build()` requires, and whether it takes undeclared properties (`property`). Every client's `BuilderManifestTest` drives its own builders to find these, and must match | `./gradlew :tm1-client:test -PrecordConformance` (the Java builders) |
 | `calls/<JavaTestClass>.json` | The service calls one Java unit-test class records | `./gradlew :tm1-client:test -PrecordConformance` |
 | `live/<scenario>.json` | Steps every client runs against a real TM1 | Hand |
+
+## The builder manifest (`builders.json`)
+
+Every client generates its create and patch types from `spec/tm1-api.json`, each with its own generator, so the same rule (what a PATCH offers, what a create requires) is written four times. The manifest holds what the Java builders offer, and each client's `BuilderManifestTest` (`test_builder_manifest.py`, `BuilderManifestTests.cs`, `builder-manifest.test.ts`) finds what its own offer by driving them, not by reading its generator. A setter called on a builder of its own gives the JSON name it writes. A property is required when a builder with every other setter called refuses to build. The test checks the list of builders too, so a client that generates one more or one fewer fails.
+
+When a change to the spec, the overlay, the probe file or the Java generator changes what a builder offers, the Java test fails until the manifest is re-recorded (`./gradlew :tm1-client:test -PrecordConformance`). The other clients then fail until their generators agree.
+
+The manifest doesn't hold the types a setter takes (Python's setters take `Any`, and TypeScript's types are gone at runtime), nor what `builder(read)` copies: `writes.json` covers that.
 
 ## Recorded calls (`calls/`)
 
