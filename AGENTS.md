@@ -23,8 +23,9 @@ Run the Gradle task for what you changed before you push. They're what CI runs.
 | `scripts/`, `.githooks/`, shell scripts | `./gradlew checkScripts` |
 | `.github/workflows/` | Nothing local: CI lints them with actionlint. Read the workflow's header comment first, and say in the PR what you couldn't run |
 | `api-site/` | `./gradlew checkApiSite` |
+| `java/tm1-codegen/`, `spec/tm1-overlay.json`, or the probe file | `./gradlew :tm1-codegen:exportSpec` (rewrites `spec/tm1-api.json`), then `./gradlew :tm1-client:test -PrecordConformance` (rewrites `spec/conformance/builders.json` and the recorded calls), then `./gradlew checkAll`. See [the conformance README](spec/conformance/README.md) |
 | `java/tools/tm1-probe/` | `./gradlew :tools:tm1-probe:build`; for a new TM1 version, `./gradlew probeTm1` with a TM1 source, and commit the file it writes ([its README](java/tools/tm1-probe/README.md)) |
-| How a client talks to TM1 | `./gradlew liveTest --continue`, if a TM1 is configured. CI can't run these: say in the PR whether you ran them |
+| How a client talks to TM1 | `./gradlew liveTest --continue`, if a TM1 is configured: every client's live tests, then a comparison of what each sent TM1 (`scripts/compare-live-traffic.py`), which must be equal. CI can't run these: say in the PR whether you ran them |
 | Not sure | `./gradlew checkAll packageTest` |
 
 - **The four clients change together.** A change to how a client behaves (a fix, a new option, a
@@ -36,6 +37,16 @@ Run the Gradle task for what you changed before you push. They're what CI runs.
   meaning in a client gets a line saying why in its `coverage/unit-excluded.txt` (or
   `live-excluded.txt`); "not ported yet" is not a reason.
 - The gates can't see a behaviour change that comes with no new Java test, so don't make one.
+- Each client has its own generator, reading `spec/tm1-api.json`. What the generated write types
+  offer is held to `spec/conformance/builders.json`, and what `builder(read)` writes to the cases
+  in `spec/conformance/writes.json`: a change to what `builder(read)` copies or binds comes with a
+  case there, edge cases included (an unknown subtype, a null, an empty collection).
+- A write the probe finds TM1 applies needs a step in a live scenario (`spec/conformance/live`):
+  `ProbedWritesCoverageTest` fails until it has one, and `ProbeCoverageTest` fails when the
+  builders and the probe disagree.
+- Every commit builds on its own: the pre-push hook runs `./gradlew build` on each (and the lint of
+  a client the commit touches, not its tests). Java can go in a commit before the other clients,
+  but a commit that leaves the Java build failing has to be squashed before pushing.
 - New code comes with tests that CI runs, scripts and hooks included.
 - A test that needs TM1 is marked with the language's `RequiresTm1`, so it's skipped without a TM1
   rather than left out. Never delete, disable or loosen a test to get a check through.

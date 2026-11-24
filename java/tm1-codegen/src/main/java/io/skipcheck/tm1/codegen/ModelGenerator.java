@@ -1072,7 +1072,9 @@ public final class ModelGenerator {
 					? "A create of what {@code read} holds that a {@code POST} applies, to recreate it: change it with the builder's setters.\n"
 					: "A patch of what {@code read} holds that a {@code PATCH} applies, leaving out collections a {@code PATCH} appends to: change it with the builder's setters.\n")
 			.addJavadoc(
-					"A navigation the read holds expanded is bound, where its targets' paths follow from it: an entity set's by key, an element's or member's by its {@code UniqueName}; one it doesn't hold, or a subset or a view (whose path the read can't tell), isn't, nor are nested ones or nulls.\n@param read an entity read from TM1\n@return a builder\n")
+					"A navigation the read holds expanded is bound, where its targets' paths follow from it: an entity set's by key, an element's or member's by its {@code UniqueName}; one it doesn't hold, or holds empty, or a subset or a view (whose path the read can't tell), isn't, nor are nested ones or nulls"
+							+ (create ? "" : ", nor a collection, which a {@code PATCH} would replace or append to")
+							+ ".\n@param read an entity read from TM1\n@return a builder\n")
 			.addStatement("$T b = new $T()", builder, builder);
 		for (PatchProperty p : properties) {
 			String accessor = accessors.get(p.json());
@@ -1089,13 +1091,21 @@ public final class ModelGenerator {
 		}
 		for (PatchProperty p : properties) {
 			String accessor = accessors.get(p.json());
-			if (p.navigation() && p.bind() && accessor != null) {
+			// A patch from a read binds no collection: sent back, it would replace or
+			// append to what's there, whichever TM1 does for it, on an unrelated change
+			if (p.navigation() && p.bind() && accessor != null && (create || !p.collection())) {
 				readBinding(type, p, accessor).ifPresent(from::addCode);
 			}
 		}
 		if (open(type) && accessors.containsKey(DYNAMIC)) {
+			// Not nulls, as for declared properties, nor annotations (@odata.etag)
 			from.beginControlFlow("if (read.$L() != null)", accessors.get(DYNAMIC))
-				.addStatement("read.$L().forEach(b::property)", accessors.get(DYNAMIC))
+				.beginControlFlow("for (var e : read.$L().entrySet())", accessors.get(DYNAMIC))
+				.beginControlFlow("if (!e.getKey().startsWith($S) && e.getValue() != null && !e.getValue().isNull())",
+						"@")
+				.addStatement("b.property(e.getKey(), e.getValue())")
+				.endControlFlow()
+				.endControlFlow()
 				.endControlFlow();
 		}
 		return from.addStatement("return b").build();
@@ -1201,7 +1211,10 @@ public final class ModelGenerator {
 				.returns(paths)
 				.addParameter(String.class, "set")
 				.addParameter(keys, "keys")
-				.addJavadoc("Entities in a set, by their keys: null if any key is missing.\n")
+				.addJavadoc("Entities in a set, by their keys: null if any key is missing, or there are none.\n")
+				.beginControlFlow("if (keys.isEmpty())")
+				.addStatement("return null")
+				.endControlFlow()
 				.addStatement("$T[] out = new $T[keys.size()]", ODATA_PATH, ODATA_PATH)
 				.beginControlFlow("for (int i = 0; i < out.length; i++)")
 				.addStatement("$T path = byKey(set, keys.get(i))", nullablePath)
@@ -1273,7 +1286,11 @@ public final class ModelGenerator {
 				.returns(paths)
 				.addParameter(String.class, "collection")
 				.addParameter(keys, "uniqueNames")
-				.addJavadoc("Elements or members, by their {@code UniqueName}s: null if any can't be made.\n")
+				.addJavadoc(
+						"Elements or members, by their {@code UniqueName}s: null if any can't be made, or there are none.\n")
+				.beginControlFlow("if (uniqueNames.isEmpty())")
+				.addStatement("return null")
+				.endControlFlow()
 				.addStatement("$T[] out = new $T[uniqueNames.size()]", ODATA_PATH, ODATA_PATH)
 				.beginControlFlow("for (int i = 0; i < out.length; i++)")
 				.addStatement("Object name = uniqueNames.get(i)")

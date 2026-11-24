@@ -284,7 +284,26 @@
 			}
 		},
 		{
-			"id": "a user's patch binds the groups a PATCH replaces",
+			"id": "a patch binds no collection a read holds, which a PATCH would replace or append to",
+			"type": "Element",
+			"write": "patch",
+			"read": {
+				"Name": "Total",
+				"UniqueName": "[Region].[Region].[Total]",
+				"Type": "Consolidated",
+				"Components": [
+					{
+						"Name": "North",
+						"UniqueName": "[Region].[Region].[North]"
+					}
+				]
+			},
+			"expect": {
+				"Type": "Consolidated"
+			}
+		},
+		{
+			"id": "a user's patch leaves its groups to setGroups",
 			"type": "User",
 			"write": "patch",
 			"read": {
@@ -293,12 +312,142 @@
 					{
 						"Name": "ADMIN"
 					}
+				],
+				"Enabled": true
+			},
+			"expect": {
+				"Enabled": true
+			}
+		},
+		{
+			"id": "a patch binds a single navigation a read holds",
+			"type": "ChoreTask",
+			"write": "patch",
+			"read": {
+				"Step": 0,
+				"Process": {
+					"Name": "Load"
+				},
+				"Parameters": [
+					{
+						"Name": "pValue",
+						"Value": "1"
+					}
 				]
 			},
 			"expect": {
-				"Groups@odata.bind": [
-					"Groups('ADMIN')"
+				"Parameters": [
+					{
+						"Name": "pValue",
+						"Value": "1"
+					}
+				],
+				"Process@odata.bind": "Processes('Load')"
+			}
+		},
+		{
+			"id": "an expanded collection a read holds empty isn't bound",
+			"type": "Cube",
+			"write": "create",
+			"read": {
+				"Name": "Sales",
+				"Dimensions": []
+			},
+			"error": "Dimensions"
+		},
+		{
+			"id": "a value of a subtype this client doesn't know is copied as its root's",
+			"type": "ServerSettings",
+			"write": "patch",
+			"read": {
+				"EncryptionAtRest": {
+					"@odata.type": "#ibm.tm1.api.v1.FutureSettings",
+					"KeyRef": "key",
+					"Extra": "x"
+				}
+			},
+			"expect": {
+				"EncryptionAtRest": {
+					"KeyRef": "key",
+					"Extra": "x"
+				}
+			}
+		},
+		{
+			"id": "an open type's undeclared properties are copied without nulls or annotations",
+			"type": "Annotation",
+			"write": "patch",
+			"read": {
+				"ID": "a1",
+				"Text": "note",
+				"@odata.etag": "W/\"1\"",
+				"commentValue": null,
+				"objectName": "Sales"
+			},
+			"expect": {
+				"Text": "note",
+				"objectName": "Sales"
+			}
+		},
+		{
+			"id": "a root's create refuses a read of a type TM1 makes no create for",
+			"type": "Entry",
+			"write": "create",
+			"read": {
+				"@odata.type": "#ibm.tm1.api.v1.DocumentReference",
+				"Name": "notes.txt"
+			},
+			"error": "has no create"
+		},
+		{
+			"id": "a UniqueName of four parts makes no path",
+			"type": "Subset",
+			"write": "create",
+			"read": {
+				"Name": "Odd",
+				"Elements": [
+					{
+						"Name": "a",
+						"UniqueName": "[d].[h].[x].[a]"
+					}
 				]
+			},
+			"expect": {
+				"Name": "Odd"
+			}
+		},
+		{
+			"id": "an unclosed UniqueName makes no path",
+			"type": "Subset",
+			"write": "create",
+			"read": {
+				"Name": "Odd",
+				"Elements": [
+					{
+						"Name": "a",
+						"UniqueName": "[d].[a"
+					}
+				]
+			},
+			"expect": {
+				"Name": "Odd"
+			}
+		},
+		{
+			"id": "an empty UniqueName makes no path",
+			"type": "Subset",
+			"write": "create",
+			"read": {
+				"Name": "Odd",
+				"Elements": [
+					{
+						"Name": "a",
+						"UniqueName": ""
+					}
+				]
+			},
+			"expect": {
+				"Name": "Odd"
 			}
 		},
 		{

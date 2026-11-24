@@ -441,6 +441,7 @@
 			"method" : "delete",
 			"params" : [ "name" ],
 			"args" : [ "${third}" ]
-		}
+		},
+		{ "service" : "server", "method" : "updateLogger", "params" : [ "name", "patch" ], "args" : [ "TM1.Server", { "$patch" : "LoggerPatch", "json" : { "Level" : "${level}" } } ] }
 	]
 }
