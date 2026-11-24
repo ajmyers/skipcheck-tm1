@@ -3746,6 +3746,184 @@
       "type" : "ServerSettings",
       "generate" : false,
       "patch" : {
+        "Access/Authentication/IntegratedSecurityMode" : {
+          "outcome" : "transformed"
+        },
+        "Access/Authentication/MaximumLoginAttempts" : {
+          "outcome" : "applied"
+        },
+        "Access/Authentication/SecurityPackageName" : {
+          "outcome" : "applied"
+        },
+        "Access/Authentication/ServicePrincipalName" : {
+          "outcome" : "applied"
+        },
+        "Access/CAM/CAMUseSSL" : {
+          "outcome" : "applied"
+        },
+        "Access/CAM/ClientPingCAMPassport" : {
+          "outcome" : "applied"
+        },
+        "Access/CAM/ClientURI" : {
+          "outcome" : "applied"
+        },
+        "Access/CAM/CreateNewCAMClients" : {
+          "outcome" : "applied"
+        },
+        "Access/CAM/PortalVariableFile" : {
+          "outcome" : "applied"
+        },
+        "Access/CAM/ServerCAMURIRetryAttempts" : {
+          "outcome" : "applied"
+        },
+        "Access/CAM/ServerURIs" : {
+          "outcome" : "applied"
+        },
+        "Access/CAPI/ClientMessagePort" : {
+          "outcome" : "applied"
+        },
+        "Access/CAPI/ClientVersionMaximum" : {
+          "outcome" : "applied"
+        },
+        "Access/CAPI/ClientVersionMinimum" : {
+          "outcome" : "applied"
+        },
+        "Access/CAPI/ClientVersionPrecision" : {
+          "outcome" : "applied"
+        },
+        "Access/CAPI/MessageCompression" : {
+          "outcome" : "applied"
+        },
+        "Access/CAPI/Port" : {
+          "outcome" : "applied"
+        },
+        "Access/CAPI/ProgressMessage" : {
+          "outcome" : "applied"
+        },
+        "Access/HTTP/OriginAllowList" : {
+          "outcome" : "applied"
+        },
+        "Access/HTTP/Port" : {
+          "outcome" : "applied"
+        },
+        "Access/HTTP/RequestEntityMaxSizeInKB" : {
+          "outcome" : "applied"
+        },
+        "Access/HTTP/SessionMaxRequests" : {
+          "outcome" : "applied"
+        },
+        "Access/HTTP/SessionTimeout" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/Enable" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/Host" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/PasswordFile" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/PasswordKeyFile" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/Port" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/SearchBase" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/SearchField" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/SkipSSLCRLVerification" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/SkipSSLCertVerification" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/UseServerAccount" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/VerifyCertServerName" : {
+          "outcome" : "ignored"
+        },
+        "Access/LDAP/VerifyServerSSLCert" : {
+          "outcome" : "applied"
+        },
+        "Access/LDAP/WellKnownUserName" : {
+          "outcome" : "applied"
+        },
+        "Access/Network/IPAddress" : {
+          "outcome" : "applied"
+        },
+        "Access/Network/IPVersion" : {
+          "outcome" : "applied"
+        },
+        "Access/Network/IdleConnectionTimeOut" : {
+          "outcome" : "applied"
+        },
+        "Access/Network/NetRecvBlockingWaitLimit" : {
+          "outcome" : "applied"
+        },
+        "Access/Network/NetRecvMaxClientIOWaitWithinAPIs" : {
+          "outcome" : "applied"
+        },
+        "Access/Network/ReceiveProgressResponseTimeout" : {
+          "outcome" : "applied"
+        },
+        "Access/SSL/CertAuthority" : {
+          "outcome" : "applied"
+        },
+        "Access/SSL/CertRevocationFile" : {
+          "outcome" : "applied"
+        },
+        "Access/SSL/CertificateFile" : {
+          "outcome" : "untested",
+          "why" : "not read, so it couldn't be set back after a write"
+        },
+        "Access/SSL/CertificateID" : {
+          "outcome" : "applied"
+        },
+        "Access/SSL/ClientExportServerCertificate" : {
+          "outcome" : "untested",
+          "why" : "not read, so it couldn't be set back after a write"
+        },
+        "Access/SSL/ClientExportServerKeyID" : {
+          "outcome" : "applied"
+        },
+        "Access/SSL/Enable" : {
+          "outcome" : "applied"
+        },
+        "Access/SSL/FIPSOperationMode" : {
+          "outcome" : "transformed"
+        },
+        "Access/SSL/KeyFile" : {
+          "outcome" : "applied"
+        },
+        "Access/SSL/KeyLabel" : {
+          "outcome" : "applied"
+        },
+        "Access/SSL/KeyStashFile" : {
+          "outcome" : "applied"
+        },
+        "Access/SSL/NIST_SP800_131A_MODE" : {
+          "outcome" : "applied"
+        },
+        "Access/SSL/PrivateKeyPwdFile" : {
+          "outcome" : "untested",
+          "why" : "not read, so it couldn't be set back after a write"
+        },
+        "Access/SSL/PwdKeyFile" : {
+          "outcome" : "untested",
+          "why" : "not read, so it couldn't be set back after a write"
+        },
+        "Access/SSL/TLSCipherList" : {
+          "outcome" : "applied"
+        },
+        "Administration/AdminHost" : {
+          "outcome" : "applied"
+        },
         "Administration/AllowReadOnlyChoreReschedule" : {
           "outcome" : "applied"
         },
@@ -3761,6 +3939,22 @@
         "Administration/AuditLog/UpdateInterval" : {
           "outcome" : "applied"
         },
+        "Administration/Clients/ClientPropertiesSyncInterval" : {
+          "outcome" : "applied"
+        },
+        "Administration/Clients/PasswordMinimumLength" : {
+          "outcome" : "applied"
+        },
+        "Administration/Clients/RetainNonCAMGroupMembership" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Administration/DataBaseDirectory" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
         "Administration/DebugLog/LoggingDirectory" : {
           "outcome" : "applied"
         },
@@ -3768,9 +3962,7 @@
           "outcome" : "applied"
         },
         "Administration/DownTime" : {
-          "outcome" : "rejected",
-          "status" : 400,
-          "code" : "278"
+          "outcome" : "applied"
         },
         "Administration/EnableSandboxDimension" : {
           "outcome" : "applied"
@@ -3853,6 +4045,9 @@
         "Administration/ServerLog/LogReleaseLineCount" : {
           "outcome" : "applied"
         },
+        "Administration/ServerName" : {
+          "outcome" : "applied"
+        },
         "Administration/StartupChores" : {
           "outcome" : "applied"
         },
@@ -3926,9 +4121,7 @@
           "outcome" : "applied"
         },
         "Modelling/TI/MaximumTILockObjects" : {
-          "outcome" : "rejected",
-          "status" : 400,
-          "code" : "278"
+          "outcome" : "applied"
         },
         "Modelling/TI/UseExcelSerialDate" : {
           "outcome" : "applied"

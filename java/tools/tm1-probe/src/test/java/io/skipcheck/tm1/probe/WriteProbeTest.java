@@ -3,6 +3,7 @@
 package io.skipcheck.tm1.probe;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -396,7 +397,7 @@ class WriteProbeTest {
 			    <Property Name="Step" Type="Edm.Int32" Nullable="false"/>
 			    <Property Name="Note" Type="Edm.String"/>
 			   </EntityType>
-			   <ComplexType Name="Admin"><Property Name="Language" Type="Edm.String"/><Property Name="Port" Type="Edm.Int32"/></ComplexType>
+			   <ComplexType Name="Admin"><Property Name="Language" Type="Edm.String"/><Property Name="Port" Type="Edm.Int32"/><Property Name="Secret" Type="Edm.String"/><Property Name="Vanishing" Type="Edm.String"/></ComplexType>
 			   <ComplexType Name="Settings"><Property Name="Admin" Type="tm1.Admin"/><Property Name="Fixed" Type="Edm.Boolean"/></ComplexType>
 			   <EntityContainer Name="API"><EntitySet Name="Tasks" EntityType="tm1.Task"/></EntityContainer>
 			  </Schema>
@@ -414,9 +415,16 @@ class WriteProbeTest {
 		final List<String> logs = new ArrayList<>();
 
 		final ObjectNode settings = (ObjectNode) ProbeClient.JSON
-			.readTree("{\"Admin\": {\"Language\": \"en\", \"Port\": 1}, \"Fixed\": false}");
+			.readTree("{\"Admin\": {\"Language\": \"en\", \"Port\": 1, \"Vanishing\": \"v\"}, \"Fixed\": false}");
 
 		int next = 1;
+
+		/**
+		 * Whether a PATCH of Admin's Port locks the probe out (ActiveUser refuses it).
+		 */
+		boolean portLocksOut;
+
+		boolean lockedOut;
 
 		Tasks() {
 			tasks.put(0, "first");
@@ -425,12 +433,28 @@ class WriteProbeTest {
 		@Override
 		public FakeTm1.Reply handle(String method, String target, @Nullable JsonNode body) {
 			String path = target.replaceAll("\\?.*", "");
+			if (path.equals("ActiveUser")) {
+				return lockedOut ? new FakeTm1.Reply(401, null) : FakeTm1.Reply.ok("{\"Name\": \"Admin\"}");
+			}
 			if (path.equals("Settings")) {
 				if (method.equals("PATCH") && body != null) {
 					if (body.has("Admin")) {
-						body.get("Admin")
-							.properties()
-							.forEach(e -> ((ObjectNode) settings.get("Admin")).set(e.getKey(), e.getValue()));
+						body.get("Admin").properties().forEach(e -> {
+							// Secret is taken but never returned; Port can lock the probe
+							// out
+							if (e.getKey().equals("Port") && portLocksOut) {
+								lockedOut = true;
+							}
+							ObjectNode admin = (ObjectNode) settings.get("Admin");
+							// Vanishing reads back only while it holds what it started
+							// with
+							if (e.getKey().equals("Vanishing") && !e.getValue().asString().equals("v")) {
+								admin.remove("Vanishing");
+							}
+							else if (!e.getKey().equals("Secret")) {
+								admin.set(e.getKey(), e.getValue());
+							}
+						});
 					}
 					return new FakeTm1.Reply(204, null);
 				}
@@ -517,10 +541,31 @@ class WriteProbeTest {
 				.get("Settings");
 		}
 		JsonNode patch = settings.path("patch");
-		assertThat(patch.propertyNames()).containsExactly("Admin/Language", "Fixed");
+		// Secret is declared but never read, so it's not written: it couldn't be set back
+		assertThat(patch.propertyNames()).containsExactly("Admin/Language", "Admin/Secret", "Admin/Vanishing", "Fixed");
+		assertThat(outcome(patch.path("Admin/Secret"))).isEqualTo("untested");
+		assertThat(server.settings.path("Admin").has("Secret")).as("never written").isFalse();
+		// Vanishing is taken, then not read back
+		assertThat(outcome(patch.path("Admin/Vanishing"))).isEqualTo("unread");
+		assertThat(server.settings.path("Admin").path("Vanishing").asString()).as("set back").isEqualTo("v");
 		assertThat(outcome(patch.path("Admin/Language"))).isEqualTo("applied");
 		assertThat(outcome(patch.path("Fixed"))).isEqualTo("ignored");
 		assertThat(server.settings.path("Admin").path("Language").asString()).as("set back").isEqualTo("en");
+	}
+
+	@Test
+	void stopsNamingASettingAfterWhichItCantSignIn() throws Exception {
+		String cases = """
+				{"cases": [{"id": "Settings", "type": "Settings", "singleton": true, "source": "Settings"}]}""";
+		Tasks server = new Tasks();
+		server.portLocksOut = true;
+		try (FakeTm1 tm1 = new FakeTm1(server)) {
+			ProbeClient client = new ProbeClient(tm1.url(), "Basic x");
+			WriteProbe probe = new WriteProbe(client, CsdlParser.parse(TASK_METADATA), Map.of(),
+					ProbeClient.JSON.readTree(cases), "P", s -> {
+					});
+			assertThatThrownBy(probe::run).isInstanceOf(IllegalStateException.class).hasMessageContaining("Admin/Port");
+		}
 	}
 
 	@Test

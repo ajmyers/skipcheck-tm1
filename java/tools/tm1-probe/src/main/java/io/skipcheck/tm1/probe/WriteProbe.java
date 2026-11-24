@@ -561,9 +561,23 @@ public final class WriteProbe {
 
 	private void probeLeaves(String at, String type, String prefixPath, JsonNode current, JsonNode values,
 			Set<String> skip, ObjectNode out) {
-		for (String property : sortedFields(current)) {
+		// Every field the type declares, not only what the read returned: TM1 leaves some
+		// out of a read (an SSL key file's password)
+		TreeSet<String> fields = new TreeSet<>(current.propertyNames());
+		for (CsdlStructuredType level : metadata.typeHierarchy(qualified(type))) {
+			level.properties().forEach(p -> fields.add(p.name()));
+		}
+		for (String property : fields) {
 			String here = prefixPath + property;
 			if (skip.contains(here)) {
+				continue;
+			}
+			if (!current.has(property)) {
+				// TM1 doesn't return it, so its value can't be put back after a try: not
+				// written
+				out.putObject(here)
+					.put("outcome", "untested")
+					.put("why", "not read, so it couldn't be set back after a write");
 				continue;
 			}
 			JsonNode original = current.get(property);
@@ -579,14 +593,44 @@ public final class WriteProbe {
 			}
 			ProbeClient.Answer answer = client.send("PATCH", at, nested(here, value));
 			if (!answer.ok()) {
-				out.set(here, outcome(answer));
+				out.set(here, refused(answer, "PATCH", at, here, nested(here, value)));
+				stillReaches(at, here);
 				continue;
 			}
 			ProbeClient.Answer back = client.get(at);
-			JsonNode got = back.body() == null ? null : back.body().at("/" + here);
-			out.set(here, logged(classify(got == null || got.isMissingNode() ? null : got, value, original), at, here,
-					"PATCH", value, got));
-			client.send("PATCH", at, nested(here, original));
+			setBack(at, here, original);
+			// Checked on every path, before a failed read-back is taken for anything else
+			stillReaches(at, here);
+			if (!back.ok() || back.body() == null) {
+				throw new IllegalStateException("After a PATCH of " + here + ", " + at + " can't be read: stopped");
+			}
+			JsonNode got = back.body().at("/" + here);
+			if (got.isMissingNode()) {
+				// TM1 took it, but never returns it
+				out.putObject(here).put("outcome", "unread");
+				continue;
+			}
+			out.set(here, logged(classify(got, value, original), at, here, "PATCH", value, got));
+		}
+	}
+
+	/**
+	 * Stops the probe, naming the setting, if it can no longer sign in after one was
+	 * written and set back: what a server's own access depends on (its security, its
+	 * network) mustn't be read as an outcome.
+	 */
+	private void setBack(String at, String here, JsonNode original) {
+		ProbeClient.Answer answer = client.send("PATCH", at, nested(here, original));
+		if (!answer.ok()) {
+			throw new IllegalStateException("Couldn't set " + here + " back on " + at + " (" + answer.status()
+					+ "): stopped, with the probe's value left in place");
+		}
+	}
+
+	private void stillReaches(String at, String here) {
+		if (!client.get("ActiveUser").ok()) {
+			throw new IllegalStateException(
+					"After a PATCH of " + here + " and setting it back, the probe can't reach " + at + ": stopped");
 		}
 	}
 

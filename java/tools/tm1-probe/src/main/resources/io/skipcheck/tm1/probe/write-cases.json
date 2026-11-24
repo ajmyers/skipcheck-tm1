@@ -780,17 +780,11 @@
 		},
 		{
 			"id": "ServerSettings",
+			"$comment": "Every setting, security and network ones included: each is static configuration (tm1s.cfg, read at start), set back after its try, and the probe checks it can still sign in after each.",
 			"type": "ServerSettings",
 			"singleton": true,
 			"source": "StaticConfiguration",
-			"skip": [
-				"Access",
-				"Network",
-				"Administration/ServerName",
-				"Administration/DataBaseDirectory",
-				"Administration/AdminHost",
-				"Administration/Clients"
-			],
+			"skip": [],
 			"generate": false,
 			"values": {
 				"Administration/StartupChores": [
@@ -798,7 +792,20 @@
 				],
 				"Administration/FileRetry/FileRetryFileSpec": [
 					"probe*.cub"
-				]
+				],
+				"Access/CAM/ServerURIs": [
+					"http://probe.example:9300/p2pd/servlet/dispatch"
+				],
+				"Access/HTTP/OriginAllowList": [
+					"https://probe.example"
+				],
+				"Access/LDAP/VerifyCertServerName": [
+					"probe.example"
+				],
+				"Access/CAM/ClientPingCAMPassport": "P0DT00H15M00S",
+				"Access/SSL/FIPSOperationMode": 2,
+				"Administration/DownTime": "02:00:00",
+				"Modelling/TI/MaximumTILockObjects": 2000
 			}
 		},
 		{
