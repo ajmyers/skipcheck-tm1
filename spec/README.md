@@ -4,6 +4,7 @@ Every client in this repository (Java, Python, .NET, TypeScript, and any added l
 
 ```
 java/tm1-client/src/model/metadata/tm1-schema-<v>.xml   TM1's $metadata, as captured (the source of truth)
+java/tm1-client/src/model/metadata/tm1-probe-<v>.json what a running TM1 does beyond its $metadata (probed: ./gradlew probeTm1)
 spec/tm1-overlay.json                              what TM1 does differently from its $metadata (hand-written)
         │  tm1-codegen  (./gradlew :tm1-codegen:exportSpec)
         ▼
@@ -20,6 +21,7 @@ spec/conformance/*.json                            cases every client's tests mu
 | File | What it is | Edited by |
 |---|---|---|
 | `tm1-overlay.json` | TM1's departures from `$metadata`: properties sent in another type (`departures`), dates TM1 sometimes garbles (`lenientDates`), and notes about endpoints, with generic requests a client mustn't offer (`forbid`). Notes are Markdown. | Hand |
+| `tm1-probe-<v>.json` (beside the snapshot) | What a running TM1 does that its `$metadata` doesn't say, found by probing it: so far, the properties it sends only when asked for by name. Not read by the generators yet ([#312](https://github.com/ajmyers/skipcheck-tm1/issues/312)). | `./gradlew probeTm1` ([tm1-probe](../java/tools/tm1-probe/README.md)) |
 | `tm1-api.json` | The snapshot as plain JSON, with the overlay merged in: `enums`, `types`, `operations`, `container`, and `endpoints`, the coverage inventory. Sorted and versioned (`specVersion`), so a TM1 upgrade shows up as a readable diff. | `./gradlew :tm1-codegen:exportSpec` |
 | `conformance/odata-encoding.json` | Paths and literals every client must build identically. | Hand |
 | `conformance/calls/*.json` | Service calls the Java unit tests record, with every request and answer, which every other client replays exactly ([format](conformance/README.md)). | `./gradlew :tm1-client:test -PrecordConformance` |

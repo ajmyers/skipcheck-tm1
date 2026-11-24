@@ -23,6 +23,7 @@ Run the Gradle task for what you changed before you push. They're what CI runs.
 | `scripts/`, `.githooks/`, shell scripts | `./gradlew checkScripts` |
 | `.github/workflows/` | Nothing local: CI lints them with actionlint. Read the workflow's header comment first, and say in the PR what you couldn't run |
 | `api-site/` | `./gradlew checkApiSite` |
+| `java/tools/tm1-probe/` | `./gradlew :tools:tm1-probe:build`; for a new TM1 version, `./gradlew probeTm1` with a TM1 source, and commit the file it writes ([its README](java/tools/tm1-probe/README.md)) |
 | How a client talks to TM1 | `./gradlew liveTest --continue`, if a TM1 is configured. CI can't run these: say in the PR whether you ran them |
 | Not sure | `./gradlew checkAll packageTest` |
 
