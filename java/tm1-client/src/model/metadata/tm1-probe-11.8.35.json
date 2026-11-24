@@ -106,6 +106,126 @@
   "unverifiable" : [ "Annotation", "View" ],
   "unreached" : [ "AuditDetail", "ChoreReference", "CubeDrillthrough", "CubeReference", "DimensionReference", "Document", "DocumentReference", "GitPlan", "GitPullPlan", "GitPushPlan", "Link", "MDXView", "NativeView", "ProcessDebugContextBreakpoint", "ProcessDebugContextDataBreakpoint", "ProcessDebugContextLineBreakpoint", "ProcessDebugContextLockBreakpoint", "ProcessDebugContextStackFrame", "ProcessDebugContextVariable", "ProcessReference", "RelationalDrillthrough", "RowsetRow", "SubsetReference", "ViewReference" ],
   "writes" : {
+    "Annotation" : {
+      "type" : "Annotation",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "accepted"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ "ApplicationContext", "DimensionalContext@odata.bind" ],
+      "post" : {
+        "Created" : {
+          "outcome" : "ignored"
+        },
+        "Creator" : {
+          "outcome" : "ignored"
+        },
+        "LastUpdated" : {
+          "outcome" : "ignored"
+        },
+        "LastUpdatedBy" : {
+          "outcome" : "ignored"
+        },
+        "Text" : {
+          "outcome" : "applied"
+        }
+      },
+      "patch" : {
+        "Created" : {
+          "outcome" : "ignored"
+        },
+        "Creator" : {
+          "outcome" : "ignored"
+        },
+        "LastUpdated" : {
+          "outcome" : "transformed"
+        },
+        "LastUpdatedBy" : {
+          "outcome" : "transformed"
+        },
+        "Text" : {
+          "outcome" : "applied"
+        }
+      },
+      "patchNull" : {
+        "Created" : {
+          "outcome" : "accepted"
+        },
+        "Creator" : {
+          "outcome" : "accepted"
+        },
+        "LastUpdated" : {
+          "outcome" : "accepted"
+        },
+        "LastUpdatedBy" : {
+          "outcome" : "accepted"
+        },
+        "Text" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : {
+        "ApplicationContext" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "Attachments" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "DimensionalContext" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        }
+      }
+    },
     "AttributeDefinition" : {
       "type" : "AttributeDefinition",
       "postRead" : {
@@ -266,6 +386,82 @@
         "outcome" : "rejected",
         "status" : 400,
         "code" : "278"
+      }
+    },
+    "ChoreTask" : {
+      "type" : "ChoreTask",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "accepted"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ "Parameters", "Process@odata.bind" ],
+      "post" : {
+        "Parameters" : {
+          "outcome" : "applied"
+        }
+      },
+      "patch" : {
+        "Parameters" : {
+          "outcome" : "applied"
+        }
+      },
+      "patchNull" : {
+        "Parameters" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : {
+        "Chore" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "248"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "248"
+            }
+          }
+        },
+        "Process" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "248"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "replaces"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        }
       }
     },
     "Cube" : {
@@ -644,6 +840,98 @@
         "outcome" : "ignored"
       }
     },
+    "Edge" : {
+      "type" : "Edge",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "rejected",
+        "status" : 400,
+        "code" : "24"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ "ComponentName", "ParentName" ],
+      "post" : {
+        "Weight" : {
+          "outcome" : "applied"
+        }
+      },
+      "patch" : {
+        "Weight" : {
+          "outcome" : "applied"
+        }
+      },
+      "patchNull" : {
+        "Weight" : {
+          "outcome" : "accepted"
+        }
+      },
+      "navigations" : {
+        "Component" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "Hierarchy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "Parent" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        }
+      }
+    },
     "Element" : {
       "type" : "Element",
       "postRead" : {
@@ -811,6 +1099,132 @@
       },
       "rename" : {
         "outcome" : "ignored"
+      }
+    },
+    "Folder" : {
+      "type" : "Folder",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "accepted"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ ],
+      "post" : {
+        "Attributes" : {
+          "outcome" : "untested"
+        },
+        "ID" : {
+          "outcome" : "ignored"
+        }
+      },
+      "patch" : {
+        "Attributes" : {
+          "outcome" : "untested"
+        },
+        "ID" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "patchNull" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "ID" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : {
+        "ContainedBy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "Contents" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "PrivateContents" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        }
+      },
+      "rename" : {
+        "outcome" : "rejected",
+        "status" : 400,
+        "code" : "278"
       }
     },
     "Group" : {
@@ -1208,6 +1622,120 @@
       "rename" : {
         "outcome" : "ignored"
       }
+    },
+    "Link" : {
+      "type" : "Link",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "accepted"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ "URL" ],
+      "post" : {
+        "Attributes" : {
+          "outcome" : "untested"
+        },
+        "URL" : {
+          "outcome" : "applied"
+        }
+      },
+      "patch" : {
+        "Attributes" : {
+          "outcome" : "untested"
+        },
+        "URL" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "patchNull" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "URL" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : {
+        "ContainedBy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        }
+      }
+    },
+    "LocalizedAttributes" : {
+      "type" : "LocalizedAttributes",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "rejected",
+        "status" : 400,
+        "code" : "278"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ "Attributes", "LocaleID" ],
+      "post" : {
+        "Attributes" : {
+          "outcome" : "applied"
+        }
+      },
+      "patch" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "patchNull" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : { }
     },
     "MDXView" : {
       "type" : "MDXView",
@@ -1862,6 +2390,316 @@
       "navigations" : { },
       "rename" : {
         "outcome" : "ignored"
+      }
+    },
+    "ServerSettings" : {
+      "type" : "ServerSettings",
+      "generate" : false,
+      "patch" : {
+        "Administration/AllowReadOnlyChoreReschedule" : {
+          "outcome" : "applied"
+        },
+        "Administration/AuditLog/Enable" : {
+          "outcome" : "applied"
+        },
+        "Administration/AuditLog/MaxFileSizeKilobytes" : {
+          "outcome" : "applied"
+        },
+        "Administration/AuditLog/MaxQueryMemoryKilobytes" : {
+          "outcome" : "applied"
+        },
+        "Administration/AuditLog/UpdateInterval" : {
+          "outcome" : "applied"
+        },
+        "Administration/DebugLog/LoggingDirectory" : {
+          "outcome" : "applied"
+        },
+        "Administration/DisableSandboxing" : {
+          "outcome" : "applied"
+        },
+        "Administration/DownTime" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Administration/EnableSandboxDimension" : {
+          "outcome" : "applied"
+        },
+        "Administration/EventLog/Enable" : {
+          "outcome" : "applied"
+        },
+        "Administration/EventLog/ScanFrequency" : {
+          "outcome" : "applied"
+        },
+        "Administration/EventLog/ThresholdForPooledMemoryInMB" : {
+          "outcome" : "applied"
+        },
+        "Administration/EventLog/ThresholdForThreadBlockingNumber" : {
+          "outcome" : "applied"
+        },
+        "Administration/EventLog/ThresholdForThreadRunningTime" : {
+          "outcome" : "applied"
+        },
+        "Administration/EventLog/ThresholdForThreadWaitingTime" : {
+          "outcome" : "applied"
+        },
+        "Administration/ExternalDatabase/ODBCLibraryPath" : {
+          "outcome" : "applied"
+        },
+        "Administration/ExternalDatabase/ODBCTimeoutInSeconds" : {
+          "outcome" : "applied"
+        },
+        "Administration/ExternalDatabase/OracleErrorForceRowStatus" : {
+          "outcome" : "ignored"
+        },
+        "Administration/ExternalDatabase/SQLFetchType" : {
+          "outcome" : "applied"
+        },
+        "Administration/ExternalDatabase/SQLRowsetSize" : {
+          "outcome" : "applied"
+        },
+        "Administration/ExternalDatabase/TM1ConnectorforSAP" : {
+          "outcome" : "applied"
+        },
+        "Administration/ExternalDatabase/UseNewConnectorforSAP" : {
+          "outcome" : "applied"
+        },
+        "Administration/FileRetry/FileRetryCount" : {
+          "outcome" : "applied"
+        },
+        "Administration/FileRetry/FileRetryDelayMilliseconds" : {
+          "outcome" : "applied"
+        },
+        "Administration/FileRetry/FileRetryFileSpec" : {
+          "outcome" : "untested"
+        },
+        "Administration/Java/ClassPath" : {
+          "outcome" : "applied"
+        },
+        "Administration/Java/JVMArgs" : {
+          "outcome" : "applied"
+        },
+        "Administration/Java/JVMPath" : {
+          "outcome" : "applied"
+        },
+        "Administration/Language" : {
+          "outcome" : "applied"
+        },
+        "Administration/MaskUserNameInServerTools" : {
+          "outcome" : "applied"
+        },
+        "Administration/PerfMonActive" : {
+          "outcome" : "applied"
+        },
+        "Administration/PerformanceMonitorOn" : {
+          "outcome" : "applied"
+        },
+        "Administration/RunningInBackground" : {
+          "outcome" : "applied"
+        },
+        "Administration/ServerLog/Enable" : {
+          "outcome" : "applied"
+        },
+        "Administration/ServerLog/LogReleaseLineCount" : {
+          "outcome" : "applied"
+        },
+        "Administration/StartupChores" : {
+          "outcome" : "untested"
+        },
+        "Administration/TM1Web/ExcelWebPublishEnabled" : {
+          "outcome" : "applied"
+        },
+        "Administration/TopLog/Enable" : {
+          "outcome" : "applied"
+        },
+        "Administration/TopLog/ScanFrequency" : {
+          "outcome" : "applied"
+        },
+        "Administration/TopLog/ScanMode" : {
+          "outcome" : "applied"
+        },
+        "Administration/UnicodeUpperLowerCase" : {
+          "outcome" : "applied"
+        },
+        "EncryptionAtRest" : {
+          "outcome" : "untested"
+        },
+        "Modelling/DefaultMeasuresDimension" : {
+          "outcome" : "applied"
+        },
+        "Modelling/EnableNewHierarchyCreation" : {
+          "outcome" : "applied"
+        },
+        "Modelling/MDXSelectCalculatedMemberInputs" : {
+          "outcome" : "applied"
+        },
+        "Modelling/Rules/AllowSeparateNandCRules" : {
+          "outcome" : "applied"
+        },
+        "Modelling/Rules/AutomaticallyAddCubeDependencies" : {
+          "outcome" : "applied"
+        },
+        "Modelling/Rules/ForceReevaluationOfFeedersForFedCellsOnDataChange" : {
+          "outcome" : "applied"
+        },
+        "Modelling/Rules/RulesOverwriteCellsOnLoad" : {
+          "outcome" : "applied"
+        },
+        "Modelling/Spreading/ProportionSpreadToZeroCells" : {
+          "outcome" : "applied"
+        },
+        "Modelling/Spreading/SpreadingPrecision" : {
+          "outcome" : "applied"
+        },
+        "Modelling/Startup/LoadPrivateSubsetsOnStartup" : {
+          "outcome" : "applied"
+        },
+        "Modelling/Startup/MaximumCubeLoadThreads" : {
+          "outcome" : "applied"
+        },
+        "Modelling/Startup/PersistentFeeders" : {
+          "outcome" : "applied"
+        },
+        "Modelling/Startup/SkipLoadingAliases" : {
+          "outcome" : "ignored"
+        },
+        "Modelling/Synchronization/MaximumSynchAttempts" : {
+          "outcome" : "applied"
+        },
+        "Modelling/Synchronization/SyncUnitSize" : {
+          "outcome" : "applied"
+        },
+        "Modelling/TI/CognosTM1InterfacePath" : {
+          "outcome" : "applied"
+        },
+        "Modelling/TI/EnableTIDebugging" : {
+          "outcome" : "applied"
+        },
+        "Modelling/TI/MaximumTILockObjects" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Modelling/TI/UseExcelSerialDate" : {
+          "outcome" : "applied"
+        },
+        "Modelling/UserDefinedCalculations" : {
+          "outcome" : "applied"
+        },
+        "Performance/JobQueuing/Enable" : {
+          "outcome" : "applied"
+        },
+        "Performance/JobQueuing/MaxWaitTime" : {
+          "outcome" : "applied"
+        },
+        "Performance/JobQueuing/ThreadPoolSize" : {
+          "outcome" : "applied"
+        },
+        "Performance/JobQueuing/ThreadSleepTime" : {
+          "outcome" : "applied"
+        },
+        "Performance/Locking/PullInvalidationSubsets" : {
+          "outcome" : "applied"
+        },
+        "Performance/Locking/SubsetElementLockBreathing" : {
+          "outcome" : "applied"
+        },
+        "Performance/Locking/UseLocalCopiesForPublicDynamicSubsets" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTCubeLoad/Enabled" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTCubeLoad/MinFileSize" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTCubeLoad/UseBookmarkFiles" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTCubeLoad/Weight" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTFeeders/AtStartup" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTFeeders/Enabled" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTQ/ImmediateCheckForSplit" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTQ/MTFeeders" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTQ/MTFeedersAtStartup" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTQ/MTQQuery" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTQ/NumberOfThreadsToUse" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTQ/OperationProgressCheckSkipLoopSize" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTQ/SingleCellConsolidation" : {
+          "outcome" : "applied"
+        },
+        "Performance/MTQ/UseAllThreads" : {
+          "outcome" : "applied"
+        },
+        "Performance/Memory/ApplyMaximumViewSizeToEntireTransaction" : {
+          "outcome" : "applied"
+        },
+        "Performance/Memory/CacheFriendlyMalloc" : {
+          "outcome" : "applied"
+        },
+        "Performance/Memory/DisableMemoryCache" : {
+          "outcome" : "applied"
+        },
+        "Performance/Memory/LockPagesInMemory" : {
+          "outcome" : "applied"
+        },
+        "Performance/Memory/MaximumMemoryForSubsetUndoKB" : {
+          "outcome" : "applied"
+        },
+        "Performance/Memory/MaximumUserSandboxSizeMB" : {
+          "outcome" : "applied"
+        },
+        "Performance/Memory/MaximumViewSizeMB" : {
+          "outcome" : "applied"
+        },
+        "Performance/PrivilegeGenerationOptimization" : {
+          "outcome" : "applied"
+        },
+        "Performance/Stargate/AllRuleCalcStargateOptimization" : {
+          "outcome" : "applied"
+        },
+        "Performance/Stargate/UseStargateForRules" : {
+          "outcome" : "applied"
+        },
+        "Performance/Stargate/ZeroWeightOptimization" : {
+          "outcome" : "applied"
+        },
+        "Performance/ViewCalculation/CalculationThresholdForStorage" : {
+          "outcome" : "applied"
+        },
+        "Performance/ViewCalculation/CheckFeedersMaximumCells" : {
+          "outcome" : "applied"
+        },
+        "Performance/ViewCalculation/MagnitudeDifferenceToBeZero" : {
+          "outcome" : "applied"
+        },
+        "Performance/ViewCalculation/ViewConsolidationOptimization" : {
+          "outcome" : "applied"
+        },
+        "Performance/ViewCalculation/ViewConsolidationOptimizationMethod" : {
+          "outcome" : "applied"
+        },
+        "ServerName" : {
+          "outcome" : "ignored"
+        }
       }
     },
     "Subset/dynamic" : {

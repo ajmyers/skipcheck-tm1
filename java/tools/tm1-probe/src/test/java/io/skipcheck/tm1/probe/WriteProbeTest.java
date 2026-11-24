@@ -384,6 +384,141 @@ class WriteProbeTest {
 		assertThat(pals.friends.keySet()).containsExactlyInAnyOrder("PSource", "PTarget");
 	}
 
+	private static final String TASK_METADATA = """
+			<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+			 <edmx:DataServices>
+			  <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="ibm.tm1.api.v1" Alias="tm1">
+			   <EntityType Name="Task"><Key><PropertyRef Name="Step"/></Key>
+			    <Property Name="Step" Type="Edm.Int32" Nullable="false"/>
+			    <Property Name="Note" Type="Edm.String"/>
+			   </EntityType>
+			   <ComplexType Name="Admin"><Property Name="Language" Type="Edm.String"/><Property Name="Port" Type="Edm.Int32"/></ComplexType>
+			   <ComplexType Name="Settings"><Property Name="Admin" Type="tm1.Admin"/><Property Name="Fixed" Type="Edm.Boolean"/></ComplexType>
+			   <EntityContainer Name="API"><EntitySet Name="Tasks" EntityType="tm1.Task"/></EntityContainer>
+			  </Schema>
+			 </edmx:DataServices>
+			</edmx:Edmx>""";
+
+	/**
+	 * Tasks whose Step the server assigns, each made after a setup request (a Log), and
+	 * settings whose Language a PATCH changes and whose Fixed it ignores.
+	 */
+	static final class Tasks implements FakeTm1.Handler {
+
+		final Map<Integer, String> tasks = new LinkedHashMap<>();
+
+		final List<String> logs = new ArrayList<>();
+
+		final ObjectNode settings = (ObjectNode) ProbeClient.JSON
+			.readTree("{\"Admin\": {\"Language\": \"en\", \"Port\": 1}, \"Fixed\": false}");
+
+		int next = 1;
+
+		Tasks() {
+			tasks.put(0, "first");
+		}
+
+		@Override
+		public FakeTm1.Reply handle(String method, String target, @Nullable JsonNode body) {
+			String path = target.replaceAll("\\?.*", "");
+			if (path.equals("Settings")) {
+				if (method.equals("PATCH") && body != null) {
+					if (body.has("Admin")) {
+						body.get("Admin")
+							.properties()
+							.forEach(e -> ((ObjectNode) settings.get("Admin")).set(e.getKey(), e.getValue()));
+					}
+					return new FakeTm1.Reply(204, null);
+				}
+				return new FakeTm1.Reply(200, settings);
+			}
+			if (method.equals("POST") && path.equals("Logs") && body != null) {
+				logs.add(body.path("Name").asString());
+				return new FakeTm1.Reply(201, null);
+			}
+			if (method.equals("DELETE") && path.startsWith("Logs('")) {
+				logs.remove(WriteProbe.keyOf(path));
+				return new FakeTm1.Reply(204, null);
+			}
+			if (method.equals("POST") && path.equals("Tasks") && body != null) {
+				int step = next++;
+				tasks.put(step, body.path("Note").asString(""));
+				return FakeTm1.Reply.ok("{\"Step\": " + step + ", \"Note\": \"" + tasks.get(step) + "\"}");
+			}
+			Matcher m = Pattern.compile("Tasks\\((\\d+)\\)").matcher(path);
+			if (!m.matches() || !tasks.containsKey(Integer.valueOf(m.group(1)))) {
+				return new FakeTm1.Reply(404, null);
+			}
+			int step = Integer.parseInt(m.group(1));
+			return switch (method) {
+				case "GET" -> FakeTm1.Reply.ok("{\"Step\": " + step + ", \"Note\": \"" + tasks.get(step) + "\"}");
+				case "DELETE" -> {
+					tasks.remove(step);
+					yield new FakeTm1.Reply(204, null);
+				}
+				case "PATCH" -> {
+					if (body != null && body.has("Note")) {
+						tasks.put(step, body.path("Note").asString());
+					}
+					yield new FakeTm1.Reply(204, null);
+				}
+				default -> new FakeTm1.Reply(405, null);
+			};
+		}
+
+	}
+
+	@Test
+	void findsWhatItMadeByTheKeyTm1AssignsAndRunsEachTrysSetupAndTeardown() throws Exception {
+		String cases = """
+				{"cases": [{"id": "Task", "type": "Task", "collection": "Tasks", "source": "Tasks(0)", "named": false,
+				  "assigned": "Step", "base": {"Note": "n"},
+				  "setup": [{"method": "POST", "path": "Logs", "body": {"Name": "{name}"}}],
+				  "teardown": [{"method": "DELETE", "path": "Logs('{name}')"}]}]}""";
+		Tasks tasks = new Tasks();
+		JsonNode task;
+		try (FakeTm1 tm1 = new FakeTm1(tasks)) {
+			ProbeClient client = new ProbeClient(tm1.url(), "Basic x");
+			task = new WriteProbe(client, CsdlParser.parse(TASK_METADATA), Map.of(), ProbeClient.JSON.readTree(cases),
+					"P", s -> {
+					})
+				.run()
+				.writes()
+				.get("Task");
+		}
+		assertThat(outcome(task.path("minimal"))).isEqualTo("accepted");
+		// The key isn't probed; the rest is, on what each create made
+		assertThat(task.path("post").propertyNames()).containsExactly("Note");
+		assertThat(outcome(task.path("post").path("Note"))).isEqualTo("applied");
+		assertThat(outcome(task.path("patch").path("Note"))).isEqualTo("applied");
+		assertThat(task.has("rename")).as("found by its key, not by a name").isFalse();
+		assertThat(tasks.tasks).containsOnlyKeys(0);
+		assertThat(tasks.logs).as("every setup torn down").isEmpty();
+	}
+
+	@Test
+	void patchesASingletonsSettingsOneByOneAndSetsEachBack() throws Exception {
+		String cases = """
+				{"cases": [{"id": "Settings", "type": "Settings", "singleton": true, "source": "Settings",
+				  "skip": ["Admin/Port"]}]}""";
+		Tasks server = new Tasks();
+		JsonNode settings;
+		try (FakeTm1 tm1 = new FakeTm1(server)) {
+			ProbeClient client = new ProbeClient(tm1.url(), "Basic x");
+			settings = new WriteProbe(client, CsdlParser.parse(TASK_METADATA), Map.of(),
+					ProbeClient.JSON.readTree(cases), "P", s -> {
+					})
+				.run()
+				.writes()
+				.get("Settings");
+		}
+		JsonNode patch = settings.path("patch");
+		assertThat(patch.propertyNames()).containsExactly("Admin/Language", "Fixed");
+		assertThat(outcome(patch.path("Admin/Language"))).isEqualTo("applied");
+		assertThat(outcome(patch.path("Fixed"))).isEqualTo("ignored");
+		assertThat(server.settings.path("Admin").path("Language").asString()).as("set back").isEqualTo("en");
+	}
+
 	@Test
 	void tellsAReplacingCollectionFromAnAppendingOne() throws Exception {
 		assertThat(outcome(probe().collections().get("Thing/Items"))).isEqualTo("replaces");

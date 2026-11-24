@@ -95,6 +95,23 @@ With several servers, each one creates the same fixtures and finds its own paths
 every Nth type in name order. Identical servers give identical answers, so the file doesn't
 depend on how many there were.
 
+### Write cases
+
+A case in [`write-cases.json`](src/main/resources/io/skipcheck/tm1/probe/write-cases.json) names its `type`, where it's made (`collection`), a fixture to read a full set of properties from (`source`, an entity or a list whose first member is read), the least a create needs (`base`), and `values` for properties no value can be made up for. The rest is for types that aren't made and found by a name:
+
+| Field | For |
+|---|---|
+| `named` | `false` when the body carries no `Name` (an edge, a task, an annotation) |
+| `key` | key properties, which aren't probed (`["ParentName", "ComponentName"]`) |
+| `address` | where a try's object is found, with `{name}` (an edge: `Edges(ParentName='…',ComponentName='{name}')`); else `collection('name')` |
+| `assigned` | the key TM1 assigns, read from the create's answer: a task's `Step`, an annotation's or a link's `ID` (a link's is its name and `.extr`) |
+| `setup`, `teardown` | requests before each create and after each delete, with `{name}` (an edge's component element) |
+| `names` | the names to use in turn, where TM1 takes only some (locales, for translations) |
+| `targets` | the case's own binding targets, over the cases' `targets` |
+| `secrets` | properties TM1 never reads back, checked by signing in |
+| `singleton`, `skip` | one object, patched setting by setting (nested ones by path, `Administration/Language`), read back and set back; `skip` leaves paths alone, such as what the probe's own connection depends on |
+| `generate` | `false` while the generators don't use the case yet ([#338](https://github.com/ajmyers/skipcheck-tm1/issues/338)): its writes are recorded, and `tm1-codegen` skips them |
+
 ## The file
 
 | Key | What it holds |
@@ -115,7 +132,7 @@ messages or the values read, which can hold the names of objects the run made.
 
 ## What it can't see
 
-- **Writes of types without a case**, such as `ChoreTask` and `Edge` (keys the server assigns,
+- **Writes of a debug context's breakpoints**, which need a running debug session, and of the encryption providers and Git, which need infrastructure the probe server lacks (a key store, a Git remote).
   or two-part keys): add a case to `write-cases.json`.
 - **What depends on other properties**, beyond the fixture each case reads: a process's
   data source fields for another `Type`, say.

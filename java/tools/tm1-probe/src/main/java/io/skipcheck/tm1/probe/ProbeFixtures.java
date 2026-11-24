@@ -100,7 +100,15 @@ public final class ProbeFixtures {
 			step("POST", "CubeAttributes", """
 					{"Name": "%1$sCubeAttribute", "Type": "String"}"""), step("POST", "ProcessAttributes", """
 					{"Name": "%1$sProcessAttribute", "Type": "String"}"""), step("POST", "Sandboxes", """
-					{"Name": "%1$sSandbox"}"""), step("POST", "Annotations",
+					{"Name": "%1$sSandbox"}"""),
+			// Content to read a folder and a link from, and a cube's translations
+			step("POST", "Contents('Applications')/Contents", """
+					{"@odata.type": "#ibm.tm1.api.v1.Folder", "Name": "%1$sFolder"}"""),
+			// TM1 keeps links out of the root folder
+			step("POST", "Contents('Applications')/Contents('%1$sFolder')/Contents", """
+					{"@odata.type": "#ibm.tm1.api.v1.Link", "Name": "%1$sLink", "URL": "https://example.com/probe"}"""),
+			step("POST", "Cubes('%1$sCube')/LocalizedAttributes", """
+					{"LocaleID": "fr", "Attributes": {"%1$sCubeAttribute": "Le cube"}}"""), step("POST", "Annotations",
 					"""
 							{"Text": "A probe note",
 							 "ApplicationContext": [{"Facet@odata.bind": "ApplicationContextFacets('}Cubes')", "Value": "%1$sCube"}],
@@ -113,7 +121,9 @@ public final class ProbeFixtures {
 			"Processes('%1$sView')", "Cubes('%1$sCube')", "Dimensions('%1$sDim')", "Dimensions('%1$sMeasures')",
 			"Dimensions('%1$sOther')", "Users('%1$sUser')", "Groups('%1$sGroup')",
 			"CubeAttributes('%1$sCubeAttribute')", "ProcessAttributes('%1$sProcessAttribute')",
-			"Sandboxes('%1$sSandbox')");
+			"Sandboxes('%1$sSandbox')", // TM1 gives a link the ID of its name and .extr
+			"Contents('Applications')/Contents('%1$sFolder')/Contents('%1$sLink.extr')",
+			"Contents('Applications')/Contents('%1$sFolder')");
 
 	private ProbeFixtures() {
 	}
