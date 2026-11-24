@@ -1,5 +1,7 @@
 # skipcheck-tm1 (Python)
 
+> **Pre-1.0:** the API may change between minor versions (0.1 → 0.2) until 1.0.0. See [Stability](https://github.com/ajmyers/skipcheck-tm1#stability).
+
 A Python client for the **IBM Planning Analytics (TM1) REST API**, with the same API as the Java client (`tm1-client`): the same services, methods, parameters, queries, patches, session views and errors, named the Python way. Its model is generated from the same language-neutral spec ([`spec/tm1-api.json`](../spec)).
 
 It comes in two flavors with one API: sync (`skipcheck_tm1`) and asyncio (`skipcheck_tm1.aio`). Requires Python 3.11+, [httpx2](https://github.com/pydantic/httpx2) and [pydantic](https://docs.pydantic.dev/) 2.
