@@ -95,6 +95,10 @@ With several servers, each one creates the same fixtures and finds its own paths
 every Nth type in name order. Identical servers give identical answers, so the file doesn't
 depend on how many there were.
 
+### Coverage
+
+Every setter the clients' create and patch types offer must be verified by the probe or listed in [`spec/conformance/probe-coverage.json`](../../../spec/conformance/probe-coverage.json), with why (`ProbeCoverageTest`). For a new TM1 version, a failure there names each writable property or type the cases don't reach yet: add a case, or list it with a reason.
+
 ### Write cases
 
 A case in [`write-cases.json`](src/main/resources/io/skipcheck/tm1/probe/write-cases.json) names its `type`, where it's made (`collection`), a fixture to read a full set of properties from (`source`, an entity or a list whose first member is read), the least a create needs (`base`), and `values` for properties no value can be made up for. The rest is for types that aren't made and found by a name:
