@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -160,57 +161,211 @@ public final class WriteProbe {
 		return new Result(writes, collections);
 	}
 
+	/**
+	 * Where a case's objects are made and found: its {@code collection}; its
+	 * {@code base}, with {@code {name}} for the try's fresh name; whether the body
+	 * carries {@code Name} ({@code named}, by default); the address of what's made
+	 * ({@code address}, with {@code {name}}; else {@code collection('name')}; or by the
+	 * key TM1 assigns, {@code assigned}, read from the create's answer); its key
+	 * properties, which aren't probed ({@code key}); and requests to run before each
+	 * create and after each delete ({@code setup}, {@code teardown}, with
+	 * {@code {name}}).
+	 */
+	private final class Shape {
+
+		final String collection;
+
+		final JsonNode base;
+
+		final boolean named;
+
+		final @Nullable String address;
+
+		final @Nullable String assigned;
+
+		final Set<String> keys = new TreeSet<>();
+
+		final JsonNode setup;
+
+		final JsonNode teardown;
+
+		final List<String> names = new ArrayList<>();
+
+		private int next;
+
+		Shape(JsonNode c) {
+			c.path("names").forEach(n -> names.add(n.asString()));
+			collection = c.path("collection").asString().replace("{p}", prefix);
+			base = c.path("base");
+			named = c.path("named").asBoolean(true);
+			address = c.path("address").isString() ? c.path("address").asString() : null;
+			assigned = c.path("assigned").isString() ? c.path("assigned").asString() : null;
+			setup = c.path("setup");
+			teardown = c.path("teardown");
+			c.path("key").forEach(k -> keys.add(k.asString()));
+			if (named) {
+				keys.add("Name");
+			}
+			if (assigned != null) {
+				keys.add(assigned);
+			}
+		}
+
+		/**
+		 * Whether TM1 renames one by a PATCH of {@code Name}: only a named one, found by
+		 * it.
+		 */
+		boolean renames() {
+			return named && address == null && assigned == null;
+		}
+
+		String fresh() {
+			// A case's names, in turn, where TM1 takes only some (a locale): else a new
+			// one
+			String name = names.isEmpty() ? prefix + "W" + String.format(Locale.ROOT, "%03d", sequence++)
+					: names.get(next++ % names.size());
+			if (assigned == null) {
+				client.send("DELETE", addressed(name), null);
+			}
+			run(teardown, name);
+			return name;
+		}
+
+		ObjectNode body(String name) {
+			ObjectNode body = merge(substitute(base, name), NODES.objectNode());
+			if (named) {
+				body.put("Name", name);
+			}
+			return body;
+		}
+
+		Made post(String name) {
+			return post(name, body(name));
+		}
+
+		Made post(String name, ObjectNode body) {
+			run(setup, name);
+			ProbeClient.Answer answer = client.send("POST", collection, body);
+			return new Made(name, answer, answer.ok() ? at(name, answer.body()) : null);
+		}
+
+		@Nullable String at(String name, @Nullable JsonNode answer) {
+			if (assigned != null) {
+				JsonNode key = answer == null ? NODES.missingNode() : answer.path(assigned);
+				if (key.isMissingNode() || key.isNull()) {
+					return null;
+				}
+				return collection + "("
+						+ (key.isNumber() ? key.asString() : "'" + key.asString().replace("'", "''") + "'") + ")";
+			}
+			return addressed(name);
+		}
+
+		/** Where an object TM1 doesn't assign a key to is found. */
+		String addressed(String name) {
+			return address != null ? text(address, name) : path(collection, name);
+		}
+
+		void remove(Made made) {
+			if (made.at() != null) {
+				client.send("DELETE", made.at(), null);
+			}
+			run(teardown, made.name());
+		}
+
+		private void run(JsonNode requests, String name) {
+			for (JsonNode r : requests) {
+				client.send(r.path("method").asString(), text(r.path("path").asString(), name),
+						r.has("body") ? substitute(r.path("body"), name) : null);
+			}
+		}
+
+	}
+
+	/**
+	 * What a create made: the try's name, TM1's answer, and where the object is, or null.
+	 */
+	private record Made(String name, ProbeClient.Answer answer, @Nullable String at) {
+
+		boolean ok() {
+			return answer.ok() && at != null;
+		}
+
+		/** Where it is: only for one that's {@link #ok}. */
+		String where() {
+			return Objects.requireNonNull(at, "nothing was made");
+		}
+
+	}
+
+	private String text(String template, String name) {
+		return template.replace("{p}", prefix).replace("{name}", name);
+	}
+
 	private JsonNode probeCase(JsonNode c) {
+		if (c.path("singleton").asBoolean(false)) {
+			return probeSingleton(c);
+		}
 		String type = c.path("type").asString();
-		String collection = c.path("collection").asString().replace("{p}", prefix);
-		JsonNode base = substitute(c.path("base"), "");
+		Shape shape = new Shape(c);
 		JsonNode values = c.path("values");
 		ObjectNode result = NODES.objectNode();
 		result.put("type", type);
+		if (!c.path("generate").asBoolean(true)) {
+			// Recorded only: the generators leave it out (#338)
+			result.put("generate", false);
+		}
 
 		String select = select(type);
-		ProbeClient.Answer source = client.get(c.path("source").asString().replace("{p}", prefix) + "?" + select);
+		ProbeClient.Answer source = client.get(text(c.path("source").asString(), "") + "?" + select);
 		if (!source.ok() || source.body() == null) {
 			result.set("source", outcome(source));
 			return result;
 		}
-		ObjectNode read = clean(source.body());
+		// A source can be a list, such as a cube's annotations: its first
+		JsonNode first = source.body().path("value").isArray() ? source.body().path("value").path(0) : source.body();
+		ObjectNode read = clean(first);
 
 		// The read body as a create
-		String name = fresh(collection);
-		ObjectNode body = merge(base, read);
-		body.put("Name", name);
-		result.set("postRead", outcome(client.send("POST", collection, body)));
-		delete(collection, name);
+		String name = shape.fresh();
+		ObjectNode body = merge(substitute(shape.base, name), read);
+		if (shape.named) {
+			body.put("Name", name);
+		}
+		Made made = shape.post(name, body);
+		result.set("postRead", outcome(made.answer()));
+		shape.remove(made);
 
 		// The least a create needs
-		name = fresh(collection);
-		ProbeClient.Answer minimal = client.send("POST", collection, withName(base, name));
-		result.set("minimal", outcome(minimal));
+		name = shape.fresh();
+		Made minimal = shape.post(name);
+		result.set("minimal", outcome(minimal.answer()));
 		if (!minimal.ok()) {
+			shape.remove(minimal);
 			return result;
 		}
-		ObjectNode defaults = readBack(collection, name, select);
-		delete(collection, name);
+		ObjectNode defaults = readBack(minimal.where(), select);
+		shape.remove(minimal);
 		ArrayNode required = result.putArray("required");
-		for (String key : sortedFields(base)) {
+		for (String key : sortedFields(shape.base)) {
 			if (key.startsWith("@")) {
 				continue;
 			}
-			ObjectNode without = withName(base, fresh(collection));
+			String n = shape.fresh();
+			ObjectNode without = shape.body(n);
 			without.remove(key);
-			String n = without.path("Name").asString();
-			if (!client.send("POST", collection, without).ok()) {
+			Made m = shape.post(n, without);
+			if (!m.answer().ok()) {
 				required.add(key);
 			}
-			delete(collection, n);
+			shape.remove(m);
 		}
 
 		ObjectNode post = result.putObject("post");
 		ObjectNode patch = result.putObject("patch");
 		ObjectNode patchNull = result.putObject("patchNull");
 		for (String property : sortedFields(read)) {
-			if (property.equals("Name")) {
+			if (shape.keys.contains(property)) {
 				continue;
 			}
 			JsonNode value = valueFor(type, property, values, read.get(property), defaults.get(property));
@@ -219,37 +374,107 @@ public final class WriteProbe {
 				patch.putObject(property).put("outcome", "untested");
 			}
 			else {
-				post.set(property, tryPost(collection, base, select, property, value, defaults.get(property)));
-				patch.set(property, tryPatch(collection, base, select, property, value));
+				post.set(property, tryPost(shape, select, property, value, defaults.get(property)));
+				patch.set(property, tryPatch(shape, select, property, value));
 			}
-			String n = fresh(collection);
-			client.send("POST", collection, withName(base, n));
+			Made m = shape.post(shape.fresh());
 			ObjectNode toNull = NODES.objectNode();
 			toNull.putNull(property);
-			patchNull.set(property, outcome(client.send("PATCH", path(collection, n), toNull)));
-			delete(collection, n);
+			patchNull.set(property, m.ok() ? outcome(client.send("PATCH", m.where(), toNull)) : outcome(m.answer()));
+			shape.remove(m);
 		}
 
-		probeSecrets(c, collection, base, post, patch);
-		result.set("navigations", probeNavigations(type, collection, base));
+		probeSecrets(c, shape, post, patch);
+		result.set("navigations", probeNavigations(type, shape, c));
 
-		// Renaming by PATCH
-		String before = fresh(collection);
-		String after = fresh(collection);
-		client.send("POST", collection, withName(base, before));
-		ObjectNode rename = NODES.objectNode();
-		rename.put("Name", after);
-		ProbeClient.Answer renamed = client.send("PATCH", path(collection, before), rename);
-		boolean oldThere = client.get(path(collection, before)).ok();
-		boolean newThere = client.get(path(collection, after)).ok();
-		ObjectNode r = renamed.ok() ? NODES.objectNode() : outcome(renamed);
-		if (renamed.ok()) {
-			r.put("outcome", newThere && !oldThere ? "applied" : oldThere && !newThere ? "ignored" : "transformed");
+		if (shape.renames()) {
+			// Renaming by PATCH
+			String before = shape.fresh();
+			String after = shape.fresh();
+			Made m = shape.post(before);
+			ObjectNode rename = NODES.objectNode();
+			rename.put("Name", after);
+			ProbeClient.Answer renamed = client.send("PATCH", path(shape.collection, before), rename);
+			boolean oldThere = client.get(path(shape.collection, before)).ok();
+			boolean newThere = client.get(path(shape.collection, after)).ok();
+			ObjectNode r = renamed.ok() ? NODES.objectNode() : outcome(renamed);
+			if (renamed.ok()) {
+				r.put("outcome", newThere && !oldThere ? "applied" : oldThere && !newThere ? "ignored" : "transformed");
+			}
+			result.set("rename", r);
+			shape.remove(m);
+			delete(shape.collection, after);
 		}
-		result.set("rename", r);
-		delete(collection, before);
-		delete(collection, after);
 		return result;
+	}
+
+	/**
+	 * A singleton's case ({@code "singleton": true}, such as the server's configuration):
+	 * nothing to create, so each property, nested ones by their path
+	 * ({@code Administration/Language}), is patched on the one there is, read back,
+	 * compared with what it was, and set back. The case's {@code skip} lists paths left
+	 * alone, such as what the probe's own connection depends on.
+	 */
+	private JsonNode probeSingleton(JsonNode c) {
+		String type = c.path("type").asString();
+		String at = text(c.path("source").asString(), "");
+		ObjectNode result = NODES.objectNode();
+		result.put("type", type);
+		if (!c.path("generate").asBoolean(true)) {
+			result.put("generate", false);
+		}
+		ProbeClient.Answer source = client.get(at);
+		if (!source.ok() || source.body() == null) {
+			result.set("source", outcome(source));
+			return result;
+		}
+		Set<String> skip = new TreeSet<>();
+		c.path("skip").forEach(s -> skip.add(s.asString()));
+		probeLeaves(at, type, "", clean(source.body()), c.path("values"), skip, result.putObject("patch"));
+		return result;
+	}
+
+	private void probeLeaves(String at, String type, String prefixPath, JsonNode current, JsonNode values,
+			Set<String> skip, ObjectNode out) {
+		for (String property : sortedFields(current)) {
+			String here = prefixPath + property;
+			if (skip.contains(here)) {
+				continue;
+			}
+			JsonNode original = current.get(property);
+			Optional<CsdlProperty> declared = declaredProperty(type, property);
+			if (original.isObject() && declared.isPresent()) {
+				probeLeaves(at, simple(declared.get().type().name()), here + "/", original, values, skip, out);
+				continue;
+			}
+			JsonNode value = values.has(here) ? substitute(values.get(here), "") : madeUp(type, property, original);
+			if (value == null) {
+				out.putObject(here).put("outcome", "untested");
+				continue;
+			}
+			ProbeClient.Answer answer = client.send("PATCH", at, nested(here, value));
+			if (!answer.ok()) {
+				out.set(here, outcome(answer));
+				continue;
+			}
+			ProbeClient.Answer back = client.get(at);
+			JsonNode got = back.body() == null ? null : back.body().at("/" + here);
+			out.set(here, logged(classify(got == null || got.isMissingNode() ? null : got, value, original), at, here,
+					"PATCH", value, got));
+			client.send("PATCH", at, nested(here, original));
+		}
+	}
+
+	/** {@code {"A": {"B": value}}} for the path {@code A/B}. */
+	private static ObjectNode nested(String path, JsonNode value) {
+		String[] parts = path.split("/", -1);
+		ObjectNode root = NODES.objectNode();
+		ObjectNode node = root;
+		for (int i = 0; i < parts.length - 1; i++) {
+			node = node.putObject(parts[i]);
+		}
+		node.set(parts[parts.length - 1], value);
+		return root;
 	}
 
 	/**
@@ -260,37 +485,42 @@ public final class WriteProbe {
 	 * element of another type, code 272). If the baseline is refused, the default is the
 	 * baseline.
 	 */
-	private JsonNode tryPost(String collection, JsonNode base, String select, String property, JsonNode value,
+	private JsonNode tryPost(Shape shape, String select, String property, JsonNode value,
 			@Nullable JsonNode defaultValue) {
-		String name = fresh(collection);
-		ObjectNode body = withName(base, name);
+		String name = shape.fresh();
+		ObjectNode body = shape.body(name);
 		body.set(property, value);
-		ProbeClient.Answer answer = client.send("POST", collection, body);
-		JsonNode got = answer.ok() ? readBack(collection, name, select).get(property) : null;
-		delete(collection, name);
-		if (!answer.ok()) {
-			return outcome(answer);
+		Made made = shape.post(name, body);
+		JsonNode got = made.ok() ? readBack(made.where(), select).get(property) : null;
+		shape.remove(made);
+		if (!made.answer().ok()) {
+			return outcome(made.answer());
 		}
 		JsonNode baseline = defaultValue;
-		if (client.send("POST", collection, withName(base, name)).ok()) {
-			baseline = readBack(collection, name, select).get(property);
+		Made again = shape.post(name);
+		if (again.ok()) {
+			baseline = readBack(again.where(), select).get(property);
 		}
-		delete(collection, name);
-		return logged(classify(got, value, baseline), collection, property, "POST", value, got);
+		shape.remove(again);
+		return logged(classify(got, value, baseline), shape.collection, property, "POST", value, got);
 	}
 
 	/** A PATCH of one property on a fresh object, compared with what it read before. */
-	private JsonNode tryPatch(String collection, JsonNode base, String select, String property, JsonNode value) {
-		String name = fresh(collection);
-		client.send("POST", collection, withName(base, name));
-		JsonNode baseline = readBack(collection, name, select).get(property);
+	private JsonNode tryPatch(Shape shape, String select, String property, JsonNode value) {
+		Made made = shape.post(shape.fresh());
+		if (!made.ok()) {
+			shape.remove(made);
+			return outcome(made.answer());
+		}
+		JsonNode baseline = readBack(made.where(), select).get(property);
 		ObjectNode body = NODES.objectNode();
 		body.set(property, value);
-		ProbeClient.Answer answer = client.send("PATCH", path(collection, name), body);
-		JsonNode got = answer.ok() ? readBack(collection, name, select).get(property) : null;
+		ProbeClient.Answer answer = client.send("PATCH", made.where(), body);
+		JsonNode got = answer.ok() ? readBack(made.where(), select).get(property) : null;
 		JsonNode result = answer.ok()
-				? logged(classify(got, value, baseline), collection, property, "PATCH", value, got) : outcome(answer);
-		delete(collection, name);
+				? logged(classify(got, value, baseline), shape.collection, property, "PATCH", value, got)
+				: outcome(answer);
+		shape.remove(made);
 		return result;
 	}
 
@@ -314,25 +544,24 @@ public final class WriteProbe {
 	 * a PATCH to the second, is applied when the object then signs in with it and not
 	 * with the other ({@link ProbeClient#signsIn}).
 	 */
-	private void probeSecrets(JsonNode c, String collection, JsonNode base, ObjectNode post, ObjectNode patch) {
+	private void probeSecrets(JsonNode c, Shape shape, ObjectNode post, ObjectNode patch) {
 		for (Map.Entry<String, JsonNode> secret : c.path("secrets").properties()) {
 			String property = secret.getKey();
 			String first = secret.getValue().path(0).asString();
 			String second = secret.getValue().path(1).asString();
-			String name = fresh(collection);
-			ObjectNode body = withName(base, name);
+			String name = shape.fresh();
+			ObjectNode body = shape.body(name);
 			body.put(property, first);
-			ProbeClient.Answer created = client.send("POST", collection, body);
-			post.set(property, created.ok() ? signedIn(name, first, second) : outcome(created));
-			delete(collection, name);
+			Made created = shape.post(name, body);
+			post.set(property, created.answer().ok() ? signedIn(name, first, second) : outcome(created.answer()));
+			shape.remove(created);
 
-			name = fresh(collection);
-			client.send("POST", collection, withName(base, name));
+			Made made = shape.post(shape.fresh());
 			ObjectNode change = NODES.objectNode();
 			change.put(property, second);
-			ProbeClient.Answer patched = client.send("PATCH", path(collection, name), change);
-			patch.set(property, patched.ok() ? signedIn(name, second, first) : outcome(patched));
-			delete(collection, name);
+			ProbeClient.Answer patched = made.ok() ? client.send("PATCH", made.where(), change) : made.answer();
+			patch.set(property, patched.ok() ? signedIn(made.name(), second, first) : outcome(patched));
+			shape.remove(made);
 		}
 	}
 
@@ -345,7 +574,7 @@ public final class WriteProbe {
 	 * {@code rejected}, {@code unread} (TM1 took it but won't list the navigation), or
 	 * {@code untested} (nothing to bind or nest).
 	 */
-	private ObjectNode probeNavigations(String type, String collection, JsonNode base) {
+	private ObjectNode probeNavigations(String type, Shape shape, JsonNode c) {
 		List<CsdlNavigationProperty> navigations = new ArrayList<>();
 		for (CsdlStructuredType level : metadata.typeHierarchy(qualified(type))) {
 			navigations.addAll(level.navigationProperties());
@@ -359,8 +588,9 @@ public final class WriteProbe {
 			ObjectNode n = out.putObject(nav);
 			ObjectNode post = n.putObject("post");
 			ObjectNode patch = n.putObject("patch");
-			String bound = cases.path("targets").path(target).isString()
-					? cases.path("targets").path(target).asString().replace("{p}", prefix) : null;
+			// The case's own target for a type, else the cases'
+			JsonNode targets = c.path("targets").path(target).isString() ? c.path("targets") : cases.path("targets");
+			String bound = targets.path(target).isString() ? text(targets.path(target).asString(), "") : null;
 			if (bound == null) {
 				post.putObject("bind").put("outcome", "untested");
 				patch.putObject("bind").put("outcome", "untested");
@@ -371,27 +601,27 @@ public final class WriteProbe {
 				JsonNode value = NODES.stringNode(bound);
 				if (many) {
 					ArrayNode all = NODES.arrayNode();
-					base.path(nav + "@odata.bind").forEach(all::add);
+					substitute(shape.base.path(nav + "@odata.bind"), "").forEach(all::add);
 					value = all.add(bound);
 				}
 				Sent bind = new Sent(nav + "@odata.bind", value, keyOf(bound), null);
-				post.set("bind", navPost(collection, base, nav, () -> bind));
-				patch.set("bind", navPatch(collection, base, nav, () -> bind));
+				post.set("bind", navPost(shape, nav, () -> bind));
+				patch.set("bind", navPatch(shape, nav, () -> bind));
 			}
 			JsonNode nestedCase = caseFor(target);
-			if (nestedCase == null) {
+			if (nestedCase == null || !nestedCase.path("named").asBoolean(true)) {
 				post.putObject("nested").put("outcome", "untested");
 				patch.putObject("nested").put("outcome", "untested");
 			}
 			else {
 				Supplier<Sent> nested = () -> {
-					String into = nestedCase.path("collection").asString().replace("{p}", prefix);
+					String into = text(nestedCase.path("collection").asString(), "");
 					String name = fresh(into);
-					ObjectNode body = withName(substitute(nestedCase.path("base"), ""), name);
+					ObjectNode body = withName(substitute(nestedCase.path("base"), name), name);
 					return new Sent(nav, many ? NODES.arrayNode().add(body) : body, name, path(into, name));
 				};
-				post.set("nested", navPost(collection, base, nav, nested));
-				patch.set("nested", navPatch(collection, base, nav, nested));
+				post.set("nested", navPost(shape, nav, nested));
+				patch.set("nested", navPatch(shape, nav, nested));
 			}
 		}
 		return out;
@@ -404,23 +634,24 @@ public final class WriteProbe {
 	private record Sent(String property, JsonNode value, String key, @Nullable String cleanup) {
 	}
 
-	private JsonNode navPost(String collection, JsonNode base, String nav, Supplier<Sent> make) {
-		String name = fresh(collection);
+	private JsonNode navPost(Shape shape, String nav, Supplier<Sent> make) {
+		String name = shape.fresh();
 		Sent sent = make.get();
-		ObjectNode body = withName(base, name);
+		ObjectNode body = shape.body(name);
 		body.set(sent.property(), sent.value());
-		ProbeClient.Answer answer = client.send("POST", collection, body);
-		List<String> after = answer.ok() ? navKeys(collection, name, nav) : null;
-		delete(collection, name);
+		Made made = shape.post(name, body);
+		List<String> after = made.ok() ? navKeys(made.where(), nav) : null;
+		shape.remove(made);
 		cleanup(sent);
-		if (!answer.ok()) {
-			return outcome(answer);
+		if (!made.answer().ok()) {
+			return outcome(made.answer());
 		}
 		List<String> baseline = null;
-		if (client.send("POST", collection, withName(base, name)).ok()) {
-			baseline = navKeys(collection, name, nav);
+		Made again = shape.post(name);
+		if (again.ok()) {
+			baseline = navKeys(again.where(), nav);
 		}
-		delete(collection, name);
+		shape.remove(again);
 		ObjectNode result = NODES.objectNode();
 		if (after == null || baseline == null) {
 			return result.put("outcome", "unread");
@@ -429,16 +660,19 @@ public final class WriteProbe {
 				after.equals(baseline) ? "ignored" : after.contains(sent.key()) ? "applied" : "transformed");
 	}
 
-	private JsonNode navPatch(String collection, JsonNode base, String nav, Supplier<Sent> make) {
-		String name = fresh(collection);
-		client.send("POST", collection, withName(base, name));
-		List<String> before = navKeys(collection, name, nav);
+	private JsonNode navPatch(Shape shape, String nav, Supplier<Sent> make) {
+		Made made = shape.post(shape.fresh());
+		if (!made.ok()) {
+			shape.remove(made);
+			return outcome(made.answer());
+		}
+		List<String> before = navKeys(made.where(), nav);
 		Sent sent = make.get();
 		ObjectNode body = NODES.objectNode();
 		body.set(sent.property(), sent.value());
-		ProbeClient.Answer answer = client.send("PATCH", path(collection, name), body);
-		List<String> after = answer.ok() ? navKeys(collection, name, nav) : null;
-		delete(collection, name);
+		ProbeClient.Answer answer = client.send("PATCH", made.where(), body);
+		List<String> after = answer.ok() ? navKeys(made.where(), nav) : null;
+		shape.remove(made);
 		cleanup(sent);
 		if (!answer.ok()) {
 			return outcome(answer);
@@ -479,8 +713,8 @@ public final class WriteProbe {
 	 * The keys a navigation holds: each member's {@code Name}, else its {@code ID}, in
 	 * order; none when a single-valued one is unset; null when TM1 won't list it.
 	 */
-	private @Nullable List<String> navKeys(String collection, String name, String nav) {
-		ProbeClient.Answer answer = client.get(path(collection, name) + "/" + nav);
+	private @Nullable List<String> navKeys(String at, String nav) {
+		ProbeClient.Answer answer = client.get(at + "/" + nav);
 		if (answer.status() == 204 || answer.status() == 404) {
 			return List.of();
 		}
@@ -779,8 +1013,8 @@ public final class WriteProbe {
 		return contains(a, b) && contains(b, a);
 	}
 
-	private ObjectNode readBack(String collection, String name, String select) {
-		ProbeClient.Answer answer = client.get(path(collection, name) + "?" + select);
+	private ObjectNode readBack(String at, String select) {
+		ProbeClient.Answer answer = client.get(at + "?" + select);
 		return answer.ok() && answer.body() != null ? clean(answer.body()) : NODES.objectNode();
 	}
 
@@ -840,7 +1074,9 @@ public final class WriteProbe {
 		}
 		if (node.isObject()) {
 			ObjectNode out = NODES.objectNode();
-			node.properties().forEach(e -> out.set(e.getKey(), substitute(e.getValue(), name)));
+			node.properties()
+				.forEach(e -> out.set(e.getKey().replace("{p}", prefix).replace("{name}", name),
+						substitute(e.getValue(), name)));
 			return out;
 		}
 		return node.deepCopy();

@@ -20,6 +20,29 @@
 	},
 	"cases": [
 		{
+			"id": "Annotation",
+			"type": "Annotation",
+			"collection": "Annotations",
+			"source": "Cubes('{p}Cube')/Annotations",
+			"named": false,
+			"assigned": "ID",
+			"base": {
+				"Text": "A probe note",
+				"ApplicationContext": [
+					{
+						"Facet@odata.bind": "ApplicationContextFacets('}Cubes')",
+						"Value": "{p}Cube"
+					}
+				],
+				"DimensionalContext@odata.bind": [
+					"Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Members('{p}B')",
+					"Dimensions('{p}Measures')/Hierarchies('{p}Measures')/Members('{p}Value')"
+				],
+				"objectName": "{p}Cube"
+			},
+			"generate": false
+		},
+		{
 			"id": "AttributeDefinition",
 			"type": "AttributeDefinition",
 			"collection": "CubeAttributes",
@@ -34,6 +57,36 @@
 			"collection": "Chores",
 			"source": "Chores('{p}Chore')",
 			"base": {}
+		},
+		{
+			"id": "ChoreTask",
+			"type": "ChoreTask",
+			"collection": "Chores('{p}Chore')/Tasks",
+			"source": "Chores('{p}Chore')/Tasks(0)",
+			"named": false,
+			"assigned": "Step",
+			"base": {
+				"Process@odata.bind": "Processes('{p}Ascii')",
+				"Parameters": [
+					{
+						"Name": "pValue",
+						"Value": "1"
+					}
+				]
+			},
+			"values": {
+				"Parameters": [
+					{
+						"Name": "pValue",
+						"Value": "2"
+					}
+				]
+			},
+			"targets": {
+				"$comment": "A process other than the one the base binds",
+				"Process": "Processes('{p}View')"
+			},
+			"generate": false
 		},
 		{
 			"id": "Cube",
@@ -62,6 +115,40 @@
 			"base": {}
 		},
 		{
+			"id": "Edge",
+			"type": "Edge",
+			"collection": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Edges",
+			"source": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Edges(ParentName='{p}Total',ComponentName='{p}A')",
+			"named": false,
+			"key": [
+				"ParentName",
+				"ComponentName"
+			],
+			"address": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Edges(ParentName='{p}Total',ComponentName='{name}')",
+			"base": {
+				"ParentName": "{p}Total",
+				"ComponentName": "{name}",
+				"Weight": 1
+			},
+			"setup": [
+				{
+					"method": "POST",
+					"path": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Elements",
+					"body": {
+						"Name": "{name}",
+						"Type": "Numeric"
+					}
+				}
+			],
+			"teardown": [
+				{
+					"method": "DELETE",
+					"path": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Elements('{name}')"
+				}
+			],
+			"generate": false
+		},
+		{
 			"id": "Element",
 			"type": "Element",
 			"collection": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Elements",
@@ -70,6 +157,16 @@
 			"values": {
 				"DisplayString": "Shown"
 			}
+		},
+		{
+			"id": "Folder",
+			"type": "Folder",
+			"collection": "Contents('Applications')/Contents",
+			"source": "Contents('Applications')/Contents('{p}Folder')",
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.Folder"
+			},
+			"generate": false
 		},
 		{
 			"id": "Group",
@@ -90,6 +187,54 @@
 				"ComponentsSortType": "ByName",
 				"ComponentsSortSense": "Descending"
 			}
+		},
+		{
+			"id": "Link",
+			"type": "Link",
+			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
+			"source": "Contents('Applications')/Contents('{p}Folder')/Contents('{p}Link.extr')",
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.Link",
+				"URL": "https://example.com/probe"
+			},
+			"values": {
+				"URL": "https://example.com/other"
+			},
+			"generate": false,
+			"assigned": "ID"
+		},
+		{
+			"id": "LocalizedAttributes",
+			"type": "LocalizedAttributes",
+			"collection": "Cubes('{p}Cube')/LocalizedAttributes",
+			"source": "Cubes('{p}Cube')/LocalizedAttributes('fr')",
+			"named": false,
+			"key": [
+				"LocaleID"
+			],
+			"address": "Cubes('{p}Cube')/LocalizedAttributes('{name}')",
+			"base": {
+				"LocaleID": "{name}",
+				"Attributes": {
+					"{p}CubeAttribute": "Ein Würfel"
+				}
+			},
+			"values": {
+				"Attributes": {
+					"{p}CubeAttribute": "Un cube"
+				}
+			},
+			"names": [
+				"de",
+				"es",
+				"it",
+				"ja",
+				"ko",
+				"pt",
+				"ru",
+				"zh"
+			],
+			"generate": false
 		},
 		{
 			"id": "MDXView",
@@ -167,6 +312,21 @@
 			"collection": "Sandboxes",
 			"source": "Sandboxes('{p}Sandbox')",
 			"base": {}
+		},
+		{
+			"id": "ServerSettings",
+			"type": "ServerSettings",
+			"singleton": true,
+			"source": "StaticConfiguration",
+			"skip": [
+				"Access",
+				"Network",
+				"Administration/ServerName",
+				"Administration/DataBaseDirectory",
+				"Administration/AdminHost",
+				"Administration/Clients"
+			],
+			"generate": false
 		},
 		{
 			"id": "Subset/dynamic",
