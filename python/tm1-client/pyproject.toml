@@ -18,6 +18,13 @@ dependencies = [
     "pydantic>=2.7",
 ]
 
+# What PyPI links to: the project's page on skipcheck.io, its Python docs, and its code here
+[project.urls]
+Homepage = "https://skipcheck.io/tm1-client/"
+Documentation = "https://skipcheck.io/tm1-client/docs/python/"
+Source = "https://github.com/ajmyers/skipcheck-tm1/tree/master/python/tm1-client"
+Issues = "https://github.com/ajmyers/skipcheck-tm1/issues"
+
 [project.optional-dependencies]
 # Ruff is pinned: a newer one may lay code out differently, and tests/test_format.py checks the layout.
 # Pyright is pinned too: a newer one may report more, and tests/test_types.py fails on a finding

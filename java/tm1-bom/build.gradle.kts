@@ -11,6 +11,8 @@ mavenPublishing {
 	pom {
 		name = "TM1 / IBM Planning Analytics BOM"
 		description = project.description
+		// It has no page of its own on skipcheck.io: the site, which lists the libraries it pins
+		url = providers.gradleProperty("apiSiteBaseUrl").get()
 	}
 }
 

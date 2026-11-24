@@ -11,6 +11,9 @@ plugins {
 }
 
 val githubRepo = providers.gradleProperty("githubRepo").get()
+// Each module's page on skipcheck.io (api-site/), which Maven Central links to as the project's home. A module without a
+// landing page opens at its docs there; the BOM, which has no page, sets the site's own address instead
+val apiSiteBaseUrl = providers.gradleProperty("apiSiteBaseUrl").get()
 
 mavenPublishing {
 	publishToMavenCentral()
@@ -21,7 +24,7 @@ mavenPublishing {
 	}
 
 	pom {
-		url = "https://github.com/$githubRepo"
+		url = "$apiSiteBaseUrl${project.name}/"
 		inceptionYear = "2026"
 		licenses {
 			license {

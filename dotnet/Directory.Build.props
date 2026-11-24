@@ -35,12 +35,12 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <!-- What nuget.org shows for the two published libraries. The version is each project's own until
-       a release, when the release workflow sets one for both (-p:Version). -->
+       a release, when the release workflow sets one for both (-p:Version). Each sets its own
+       PackageProjectUrl, its page on skipcheck.io. -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Tm1.Client' Or '$(MSBuildProjectName)' == 'Tm1.Testcontainers'">
     <Authors>Andrew Myers</Authors>
     <Copyright>© Andrew Myers</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <PackageProjectUrl>https://skipcheck.io</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ajmyers/skipcheck-tm1</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>tm1;planning-analytics;ibm;odata;testcontainers</PackageTags>

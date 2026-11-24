@@ -4,7 +4,7 @@
   "description": "A client for the IBM Planning Analytics (TM1) REST API, with the Java client's API",
   "license": "Apache-2.0",
   "author": "Andrew Myers (https://ajmyers.net)",
-  "homepage": "https://skipcheck.io",
+  "homepage": "https://skipcheck.io/tm1-client/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ajmyers/skipcheck-tm1.git",
