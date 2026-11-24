@@ -572,7 +572,15 @@ public final class WriteProbe {
 			if (skip.contains(here)) {
 				continue;
 			}
-			JsonNode original = current.has(property) ? current.get(property) : NODES.nullNode();
+			if (!current.has(property)) {
+				// TM1 doesn't return it, so its value can't be put back after a try: not
+				// written
+				out.putObject(here)
+					.put("outcome", "untested")
+					.put("why", "not read, so it couldn't be set back after a write");
+				continue;
+			}
+			JsonNode original = current.get(property);
 			Optional<CsdlProperty> declared = declaredProperty(type, property);
 			if (original.isObject() && declared.isPresent()) {
 				probeLeaves(at, simple(declared.get().type().name()), here + "/", original, values, skip, out);
@@ -590,7 +598,7 @@ public final class WriteProbe {
 				continue;
 			}
 			ProbeClient.Answer back = client.get(at);
-			client.send("PATCH", at, nested(here, original));
+			setBack(at, here, original);
 			// Checked on every path, before a failed read-back is taken for anything else
 			stillReaches(at, here);
 			if (!back.ok() || back.body() == null) {
@@ -611,6 +619,14 @@ public final class WriteProbe {
 	 * written and set back: what a server's own access depends on (its security, its
 	 * network) mustn't be read as an outcome.
 	 */
+	private void setBack(String at, String here, JsonNode original) {
+		ProbeClient.Answer answer = client.send("PATCH", at, nested(here, original));
+		if (!answer.ok()) {
+			throw new IllegalStateException("Couldn't set " + here + " back on " + at + " (" + answer.status()
+					+ "): stopped, with the probe's value left in place");
+		}
+	}
+
 	private void stillReaches(String at, String here) {
 		if (!client.get("ActiveUser").ok()) {
 			throw new IllegalStateException(

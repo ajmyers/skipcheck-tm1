@@ -3879,13 +3879,15 @@
           "outcome" : "applied"
         },
         "Access/SSL/CertificateFile" : {
-          "outcome" : "unread"
+          "outcome" : "untested",
+          "why" : "not read, so it couldn't be set back after a write"
         },
         "Access/SSL/CertificateID" : {
           "outcome" : "applied"
         },
         "Access/SSL/ClientExportServerCertificate" : {
-          "outcome" : "unread"
+          "outcome" : "untested",
+          "why" : "not read, so it couldn't be set back after a write"
         },
         "Access/SSL/ClientExportServerKeyID" : {
           "outcome" : "applied"
@@ -3909,10 +3911,12 @@
           "outcome" : "applied"
         },
         "Access/SSL/PrivateKeyPwdFile" : {
-          "outcome" : "unread"
+          "outcome" : "untested",
+          "why" : "not read, so it couldn't be set back after a write"
         },
         "Access/SSL/PwdKeyFile" : {
-          "outcome" : "unread"
+          "outcome" : "untested",
+          "why" : "not read, so it couldn't be set back after a write"
         },
         "Access/SSL/TLSCipherList" : {
           "outcome" : "applied"

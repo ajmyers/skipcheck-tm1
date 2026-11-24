@@ -397,7 +397,7 @@ class WriteProbeTest {
 			    <Property Name="Step" Type="Edm.Int32" Nullable="false"/>
 			    <Property Name="Note" Type="Edm.String"/>
 			   </EntityType>
-			   <ComplexType Name="Admin"><Property Name="Language" Type="Edm.String"/><Property Name="Port" Type="Edm.Int32"/><Property Name="Secret" Type="Edm.String"/></ComplexType>
+			   <ComplexType Name="Admin"><Property Name="Language" Type="Edm.String"/><Property Name="Port" Type="Edm.Int32"/><Property Name="Secret" Type="Edm.String"/><Property Name="Vanishing" Type="Edm.String"/></ComplexType>
 			   <ComplexType Name="Settings"><Property Name="Admin" Type="tm1.Admin"/><Property Name="Fixed" Type="Edm.Boolean"/></ComplexType>
 			   <EntityContainer Name="API"><EntitySet Name="Tasks" EntityType="tm1.Task"/></EntityContainer>
 			  </Schema>
@@ -415,7 +415,7 @@ class WriteProbeTest {
 		final List<String> logs = new ArrayList<>();
 
 		final ObjectNode settings = (ObjectNode) ProbeClient.JSON
-			.readTree("{\"Admin\": {\"Language\": \"en\", \"Port\": 1}, \"Fixed\": false}");
+			.readTree("{\"Admin\": {\"Language\": \"en\", \"Port\": 1, \"Vanishing\": \"v\"}, \"Fixed\": false}");
 
 		int next = 1;
 
@@ -445,8 +445,14 @@ class WriteProbeTest {
 							if (e.getKey().equals("Port") && portLocksOut) {
 								lockedOut = true;
 							}
-							if (!e.getKey().equals("Secret")) {
-								((ObjectNode) settings.get("Admin")).set(e.getKey(), e.getValue());
+							ObjectNode admin = (ObjectNode) settings.get("Admin");
+							// Vanishing reads back only while it holds what it started
+							// with
+							if (e.getKey().equals("Vanishing") && !e.getValue().asString().equals("v")) {
+								admin.remove("Vanishing");
+							}
+							else if (!e.getKey().equals("Secret")) {
+								admin.set(e.getKey(), e.getValue());
 							}
 						});
 					}
@@ -535,10 +541,13 @@ class WriteProbeTest {
 				.get("Settings");
 		}
 		JsonNode patch = settings.path("patch");
-		// Secret is declared, and probed though the read leaves it out: taken, never
-		// returned
-		assertThat(patch.propertyNames()).containsExactly("Admin/Language", "Admin/Secret", "Fixed");
-		assertThat(outcome(patch.path("Admin/Secret"))).isEqualTo("unread");
+		// Secret is declared but never read, so it's not written: it couldn't be set back
+		assertThat(patch.propertyNames()).containsExactly("Admin/Language", "Admin/Secret", "Admin/Vanishing", "Fixed");
+		assertThat(outcome(patch.path("Admin/Secret"))).isEqualTo("untested");
+		assertThat(server.settings.path("Admin").has("Secret")).as("never written").isFalse();
+		// Vanishing is taken, then not read back
+		assertThat(outcome(patch.path("Admin/Vanishing"))).isEqualTo("unread");
+		assertThat(server.settings.path("Admin").path("Vanishing").asString()).as("set back").isEqualTo("v");
 		assertThat(outcome(patch.path("Admin/Language"))).isEqualTo("applied");
 		assertThat(outcome(patch.path("Fixed"))).isEqualTo("ignored");
 		assertThat(server.settings.path("Admin").path("Language").asString()).as("set back").isEqualTo("en");
