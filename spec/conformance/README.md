@@ -7,6 +7,7 @@ The Java client is the definition of how a call behaves. Its unit tests record e
 | `odata-encoding.json` | Paths and literals every client must encode identically | Hand |
 | `writes.json` | Writes made from what was read (`builder(read)` on the create and patch types) that every client must produce identically | Hand |
 | `builders.json` | What every generated create and patch builder offers: each `XPatch` and `XCreate`, its `@odata.type`, the JSON names its setters write, what its `build()` requires, and whether it takes undeclared properties (`property`). Every client's `BuilderManifestTest` drives its own builders to find these, and must match | `./gradlew :tm1-client:test -PrecordConformance` (the Java builders) |
+| `probe-coverage.json` | What the write probe doesn't verify, and why: each create or patch type's setter (`builders.json`) the probe file has no outcome for is listed as `excluded` (not probed, for a reason) or `pending` (not probed yet, until the #338 step named). The Java client's `ProbeCoverageTest` fails on a setter that's neither verified nor listed, such as a writable property a new TM1 version adds, and on a listing the probe now verifies, so `pending` only shrinks | Hand |
 | `calls/<JavaTestClass>.json` | The service calls one Java unit-test class records | `./gradlew :tm1-client:test -PrecordConformance` |
 | `live/<scenario>.json` | Steps every client runs against a real TM1 | Hand |
 
