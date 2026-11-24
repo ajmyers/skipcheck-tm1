@@ -50,11 +50,23 @@ public final class ProbeFixtures {
 			// A dimension no fixture cube has, for a binding to add
 			step("POST", "Dimensions", """
 					{"Name": "%1$sOther", "Hierarchies": [{"Name": "%1$sOther",
-					 "Elements": [{"Name": "%1$sO", "Type": "Numeric"}]}]}"""),
+					 "Elements": [{"Name": "%1$sO", "Type": "Numeric"}, {"Name": "%1$sP", "Type": "Numeric"}]}]}"""),
+			// A named subset on the measures, for a view's rows to bind
+			step("POST", "Dimensions('%1$sMeasures')/Hierarchies('%1$sMeasures')/Subsets", """
+					{"Name": "%1$sMeasureSet", "Expression": "{[%1$sMeasures].[%1$sValue]}"}"""),
+			step("POST", "Dimensions('%1$sMeasures')/Hierarchies('%1$sMeasures')/Subsets", """
+					{"Name": "%1$sMeasureAll", "Expression": "{TM1SUBSETALL([%1$sMeasures])}"}"""),
+			step("POST", "Dimensions('%1$sOther')/Hierarchies('%1$sOther')/Subsets", """
+					{"Name": "%1$sOtherSet", "Expression": "{TM1SUBSETALL([%1$sOther])}"}"""),
 			step("POST", "Cubes",
 					"""
 							{"Name": "%1$sCube", "Dimensions@odata.bind": ["Dimensions('%1$sDim')", "Dimensions('%1$sMeasures')"],
 							 "Rules": "['%1$sA', '%1$sValue'] = N: 5;"}"""),
+			// A cube with a dimension on no axis, for a native view's titles
+			step("POST", "Cubes",
+					"""
+							{"Name": "%1$sTitled", "Dimensions@odata.bind": ["Dimensions('%1$sDim')", "Dimensions('%1$sMeasures')",
+							 "Dimensions('%1$sOther')"]}"""),
 			step("POST", "Cubes('%1$sCube')/Views",
 					"""
 							{"@odata.type": "ibm.tm1.api.v1.NativeView", "Name": "%1$sNative",
@@ -122,9 +134,9 @@ public final class ProbeFixtures {
 							 "objectName": "%1$sCube"}"""));
 
 	private static final List<String> DELETES = List.of("Chores('%1$sChore')", "Processes('%1$sAscii')",
-			"Processes('%1$sView')", "Processes('%1$sFail')", "Cubes('%1$sCube')", "Dimensions('%1$sDim')",
-			"Dimensions('%1$sMeasures')", "Dimensions('%1$sOther')", "Users('%1$sUser')", "Groups('%1$sGroup')",
-			"CubeAttributes('%1$sCubeAttribute')", "ProcessAttributes('%1$sProcessAttribute')",
+			"Processes('%1$sView')", "Processes('%1$sFail')", "Cubes('%1$sCube')", "Cubes('%1$sTitled')",
+			"Dimensions('%1$sDim')", "Dimensions('%1$sMeasures')", "Dimensions('%1$sOther')", "Users('%1$sUser')",
+			"Groups('%1$sGroup')", "CubeAttributes('%1$sCubeAttribute')", "ProcessAttributes('%1$sProcessAttribute')",
 			"Sandboxes('%1$sSandbox')", // TM1 gives a link the ID of its name and .extr
 			"Contents('Applications')/Contents('%1$sFolder')/Contents('%1$sLink.extr')",
 			"Contents('Applications')/Contents('%1$sFolder')");

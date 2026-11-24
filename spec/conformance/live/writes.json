@@ -2,7 +2,7 @@
 	"specVersion" : 1,
 	"name" : "writes",
 	"description" : "What the probe found TM1 applies, written through every client's create and patch types: each property a create or a patch applies, by tm1-probe-<schema>.json, that no other scenario writes, read back after its create and after its patch. ProbedWritesCoverageTest holds the scenarios to the probe.",
-	"names" : [ "dim", "month", "cube", "native", "process", "chore", "sandbox", "subset", "user" ],
+	"names" : [ "dim", "month", "third", "cube", "native", "process", "chore", "sandbox", "subset", "user" ],
 	"steps" : [
 		{
 			"service" : "dimensions",
@@ -17,6 +17,13 @@
 			"params" : [ "dimension" ],
 			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${month}", "Hierarchies" : [ { "Name" : "${month}", "Elements" : [ { "Name" : "Jan", "Type" : "Numeric" } ] } ] } } ],
 			"expect" : { "fields" : { "Name" : "${month}" } }
+		},
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${third}", "Hierarchies" : [ { "Name" : "${third}", "Elements" : [ { "Name" : "T1", "Type" : "Numeric" }, { "Name" : "T2", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${third}" } }
 		},
 		{
 			"service" : "hierarchies",
@@ -50,7 +57,7 @@
 			"service" : "cubes",
 			"method" : "create",
 			"params" : [ "cube" ],
-			"args" : [ { "$patch" : "CubeCreate", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${dim}')", "Dimensions('${month}')" ], "Rules" : "SKIPCHECK;", "DrillthroughRules" : "['A'] = S: 'x';", "AllowPersistentHolds" : true, "CalculationThresholdForStorage" : 50, "CellSecurityMostRestrictive" : true, "ViewStorageMaxMemory" : 1000 } } ],
+			"args" : [ { "$patch" : "CubeCreate", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${dim}')", "Dimensions('${month}')", "Dimensions('${third}')" ], "Rules" : "SKIPCHECK;", "DrillthroughRules" : "['A'] = S: 'x';", "AllowPersistentHolds" : true, "CalculationThresholdForStorage" : 50, "CellSecurityMostRestrictive" : true, "ViewStorageMaxMemory" : 1000 } } ],
 			"expect" : { "fields" : { "Name" : "${cube}" } }
 		},
 		{
@@ -78,7 +85,7 @@
 			"service" : "views",
 			"method" : "create",
 			"params" : [ "cube", "scope", "view" ],
-			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "NativeViewCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "Name" : "${native}", "Columns" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${month}')/Hierarchies('${month}')", "Expression" : "{TM1SUBSETALL([${month}].[${month}])}" } } ], "Rows" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${dim}')/Hierarchies('${dim}')", "Expression" : "{TM1SUBSETALL([${dim}].[${dim}])}" } } ], "SuppressEmptyRows" : true, "SuppressEmptyColumns" : true, "FormatString" : "0.00" } } ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "NativeViewCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "Name" : "${native}", "Columns" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${month}')/Hierarchies('${month}')", "Expression" : "{TM1SUBSETALL([${month}].[${month}])}" } } ], "Rows" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${dim}')/Hierarchies('${dim}')", "Expression" : "{TM1SUBSETALL([${dim}].[${dim}])}" } } ], "SuppressEmptyRows" : true, "SuppressEmptyColumns" : true, "FormatString" : "0.00", "Titles" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')", "Expression" : "{TM1SUBSETALL([${third}].[${third}])}" }, "Selected@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')/Elements('T1')" } ] } } ],
 			"expect" : { "fields" : { "Name" : "${native}" } }
 		},
 		{
@@ -92,7 +99,7 @@
 			"service" : "views",
 			"method" : "update",
 			"params" : [ "cube", "scope", "view", "patch" ],
-			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${native}", { "$patch" : "NativeViewPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "SuppressEmptyRows" : false, "SuppressEmptyColumns" : false, "FormatString" : "0.0" } } ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${native}", { "$patch" : "NativeViewPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "SuppressEmptyRows" : false, "SuppressEmptyColumns" : false, "FormatString" : "0.0", "Columns" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${month}')/Hierarchies('${month}')", "Expression" : "{[${month}].[${month}].[Jan]}" } } ], "Rows" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${dim}')/Hierarchies('${dim}')", "Expression" : "{[${dim}].[${dim}].[A]}" } } ], "Titles" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')", "Expression" : "{TM1SUBSETALL([${third}].[${third}])}" }, "Selected@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')/Elements('T2')" } ] } } ],
 			"expect" : { "none" : true }
 		},
 		{
@@ -297,6 +304,12 @@
 			"method" : "delete",
 			"params" : [ "name" ],
 			"args" : [ "${month}" ]
+		},
+		{
+			"service" : "dimensions",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${third}" ]
 		}
 	]
 }

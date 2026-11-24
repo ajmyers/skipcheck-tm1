@@ -115,15 +115,22 @@ class ProbeCoverageTest {
 				if (w.path(write).path(property).path("outcome").asString().equals("untested")) {
 					continue;
 				}
-				// A singleton's setting, by path: each part's type is verified along the
-				// way
+				// A setting or a nested value's field, by path: each part's type is
+				// verified
+				// along the way. A nested type has one write type, used in its holder's
+				// create and PATCH alike, so a nested part counts for both
 				String at = type;
+				boolean nested = false;
 				for (String part : property.split("/", -1)) {
 					if (at == null) {
 						break;
 					}
 					verified.add(at + "|" + write + "|" + part);
-					at = typeOf(at, part, types);
+					if (nested) {
+						verified.add(at + "|" + (write.equals("post") ? "patch" : "post") + "|" + part);
+					}
+					at = typeOf(at, part.replace(BIND, ""), types);
+					nested = true;
 				}
 			}
 			for (String nav : w.path("navigations").propertyNames()) {

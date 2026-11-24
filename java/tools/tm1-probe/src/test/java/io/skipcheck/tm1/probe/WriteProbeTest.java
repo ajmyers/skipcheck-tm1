@@ -534,6 +534,26 @@ class WriteProbeTest {
 	}
 
 	@Test
+	void probesEachFieldOfAStructuredValueByItsPath() throws Exception {
+		String cases = """
+				{"cases": [{"id": "Thing", "type": "Thing", "collection": "Things", "source": "Things('{p}Source')",
+				  "base": {}, "values": {"Items": [{"Name": "first"}]}}]}""";
+		JsonNode thing;
+		try (FakeTm1 tm1 = new FakeTm1(new Things())) {
+			ProbeClient client = new ProbeClient(tm1.url(), "Basic x");
+			thing = new WriteProbe(client, CsdlParser.parse(METADATA), Map.of(), ProbeClient.JSON.readTree(cases), "P",
+					s -> {
+					})
+				.run()
+				.writes()
+				.get("Thing");
+		}
+		// The first item's Name, changed and read back, in a create and a PATCH
+		assertThat(outcome(thing.path("post").path("Items/Name"))).isEqualTo("applied");
+		assertThat(outcome(thing.path("patch").path("Items/Name"))).isEqualTo("applied");
+	}
+
+	@Test
 	void readsTheKeyABindingPathNamesLast() {
 		assertThat(WriteProbe.keyOf("Dimensions('D')/Hierarchies('D')/Elements('A')")).isEqualTo("A");
 		assertThat(WriteProbe.keyOf("Users('O''Neil')")).isEqualTo("O'Neil");

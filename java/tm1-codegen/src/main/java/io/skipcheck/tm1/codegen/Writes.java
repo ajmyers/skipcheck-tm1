@@ -207,6 +207,12 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 
 	private static void merge(Map<String, String> into, JsonNode outcomes) {
 		for (Map.Entry<String, JsonNode> p : outcomes.properties()) {
+			// A nested value's field, by path (Parameters/Prompt): the generators don't
+			// act on
+			// those yet (#338)
+			if (p.getKey().contains("/")) {
+				continue;
+			}
 			into.merge(p.getKey(), p.getValue().path("outcome").asString("untested"), Writes::most);
 		}
 	}
