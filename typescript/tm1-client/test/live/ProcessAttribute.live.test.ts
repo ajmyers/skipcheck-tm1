@@ -2,17 +2,17 @@
 
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import {
-  AttributeDefinitionPatch,
+  AttributeDefinitionCreate,
   AttributeOwner,
   AttributeSet,
   AttributesPatch,
   AttributeType,
   ChoreExecutionMode,
-  ChorePatch,
+  ChoreCreate,
   ChoreTaskPatch,
   LocalizedAttributesPatch,
   ODataPath,
-  ProcessPatch,
+  ProcessCreate,
   Tm1Duration,
   type Tm1Client,
 } from "../../src/index.js";
@@ -29,8 +29,8 @@ describe("Process and chore attributes on TM1" + liveReason, () => {
   beforeAll(async () => {
     if (!Live.configured) return;
     tm1 = await Live.client();
-    await tm1.processes.create(ProcessPatch.builder().name(process).prologProcedure("nX = 1;\n").build());
-    const definition = ChorePatch.builder()
+    await tm1.processes.create(ProcessCreate.builder().name(process).prologProcedure("nX = 1;\n").build());
+    const definition = ChoreCreate.builder()
       .name(chore)
       .startTime("2026-01-01T02:00:00Z")
       .dstSensitive(false)
@@ -53,7 +53,7 @@ describe("Process and chore attributes on TM1" + liveReason, () => {
     const set = kind === "process" ? AttributeSet.processes() : AttributeSet.chores();
     const owner = kind === "process" ? AttributeOwner.process(process) : AttributeOwner.chore(chore);
     const label = "Label " + shortId();
-    await tm1.attributes.create(set, AttributeDefinitionPatch.builder().name(label).type(AttributeType.String).build());
+    await tm1.attributes.create(set, AttributeDefinitionCreate.builder().name(label).type(AttributeType.String).build());
     try {
       expect((await tm1.attributes.list(set).toArray()).map((a) => a.Name)).toContain(label);
       await tm1.localizedAttributes.create(

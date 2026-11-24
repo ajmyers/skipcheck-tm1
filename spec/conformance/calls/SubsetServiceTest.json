@@ -264,7 +264,7 @@
 					"json" : "PUBLIC"
 				},
 				{
-					"$patch" : "SubsetPatch",
+					"$patch" : "SubsetCreate",
 					"json" : {
 						"Name" : "Leaves",
 						"Expression" : "{}"
@@ -523,7 +523,7 @@
 				"Region",
 				"Region",
 				{
-					"$patch" : "SubsetPatch",
+					"$patch" : "SubsetCreate",
 					"json" : {
 						"Name" : "Wanted",
 						"Expression" : "{[Region].[West]}"
@@ -581,7 +581,7 @@
 				"Region",
 				"Region",
 				{
-					"$patch" : "SubsetPatch",
+					"$patch" : "SubsetCreate",
 					"json" : {
 						"Elements@odata.bind" : [
 							"Dimensions('Region')/Hierarchies('Region')/Elements('West')"
@@ -698,7 +698,7 @@
 					"json" : "PUBLIC"
 				},
 				{
-					"$patch" : "SubsetPatch",
+					"$patch" : "SubsetCreate",
 					"json" : {
 						"Name" : "Key Regions",
 						"Elements@odata.bind" : [
@@ -764,7 +764,7 @@
 					"json" : "PRIVATE"
 				},
 				{
-					"$patch" : "SubsetPatch",
+					"$patch" : "SubsetCreate",
 					"json" : {
 						"Name" : "Leaves",
 						"Expression" : "{TM1SUBSETALL([Region])}"

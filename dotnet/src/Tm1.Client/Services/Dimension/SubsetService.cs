@@ -60,8 +60,13 @@ public sealed class SubsetService : Tm1Service
     [Tm1Endpoint("Navigation Hierarchy/Subsets")]
     [Tm1Endpoint("Navigation Hierarchy/PrivateSubsets")]
     [Tm1Endpoint("Navigation Hierarchy/SessionSubsets")]
-    public Task<Subset> CreateAsync(string dimension, string hierarchy, SubsetScope scope, SubsetPatch subset, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Post<Subset>(SubsetsPath(dimension, hierarchy, scope), Require(subset, nameof(subset))), cancellationToken);
+    public Task<Subset> CreateAsync(
+        string dimension,
+        string hierarchy,
+        SubsetScope scope,
+        SubsetCreate subset,
+        CancellationToken cancellationToken = default
+    ) => Session.ExecuteAsync(Tm1Request.Post<Subset>(SubsetsPath(dimension, hierarchy, scope), Require(subset, nameof(subset))), cancellationToken);
 
     /// <summary><c>PATCH …/Subsets('s')</c>: changes the properties the patch sets, such as
     /// <c>Expression</c>. A patch with <c>Elements</c> is refused (<see cref="ArgumentException"/>): TM1
@@ -230,7 +235,7 @@ public sealed class SubsetService : Tm1Service
 
     /// <summary><c>tm1.CreateSessionSubset</c>: a subset for this session only, from a definition.</summary>
     [Tm1Endpoint("Action Hierarchy/CreateSessionSubset")]
-    public Task<Subset> CreateSessionSubsetAsync(string dimension, string hierarchy, SubsetPatch definition, CancellationToken cancellationToken = default) =>
+    public Task<Subset> CreateSessionSubsetAsync(string dimension, string hierarchy, SubsetCreate definition, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(
             Action<Subset>(
                 Tm1Operations.HierarchyCreateSessionSubset,

@@ -207,7 +207,7 @@
 			],
 			"args" : [
 				{
-					"$patch" : "CubePatch",
+					"$patch" : "CubeCreate",
 					"json" : {
 						"Name" : "Sales",
 						"Dimensions@odata.bind" : [

@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Request, Tm1Session, auth
-from skipcheck_tm1.model import MessageLogEntry, SandboxPatch
+from skipcheck_tm1.model import MessageLogEntry, SandboxCreate
 from skipcheck_tm1.services import CellService, SandboxService
 
 
@@ -43,6 +43,6 @@ def sandbox(session: Tm1Session) -> None:
     # @start region = sandbox
     # The cell: every dimension, in the cube's order
     cell = {"Region": "North", "Month": "Jan"}
-    SandboxService(session).create(SandboxPatch.builder().name("What-if").build())
+    SandboxService(session).create(SandboxCreate.builder().name("What-if").build())
     CellService(session.with_sandbox("What-if")).update("Sales", cell, 1200)
     # @end

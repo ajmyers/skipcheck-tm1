@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from skipcheck_tm1 import Tm1Client
-from skipcheck_tm1.model import ProcessExecuteStatusCode, ProcessPatch
+from skipcheck_tm1.model import ProcessCreate, ProcessExecuteStatusCode
 
 from .conftest import CONFIGURED, REASON, async_client
 
@@ -23,7 +23,7 @@ pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 def test_runs_a_process_and_reads_a_collection_through_the_monitor(tm1: Tm1Client) -> None:
     process = "tm1-client-" + uuid.uuid4().hex[:8]
     polled = tm1.with_async(0.2)
-    tm1.processes.create(ProcessPatch.builder().name(process).prolog_procedure("x = 1;\n").build())
+    tm1.processes.create(ProcessCreate.builder().name(process).prolog_procedure("x = 1;\n").build())
     try:
         assert polled.processes.execute_with_return(process).process_execute_status_code is ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY
         assert polled.cubes.list(select="Name")
@@ -46,7 +46,7 @@ def test_stops_the_work_on_tm1_when_cancelled() -> None:
 
     async def go() -> None:
         async with async_client() as tm1:
-            await tm1.processes.create(ProcessPatch.builder().name(process).prolog_procedure(loop).build())
+            await tm1.processes.create(ProcessCreate.builder().name(process).prolog_procedure(loop).build())
             try:
                 # Cancelling the task is this flavor's way to cancel a run
                 run = asyncio.ensure_future(tm1.with_async(0.2).processes.execute_with_return(process))

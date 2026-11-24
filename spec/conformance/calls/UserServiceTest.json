@@ -61,7 +61,7 @@
 			],
 			"args" : [
 				{
-					"$patch" : "UserPatch",
+					"$patch" : "UserCreate",
 					"json" : {
 						"Name" : "alice"
 					}
@@ -113,7 +113,7 @@
 			],
 			"args" : [
 				{
-					"$patch" : "UserPatch",
+					"$patch" : "UserCreate",
 					"json" : {
 						"Name" : "alice",
 						"FriendlyName" : "Alice",

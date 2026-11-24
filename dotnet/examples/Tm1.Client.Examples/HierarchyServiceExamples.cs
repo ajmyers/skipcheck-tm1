@@ -18,13 +18,13 @@ public static class HierarchyServiceExamples
         // A second hierarchy of Region, rolling the same leaves up by manager
         return await tm1.Hierarchies.CreateAsync(
             "Region",
-            HierarchyPatch
+            HierarchyCreate
                 .Builder()
                 .Name("By Manager")
                 .Elements([
-                    ElementPatch.Builder().Name("Smith").Type(ElementType.Consolidated).Build(),
-                    ElementPatch.Builder().Name("North").Type(ElementType.Numeric).Build(),
-                    ElementPatch.Builder().Name("South").Type(ElementType.Numeric).Build(),
+                    ElementCreate.Builder().Name("Smith").Type(ElementType.Consolidated).Build(),
+                    ElementCreate.Builder().Name("North").Type(ElementType.Numeric).Build(),
+                    ElementCreate.Builder().Name("South").Type(ElementType.Numeric).Build(),
                 ])
                 .Edges([
                     EdgePatch.Builder().ParentName("Smith").ComponentName("North").Weight(1.0).Build(),
@@ -40,9 +40,9 @@ public static class HierarchyServiceExamples
         // @start region = replace
         // Makes the elements and edges exactly these: TM1 deletes every other element of
         // the hierarchy, with its data
-        var all = ElementPatch.Builder().Name("All Versions").Type(ElementType.Consolidated).Build();
-        var actual = ElementPatch.Builder().Name("Actual").Type(ElementType.Numeric).Build();
-        var budget = ElementPatch.Builder().Name("Budget").Type(ElementType.Numeric).Build();
+        var all = ElementCreate.Builder().Name("All Versions").Type(ElementType.Consolidated).Build();
+        var actual = ElementCreate.Builder().Name("Actual").Type(ElementType.Numeric).Build();
+        var budget = ElementCreate.Builder().Name("Budget").Type(ElementType.Numeric).Build();
         await tm1.Hierarchies.ReplaceStructureAsync(
             "Version",
             "Version",

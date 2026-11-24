@@ -9,7 +9,7 @@ import java.util.function.Supplier;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.model.MessageLogEntry;
-import io.skipcheck.tm1.client.model.SandboxPatch;
+import io.skipcheck.tm1.client.model.SandboxCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.data.CellService;
@@ -58,7 +58,7 @@ final class SessionExamples {
 		Map<String, String> cell = new LinkedHashMap<>();
 		cell.put("Region", "North");
 		cell.put("Month", "Jan");
-		return new SandboxService(session).create(SandboxPatch.builder().name("What-if").build())
+		return new SandboxService(session).create(SandboxCreate.builder().name("What-if").build())
 			.then(new CellService(session.withSandbox("What-if")).update("Sales", cell, 1200));
 		// @end
 	}

@@ -3,7 +3,7 @@
 // Examples for requiresTm1, requiresTm1Web, requiresPaw and requiresCognos (Java's @RequiresTm1 and the
 // others), quoted in their documentation: vitest tests, type-checked but never run.
 import { randomUUID } from "node:crypto";
-import { DimensionPatch, ElementPatch, ElementType, HierarchyPatch, Tm1Client, Tm1Version } from "@skipcheck/tm1-client";
+import { DimensionCreate, ElementCreate, ElementType, HierarchyCreate, Tm1Client, Tm1Version } from "@skipcheck/tm1-client";
 import { CognosContainer, Tm1ServerContainer } from "@skipcheck/tm1-testcontainers";
 import { RequiresTm1, requiresCognos, requiresPaw, requiresTm1, requiresTm1Web } from "@skipcheck/tm1-testcontainers/vitest";
 import { afterAll, afterEach, beforeAll, describe, expect } from "vitest";
@@ -33,9 +33,9 @@ describe("the Region dimension", async () => {
   });
 
   requiresTm1("creates the regions", async () => {
-    const elements = ["North", "South"].map((name) => ElementPatch.builder().name(name).type(ElementType.Numeric).build());
-    const hierarchy = HierarchyPatch.builder().name(region).elements(elements).build();
-    const created = await tm1.dimensions.create(DimensionPatch.builder().name(region).hierarchies([hierarchy]).build());
+    const elements = ["North", "South"].map((name) => ElementCreate.builder().name(name).type(ElementType.Numeric).build());
+    const hierarchy = HierarchyCreate.builder().name(region).elements(elements).build();
+    const created = await tm1.dimensions.create(DimensionCreate.builder().name(region).hierarchies([hierarchy]).build());
     expect(created.Name).toBe(region);
   });
 });

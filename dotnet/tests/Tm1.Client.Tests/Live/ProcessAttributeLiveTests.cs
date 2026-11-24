@@ -17,7 +17,7 @@ public class ProcessAttributeLiveTests
 {
     private static string Label() => "Label " + Guid.NewGuid().ToString("N")[..4];
 
-    private static AttributeDefinitionPatch StringAttribute(string name) => AttributeDefinitionPatch.Builder().Name(name).Type(AttributeType.String).Build();
+    private static AttributeDefinitionCreate StringAttribute(string name) => AttributeDefinitionCreate.Builder().Name(name).Type(AttributeType.String).Build();
 
     private static LocalizedAttributesPatch French(string attribute, string value) =>
         LocalizedAttributesPatch.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Property(attribute, value).Build()).Build();
@@ -37,11 +37,11 @@ public class ProcessAttributeLiveTests
         await using var tm1 = Live.Client();
         var process = Live.Name();
         var chore = process + "-chore";
-        await tm1.Processes.CreateAsync(ProcessPatch.Builder().Name(process).PrologProcedure("nX = 1;\n").Build());
+        await tm1.Processes.CreateAsync(ProcessCreate.Builder().Name(process).PrologProcedure("nX = 1;\n").Build());
         try
         {
             await tm1.Chores.CreateAsync(
-                ChorePatch
+                ChoreCreate
                     .Builder()
                     .Name(chore)
                     .StartTime(new DateTimeOffset(2026, 1, 1, 2, 0, 0, TimeSpan.Zero))

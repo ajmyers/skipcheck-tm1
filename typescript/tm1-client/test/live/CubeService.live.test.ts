@@ -3,18 +3,19 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
 import {
   Cube,
+  CubeCreate,
   CubePatch,
   Dimension,
-  DimensionPatch,
-  ElementPatch,
+  DimensionCreate,
+  ElementCreate,
   ElementType,
   Filter,
-  HierarchyPatch,
+  HierarchyCreate,
   ODataPath,
   ODataQuery,
+  type Tm1Client,
   Tm1NotFoundException,
   Tm1PreconditionFailedException,
-  type Tm1Client,
   type Tm1Stream,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
@@ -33,12 +34,12 @@ describe("CubeService on TM1" + liveReason, () => {
 
   const dimension = (name: string, ...elements: string[]): Promise<unknown> =>
     tm1.dimensions.create(
-      DimensionPatch.builder()
+      DimensionCreate.builder()
         .name(name)
         .hierarchies([
-          HierarchyPatch.builder()
+          HierarchyCreate.builder()
             .name(name)
-            .elements(elements.map((e) => ElementPatch.builder().name(e).type(ElementType.Numeric).build()))
+            .elements(elements.map((e) => ElementCreate.builder().name(e).type(ElementType.Numeric).build()))
             .build(),
         ])
         .build(),
@@ -62,7 +63,7 @@ describe("CubeService on TM1" + liveReason, () => {
     measure = cube + "-measure";
     await dimension(region, "North", "South");
     await dimension(measure, "Amount");
-    await tm1.cubes.create(CubePatch.builder().name(cube).bindDimensions(dim(region), dim(measure)).build());
+    await tm1.cubes.create(CubeCreate.builder().name(cube).bindDimensions(dim(region), dim(measure)).build());
   });
 
   afterEach(async () => {

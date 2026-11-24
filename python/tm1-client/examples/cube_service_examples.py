@@ -5,7 +5,11 @@
 from __future__ import annotations
 
 from skipcheck_tm1 import Filter, ODataPath, ODataQuery, Tm1Client
-from skipcheck_tm1.model import Cube, CubePatch
+from skipcheck_tm1.model import (
+    Cube,
+    CubeCreate,
+    CubePatch,
+)
 
 
 def list_names(tm1: Tm1Client) -> list[str | None]:
@@ -20,7 +24,7 @@ def create(tm1: Tm1Client) -> Cube:
     # @start region = create
     # A cube over two existing dimensions, in this order
     dimensions = ODataPath.of("Dimensions")
-    return tm1.cubes.create(CubePatch.builder().name("Sales").bind_dimensions(dimensions.key("Region"), dimensions.key("Month")).build())
+    return tm1.cubes.create(CubeCreate.builder().name("Sales").bind_dimensions(dimensions.key("Region"), dimensions.key("Month")).build())
     # @end
 
 

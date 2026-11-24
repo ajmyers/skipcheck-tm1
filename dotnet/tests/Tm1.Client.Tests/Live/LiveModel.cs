@@ -21,7 +21,7 @@ internal static class LiveModel
 
     public static ODataPath Element(string dimension, string element) => Dim(dimension).Nav("Hierarchies").Key(dimension).Nav("Elements").Key(element);
 
-    public static ElementPatch Element(string name, ElementType type) => ElementPatch.Builder().Name(name).Type(type).Build();
+    public static ElementCreate Element(string name, ElementType type) => ElementCreate.Builder().Name(name).Type(type).Build();
 
     public static EdgePatch Edge(string parent, string component) => EdgePatch.Builder().ParentName(parent).ComponentName(component).Weight(1.0).Build();
 
@@ -29,15 +29,15 @@ internal static class LiveModel
     public static Task DimensionAsync(Tm1Client tm1, string name, params string[] elements) =>
         DimensionAsync(tm1, name, elements.Select(e => Element(e, ElementType.Numeric)).ToList(), []);
 
-    public static Task DimensionAsync(Tm1Client tm1, string name, IReadOnlyList<ElementPatch> elements, IReadOnlyList<EdgePatch> edges)
+    public static Task DimensionAsync(Tm1Client tm1, string name, IReadOnlyList<ElementCreate> elements, IReadOnlyList<EdgePatch> edges)
     {
-        var hierarchy = HierarchyPatch.Builder().Name(name).Elements(elements);
+        var hierarchy = HierarchyCreate.Builder().Name(name).Elements(elements);
         if (edges.Count > 0)
         {
             hierarchy.Edges(edges);
         }
         return tm1.Session.ExecuteAsync(
-            Tm1Request.Post(ODataPath.Of("Dimensions"), DimensionPatch.Builder().Name(name).Hierarchies([hierarchy.Build()]).Build())
+            Tm1Request.Post(ODataPath.Of("Dimensions"), DimensionCreate.Builder().Name(name).Hierarchies([hierarchy.Build()]).Build())
         );
     }
 
@@ -46,7 +46,7 @@ internal static class LiveModel
         tm1.Session.ExecuteAsync(
             Tm1Request.Post(
                 Dim(dimension).Nav("Hierarchies").Key(dimension).Nav("Subsets"),
-                SubsetPatch.Builder().Name("All").Expression($"{{TM1SUBSETALL([{dimension}].[{dimension}])}}").Build()
+                SubsetCreate.Builder().Name("All").Expression($"{{TM1SUBSETALL([{dimension}].[{dimension}])}}").Build()
             )
         );
 

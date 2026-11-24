@@ -44,8 +44,8 @@ class WritesTest {
 				 "Attributes": {"Caption": "Nightly"},
 				 "Tasks": [{"Step": 0, "Parameters": [{"Name": "pValue", "Value": "1"}]}]}""", Chore.class);
 		JsonNode patch = json(ChorePatch.builder(read).build());
-		// A PATCH refuses Attributes, and appends Tasks: neither is copied
-		assertThat(patch.propertyNames()).containsExactlyInAnyOrder("Name", "Active", "Frequency");
+		// A PATCH refuses Attributes and a rename, and appends Tasks: none is copied
+		assertThat(patch.propertyNames()).containsExactlyInAnyOrder("Active", "Frequency");
 		// A create ignores Attributes too: they're written through the attribute cubes.
 		// Tasks is a navigation, so none is copied: a task's Process would need binding.
 		assertThat(json(ChoreCreate.builder(read).build()).propertyNames()).contains("Frequency")

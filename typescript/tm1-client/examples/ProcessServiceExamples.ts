@@ -4,7 +4,7 @@ import {
   ODataQuery,
   ProcessExecuteResult,
   ProcessParameterPatch,
-  ProcessPatch,
+  ProcessCreate,
   ProcessVariableType,
   type Process,
   type Tm1Client,
@@ -15,7 +15,7 @@ import {
 export async function create(tm1: Tm1Client): Promise<Process> {
   // @start region = create
   // TM1 saves code that doesn't compile, so compile the definition first
-  const process = ProcessPatch.builder()
+  const process = ProcessCreate.builder()
     .name("Load Sales")
     .parameters([
       ProcessParameterPatch.builder().name("pVersion").value("Actual").type(ProcessVariableType.String).build(),
@@ -44,7 +44,7 @@ export async function run(tm1: Tm1Client): Promise<ProcessExecuteResult> {
 export function runUnsaved(tm1: Tm1Client): Promise<ProcessExecuteResult> {
   // @start region = run-unsaved
   // A one-off run of code that isn't saved as a process
-  const cleanup = ProcessPatch.builder().name("Clear Sales Staging").prologProcedure("CubeClearData('Sales Staging');\n").build();
+  const cleanup = ProcessCreate.builder().name("Clear Sales Staging").prologProcedure("CubeClearData('Sales Staging');\n").build();
   return tm1.processes.executeWithReturn(cleanup);
   // @end
 }

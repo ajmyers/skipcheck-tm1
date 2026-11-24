@@ -7,7 +7,7 @@ on SData's SalesCube. The live tests run its steps and record what they print
 from __future__ import annotations
 
 from skipcheck_tm1 import ODataQuery, Tm1Client
-from skipcheck_tm1.model import Cellset, CellsetCell, ProcessExecuteResult, ProcessParameterPatch, ProcessPatch, ProcessVariableType
+from skipcheck_tm1.model import Cellset, CellsetCell, ProcessCreate, ProcessExecuteResult, ProcessParameterPatch, ProcessVariableType
 
 
 def main() -> None:
@@ -24,7 +24,7 @@ def create(tm1: Tm1Client) -> None:
     # @start region = create
     # A process that sets a month's budget to its actual units plus 10%
     process = (
-        ProcessPatch.builder()
+        ProcessCreate.builder()
         .name("Budget From Actual")
         .parameters([ProcessParameterPatch.builder().name("pMonth").value("Jan").type(ProcessVariableType.STRING).build()])
         .prolog_procedure(

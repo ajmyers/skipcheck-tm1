@@ -61,7 +61,7 @@ public sealed class UserService : Tm1Service
     /// <summary><c>POST Users</c>: creates a user, in the groups the patch binds
     /// (<c>UserPatch.PatchBuilder.BindGroups</c>). It needs a name, and a password for Basic security.</summary>
     [Tm1Endpoint("EntitySet Users")]
-    public Task<User> CreateAsync(UserPatch user, CancellationToken cancellationToken = default) =>
+    public Task<User> CreateAsync(UserCreate user, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<User>(Users, Require(user, nameof(user))), cancellationToken);
 
     /// <summary><c>PATCH Users('name')</c>: changes the properties the patch sets, such as

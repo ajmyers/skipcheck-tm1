@@ -8,21 +8,21 @@
 			"service" : "dimensions",
 			"method" : "create",
 			"params" : [ "dimension" ],
-			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${region}", "Hierarchies" : [ { "Name" : "${region}", "Elements" : [ { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" } ] } ] } } ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${region}", "Hierarchies" : [ { "Name" : "${region}", "Elements" : [ { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" } ] } ] } } ],
 			"expect" : { "fields" : { "Name" : "${region}" } }
 		},
 		{
 			"service" : "dimensions",
 			"method" : "create",
 			"params" : [ "dimension" ],
-			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${month}", "Hierarchies" : [ { "Name" : "${month}", "Elements" : [ { "Name" : "Jan", "Type" : "Numeric" }, { "Name" : "Feb", "Type" : "Numeric" }, { "Name" : "Mar", "Type" : "Numeric" } ] } ] } } ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${month}", "Hierarchies" : [ { "Name" : "${month}", "Elements" : [ { "Name" : "Jan", "Type" : "Numeric" }, { "Name" : "Feb", "Type" : "Numeric" }, { "Name" : "Mar", "Type" : "Numeric" } ] } ] } } ],
 			"expect" : { "fields" : { "Name" : "${month}" } }
 		},
 		{
 			"service" : "cubes",
 			"method" : "create",
 			"params" : [ "cube" ],
-			"args" : [ { "$patch" : "CubePatch", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${region}')", "Dimensions('${month}')" ] } } ],
+			"args" : [ { "$patch" : "CubeCreate", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${region}')", "Dimensions('${month}')" ] } } ],
 			"expect" : { "fields" : { "Name" : "${cube}" } }
 		},
 		{

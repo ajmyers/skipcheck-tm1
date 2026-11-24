@@ -31,8 +31,8 @@ public class SubsetServiceLiveTests
         await using var made = await Abcd();
         var (tm1, d) = (made.Tm1, made.Name);
         var (subsets, pub) = (tm1.Subsets, SubsetScope.Public);
-        await subsets.CreateAsync(d, d, pub, SubsetPatch.Builder().Name("Static").BindElements(El(d, "A"), El(d, "B")).Build());
-        await subsets.CreateAsync(d, d, pub, SubsetPatch.Builder().Name("Dynamic").Expression($"{{TM1SUBSETALL([{d}].[{d}])}}").Build());
+        await subsets.CreateAsync(d, d, pub, SubsetCreate.Builder().Name("Static").BindElements(El(d, "A"), El(d, "B")).Build());
+        await subsets.CreateAsync(d, d, pub, SubsetCreate.Builder().Name("Dynamic").Expression($"{{TM1SUBSETALL([{d}].[{d}])}}").Build());
         Assert.Equal(["Dynamic", "Static"], LiveDimension.Names(await subsets.ListAsync(d, d, pub).ToListAsync()).Order());
         Assert.Equal(["A", "B"], await SubsetElements(tm1, d, pub, "Static"));
         Assert.Equal(["A", "B", "C", "D"], (await SubsetElements(tm1, d, pub, "Dynamic")).Order());
@@ -53,7 +53,7 @@ public class SubsetServiceLiveTests
         await using var made = await Abcd();
         var (tm1, d) = (made.Tm1, made.Name);
         var pub = SubsetScope.Public;
-        await tm1.Subsets.CreateAsync(d, d, pub, SubsetPatch.Builder().Name("S").BindElements(El(d, "A")).Build());
+        await tm1.Subsets.CreateAsync(d, d, pub, SubsetCreate.Builder().Name("S").BindElements(El(d, "A")).Build());
         await tm1.Subsets.AddElementsAsync(d, d, pub, "S", ["C", "B"]);
         Assert.Equal(["A", "C", "B"], await SubsetElements(tm1, d, pub, "S")); // appended, in order
         await tm1.Subsets.ClearElementsAsync(d, d, pub, "S");
@@ -71,7 +71,7 @@ public class SubsetServiceLiveTests
         await using var made = await Abcd();
         var (tm1, d) = (made.Tm1, made.Name);
         var pub = SubsetScope.Public;
-        await tm1.Subsets.CreateAsync(d, d, pub, SubsetPatch.Builder().Name("S").BindElements(El(d, "A"), El(d, "B")).Build());
+        await tm1.Subsets.CreateAsync(d, d, pub, SubsetCreate.Builder().Name("S").BindElements(El(d, "A"), El(d, "B")).Build());
         await tm1.Subsets.SetElementAsync(d, d, pub, "S", "C");
         Assert.Equal(["A", "B", "C"], await SubsetElements(tm1, d, pub, "S")); // no position puts it last
         await tm1.Subsets.SetElementBeforeAsync(d, d, pub, "S", "D", "B");
@@ -85,10 +85,10 @@ public class SubsetServiceLiveTests
     {
         await using var made = await Abcd();
         var (tm1, d) = (made.Tm1, made.Name);
-        await tm1.Subsets.CreateAsync(d, d, SubsetScope.Private, SubsetPatch.Builder().Name("Mine").BindElements(El(d, "D")).Build());
+        await tm1.Subsets.CreateAsync(d, d, SubsetScope.Private, SubsetCreate.Builder().Name("Mine").BindElements(El(d, "D")).Build());
         Assert.Equal(["Mine"], LiveDimension.Names(await tm1.Subsets.ListAsync(d, d, SubsetScope.Private).ToListAsync()));
         Assert.Empty(await tm1.Subsets.ListAsync(d, d, SubsetScope.Public).ToListAsync());
-        await tm1.Subsets.CreateAsync(d, d, SubsetScope.Public, SubsetPatch.Builder().Name("All").Expression($"{{TM1SUBSETALL([{d}].[{d}])}}").Build());
+        await tm1.Subsets.CreateAsync(d, d, SubsetScope.Public, SubsetCreate.Builder().Name("All").Expression($"{{TM1SUBSETALL([{d}].[{d}])}}").Build());
         Assert.False(string.IsNullOrEmpty((await tm1.Subsets.SaveAsAsync(d, d, SubsetScope.Public, "All", "Copy")).Expression));
         var frozen = await tm1.Subsets.SaveAsAsync(d, d, SubsetScope.Public, "All", "Frozen", true, true);
         Assert.True(string.IsNullOrEmpty(frozen.Expression), "static");
@@ -100,10 +100,10 @@ public class SubsetServiceLiveTests
     {
         await using var made = await Abcd();
         var (tm1, d) = (made.Tm1, made.Name);
-        var defined = await tm1.Subsets.CreateSessionSubsetAsync(d, d, SubsetPatch.Builder().Name("Wanted").Expression($"{{[{d}].[{d}].[B]}}").Build());
+        var defined = await tm1.Subsets.CreateSessionSubsetAsync(d, d, SubsetCreate.Builder().Name("Wanted").Expression($"{{[{d}].[{d}].[B]}}").Build());
         Assert.NotEqual("Wanted", defined.Name); // TM1 ignores the name it's given
         Assert.Equal(["B"], await SubsetElements(tm1, d, SubsetScope.Session, defined.Name!));
-        await tm1.Subsets.CreateAsync(d, d, SubsetScope.Public, SubsetPatch.Builder().Name("S").BindElements(El(d, "C"), El(d, "D")).Build());
+        await tm1.Subsets.CreateAsync(d, d, SubsetScope.Public, SubsetCreate.Builder().Name("S").BindElements(El(d, "C"), El(d, "D")).Build());
         var copied = await tm1.Subsets.CreateSessionSubsetFromAsync(d, d, SubsetScope.Public, "S");
         Assert.Equal(["C", "D"], await SubsetElements(tm1, d, SubsetScope.Session, copied.Name!));
         Assert.Empty(await tm1.Subsets.ListAsync(d, d, SubsetScope.Session).ToListAsync()); // TM1 lists no session subsets, though each reads by its name

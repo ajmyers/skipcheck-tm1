@@ -15,7 +15,11 @@ from skipcheck_tm1 import (
     Tm1NotFoundError,
     Tm1Request,
 )
-from skipcheck_tm1.model import UserPatch, UserType
+from skipcheck_tm1.model import (
+    UserCreate,
+    UserPatch,
+    UserType,
+)
 
 from .conftest import ADMIN, CONFIGURED, REASON, other_client
 
@@ -34,7 +38,7 @@ def people(tm1: Tm1Client, name: str) -> Iterator[People]:
     p = People(name)
     tm1.groups.create(p.g1)
     tm1.groups.create(p.g2)
-    tm1.users.create(UserPatch.builder().name(p.user).password("pw").bind_groups(ODataPath.of("Groups").key(p.g1)).build())
+    tm1.users.create(UserCreate.builder().name(p.user).password("pw").bind_groups(ODataPath.of("Groups").key(p.g1)).build())
     yield p
     for cleanup in (lambda: tm1.users.delete(p.user), lambda: tm1.groups.delete(p.g1), lambda: tm1.groups.delete(p.g2)):
         try:

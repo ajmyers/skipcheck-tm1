@@ -48,7 +48,8 @@ public sealed class PatchEmitter
         string element;
         if (_spec.TypeByName.TryGetValue(typeName, out var t))
         {
-            element = Spec.Str(t, "name") + "Patch";
+            // A nested entity is sent as its create where it has one: a deep insert creates it
+            element = Spec.Str(t, "name") + (Creatable(t) ? "Create" : "Patch");
             return collection ? $"IEnumerable<{element}>?" : element + "?";
         }
         if (ModelEmitter.Element(_spec, typeName) is not { } el)
@@ -62,7 +63,7 @@ public sealed class PatchEmitter
         return collection ? $"IEnumerable<{el.Type}>?" : el.Type + "?";
     }
 
-    private static readonly HashSet<string> Writing = ["applied", "transformed", "untested"];
+    private static readonly HashSet<string> Writing = ["applied", "writeOnly", "transformed", "untested"];
 
     private static bool Writes(string? outcome) => outcome is null || Writing.Contains(outcome);
 
@@ -79,6 +80,27 @@ public sealed class PatchEmitter
     private static bool Patches(JsonElement t, string prop) =>
         Writes(Outcome(t, "patch", prop))
         && !(t.TryGetProperty("write", out var w) && w.TryGetProperty("collections", out var c) && c.TryGetProperty(prop, out _));
+
+    private static bool WriteOffersInPatch(JsonElement w, string prop)
+    {
+        var patch = w.GetProperty("patch");
+        if (prop == "Name")
+        {
+            return !patch.TryGetProperty("rename", out var rename) || rename.ValueKind == JsonValueKind.Null || rename.GetString() == "applied";
+        }
+        var outcome = patch.GetProperty("properties").TryGetProperty(prop, out var o) ? o.GetString() : null;
+        return outcome is not ("rejected" or "ignored");
+    }
+
+    /// <summary>
+    /// Whether a patch of <paramref name="t"/> offers a property: not if a PATCH rejects or ignores it, by the
+    /// probe, nor <c>Name</c> where a PATCH doesn't rename; for the root of a hierarchy without writes of its
+    /// own, if every probed subtype's patch offers it. As the Java generator.
+    /// </summary>
+    private bool OffersInPatch(JsonElement t, string prop) =>
+        t.TryGetProperty("write", out var w)
+            ? WriteOffersInPatch(w, prop)
+            : _spec.Derived(t).Where(d => d.TryGetProperty("write", out _)).All(d => WriteOffersInPatch(d.GetProperty("write"), prop));
 
     /// <summary>Whether a type gets a create: the probe has writes for it, or for a subtype it's the root of.</summary>
     private bool Creatable(JsonElement t) =>
@@ -119,7 +141,11 @@ public sealed class PatchEmitter
                 foreach (var p in Spec.Array(level, "properties"))
                 {
                     var prop = Spec.Str(p, "name")!;
-                    if (Spec.Str(p, "type") != "Edm.Stream" && !copied.Contains(prop) && (create ? Creates(t, prop) : Patches(t, prop)))
+                    if (
+                        Spec.Str(p, "type") != "Edm.Stream"
+                        && !copied.Contains(prop)
+                        && (create ? Creates(t, prop) : Patches(t, prop) && OffersInPatch(t, prop))
+                    )
                     {
                         copied.Add(prop);
                     }
@@ -173,7 +199,7 @@ public sealed class PatchEmitter
             {
                 var prop = Spec.Str(p, "name")!;
                 var type = p.TryGetProperty("departure", out _) ? "object?" : PatchType(Spec.Str(p, "type")!, Spec.Bool(p, "collection"));
-                if (type is null || (create && !Creates(t, prop)))
+                if (type is null || (create ? !Creates(t, prop) : !OffersInPatch(t, prop)))
                 {
                     continue;
                 }

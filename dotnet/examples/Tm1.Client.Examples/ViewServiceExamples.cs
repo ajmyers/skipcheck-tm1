@@ -26,7 +26,7 @@ public static class ViewServiceExamples
         return await tm1.Views.CreateAsync(
             "Sales",
             ViewScope.Public,
-            NativeViewPatch
+            NativeViewCreate
                 .Builder()
                 .Name("Revenue by Region")
                 .Columns([ViewAxisSelectionPatch.Builder().BindSubset(months).Build()])
@@ -49,7 +49,7 @@ public static class ViewServiceExamples
             "SELECT {[Month].[Month].[Jan], [Month].[Month].[Feb]} ON 0,"
             + " {TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)} ON 1 FROM [Sales]"
             + " WHERE ([Version].[Version].[Actual], [Measure].[Measure].[Revenue])";
-        return await tm1.Views.CreateAsync("Sales", ViewScope.Private, MDXViewPatch.Builder().Name("My Revenue").Mdx(mdx).Build());
+        return await tm1.Views.CreateAsync("Sales", ViewScope.Private, MDXViewCreate.Builder().Name("My Revenue").Mdx(mdx).Build());
         // @end
     }
 

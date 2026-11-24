@@ -6,7 +6,7 @@ import {
   ODataQuery,
   ProcessExecuteResult,
   ProcessParameterPatch,
-  ProcessPatch,
+  ProcessCreate,
   ProcessVariableType,
   type Tm1Client,
 } from "@skipcheck/tm1-client";
@@ -32,7 +32,7 @@ export async function main(): Promise<void> {
 export async function create(tm1: Tm1Client): Promise<void> {
   // @start region = create
   // A process that sets a month's budget to its actual units plus 10%
-  const process = ProcessPatch.builder()
+  const process = ProcessCreate.builder()
     .name("Budget From Actual")
     .parameters([ProcessParameterPatch.builder().name("pMonth").value("Jan").type(ProcessVariableType.String).build()])
     .prologProcedure(

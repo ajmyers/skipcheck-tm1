@@ -369,7 +369,7 @@ codecs. One shared, configured `JsonMapper`:
 ### 8.3 Writes: absent vs. null
 
 A record can't tell "not set" from "set to null", and PATCH depends on that difference (§3.1).
-So writes use generated builders backed by an ordered map: `DimensionPatch.builder().name("x").build()`.
+So writes use generated builders backed by an ordered map: `DimensionCreate.builder().name("x").build()`.
 They serialize only the properties that were set, explicit nulls included, plus `@odata.bind`
 references (`Dimensions@odata.bind: ["Dimensions('A')", …]` when creating a cube). Create
 payloads use the same builders, with required properties checked.

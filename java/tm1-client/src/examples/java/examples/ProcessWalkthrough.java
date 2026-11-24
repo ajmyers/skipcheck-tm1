@@ -9,9 +9,9 @@ import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Cellset;
 import io.skipcheck.tm1.client.model.CellsetCell;
 import io.skipcheck.tm1.client.model.ErrorLogFile;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessExecuteResult;
 import io.skipcheck.tm1.client.model.ProcessParameterPatch;
-import io.skipcheck.tm1.client.model.ProcessPatch;
 import io.skipcheck.tm1.client.model.ProcessSyntaxError;
 import io.skipcheck.tm1.client.model.ProcessVariableType;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -40,7 +40,7 @@ public final class ProcessWalkthrough {
 	static void create(Tm1Client tm1) {
 		// @start region = create
 		// A process that sets a month's budget to its actual units plus 10%
-		ProcessPatch process = ProcessPatch.builder()
+		ProcessCreate process = ProcessCreate.builder()
 			.name("Budget From Actual")
 			.parameters(List.of(ProcessParameterPatch.builder()
 				.name("pMonth")

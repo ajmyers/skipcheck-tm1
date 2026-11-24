@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Chore, ChoreTask, Process, Tm1Operations, type ChorePatch, type ChoreTaskPatch } from "../../generated/index.js";
+import { Chore, type ChoreCreate, type ChorePatch, ChoreTask, type ChoreTaskPatch, Process, Tm1Operations } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";
 import { Tm1Request } from "../../request.js";
@@ -21,7 +21,7 @@ const CHORES = ODataPath.of("Chores");
  * Create a daily chore with one task:
  * ```ts
  * const task = ChoreTaskPatch.builder().bindProcess(ODataPath.of("Processes").key("Load")).build();
- * await tm1.chores.create(ChorePatch.builder().name("Nightly").startTime("2026-01-01T02:00:00Z").frequency("P1DT00H00M00S").executionMode("SingleCommit").tasks([task]).build());
+ * await tm1.chores.create(ChoreCreate.builder().name("Nightly").startTime("2026-01-01T02:00:00Z").frequency("P1DT00H00M00S").executionMode("SingleCommit").tasks([task]).build());
  * ```
  * Add a task at the end, and get the step TM1 gave it:
  * ```ts
@@ -66,7 +66,7 @@ export class ChoreService extends Tm1Service {
 
   /** `POST Chores`: creates a chore, with its tasks if the patch has them. It needs a name, start
    * time, frequency and execution mode; returns the chore as created. */
-  create(chore: ChorePatch, options?: Tm1CallOptions): Promise<Chore> {
+  create(chore: ChoreCreate, options?: Tm1CallOptions): Promise<Chore> {
     return this.session.execute(Tm1Request.post(CHORES, required(chore, "chore"), Chore), options);
   }
 

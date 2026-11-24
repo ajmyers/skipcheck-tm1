@@ -108,7 +108,7 @@ class ProcessService(Service):
     Create a process, compiling it first, since TM1 saves code that doesn't compile::
 
         process = (
-            ProcessPatch.builder()
+            ProcessCreate.builder()
             .name("Load Sales")
             .parameters([
                 ProcessParameterPatch.builder().name("pVersion").value("Actual").type(ProcessVariableType.STRING).build(),
@@ -133,7 +133,7 @@ class ProcessService(Service):
 
     Run code without saving it as a process::
 
-        cleanup = ProcessPatch.builder().name("Clear Sales Staging").prolog_procedure("CubeClearData('Sales Staging');\\n").build()
+        cleanup = ProcessCreate.builder().name("Clear Sales Staging").prolog_procedure("CubeClearData('Sales Staging');\\n").build()
         await tm1.processes.execute_with_return(cleanup)
     """
 
@@ -487,7 +487,7 @@ class ChoreService(Service):
             .build()
         )
         await tm1.chores.create(
-            ChorePatch.builder()
+            ChoreCreate.builder()
             .name("Nightly Load")
             .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=timezone.utc))
             .dst_sensitive(False)

@@ -11,6 +11,7 @@ import java.util.Objects;
 import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Chore;
+import io.skipcheck.tm1.client.model.ChoreCreate;
 import io.skipcheck.tm1.client.model.ChorePatch;
 import io.skipcheck.tm1.client.model.ChoreTask;
 import io.skipcheck.tm1.client.model.ChoreTaskPatch;
@@ -85,7 +86,7 @@ public final class ChoreService {
 	 * @return the chore as created
 	 */
 	@Tm1Endpoint("EntitySet Chores")
-	public Mono<Chore> create(ChorePatch chore) {
+	public Mono<Chore> create(ChoreCreate chore) {
 		return session.execute(Tm1Request.post(CHORES, chore, Chore.class));
 	}
 

@@ -13,6 +13,7 @@ import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.CalculationComponent;
 import io.skipcheck.tm1.client.model.CheckFeedersSelection;
 import io.skipcheck.tm1.client.model.Cube;
+import io.skipcheck.tm1.client.model.CubeCreate;
 import io.skipcheck.tm1.client.model.CubePatch;
 import io.skipcheck.tm1.client.model.Dimension;
 import io.skipcheck.tm1.client.model.FedCellDescriptor;
@@ -107,7 +108,7 @@ public final class CubeService {
 	 * @return the cube as created
 	 */
 	@Tm1Endpoint("EntitySet Cubes")
-	public Mono<Cube> create(CubePatch cube) {
+	public Mono<Cube> create(CubeCreate cube) {
 		return session.execute(Tm1Request.post(CUBES, cube, Cube.class));
 	}
 

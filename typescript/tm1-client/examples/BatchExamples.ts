@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { ElementPatch, ODataQuery, Process, type Cube, type Dimension, type Tm1Client } from "@skipcheck/tm1-client";
+import { ElementCreate, ODataQuery, Process, type Cube, type Dimension, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for Tm1Batch, quoted in its documentation.
 
@@ -21,7 +21,7 @@ export async function many(tm1: Tm1Client, cities: string[]): Promise<string[]> 
   // One request per element, 200 to a $batch; one element's failure is its own
   const batch = tm1.batch();
   const results = cities.map((city) =>
-    batch.client.elements.create("City", "City", ElementPatch.builder().name(city).build()).then(
+    batch.client.elements.create("City", "City", ElementCreate.builder().name(city).build()).then(
       (element) => element.Name ?? city,
       (e: unknown) => `${city} failed: ${String(e)}`,
     ),

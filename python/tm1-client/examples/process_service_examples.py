@@ -5,14 +5,14 @@
 from __future__ import annotations
 
 from skipcheck_tm1 import ODataQuery, Tm1Client
-from skipcheck_tm1.model import Process, ProcessExecuteResult, ProcessParameterPatch, ProcessPatch, ProcessVariableType
+from skipcheck_tm1.model import Process, ProcessCreate, ProcessExecuteResult, ProcessParameterPatch, ProcessVariableType
 
 
 def create(tm1: Tm1Client) -> Process:
     # @start region = create
     # TM1 saves code that doesn't compile, so compile the definition first
     process = (
-        ProcessPatch.builder()
+        ProcessCreate.builder()
         .name("Load Sales")
         .parameters(
             [
@@ -45,6 +45,6 @@ def run(tm1: Tm1Client) -> ProcessExecuteResult:
 def run_unsaved(tm1: Tm1Client) -> ProcessExecuteResult:
     # @start region = run-unsaved
     # A one-off run of code that isn't saved as a process
-    cleanup = ProcessPatch.builder().name("Clear Sales Staging").prolog_procedure("CubeClearData('Sales Staging');\n").build()
+    cleanup = ProcessCreate.builder().name("Clear Sales Staging").prolog_procedure("CubeClearData('Sales Staging');\n").build()
     return tm1.processes.execute_with_return(cleanup)
     # @end

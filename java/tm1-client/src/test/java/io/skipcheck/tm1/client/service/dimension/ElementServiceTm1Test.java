@@ -3,11 +3,12 @@
 package io.skipcheck.tm1.client.service.dimension;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
+import java.lang.reflect.Method;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,13 +24,14 @@ import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
-import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.Edge;
 import io.skipcheck.tm1.client.model.EdgePatch;
 import io.skipcheck.tm1.client.model.Element;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementPatch;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
@@ -71,9 +73,9 @@ class ElementServiceTm1Test {
 	void createDimension() {
 		d = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(d)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(d)
 					.elements(List.of(element("Total", ElementType.CONSOLIDATED), element("North", ElementType.NUMERIC),
 							element("South", ElementType.NUMERIC), element("East", ElementType.NUMERIC),
@@ -112,11 +114,9 @@ class ElementServiceTm1Test {
 
 	@Test
 	void refusesNameAndAttributesInAnUpdateAsTm1IgnoresOrRejectsThem() {
-		assertThatIllegalArgumentException()
-			.isThrownBy(() -> elements.update(d, d, "East", ElementPatch.builder().name("Est").build()))
-			.withMessageContaining("renamed");
-		assertThatIllegalArgumentException()
-			.isThrownBy(() -> elements.update(d, d, "East", ElementPatch.builder().name("Est").build(), "W/\"x\""));
+		// ElementPatch offers neither: TM1 ignores the name and refuses Attributes
+		assertThat(Arrays.stream(ElementPatch.Builder.class.getMethods()).map(Method::getName)).doesNotContain("name",
+				"attributes");
 
 		ODataPath east = ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Elements").key("East");
 		tm1.session().execute(Tm1Request.patch(east, Map.of("Name", "Est"))).block(WAIT);
@@ -161,8 +161,8 @@ class ElementServiceTm1Test {
 		return elements.components(d, d, parent, ODataQuery.none()).map(Element::name).collectList().block(WAIT);
 	}
 
-	private static ElementPatch element(String name, ElementType type) {
-		return ElementPatch.builder().name(name).type(type).build();
+	private static ElementCreate element(String name, ElementType type) {
+		return ElementCreate.builder().name(name).type(type).build();
 	}
 
 	private static EdgePatch edge(String parent, String component) {

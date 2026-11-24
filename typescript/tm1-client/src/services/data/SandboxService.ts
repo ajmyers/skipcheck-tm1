@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Sandbox, Tm1Operations, type ConflictResolution, type SandboxPatch } from "../../generated/index.js";
+import { type ConflictResolution, Sandbox, type SandboxCreate, type SandboxPatch, Tm1Operations } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";
 import { Tm1Request } from "../../request.js";
@@ -20,7 +20,7 @@ const SANDBOXES = ODataPath.of("Sandboxes");
  *
  * Create a sandbox, write to it, and publish the changes to base data:
  * ```ts
- * await tm1.sandboxes.create(SandboxPatch.builder().name("What if").build());
+ * await tm1.sandboxes.create(SandboxCreate.builder().name("What if").build());
  * await tm1.withSandbox("What if").cells.update("Sales", { Region: "North", Measure: "Amount" }, 42);
  * await tm1.sandboxes.publish("What if");
  * ```
@@ -52,7 +52,7 @@ export class SandboxService extends Tm1Service {
   }
 
   /** `POST Sandboxes`: creates an empty sandbox; it needs a name. Returns the sandbox as created. */
-  create(sandbox: SandboxPatch, options?: Tm1CallOptions): Promise<Sandbox> {
+  create(sandbox: SandboxCreate, options?: Tm1CallOptions): Promise<Sandbox> {
     return this.session.execute(Tm1Request.post(SANDBOXES, required(sandbox, "sandbox"), Sandbox), options);
   }
 

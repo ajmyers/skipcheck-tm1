@@ -29,7 +29,7 @@ public sealed class CellsetServiceLiveTests : IAsyncLifetime
     {
         await LiveModel.DimensionAsync(_tm1, Region, Regions);
         await LiveModel.DimensionAsync(_tm1, Measure, Measures);
-        await _tm1.Cubes.CreateAsync(CubePatch.Builder().Name(_cube).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure)).Build());
+        await _tm1.Cubes.CreateAsync(CubeCreate.Builder().Name(_cube).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure)).Build());
         // Ordinals run across the columns (measures) first: cell (row r, column c) is r * 2 + c
         var value = 1;
         foreach (var r in Regions)
@@ -130,7 +130,7 @@ public sealed class CellsetServiceLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task ExecutesMdxAndNativeViews()
     {
-        await _tm1.Views.CreateAsync(_cube, ViewScope.Public, MDXViewPatch.Builder().Name("Mdx").Mdx(Mdx).Build());
+        await _tm1.Views.CreateAsync(_cube, ViewScope.Public, MDXViewCreate.Builder().Name("Mdx").Mdx(Mdx).Build());
         foreach (var d in new[] { Region, Measure })
         {
             await LiveModel.SubsetAllAsync(_tm1, d);
@@ -138,7 +138,7 @@ public sealed class CellsetServiceLiveTests : IAsyncLifetime
         await _tm1.Views.CreateAsync(
             _cube,
             ViewScope.Public,
-            NativeViewPatch
+            NativeViewCreate
                 .Builder()
                 .Name("Native")
                 .Columns([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(Measure)).Build()])

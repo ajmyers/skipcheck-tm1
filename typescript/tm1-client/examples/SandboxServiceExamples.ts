@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { CellsetCell, ODataQuery, SandboxPatch, type Tm1Client } from "@skipcheck/tm1-client";
+import { CellsetCell, ODataQuery, SandboxCreate, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for SandboxService, quoted in its documentation.
 
@@ -8,7 +8,7 @@ export async function publish(tm1: Tm1Client): Promise<void> {
   // @start region = publish
   // Write to a new sandbox, leaving base data alone until the changes are published
   const cell = { Version: "Budget", Region: "North", Month: "Jan", Measure: "Revenue" };
-  await tm1.sandboxes.create(SandboxPatch.builder().name("What If").build());
+  await tm1.sandboxes.create(SandboxCreate.builder().name("What If").build());
   await tm1.withSandbox("What If").cells.update("Sales", cell, 1500);
   await tm1.sandboxes.publish("What If");
   // @end

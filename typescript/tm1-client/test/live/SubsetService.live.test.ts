@@ -2,17 +2,18 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
 import {
-  DimensionPatch,
+  DimensionCreate,
   Element,
-  ElementPatch,
+  ElementCreate,
   ElementType,
-  HierarchyPatch,
+  HierarchyCreate,
   ODataPath,
   ODataQuery,
+  SubsetCreate,
   SubsetPatch,
   SubsetScope,
-  Tm1PreconditionFailedException,
   type Tm1Client,
+  Tm1PreconditionFailedException,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
@@ -34,12 +35,12 @@ describe("SubsetService on TM1" + liveReason, () => {
   beforeEach(async () => {
     if (!Live.configured) return;
     d = Live.name();
-    const numeric = (name: string): ElementPatch => ElementPatch.builder().name(name).type(ElementType.Numeric).build();
+    const numeric = (name: string): ElementCreate => ElementCreate.builder().name(name).type(ElementType.Numeric).build();
     await tm1.dimensions.create(
-      DimensionPatch.builder()
+      DimensionCreate.builder()
         .name(d)
         .hierarchies([
-          HierarchyPatch.builder()
+          HierarchyCreate.builder()
             .name(d)
             .elements([numeric("A"), numeric("B"), numeric("C"), numeric("D")])
             .build(),
@@ -61,8 +62,8 @@ describe("SubsetService on TM1" + liveReason, () => {
   const names = async (scope: SubsetScope): Promise<(string | undefined)[]> => (await tm1.subsets.list(d, d, scope).toArray()).map((s) => s.Name);
 
   tm1Test("creates static and dynamic subsets, reads, updates and deletes them", async () => {
-    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetPatch.builder().name("Static").bindElements(el("A"), el("B")).build());
-    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetPatch.builder().name("Dynamic").expression(`{TM1SUBSETALL([${d}].[${d}])}`).build());
+    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetCreate.builder().name("Static").bindElements(el("A"), el("B")).build());
+    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetCreate.builder().name("Dynamic").expression(`{TM1SUBSETALL([${d}].[${d}])}`).build());
     expect((await names(SubsetScope.Public)).sort()).toEqual(["Dynamic", "Static"]);
     expect(await elements(SubsetScope.Public, "Static")).toEqual(["A", "B"]);
     expect((await elements(SubsetScope.Public, "Dynamic")).sort()).toEqual(["A", "B", "C", "D"]);
@@ -80,7 +81,7 @@ describe("SubsetService on TM1" + liveReason, () => {
   });
 
   tm1Test("appends and clears elements by name, and refuses them in an update", async () => {
-    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetPatch.builder().name("S").bindElements(el("A")).build());
+    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetCreate.builder().name("S").bindElements(el("A")).build());
     await tm1.subsets.addElements(d, d, SubsetScope.Public, "S", ["C", "B"]);
     expect(await elements(SubsetScope.Public, "S"), "appended, in order").toEqual(["A", "C", "B"]);
 
@@ -91,7 +92,7 @@ describe("SubsetService on TM1" + liveReason, () => {
   });
 
   tm1Test("places elements last, before or after others", async () => {
-    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetPatch.builder().name("S").bindElements(el("A"), el("B")).build());
+    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetCreate.builder().name("S").bindElements(el("A"), el("B")).build());
     await tm1.subsets.setElement(d, d, SubsetScope.Public, "S", "C");
     expect(await elements(SubsetScope.Public, "S"), "no position puts it last").toEqual(["A", "B", "C"]);
     await tm1.subsets.setElementBefore(d, d, SubsetScope.Public, "S", "D", "B");
@@ -101,11 +102,11 @@ describe("SubsetService on TM1" + liveReason, () => {
   });
 
   tm1Test("keeps private subsets apart and saves copies", async () => {
-    await tm1.subsets.create(d, d, SubsetScope.Private, SubsetPatch.builder().name("Mine").bindElements(el("D")).build());
+    await tm1.subsets.create(d, d, SubsetScope.Private, SubsetCreate.builder().name("Mine").bindElements(el("D")).build());
     expect(await names(SubsetScope.Private)).toEqual(["Mine"]);
     expect(await tm1.subsets.list(d, d, SubsetScope.Public).toArray()).toEqual([]);
 
-    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetPatch.builder().name("All").expression(`{TM1SUBSETALL([${d}].[${d}])}`).build());
+    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetCreate.builder().name("All").expression(`{TM1SUBSETALL([${d}].[${d}])}`).build());
     expect((await tm1.subsets.saveAs(d, d, SubsetScope.Public, "All", "Copy")).Expression?.trim()).toBeTruthy();
     const frozen = await tm1.subsets.saveAs(d, d, SubsetScope.Public, "All", "Frozen", true, true);
     expect(frozen.Expression ?? "", "static").toBe("");
@@ -113,11 +114,11 @@ describe("SubsetService on TM1" + liveReason, () => {
   });
 
   tm1Test("creates session subsets under the server's name", async () => {
-    const defined = await tm1.subsets.createSessionSubset(d, d, SubsetPatch.builder().name("Wanted").expression(`{[${d}].[${d}].[B]}`).build());
+    const defined = await tm1.subsets.createSessionSubset(d, d, SubsetCreate.builder().name("Wanted").expression(`{[${d}].[${d}].[B]}`).build());
     expect(defined.Name, "TM1 ignores the name it's given").not.toBe("Wanted");
     expect(await elements(SubsetScope.Session, defined.Name!)).toEqual(["B"]);
 
-    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetPatch.builder().name("S").bindElements(el("C"), el("D")).build());
+    await tm1.subsets.create(d, d, SubsetScope.Public, SubsetCreate.builder().name("S").bindElements(el("C"), el("D")).build());
     const copied = await tm1.subsets.createSessionSubsetFrom(d, d, SubsetScope.Public, "S");
     expect(await elements(SubsetScope.Session, copied.Name!)).toEqual(["C", "D"]);
     expect(await tm1.subsets.list(d, d, SubsetScope.Session).toArray(), "TM1 lists no session subsets, though each reads by its name").toEqual([]);

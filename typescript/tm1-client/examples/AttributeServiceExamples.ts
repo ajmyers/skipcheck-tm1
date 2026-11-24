@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { AttributeDefinition, AttributeDefinitionPatch, AttributeSet, AttributeType, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
+import { AttributeDefinition, AttributeDefinitionCreate, AttributeSet, AttributeType, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for AttributeService, quoted in its documentation.
 
 export function create(tm1: Tm1Client): Promise<AttributeDefinition> {
   // @start region = create
   // A text attribute on every element of the Region hierarchy
-  const manager = AttributeDefinitionPatch.builder().name("Manager").type(AttributeType.String).build();
+  const manager = AttributeDefinitionCreate.builder().name("Manager").type(AttributeType.String).build();
   return tm1.attributes.create(AttributeSet.elements("Region", "Region"), manager);
   // @end
 }

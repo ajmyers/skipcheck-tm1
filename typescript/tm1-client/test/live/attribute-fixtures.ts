@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { randomUUID } from "node:crypto";
-import { DimensionPatch, ElementPatch, ElementType, HierarchyPatch, ODataPath, SubsetScope, type SubsetPatch, type Tm1Client } from "../../src/index.js";
+import { DimensionCreate, ElementCreate, ElementType, HierarchyCreate, ODataPath, SubsetScope, type SubsetCreate, type Tm1Client } from "../../src/index.js";
 
 // What the attribute tests share.
 
 export const DIMENSIONS = ODataPath.of("Dimensions");
 
 export function createDimension(tm1: Tm1Client, name: string, elements: string[]): Promise<unknown> {
-  const hierarchy = HierarchyPatch.builder()
+  const hierarchy = HierarchyCreate.builder()
     .name(name)
-    .elements(elements.map((e) => ElementPatch.builder().name(e).type(ElementType.Numeric).build()))
+    .elements(elements.map((e) => ElementCreate.builder().name(e).type(ElementType.Numeric).build()))
     .build();
-  return tm1.dimensions.create(DimensionPatch.builder().name(name).hierarchies([hierarchy]).build());
+  return tm1.dimensions.create(DimensionCreate.builder().name(name).hierarchies([hierarchy]).build());
 }
 
-export function createSubset(tm1: Tm1Client, dimension: string, subset: SubsetPatch): Promise<unknown> {
+export function createSubset(tm1: Tm1Client, dimension: string, subset: SubsetCreate): Promise<unknown> {
   return tm1.subsets.create(dimension, dimension, SubsetScope.Public, subset);
 }
 

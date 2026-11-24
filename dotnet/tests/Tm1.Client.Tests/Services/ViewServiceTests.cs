@@ -58,15 +58,15 @@ public class ViewServiceTests
     {
         var tm1 = _tm1.Client();
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "Mine" };
-        var created = await tm1.Views.CreateAsync("Sales", ViewScope.Private, ViewPatch.Builder().Name("Mine").Build());
+        var created = await tm1.Views.CreateAsync("Sales", ViewScope.Private, ViewCreate.Builder().Name("Mine").Build());
         Assert.Equal("Mine", created.Name);
         Assert.Equal(("POST", "Cubes('Sales')/PrivateViews", """{"Name":"Mine"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => null;
-        await tm1.Views.UpdateAsync("Sales", ViewScope.Public, "Default", ViewPatch.Builder().Name("Renamed").Build());
+        await tm1.Views.UpdateAsync("Sales", ViewScope.Public, "Default", NativeViewPatch.Builder().SuppressEmptyRows(false).Build());
         Assert.Equal(("PATCH", "Cubes('Sales')/Views('Default')"), (_tm1.Last.Method, _tm1.Last.Target));
         Assert.False(_tm1.Last.Headers.ContainsKey("if-match"));
-        await tm1.Views.UpdateAsync("Sales", ViewScope.Public, "Default", ViewPatch.Builder().Name("Renamed").Build(), "W/\"3\"");
+        await tm1.Views.UpdateAsync("Sales", ViewScope.Public, "Default", NativeViewPatch.Builder().SuppressEmptyRows(false).Build(), "W/\"3\"");
         Assert.Equal("W/\"3\"", _tm1.Last.Headers["if-match"]);
 
         await tm1.Views.DeleteAsync("Sales", ViewScope.Public, "Default");

@@ -17,6 +17,7 @@ from skipcheck_tm1 import (
 from skipcheck_tm1._sync.services.dimension import SubsetScope
 from skipcheck_tm1.model import (
     Element,
+    SubsetCreate,
     SubsetPatch,
 )
 
@@ -47,8 +48,8 @@ def subset_elements(tm1: Tm1Client, d: str, scope: SubsetScope, subset: str) -> 
 
 def test_creates_static_and_dynamic_subsets_reads_updates_and_deletes_them(tm1: Tm1Client, abcd: str) -> None:
     d, subsets, public = abcd, tm1.subsets, SubsetScope.PUBLIC
-    subsets.create(d, d, public, SubsetPatch.builder().name("Static").bind_elements(el(d, "A"), el(d, "B")).build())
-    subsets.create(d, d, public, SubsetPatch.builder().name("Dynamic").expression(f"{{TM1SUBSETALL([{d}].[{d}])}}").build())
+    subsets.create(d, d, public, SubsetCreate.builder().name("Static").bind_elements(el(d, "A"), el(d, "B")).build())
+    subsets.create(d, d, public, SubsetCreate.builder().name("Dynamic").expression(f"{{TM1SUBSETALL([{d}].[{d}])}}").build())
     assert sorted(names(subsets.list(d, d, public))) == ["Dynamic", "Static"]
     assert subset_elements(tm1, d, public, "Static") == ["A", "B"]
     assert sorted(subset_elements(tm1, d, public, "Dynamic")) == ["A", "B", "C", "D"]
@@ -64,7 +65,7 @@ def test_creates_static_and_dynamic_subsets_reads_updates_and_deletes_them(tm1: 
 
 def test_appends_and_clears_elements_by_name_and_refuses_them_in_an_update(tm1: Tm1Client, abcd: str) -> None:
     d, public = abcd, SubsetScope.PUBLIC
-    tm1.subsets.create(d, d, public, SubsetPatch.builder().name("S").bind_elements(el(d, "A")).build())
+    tm1.subsets.create(d, d, public, SubsetCreate.builder().name("S").bind_elements(el(d, "A")).build())
     tm1.subsets.add_elements(d, d, public, "S", ["C", "B"])
     assert subset_elements(tm1, d, public, "S") == ["A", "C", "B"], "appended, in order"
     tm1.subsets.clear_elements(d, d, public, "S")
@@ -75,7 +76,7 @@ def test_appends_and_clears_elements_by_name_and_refuses_them_in_an_update(tm1: 
 
 def test_places_elements_last_before_or_after_others(tm1: Tm1Client, abcd: str) -> None:
     d, public = abcd, SubsetScope.PUBLIC
-    tm1.subsets.create(d, d, public, SubsetPatch.builder().name("S").bind_elements(el(d, "A"), el(d, "B")).build())
+    tm1.subsets.create(d, d, public, SubsetCreate.builder().name("S").bind_elements(el(d, "A"), el(d, "B")).build())
     tm1.subsets.set_element(d, d, public, "S", "C")
     assert subset_elements(tm1, d, public, "S") == ["A", "B", "C"], "no position puts it last"
     tm1.subsets.set_element_before(d, d, public, "S", "D", "B")
@@ -86,10 +87,10 @@ def test_places_elements_last_before_or_after_others(tm1: Tm1Client, abcd: str) 
 
 def test_keeps_private_subsets_apart_and_saves_copies(tm1: Tm1Client, abcd: str) -> None:
     d = abcd
-    tm1.subsets.create(d, d, SubsetScope.PRIVATE, SubsetPatch.builder().name("Mine").bind_elements(el(d, "D")).build())
+    tm1.subsets.create(d, d, SubsetScope.PRIVATE, SubsetCreate.builder().name("Mine").bind_elements(el(d, "D")).build())
     assert names(tm1.subsets.list(d, d, SubsetScope.PRIVATE)) == ["Mine"]
     assert tm1.subsets.list(d, d, SubsetScope.PUBLIC) == []
-    tm1.subsets.create(d, d, SubsetScope.PUBLIC, SubsetPatch.builder().name("All").expression(f"{{TM1SUBSETALL([{d}].[{d}])}}").build())
+    tm1.subsets.create(d, d, SubsetScope.PUBLIC, SubsetCreate.builder().name("All").expression(f"{{TM1SUBSETALL([{d}].[{d}])}}").build())
     assert tm1.subsets.save_as(d, d, SubsetScope.PUBLIC, "All", "Copy").expression
     frozen = tm1.subsets.save_as(d, d, SubsetScope.PUBLIC, "All", "Frozen", True, True)
     assert not frozen.expression, "static"
@@ -98,10 +99,10 @@ def test_keeps_private_subsets_apart_and_saves_copies(tm1: Tm1Client, abcd: str)
 
 def test_creates_session_subsets_under_the_servers_name(tm1: Tm1Client, abcd: str) -> None:
     d = abcd
-    defined = tm1.subsets.create_session_subset(d, d, SubsetPatch.builder().name("Wanted").expression(f"{{[{d}].[{d}].[B]}}").build())
+    defined = tm1.subsets.create_session_subset(d, d, SubsetCreate.builder().name("Wanted").expression(f"{{[{d}].[{d}].[B]}}").build())
     assert defined.name != "Wanted", "TM1 ignores the name it's given"
     assert subset_elements(tm1, d, SubsetScope.SESSION, defined.name) == ["B"]
-    tm1.subsets.create(d, d, SubsetScope.PUBLIC, SubsetPatch.builder().name("S").bind_elements(el(d, "C"), el(d, "D")).build())
+    tm1.subsets.create(d, d, SubsetScope.PUBLIC, SubsetCreate.builder().name("S").bind_elements(el(d, "C"), el(d, "D")).build())
     copied = tm1.subsets.create_session_subset_from(d, d, SubsetScope.PUBLIC, "S")
     assert subset_elements(tm1, d, SubsetScope.SESSION, copied.name) == ["C", "D"]
     assert tm1.subsets.list(d, d, SubsetScope.SESSION) == [], "TM1 lists no session subsets, though each reads by its name"

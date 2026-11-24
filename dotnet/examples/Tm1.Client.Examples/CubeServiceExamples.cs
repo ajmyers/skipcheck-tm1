@@ -28,7 +28,7 @@ public static class CubeServiceExamples
         // @start region = create
         // A cube over two existing dimensions, in this order
         var dimensions = ODataPath.Of("Dimensions");
-        return await tm1.Cubes.CreateAsync(CubePatch.Builder().Name("Sales").BindDimensions(dimensions.Key("Region"), dimensions.Key("Month")).Build());
+        return await tm1.Cubes.CreateAsync(CubeCreate.Builder().Name("Sales").BindDimensions(dimensions.Key("Region"), dimensions.Key("Month")).Build());
         // @end
     }
 

@@ -18,8 +18,8 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1ServerException;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessExecuteResult;
-import io.skipcheck.tm1.client.model.ProcessPatch;
 import io.skipcheck.tm1.client.model.Session;
 import io.skipcheck.tm1.client.model.Thread;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -90,7 +90,7 @@ class SessionAndThreadTm1Test {
 	void cancelsARunningProcessThroughItsThread() throws Exception {
 		String process = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.processes()
-			.create(ProcessPatch.builder()
+			.create(ProcessCreate.builder()
 				.name(process)
 				.prologProcedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n")
 				.build())

@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from skipcheck_tm1 import ODataQuery, Tm1Client, Tm1Error
-from skipcheck_tm1.model import Cube, Dimension, ElementPatch, Process
+from skipcheck_tm1.model import Cube, Dimension, ElementCreate, Process
 
 
 def read(tm1: Tm1Client) -> tuple[Cube, Dimension, list[Process]]:
@@ -23,7 +23,7 @@ def many(tm1: Tm1Client, cities: list[str]) -> list[str]:
     # @start region = many
     # One request per element, 200 to a $batch; one element's failure is its own
     batch = tm1.batch()
-    created = {city: batch.client.elements.create("City", "City", ElementPatch.builder().name(city).build()) for city in cities}
+    created = {city: batch.client.elements.create("City", "City", ElementCreate.builder().name(city).build()) for city in cities}
     batch.run(200)
 
     results = []

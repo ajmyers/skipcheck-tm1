@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { EdgePatch, ElementPatch, ElementType, HierarchyPatch, ODataPath, ODataQuery } from "../../src/index.js";
+import { EdgePatch, ElementCreate, ElementType, HierarchyCreate, HierarchyPatch, ODataPath, ODataQuery } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 const HIERARCHY = "Dimensions('Region')/Hierarchies('Region')";
@@ -20,14 +20,14 @@ describe("HierarchyService", () => {
     tm1.respond = () => ({ Name: "Leaves" });
     expect((await client.hierarchies.get("Region", "Leaves")).Name).toBe("Leaves");
     expect([tm1.last.method, tm1.last.target]).toEqual(["GET", "Dimensions('Region')/Hierarchies('Leaves')"]);
-    expect((await client.hierarchies.create("Region", HierarchyPatch.builder().name("Leaves").build())).Name).toBe("Leaves");
+    expect((await client.hierarchies.create("Region", HierarchyCreate.builder().name("Leaves").build())).Name).toBe("Leaves");
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Dimensions('Region')/Hierarchies", '{"Name":"Leaves"}']);
 
     tm1.respond = () => null;
-    await client.hierarchies.update("Region", "Leaves", HierarchyPatch.builder().visible(false).build());
-    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["PATCH", "Dimensions('Region')/Hierarchies('Leaves')", '{"Visible":false}']);
+    await client.hierarchies.update("Region", "Leaves", HierarchyPatch.builder().elementsSortType("ByName").build());
+    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["PATCH", "Dimensions('Region')/Hierarchies('Leaves')", '{"ElementsSortType":"ByName"}']);
     expect(tm1.last.headers["if-match"]).toBeUndefined();
-    await client.hierarchies.update("Region", "Leaves", HierarchyPatch.builder().visible(true).build(), 'W/"2"');
+    await client.hierarchies.update("Region", "Leaves", HierarchyPatch.builder().elementsSortSense("Descending").build(), 'W/"2"');
     expect(tm1.last.headers["if-match"]).toBe('W/"2"');
     await client.hierarchies.delete("Region", "Leaves");
     expect([tm1.last.method, tm1.last.target]).toEqual(["DELETE", "Dimensions('Region')/Hierarchies('Leaves')"]);
@@ -36,11 +36,11 @@ describe("HierarchyService", () => {
   it("refuses an update with structure", () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    const withElements = HierarchyPatch.builder()
-      .elements([ElementPatch.builder().name("x").build()])
+    const withElements = HierarchyCreate.builder()
+      .elements([ElementCreate.builder().name("x").build()])
       .build();
-    const withBinding = HierarchyPatch.builder().bindElements(ODataPath.of("Dimensions").key("d")).build();
-    const withEdges = HierarchyPatch.builder().edges([]).build();
+    const withBinding = HierarchyCreate.builder().bindElements(ODataPath.of("Dimensions").key("d")).build();
+    const withEdges = HierarchyCreate.builder().edges([]).build();
     for (const patch of [withElements, withBinding, withEdges]) {
       expect(() => client.hierarchies.update("Region", "Region", patch)).toThrow(/replaceStructure/);
       expect(() => client.hierarchies.update("Region", "Region", patch)).toThrow(RangeError);
@@ -57,7 +57,7 @@ describe("HierarchyService", () => {
       .hierarchies.replaceStructure(
         "Region",
         "Region",
-        [ElementPatch.builder().name("All").type(ElementType.Consolidated).build()],
+        [ElementCreate.builder().name("All").type(ElementType.Consolidated).build()],
         [EdgePatch.builder().parentName("All").componentName("North").weight(1).build()],
       );
     expect([tm1.last.method, tm1.last.target]).toEqual(["PATCH", HIERARCHY]);

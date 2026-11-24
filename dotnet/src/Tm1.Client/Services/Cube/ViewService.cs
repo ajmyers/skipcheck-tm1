@@ -64,7 +64,7 @@ public sealed class ViewService : Tm1Service
     /// and titles (400, "All cube dimensions must be placed on an axis").</summary>
     [Tm1Endpoint("Navigation Cube/Views")]
     [Tm1Endpoint("Navigation Cube/PrivateViews")]
-    public Task<View> CreateAsync(string cube, ViewScope scope, ViewPatch view, CancellationToken cancellationToken = default) =>
+    public Task<View> CreateAsync(string cube, ViewScope scope, ViewCreate view, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<View>(Views(cube, scope), Require(view, nameof(view))), cancellationToken);
 
     /// <summary><c>PATCH Cubes('c')/Views('v')</c>: changes the properties the patch sets, such as an

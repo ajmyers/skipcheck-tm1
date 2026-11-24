@@ -33,7 +33,7 @@ public class ChoreServiceTests
             .BindProcess(ODataPath.Of("Processes").Key("Load Sales"))
             .Parameters([ChoreTaskParameterPatch.Builder().Name("pYear").Value(2026).Build()])
             .Build();
-        await tm1.Chores.CreateAsync(ChorePatch.Builder().Name("Nightly Load").Active(false).Tasks([task]).Build());
+        await tm1.Chores.CreateAsync(ChoreCreate.Builder().Name("Nightly Load").Active(false).Tasks([task]).Build());
         Assert.Equal(("POST", "Chores"), (_tm1.Last.Method, _tm1.Last.Target));
         Assert.Equal(
             """{"Name":"Nightly Load","Active":false,"Tasks":[{"Process@odata.bind":"Processes('Load%20Sales')","Parameters":[{"Name":"pYear","Value":2026}]}]}""",

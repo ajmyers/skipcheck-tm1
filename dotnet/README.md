@@ -17,7 +17,7 @@ await foreach (var cube in tm1.Cubes.ModelCubesAsync(ODataQuery.None().Select(Cu
 }
 
 var dimensions = ODataPath.Of("Dimensions");
-await tm1.Cubes.CreateAsync(CubePatch.Builder().Name("Plan").BindDimensions(dimensions.Key("Region"), dimensions.Key("Year")).Build());
+await tm1.Cubes.CreateAsync(CubeCreate.Builder().Name("Plan").BindDimensions(dimensions.Key("Region"), dimensions.Key("Year")).Build());
 
 var rules = "SKIPCHECK;\n['Margin'] = N: ['Revenue'] - ['Cost'];";
 if (await tm1.Cubes.CheckRulesAsync("Plan", rules).CountAsync() == 0)
@@ -39,7 +39,7 @@ await tm1.WithAsync(TimeSpan.FromSeconds(2)).Processes.ExecuteWithReturnAsync("R
 | Cancelling a subscription | A `CancellationToken`, the last parameter of every method |
 | `ODataQuery query` parameter | `ODataQuery? query = null` |
 | Overloads (`update(name, patch)`, `update(name, patch, etag)`) | Optional parameters where they're a tail, real overloads otherwise |
-| `CubePatch.builder().name("x").build()` | `CubePatch.Builder().Name("x").Build()` |
+| `CubeCreate.builder().name("x").build()` | `CubeCreate.Builder().Name("x").Build()` |
 | `Cube.NAME`, `Filter.and(…)` | `Cube.Fields.Name`, `Filter.And(…)` |
 | `Tm1Client.builder()…build()`, `withSandbox`, `withAsync`, `batch()` | `Tm1Client.Builder()…Build()`, `WithSandbox`, `WithAsync`, `Batch()` |
 | `Tm1SessionPool`, `Tm1Identity`, `Tm1Timeouts`, `Tm1ErrorClassifier` | the same names |

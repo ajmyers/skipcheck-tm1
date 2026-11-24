@@ -57,7 +57,7 @@ public sealed class ChoreService : Tm1Service
 
     /// <summary><c>POST Chores</c>: creates a chore, with its tasks if the patch has them.</summary>
     [Tm1Endpoint("EntitySet Chores")]
-    public Task<Chore> CreateAsync(ChorePatch chore, CancellationToken cancellationToken = default) =>
+    public Task<Chore> CreateAsync(ChoreCreate chore, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<Chore>(Chores, Require(chore, nameof(chore))), cancellationToken);
 
     /// <summary><c>PATCH Chores('name')</c>: changes the properties the patch sets, <c>Active</c>

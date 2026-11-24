@@ -14,10 +14,12 @@ import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery
 from skipcheck_tm1.model import (
+    ChoreCreate,
     ChoreExecutionMode,
     ChorePatch,
     ChoreTaskParameterPatch,
     ChoreTaskPatch,
+    ProcessCreate,
     ProcessDebugContextLineBreakpointPatch,
     ProcessDebugContextStatus,
     ProcessErrorLog,
@@ -44,7 +46,7 @@ def test_lists_gets_creates_updates_and_deletes_processes(api: Api, fake: FakeTm
     fake.respond = lambda r: {"Name": "Load"}
     assert api.run(processes.get("Load")).name == "Load"
     assert target(fake.last) == "GET Processes('Load')"
-    patch = ProcessPatch.builder().name("Load").prolog_procedure("x;").build()
+    patch = ProcessCreate.builder().name("Load").prolog_procedure("x;").build()
     api.run(processes.create(patch))
     assert (target(fake.last), body(fake.last)) == ("POST Processes", {"Name": "Load", "PrologProcedure": "x;"})
     fake.respond = lambda r: None
@@ -62,7 +64,7 @@ def test_compiles_saved_and_unsaved_processes(api: Api, fake: FakeTm1) -> None:
     errors = api.run(api.client.processes.compile("Load"))
     assert (target(fake.last), body(fake.last)) == ("POST Processes('Load')/tm1.Compile", {})
     assert errors[0].line_number == 3
-    definition = ProcessPatch.builder().name("New").prolog_procedure("x;").build()
+    definition = ProcessCreate.builder().name("New").prolog_procedure("x;").build()
     api.run(api.client.processes.compile(definition))
     assert (target(fake.last), body(fake.last)) == ("POST CompileProcess", {"Process": {"Name": "New", "PrologProcedure": "x;"}})
     api.run(api.client.processes.compile(definition=definition))
@@ -81,7 +83,7 @@ def test_runs_with_return_saved_and_unsaved(api: Api, fake: FakeTm1) -> None:
     api.run(api.client.processes.execute_with_return("Load"))
     assert body(fake.last) == {}
 
-    cleanup = ProcessPatch.builder().name("Clear").prolog_procedure("CubeClearData('s');").build()
+    cleanup = ProcessCreate.builder().name("Clear").prolog_procedure("CubeClearData('s');").build()
     api.run(api.client.processes.execute_with_return(cleanup))
     assert (target(fake.last), body(fake.last)) == (
         "POST ExecuteProcessWithReturn",
@@ -102,7 +104,7 @@ def test_runs_without_return(api: Api, fake: FakeTm1) -> None:
     fake.respond = lambda r: None
     api.run(api.client.processes.execute("Load", {"p": "x"}))
     assert (target(fake.last), body(fake.last)) == ("POST Processes('Load')/tm1.Execute", {"Parameters": [{"Name": "p", "Value": "x"}]})
-    api.run(api.client.processes.execute(ProcessPatch.builder().name("Tmp").build()))
+    api.run(api.client.processes.execute(ProcessCreate.builder().name("Tmp").build()))
     assert (target(fake.last), body(fake.last)) == ("POST ExecuteProcess", {"Process": {"Name": "Tmp"}})
 
 
@@ -287,7 +289,7 @@ def test_chores(api: Api, fake: FakeTm1) -> None:
     )
     api.run(
         chores.create(
-            ChorePatch.builder()
+            ChoreCreate.builder()
             .name("Nightly")
             .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=UTC))
             .dst_sensitive(False)

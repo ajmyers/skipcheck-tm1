@@ -30,10 +30,10 @@ public class GitServiceLiveTests
             await Fails(() => tm1.Git.PushAsync("main", null, Commit, none, true), "Cannot create bare commit"); // nothing has changed
 
             await tm1.Dimensions.CreateAsync(
-                DimensionPatch
+                DimensionCreate
                     .Builder()
                     .Name(dimension)
-                    .Hierarchies([HierarchyPatch.Builder().Name(dimension).Elements([ElementPatch.Builder().Name("North").Build()]).Build()])
+                    .Hierarchies([HierarchyCreate.Builder().Name(dimension).Elements([ElementCreate.Builder().Name("North").Build()]).Build()])
                     .Build()
             );
             var push = await tm1.Git.PushAsync("main", null, Commit, none, true);

@@ -15,6 +15,7 @@ import io.skipcheck.tm1.client.error.Tm1ConflictException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.ConflictResolution;
 import io.skipcheck.tm1.client.model.Sandbox;
+import io.skipcheck.tm1.client.model.SandboxCreate;
 import io.skipcheck.tm1.client.model.SandboxPatch;
 import io.skipcheck.tm1.client.odata.Filter;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -64,25 +65,25 @@ class SandboxServiceTest {
 	void createsUpdatesAndDeletes() {
 		tm1().json(201, "{\"Name\":\"S\",\"IsLoaded\":true}");
 		Sandbox created = conformance.call("sandboxes", "create",
-				SandboxPatch.builder().name("S").includeInSandboxDimension(true).build());
+				SandboxCreate.builder().name("S").includeInSandboxDimension(true).build());
 		assertThat(created.name()).isEqualTo("S");
 		assertThat(tm1().last().key()).isEqualTo("POST Sandboxes");
 		assertThat(tm1().last().text()).isEqualTo("{\"Name\":\"S\",\"IncludeInSandboxDimension\":true}");
 
 		tm1().status(204);
-		conformance.call("sandboxes", "update", "S", SandboxPatch.builder().name("T").isActive(null).build());
+		conformance.call("sandboxes", "update", "S", SandboxPatch.builder().includeInSandboxDimension(false).build());
 		assertThat(tm1().last().key()).isEqualTo("PATCH Sandboxes('S')");
-		assertThat(tm1().last().text()).isEqualTo("{\"Name\":\"T\",\"IsActive\":null}");
+		assertThat(tm1().last().text()).isEqualTo("{\"IncludeInSandboxDimension\":false}");
 
 		tm1().status(204);
-		conformance.call("sandboxes", "delete", "T");
-		assertThat(tm1().last().key()).isEqualTo("DELETE Sandboxes('T')");
+		conformance.call("sandboxes", "delete", "S");
+		assertThat(tm1().last().key()).isEqualTo("DELETE Sandboxes('S')");
 	}
 
 	@Test
 	void aSandboxThatExistsIsAConflict() {
 		tm1().error(409, "278", "'S' already exists");
-		Throwable error = conformance.fail("sandboxes", "create", SandboxPatch.builder().name("S").build());
+		Throwable error = conformance.fail("sandboxes", "create", SandboxCreate.builder().name("S").build());
 		assertThat(error).isInstanceOf(Tm1ConflictException.class);
 	}
 

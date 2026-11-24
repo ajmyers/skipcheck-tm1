@@ -30,7 +30,7 @@ public static class ElementServiceExamples
     {
         // @start region = add-child
         // A new element is a root; SetComponent then puts it last under Total
-        await tm1.Elements.CreateAsync("Region", "Region", ElementPatch.Builder().Name("West").Type(ElementType.Numeric).Build());
+        await tm1.Elements.CreateAsync("Region", "Region", ElementCreate.Builder().Name("West").Type(ElementType.Numeric).Build());
         await tm1.Elements.SetComponentAsync("Region", "Region", "Total", "West");
         // @end
     }

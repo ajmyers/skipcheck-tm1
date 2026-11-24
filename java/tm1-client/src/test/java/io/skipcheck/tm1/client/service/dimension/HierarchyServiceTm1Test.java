@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterAll;
@@ -17,13 +18,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
-import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.EdgePatch;
 import io.skipcheck.tm1.client.model.Element;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.Hierarchy;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.HierarchyPatch;
 import io.skipcheck.tm1.client.model.Member;
 import io.skipcheck.tm1.client.odata.ODataPath;
@@ -60,7 +63,7 @@ class HierarchyServiceTm1Test {
 	void createDimension() {
 		dimension = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.dimensions()
-			.create(DimensionPatch.builder().name(dimension).hierarchies(List.of(structure(dimension))).build())
+			.create(DimensionCreate.builder().name(dimension).hierarchies(List.of(structure(dimension))).build())
 			.block(WAIT);
 	}
 
@@ -118,7 +121,14 @@ class HierarchyServiceTm1Test {
 	@Test
 	void updatesOnlyWhenTheEtagIsCurrentAndIgnoresVisible() {
 		String etag = hierarchies.get(dimension, dimension, ODataQuery.none()).block(WAIT).etag();
-		hierarchies.update(dimension, dimension, HierarchyPatch.builder().visible(false).build(), etag).block(WAIT);
+		hierarchies.update(dimension, dimension, HierarchyPatch.builder().elementsSortType("ByInput").build(), etag)
+			.block(WAIT);
+		// HierarchyPatch doesn't offer Visible, as TM1 ignores it: sent as it is, to pin
+		// it
+		tm1.session()
+			.execute(Tm1Request.patch(ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension),
+					Map.of("Visible", false)))
+			.block(WAIT);
 		assertThat(hierarchies.get(dimension, dimension, ODataQuery.none()).block(WAIT).visible())
 			.as("TM1 accepts Visible in a PATCH and ignores it")
 			.isTrue();
@@ -176,20 +186,20 @@ class HierarchyServiceTm1Test {
 			.elements();
 	}
 
-	private static HierarchyPatch structure(String name) {
-		return HierarchyPatch.builder()
+	private static HierarchyCreate structure(String name) {
+		return HierarchyCreate.builder()
 			.name(name)
 			.elements(List.of(consolidated("Total"), numeric("North"), numeric("South"), numeric("East")))
 			.edges(List.of(edge("Total", "North"), edge("Total", "South")))
 			.build();
 	}
 
-	private static ElementPatch numeric(String name) {
-		return ElementPatch.builder().name(name).type(ElementType.NUMERIC).build();
+	private static ElementCreate numeric(String name) {
+		return ElementCreate.builder().name(name).type(ElementType.NUMERIC).build();
 	}
 
-	private static ElementPatch consolidated(String name) {
-		return ElementPatch.builder().name(name).type(ElementType.CONSOLIDATED).build();
+	private static ElementCreate consolidated(String name) {
+		return ElementCreate.builder().name(name).type(ElementType.CONSOLIDATED).build();
 	}
 
 	private static EdgePatch edge(String parent, String component) {

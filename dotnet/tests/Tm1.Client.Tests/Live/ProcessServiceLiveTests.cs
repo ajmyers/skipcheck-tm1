@@ -127,8 +127,8 @@ public sealed class ProcessServiceLiveTests : IAsyncLifetime
 
     private static Dictionary<string, object?> Parameters(int count) => new() { ["pName"] = "x", ["pCount"] = count };
 
-    private static ProcessPatch Definition(string name, string prolog) =>
-        ProcessPatch
+    private static ProcessCreate Definition(string name, string prolog) =>
+        ProcessCreate
             .Builder()
             .Name(name)
             .Parameters([

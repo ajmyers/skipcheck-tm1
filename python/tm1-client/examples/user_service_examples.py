@@ -5,14 +5,19 @@
 from __future__ import annotations
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client
-from skipcheck_tm1.model import Group, User, UserPatch
+from skipcheck_tm1.model import (
+    Group,
+    User,
+    UserCreate,
+    UserPatch,
+)
 
 
 def create(tm1: Tm1Client) -> User:
     # @start region = create
     # A user in two existing groups, bound by their paths
     groups = ODataPath.of("Groups")
-    alice = UserPatch.builder().name("alice").password("initial-password").bind_groups(groups.key("Planners"), groups.key("Sales")).build()
+    alice = UserCreate.builder().name("alice").password("initial-password").bind_groups(groups.key("Planners"), groups.key("Sales")).build()
     return tm1.users.create(alice)
     # @end
 

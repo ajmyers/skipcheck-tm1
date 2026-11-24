@@ -36,7 +36,7 @@ class UserService(Service):
 
         groups = ODataPath.of("Groups")
         await tm1.users.create(
-            UserPatch.builder().name("alice").password("initial-password").bind_groups(groups.key("Planners"), groups.key("Sales")).build()
+            UserCreate.builder().name("alice").password("initial-password").bind_groups(groups.key("Planners"), groups.key("Sales")).build()
         )
 
     Take a user out of one group by setting the rest::
@@ -69,7 +69,7 @@ class UserService(Service):
     @endpoint("EntitySet Users")
     async def create(self, user: Any) -> User:
         """``POST Users``: creates a user, in the groups the patch binds
-        (``UserPatch.Builder.bind_groups``). It needs a name, and a password for Basic security."""
+        (``UserCreate.Builder.bind_groups``). It needs a name, and a password for Basic security."""
         return await self._session.execute(Tm1Request.post(_USERS, _require(user, "user"), User))
 
     @endpoint("EntitySet Users")

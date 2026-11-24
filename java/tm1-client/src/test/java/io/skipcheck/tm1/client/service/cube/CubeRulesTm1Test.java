@@ -19,14 +19,14 @@ import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.CalculationComponent;
 import io.skipcheck.tm1.client.model.CheckFeedersSelection;
-import io.skipcheck.tm1.client.model.CubePatch;
-import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.CubeCreate;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.EdgePatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.FedCellDescriptor;
 import io.skipcheck.tm1.client.model.FeederTrace;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.RuleSyntaxError;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -65,9 +65,9 @@ class CubeRulesTm1Test {
 		region = cube + "-region";
 		measure = cube + "-measure";
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(region)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(region)
 					.elements(List.of(element("Total", ElementType.CONSOLIDATED), element("North", ElementType.NUMERIC),
 							element("South", ElementType.NUMERIC)))
@@ -76,9 +76,9 @@ class CubeRulesTm1Test {
 				.build())
 			.block(WAIT);
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(measure)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(measure)
 					.elements(Arrays.asList(element("Amount", ElementType.NUMERIC),
 							element("Double", ElementType.NUMERIC)))
@@ -86,7 +86,7 @@ class CubeRulesTm1Test {
 				.build())
 			.block(WAIT);
 		cubes
-			.create(CubePatch.builder()
+			.create(CubeCreate.builder()
 				.name(cube)
 				.rules(RULES)
 				.bindDimensions(ODataPath.of("Dimensions").key(region), ODataPath.of("Dimensions").key(measure))
@@ -167,8 +167,8 @@ class CubeRulesTm1Test {
 		return tuple;
 	}
 
-	private static ElementPatch element(String name, ElementType type) {
-		return ElementPatch.builder().name(name).type(type).build();
+	private static ElementCreate element(String name, ElementType type) {
+		return ElementCreate.builder().name(name).type(type).build();
 	}
 
 	private static EdgePatch edge(String parent, String component) {

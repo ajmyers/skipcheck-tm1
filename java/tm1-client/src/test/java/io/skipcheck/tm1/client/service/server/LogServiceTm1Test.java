@@ -17,10 +17,10 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.MessageLogEntry;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessExecuteResult;
-import io.skipcheck.tm1.client.model.ProcessPatch;
 import io.skipcheck.tm1.client.model.TransactionLogEntry;
-import io.skipcheck.tm1.client.model.UserPatch;
+import io.skipcheck.tm1.client.model.UserCreate;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
@@ -113,7 +113,7 @@ class LogServiceTm1Test {
 	@Test
 	void readsAPasswordsHashThatIsntUtf8AsReplacementCharacters() {
 		String user = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
-		tm1.users().create(UserPatch.builder().name(user).password("pw").build()).block(WAIT);
+		tm1.users().create(UserCreate.builder().name(user).password("pw").build()).block(WAIT);
 		try {
 			List<TransactionLogEntry> newest = tm1.logs()
 				.transactionLog(true, true, ODataQuery.none().top(50))
@@ -135,7 +135,7 @@ class LogServiceTm1Test {
 	void readsAProcessErrorLog() {
 		String process = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.processes()
-			.create(ProcessPatch.builder().name(process).prologProcedure("ProcessError;\n").build())
+			.create(ProcessCreate.builder().name(process).prologProcedure("ProcessError;\n").build())
 			.block(WAIT);
 		try {
 			ProcessExecuteResult result = tm1.processes()

@@ -8,7 +8,7 @@
 			"service" : "dimensions",
 			"method" : "create",
 			"params" : [ "dimension" ],
-			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${world}", "Hierarchies" : [ { "Name" : "${world}", "Elements" : [ { "Name" : "World", "Type" : "Consolidated" }, { "Name" : "Europe", "Type" : "Consolidated" }, { "Name" : "Asia", "Type" : "Consolidated" }, { "Name" : "France", "Type" : "Numeric" }, { "Name" : "Spain", "Type" : "Numeric" }, { "Name" : "Japan", "Type" : "Numeric" } ], "Edges" : [ { "ParentName" : "World", "ComponentName" : "Europe", "Weight" : 1.0 }, { "ParentName" : "World", "ComponentName" : "Asia", "Weight" : 1.0 }, { "ParentName" : "Europe", "ComponentName" : "France", "Weight" : 1.0 }, { "ParentName" : "Europe", "ComponentName" : "Spain", "Weight" : 1.0 }, { "ParentName" : "Asia", "ComponentName" : "Japan", "Weight" : 1.0 } ] } ] } } ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${world}", "Hierarchies" : [ { "Name" : "${world}", "Elements" : [ { "Name" : "World", "Type" : "Consolidated" }, { "Name" : "Europe", "Type" : "Consolidated" }, { "Name" : "Asia", "Type" : "Consolidated" }, { "Name" : "France", "Type" : "Numeric" }, { "Name" : "Spain", "Type" : "Numeric" }, { "Name" : "Japan", "Type" : "Numeric" } ], "Edges" : [ { "ParentName" : "World", "ComponentName" : "Europe", "Weight" : 1.0 }, { "ParentName" : "World", "ComponentName" : "Asia", "Weight" : 1.0 }, { "ParentName" : "Europe", "ComponentName" : "France", "Weight" : 1.0 }, { "ParentName" : "Europe", "ComponentName" : "Spain", "Weight" : 1.0 }, { "ParentName" : "Asia", "ComponentName" : "Japan", "Weight" : 1.0 } ] } ] } } ],
 			"expect" : { "fields" : { "Name" : "${world}" } }
 		},
 		{

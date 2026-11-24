@@ -22,7 +22,7 @@ public static class SubsetServiceExamples
             "Region",
             "Region",
             SubsetScope.Public,
-            SubsetPatch.Builder().Name("Key Regions").BindElements(elements.Key("North"), elements.Key("South")).Build()
+            SubsetCreate.Builder().Name("Key Regions").BindElements(elements.Key("North"), elements.Key("South")).Build()
         );
         // @end
     }
@@ -35,7 +35,7 @@ public static class SubsetServiceExamples
             "Region",
             "Region",
             SubsetScope.Public,
-            SubsetPatch.Builder().Name("All Leaves").Expression("{TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)}").Build()
+            SubsetCreate.Builder().Name("All Leaves").Expression("{TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)}").Build()
         );
         // @end
     }
@@ -57,7 +57,7 @@ public static class SubsetServiceExamples
         var subset = await tm1.Subsets.CreateSessionSubsetAsync(
             "Region",
             "Region",
-            SubsetPatch.Builder().Name("Regions").Expression("{[Region].[Region].[Total].Children}").Build()
+            SubsetCreate.Builder().Name("Regions").Expression("{[Region].[Region].[Total].Children}").Build()
         );
         return await tm1
             .Subsets.ElementsAsync("Region", "Region", SubsetScope.Session, subset.Name!, ODataQuery.None().Select(Element.Fields.Name))

@@ -52,7 +52,7 @@ public static class SessionExamples
         // @start region = sandbox
         // The cell: every dimension, in the cube's order
         var cell = new Dictionary<string, string> { ["Region"] = "North", ["Month"] = "Jan" };
-        await new SandboxService(session).CreateAsync(SandboxPatch.Builder().Name("What-if").Build());
+        await new SandboxService(session).CreateAsync(SandboxCreate.Builder().Name("What-if").Build());
         await new CellService(session.WithSandbox("What-if")).UpdateAsync("Sales", cell, 1200);
         // @end
     }

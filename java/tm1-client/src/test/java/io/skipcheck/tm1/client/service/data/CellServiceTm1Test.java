@@ -23,13 +23,13 @@ import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.model.Cellset;
 import io.skipcheck.tm1.client.model.CellsetUpdatePatch;
-import io.skipcheck.tm1.client.model.CubePatch;
+import io.skipcheck.tm1.client.model.CubeCreate;
 import io.skipcheck.tm1.client.model.CubeUpdatePatch;
-import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.EdgePatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.UpdateOrder;
 import io.skipcheck.tm1.client.model.View;
 import io.skipcheck.tm1.client.odata.ODataPath;
@@ -66,9 +66,9 @@ class CellServiceTm1Test {
 		region = "tm1-client-" + id + "-region";
 		measure = "tm1-client-" + id + "-measure";
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(region)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(region)
 					.elements(List.of(element("Total", ElementType.CONSOLIDATED), element("North", ElementType.NUMERIC),
 							element("South", ElementType.NUMERIC)))
@@ -77,9 +77,9 @@ class CellServiceTm1Test {
 				.build())
 			.block(WAIT);
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(measure)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(measure)
 					.elements(List.of(element("Amount", ElementType.NUMERIC), element("Note", ElementType.STRING)))
 					.build()))
@@ -98,7 +98,7 @@ class CellServiceTm1Test {
 	void createCube() {
 		cube = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.cubes()
-			.create(CubePatch.builder()
+			.create(CubeCreate.builder()
 				.name(cube)
 				.bindDimensions(ODataPath.of("Dimensions").key(region), ODataPath.of("Dimensions").key(measure))
 				.build())
@@ -237,8 +237,8 @@ class CellServiceTm1Test {
 			.block(WAIT);
 	}
 
-	private static ElementPatch element(String name, ElementType type) {
-		return ElementPatch.builder().name(name).type(type).build();
+	private static ElementCreate element(String name, ElementType type) {
+		return ElementCreate.builder().name(name).type(type).build();
 	}
 
 	private static EdgePatch edge(String parent, String component) {

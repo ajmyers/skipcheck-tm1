@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Cube, CubePatch, Filter, ODataPath, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
+import { Cube, CubeCreate, CubePatch, Filter, ODataPath, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for CubeService, quoted in its documentation.
 
@@ -17,7 +17,7 @@ export function create(tm1: Tm1Client): Promise<Cube> {
   // @start region = create
   // A cube over two existing dimensions, in this order
   const dimensions = ODataPath.of("Dimensions");
-  return tm1.cubes.create(CubePatch.builder().name("Sales").bindDimensions(dimensions.key("Region"), dimensions.key("Month")).build());
+  return tm1.cubes.create(CubeCreate.builder().name("Sales").bindDimensions(dimensions.key("Region"), dimensions.key("Month")).build());
   // @end
 }
 

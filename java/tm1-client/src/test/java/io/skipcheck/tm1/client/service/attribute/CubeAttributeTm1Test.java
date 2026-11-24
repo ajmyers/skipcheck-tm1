@@ -15,19 +15,19 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.AttributeDefinition;
-import io.skipcheck.tm1.client.model.AttributeDefinitionPatch;
+import io.skipcheck.tm1.client.model.AttributeDefinitionCreate;
 import io.skipcheck.tm1.client.model.AttributeType;
 import io.skipcheck.tm1.client.model.AttributesPatch;
-import io.skipcheck.tm1.client.model.CubePatch;
-import io.skipcheck.tm1.client.model.DimensionPatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.CubeCreate;
+import io.skipcheck.tm1.client.model.DimensionCreate;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.LocalizedAttributes;
 import io.skipcheck.tm1.client.model.LocalizedAttributesPatch;
-import io.skipcheck.tm1.client.model.MDXViewPatch;
-import io.skipcheck.tm1.client.model.NativeViewPatch;
-import io.skipcheck.tm1.client.model.SubsetPatch;
+import io.skipcheck.tm1.client.model.MDXViewCreate;
+import io.skipcheck.tm1.client.model.NativeViewCreate;
+import io.skipcheck.tm1.client.model.SubsetCreate;
 import io.skipcheck.tm1.client.model.ViewAxisSelectionPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -58,17 +58,17 @@ class CubeAttributeTm1Test {
 		dimensions = List.of(cube + "-a", cube + "-b");
 		for (String d : dimensions) {
 			tm1.dimensions()
-				.create(DimensionPatch.builder()
+				.create(DimensionCreate.builder()
 					.name(d)
-					.hierarchies(List.of(HierarchyPatch.builder()
+					.hierarchies(List.of(HierarchyCreate.builder()
 						.name(d)
-						.elements(List.of(ElementPatch.builder().name("X").type(ElementType.NUMERIC).build()))
+						.elements(List.of(ElementCreate.builder().name("X").type(ElementType.NUMERIC).build()))
 						.build()))
 					.build())
 				.block(WAIT);
 		}
 		tm1.cubes()
-			.create(CubePatch.builder()
+			.create(CubeCreate.builder()
 				.name(cube)
 				.bindDimensions(ODataPath.of("Dimensions").key(dimensions.get(0)),
 						ODataPath.of("Dimensions").key(dimensions.get(1)))
@@ -76,7 +76,7 @@ class CubeAttributeTm1Test {
 			.block(WAIT);
 		tm1.views()
 			.create(cube, ViewScope.PUBLIC,
-					MDXViewPatch.builder()
+					MDXViewCreate.builder()
 						.name("V")
 						.mdx("SELECT {[" + dimensions.get(0) + "].[" + dimensions.get(0) + "].Members} ON 0 FROM ["
 								+ cube + "]")
@@ -85,12 +85,15 @@ class CubeAttributeTm1Test {
 		for (String d : dimensions) {
 			tm1.subsets()
 				.create(d, d, SubsetScope.PUBLIC,
-						SubsetPatch.builder().name("All").expression("{TM1SUBSETALL([" + d + "].[" + d + "])}").build())
+						SubsetCreate.builder()
+							.name("All")
+							.expression("{TM1SUBSETALL([" + d + "].[" + d + "])}")
+							.build())
 				.block(WAIT);
 		}
 		tm1.views()
 			.create(cube, ViewScope.PUBLIC,
-					NativeViewPatch.builder()
+					NativeViewCreate.builder()
 						.name("N")
 						.columns(List.of(axis(dimensions.get(0))))
 						.rows(List.of(axis(dimensions.get(1))))
@@ -113,7 +116,7 @@ class CubeAttributeTm1Test {
 				: AttributeOwner.view(cube, ViewScope.PUBLIC, "V");
 		String label = "Label " + UUID.randomUUID().toString().substring(0, 4);
 		tm1.attributes()
-			.create(set, AttributeDefinitionPatch.builder().name(label).type(AttributeType.STRING).build())
+			.create(set, AttributeDefinitionCreate.builder().name(label).type(AttributeType.STRING).build())
 			.block(WAIT);
 		try {
 			assertThat(tm1.attributes()

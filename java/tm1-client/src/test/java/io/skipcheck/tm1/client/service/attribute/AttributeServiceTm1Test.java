@@ -21,16 +21,16 @@ import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.model.AttributeDefinition;
-import io.skipcheck.tm1.client.model.AttributeDefinitionPatch;
+import io.skipcheck.tm1.client.model.AttributeDefinitionCreate;
 import io.skipcheck.tm1.client.model.AttributeType;
 import io.skipcheck.tm1.client.model.AttributesPatch;
-import io.skipcheck.tm1.client.model.DimensionPatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.LocalizedAttributes;
 import io.skipcheck.tm1.client.model.LocalizedAttributesPatch;
-import io.skipcheck.tm1.client.model.SubsetPatch;
+import io.skipcheck.tm1.client.model.SubsetCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.dimension.SubsetScope;
@@ -67,18 +67,18 @@ class AttributeServiceTm1Test {
 	void createDimension() {
 		d = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(d)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(d)
-					.elements(List.of(ElementPatch.builder().name("North").type(ElementType.NUMERIC).build(),
-							ElementPatch.builder().name("South").type(ElementType.NUMERIC).build()))
+					.elements(List.of(ElementCreate.builder().name("North").type(ElementType.NUMERIC).build(),
+							ElementCreate.builder().name("South").type(ElementType.NUMERIC).build()))
 					.build()))
 				.build())
 			.block(WAIT);
 		tm1.subsets()
 			.create(d, d, SubsetScope.PUBLIC,
-					SubsetPatch.builder().name("S").expression("{[" + d + "].[" + d + "].[North]}").build())
+					SubsetCreate.builder().name("S").expression("{[" + d + "].[" + d + "].[North]}").build())
 			.block(WAIT);
 	}
 
@@ -98,7 +98,7 @@ class AttributeServiceTm1Test {
 		};
 		String name = "Code " + UUID.randomUUID().toString().substring(0, 4);
 		AttributeDefinition created = tm1.attributes()
-			.create(set, AttributeDefinitionPatch.builder().name(name).type(AttributeType.STRING).build())
+			.create(set, AttributeDefinitionCreate.builder().name(name).type(AttributeType.STRING).build())
 			.block(WAIT);
 		assertThat(created.type()).isEqualTo(AttributeType.STRING);
 		try {
@@ -136,7 +136,7 @@ class AttributeServiceTm1Test {
 		AttributeOwner reader = kind.equals("member") ? AttributeOwner.member(d, d, "North") : owner;
 		String label = "Label " + UUID.randomUUID().toString().substring(0, 4);
 		tm1.attributes()
-			.create(set, AttributeDefinitionPatch.builder().name(label).type(AttributeType.STRING).build())
+			.create(set, AttributeDefinitionCreate.builder().name(label).type(AttributeType.STRING).build())
 			.block(WAIT);
 		LocalizedAttributeService localized = tm1.localizedAttributes();
 		try {

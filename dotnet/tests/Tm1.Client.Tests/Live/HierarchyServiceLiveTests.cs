@@ -24,8 +24,8 @@ public class HierarchyServiceLiveTests
             )
         );
 
-    private static HierarchyPatch Structure(string name) =>
-        HierarchyPatch
+    private static HierarchyCreate Structure(string name) =>
+        HierarchyCreate
             .Builder()
             .Name(name)
             .Elements([LiveDimension.Consolidated("Total"), LiveDimension.Numeric("North"), LiveDimension.Numeric("South"), LiveDimension.Numeric("East")])
@@ -93,7 +93,11 @@ public class HierarchyServiceLiveTests
         await using var made = await Region();
         var (tm1, d) = (made.Tm1, made.Name);
         var etag = (await tm1.Hierarchies.GetAsync(d, d)).ETag!;
-        await tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().Visible(false).Build(), etag);
+        await tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().ElementsSortType("ByInput").Build(), etag);
+        // HierarchyPatch doesn't offer Visible, as TM1 ignores it: sent as it is, to pin it
+        await tm1.Session.ExecuteAsync(
+            Tm1Request.Patch(ODataPath.Of("Dimensions").Key(d).Nav("Hierarchies").Key(d), new Dictionary<string, object?> { ["Visible"] = false })
+        );
         Assert.True((await tm1.Hierarchies.GetAsync(d, d)).Visible, "TM1 accepts Visible in a PATCH and ignores it");
         await tm1.Hierarchies.ReplaceStructureAsync(d, d, [LiveDimension.Numeric("North")], []);
         await Assert.ThrowsAsync<Tm1PreconditionFailedException>(() => tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().Build(), etag));

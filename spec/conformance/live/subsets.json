@@ -8,21 +8,21 @@
 			"service" : "dimensions",
 			"method" : "create",
 			"params" : [ "dimension" ],
-			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${dim}", "Hierarchies" : [ { "Name" : "${dim}", "Elements" : [ { "Name" : "A", "Type" : "Numeric" }, { "Name" : "B", "Type" : "Numeric" }, { "Name" : "C", "Type" : "Numeric" }, { "Name" : "D", "Type" : "Numeric" } ] } ] } } ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${dim}", "Hierarchies" : [ { "Name" : "${dim}", "Elements" : [ { "Name" : "A", "Type" : "Numeric" }, { "Name" : "B", "Type" : "Numeric" }, { "Name" : "C", "Type" : "Numeric" }, { "Name" : "D", "Type" : "Numeric" } ] } ] } } ],
 			"expect" : { "fields" : { "Name" : "${dim}" } }
 		},
 		{
 			"service" : "subsets",
 			"method" : "create",
 			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
-			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "SubsetPatch", "json" : { "Name" : "${static}", "Elements@odata.bind" : [ "Dimensions('${dim}')/Hierarchies('${dim}')/Elements('A')", "Dimensions('${dim}')/Hierarchies('${dim}')/Elements('B')" ] } } ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "SubsetCreate", "json" : { "Name" : "${static}", "Elements@odata.bind" : [ "Dimensions('${dim}')/Hierarchies('${dim}')/Elements('A')", "Dimensions('${dim}')/Hierarchies('${dim}')/Elements('B')" ] } } ],
 			"expect" : { "fields" : { "Name" : "${static}" } }
 		},
 		{
 			"service" : "subsets",
 			"method" : "create",
 			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
-			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "SubsetPatch", "json" : { "Name" : "${dynamic}", "Expression" : "{TM1SUBSETALL([${dim}].[${dim}])}" } } ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "SubsetCreate", "json" : { "Name" : "${dynamic}", "Expression" : "{TM1SUBSETALL([${dim}].[${dim}])}" } } ],
 			"expect" : { "fields" : { "Name" : "${dynamic}" } }
 		},
 		{

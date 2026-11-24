@@ -3,14 +3,15 @@
 import { Primitive, type Tm1Model } from "../../model.js";
 import {
   CalculationComponent,
+  type CheckFeedersSelection,
   Cube,
+  type CubeCreate,
+  type CubePatch,
   Dimension,
   FedCellDescriptor,
   FeederTrace,
   RuleSyntaxError,
   Tm1Operations,
-  type CheckFeedersSelection,
-  type CubePatch,
 } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";
@@ -35,7 +36,7 @@ const CUBES = ODataPath.of("Cubes");
  * Create a cube over existing dimensions, bound in order:
  * ```ts
  * const dimensions = ODataPath.of("Dimensions");
- * await tm1.cubes.create(CubePatch.builder().name("Sales").bindDimensions(dimensions.key("Region"), dimensions.key("Month")).build());
+ * await tm1.cubes.create(CubeCreate.builder().name("Sales").bindDimensions(dimensions.key("Region"), dimensions.key("Month")).build());
  * ```
  * Change a cube's rules, checking them first (TM1 saves rules even when they don't compile):
  * ```ts
@@ -94,7 +95,7 @@ export class CubeService extends Tm1Service {
   /** `POST Cubes`: creates a cube over existing dimensions, bound in order with
    * `CubePatch.builder().bindDimensions(…)`, and optionally its rules. It needs a name and at least
    * two dimensions; returns the cube as created. */
-  create(cube: CubePatch, options?: Tm1CallOptions): Promise<Cube> {
+  create(cube: CubeCreate, options?: Tm1CallOptions): Promise<Cube> {
     return this.session.execute(Tm1Request.post(CUBES, required(cube, "cube"), Cube), options);
   }
 

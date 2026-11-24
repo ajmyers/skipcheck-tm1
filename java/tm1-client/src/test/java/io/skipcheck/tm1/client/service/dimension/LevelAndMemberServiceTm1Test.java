@@ -13,11 +13,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
-import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.EdgePatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.Level;
 import io.skipcheck.tm1.client.model.Member;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -45,9 +45,9 @@ class LevelAndMemberServiceTm1Test {
 			.build();
 		d = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(d)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(d)
 					.elements(List.of(consolidated("World"), consolidated("Europe"), consolidated("Asia"),
 							numeric("France"), numeric("Spain"), numeric("Japan")))
@@ -80,12 +80,12 @@ class LevelAndMemberServiceTm1Test {
 		return members.stream().map(Member::name).toList();
 	}
 
-	private static ElementPatch numeric(String name) {
-		return ElementPatch.builder().name(name).type(ElementType.NUMERIC).build();
+	private static ElementCreate numeric(String name) {
+		return ElementCreate.builder().name(name).type(ElementType.NUMERIC).build();
 	}
 
-	private static ElementPatch consolidated(String name) {
-		return ElementPatch.builder().name(name).type(ElementType.CONSOLIDATED).build();
+	private static ElementCreate consolidated(String name) {
+		return ElementCreate.builder().name(name).type(ElementType.CONSOLIDATED).build();
 	}
 
 	private static EdgePatch edge(String parent, String component) {

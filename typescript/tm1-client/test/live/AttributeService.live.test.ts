@@ -2,13 +2,13 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
 import {
-  AttributeDefinitionPatch,
+  AttributeDefinitionCreate,
   AttributeOwner,
   AttributeSet,
   AttributesPatch,
   AttributeType,
   LocalizedAttributesPatch,
-  SubsetPatch,
+  SubsetCreate,
   SubsetScope,
   Tm1BadRequestException,
   Tm1Request,
@@ -36,7 +36,7 @@ describe("AttributeService and LocalizedAttributeService on TM1" + liveReason, (
     if (!Live.configured) return;
     d = Live.name();
     await createDimension(tm1, d, ["North", "South"]);
-    await createSubset(tm1, d, SubsetPatch.builder().name("S").expression(`{[${d}].[${d}].[North]}`).build());
+    await createSubset(tm1, d, SubsetCreate.builder().name("S").expression(`{[${d}].[${d}].[North]}`).build());
   });
 
   afterEach(async () => {
@@ -55,7 +55,7 @@ describe("AttributeService and LocalizedAttributeService on TM1" + liveReason, (
   tm1Test.each(["dimensions", "hierarchies", "elements", "subsets"])("creates, lists, reads and deletes attribute definitions: %s", async (kind) => {
     const set = definitions(kind);
     const name = "Code " + shortId();
-    const created = await tm1.attributes.create(set, AttributeDefinitionPatch.builder().name(name).type(AttributeType.String).build());
+    const created = await tm1.attributes.create(set, AttributeDefinitionCreate.builder().name(name).type(AttributeType.String).build());
     expect(created.Type).toBe(AttributeType.String);
     try {
       expect((await tm1.attributes.list(set).toArray()).map((a) => a.Name)).toContain(name);
@@ -79,7 +79,7 @@ describe("AttributeService and LocalizedAttributeService on TM1" + liveReason, (
     // A member's translations are its element's, and read only
     const reader = kind === "member" ? AttributeOwner.member(d, d, "North") : owner;
     const label = "Label " + shortId();
-    await tm1.attributes.create(set, AttributeDefinitionPatch.builder().name(label).type(AttributeType.String).build());
+    await tm1.attributes.create(set, AttributeDefinitionCreate.builder().name(label).type(AttributeType.String).build());
     const localized = tm1.localizedAttributes;
     const value = async (o: AttributeOwner): Promise<unknown> => (await localized.get(o, "fr")).Attributes?.[label];
     try {

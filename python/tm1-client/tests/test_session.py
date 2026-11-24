@@ -163,10 +163,10 @@ def test_a_compound_key(client: Tm1Client, fake: FakeTm1) -> None:
 
 
 def test_the_generated_api_takes_patches_too(client: Tm1Client, fake: FakeTm1) -> None:
-    from skipcheck_tm1.model import CubePatch, ProcessPatch
+    from skipcheck_tm1.model import CubePatch, ProcessCreate
 
     fake.respond = lambda r: {"Name": "p"}
-    client.api.processes.create(ProcessPatch.builder().name("p").build())
+    client.api.processes.create(ProcessCreate.builder().name("p").build())
     assert json.loads(fake.last.content) == {"Name": "p"}
     fake.respond = lambda r: None
     client.api.cubes["c"].update(CubePatch.builder().rules(None).build())

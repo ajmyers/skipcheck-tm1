@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { ProcessPatch, Tm1ServerException, type Thread, type Tm1Client, type Tm1ClientBuilder } from "../../src/index.js";
+import { ProcessCreate, Tm1ServerException, type Thread, type Tm1Client, type Tm1ClientBuilder } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 /** A client beside `Live.client()`, of the same TM1 with the same settings, as another session. */
@@ -47,7 +47,7 @@ describe("SessionService and ThreadService on TM1" + liveReason, () => {
 
   tm1Test("cancels a running process through its thread", { timeout: 180_000 }, async () => {
     const process = Live.name();
-    await tm1.processes.create(ProcessPatch.builder().name(process).prologProcedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n").build());
+    await tm1.processes.create(ProcessCreate.builder().name(process).prologProcedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n").build());
     const runner = await otherClient();
     const run = runner.processes.executeWithReturn(process);
     const ran = run.then(

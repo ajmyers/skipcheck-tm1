@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+  type Chore,
+  ChoreCreate,
   ChoreExecutionMode,
   ChorePatch,
   ChoreTaskParameterPatch,
   ChoreTaskPatch,
   ODataPath,
-  Tm1Duration,
-  type Chore,
   type Tm1Client,
+  Tm1Duration,
 } from "@skipcheck/tm1-client";
 
 // Examples for ChoreService, quoted in its documentation.
@@ -24,7 +25,7 @@ export function create(tm1: Tm1Client): Promise<Chore> {
       ChoreTaskParameterPatch.builder().name("pYear").value(2026).build(),
     ])
     .build();
-  const nightly = ChorePatch.builder()
+  const nightly = ChoreCreate.builder()
     .name("Nightly Load")
     .startTime("2026-01-01T02:00:00Z")
     .dstSensitive(false)

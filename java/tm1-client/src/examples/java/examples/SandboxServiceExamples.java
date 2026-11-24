@@ -7,7 +7,7 @@ import java.util.Map;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.CellsetCell;
-import io.skipcheck.tm1.client.model.SandboxPatch;
+import io.skipcheck.tm1.client.model.SandboxCreate;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
@@ -28,7 +28,7 @@ final class SandboxServiceExamples {
 		cell.put("Measure", "Revenue");
 		Tm1Client whatIf = tm1.withSandbox("What If");
 		return tm1.sandboxes()
-			.create(SandboxPatch.builder().name("What If").build())
+			.create(SandboxCreate.builder().name("What If").build())
 			.then(whatIf.cells().update("Sales", cell, 1500))
 			.then(tm1.sandboxes().publish("What If"));
 		// @end

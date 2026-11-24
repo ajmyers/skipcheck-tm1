@@ -41,7 +41,7 @@ public class CubeServiceTests
         Assert.Equal("Cubes('Sales')?$select=Name", _tm1.Last.Target);
 
         var dimensions = ODataPath.Of("Dimensions");
-        await tm1.Cubes.CreateAsync(CubePatch.Builder().Name("Sales").BindDimensions(dimensions.Key("Region"), dimensions.Key("Month")).Build());
+        await tm1.Cubes.CreateAsync(CubeCreate.Builder().Name("Sales").BindDimensions(dimensions.Key("Region"), dimensions.Key("Month")).Build());
         Assert.Equal("POST", _tm1.Last.Method);
         Assert.Equal("""{"Name":"Sales","Dimensions@odata.bind":["Dimensions('Region')","Dimensions('Month')"]}""", _tm1.Last.Text);
 

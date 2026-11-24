@@ -20,13 +20,15 @@ import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1Exception;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Chore;
+import io.skipcheck.tm1.client.model.ChoreCreate;
 import io.skipcheck.tm1.client.model.ChoreExecutionMode;
 import io.skipcheck.tm1.client.model.ChorePatch;
 import io.skipcheck.tm1.client.model.ChoreTask;
 import io.skipcheck.tm1.client.model.ChoreTaskParameterPatch;
 import io.skipcheck.tm1.client.model.ChoreTaskPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessParameterPatch;
-import io.skipcheck.tm1.client.model.ProcessPatch;
 import io.skipcheck.tm1.client.model.ProcessVariableType;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -60,7 +62,7 @@ class ChoreServiceTm1Test {
 		process = "tm1-client-" + id;
 		chore = "tm1-client-chore-" + id;
 		tm1.processes()
-			.create(ProcessPatch.builder()
+			.create(ProcessCreate.builder()
 				.name(process)
 				.parameters(List.of(
 						ProcessParameterPatch.builder()
@@ -77,7 +79,7 @@ class ChoreServiceTm1Test {
 				.build())
 			.block(WAIT);
 		chores
-			.create(ChorePatch.builder()
+			.create(ChoreCreate.builder()
 				.name(chore)
 				.startTime(OffsetDateTime.parse("2026-01-01T02:00:00Z"))
 				.dstSensitive(false)

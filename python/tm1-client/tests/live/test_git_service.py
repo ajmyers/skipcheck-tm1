@@ -20,7 +20,7 @@ import pytest
 
 from skipcheck_tm1 import Tm1BadRequestError, Tm1Client, Tm1Error, Tm1NotFoundError
 from skipcheck_tm1._sync.services.git import GitCommitDetails, GitCredentials
-from skipcheck_tm1.model import DimensionPatch, ElementPatch, GitPushPlan, HierarchyPatch
+from skipcheck_tm1.model import DimensionCreate, ElementCreate, GitPushPlan, HierarchyCreate
 
 from .conftest import _RUNNING, CONFIGURED, REASON
 
@@ -141,9 +141,9 @@ def test_pushes_the_model_and_pulls_it_back(tm1: Tm1Client, remote: GitDaemon) -
             tm1.git.push("main", None, COMMIT, none, True)  # nothing has changed
 
         tm1.dimensions.create(
-            DimensionPatch.builder()
+            DimensionCreate.builder()
             .name(dimension)
-            .hierarchies([HierarchyPatch.builder().name(dimension).elements([ElementPatch.builder().name("North").build()]).build()])
+            .hierarchies([HierarchyCreate.builder().name(dimension).elements([ElementCreate.builder().name("North").build()]).build()])
             .build()
         )
         push = tm1.git.push("main", None, COMMIT, none, True)

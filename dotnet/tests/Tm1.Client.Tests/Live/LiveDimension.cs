@@ -13,22 +13,22 @@ namespace Skipcheck.Tm1.Client.Tests.Live;
 /// one test, and the names of what a test reads.</summary>
 internal static class LiveDimension
 {
-    public static ElementPatch Numeric(string name) => ElementPatch.Builder().Name(name).Type(ElementType.Numeric).Build();
+    public static ElementCreate Numeric(string name) => ElementCreate.Builder().Name(name).Type(ElementType.Numeric).Build();
 
-    public static ElementPatch Consolidated(string name) => ElementPatch.Builder().Name(name).Type(ElementType.Consolidated).Build();
+    public static ElementCreate Consolidated(string name) => ElementCreate.Builder().Name(name).Type(ElementType.Consolidated).Build();
 
-    public static ElementPatch Text(string name) => ElementPatch.Builder().Name(name).Type(ElementType.String).Build();
+    public static ElementCreate Text(string name) => ElementCreate.Builder().Name(name).Type(ElementType.String).Build();
 
     public static EdgePatch Edge(string parent, string component) => EdgePatch.Builder().ParentName(parent).ComponentName(component).Weight(1.0).Build();
 
-    public static DimensionPatch DimensionOf(string name, IReadOnlyList<ElementPatch> elements, IReadOnlyList<EdgePatch>? edges = null)
+    public static DimensionCreate DimensionOf(string name, IReadOnlyList<ElementCreate> elements, IReadOnlyList<EdgePatch>? edges = null)
     {
-        var hierarchy = HierarchyPatch.Builder().Name(name).Elements(elements);
+        var hierarchy = HierarchyCreate.Builder().Name(name).Elements(elements);
         if (edges is { Count: > 0 })
         {
             hierarchy = hierarchy.Edges(edges);
         }
-        return DimensionPatch.Builder().Name(name).Hierarchies([hierarchy.Build()]).Build();
+        return DimensionCreate.Builder().Name(name).Hierarchies([hierarchy.Build()]).Build();
     }
 
     public static List<string> Names(IEnumerable<Element> items) => items.Select(i => i.Name!).ToList();
@@ -52,7 +52,7 @@ internal static class LiveDimension
 
         public string Name { get; }
 
-        public static async Task<Made> Of(Func<string, DimensionPatch> patch)
+        public static async Task<Made> Of(Func<string, DimensionCreate> patch)
         {
             var tm1 = Live.Client();
             var name = Live.Name();

@@ -35,7 +35,7 @@ public sealed class CellServiceLiveTests : IAsyncLifetime
             [LiveModel.Edge("Total", "North"), LiveModel.Edge("Total", "South")]
         );
         await LiveModel.DimensionAsync(_tm1, Measure, [LiveModel.Element("Amount", ElementType.Numeric), LiveModel.Element("Note", ElementType.String)], []);
-        await _tm1.Cubes.CreateAsync(CubePatch.Builder().Name(_cube).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure)).Build());
+        await _tm1.Cubes.CreateAsync(CubeCreate.Builder().Name(_cube).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure)).Build());
     }
 
     public async Task DisposeAsync()

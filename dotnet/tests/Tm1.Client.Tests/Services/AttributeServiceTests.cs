@@ -40,7 +40,7 @@ public class AttributeServiceTests
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "Manager", ["Type"] = "String" };
         await tm1.Attributes.GetAsync(set, "Manager");
         Assert.Equal(("GET", path + "('Manager')"), (_tm1.Last.Method, _tm1.Last.Target));
-        await tm1.Attributes.CreateAsync(set, AttributeDefinitionPatch.Builder().Name("Manager").Type(AttributeType.String).Build());
+        await tm1.Attributes.CreateAsync(set, AttributeDefinitionCreate.Builder().Name("Manager").Type(AttributeType.String).Build());
         Assert.Equal(("POST", path, """{"Name":"Manager","Type":"String"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => null;

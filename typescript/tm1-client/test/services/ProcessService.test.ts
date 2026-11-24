@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { ODataQuery, ProcessPatch, Tm1PreconditionFailedException, Tm1UnsupportedOperationException } from "../../src/index.js";
+import { ODataQuery, ProcessCreate, ProcessPatch, Tm1PreconditionFailedException, Tm1UnsupportedOperationException } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 /** ProcessService against a fake TM1: each method sends what the Java client's does (the Java
@@ -18,7 +18,7 @@ describe("ProcessService", () => {
     tm1.respond = () => ({ Name: "Load", "@odata.etag": 'W/"1"' });
     expect((await client.processes.get("Load"))["@odata.etag"]).toBe('W/"1"');
     expect(`${tm1.last.method} ${tm1.last.target}`).toBe("GET Processes('Load')");
-    const created = await client.processes.create(ProcessPatch.builder().name("Load").prologProcedure("x=1;").build());
+    const created = await client.processes.create(ProcessCreate.builder().name("Load").prologProcedure("x=1;").build());
     expect(created.Name).toBe("Load");
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Processes", '{"Name":"Load","PrologProcedure":"x=1;"}']);
 
@@ -49,7 +49,7 @@ describe("ProcessService", () => {
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Processes('Load')/tm1.Compile", "{}"]);
 
     tm1.respond = () => FakeTm1.collection();
-    expect(await client.processes.compile(ProcessPatch.builder().name("x").build()).toArray()).toEqual([]);
+    expect(await client.processes.compile(ProcessCreate.builder().name("x").build()).toArray()).toEqual([]);
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "CompileProcess", '{"Process":{"Name":"x"}}']);
   });
 
@@ -74,7 +74,7 @@ describe("ProcessService", () => {
     expect(tm1.last.text).toBe("{}");
 
     tm1.respond = () => ({ ProcessExecuteStatusCode: "Aborted", ErrorLogFile: { Filename: "tm1processerror_x_adhoc.log" } });
-    const adhoc = await client.processes.executeWithReturn(ProcessPatch.builder().name("adhoc").build(), { p: "v" }, ODataQuery.none().expand("ErrorLogFile"));
+    const adhoc = await client.processes.executeWithReturn(ProcessCreate.builder().name("adhoc").build(), { p: "v" }, ODataQuery.none().expand("ErrorLogFile"));
     expect(adhoc.ProcessExecuteStatusCode).toBe("Aborted");
     expect(adhoc.ErrorLogFile?.Filename).toBe("tm1processerror_x_adhoc.log");
     expect([tm1.last.method, tm1.last.target]).toEqual(["POST", "ExecuteProcessWithReturn?$expand=ErrorLogFile"]);
@@ -93,9 +93,9 @@ describe("ProcessService", () => {
     const client = tm1.client();
     await client.processes.execute("Load", { p: 1 });
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Processes('Load')/tm1.Execute", '{"Parameters":[{"Name":"p","Value":1}]}']);
-    await client.processes.execute(ProcessPatch.builder().name("adhoc").build());
+    await client.processes.execute(ProcessCreate.builder().name("adhoc").build());
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "ExecuteProcess", '{"Process":{"Name":"adhoc"}}']);
-    await client.processes.execute(ProcessPatch.builder().name("adhoc").build(), new Map([["p", null]]));
+    await client.processes.execute(ProcessCreate.builder().name("adhoc").build(), new Map([["p", null]]));
     expect(tm1.last.text).toBe('{"Process":{"Name":"adhoc"},"Parameters":[{"Name":"p","Value":null}]}');
 
     tm1.respond = () => FakeTm1.collection({ Timestamp: "2026-01-02T03:04:05Z" });
@@ -132,12 +132,12 @@ describe("ProcessService", () => {
     const client = tm1.client();
     // The deprecated ones aren't checked, so they're sent
     await client.processes.execute("Load");
-    await client.processes.execute(ProcessPatch.builder().name("x").build());
+    await client.processes.execute(ProcessCreate.builder().name("x").build());
     expect(tm1.requests.map((r) => r.target)).toEqual(["Processes('Load')/tm1.Execute", "ExecuteProcess"]);
     await expect(client.processes.executeWithReturn("Load")).rejects.toBeInstanceOf(Tm1UnsupportedOperationException);
-    await expect(client.processes.executeWithReturn(ProcessPatch.builder().name("x").build())).rejects.toBeInstanceOf(Tm1UnsupportedOperationException);
+    await expect(client.processes.executeWithReturn(ProcessCreate.builder().name("x").build())).rejects.toBeInstanceOf(Tm1UnsupportedOperationException);
     await expect(client.processes.compile("Load").toArray()).rejects.toBeInstanceOf(Tm1UnsupportedOperationException);
-    await expect(client.processes.compile(ProcessPatch.builder().name("x").build()).toArray()).rejects.toBeInstanceOf(Tm1UnsupportedOperationException);
+    await expect(client.processes.compile(ProcessCreate.builder().name("x").build()).toArray()).rejects.toBeInstanceOf(Tm1UnsupportedOperationException);
     expect(tm1.requests.length).toBe(2);
   });
 });

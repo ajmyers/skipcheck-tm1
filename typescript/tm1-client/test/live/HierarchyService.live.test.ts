@@ -2,27 +2,29 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
 import {
-  DimensionPatch,
+  DimensionCreate,
   EdgePatch,
-  ElementPatch,
+  ElementCreate,
   ElementType,
   Hierarchy,
+  HierarchyCreate,
   HierarchyPatch,
   Member,
   ODataPath,
   ODataQuery,
-  Tm1PreconditionFailedException,
   type Tm1Client,
+  Tm1PreconditionFailedException,
+  Tm1Request,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
-const numeric = (name: string): ElementPatch => ElementPatch.builder().name(name).type(ElementType.Numeric).build();
-const consolidated = (name: string): ElementPatch => ElementPatch.builder().name(name).type(ElementType.Consolidated).build();
+const numeric = (name: string): ElementCreate => ElementCreate.builder().name(name).type(ElementType.Numeric).build();
+const consolidated = (name: string): ElementCreate => ElementCreate.builder().name(name).type(ElementType.Consolidated).build();
 const edge = (parent: string, component: string): EdgePatch => EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
 
 /** Total = North + South, and East alone. */
-const structure = (name: string): HierarchyPatch =>
-  HierarchyPatch.builder()
+const structure = (name: string): HierarchyCreate =>
+  HierarchyCreate.builder()
     .name(name)
     .elements([consolidated("Total"), numeric("North"), numeric("South"), numeric("East")])
     .edges([edge("Total", "North"), edge("Total", "South")])
@@ -46,7 +48,7 @@ describe("HierarchyService on TM1" + liveReason, () => {
     if (!Live.configured) return;
     dimension = Live.name();
     await tm1.dimensions.create(
-      DimensionPatch.builder()
+      DimensionCreate.builder()
         .name(dimension)
         .hierarchies([structure(dimension)])
         .build(),
@@ -99,7 +101,9 @@ describe("HierarchyService on TM1" + liveReason, () => {
 
   tm1Test("updates only when the ETag is current, and ignores Visible", async () => {
     const etag = (await tm1.hierarchies.get(dimension, dimension))["@odata.etag"]!;
-    await tm1.hierarchies.update(dimension, dimension, HierarchyPatch.builder().visible(false).build(), etag);
+    await tm1.hierarchies.update(dimension, dimension, HierarchyPatch.builder().elementsSortType("ByInput").build(), etag);
+    // HierarchyPatch doesn't offer Visible, as TM1 ignores it: sent as it is, to pin it
+    await tm1.session.execute(Tm1Request.patch(ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension), { Visible: false }));
     // TM1 accepts Visible in a PATCH and ignores it
     expect((await tm1.hierarchies.get(dimension, dimension)).Visible).toBe(true);
 

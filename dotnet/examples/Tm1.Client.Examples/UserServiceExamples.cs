@@ -17,7 +17,7 @@ public static class UserServiceExamples
         // A user in two existing groups, bound by their paths
         var groups = ODataPath.Of("Groups");
         return await tm1.Users.CreateAsync(
-            UserPatch.Builder().Name("alice").Password("initial-password").BindGroups(groups.Key("Planners"), groups.Key("Sales")).Build()
+            UserCreate.Builder().Name("alice").Password("initial-password").BindGroups(groups.Key("Planners"), groups.Key("Sales")).Build()
         );
         // @end
     }

@@ -42,8 +42,8 @@ public class WritesTests
             """{"Name": "Nightly", "Active": true, "Frequency": "P1DT00H00M00S", "Attributes": {"Caption": "Nightly"}, "Tasks": [{"Step": 0, "Parameters": [{"Name": "pValue", "Value": "1"}]}]}""",
             Tm1Json.Options
         )!;
-        // A PATCH refuses Attributes, and appends Tasks: neither is copied
-        Assert.Equal(["Active", "Frequency", "Name"], Names(ChorePatch.Builder(read).Build()));
+        // A PATCH refuses Attributes and a rename, and appends Tasks: none is copied
+        Assert.Equal(["Active", "Frequency"], Names(ChorePatch.Builder(read).Build()));
         // A create ignores Attributes too (they're written through the attribute cubes). Tasks is a
         // navigation: none is copied, as a task's Process would have to be bound again
         var create = Names(ChoreCreate.Builder(read).Build());

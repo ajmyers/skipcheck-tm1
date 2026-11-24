@@ -6,12 +6,12 @@ import java.util.List;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Dimension;
-import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.EdgePatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.Hierarchy;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -34,13 +34,13 @@ final class DimensionServiceExamples {
 	Mono<Dimension> create(Tm1Client tm1) {
 		// @start region = create
 		// Region, with one hierarchy of the same name: Total = North + South
-		ElementPatch total = ElementPatch.builder().name("Total").type(ElementType.CONSOLIDATED).build();
-		ElementPatch north = ElementPatch.builder().name("North").type(ElementType.NUMERIC).build();
-		ElementPatch south = ElementPatch.builder().name("South").type(ElementType.NUMERIC).build();
+		ElementCreate total = ElementCreate.builder().name("Total").type(ElementType.CONSOLIDATED).build();
+		ElementCreate north = ElementCreate.builder().name("North").type(ElementType.NUMERIC).build();
+		ElementCreate south = ElementCreate.builder().name("South").type(ElementType.NUMERIC).build();
 		return tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name("Region")
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name("Region")
 					.elements(List.of(total, north, south))
 					.edges(List.of(EdgePatch.builder().parentName("Total").componentName("North").weight(1.0).build(),

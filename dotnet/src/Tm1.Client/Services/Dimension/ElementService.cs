@@ -43,7 +43,7 @@ public sealed class ElementService : Tm1Service
     /// <summary><c>POST …/Elements</c>: adds an element, with its components if the patch has them;
     /// returns the element as created.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Elements")]
-    public Task<Element> CreateAsync(string dimension, string hierarchy, ElementPatch element, CancellationToken cancellationToken = default) =>
+    public Task<Element> CreateAsync(string dimension, string hierarchy, ElementCreate element, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<Element>(ElementsPath(dimension, hierarchy), Require(element, nameof(element))), cancellationToken);
 
     /// <summary><c>PATCH …/Elements('e')</c>: changes the properties the patch sets, typically <c>Type</c>.

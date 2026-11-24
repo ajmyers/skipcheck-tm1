@@ -3,16 +3,17 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import {
   Cube,
+  CubeCreate,
   CubePatch,
-  DimensionPatch,
-  ElementPatch,
+  DimensionCreate,
+  ElementCreate,
   ElementType,
   Filter,
-  HierarchyPatch,
+  HierarchyCreate,
   ODataPath,
   ODataQuery,
-  Tm1NotFoundException,
   type Tm1Client,
+  Tm1NotFoundException,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
@@ -33,15 +34,15 @@ describe("TypeScript-only live tests: CubeService" + liveReason, () => {
       [dimensions[0]!, ["a", "b"]],
       [dimensions[1]!, ["x", "y"]],
     ] as const) {
-      const hierarchy = HierarchyPatch.builder()
+      const hierarchy = HierarchyCreate.builder()
         .name(d)
-        .elements(elements.map((e) => ElementPatch.builder().name(e).type(ElementType.Numeric).build()))
+        .elements(elements.map((e) => ElementCreate.builder().name(e).type(ElementType.Numeric).build()))
         .build();
-      await tm1.dimensions.create(DimensionPatch.builder().name(d).hierarchies([hierarchy]).build());
+      await tm1.dimensions.create(DimensionCreate.builder().name(d).hierarchies([hierarchy]).build());
     }
     const all = ODataPath.of("Dimensions");
     await tm1.cubes.create(
-      CubePatch.builder()
+      CubeCreate.builder()
         .name(cube)
         .bindDimensions(...dimensions.map((d) => all.key(d)))
         .build(),

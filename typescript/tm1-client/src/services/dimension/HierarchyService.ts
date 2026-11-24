@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Tm1Model } from "../../model.js";
-import { Dimension, Hierarchy, HierarchyPatch, Member, Tm1Operations, type EdgePatch, type ElementPatch } from "../../generated/index.js";
+import {
+  Dimension,
+  type EdgePatch,
+  type ElementCreate,
+  Hierarchy,
+  type HierarchyCreate,
+  HierarchyPatch,
+  Member,
+  Tm1Operations,
+} from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";
 import { Tm1Request } from "../../request.js";
@@ -18,8 +27,8 @@ import { Tm1Service, type Tm1Endpoints } from "../service.js";
  *
  * Add a hierarchy to a dimension, with its elements and edges:
  * ```ts
- * await tm1.hierarchies.create("Region", HierarchyPatch.builder().name("ByManager")
- *   .elements([ElementPatch.builder().name("All").type(ElementType.Consolidated).build(), ElementPatch.builder().name("North").build()])
+ * await tm1.hierarchies.create("Region", HierarchyCreate.builder().name("ByManager")
+ *   .elements([ElementCreate.builder().name("All").type(ElementType.Consolidated).build(), ElementCreate.builder().name("North").build()])
  *   .edges([EdgePatch.builder().parentName("All").componentName("North").weight(1).build()])
  *   .build());
  * ```
@@ -63,7 +72,7 @@ export class HierarchyService extends Tm1Service {
 
   /** `POST Dimensions('d')/Hierarchies`: adds a hierarchy, with its elements and edges if the patch
    * has them. It needs a name; returns the hierarchy as created. */
-  create(dimension: string, hierarchy: HierarchyPatch, options?: Tm1CallOptions): Promise<Hierarchy> {
+  create(dimension: string, hierarchy: HierarchyCreate, options?: Tm1CallOptions): Promise<Hierarchy> {
     return this.session.execute(Tm1Request.post(hierarchiesPath(dimension), required(hierarchy, "hierarchy"), Hierarchy), options);
   }
 
@@ -83,7 +92,7 @@ export class HierarchyService extends Tm1Service {
   replaceStructure(
     dimension: string,
     hierarchy: string,
-    elements: readonly ElementPatch[],
+    elements: readonly ElementCreate[],
     edges: readonly EdgePatch[],
     options?: Tm1CallOptions,
   ): Promise<void> {

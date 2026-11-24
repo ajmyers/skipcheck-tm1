@@ -16,12 +16,12 @@ from skipcheck_tm1._sync.services.dimension import SubsetScope
 from skipcheck_tm1.model import (
     AttributesPatch,
     AttributeType,
-    DimensionPatch,
-    ElementPatch,
+    DimensionCreate,
+    ElementCreate,
     ElementType,
-    HierarchyPatch,
+    HierarchyCreate,
     LocalizedAttributesPatch,
-    SubsetPatch,
+    SubsetCreate,
 )
 
 from .conftest import CONFIGURED, REASON
@@ -39,16 +39,16 @@ pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 def d(tm1: Tm1Client, name: str) -> Iterator[str]:
     """A dimension with North and South, and a public subset S."""
     tm1.dimensions.create(
-        DimensionPatch.builder()
+        DimensionCreate.builder()
         .name(name)
         .hierarchies(
             [
-                HierarchyPatch.builder()
+                HierarchyCreate.builder()
                 .name(name)
                 .elements(
                     [
-                        ElementPatch.builder().name("North").type(ElementType.NUMERIC).build(),
-                        ElementPatch.builder().name("South").type(ElementType.NUMERIC).build(),
+                        ElementCreate.builder().name("North").type(ElementType.NUMERIC).build(),
+                        ElementCreate.builder().name("South").type(ElementType.NUMERIC).build(),
                     ]
                 )
                 .build()
@@ -57,7 +57,7 @@ def d(tm1: Tm1Client, name: str) -> Iterator[str]:
         .build()
     )
     try:
-        tm1.subsets.create(name, name, SubsetScope.PUBLIC, SubsetPatch.builder().name("S").expression(f"{{[{name}].[{name}].[North]}}").build())
+        tm1.subsets.create(name, name, SubsetScope.PUBLIC, SubsetCreate.builder().name("S").expression(f"{{[{name}].[{name}].[North]}}").build())
         yield name
     finally:
         tm1.dimensions.delete(name)

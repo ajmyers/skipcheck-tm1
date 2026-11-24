@@ -17,6 +17,7 @@ import io.skipcheck.tm1.client.conformance.ConformanceTm1;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Process;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessErrorLog;
 import io.skipcheck.tm1.client.model.ProcessExecuteResult;
 import io.skipcheck.tm1.client.model.ProcessExecuteStatusCode;
@@ -50,8 +51,8 @@ class ProcessServiceTest {
 		return parameters;
 	}
 
-	private static ProcessPatch adhoc() {
-		return ProcessPatch.builder()
+	private static ProcessCreate adhoc() {
+		return ProcessCreate.builder()
 			.name("adhoc")
 			.parameters(List
 				.of(ProcessParameterPatch.builder().name("p").value("v").type(ProcessVariableType.STRING).build()))
@@ -128,7 +129,7 @@ class ProcessServiceTest {
 	@Test
 	void anExistingProcessConflicts() {
 		tm1().error(409, "278", "A process with the name 'adhoc' already exists.");
-		Throwable error = conformance.fail("processes", "create", ProcessPatch.builder().name("adhoc").build());
+		Throwable error = conformance.fail("processes", "create", ProcessCreate.builder().name("adhoc").build());
 		assertThat(error).hasMessageContaining("already exists");
 	}
 
@@ -239,7 +240,7 @@ class ProcessServiceTest {
 		Map<String, Object> nulls = new LinkedHashMap<>();
 		nulls.put("p", null);
 		nulls.put("q", 2.5);
-		conformance.call("processes", "execute", ProcessPatch.builder().name("adhoc").build(), nulls);
+		conformance.call("processes", "execute", ProcessCreate.builder().name("adhoc").build(), nulls);
 		assertThat(tm1().last().key()).isEqualTo("POST ExecuteProcess");
 		assertThat(tm1().last().text()).isEqualTo(
 				"{\"Process\":{\"Name\":\"adhoc\"},\"Parameters\":[{\"Name\":\"p\",\"Value\":null},{\"Name\":\"q\",\"Value\":2.5}]}");

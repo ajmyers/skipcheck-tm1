@@ -47,7 +47,7 @@ public sealed class HierarchyService : Tm1Service
     /// <summary><c>POST Dimensions('d')/Hierarchies</c>: creates a hierarchy, with its elements and edges
     /// if the patch has them. It needs a name; returns the hierarchy as created.</summary>
     [Tm1Endpoint("Navigation Dimension/Hierarchies")]
-    public Task<Hierarchy> CreateAsync(string dimension, HierarchyPatch hierarchy, CancellationToken cancellationToken = default) =>
+    public Task<Hierarchy> CreateAsync(string dimension, HierarchyCreate hierarchy, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<Hierarchy>(HierarchiesPath(dimension), Require(hierarchy, nameof(hierarchy))), cancellationToken);
 
     /// <summary><c>PATCH Dimensions('d')/Hierarchies('h')</c>: changes the properties the patch sets.
@@ -75,7 +75,7 @@ public sealed class HierarchyService : Tm1Service
     public Task ReplaceStructureAsync(
         string dimension,
         string hierarchy,
-        IReadOnlyList<ElementPatch> elements,
+        IReadOnlyList<ElementCreate> elements,
         IReadOnlyList<EdgePatch> edges,
         CancellationToken cancellationToken = default
     )

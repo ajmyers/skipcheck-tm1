@@ -17,13 +17,13 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.Cube;
-import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.Element;
-import io.skipcheck.tm1.client.model.ElementPatch;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessExecuteResult;
 import io.skipcheck.tm1.client.model.ProcessExecuteStatusCode;
-import io.skipcheck.tm1.client.model.ProcessPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
@@ -57,21 +57,21 @@ class Tm1BatchTm1Test {
 		String dimension = "batch" + UUID.randomUUID().toString().substring(0, 8);
 		String process = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(dimension)
-				.hierarchies(List.of(HierarchyPatch.builder().name(dimension).build()))
+				.hierarchies(List.of(HierarchyCreate.builder().name(dimension).build()))
 				.build())
 			.block(WAIT);
-		tm1.processes().create(ProcessPatch.builder().name(process).prologProcedure("x = 1;\n").build()).block(WAIT);
+		tm1.processes().create(ProcessCreate.builder().name(process).prologProcedure("x = 1;\n").build()).block(WAIT);
 		try {
 			Tm1Batch batch = tm1.batch();
 			Tm1Client queued = batch.client();
 			Mono<Cube> cube = queued.cubes().get("}ClientGroups", ODataQuery.none().select(Cube.NAME));
 			Mono<Cube> missing = queued.cubes().get("not-a-cube", ODataQuery.none());
 			Mono<Element> north = queued.elements()
-				.create(dimension, dimension, ElementPatch.builder().name("North").build());
+				.create(dimension, dimension, ElementCreate.builder().name("North").build());
 			Mono<Element> twice = queued.elements()
-				.create(dimension, dimension, ElementPatch.builder().name("North").build());
+				.create(dimension, dimension, ElementCreate.builder().name("North").build());
 			Flux<Element> listed = queued.elements().list(dimension, dimension, ODataQuery.none());
 			Mono<ProcessExecuteResult> run = queued.processes().executeWithReturn(process, Map.of(), ODataQuery.none());
 			Mono<String> count = queued.session()
@@ -106,9 +106,9 @@ class Tm1BatchTm1Test {
 	void runsRequestsInOrder() {
 		String dimension = "batch" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(dimension)
-				.hierarchies(List.of(HierarchyPatch.builder().name(dimension).build()))
+				.hierarchies(List.of(HierarchyCreate.builder().name(dimension).build()))
 				.build())
 			.block(WAIT);
 		try {
@@ -120,7 +120,7 @@ class Tm1BatchTm1Test {
 			for (int i = 0; i < 10; i++) {
 				String name = "e" + i;
 				before.add(queued.elements().get(dimension, dimension, name, ODataQuery.none()));
-				queued.elements().create(dimension, dimension, ElementPatch.builder().name(name).build());
+				queued.elements().create(dimension, dimension, ElementCreate.builder().name(name).build());
 				after.add(queued.elements().get(dimension, dimension, name, ODataQuery.none()));
 			}
 

@@ -48,10 +48,11 @@ def test_creates_reads_updates_and_deletes_an_element(tm1: Tm1Client, elements_d
 
 def test_refuses_name_and_attributes_in_an_update_as_tm1_ignores_or_rejects_them(tm1: Tm1Client, elements_dim: str) -> None:
     d = elements_dim
+    assert not hasattr(ElementPatch.Builder, "name") and not hasattr(ElementPatch.Builder, "attributes")
     with pytest.raises(ValueError, match="renamed"):
-        tm1.elements.update(d, d, "East", ElementPatch.builder().name("Est").build())
+        tm1.elements.update(d, d, "East", {"Name": "Est"})
     with pytest.raises(ValueError):
-        tm1.elements.update(d, d, "East", ElementPatch.builder().name("Est").build(), 'W/"x"')
+        tm1.elements.update(d, d, "East", {"Name": "Est"}, 'W/"x"')
     east = ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Elements").key("East")
     tm1.session.execute(Tm1Request.patch(east, {"Name": "Est"}))
     assert tm1.elements.get(d, d, "East").name == "East", "TM1 ignores the new name"

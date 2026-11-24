@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { AttributeDefinition, type AttributeDefinitionPatch } from "../../generated/index.js";
+import { AttributeDefinition, type AttributeDefinitionCreate } from "../../generated/index.js";
 import type { ODataQuery } from "../../odata/index.js";
 import { Tm1Request } from "../../request.js";
 import type { Tm1CallOptions } from "../../session/session.js";
@@ -26,7 +26,7 @@ const SETS = [
  *
  * Add an attribute to every element of a hierarchy:
  * ```ts
- * await tm1.attributes.create(AttributeSet.elements("Region", "Region"), AttributeDefinitionPatch.builder().name("Manager").type(AttributeType.String).build());
+ * await tm1.attributes.create(AttributeSet.elements("Region", "Region"), AttributeDefinitionCreate.builder().name("Manager").type(AttributeType.String).build());
  * ```
  * List the attributes a kind of object has, here cubes:
  * ```ts
@@ -55,7 +55,7 @@ export class AttributeService extends Tm1Service {
 
   /** `POST`: adds an attribute, with its name and type, to every object of the set's kind; returns
    * it as created. */
-  create(set: AttributeSet, attribute: AttributeDefinitionPatch, options?: Tm1CallOptions): Promise<AttributeDefinition> {
+  create(set: AttributeSet, attribute: AttributeDefinitionCreate, options?: Tm1CallOptions): Promise<AttributeDefinition> {
     return this.session.execute(Tm1Request.post(required(set, "set").path(), required(attribute, "attribute"), AttributeDefinition), options);
   }
 

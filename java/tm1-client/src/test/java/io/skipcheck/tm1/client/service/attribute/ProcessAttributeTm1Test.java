@@ -16,14 +16,14 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.AttributeDefinition;
-import io.skipcheck.tm1.client.model.AttributeDefinitionPatch;
+import io.skipcheck.tm1.client.model.AttributeDefinitionCreate;
 import io.skipcheck.tm1.client.model.AttributeType;
 import io.skipcheck.tm1.client.model.AttributesPatch;
+import io.skipcheck.tm1.client.model.ChoreCreate;
 import io.skipcheck.tm1.client.model.ChoreExecutionMode;
-import io.skipcheck.tm1.client.model.ChorePatch;
 import io.skipcheck.tm1.client.model.ChoreTaskPatch;
 import io.skipcheck.tm1.client.model.LocalizedAttributesPatch;
-import io.skipcheck.tm1.client.model.ProcessPatch;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
@@ -50,9 +50,9 @@ class ProcessAttributeTm1Test {
 		String id = UUID.randomUUID().toString().substring(0, 8);
 		process = "tm1-client-" + id;
 		chore = "tm1-client-chore-" + id;
-		tm1.processes().create(ProcessPatch.builder().name(process).prologProcedure("nX = 1;\n").build()).block(WAIT);
+		tm1.processes().create(ProcessCreate.builder().name(process).prologProcedure("nX = 1;\n").build()).block(WAIT);
 		tm1.chores()
-			.create(ChorePatch.builder()
+			.create(ChoreCreate.builder()
 				.name(chore)
 				.startTime(OffsetDateTime.parse("2026-01-01T02:00:00Z"))
 				.dstSensitive(false)
@@ -78,7 +78,7 @@ class ProcessAttributeTm1Test {
 		AttributeOwner owner = kind.equals("process") ? AttributeOwner.process(process) : AttributeOwner.chore(chore);
 		String label = "Label " + UUID.randomUUID().toString().substring(0, 4);
 		tm1.attributes()
-			.create(set, AttributeDefinitionPatch.builder().name(label).type(AttributeType.STRING).build())
+			.create(set, AttributeDefinitionCreate.builder().name(label).type(AttributeType.STRING).build())
 			.block(WAIT);
 		try {
 			assertThat(tm1.attributes()

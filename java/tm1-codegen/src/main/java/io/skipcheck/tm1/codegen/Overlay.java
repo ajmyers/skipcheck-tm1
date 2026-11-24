@@ -34,9 +34,12 @@ import tools.jackson.databind.json.JsonMapper;
  * @param undeclared types for properties the probe found that {@code $metadata} doesn't
  * declare, by {@code Type/Property}, where the kind of value it read isn't enough
  * ({@link Undeclared})
+ * @param writeOnly properties TM1 takes in a write but never sends back, by
+ * {@code Type/Property}, with a note: the write probe reads them as ignored, so
+ * {@link Writes} counts them as written
  */
 public record Overlay(Map<String, String> departures, Map<String, String> lenientDates,
-		Map<String, EndpointNote> endpoints, Map<String, UndeclaredType> undeclared) {
+		Map<String, EndpointNote> endpoints, Map<String, UndeclaredType> undeclared, Map<String, String> writeOnly) {
 
 	private static final Pattern CODE = Pattern.compile("`([^`]*)`");
 
@@ -46,6 +49,7 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 		lenientDates = Collections.unmodifiableMap(new LinkedHashMap<>(lenientDates));
 		endpoints = Collections.unmodifiableMap(new LinkedHashMap<>(endpoints));
 		undeclared = Collections.unmodifiableMap(new LinkedHashMap<>(undeclared));
+		writeOnly = Collections.unmodifiableMap(new LinkedHashMap<>(writeOnly));
 	}
 
 	/**
@@ -74,7 +78,7 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 	}
 
 	/** An overlay that changes nothing. */
-	public static final Overlay NONE = new Overlay(Map.of(), Map.of(), Map.of(), Map.of());
+	public static final Overlay NONE = new Overlay(Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
 
 	/**
 	 * The overlay bundled with the generator: {@code spec/tm1-overlay.json}, copied onto
@@ -121,7 +125,11 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 			undeclared.put(e.getKey(),
 					new UndeclaredType(e.getValue().path("type").asString(), note.isString() ? note.asString() : null));
 		});
-		return new Overlay(departures, lenient, endpoints, undeclared);
+		Map<String, String> writeOnly = new LinkedHashMap<>();
+		root.path("writeOnly")
+			.properties()
+			.forEach(e -> writeOnly.put(e.getKey(), e.getValue().path("note").asString("")));
+		return new Overlay(departures, lenient, endpoints, undeclared, writeOnly);
 	}
 
 	/**

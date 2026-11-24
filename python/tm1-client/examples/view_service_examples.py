@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client
-from skipcheck_tm1.model import MDXView, MDXViewPatch, NativeView, NativeViewPatch, View, ViewAxisSelectionPatch, ViewTitlePatch
+from skipcheck_tm1.model import MDXView, MDXViewCreate, NativeView, NativeViewCreate, View, ViewAxisSelectionPatch, ViewTitlePatch
 from skipcheck_tm1.services import ViewScope
 
 
@@ -21,7 +21,7 @@ def create_native(tm1: Tm1Client) -> View:
     actual = ViewTitlePatch.builder().bind_subset(versions.nav("Subsets").key("All")).bind_selected(versions.nav("Elements").key("Actual")).build()
     revenue = ViewTitlePatch.builder().bind_subset(measures.nav("Subsets").key("All")).bind_selected(measures.nav("Elements").key("Revenue")).build()
     view = (
-        NativeViewPatch.builder()
+        NativeViewCreate.builder()
         .name("Revenue by Region")
         .columns([ViewAxisSelectionPatch.builder().bind_subset(months).build()])
         .rows([ViewAxisSelectionPatch.builder().bind_subset(regions).build()])
@@ -41,7 +41,7 @@ def create_mdx(tm1: Tm1Client) -> View:
         " {TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)} ON 1 FROM [Sales]"
         " WHERE ([Version].[Version].[Actual], [Measure].[Measure].[Revenue])"
     )
-    return tm1.views.create("Sales", ViewScope.PRIVATE, MDXViewPatch.builder().name("My Revenue").mdx(mdx).build())
+    return tm1.views.create("Sales", ViewScope.PRIVATE, MDXViewCreate.builder().name("My Revenue").mdx(mdx).build())
     # @end
 
 

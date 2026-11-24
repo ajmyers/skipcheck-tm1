@@ -8,7 +8,7 @@
 			"service" : "processes",
 			"method" : "create",
 			"params" : [ "process" ],
-			"args" : [ { "$patch" : "ProcessPatch", "json" : { "Name" : "${process}", "Parameters" : [ { "Name" : "pName", "Prompt" : "", "Value" : "first", "Type" : "String" } ], "PrologProcedure" : "sName = pName;\n" } } ],
+			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${process}", "Parameters" : [ { "Name" : "pName", "Prompt" : "", "Value" : "first", "Type" : "String" } ], "PrologProcedure" : "sName = pName;\n" } } ],
 			"expect" : { "fields" : { "Name" : "${process}" } }
 		},
 		{
@@ -43,7 +43,7 @@
 			"service" : "processes",
 			"method" : "compile",
 			"params" : [ "definition" ],
-			"args" : [ { "$patch" : "ProcessPatch", "json" : { "Name" : "${adhoc}", "PrologProcedure" : "nX = ;\n" } } ],
+			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${adhoc}", "PrologProcedure" : "nX = ;\n" } } ],
 			"expect" : { "count" : 1 }
 		},
 		{
@@ -57,7 +57,7 @@
 			"service" : "processes",
 			"method" : "executeWithReturn",
 			"params" : [ "definition", "parameters", "query" ],
-			"args" : [ { "$patch" : "ProcessPatch", "json" : { "Name" : "${adhoc}", "PrologProcedure" : "nX = 1;\n" } }, { "$map" : { } }, { "$query" : { } } ],
+			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${adhoc}", "PrologProcedure" : "nX = 1;\n" } }, { "$map" : { } }, { "$query" : { } } ],
 			"expect" : { "fields" : { "ProcessExecuteStatusCode" : "CompletedSuccessfully" } }
 		},
 		{

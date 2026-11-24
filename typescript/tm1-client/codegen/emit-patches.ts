@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Emits patches.ts: a patch per type, as the Java model's `CubePatch`:
-// `CubePatch.builder().name("Sales").bindDimensions(dims.key("Region")).build()`. Only the properties
+// `CubePatch.builder().rules(rules).build()`, and a create per probed type, as `CubeCreate`. Only the properties
 // set are sent, an explicit `null` included; a subtype's patch sends its `@odata.type` first.
 
 import { element } from "./emit-model.js";
@@ -10,7 +10,8 @@ import { HEADER, Names, type Spec, type SpecType } from "./spec.js";
 function patchType(spec: Spec, typeName: string, collection: boolean): string | undefined {
   const t = spec.typeByName.get(typeName);
   let el: string | undefined;
-  if (t) el = t.name + "Patch";
+  // A nested entity is sent as its create where it has one: a deep insert creates it
+  if (t) el = t.name + (creatable(spec, t) ? "Create" : "Patch");
   else el = element(spec, typeName);
   if (el === undefined) return undefined;
   if (!t && spec.enumByName.has(typeName) && !spec.enumByName.get(typeName)!.flags) el = "model." + el;
@@ -45,7 +46,7 @@ export function emitPatches(spec: Spec): string {
   return out;
 }
 
-const WRITING = new Set(["applied", "transformed", "untested"]);
+const WRITING = new Set(["applied", "writeOnly", "transformed", "untested"]);
 
 function writes(outcome: string | undefined): boolean {
   return outcome === undefined || WRITING.has(outcome);
@@ -66,6 +67,25 @@ export function creates(t: SpecType, prop: string, spec?: Spec): boolean {
 /** Whether a PATCH of `t` applies a property, leaving out collections it replaces or appends to. */
 export function patches(t: SpecType, prop: string): boolean {
   return writes(t.write?.patch.properties[prop]) && !(t.write?.collections && prop in t.write.collections);
+}
+
+function writeOffersInPatch(write: NonNullable<SpecType["write"]>, prop: string): boolean {
+  if (prop === "Name") return write.patch.rename === undefined || write.patch.rename === null || write.patch.rename === "applied";
+  const outcome = write.patch.properties[prop];
+  return outcome !== "rejected" && outcome !== "ignored";
+}
+
+/**
+ * Whether a patch of `t` offers a property: not if a PATCH rejects or ignores it, by the probe, nor
+ * `Name` where a PATCH doesn't rename; for the root of a hierarchy without writes of its own, if
+ * every probed subtype's patch offers it. As the Java generator.
+ */
+export function offersInPatch(spec: Spec, t: SpecType, prop: string): boolean {
+  if (t.write) return writeOffersInPatch(t.write, prop);
+  return spec
+    .derived(t)
+    .filter((d) => !!d.write)
+    .every((d) => writeOffersInPatch(d.write!, prop));
 }
 
 /** Whether a type gets a create: the probe has writes for it, or a subtype it's the root of does. */
@@ -92,7 +112,8 @@ function emitPatch(spec: Spec, t: SpecType, create = false): string {
     const copied: string[] = [];
     for (const level of spec.chain(t))
       for (const p of level.properties ?? [])
-        if (p.type !== "Edm.Stream" && !copied.includes(p.name) && (create ? creates(t, p.name, spec) : patches(t, p.name))) copied.push(p.name);
+        if (p.type !== "Edm.Stream" && !copied.includes(p.name) && (create ? creates(t, p.name, spec) : patches(t, p.name) && offersInPatch(spec, t, p.name)))
+          copied.push(p.name);
     const declared = spec.chain(t).some((l) => l.open)
       ? JSON.stringify(spec.chain(t).flatMap((l) => [...(l.properties ?? []), ...(l.navigationProperties ?? [])].map((p) => p.name)))
       : "null";
@@ -118,7 +139,7 @@ function emitPatch(spec: Spec, t: SpecType, create = false): string {
   for (const level of spec.chain(t)) {
     for (const p of level.properties ?? []) {
       const type = p.departure ? "unknown" : patchType(spec, p.type, !!p.collection);
-      if (type === undefined || (create && !creates(t, p.name, spec))) continue;
+      if (type === undefined || (create ? !creates(t, p.name, spec) : !offersInPatch(spec, t, p.name))) continue;
       const method = Names.unique(Names.method(p.name), taken);
       out += `\n  ${method}(value: ${type}): this {\n    return this.set(${JSON.stringify(p.name)}, value);\n  }\n`;
     }

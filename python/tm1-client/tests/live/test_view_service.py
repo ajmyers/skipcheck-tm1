@@ -12,11 +12,12 @@ import pytest
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client, Tm1PreconditionFailedError
 from skipcheck_tm1.aio.services.cube import ViewScope
 from skipcheck_tm1.model import (
-    CubePatch,
+    CubeCreate,
     MDXView,
+    MDXViewCreate,
     MDXViewPatch,
     NativeView,
-    NativeViewPatch,
+    NativeViewCreate,
     ViewAxisSelectionPatch,
     ViewTitlePatch,
 )
@@ -37,7 +38,7 @@ def viewed(tm1: Tm1Client, name: str) -> Iterator[tuple[str, str, str, str]]:
     region = dimension(tm1, name + "-region", [element("North"), element("South")], subset=True)
     measure = dimension(tm1, name + "-measure", [element("Amount")], subset=True)
     year = dimension(tm1, name + "-year", [element("2026")], subset=True)
-    tm1.cubes.create(CubePatch.builder().name(name).bind_dimensions(dim(region), dim(measure), dim(year)).build())
+    tm1.cubes.create(CubeCreate.builder().name(name).bind_dimensions(dim(region), dim(measure), dim(year)).build())
     yield name, region, measure, year
     tm1.cubes.delete(name)
     drop(tm1, region, measure, year)
@@ -49,7 +50,7 @@ def _subset(dimension: str) -> ODataPath:
 
 def _native(view: str, region: str, measure: str, year: str) -> Any:
     return (
-        NativeViewPatch.builder()
+        NativeViewCreate.builder()
         .name(view)
         .columns([ViewAxisSelectionPatch.builder().bind_subset(_subset(measure)).build()])
         .rows([ViewAxisSelectionPatch.builder().bind_subset(_subset(region)).build()])
@@ -65,7 +66,7 @@ def _mdx(cube: str, region: str, measure: str) -> str:
 def test_creates_reads_updates_and_deletes_both_kinds_of_view(tm1: Tm1Client, viewed: tuple[str, str, str, str]) -> None:
     cube, region, measure, year = viewed
     views = tm1.views
-    views.create(cube, ViewScope.PUBLIC, MDXViewPatch.builder().name("Mdx").mdx(_mdx(cube, region, measure)).build())
+    views.create(cube, ViewScope.PUBLIC, MDXViewCreate.builder().name("Mdx").mdx(_mdx(cube, region, measure)).build())
     views.create(cube, ViewScope.PUBLIC, _native("Native", region, measure, year))
     every = {v.name: v for v in views.list(cube, ViewScope.PUBLIC)}
     assert set(every) == {"Mdx", "Native"}
@@ -86,7 +87,7 @@ def test_creates_reads_updates_and_deletes_both_kinds_of_view(tm1: Tm1Client, vi
 
 def test_keeps_private_views_apart(tm1: Tm1Client, viewed: tuple[str, str, str, str]) -> None:
     cube, region, measure, _ = viewed
-    tm1.views.create(cube, ViewScope.PRIVATE, MDXViewPatch.builder().name("Mine").mdx(_mdx(cube, region, measure)).build())
+    tm1.views.create(cube, ViewScope.PRIVATE, MDXViewCreate.builder().name("Mine").mdx(_mdx(cube, region, measure)).build())
     assert [v.name for v in tm1.views.list(cube, ViewScope.PRIVATE)] == ["Mine"]
     assert tm1.views.list(cube, ViewScope.PUBLIC) == []
 
@@ -108,7 +109,7 @@ def test_expands_a_native_views_axes_through_its_type(tm1: Tm1Client, viewed: tu
 def test_expands_native_views_axes_in_a_list_with_mdx_views(tm1: Tm1Client, viewed: tuple[str, str, str, str]) -> None:
     cube, region, measure, year = viewed
     tm1.views.create(cube, ViewScope.PUBLIC, _native("Native", region, measure, year))
-    tm1.views.create(cube, ViewScope.PUBLIC, MDXViewPatch.builder().name("Mdx").mdx(_mdx(cube, region, measure)).build())
+    tm1.views.create(cube, ViewScope.PUBLIC, MDXViewCreate.builder().name("Mdx").mdx(_mdx(cube, region, measure)).build())
     every = tm1.views.list(cube, ViewScope.PUBLIC, expand="tm1.NativeView/Columns/Subset")
     natives = [v for v in every if isinstance(v, NativeView)]
     assert len(natives) == 1 and [c.subset.name for c in natives[0].columns] == ["All"]

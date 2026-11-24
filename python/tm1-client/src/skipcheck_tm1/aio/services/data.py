@@ -475,7 +475,7 @@ class SandboxService(Service):
     Create a sandbox, write to it, and publish the changes to base data::
 
         cell = {"Version": "Budget", "Region": "North", "Month": "Jan", "Measure": "Revenue"}
-        await tm1.sandboxes.create(SandboxPatch.builder().name("What If").build())
+        await tm1.sandboxes.create(SandboxCreate.builder().name("What If").build())
         await tm1.with_sandbox("What If").cells.update("Sales", cell, 1500)
         await tm1.sandboxes.publish("What If")
 

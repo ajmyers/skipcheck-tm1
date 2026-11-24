@@ -12,6 +12,7 @@ import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Edge;
 import io.skipcheck.tm1.client.model.Element;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementPatch;
 import io.skipcheck.tm1.client.model.Hierarchy;
 import io.skipcheck.tm1.client.model.Tm1Operations;
@@ -89,7 +90,7 @@ public final class ElementService {
 	 * @return the element as created
 	 */
 	@Tm1Endpoint("Navigation Hierarchy/Elements")
-	public Mono<Element> create(String dimension, String hierarchy, ElementPatch element) {
+	public Mono<Element> create(String dimension, String hierarchy, ElementCreate element) {
 		return session.execute(Tm1Request.post(elements(dimension, hierarchy), element, Element.class));
 	}
 

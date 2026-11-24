@@ -7,7 +7,7 @@ import java.util.List;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Element;
 import io.skipcheck.tm1.client.model.Subset;
-import io.skipcheck.tm1.client.model.SubsetPatch;
+import io.skipcheck.tm1.client.model.SubsetCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.dimension.SubsetScope;
@@ -26,7 +26,7 @@ final class SubsetServiceExamples {
 		ODataPath elements = ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements");
 		return tm1.subsets()
 			.create("Region", "Region", SubsetScope.PUBLIC,
-					SubsetPatch.builder()
+					SubsetCreate.builder()
 						.name("Key Regions")
 						.bindElements(elements.key("North"), elements.key("South"))
 						.build());
@@ -38,7 +38,7 @@ final class SubsetServiceExamples {
 		// A dynamic subset has an MDX expression, evaluated each time it's read
 		return tm1.subsets()
 			.create("Region", "Region", SubsetScope.PUBLIC,
-					SubsetPatch.builder()
+					SubsetCreate.builder()
 						.name("All Leaves")
 						.expression("{TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)}")
 						.build());
@@ -61,7 +61,7 @@ final class SubsetServiceExamples {
 		// it gives back
 		return tm1.subsets()
 			.createSessionSubset("Region", "Region",
-					SubsetPatch.builder().name("Regions").expression("{[Region].[Region].[Total].Children}").build())
+					SubsetCreate.builder().name("Regions").expression("{[Region].[Region].[Total].Children}").build())
 			.flatMapMany(subset -> tm1.subsets()
 				.elements("Region", "Region", SubsetScope.SESSION, subset.name(),
 						ODataQuery.none().select(Element.NAME)))

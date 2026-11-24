@@ -17,7 +17,7 @@ public static class ProcessServiceExamples
     {
         // @start region = create
         // TM1 saves code that doesn't compile, so compile the definition first
-        var process = ProcessPatch
+        var process = ProcessCreate
             .Builder()
             .Name("Load Sales")
             .Parameters([
@@ -54,7 +54,7 @@ public static class ProcessServiceExamples
     {
         // @start region = run-unsaved
         // A one-off run of code that isn't saved as a process
-        var cleanup = ProcessPatch.Builder().Name("Clear Sales Staging").PrologProcedure("CubeClearData('Sales Staging');\n").Build();
+        var cleanup = ProcessCreate.Builder().Name("Clear Sales Staging").PrologProcedure("CubeClearData('Sales Staging');\n").Build();
         return await tm1.Processes.ExecuteWithReturnAsync(cleanup);
         // @end
     }

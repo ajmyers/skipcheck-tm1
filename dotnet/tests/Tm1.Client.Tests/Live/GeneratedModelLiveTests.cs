@@ -49,7 +49,7 @@ public class GeneratedModelLiveTests
         {
             // Java posts its MDXView record; here a model is read only, and its patch is what's written
             var created = await session.ExecuteAsync(
-                Tm1Request.Post<View>(views, MDXViewPatch.Builder().Name(name).Mdx("SELECT {[}Groups].[}Groups].MEMBERS} ON 0 FROM [}ClientGroups]").Build())
+                Tm1Request.Post<View>(views, MDXViewCreate.Builder().Name(name).Mdx("SELECT {[}Groups].[}Groups].MEMBERS} ON 0 FROM [}ClientGroups]").Build())
             );
             Assert.Contains("}Groups", Assert.IsType<MDXView>(created).Mdx);
 
@@ -102,16 +102,16 @@ public class GeneratedModelLiveTests
             await session.ExecuteAsync(
                 Tm1Request.Post<Dimension>(
                     ODataPath.Of("Dimensions"),
-                    DimensionPatch
+                    DimensionCreate
                         .Builder()
                         .Name(name)
                         .Hierarchies([
-                            HierarchyPatch
+                            HierarchyCreate
                                 .Builder()
                                 .Name(name)
                                 .Elements([
-                                    ElementPatch.Builder().Name("North").Type(ElementType.Numeric).Build(),
-                                    ElementPatch.Builder().Name("South").Type(ElementType.Numeric).Build(),
+                                    ElementCreate.Builder().Name("North").Type(ElementType.Numeric).Build(),
+                                    ElementCreate.Builder().Name("South").Type(ElementType.Numeric).Build(),
                                 ])
                                 .Build(),
                         ])
@@ -121,7 +121,7 @@ public class GeneratedModelLiveTests
             await session.ExecuteAsync(
                 Tm1Request.Post<Cube>(
                     ODataPath.Of("Cubes"),
-                    CubePatch.Builder().Name(name).BindDimensions(dimension, ODataPath.Of("Dimensions").Key("}Groups")).Build()
+                    CubeCreate.Builder().Name(name).BindDimensions(dimension, ODataPath.Of("Dimensions").Key("}Groups")).Build()
                 )
             );
 

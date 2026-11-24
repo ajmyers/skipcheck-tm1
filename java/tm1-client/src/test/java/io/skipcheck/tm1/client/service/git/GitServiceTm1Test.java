@@ -15,12 +15,12 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
-import io.skipcheck.tm1.client.model.DimensionPatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.Git;
 import io.skipcheck.tm1.client.model.GitPullPlan;
 import io.skipcheck.tm1.client.model.GitPushPlan;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
@@ -68,11 +68,11 @@ class GitServiceTm1Test {
 					.hasMessageContaining("Cannot create bare commit");
 
 				tm1.dimensions()
-					.create(DimensionPatch.builder()
+					.create(DimensionCreate.builder()
 						.name(dimension)
-						.hierarchies(List.of(HierarchyPatch.builder()
+						.hierarchies(List.of(HierarchyCreate.builder()
 							.name(dimension)
-							.elements(List.of(ElementPatch.builder().name("North").build()))
+							.elements(List.of(ElementCreate.builder().name("North").build()))
 							.build()))
 						.build())
 					.block(WAIT);

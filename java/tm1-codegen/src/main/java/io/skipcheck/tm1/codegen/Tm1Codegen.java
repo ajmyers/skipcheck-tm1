@@ -75,8 +75,8 @@ public final class Tm1Codegen {
 			}
 			String json = Files.readString(probe, StandardCharsets.UTF_8);
 			Undeclared undeclared = Undeclared.read(json, overlay, metadata);
-			return new Model(undeclared.applyTo(metadata), undeclared.applyTo(overlay), undeclared, Writes.read(json),
-					probe.getFileName().toString());
+			return new Model(undeclared.applyTo(metadata), undeclared.applyTo(overlay), undeclared,
+					Writes.read(json, overlay), probe.getFileName().toString());
 		}
 
 	}

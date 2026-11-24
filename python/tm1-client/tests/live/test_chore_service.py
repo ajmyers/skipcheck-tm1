@@ -20,6 +20,7 @@ from skipcheck_tm1 import (
 )
 from skipcheck_tm1.model import (
     Chore,
+    ChoreCreate,
     ChoreExecutionMode,
     ChorePatch,
     ChoreTask,
@@ -63,7 +64,7 @@ def chores(tm1: Tm1Client, name: str) -> Iterator[Chores]:
     c = Chores(tm1, name)
     tm1.processes.create(process_definition(c.process, "If(DimensionExists(pName) = 0);\n  DimensionCreate(pName);\nEndIf;\n"))
     tm1.chores.create(
-        ChorePatch.builder()
+        ChoreCreate.builder()
         .name(c.chore)
         .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=UTC))
         .dst_sensitive(False)

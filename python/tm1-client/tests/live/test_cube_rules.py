@@ -11,7 +11,7 @@ import pytest
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client, Tm1Request
 from skipcheck_tm1.model import (
     CheckFeedersSelection,
-    CubePatch,
+    CubeCreate,
     ElementType,
 )
 
@@ -38,7 +38,7 @@ def ruled(tm1: Tm1Client, name: str) -> Iterator[tuple[str, str, str]]:
         [edge("Total", "North"), edge("Total", "South")],
     )
     measure = dimension(tm1, name + "-measure", [element("Amount"), element("Double")])
-    tm1.cubes.create(CubePatch.builder().name(name).rules(RULES).bind_dimensions(dim(region), dim(measure)).build())
+    tm1.cubes.create(CubeCreate.builder().name(name).rules(RULES).bind_dimensions(dim(region), dim(measure)).build())
     yield name, region, measure
     tm1.cubes.delete(name)
     drop(tm1, region, measure)

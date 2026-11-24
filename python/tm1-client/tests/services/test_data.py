@@ -22,6 +22,7 @@ from skipcheck_tm1.model import (
     CubeUpdatePatch,
     MDXView,
     ProcessParameterPatch,
+    SandboxCreate,
     SandboxPatch,
     UpdateOrder,
 )
@@ -275,7 +276,7 @@ def test_member_sets(api: Api, fake: FakeTm1) -> None:
 def test_sandboxes(api: Api, fake: FakeTm1) -> None:
     sandboxes = api.client.sandboxes
     fake.respond = lambda r: {"Name": "What If"}
-    assert api.run(sandboxes.create(SandboxPatch.builder().name("What If").build())).name == "What If"
+    assert api.run(sandboxes.create(SandboxCreate.builder().name("What If").build())).name == "What If"
     assert (target(fake.last), body(fake.last)) == ("POST Sandboxes", {"Name": "What If"})
     api.run(sandboxes.get("What If", select="Name"))
     assert target(fake.last) == "GET Sandboxes('What%20If')?$select=Name"

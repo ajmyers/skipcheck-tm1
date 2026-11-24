@@ -17,7 +17,7 @@ public class AttributeServiceLiveTests
 {
     private static string Label() => "Label " + Guid.NewGuid().ToString("N")[..4];
 
-    private static AttributeDefinitionPatch StringAttribute(string name) => AttributeDefinitionPatch.Builder().Name(name).Type(AttributeType.String).Build();
+    private static AttributeDefinitionCreate StringAttribute(string name) => AttributeDefinitionCreate.Builder().Name(name).Type(AttributeType.String).Build();
 
     private static LocalizedAttributesPatch French(string attribute, string value) =>
         LocalizedAttributesPatch.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Property(attribute, value).Build()).Build();
@@ -38,7 +38,7 @@ public class AttributeServiceLiveTests
     {
         var made = await LiveDimension.Made.Of(n => LiveDimension.DimensionOf(n, [LiveDimension.Numeric("North"), LiveDimension.Numeric("South")]));
         var d = made.Name;
-        await made.Tm1.Subsets.CreateAsync(d, d, SubsetScope.Public, SubsetPatch.Builder().Name("S").Expression($"{{[{d}].[{d}].[North]}}").Build());
+        await made.Tm1.Subsets.CreateAsync(d, d, SubsetScope.Public, SubsetCreate.Builder().Name("S").Expression($"{{[{d}].[{d}].[North]}}").Build());
         return made;
     }
 

@@ -25,7 +25,7 @@ public static class ChoreServiceExamples
             ])
             .Build();
         return await tm1.Chores.CreateAsync(
-            ChorePatch
+            ChoreCreate
                 .Builder()
                 .Name("Nightly Load")
                 .StartTime(new DateTimeOffset(2026, 1, 1, 2, 0, 0, TimeSpan.Zero))

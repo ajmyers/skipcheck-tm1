@@ -4,7 +4,7 @@
 	"description" : "A fresh dimension: create it with its structure, read, list and filter, update, copy it, add an all-leaves hierarchy, lock and reserve it, delete it, and a missing dimension.",
 	"names" : ["dimension", "copy", "missing"],
 	"steps" : [
-		{"service": "dimensions", "method": "create", "params": ["dimension"], "args": [{"$patch": "DimensionPatch", "json": {"Name": "${dimension}", "Hierarchies": [{"Name": "${dimension}", "Elements": [{"Name": "North", "Type": "Numeric"}, {"Name": "South", "Type": "Numeric"}]}]}}], "expect": {"fields": {"Name": "${dimension}"}}},
+		{"service": "dimensions", "method": "create", "params": ["dimension"], "args": [{"$patch": "DimensionCreate", "json": {"Name": "${dimension}", "Hierarchies": [{"Name": "${dimension}", "Elements": [{"Name": "North", "Type": "Numeric"}, {"Name": "South", "Type": "Numeric"}]}]}}], "expect": {"fields": {"Name": "${dimension}"}}},
 		{"service": "dimensions", "method": "get", "params": ["name", "query"], "args": ["${dimension}", {"$query": {"select": ["Name"], "expand": {"Hierarchies": {"select": ["Name"], "expand": {"Elements": {"select": ["Name"]}}}}}}], "expect": {"fields": {"Name": "${dimension}"}}},
 		{"service": "dimensions", "method": "list", "params": ["query"], "args": [{"$query": {"select": ["Name"], "filter": "Name eq '${dimension}'"}}], "expect": {"items": {"Name": ["${dimension}"]}}},
 		{"service": "dimensions", "method": "modelDimensions", "params": ["query"], "args": [{"$query": {"select": ["Name"], "filter": "startswith(Name,'${dimension}')"}}], "expect": {"items": {"Name": ["${dimension}"]}}},

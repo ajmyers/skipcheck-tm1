@@ -5,7 +5,7 @@
 A TypeScript client for the **IBM Planning Analytics (TM1) REST API**, with the same API as the Java client (`tm1-client`): the same services, methods, parameters, queries, patches, session views and errors, named the TypeScript way. Its model is generated from the same language-neutral spec ([`spec/tm1-api.json`](../spec)). ESM, for Node 22+ and browsers, with no runtime dependencies: it sends with `fetch`.
 
 ```ts
-import { Cube, CubePatch, Filter, ODataPath, ODataQuery, Tm1Client } from "@skipcheck/tm1-client";
+import { Cube, CubeCreate, Filter, ODataPath, ODataQuery, Tm1Client } from "@skipcheck/tm1-client";
 
 await using tm1 = Tm1Client.builder().baseUrl("http://localhost:8010/api/v1/").basicAuth("admin", "apple").build();
 
@@ -14,7 +14,7 @@ for await (const cube of tm1.cubes.modelCubes(ODataQuery.none().select(Cube.Fiel
 }
 
 const dimensions = ODataPath.of("Dimensions");
-await tm1.cubes.create(CubePatch.builder().name("Plan").bindDimensions(dimensions.key("Region"), dimensions.key("Year")).build());
+await tm1.cubes.create(CubeCreate.builder().name("Plan").bindDimensions(dimensions.key("Region"), dimensions.key("Year")).build());
 
 const rules = "SKIPCHECK;\n['Margin'] = N: ['Revenue'] - ['Cost'];";
 if ((await tm1.cubes.checkRules("Plan", rules).toArray()).length === 0) {
@@ -38,7 +38,7 @@ if ((await tm1.cubes.checkRules("Plan", rules).toArray()).length === 0) {
 | `Duration` | milliseconds (`withAsync(2000)`, `Tm1Timeouts`); TM1's own durations are ISO 8601 strings, read and written in Java's form (`PT24H`, never `P1D`; `Tm1Duration` converts) |
 | `cube.name()`, `Cube.NAME` | `cube.Name`, `Cube.Fields.Name`: the model keeps TM1's property names, so what's read is TM1's JSON, but for date-times and durations (below) |
 | `OffsetDateTime`, `Duration` read from TM1 | strings, as the Java client reads the values: a date-time as its instant in UTC without trailing zeros (`2026-01-02T03:04:00.120+05:30` reads as `2026-01-01T21:34:00.12Z`), a duration as Java's `Duration.toString` (`P1DT02H00M03.5S`, or bare seconds, reads as `PT26H3.5S`). So every client holds the same value; TM1's exact text isn't kept |
-| `CubePatch.builder().name("x").build()` | the same |
+| `CubeCreate.builder().name("x").build()` | the same |
 | `Tm1Operations.CUBE_RESERVE` | `Tm1Operations.CubeReserve` |
 | An enum, `ElementType.NUMERIC` | a string union, `"Numeric"`, and its members, `ElementType.Numeric`; `ElementType.literal("Numeric")` for a filter |
 | `View` read as `NativeView` | `readAs(View, …)` keeps `@odata.type`; `typeOf(View, v) === "NativeView"` |

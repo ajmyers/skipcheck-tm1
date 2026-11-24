@@ -2,24 +2,26 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
 import {
-  DimensionPatch,
+  DimensionCreate,
   Edge,
   EdgePatch,
   Element,
+  ElementCreate,
   ElementPatch,
+  ElementPatchBuilder,
   ElementType,
-  HierarchyPatch,
+  HierarchyCreate,
   ODataPath,
   ODataQuery,
   Tm1BadRequestException,
+  type Tm1Client,
   Tm1NotFoundException,
   Tm1PreconditionFailedException,
   Tm1Request,
-  type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
-const element = (name: string, type: ElementType): ElementPatch => ElementPatch.builder().name(name).type(type).build();
+const element = (name: string, type: ElementType): ElementCreate => ElementCreate.builder().name(name).type(type).build();
 const edge = (parent: string, component: string): EdgePatch => EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
 
 /** ElementService (and edges) against a real TM1, on a dimension with Total = North + South, and
@@ -41,10 +43,10 @@ describe("ElementService on TM1" + liveReason, () => {
     if (!Live.configured) return;
     d = Live.name();
     await tm1.dimensions.create(
-      DimensionPatch.builder()
+      DimensionCreate.builder()
         .name(d)
         .hierarchies([
-          HierarchyPatch.builder()
+          HierarchyCreate.builder()
             .name(d)
             .elements([
               element("Total", ElementType.Consolidated),
@@ -92,8 +94,9 @@ describe("ElementService on TM1" + liveReason, () => {
   });
 
   tm1Test("refuses name and attributes in an update, as TM1 ignores or rejects them", async () => {
-    expect(() => tm1.elements.update(d, d, "East", ElementPatch.builder().name("Est").build())).toThrow(/renamed/);
-    expect(() => tm1.elements.update(d, d, "East", ElementPatch.builder().name("Est").build(), 'W/"x"')).toThrow(RangeError);
+    // ElementPatch offers neither: TM1 ignores the name and refuses Attributes
+    expect(Object.getOwnPropertyNames(ElementPatchBuilder.prototype)).not.toContain("name");
+    expect(Object.getOwnPropertyNames(ElementPatchBuilder.prototype)).not.toContain("attributes");
 
     const east = ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Elements").key("East");
     await tm1.session.execute(Tm1Request.patch(east, { Name: "Est" }));

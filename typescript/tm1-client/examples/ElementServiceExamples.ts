@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Element, ElementPatch, ElementType, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
+import { Element, ElementCreate, ElementType, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for ElementService, quoted in its documentation.
 
@@ -19,7 +19,7 @@ export async function consolidations(tm1: Tm1Client): Promise<string[]> {
 export async function addChild(tm1: Tm1Client): Promise<void> {
   // @start region = add-child
   // A new element is a root; SetComponent then puts it last under Total
-  await tm1.elements.create("Region", "Region", ElementPatch.builder().name("West").type(ElementType.Numeric).build());
+  await tm1.elements.create("Region", "Region", ElementCreate.builder().name("West").type(ElementType.Numeric).build());
   await tm1.elements.setComponent("Region", "Region", "Total", "West");
   // @end
 }

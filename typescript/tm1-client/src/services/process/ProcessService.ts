@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Process, ProcessErrorLog, ProcessExecuteResult, ProcessSyntaxError, Tm1Operations, type ProcessPatch } from "../../generated/index.js";
+import {
+  Process,
+  type ProcessCreate,
+  ProcessErrorLog,
+  ProcessExecuteResult,
+  type ProcessPatch,
+  ProcessSyntaxError,
+  Tm1Operations,
+} from "../../generated/index.js";
 import { ODataLiterals, ODataPath, type ODataQuery } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";
 import { Tm1Request } from "../../request.js";
@@ -20,7 +28,7 @@ const PROCESSES = ODataPath.of("Processes");
  *
  * Create a process, compiling it first, since TM1 saves code that doesn't compile:
  * ```ts
- * const process = ProcessPatch.builder().name("Load").prologProcedure("x = 1;").build();
+ * const process = ProcessCreate.builder().name("Load").prologProcedure("x = 1;").build();
  * if ((await tm1.processes.compile(process).toArray()).length === 0) await tm1.processes.create(process);
  * ```
  * Run it with parameters, and fail if it wrote an error log:
@@ -30,7 +38,7 @@ const PROCESSES = ODataPath.of("Processes");
  * ```
  * Run code without saving it as a process:
  * ```ts
- * await tm1.processes.executeWithReturn(ProcessPatch.builder().name("adhoc").prologProcedure("x = 1;").build());
+ * await tm1.processes.executeWithReturn(ProcessCreate.builder().name("adhoc").prologProcedure("x = 1;").build());
  * ```
  */
 export class ProcessService extends Tm1Service {
@@ -63,7 +71,7 @@ export class ProcessService extends Tm1Service {
 
   /** `POST Processes`: creates a process (it needs a name); returns it as created. TM1 (11.8) saves
    * code that doesn't compile: check it with {@link compile} first. */
-  create(process: ProcessPatch, options?: Tm1CallOptions): Promise<Process> {
+  create(process: ProcessCreate, options?: Tm1CallOptions): Promise<Process> {
     return this.session.execute(Tm1Request.post(PROCESSES, required(process, "process"), Process), options);
   }
 
@@ -85,8 +93,8 @@ export class ProcessService extends Tm1Service {
   compile(name: string, options?: Tm1CallOptions): Tm1Stream<ProcessSyntaxError>;
   /** `CompileProcess`: compiles a process definition that needn't be saved, such as one about to be
    * created. Needs schema 11.0.0. */
-  compile(definition: ProcessPatch, options?: Tm1CallOptions): Tm1Stream<ProcessSyntaxError>;
-  compile(nameOrDefinition: string | ProcessPatch, options?: Tm1CallOptions): Tm1Stream<ProcessSyntaxError> {
+  compile(definition: ProcessCreate, options?: Tm1CallOptions): Tm1Stream<ProcessSyntaxError>;
+  compile(nameOrDefinition: string | ProcessCreate, options?: Tm1CallOptions): Tm1Stream<ProcessSyntaxError> {
     if (typeof nameOrDefinition === "string") {
       const operation = Tm1Operations.ProcessCompile;
       return this.session.stream(
@@ -109,13 +117,13 @@ export class ProcessService extends Tm1Service {
   executeWithReturn(name: string, parameters?: Tm1Map<unknown> | null, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<ProcessExecuteResult>;
   /** `ExecuteProcessWithReturn`: runs a process definition that needn't be saved. Needs schema 11.3.0. */
   executeWithReturn(
-    definition: ProcessPatch,
+    definition: ProcessCreate,
     parameters?: Tm1Map<unknown> | null,
     query?: ODataQuery | null,
     options?: Tm1CallOptions,
   ): Promise<ProcessExecuteResult>;
   executeWithReturn(
-    nameOrDefinition: string | ProcessPatch,
+    nameOrDefinition: string | ProcessCreate,
     parameters?: Tm1Map<unknown> | null,
     query?: ODataQuery | null,
     options?: Tm1CallOptions,
@@ -135,8 +143,8 @@ export class ProcessService extends Tm1Service {
   execute(name: string, parameters?: Tm1Map<unknown> | null, options?: Tm1CallOptions): Promise<void>;
   /** `ExecuteProcess`: runs a process definition, without saying how it ended. Needs schema 11.0.0.
    * @deprecated Deprecated in TM1 schema 11.3.0: use {@link executeWithReturn}. */
-  execute(definition: ProcessPatch, parameters?: Tm1Map<unknown> | null, options?: Tm1CallOptions): Promise<void>;
-  execute(nameOrDefinition: string | ProcessPatch, parameters?: Tm1Map<unknown> | null, options?: Tm1CallOptions): Promise<void> {
+  execute(definition: ProcessCreate, parameters?: Tm1Map<unknown> | null, options?: Tm1CallOptions): Promise<void>;
+  execute(nameOrDefinition: string | ProcessCreate, parameters?: Tm1Map<unknown> | null, options?: Tm1CallOptions): Promise<void> {
     // As the Java client's, neither is checked against $metadata first
     if (typeof nameOrDefinition === "string") {
       return this.session.execute(

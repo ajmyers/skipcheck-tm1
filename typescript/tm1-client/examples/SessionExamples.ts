@@ -5,7 +5,7 @@ import {
   MessageLogEntry,
   ODataPath,
   ODataQuery,
-  SandboxPatch,
+  SandboxCreate,
   SandboxService,
   Tm1Authenticator,
   Tm1Request,
@@ -45,7 +45,7 @@ export async function sandbox(session: Tm1Session): Promise<void> {
   // @start region = sandbox
   // The cell: every dimension, in the cube's order
   const cell = { Region: "North", Month: "Jan" };
-  await new SandboxService(session).create(SandboxPatch.builder().name("What-if").build());
+  await new SandboxService(session).create(SandboxCreate.builder().name("What-if").build());
   await new CellService(session.withSandbox("What-if")).update("Sales", cell, 1200);
   // @end
 }

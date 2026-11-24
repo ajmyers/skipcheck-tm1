@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Edge, Element, Hierarchy, Tm1Operations, type ElementPatch } from "../../generated/index.js";
+import { Edge, Element, type ElementCreate, type ElementPatch, Hierarchy, Tm1Operations } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";
 import { Tm1Request } from "../../request.js";
@@ -24,7 +24,7 @@ import { Tm1Service, type Tm1Endpoints } from "../service.js";
  * ```
  * Add an element under a consolidation. A new element is a root until it has a parent:
  * ```ts
- * await tm1.elements.create("Region", "Region", ElementPatch.builder().name("West").type(ElementType.Numeric).build());
+ * await tm1.elements.create("Region", "Region", ElementCreate.builder().name("West").type(ElementType.Numeric).build());
  * await tm1.elements.setComponent("Region", "Region", "Total", "West");
  * ```
  * Read a consolidation's children:
@@ -64,7 +64,7 @@ export class ElementService extends Tm1Service {
 
   /** `POST …/Elements`: adds an element, as a root of the hierarchy. It needs a name, and a type
    * unless it's numeric; returns the element as created. */
-  create(dimension: string, hierarchy: string, element: ElementPatch, options?: Tm1CallOptions): Promise<Element> {
+  create(dimension: string, hierarchy: string, element: ElementCreate, options?: Tm1CallOptions): Promise<Element> {
     return this.session.execute(Tm1Request.post(elementsPath(dimension, hierarchy), required(element, "element"), Element), options);
   }
 

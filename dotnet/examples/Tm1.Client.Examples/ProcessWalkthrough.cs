@@ -35,7 +35,7 @@ public static class ProcessWalkthrough
     {
         // @start region = create
         // A process that sets a month's budget to its actual units plus 10%
-        var process = ProcessPatch
+        var process = ProcessCreate
             .Builder()
             .Name("Budget From Actual")
             .Parameters([ProcessParameterPatch.Builder().Name("pMonth").Value("Jan").Type(ProcessVariableType.String).Build()])

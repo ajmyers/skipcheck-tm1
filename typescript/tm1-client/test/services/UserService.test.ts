@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { ODataPath, ODataQuery, UserPatch } from "../../src/index.js";
+import { ODataPath, ODataQuery, UserCreate, UserPatch } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 /** UserService against a fake TM1: each method sends what the Java client's does, and group
@@ -26,7 +26,9 @@ describe("UserService", () => {
     tm1.respond = () => ({ Name: "jsmith" });
     const client = tm1.client();
     const groups = ODataPath.of("Groups");
-    const made = await client.users.create(UserPatch.builder().name("jsmith").password("pw").bindGroups(groups.key("Finance"), groups.key("Planners")).build());
+    const made = await client.users.create(
+      UserCreate.builder().name("jsmith").password("pw").bindGroups(groups.key("Finance"), groups.key("Planners")).build(),
+    );
     expect(made.Name).toBe("jsmith");
     expect([tm1.last.method, tm1.last.target]).toEqual(["POST", "Users"]);
     expect(tm1.last.text).toBe(`{"Name":"jsmith","Password":"pw","Groups@odata.bind":["Groups('Finance')","Groups('Planners')"]}`);

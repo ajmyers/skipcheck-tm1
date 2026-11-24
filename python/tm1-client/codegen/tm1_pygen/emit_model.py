@@ -249,7 +249,7 @@ def _model(spec: Spec, t: dict[str, Any]) -> list[str]:
     return out
 
 
-WRITES = {"applied", "transformed", "untested"}
+WRITES = {"applied", "writeOnly", "transformed", "untested"}
 
 
 def _writes(outcome: str | None) -> bool:
@@ -273,6 +273,24 @@ def patches(t: dict[str, Any], prop: str) -> bool:
     return w is None or (_writes(w["patch"]["properties"].get(prop)) and prop not in w.get("collections", {}))
 
 
+def _offers_in_patch(w: dict[str, Any], prop: str) -> bool:
+    if prop == "Name":
+        return w["patch"].get("rename", "applied") == "applied"
+    outcome = w["patch"]["properties"].get(prop)
+    return outcome not in ("rejected", "ignored")
+
+
+def offers_in_patch(spec: Spec, t: dict[str, Any], prop: str) -> bool:
+    """Whether a patch of ``t`` offers ``prop``: not if a PATCH rejects or ignores it, by the probe, nor
+    ``Name`` where a PATCH doesn't rename; for the root of a hierarchy without writes of its own, if
+    every probed subtype's patch offers it. As the Java generator."""
+    w = t.get("write")
+    if w is not None:
+        return _offers_in_patch(w, prop)
+    probed = [d["write"] for d in spec.derived(t) if d.get("write")]
+    return all(_offers_in_patch(d, prop) for d in probed)
+
+
 def creatable(spec: Spec, t: dict[str, Any]) -> bool:
     """Whether a type gets a create: the probe has writes for it, or a subtype it's the root of does."""
     if t["kind"] != "entity":
@@ -287,7 +305,11 @@ def _copied_names(spec: Spec, t: dict[str, Any], create: bool) -> list[str]:
     out: list[str] = []
     for level in spec.chain(t):
         for p in level["properties"]:
-            if p["type"] != "Edm.Stream" and p["name"] not in out and (creates(t, p["name"], spec) if create else patches(t, p["name"])):
+            if (
+                p["type"] != "Edm.Stream"
+                and p["name"] not in out
+                and (creates(t, p["name"], spec) if create else patches(t, p["name"]) and offers_in_patch(spec, t, p["name"]))
+            ):
                 out.append(p["name"])
     return out
 
@@ -315,12 +337,12 @@ def _builder_method(spec: Spec, t: dict[str, Any], name: str, create: bool | Non
 
 
 def emit_patches(spec: Spec) -> str:
-    """Patch builders, as the Java model's ``CubePatch.builder().name("Sales").build()``: only
+    """Patch builders, as the Java model's ``CubeCreate.builder().name("Sales").build()``: only
     what's set is sent, explicit ``None`` included, with ``bind_…`` for ``@odata.bind``."""
     out = [
         '"""Patch builders for writes, generated from spec/tm1-api.json by tm1_pygen: don\'t edit.',
         "",
-        "As the Java model's ``CubePatch``: ``CubePatch.builder().name('Sales').bind_dimensions(",
+        "As the Java model's ``CubePatch``: ``CubeCreate.builder().name('Sales').bind_dimensions(",
         "ODataPath.of('Dimensions').key('Region')).build()``. A model instance (``Cube(name=…)``)",
         "works anywhere a patch does.",
         '"""',
@@ -355,7 +377,7 @@ def emit_patches(spec: Spec) -> str:
         taken = {"build", "property"}
         methods = 0
         for p in t["properties"]:
-            if p["type"] == "Edm.Stream":
+            if p["type"] == "Edm.Stream" or not offers_in_patch(spec, t, p["name"]):
                 continue
             m = names.unique(
                 names.field_name(p["name"]).rstrip("_") if names.field_name(p["name"]).rstrip("_") not in taken else names.field_name(p["name"]), taken

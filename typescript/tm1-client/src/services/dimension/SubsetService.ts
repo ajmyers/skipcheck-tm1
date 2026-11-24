@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Element, Hierarchy, Subset, Tm1Operations, type SubsetPatch } from "../../generated/index.js";
+import { Element, Hierarchy, Subset, type SubsetCreate, type SubsetPatch, Tm1Operations } from "../../generated/index.js";
 import type { Tm1Model } from "../../model.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";
@@ -24,12 +24,12 @@ const SUBSETS = ["Navigation Hierarchy/Subsets", "Navigation Hierarchy/PrivateSu
  * ```ts
  * const elements = ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements");
  * await tm1.subsets.create("Region", "Region", SubsetScope.Public,
- *     SubsetPatch.builder().name("West Coast").bindElements(elements.key("California"), elements.key("Oregon")).build());
+ *     SubsetCreate.builder().name("West Coast").bindElements(elements.key("California"), elements.key("Oregon")).build());
  * ```
  * Create a dynamic subset from an MDX expression:
  * ```ts
  * await tm1.subsets.create("Region", "Region", SubsetScope.Public,
- *     SubsetPatch.builder().name("Leaves").expression("{TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)}").build());
+ *     SubsetCreate.builder().name("Leaves").expression("{TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)}").build());
  * ```
  * Replace a static subset's elements:
  * ```ts
@@ -77,7 +77,7 @@ export class SubsetService extends Tm1Service {
   /** `POST …/Subsets`: creates a subset: static with `Elements@odata.bind`
    * (`SubsetPatch.builder().bindElements(…)`), dynamic with an `Expression`. It needs a name; returns
    * the subset as created. */
-  create(dimension: string, hierarchy: string, scope: SubsetScope, subset: SubsetPatch, options?: Tm1CallOptions): Promise<Subset> {
+  create(dimension: string, hierarchy: string, scope: SubsetScope, subset: SubsetCreate, options?: Tm1CallOptions): Promise<Subset> {
     return this.session.execute(Tm1Request.post(subsetsPath(dimension, hierarchy, scope), required(subset, "subset"), Subset), options);
   }
 
@@ -195,7 +195,7 @@ export class SubsetService extends Tm1Service {
   /** `tm1.CreateSessionSubset` with a definition (an `Expression`, or bound `Elements`): creates a
    * subset visible only to this session. TM1 (11.8) ignores the definition's `Name` and names it
    * itself; the result has the name to use. */
-  createSessionSubset(dimension: string, hierarchy: string, definition: SubsetPatch, options?: Tm1CallOptions): Promise<Subset> {
+  createSessionSubset(dimension: string, hierarchy: string, definition: SubsetCreate, options?: Tm1CallOptions): Promise<Subset> {
     const body = { Subset: required(definition, "definition") };
     return this.session.execute(action(Tm1Operations.HierarchyCreateSessionSubset, hierarchyPath(dimension, hierarchy), body, Subset), options);
   }

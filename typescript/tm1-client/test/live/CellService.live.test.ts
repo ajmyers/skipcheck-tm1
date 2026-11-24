@@ -3,7 +3,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
 import {
   CellsetUpdatePatch,
-  CubePatch,
+  CubeCreate,
   CubeUpdatePatch,
   ODataPath,
   ODataQuery,
@@ -51,7 +51,7 @@ describe("CellService on TM1" + liveReason, () => {
   beforeEach(async () => {
     if (!tm1) return;
     cube = Live.name();
-    await tm1.cubes.create(CubePatch.builder().name(cube).bindDimensions(Fixtures.dimensionPath(region), Fixtures.dimensionPath(measure)).build());
+    await tm1.cubes.create(CubeCreate.builder().name(cube).bindDimensions(Fixtures.dimensionPath(region), Fixtures.dimensionPath(measure)).build());
   });
 
   afterEach(async () => {

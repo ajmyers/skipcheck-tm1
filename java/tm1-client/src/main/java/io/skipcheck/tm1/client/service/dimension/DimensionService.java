@@ -9,6 +9,7 @@ import java.util.Objects;
 import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Dimension;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.DimensionPatch;
 import io.skipcheck.tm1.client.model.Hierarchy;
 import io.skipcheck.tm1.client.model.Tm1Operations;
@@ -103,7 +104,7 @@ public final class DimensionService {
 	 * @return the dimension as created
 	 */
 	@Tm1Endpoint("EntitySet Dimensions")
-	public Mono<Dimension> create(DimensionPatch dimension) {
+	public Mono<Dimension> create(DimensionCreate dimension) {
 		return session.execute(Tm1Request.post(DIMENSIONS, dimension, Dimension.class));
 	}
 

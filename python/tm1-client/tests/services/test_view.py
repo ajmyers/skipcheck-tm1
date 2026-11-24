@@ -11,7 +11,14 @@ import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1PreconditionFailedError
 from skipcheck_tm1.aio.services.cube import ViewScope
-from skipcheck_tm1.model import MDXView, MDXViewPatch, NativeView, NativeViewPatch, ViewAxisSelectionPatch, ViewTitlePatch
+from skipcheck_tm1.model import (
+    MDXView,
+    MDXViewPatch,
+    NativeView,
+    NativeViewCreate,
+    ViewAxisSelectionPatch,
+    ViewTitlePatch,
+)
 
 from ..conftest import Api, FakeTm1, target
 
@@ -57,9 +64,10 @@ def test_creates_updates_and_deletes(api: Api, fake: FakeTm1) -> None:
     months = dimensions.key("Month").nav("Hierarchies").key("Month").nav("Subsets").key("Quarters")
     versions = dimensions.key("Version").nav("Hierarchies").key("Version")
     patch = (
-        NativeViewPatch.builder()
+        NativeViewCreate.builder()
         .name("Revenue")
         .columns([ViewAxisSelectionPatch.builder().bind_subset(months).build()])
+        .rows([])
         .titles([ViewTitlePatch.builder().bind_subset(versions.nav("Subsets").key("All")).bind_selected(versions.nav("Elements").key("Actual")).build()])
         .suppress_empty_rows(True)
         .build()
@@ -72,6 +80,7 @@ def test_creates_updates_and_deletes(api: Api, fake: FakeTm1) -> None:
         "@odata.type": "#ibm.tm1.api.v1.NativeView",
         "Name": "Revenue",
         "Columns": [{"Subset@odata.bind": "Dimensions('Month')/Hierarchies('Month')/Subsets('Quarters')"}],
+        "Rows": [],
         "Titles": [
             {
                 "Subset@odata.bind": "Dimensions('Version')/Hierarchies('Version')/Subsets('All')",

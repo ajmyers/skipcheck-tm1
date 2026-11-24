@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessDebugContext;
 import io.skipcheck.tm1.client.model.ProcessDebugContextLineBreakpoint;
 import io.skipcheck.tm1.client.model.ProcessDebugContextLineBreakpointPatch;
@@ -26,7 +27,6 @@ import io.skipcheck.tm1.client.model.ProcessDebugContextStackFrame;
 import io.skipcheck.tm1.client.model.ProcessDebugContextStatus;
 import io.skipcheck.tm1.client.model.ProcessDebugContextVariable;
 import io.skipcheck.tm1.client.model.ProcessExecuteStatusCode;
-import io.skipcheck.tm1.client.model.ProcessPatch;
 import io.skipcheck.tm1.client.model.ProcessProcedure;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -55,7 +55,7 @@ class ProcessDebugTm1Test {
 		debug = tm1.processDebugging();
 		process = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.processes()
-			.create(ProcessPatch.builder()
+			.create(ProcessCreate.builder()
 				.name(process)
 				.prologProcedure("nA = 1;\nnB = nA + 1;\nnC = nB + 1;\n")
 				.build())

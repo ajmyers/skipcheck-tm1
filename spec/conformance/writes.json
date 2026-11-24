@@ -21,7 +21,7 @@
 			}
 		},
 		{
-			"id": "a chore's patch leaves out what a PATCH rejects and the tasks it appends",
+			"id": "a chore's patch leaves out what a PATCH rejects (Attributes, a rename) and the tasks it appends",
 			"type": "Chore",
 			"write": "patch",
 			"read": {
@@ -45,14 +45,13 @@
 				]
 			},
 			"expect": {
-				"Name": "Nightly",
 				"Active": true,
 				"DSTSensitive": false,
 				"ExecutionMode": "SingleCommit"
 			}
 		},
 		{
-			"id": "a subset's patch keeps its undeclared Alias and ExpandAbove",
+			"id": "a subset's patch keeps its undeclared Alias and ExpandAbove, and leaves out the name a PATCH ignores",
 			"type": "Subset",
 			"write": "patch",
 			"read": {
@@ -66,7 +65,6 @@
 				}
 			},
 			"expect": {
-				"Name": "Top",
 				"Expression": "{TM1SUBSETALL([Region])}",
 				"Alias": "Code",
 				"ExpandAbove": true

@@ -18,12 +18,13 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
-import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.Element;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.Subset;
+import io.skipcheck.tm1.client.model.SubsetCreate;
 import io.skipcheck.tm1.client.model.SubsetPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -60,9 +61,9 @@ class SubsetServiceTm1Test {
 	void createDimension() {
 		d = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(d)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(d)
 					.elements(List.of(numeric("A"), numeric("B"), numeric("C"), numeric("D")))
 					.build()))
@@ -79,11 +80,10 @@ class SubsetServiceTm1Test {
 	void createsStaticAndDynamicSubsetsReadsUpdatesAndDeletesThem() {
 		subsets
 			.create(d, d, SubsetScope.PUBLIC,
-					SubsetPatch.builder().name("Static").bindElements(el("A"), el("B")).build())
+					SubsetCreate.builder().name("Static").bindElements(el("A"), el("B")).build())
 			.block(WAIT);
-		subsets
-			.create(d, d, SubsetScope.PUBLIC,
-					SubsetPatch.builder().name("Dynamic").expression("{TM1SUBSETALL([" + d + "].[" + d + "])}").build())
+		subsets.create(d, d, SubsetScope.PUBLIC,
+				SubsetCreate.builder().name("Dynamic").expression("{TM1SUBSETALL([" + d + "].[" + d + "])}").build())
 			.block(WAIT);
 		assertThat(
 				subsets.list(d, d, SubsetScope.PUBLIC, ODataQuery.none()).map(Subset::name).collectList().block(WAIT))
@@ -111,7 +111,7 @@ class SubsetServiceTm1Test {
 
 	@Test
 	void appendsAndClearsElementsByNameAndRefusesThemInAnUpdate() {
-		subsets.create(d, d, SubsetScope.PUBLIC, SubsetPatch.builder().name("S").bindElements(el("A")).build())
+		subsets.create(d, d, SubsetScope.PUBLIC, SubsetCreate.builder().name("S").bindElements(el("A")).build())
 			.block(WAIT);
 		subsets.addElements(d, d, SubsetScope.PUBLIC, "S", List.of("C", "B")).block(WAIT);
 		assertThat(elements(SubsetScope.PUBLIC, "S")).as("appended, in order").containsExactly("A", "C", "B");
@@ -127,7 +127,8 @@ class SubsetServiceTm1Test {
 
 	@Test
 	void placesElementsLastBeforeOrAfterOthers() {
-		subsets.create(d, d, SubsetScope.PUBLIC, SubsetPatch.builder().name("S").bindElements(el("A"), el("B")).build())
+		subsets
+			.create(d, d, SubsetScope.PUBLIC, SubsetCreate.builder().name("S").bindElements(el("A"), el("B")).build())
 			.block(WAIT);
 		subsets.setElement(d, d, SubsetScope.PUBLIC, "S", "C").block(WAIT);
 		assertThat(elements(SubsetScope.PUBLIC, "S")).as("no position puts it last").containsExactly("A", "B", "C");
@@ -139,7 +140,7 @@ class SubsetServiceTm1Test {
 
 	@Test
 	void keepsPrivateSubsetsApartAndSavesCopies() {
-		subsets.create(d, d, SubsetScope.PRIVATE, SubsetPatch.builder().name("Mine").bindElements(el("D")).build())
+		subsets.create(d, d, SubsetScope.PRIVATE, SubsetCreate.builder().name("Mine").bindElements(el("D")).build())
 			.block(WAIT);
 		assertThat(
 				subsets.list(d, d, SubsetScope.PRIVATE, ODataQuery.none()).map(Subset::name).collectList().block(WAIT))
@@ -148,7 +149,7 @@ class SubsetServiceTm1Test {
 
 		subsets
 			.create(d, d, SubsetScope.PUBLIC,
-					SubsetPatch.builder().name("All").expression("{TM1SUBSETALL([" + d + "].[" + d + "])}").build())
+					SubsetCreate.builder().name("All").expression("{TM1SUBSETALL([" + d + "].[" + d + "])}").build())
 			.block(WAIT);
 		assertThat(subsets.saveAs(d, d, SubsetScope.PUBLIC, "All", "Copy").block(WAIT).expression()).isNotBlank();
 		Subset frozen = subsets.saveAs(d, d, SubsetScope.PUBLIC, "All", "Frozen", true, true).block(WAIT);
@@ -160,12 +161,13 @@ class SubsetServiceTm1Test {
 	void createsSessionSubsetsUnderTheServersName() {
 		Subset defined = subsets
 			.createSessionSubset(d, d,
-					SubsetPatch.builder().name("Wanted").expression("{[" + d + "].[" + d + "].[B]}").build())
+					SubsetCreate.builder().name("Wanted").expression("{[" + d + "].[" + d + "].[B]}").build())
 			.block(WAIT);
 		assertThat(defined.name()).as("TM1 ignores the name it's given").isNotEqualTo("Wanted");
 		assertThat(elements(SubsetScope.SESSION, defined.name())).containsExactly("B");
 
-		subsets.create(d, d, SubsetScope.PUBLIC, SubsetPatch.builder().name("S").bindElements(el("C"), el("D")).build())
+		subsets
+			.create(d, d, SubsetScope.PUBLIC, SubsetCreate.builder().name("S").bindElements(el("C"), el("D")).build())
 			.block(WAIT);
 		Subset copied = subsets.createSessionSubsetFrom(d, d, SubsetScope.PUBLIC, "S").block(WAIT);
 		assertThat(elements(SubsetScope.SESSION, copied.name())).containsExactly("C", "D");
@@ -185,8 +187,8 @@ class SubsetServiceTm1Test {
 		return ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Elements").key(name);
 	}
 
-	private static ElementPatch numeric(String name) {
-		return ElementPatch.builder().name(name).type(ElementType.NUMERIC).build();
+	private static ElementCreate numeric(String name) {
+		return ElementCreate.builder().name(name).type(ElementType.NUMERIC).build();
 	}
 
 }

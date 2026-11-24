@@ -12,8 +12,8 @@ import pytest
 
 from skipcheck_tm1 import Tm1Client
 from skipcheck_tm1.model import (
-    CubePatch,
-    SandboxPatch,
+    CubeCreate,
+    SandboxCreate,
 )
 
 from .conftest import CONFIGURED, REASON
@@ -33,7 +33,7 @@ def small_cube(tm1: Tm1Client, name: str) -> Iterator[Any]:
     a, b = name + "-a", name + "-b"
     for d in (a, b):
         dimension(tm1, d, [element("X"), element("Y")])
-    tm1.cubes.create(CubePatch.builder().name(name).bind_dimensions(dim(a), dim(b)).build())
+    tm1.cubes.create(CubeCreate.builder().name(name).bind_dimensions(dim(a), dim(b)).build())
 
     def cell(e: str) -> dict[str, str]:
         return {a: e, b: e}
@@ -51,7 +51,7 @@ def small_cube(tm1: Tm1Client, name: str) -> Iterator[Any]:
 
 def test_keeps_sandbox_writes_apart_until_published(tm1: Tm1Client, small_cube: Any) -> None:
     cube, cell, value = small_cube
-    tm1.sandboxes.create(SandboxPatch.builder().name("S").build())
+    tm1.sandboxes.create(SandboxCreate.builder().name("S").build())
     assert "S" in [s.name for s in tm1.sandboxes.list()]
     tm1.with_sandbox("S").cells.update(cube, cell("X"), 5)
     assert value(tm1.with_sandbox("S"), "X") == 5.0
@@ -62,8 +62,8 @@ def test_keeps_sandbox_writes_apart_until_published(tm1: Tm1Client, small_cube: 
 
 def test_merges_discards_loads_and_unloads(tm1: Tm1Client, small_cube: Any) -> None:
     cube, cell, value = small_cube
-    tm1.sandboxes.create(SandboxPatch.builder().name("S").build())
-    tm1.sandboxes.create(SandboxPatch.builder().name("T").build())
+    tm1.sandboxes.create(SandboxCreate.builder().name("S").build())
+    tm1.sandboxes.create(SandboxCreate.builder().name("T").build())
     tm1.with_sandbox("S").cells.update(cube, cell("X"), 7)
     tm1.sandboxes.merge("S", "T")
     assert value(tm1.with_sandbox("T"), "X") == 7.0

@@ -133,18 +133,18 @@ class GeneratedModelTm1Test {
 		ODataPath cube = ODataPath.of("Cubes").key(name);
 		try {
 			session.execute(Tm1Request.post(ODataPath.of("Dimensions"),
-					DimensionPatch.builder()
+					DimensionCreate.builder()
 						.name(name)
-						.hierarchies(List.of(HierarchyPatch.builder()
+						.hierarchies(List.of(HierarchyCreate.builder()
 							.name(name)
-							.elements(List.of(ElementPatch.builder().name("North").type(ElementType.NUMERIC).build(),
-									ElementPatch.builder().name("South").type(ElementType.NUMERIC).build()))
+							.elements(List.of(ElementCreate.builder().name("North").type(ElementType.NUMERIC).build(),
+									ElementCreate.builder().name("South").type(ElementType.NUMERIC).build()))
 							.build()))
 						.build(),
 					Dimension.class))
 				.block(WAIT);
 			session.execute(Tm1Request.post(ODataPath.of("Cubes"),
-					CubePatch.builder()
+					CubeCreate.builder()
 						.name(name)
 						.bindDimensions(dimension, ODataPath.of("Dimensions").key("}Groups"))
 						.build(),

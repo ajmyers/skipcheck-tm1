@@ -14,7 +14,7 @@
 			],
 			"args" : [
 				{
-					"$patch" : "DimensionPatch",
+					"$patch" : "DimensionCreate",
 					"json" : { }
 				}
 			],
@@ -152,7 +152,7 @@
 			],
 			"args" : [
 				{
-					"$patch" : "DimensionPatch",
+					"$patch" : "DimensionCreate",
 					"json" : {
 						"Name" : "a]b"
 					}
@@ -247,7 +247,7 @@
 				{
 					"$patch" : "DimensionPatch",
 					"json" : {
-						"Name" : "Region"
+						"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Region')"
 					}
 				},
 				"W/\"0\""
@@ -265,7 +265,7 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"Name" : "Region"
+							"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Region')"
 						}
 					},
 					"response" : {
@@ -428,7 +428,7 @@
 			],
 			"args" : [
 				{
-					"$patch" : "DimensionPatch",
+					"$patch" : "DimensionCreate",
 					"json" : {
 						"Name" : "Region",
 						"Hierarchies" : [
@@ -520,7 +520,7 @@
 			],
 			"args" : [
 				{
-					"$patch" : "DimensionPatch",
+					"$patch" : "DimensionCreate",
 					"json" : {
 						"Name" : "Region"
 					}
@@ -1601,7 +1601,7 @@
 				{
 					"$patch" : "DimensionPatch",
 					"json" : {
-						"UniqueName" : "[Region]"
+						"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Alternate')"
 					}
 				}
 			],
@@ -1617,7 +1617,7 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"UniqueName" : "[Region]"
+							"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Alternate')"
 						}
 					},
 					"response" : {
@@ -1642,7 +1642,7 @@
 				{
 					"$patch" : "DimensionPatch",
 					"json" : {
-						"AllLeavesHierarchyName" : null
+						"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Alternate')"
 					}
 				},
 				"W/\"1\""
@@ -1660,7 +1660,7 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"AllLeavesHierarchyName" : null
+							"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Alternate')"
 						}
 					},
 					"response" : {

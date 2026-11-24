@@ -19,11 +19,11 @@ from skipcheck_tm1 import (
     Tm1Request,
 )
 from skipcheck_tm1.model import (
+    ProcessCreate,
     ProcessDebugContextLineBreakpoint,
     ProcessDebugContextLineBreakpointPatch,
     ProcessDebugContextStatus,
     ProcessExecuteStatusCode,
-    ProcessPatch,
     ProcessProcedure,
 )
 
@@ -34,7 +34,7 @@ pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 @pytest.fixture
 def three_lines(tm1: Tm1Client, name: str) -> Iterator[str]:
-    tm1.processes.create(ProcessPatch.builder().name(name).prolog_procedure("nA = 1;\nnB = nA + 1;\nnC = nB + 1;\n").build())
+    tm1.processes.create(ProcessCreate.builder().name(name).prolog_procedure("nA = 1;\nnB = nA + 1;\nnC = nB + 1;\n").build())
     yield name
     tm1.processes.delete(name)
 

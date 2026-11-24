@@ -3,18 +3,19 @@
 import { afterEach, beforeEach, describe, expect } from "vitest";
 import {
   Chore,
+  ChoreCreate,
   ChorePatch,
   ChoreTask,
   ChoreTaskParameterPatch,
   ChoreTaskPatch,
   ODataPath,
   ODataQuery,
+  ProcessCreate,
   ProcessParameterPatch,
-  ProcessPatch,
+  type Tm1Client,
   Tm1Duration,
   Tm1Exception,
   Tm1PreconditionFailedException,
-  type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
@@ -41,7 +42,7 @@ describe("ChoreService on TM1" + liveReason, () => {
     process = "tm1ts_test_" + id;
     chore = "tm1ts_test_chore_" + id;
     await tm1.processes.create(
-      ProcessPatch.builder()
+      ProcessCreate.builder()
         .name(process)
         .parameters([
           ProcessParameterPatch.builder().name("pName").value("").type("String").build(),
@@ -52,7 +53,7 @@ describe("ChoreService on TM1" + liveReason, () => {
     );
     // Durations as Java's Duration.toString writes them
     await tm1.chores.create(
-      ChorePatch.builder()
+      ChoreCreate.builder()
         .name(chore)
         .startTime("2026-01-01T02:00:00Z")
         .dstSensitive(false)

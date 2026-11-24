@@ -6,7 +6,7 @@ import java.util.Objects;
 
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.AttributeDefinition;
-import io.skipcheck.tm1.client.model.AttributeDefinitionPatch;
+import io.skipcheck.tm1.client.model.AttributeDefinitionCreate;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.Tm1Endpoint;
 import io.skipcheck.tm1.client.session.Tm1Session;
@@ -90,7 +90,7 @@ public final class AttributeService {
 	@Tm1Endpoint("Navigation Cube/ViewAttributes")
 	@Tm1Endpoint("EntitySet ProcessAttributes")
 	@Tm1Endpoint("EntitySet ChoreAttributes")
-	public Mono<AttributeDefinition> create(AttributeSet set, AttributeDefinitionPatch attribute) {
+	public Mono<AttributeDefinition> create(AttributeSet set, AttributeDefinitionCreate attribute) {
 		return session.execute(Tm1Request.post(set.path(), attribute, AttributeDefinition.class));
 	}
 

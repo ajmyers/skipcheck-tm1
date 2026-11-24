@@ -27,7 +27,7 @@ public class ElementServiceTests
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "West" };
         await tm1.Elements.GetAsync("Region", "Region", "West");
         Assert.Equal(("GET", Elements + "('West')"), (_tm1.Last.Method, _tm1.Last.Target));
-        await tm1.Elements.CreateAsync("Region", "Region", ElementPatch.Builder().Name("West").Type(ElementType.Numeric).Build());
+        await tm1.Elements.CreateAsync("Region", "Region", ElementCreate.Builder().Name("West").Type(ElementType.Numeric).Build());
         Assert.Equal(("POST", Elements, """{"Name":"West","Type":"Numeric"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => null;
@@ -43,18 +43,9 @@ public class ElementServiceTests
     [Fact]
     public void AnUpdateWithANameOrAttributesIsRefused()
     {
-        var tm1 = _tm1.Client();
-        var rename = Assert.Throws<ArgumentException>(() =>
-        {
-            _ = tm1.Elements.UpdateAsync("Region", "Region", "West", ElementPatch.Builder().Name("East").Build());
-        });
-        Assert.Contains("can't be renamed", rename.Message);
-        var attributes = ElementPatch.Builder().Attributes(AttributesPatch.Builder().Caption("W").Build()).Build();
-        var e = Assert.Throws<ArgumentException>(() =>
-        {
-            _ = tm1.Elements.UpdateAsync("Region", "Region", "West", attributes, "W/\"1\"");
-        });
-        Assert.Contains("}ElementAttributes_", e.Message);
+        // Refused at compile time: ElementPatch offers neither, as TM1 ignores the name and refuses
+        // Attributes in an element's PATCH
+        Assert.DoesNotContain(typeof(ElementPatch.PatchBuilder).GetMethods(), m => m.Name is "Name" or "Attributes");
         Assert.Empty(_tm1.Requests);
     }
 

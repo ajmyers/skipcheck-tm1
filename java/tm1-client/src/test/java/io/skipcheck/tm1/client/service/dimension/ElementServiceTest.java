@@ -5,6 +5,8 @@ package io.skipcheck.tm1.client.service.dimension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -16,9 +18,9 @@ import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.error.Tm1ConflictException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
-import io.skipcheck.tm1.client.model.AttributesPatch;
 import io.skipcheck.tm1.client.model.Edge;
 import io.skipcheck.tm1.client.model.Element;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementPatch;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.Hierarchy;
@@ -95,14 +97,14 @@ class ElementServiceTest {
 	void createsAnElement() {
 		tm1().json(201, "{\"Name\":\"West\",\"Type\":\"Numeric\"}");
 		Element created = conformance.call("elements", "create", "Region", "Region",
-				ElementPatch.builder().name("West").type(ElementType.NUMERIC).build());
+				ElementCreate.builder().name("West").type(ElementType.NUMERIC).build());
 		assertThat(created.name()).isEqualTo("West");
 		assertThat(tm1().last().key()).isEqualTo("POST " + E);
 		assertThat(tm1().last().text()).isEqualTo("{\"Name\":\"West\",\"Type\":\"Numeric\"}");
 
 		tm1().error(409, "278", "Element 'West' already exists.");
 		assertThat(conformance.fail("elements", "create", "Region", "Region",
-				ElementPatch.builder().name("West").type(ElementType.NUMERIC).build()))
+				ElementCreate.builder().name("West").type(ElementType.NUMERIC).build()))
 			.isInstanceOf(Tm1ConflictException.class);
 	}
 
@@ -137,17 +139,11 @@ class ElementServiceTest {
 
 	@Test
 	void anUpdateWithANameOrAttributesIsRefused() {
-		assertThat(conformance.fail("elements", "update", "Region", "Region", "West",
-				ElementPatch.builder().name("East").build()))
-			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("renamed");
-		assertThat(conformance.fail("elements", "update", "Region", "Region", "West",
-				ElementPatch.builder().name("East").build(), "W/\"1\""))
-			.isInstanceOf(IllegalArgumentException.class);
-		assertThat(conformance.fail("elements", "update", "Region", "Region", "West",
-				ElementPatch.builder().attributes(AttributesPatch.builder().build()).build()))
-			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("ElementAttributes");
+		// Refused at compile time: ElementPatch offers neither, as TM1 ignores the name
+		// and
+		// refuses Attributes in an element's PATCH
+		assertThat(Arrays.stream(ElementPatch.Builder.class.getMethods()).map(Method::getName)).doesNotContain("name",
+				"attributes");
 		assertThat(tm1().requests()).isEmpty();
 	}
 

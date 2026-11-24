@@ -9,7 +9,7 @@ import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Cube;
 import io.skipcheck.tm1.client.model.Dimension;
 import io.skipcheck.tm1.client.model.Element;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.Process;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
@@ -39,7 +39,7 @@ final class BatchExamples {
 		List<Mono<String>> results = cities.stream()
 			.map(city -> batch.client()
 				.elements()
-				.create("City", "City", ElementPatch.builder().name(city).build())
+				.create("City", "City", ElementCreate.builder().name(city).build())
 				.map(Element::name)
 				.onErrorResume(e -> Mono.just(city + " failed: " + e.getMessage())))
 			.toList();

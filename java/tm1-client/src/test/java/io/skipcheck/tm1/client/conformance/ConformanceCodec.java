@@ -24,6 +24,7 @@ import io.skipcheck.tm1.client.error.Tm1ApiException;
 import io.skipcheck.tm1.client.error.Tm1ProtocolException;
 import io.skipcheck.tm1.client.error.Tm1TransportException;
 import io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException;
+import io.skipcheck.tm1.client.model.CubeCreate;
 import io.skipcheck.tm1.client.odata.Filter;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -38,7 +39,7 @@ import tools.jackson.databind.node.ObjectNode;
  * The language-neutral encoding of a call's arguments, its result and its error, as
  * {@code spec/conformance/README.md} describes it. JSON values stand for themselves;
  * anything else is an object with one {@code $}-tag, such as {@code {"$query": {...}}} or
- * {@code {"$patch": "CubePatch", "json": {...}}}. A value it can't encode is an error,
+ * {@code {"$patch": "CubeCreate", "json": {...}}}. A value it can't encode is an error,
  * never a guess.
  */
 public final class ConformanceCodec {
@@ -147,7 +148,8 @@ public final class ConformanceCodec {
 			return tagged("$bytes", NODES.stringNode(Base64.getEncoder().encodeToString(bytes(content))));
 		}
 		Class<?> type = value.getClass();
-		if (type.getPackageName().equals(MODEL) && type.getSimpleName().endsWith("Patch")) {
+		if (type.getPackageName().equals(MODEL)
+				&& (type.getSimpleName().endsWith("Patch") || type.getSimpleName().endsWith("Create"))) {
 			ObjectNode node = NODES.objectNode();
 			node.put("$patch", type.getSimpleName());
 			node.set("json", JSON.valueToTree(value));

@@ -8,14 +8,14 @@
 			"service" : "sandboxes",
 			"method" : "create",
 			"params" : [ "sandbox" ],
-			"args" : [ { "$patch" : "SandboxPatch", "json" : { "Name" : "${sandbox}" } } ],
+			"args" : [ { "$patch" : "SandboxCreate", "json" : { "Name" : "${sandbox}" } } ],
 			"expect" : { "fields" : { "Name" : "${sandbox}" } }
 		},
 		{
 			"service" : "sandboxes",
 			"method" : "create",
 			"params" : [ "sandbox" ],
-			"args" : [ { "$patch" : "SandboxPatch", "json" : { "Name" : "${target}" } } ],
+			"args" : [ { "$patch" : "SandboxCreate", "json" : { "Name" : "${target}" } } ],
 			"expect" : { "fields" : { "Name" : "${target}" } }
 		},
 		{

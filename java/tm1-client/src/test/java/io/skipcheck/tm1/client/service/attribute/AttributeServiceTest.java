@@ -17,7 +17,7 @@ import io.skipcheck.tm1.client.conformance.ConformanceTm1;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.AttributeDefinition;
-import io.skipcheck.tm1.client.model.AttributeDefinitionPatch;
+import io.skipcheck.tm1.client.model.AttributeDefinitionCreate;
 import io.skipcheck.tm1.client.model.AttributeType;
 import io.skipcheck.tm1.client.odata.Filter;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -96,7 +96,7 @@ class AttributeServiceTest {
 		sets().forEach((path, set) -> {
 			tm1().json(201, "{\"Name\":\"Code\",\"Type\":\"String\"}");
 			AttributeDefinition created = conformance.call("attributes", "create", set,
-					AttributeDefinitionPatch.builder().name("Code").type(AttributeType.STRING).build());
+					AttributeDefinitionCreate.builder().name("Code").type(AttributeType.STRING).build());
 			assertThat(created.type()).isEqualTo(AttributeType.STRING);
 			ConformanceTm1.Recorded post = tm1().last();
 			assertThat(post.key()).isEqualTo("POST " + path);
@@ -105,7 +105,7 @@ class AttributeServiceTest {
 
 		tm1().json(201, "{\"Name\":\"Weight\",\"Type\":\"Numeric\"}");
 		conformance.call("attributes", "create", set("elements", "Region", "Region"),
-				AttributeDefinitionPatch.builder().name("Weight").type(AttributeType.NUMERIC).build());
+				AttributeDefinitionCreate.builder().name("Weight").type(AttributeType.NUMERIC).build());
 		assertThat(tm1().last().text()).isEqualTo("{\"Name\":\"Weight\",\"Type\":\"Numeric\"}");
 	}
 
@@ -113,7 +113,7 @@ class AttributeServiceTest {
 	void aViewAttributeNeedsAPublicNativeView() {
 		tm1().error(400, "278", "Cube 'Sales' has no public views.");
 		Throwable error = conformance.fail("attributes", "create", set("views", "Sales"),
-				AttributeDefinitionPatch.builder().name("Owner").type(AttributeType.STRING).build());
+				AttributeDefinitionCreate.builder().name("Owner").type(AttributeType.STRING).build());
 		assertThat(error).isInstanceOf(Tm1BadRequestException.class);
 	}
 

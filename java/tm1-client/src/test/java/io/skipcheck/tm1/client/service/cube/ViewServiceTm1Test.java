@@ -18,16 +18,17 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
-import io.skipcheck.tm1.client.model.CubePatch;
-import io.skipcheck.tm1.client.model.DimensionPatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.CubeCreate;
+import io.skipcheck.tm1.client.model.DimensionCreate;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.MDXView;
+import io.skipcheck.tm1.client.model.MDXViewCreate;
 import io.skipcheck.tm1.client.model.MDXViewPatch;
 import io.skipcheck.tm1.client.model.NativeView;
-import io.skipcheck.tm1.client.model.NativeViewPatch;
-import io.skipcheck.tm1.client.model.SubsetPatch;
+import io.skipcheck.tm1.client.model.NativeViewCreate;
+import io.skipcheck.tm1.client.model.SubsetCreate;
 import io.skipcheck.tm1.client.model.View;
 import io.skipcheck.tm1.client.model.ViewAxisSelectionPatch;
 import io.skipcheck.tm1.client.model.ViewTitlePatch;
@@ -78,7 +79,7 @@ class ViewServiceTm1Test {
 		measure = dimension(cube + "-measure", "Amount");
 		year = dimension(cube + "-year", "2025", "2026");
 		tm1.cubes()
-			.create(CubePatch.builder().name(cube).bindDimensions(dim(region), dim(measure), dim(year)).build())
+			.create(CubeCreate.builder().name(cube).bindDimensions(dim(region), dim(measure), dim(year)).build())
 			.block(WAIT);
 	}
 
@@ -92,7 +93,7 @@ class ViewServiceTm1Test {
 
 	@Test
 	void createsReadsUpdatesAndDeletesBothKindsOfView() {
-		views.create(cube, ViewScope.PUBLIC, MDXViewPatch.builder().name("Mdx").mdx(mdx()).build()).block(WAIT);
+		views.create(cube, ViewScope.PUBLIC, MDXViewCreate.builder().name("Mdx").mdx(mdx()).build()).block(WAIT);
 		views.create(cube, ViewScope.PUBLIC, nativeView("Native")).block(WAIT);
 		List<View> all = views.list(cube, ViewScope.PUBLIC, ODataQuery.none()).collectList().block(WAIT);
 		assertThat(all).extracting(View::name).containsExactlyInAnyOrder("Mdx", "Native");
@@ -117,7 +118,7 @@ class ViewServiceTm1Test {
 
 	@Test
 	void keepsPrivateViewsApart() {
-		views.create(cube, ViewScope.PRIVATE, MDXViewPatch.builder().name("Mine").mdx(mdx()).build()).block(WAIT);
+		views.create(cube, ViewScope.PRIVATE, MDXViewCreate.builder().name("Mine").mdx(mdx()).build()).block(WAIT);
 		assertThat(views.list(cube, ViewScope.PRIVATE, ODataQuery.none()).map(View::name).collectList().block(WAIT))
 			.containsExactly("Mine");
 		assertThat(views.list(cube, ViewScope.PUBLIC, ODataQuery.none()).collectList().block(WAIT)).isEmpty();
@@ -142,7 +143,7 @@ class ViewServiceTm1Test {
 	@Test
 	void expandsNativeViewsAxesInAListWithMdxViews() {
 		views.create(cube, ViewScope.PUBLIC, nativeView("Native")).block(WAIT);
-		views.create(cube, ViewScope.PUBLIC, MDXViewPatch.builder().name("Mdx").mdx(mdx()).build()).block(WAIT);
+		views.create(cube, ViewScope.PUBLIC, MDXViewCreate.builder().name("Mdx").mdx(mdx()).build()).block(WAIT);
 		List<View> all = views.list(cube, ViewScope.PUBLIC, ODataQuery.none().expand("tm1.NativeView/Columns/Subset"))
 			.collectList()
 			.block(WAIT);
@@ -153,8 +154,8 @@ class ViewServiceTm1Test {
 		assertThat(all).filteredOn(v -> v instanceof MDXView).hasSize(1);
 	}
 
-	private NativeViewPatch nativeView(String name) {
-		return NativeViewPatch.builder()
+	private NativeViewCreate nativeView(String name) {
+		return NativeViewCreate.builder()
 			.name(name)
 			.columns(List.of(ViewAxisSelectionPatch.builder().bindSubset(subset(measure)).build()))
 			.rows(List.of(ViewAxisSelectionPatch.builder().bindSubset(subset(region)).build()))
@@ -180,19 +181,19 @@ class ViewServiceTm1Test {
 
 	private static String dimension(String name, String... elements) {
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(name)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(name)
 					.elements(Arrays.stream(elements)
-						.map(e -> ElementPatch.builder().name(e).type(ElementType.NUMERIC).build())
+						.map(e -> ElementCreate.builder().name(e).type(ElementType.NUMERIC).build())
 						.toList())
 					.build()))
 				.build())
 			.block(WAIT);
 		tm1.subsets()
 			.create(name, name, SubsetScope.PUBLIC,
-					SubsetPatch.builder()
+					SubsetCreate.builder()
 						.name("All")
 						.expression("{TM1SUBSETALL([" + name + "].[" + name + "])}")
 						.build())
