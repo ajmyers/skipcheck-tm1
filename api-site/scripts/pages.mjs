@@ -301,6 +301,12 @@ for (const { project, content } of landings) {
 		'<p class="card-links"><a href="/' + PA_DOCKER.id + '/">Overview</a> · ' +
 		PA_DOCKER.pages.filter((page) => !page.path.includes('/')).map((page) => '<a href="/' + PA_DOCKER.id + '/' + page.path + '/">' + escape(page.path) + '</a>').join(' · ') +
 		'</p></li>';
+	// tm1cm's pages are built and served from ajmyers/tm1cm (docs-site/ there), by a Worker of their own
+	// on /tm1cm*: listed here so the masthead's Docs link finds them too
+	const TM1CM =
+		'<li class="card"><div class="card-head"><h3>tm1cm</h3><span class="badge">Python</span></div>' +
+		'<p>A command-line tool that moves TM1 objects between servers and files, one file each, so a model can be reviewed and promoted with git.</p>' +
+		'<p class="card-links"><a href="/tm1cm/">Overview</a> · <a href="/tm1cm/docs/">Docs</a> · <a href="/tm1cm/walkthroughs/first-project/">Get started</a></p></li>';
 	const body =
 		'<section class="hero wrap" aria-labelledby="title"><p class="kicker">Java · Python · .NET · TypeScript</p><h1 id="title">Docs</h1>' +
 		'<p class="lead">Every library, in each language it comes in. Each one has a page per type, with its members and examples in your language; ' +
@@ -313,6 +319,9 @@ for (const { project, content } of landings) {
 			: '') +
 		'<section id="running" class="section wrap" aria-labelledby="running-heading"><h2 id="running-heading" class="section-label">Running TM1</h2><ul class="cards">' +
 		docker +
+		'</ul></section>' +
+		'<section id="tools" class="section wrap" aria-labelledby="tools-heading"><h2 id="tools-heading" class="section-label">Tools</h2><ul class="cards">' +
+		TM1CM +
 		'</ul></section>';
 	await mkdir(path.join(distDir, 'docs'), { recursive: true });
 	await writeFile(
