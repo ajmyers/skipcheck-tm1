@@ -165,7 +165,13 @@ val liveTestTypescript = tasks.register<ToolTask>("liveTestTypescript") {
 	group = "verification"
 	description = "Runs the TypeScript client's tests against a real TM1 (test/live), and the testcontainers' tests."
 	directory = root.dir("typescript")
-	commands = listOf(listOf("npm", "run", "test:live", "-w", "tm1-client"), listOf("npm", "test", "-w", "tm1-testcontainers"))
+	// test:live, unlike npm test, doesn't generate the model first, and it isn't committed: in a
+	// fresh checkout the live tests would find no src/generated (#321)
+	commands = listOf(
+		listOf("npm", "run", "generate", "-w", "tm1-client"),
+		listOf("npm", "run", "test:live", "-w", "tm1-client"),
+		listOf("npm", "test", "-w", "tm1-testcontainers"),
+	)
 	dependsOn(liveTestPrepare)
 	mustRunAfter(liveTestJava, liveTestPython, liveTestDotnet)
 }
