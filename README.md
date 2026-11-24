@@ -28,6 +28,15 @@ Java is the reference: the other clients have its API, and their tests replay wh
 
 The Java libraries require Java 17+, the Python client Python 3.11+, the .NET client .NET 10, the TypeScript client Node 22+ or a modern browser (its testcontainers, Node 22.22+).
 
+## Stability
+
+These libraries are pre-1.0: their API may still change. Until 1.0.0, the version says what to expect:
+
+- A minor release (0.1.0 → 0.2.0) may make breaking changes, in any client.
+- A patch release (0.1.0 → 0.1.1) won't.
+
+So pin an exact version, or a range that stays within one minor release: `^0.1.0` in npm, `~=0.1.0` in Python. All four clients share one version and change together. From 1.0.0 on, breaking changes come only with a new major version.
+
 ## Building
 
 ```sh

@@ -11,6 +11,8 @@ license = "Apache-2.0"
 # hatch_build.py copies them here from the repository root; an sdist carries them
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
+# Pre-1.0: the API may change between minor versions (README.md#stability)
+classifiers = ["Development Status :: 3 - Alpha"]
 dependencies = [
     "httpx2>=2.16",
     "pydantic>=2.7",

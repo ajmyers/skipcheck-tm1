@@ -1,5 +1,7 @@
 # skipcheck-tm1-testcontainers (Python)
 
+> **Pre-1.0:** the API may change between minor versions (0.1 → 0.2) until 1.0.0. See [Stability](https://github.com/ajmyers/skipcheck-tm1#stability).
+
 Run tests against a real IBM Planning Analytics (TM1) server in Docker, with
 [testcontainers-python](https://testcontainers-python.readthedocs.io). The Python port of the
 Java [`tm1-testcontainers`](../../java/tm1-testcontainers/README.md) module: the same classes, sources,

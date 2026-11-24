@@ -1,5 +1,7 @@
 # Skipcheck.Tm1.Client (.NET)
 
+> **Pre-1.0:** the API may change between minor versions (0.1 → 0.2) until 1.0.0. See [Stability](https://github.com/ajmyers/skipcheck-tm1#stability).
+
 A .NET client for the **IBM Planning Analytics (TM1) REST API**, with the same API as the Java client (`tm1-client`): the same services, methods, parameters, queries, patches, session views and errors, named the .NET way. Its model is generated from the same language-neutral spec ([`spec/tm1-api.json`](../spec)). It requires .NET 10 and has no dependencies beyond the framework.
 
 ```csharp
