@@ -116,6 +116,9 @@ tasks.withType<Test>().configureEach {
 	val record = providers.gradleProperty("recordConformance").isPresent
 	systemProperty("tm1.conformance.record", record)
 	inputs.dir(conformance).withPathSensitivity(PathSensitivity.RELATIVE).optional()
+	// The probe files, which ProbedWritesCoverageTest holds the live scenarios to
+	inputs.files(fileTree(rootDir.resolve("java/tm1-client/src/model/metadata")) { include("tm1-probe-*.json") })
+		.withPathSensitivity(PathSensitivity.RELATIVE)
 	if (record) {
 		outputs.upToDateWhen { false }
 	}
