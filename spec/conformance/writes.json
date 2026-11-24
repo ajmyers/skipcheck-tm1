@@ -1,0 +1,149 @@
+{
+	"$comment": "Writes made from what was read, which every client must produce identically: the generated create and patch types' builder(read), by the probe's writes (tm1-api.json's write sections). A case reads `read` as its `type`, builds the `write` (\"create\": <type>Create, \"patch\": <type>Patch) from it, and gets exactly `expect`, compared as JSON (an object's key order doesn't count), or fails building with a message containing `error`. Read by the Java client's WritesConformanceTest and each client's test of the same name. Durations and dates are left out: how each client writes them back is a matter of format, not of what's sent.",
+	"cases": [
+		{
+			"id": "an element's create leaves out what a POST ignores",
+			"type": "Element",
+			"write": "create",
+			"read": {
+				"Name": "North",
+				"UniqueName": "[Region].[Region].[North]",
+				"Type": "Consolidated",
+				"Index": 4,
+				"Level": 1,
+				"Attributes": {
+					"Caption": "North"
+				}
+			},
+			"expect": {
+				"Name": "North",
+				"Type": "Consolidated"
+			}
+		},
+		{
+			"id": "a chore's patch leaves out what a PATCH rejects and the tasks it appends",
+			"type": "Chore",
+			"write": "patch",
+			"read": {
+				"Name": "Nightly",
+				"Active": true,
+				"DSTSensitive": false,
+				"ExecutionMode": "SingleCommit",
+				"Attributes": {
+					"Caption": "Nightly"
+				},
+				"Tasks": [
+					{
+						"Step": 0,
+						"Parameters": [
+							{
+								"Name": "pValue",
+								"Value": "1"
+							}
+						]
+					}
+				]
+			},
+			"expect": {
+				"Name": "Nightly",
+				"Active": true,
+				"DSTSensitive": false,
+				"ExecutionMode": "SingleCommit"
+			}
+		},
+		{
+			"id": "a subset's patch keeps its undeclared Alias and ExpandAbove",
+			"type": "Subset",
+			"write": "patch",
+			"read": {
+				"Name": "Top",
+				"UniqueName": "[Region].[Region].[Top]",
+				"Expression": "{TM1SUBSETALL([Region])}",
+				"Alias": "Code",
+				"ExpandAbove": true,
+				"Attributes": {
+					"Caption": "Top"
+				}
+			},
+			"expect": {
+				"Name": "Top",
+				"Expression": "{TM1SUBSETALL([Region])}",
+				"Alias": "Code",
+				"ExpandAbove": true
+			}
+		},
+		{
+			"id": "a process's create keeps its code, parameters and UI data",
+			"type": "Process",
+			"write": "create",
+			"read": {
+				"Name": "Load",
+				"HasSecurityAccess": false,
+				"PrologProcedure": "x = 1;",
+				"UIData": "CubeAction=1511\f",
+				"VariablesUIData": [
+					"VarType=32\f"
+				],
+				"Parameters": [
+					{
+						"Name": "pRegion",
+						"Prompt": "A region",
+						"Value": "North",
+						"Type": "String"
+					}
+				],
+				"Attributes": {
+					"Caption": "Load"
+				}
+			},
+			"expect": {
+				"Name": "Load",
+				"HasSecurityAccess": false,
+				"PrologProcedure": "x = 1;",
+				"UIData": "CubeAction=1511\f",
+				"VariablesUIData": [
+					"VarType=32\f"
+				],
+				"Parameters": [
+					{
+						"Name": "pRegion",
+						"Prompt": "A region",
+						"Value": "North",
+						"Type": "String"
+					}
+				]
+			}
+		},
+		{
+			"id": "a value whose type has subtypes is copied as its own type",
+			"type": "ServerSettings",
+			"write": "patch",
+			"read": {
+				"ServerName": "tm1",
+				"EncryptionAtRest": {
+					"@odata.type": "#ibm.tm1.api.v1.VaultSettings",
+					"KeyRef": "key",
+					"ServiceEndpoint": "https://vault"
+				}
+			},
+			"expect": {
+				"ServerName": "tm1",
+				"EncryptionAtRest": {
+					"@odata.type": "#ibm.tm1.api.v1.VaultSettings",
+					"KeyRef": "key",
+					"ServiceEndpoint": "https://vault"
+				}
+			}
+		},
+		{
+			"id": "a cube's create needs its dimensions",
+			"type": "Cube",
+			"write": "create",
+			"read": {
+				"Name": "Sales",
+				"Rules": "SKIPCHECK;"
+			},
+			"error": "Dimensions"
+		}
+	]
+}

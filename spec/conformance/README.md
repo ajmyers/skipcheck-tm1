@@ -5,6 +5,7 @@ The Java client is the definition of how a call behaves. Its unit tests record e
 | File | What it is | Written by |
 |---|---|---|
 | `odata-encoding.json` | Paths and literals every client must encode identically | Hand |
+| `writes.json` | Writes made from what was read (`builder(read)` on the create and patch types) that every client must produce identically | Hand |
 | `calls/<JavaTestClass>.json` | The service calls one Java unit-test class records | `./gradlew :tm1-client:test -PrecordConformance` |
 | `live/<scenario>.json` | Steps every client runs against a real TM1 | Hand |
 
