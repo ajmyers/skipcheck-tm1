@@ -13,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -71,6 +72,21 @@ public final class ProbeClient implements AutoCloseable {
 			return status >= 200 && status < 300;
 		}
 
+	}
+
+	/**
+	 * Whether a user signs in to this server with a password (Basic, as TM1's own
+	 * security takes it): how the probe checks a write it can't read back.
+	 * @param user the user's name
+	 * @param password the password
+	 * @return whether {@code ActiveUser} answers for them
+	 */
+	public boolean signsIn(String user, String password) {
+		String basic = "Basic "
+				+ Base64.getEncoder().encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
+		try (ProbeClient as = new ProbeClient(root, basic)) {
+			return as.get("ActiveUser").ok();
+		}
 	}
 
 	/**

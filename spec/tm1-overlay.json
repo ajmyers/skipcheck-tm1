@@ -60,9 +60,5 @@
 			"type": "Edm.Int64"
 		}
 	},
-	"writeOnly": {
-		"User/Password": {
-			"note": "Write-only: TM1 never sends it back, so the write probe can't see a write take effect, and reads it as ignored."
-		}
-	}
+	"writeOnly": {}
 }

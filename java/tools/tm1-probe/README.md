@@ -28,6 +28,7 @@ container.
 | Setting | Default | What it does |
 |---|---|---|
 | `TM1_PROBE_SERVERS` | `4` | How many identical TM1 containers share the work. One TM1 (11.8) answers about 35,000 names a second, however many requests it's sent at once, so more servers are the way to go faster. Each uses about 2.5 cores. |
+| `TM1_PROBE_ONLY` | unset | `writes` probes the writes alone, on one server, with the committed `tm1-probe-<schema>.json`'s undeclared properties, and keeps that file's other findings. For working on `write-cases.json`: the names take far longer and don't change with the cases. A new TM1 version needs a full run first. |
 
 It takes about 24 minutes with one server and about a quarter of that with four, plus a minute or
 two to start the containers. Then review and commit the file it wrote.
@@ -103,7 +104,7 @@ depend on how many there were.
 | `undeclared` | per entity type, the properties TM1 accepts that `$metadata` doesn't declare, each with the kind of value read (`string`, `number`, `boolean`, `array`, `object`, `null`, `navigation`, or `unread`). `null` says only that the fixture's value was null. |
 | `declaredRefused` | per entity type, declared properties TM1 refused: `$metadata` declares more than the server has |
 | `unverifiable` | types TM1 doesn't check names for, such as `View` (any type with subtypes, in any form, casts included) and `Annotation`: undeclared properties there are invisible to this probe |
-| `writes` | per case: `postRead`, `minimal`, `required`, and per property `post`, `patch` and `patchNull`, then `rename`. An outcome is `applied` (read back as sent), `ignored` (2xx, read back as the default), `transformed` (2xx, read back as neither: `UniqueName` follows the name, line ends are normalised), `rejected` (with `status` and TM1's error `code`), `accepted` (2xx, nothing to read back), or `untested` (no value to send) |
+| `writes` | per case: `postRead`, `minimal`, `required`, and per property `post`, `patch` and `patchNull`, then `rename`. An outcome is `applied` (read back as sent), `ignored` (2xx, read back as the default), `transformed` (2xx, read back as neither: `UniqueName` follows the name, line ends are normalised), `rejected` (with `status` and TM1's error `code`), `accepted` (2xx, nothing to read back), or `untested` (no value to send). A case's `secrets` (`"Password": ["one", "two"]`) are properties TM1 never reads back: a create with the first and a PATCH to the second are `applied`, `verifiedBy` `signIn`, when the user then signs in with it and not with the other. A `transformed` write is logged with what was sent and what was read back, for a person to judge; the file keeps outcomes only |
 | `collections` | per collection case, what a PATCH of it does: `replaces`, `appends`, `reorders`, `ignored`, `rejected` or `mixed` |
 | `unreached` | types the walk found no path to. It follows declared navigation types, so a subtype (`NativeView`, `ProcessReference`) is reached only as its base type and is listed here. So are types nothing on the server holds (`GitPlan` without Git). |
 

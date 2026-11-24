@@ -40,6 +40,19 @@ class ProbeReportTest {
 	}
 
 	@Test
+	void readsBackTheReportItWroteAndTakesNewWrites() {
+		String json = report().toJson();
+		assertThat(ProbeReport.fromJson(json).toJson()).isEqualTo(json);
+		JsonNode applied = ProbeClient.JSON.readTree("{\"post\": {\"Kept\": {\"outcome\": \"applied\"}}}");
+		ProbeReport rewritten = ProbeReport.fromJson(json)
+			.withWrites(new WriteProbe.Result(new TreeMap<>(Map.of("Thing", applied)), new TreeMap<>()));
+		assertThat(rewritten.writes()).containsOnlyKeys("Thing");
+		assertThat(rewritten.undeclared()).isEqualTo(report().undeclared());
+		assertThatThrownBy(() -> ProbeReport.fromJson("{\"probeVersion\": 1}"))
+			.isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@Test
 	void readsBackTheNamesForTheNextProbe() {
 		assertThat(Tm1Probe.earlierNames(List.of(report().toJson()))).containsExactly("Alias", "ExpandAbove", "UIData");
 	}

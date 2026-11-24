@@ -44,6 +44,12 @@ final class FakeTm1 implements AutoCloseable {
 	final AtomicInteger batches = new AtomicInteger();
 
 	/**
+	 * The Authorization header of the request being handled, for a handler that checks
+	 * it.
+	 */
+	static final ThreadLocal<@Nullable String> AUTHORIZATION = new ThreadLocal<>();
+
+	/**
 	 * Answers any request: its method, its target (path and decoded query), and its body
 	 * or null.
 	 */
@@ -77,6 +83,7 @@ final class FakeTm1 implements AutoCloseable {
 				send(exchange, new Reply(200, out));
 			}
 			else {
+				AUTHORIZATION.set(exchange.getRequestHeaders().getFirst("Authorization"));
 				byte[] raw = exchange.getRequestBody().readAllBytes();
 				JsonNode body = raw.length == 0 ? null : ProbeClient.JSON.readTree(raw);
 				send(exchange, handler.handle(exchange.getRequestMethod(), target, body));

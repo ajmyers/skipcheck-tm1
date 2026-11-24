@@ -227,6 +227,8 @@ public final class WriteProbe {
 			delete(collection, n);
 		}
 
+		probeSecrets(c, collection, base, post, patch);
+
 		// Renaming by PATCH
 		String before = fresh(collection);
 		String after = fresh(collection);
@@ -270,7 +272,7 @@ public final class WriteProbe {
 			baseline = readBack(collection, name, select).get(property);
 		}
 		delete(collection, name);
-		return classify(got, value, baseline);
+		return logged(classify(got, value, baseline), collection, property, "POST", value, got);
 	}
 
 	/** A PATCH of one property on a fresh object, compared with what it read before. */
@@ -281,9 +283,61 @@ public final class WriteProbe {
 		ObjectNode body = NODES.objectNode();
 		body.set(property, value);
 		ProbeClient.Answer answer = client.send("PATCH", path(collection, name), body);
-		JsonNode result = answer.ok() ? classify(readBack(collection, name, select).get(property), value, baseline)
-				: outcome(answer);
+		JsonNode got = answer.ok() ? readBack(collection, name, select).get(property) : null;
+		JsonNode result = answer.ok()
+				? logged(classify(got, value, baseline), collection, property, "PATCH", value, got) : outcome(answer);
 		delete(collection, name);
+		return result;
+	}
+
+	/**
+	 * A transformed write, logged with what was sent and what came back, for a person to
+	 * judge; the report keeps the outcome only, as a value read back (a timestamp) can
+	 * differ run to run.
+	 */
+	private JsonNode logged(JsonNode result, String collection, String property, String method, JsonNode sent,
+			@Nullable JsonNode got) {
+		if (result.path("outcome").asString().equals("transformed")) {
+			log.accept(
+					"transformed: " + method + " " + collection + " " + property + ": sent " + sent + ", read " + got);
+		}
+		return result;
+	}
+
+	/**
+	 * The case's secrets ({@code "secrets": {"Password": ["one", "two"]}}): properties
+	 * TM1 never reads back, checked by their effect instead. A create with the first, and
+	 * a PATCH to the second, is applied when the object then signs in with it and not
+	 * with the other ({@link ProbeClient#signsIn}).
+	 */
+	private void probeSecrets(JsonNode c, String collection, JsonNode base, ObjectNode post, ObjectNode patch) {
+		for (Map.Entry<String, JsonNode> secret : c.path("secrets").properties()) {
+			String property = secret.getKey();
+			String first = secret.getValue().path(0).asString();
+			String second = secret.getValue().path(1).asString();
+			String name = fresh(collection);
+			ObjectNode body = withName(base, name);
+			body.put(property, first);
+			ProbeClient.Answer created = client.send("POST", collection, body);
+			post.set(property, created.ok() ? signedIn(name, first, second) : outcome(created));
+			delete(collection, name);
+
+			name = fresh(collection);
+			client.send("POST", collection, withName(base, name));
+			ObjectNode change = NODES.objectNode();
+			change.put(property, second);
+			ProbeClient.Answer patched = client.send("PATCH", path(collection, name), change);
+			patch.set(property, patched.ok() ? signedIn(name, second, first) : outcome(patched));
+			delete(collection, name);
+		}
+	}
+
+	private JsonNode signedIn(String name, String set, String other) {
+		ObjectNode result = NODES.objectNode();
+		boolean with = client.signsIn(name, set);
+		boolean without = client.signsIn(name, other);
+		result.put("outcome", with && !without ? "applied" : "ignored");
+		result.put("verifiedBy", "signIn");
 		return result;
 	}
 

@@ -225,6 +225,13 @@
 			"service" : "users",
 			"method" : "update",
 			"params" : [ "name", "patch" ],
+			"args" : [ "${user}", { "$patch" : "UserPatch", "json" : { "Password" : "pw2" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "users",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
 			"args" : [ "${user}", { "$patch" : "UserPatch", "json" : { "Enabled" : false } } ],
 			"expect" : { "none" : true }
 		},

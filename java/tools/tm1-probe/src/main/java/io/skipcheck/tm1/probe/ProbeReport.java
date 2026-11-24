@@ -105,6 +105,56 @@ public record ProbeReport(String productVersion, String schemaVersion, String bi
 	}
 
 	/**
+	 * A report read back from its file, to probe the writes again on its findings
+	 * ({@link Tm1Probe#runWrites}).
+	 * @param json a report file's content
+	 * @return the report
+	 * @throws IllegalArgumentException if the file's {@code probeVersion} isn't this one
+	 */
+	public static ProbeReport fromJson(String json) {
+		JsonNode root = JSON.readTree(json);
+		int version = root.path("probeVersion").asInt();
+		if (version != PROBE_VERSION) {
+			throw new IllegalArgumentException("Can't read probeVersion " + version + "; this reads " + PROBE_VERSION);
+		}
+		NavigableMap<String, NavigableMap<String, String>> undeclared = new TreeMap<>();
+		for (Map.Entry<String, JsonNode> type : root.path("undeclared").properties()) {
+			NavigableMap<String, String> properties = new TreeMap<>();
+			type.getValue().properties().forEach(p -> properties.put(p.getKey(), p.getValue().path("json").asString()));
+			undeclared.put(type.getKey(), properties);
+		}
+		NavigableMap<String, NavigableSet<String>> refused = new TreeMap<>();
+		for (Map.Entry<String, JsonNode> type : root.path("declaredRefused").properties()) {
+			NavigableSet<String> names = new TreeSet<>();
+			type.getValue().forEach(n -> names.add(n.asString()));
+			refused.put(type.getKey(), names);
+		}
+		NavigableSet<String> unverifiable = new TreeSet<>();
+		root.path("unverifiable").forEach(n -> unverifiable.add(n.asString()));
+		NavigableSet<String> unreached = new TreeSet<>();
+		root.path("unreached").forEach(n -> unreached.add(n.asString()));
+		NavigableMap<String, JsonNode> writes = new TreeMap<>();
+		root.path("writes").properties().forEach(e -> writes.put(e.getKey(), e.getValue()));
+		NavigableMap<String, JsonNode> collections = new TreeMap<>();
+		root.path("collections").properties().forEach(e -> collections.put(e.getKey(), e.getValue()));
+		JsonNode server = root.path("server");
+		JsonNode binary = root.path("binary");
+		return new ProbeReport(server.path("productVersion").asString(), server.path("schemaVersion").asString(),
+				binary.path("sha256").asString(), binary.path("candidates").asInt(), undeclared, refused, unverifiable,
+				unreached, writes, collections);
+	}
+
+	/**
+	 * This report with the writes of a new run in place of its own.
+	 * @param result what a {@link WriteProbe} found
+	 * @return the report
+	 */
+	public ProbeReport withWrites(WriteProbe.Result result) {
+		return new ProbeReport(productVersion, schemaVersion, binarySha256, candidates, undeclared, declaredRefused,
+				unverifiable, unreached, result.writes(), result.collections());
+	}
+
+	/**
 	 * The undeclared property names in a report file, to try again in the next probe
 	 * whatever the binary holds.
 	 * @param json a report file's content

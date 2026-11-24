@@ -4,6 +4,9 @@ package io.skipcheck.tm1.probe;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -117,11 +120,95 @@ class WriteProbeTest {
 	}
 
 	private static WriteProbe.Result probe() throws Exception {
+		return probe(new ArrayList<>());
+	}
+
+	private static WriteProbe.Result probe(List<String> log) throws Exception {
 		CsdlDocument metadata = CsdlParser.parse(METADATA);
 		try (FakeTm1 tm1 = new FakeTm1(new Things())) {
 			ProbeClient client = new ProbeClient(tm1.url(), "Basic x");
-			return new WriteProbe(client, metadata, Map.of(), ProbeClient.JSON.readTree(CASES), "P", s -> {
-			}).run();
+			return new WriteProbe(client, metadata, Map.of(), ProbeClient.JSON.readTree(CASES), "P", log::add).run();
+		}
+	}
+
+	private static final String USER_METADATA = """
+			<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+			 <edmx:DataServices>
+			  <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="ibm.tm1.api.v1" Alias="tm1">
+			   <EntityType Name="User"><Key><PropertyRef Name="Name"/></Key>
+			    <Property Name="Name" Type="Edm.String" Nullable="false"/>
+			    <Property Name="Password" Type="Edm.String"/>
+			   </EntityType>
+			   <EntityContainer Name="API"><EntitySet Name="Users" EntityType="tm1.User"/></EntityContainer>
+			  </Schema>
+			 </edmx:DataServices>
+			</edmx:Edmx>""";
+
+	private static final Pattern USER = Pattern.compile("Users\\('([^']*)'\\)");
+
+	/**
+	 * Users whose password is never read back, and who sign in ({@code ActiveUser}) with
+	 * the one set: in a create, and in a PATCH unless {@code patchIgnored}.
+	 */
+	static final class Users implements FakeTm1.Handler {
+
+		final Map<String, String> passwords = new LinkedHashMap<>();
+
+		final boolean patchIgnored;
+
+		Users(boolean patchIgnored) {
+			this.patchIgnored = patchIgnored;
+			passwords.put("PSource", "");
+		}
+
+		@Override
+		public FakeTm1.Reply handle(String method, String target, @Nullable JsonNode body) {
+			if (target.equals("ActiveUser")) {
+				String auth = FakeTm1.AUTHORIZATION.get();
+				for (Map.Entry<String, String> user : passwords.entrySet()) {
+					String basic = "Basic " + Base64.getEncoder()
+						.encodeToString((user.getKey() + ":" + user.getValue()).getBytes(StandardCharsets.UTF_8));
+					if (basic.equals(auth)) {
+						return FakeTm1.Reply.ok("{\"Name\": \"" + user.getKey() + "\"}");
+					}
+				}
+				return new FakeTm1.Reply(401, null);
+			}
+			if (method.equals("POST") && target.equals("Users") && body != null) {
+				passwords.put(body.path("Name").asString(), body.path("Password").asString(""));
+				return FakeTm1.Reply.ok("{\"Name\": \"" + body.path("Name").asString() + "\"}");
+			}
+			Matcher m = USER.matcher(target.replaceAll("\\?.*", ""));
+			if (!m.matches() || !passwords.containsKey(m.group(1))) {
+				return new FakeTm1.Reply(404, null);
+			}
+			return switch (method) {
+				case "GET" -> FakeTm1.Reply.ok("{\"Name\": \"" + m.group(1) + "\"}");
+				case "DELETE" -> {
+					passwords.remove(m.group(1));
+					yield new FakeTm1.Reply(204, null);
+				}
+				case "PATCH" -> {
+					if (!patchIgnored && body != null && body.has("Password")) {
+						passwords.put(m.group(1), body.path("Password").asString());
+					}
+					yield new FakeTm1.Reply(204, null);
+				}
+				default -> new FakeTm1.Reply(405, null);
+			};
+		}
+
+	}
+
+	private static JsonNode user(boolean patchIgnored) throws Exception {
+		CsdlDocument metadata = CsdlParser.parse(USER_METADATA);
+		String cases = """
+				{"cases": [{"id": "User", "type": "User", "collection": "Users", "source": "Users('{p}Source')", "base": {},
+				  "secrets": {"Password": ["one", "two"]}}]}""";
+		try (FakeTm1 tm1 = new FakeTm1(new Users(patchIgnored))) {
+			ProbeClient client = new ProbeClient(tm1.url(), "Basic x");
+			return new WriteProbe(client, metadata, Map.of(), ProbeClient.JSON.readTree(cases), "P", s -> {
+			}).run().writes().get("User");
 		}
 	}
 
@@ -153,6 +240,26 @@ class WriteProbeTest {
 		assertThat(outcome(thing.path("patchNull").path("Kept"))).isEqualTo("accepted");
 		assertThat(outcome(thing.path("patchNull").path("Refused"))).isEqualTo("rejected");
 		assertThat(outcome(thing.path("rename"))).isEqualTo("ignored");
+	}
+
+	@Test
+	void logsWhatATransformedWriteSentAndReadBack() throws Exception {
+		List<String> log = new ArrayList<>();
+		probe(log);
+		assertThat(log).anySatisfy(l -> assertThat(l).startsWith("transformed: POST Things Normalised: sent \""))
+			.anySatisfy(l -> assertThat(l).startsWith("transformed: PATCH Things Normalised: sent \""));
+	}
+
+	@Test
+	void checksASecretItCantReadBackBySigningInWithIt() throws Exception {
+		JsonNode applied = user(false);
+		assertThat(outcome(applied.path("post").path("Password"))).isEqualTo("applied");
+		assertThat(outcome(applied.path("patch").path("Password"))).isEqualTo("applied");
+		assertThat(applied.path("post").path("Password").path("verifiedBy").asString()).isEqualTo("signIn");
+		JsonNode ignored = user(true);
+		assertThat(outcome(ignored.path("post").path("Password"))).isEqualTo("applied");
+		assertThat(outcome(ignored.path("patch").path("Password"))).as("still signs in with the first")
+			.isEqualTo("ignored");
 	}
 
 	@Test
