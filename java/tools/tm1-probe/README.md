@@ -88,6 +88,9 @@ writes the same file.
 - **Names the binary doesn't hold** in a form the tokenizer reads, such as compressed or
   computed ones. Names an earlier probe found are tried again whatever the binary holds.
 
+Improvements, such as reaching those types and reporting subtypes apart from types with no path,
+are [#313](https://github.com/ajmyers/skipcheck-tm1/issues/313).
+
 ## Developing it
 
 `./gradlew :tools:tm1-probe:build` runs its unit tests against a fake server (`FakeTm1`); CI runs
