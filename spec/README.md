@@ -20,8 +20,8 @@ spec/conformance/*.json                            cases every client's tests mu
 
 | File | What it is | Edited by |
 |---|---|---|
-| `tm1-overlay.json` | TM1's departures from `$metadata`: properties sent in another type (`departures`), dates TM1 sometimes garbles (`lenientDates`), and notes about endpoints, with generic requests a client mustn't offer (`forbid`). Notes are Markdown. | Hand |
-| `tm1-probe-<v>.json` (beside the snapshot) | What a running TM1 does that its `$metadata` doesn't say, found by probing it: so far, the properties it sends only when asked for by name. Not read by the generators yet ([#312](https://github.com/ajmyers/skipcheck-tm1/issues/312)). | `./gradlew probeTm1` ([tm1-probe](../java/tools/tm1-probe/README.md)) |
+| `tm1-overlay.json` | TM1's departures from `$metadata`: properties sent in another type (`departures`), dates TM1 sometimes garbles (`lenientDates`), types for undeclared properties the probe can't type itself (`undeclared`), and notes about endpoints, with generic requests a client mustn't offer (`forbid`). Notes are Markdown. | Hand |
+| `tm1-probe-<v>.json` (beside the snapshot) | What a running TM1 does that its `$metadata` doesn't say, found by probing it: the properties it sends only when asked for by name, and what a POST and a PATCH do with each property. The export adds the undeclared properties to `tm1-api.json` (#310); the writes aren't read yet (#311). | `./gradlew probeTm1` ([tm1-probe](../java/tools/tm1-probe/README.md)) |
 | `tm1-api.json` | The snapshot as plain JSON, with the overlay merged in: `enums`, `types`, `operations`, `container`, and `endpoints`, the coverage inventory. Sorted and versioned (`specVersion`), so a TM1 upgrade shows up as a readable diff. | `./gradlew :tm1-codegen:exportSpec` |
 | `conformance/odata-encoding.json` | Paths and literals every client must build identically. | Hand |
 | `conformance/calls/*.json` | Service calls the Java unit tests record, with every request and answer, which every other client replays exactly ([format](conformance/README.md)). | `./gradlew :tm1-client:test -PrecordConformance` |
@@ -51,7 +51,7 @@ Python also runs `test_contract.py`, which works out a route from the root to ev
 ## Adding a language
 
 1. Write a generator that reads `tm1-api.json`. `python/tm1-client/codegen/tm1_pygen/spec.py` has the lookups any generator needs and no Python-specific code, so it ports easily. Refuse a `specVersion` you don't know.
-2. Generate the model: an enum per `enums` entry (with a fallback member for values a newer server adds), and a type per `types` entry. Every property is optional, a hierarchy reads by `@odata.type`, open types keep undeclared properties, writes send only what was set, and properties with a `departure` or `lenientDate` read leniently.
+2. Generate the model: an enum per `enums` entry (with a fallback member for values a newer server adds), and a type per `types` entry. Every property is optional, a hierarchy reads by `@odata.type`, open types keep undeclared properties, writes send only what was set, and properties with a `departure` or `lenientDate` read leniently. Tag every property with `undeclared`, `departure` or `lenientDate` as departing from `$metadata`, the way the other clients do (Java's `@Tm1Departure`), and test the tags against the spec (`DeparturesTest`).
 3. Generate a member per endpoint, and honour `forbid`. Through a navigation that doesn't contain its targets (`containsTarget: false`), offer reads only: on TM1, deleting through one deletes the target itself.
 4. Hand-write the runtime: session (login, `TM1SessionId` cookie, re-login on 401, `ActiveSession/tm1.Close`), errors (the Java `Tm1ErrorClassifier` rules), and OData encoding.
 5. Add the gate and `conformance/` tests to CI.
