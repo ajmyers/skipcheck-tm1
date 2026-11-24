@@ -80,6 +80,39 @@ export interface SpecDocument {
    * name each writes (`Dimensions@odata.bind` for a binding), and why: what the probe verified or
    * an exception kept. A type absent gets no write type. */
   offers?: Record<string, Record<string, Record<string, string>>>;
+  /** The write plan, worked out once by tm1-codegen: per write type, everything a generator writes
+   * out for it. */
+  builders: Record<string, SpecBuilder>;
+}
+
+/** A write type in the write plan (the spec's `builders`). */
+export interface SpecBuilder {
+  type: string;
+  write: "create" | "patch";
+  base: string | null;
+  odataType: string | null;
+  open: boolean;
+  /** What `build()` checks is set, without `@odata.bind`. */
+  required: string[];
+  /** In the order they're declared, the root's level first. */
+  setters: {
+    json: string;
+    declaredOn: string;
+    navigation: boolean;
+    collection: boolean;
+    set: boolean;
+    bind: boolean;
+    /** The write type a structured value's setter takes. */
+    value: string | null;
+  }[];
+  /** What `builder(read)` does; for a root's patch, what its `of()` falls back to; null for a root's create. */
+  fromRead: {
+    copy: { json: string; via: "builder" | "of" | null; value: string | null }[];
+    bindings: { json: string; collection: boolean; by: "key" | "uniqueName"; set: string; key: string }[];
+    undeclared: string[] | null;
+  } | null;
+  /** A root's: its subtypes' write types, by the read's type. */
+  dispatch: { type: string; builder: string }[] | null;
 }
 
 export class Spec {
@@ -122,10 +155,9 @@ export class Spec {
     return (t.derivedTypes ?? []).map((d) => this.typeByName.get(d)!);
   }
 
-  /** The setters a write type offers (`CubeCreate`), by the JSON name each writes; undefined for
-   * one that isn't generated. */
-  offered(builder: string): Record<string, unknown> | undefined {
-    return this.doc.offers?.[builder];
+  /** A write type's plan (`CubeCreate`); undefined for one that isn't generated. */
+  builder(name: string): SpecBuilder | undefined {
+    return this.doc.builders[name];
   }
 
   isEntity(typeName: string): boolean {
