@@ -251,9 +251,7 @@
           "outcome" : "applied"
         },
         "CellSecurityDefaultValue" : {
-          "outcome" : "rejected",
-          "status" : 400,
-          "code" : "278"
+          "outcome" : "untested"
         },
         "CellSecurityMostRestrictive" : {
           "outcome" : "applied"
@@ -290,9 +288,7 @@
           "outcome" : "applied"
         },
         "CellSecurityDefaultValue" : {
-          "outcome" : "rejected",
-          "status" : 400,
-          "code" : "278"
+          "outcome" : "untested"
         },
         "CellSecurityMostRestrictive" : {
           "outcome" : "applied"
@@ -1280,9 +1276,7 @@
           "outcome" : "ignored"
         },
         "FriendlyName" : {
-          "outcome" : "rejected",
-          "status" : 400,
-          "code" : "140"
+          "outcome" : "applied"
         },
         "IsActive" : {
           "outcome" : "ignored"
@@ -1299,9 +1293,7 @@
           "outcome" : "applied"
         },
         "FriendlyName" : {
-          "outcome" : "rejected",
-          "status" : 400,
-          "code" : "140"
+          "outcome" : "applied"
         },
         "IsActive" : {
           "outcome" : "ignored"

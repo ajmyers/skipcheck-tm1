@@ -32,8 +32,7 @@
 				"DrillthroughRules": "['{p}A'] = S: 'x';",
 				"CalculationThresholdForStorage": 50,
 				"ViewStorageMaxMemory": 1000,
-				"ViewStorageMinTime": 5,
-				"CellSecurityDefaultValue": "READ"
+				"ViewStorageMinTime": 5
 			}
 		},
 		{
@@ -171,7 +170,10 @@
 			"type": "User",
 			"collection": "Users",
 			"source": "Users('{p}User')",
-			"base": {}
+			"base": {},
+			"values": {
+				"FriendlyName": "A probe friend"
+			}
 		}
 	],
 	"collections": [
