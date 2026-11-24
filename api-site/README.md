@@ -1,6 +1,7 @@
 # api-site
 
-Builds and serves each project's pages on skipcheck.io (and on skipcheck.dev, which mirrors it):
+Builds and serves each project's pages on skipcheck.io. skipcheck.dev and www.skipcheck.io aren't
+served here: the zones' redirect rules on Cloudflare send them to skipcheck.io (301) before any Worker runs.
 
 | Address | What | Built by |
 |---|---|---|
@@ -99,7 +100,7 @@ has one, and isn't required.
 | `scripts/check-links.mjs` | Checks every link on the landing and docs pages, every entry of the search indexes, every address in `llms.txt`, `llms-full.txt` and the prompts, and that a prompt's install commands are `packages.mjs`'s. |
 | `assets/` | The generated pages' own styles and script, copied to `/<project>/assets/`: `docs.css` (the reference's layout), `docs.js` (the reference's language memory), `search.js` and `search-rank.js` (the search box of the reference and the Docker pages, and how it matches and ranks), `tabs.css` and `tabs.js` (the landing pages' language tabs), `readme.css` (what the Docker pages add to `docs.css`). A language chosen anywhere is remembered and followed everywhere. |
 | `src/worker.js` | The Cloudflare Worker that serves `dist/`. It inserts the site's masthead and footer (`/partials/` on skipcheck.io, cached for 5 minutes) into every page, names its skipcheck.io address as canonical, sets the security headers, serves the site's 404 page for missing paths, and sends the addresses these pages had under `/projects/` to the new ones. The site's own pages under these paths (`site` in `SECTIONS`: the setup page, `/pa-docker/setup/`) it passes through to the site. |
-| `wrangler.jsonc` | The Worker's config: a route per project, for `/docs/` and for `/pa-docker/` on each zone, and one per zone for the old addresses. |
+| `wrangler.jsonc` | The Worker's config: a route on skipcheck.io per project, for `/docs/` and for `/pa-docker/`, and one for the old addresses. |
 | `test/` | `npm test` here, or `./gradlew checkApiSite`: the Worker, the Markdown, the install steps against the real build files, that every project has its routes, the extractors and the type and member gate. |
 | `.github/workflows/api-docs.yml` | Tests the Worker and the page builders, builds the site and bundles the Worker on every change, as part of CI. Deploys when the release workflow calls it for a tag, or when run by hand. |
 
@@ -130,7 +131,7 @@ run it locally (`npx wrangler dev` in ajmyers/skipcheck.io) and start this one w
 
 ## Adding a project
 
-Add it to `PROJECTS` in `scripts/site.mjs` and give it a route on each zone in `wrangler.jsonc`
+Add it to `PROJECTS` in `scripts/site.mjs` and give it a route in `wrangler.jsonc`
 (`npm test` fails without them). For a landing page, write `content/<project>.md`. `assemble.mjs`
 fails if the library has no `apiSiteJavadoc` output.
 
@@ -142,7 +143,7 @@ Until then, links to it go to GitHub.
 The workflow deploys with `wrangler deploy`. It needs two repository secrets:
 
 - `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with **Workers Scripts: Edit** on the account and
-  **Workers Routes: Edit** on the skipcheck.io and skipcheck.dev zones.
+  **Workers Routes: Edit** on the skipcheck.io zone.
 - `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account ID.
 
 ## Limits and decisions

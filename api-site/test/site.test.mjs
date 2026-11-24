@@ -12,7 +12,7 @@ import { inline, parse, slug } from '../scripts/markdown.mjs';
 import { docsVersion, installCommands, packageOf } from '../scripts/packages.mjs';
 import { judge, sourceHash } from '../scripts/output.mjs';
 import { addressOf, sitemapXml } from '../scripts/sitemap.mjs';
-import { head, languagesOf, PA_DOCKER, PROJECTS, regions, SECTIONS } from '../scripts/site.mjs';
+import { head, languagesOf, PA_DOCKER, PROJECTS, regions, SECTIONS, softwareSourceCode, techArticle } from '../scripts/site.mjs';
 import { examplesOf, typesUsed, walkthroughsOf } from '../scripts/walkthroughs.mjs';
 
 test('inline Markdown is escaped, then marked up', () => {
@@ -91,15 +91,14 @@ test("an example's regions are read from its file, without their indentation", a
 	}
 });
 
-test('every project, the Docker pages and the docs landing page have a route on each zone, and the old addresses theirs', () => {
+test('every project, the Docker pages and the docs landing page have a route on skipcheck.io, and the old addresses theirs', () => {
 	const wrangler = readFileSync(fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)), 'utf8');
 	const patterns = [...wrangler.matchAll(/"pattern":\s*"([^"]+)"/g)].map((match) => match[1]);
-	for (const zone of ['skipcheck.io', 'skipcheck.dev']) {
-		for (const section of SECTIONS) assert.ok(patterns.includes('*' + zone + '/' + section.id + '*'), 'no route for ' + section.id + ' on ' + zone);
-		assert.ok(patterns.includes('*' + zone + '/projects/tm1*'), 'no route for the old addresses on ' + zone);
-	}
+	// skipcheck.dev redirects to skipcheck.io before any Worker runs, so it has none
+	for (const section of SECTIONS) assert.ok(patterns.includes('*skipcheck.io/' + section.id + '*'), 'no route for ' + section.id);
+	assert.ok(patterns.includes('*skipcheck.io/projects/tm1*'), 'no route for the old addresses');
 	assert.ok(['tm1-client', 'pa-docker', 'docs'].every((id) => SECTIONS.some((section) => section.id === id)), SECTIONS.map((section) => section.id).join(', '));
-	assert.equal(patterns.length, 2 * (SECTIONS.length + 1), 'a route that SECTIONS in scripts/site.mjs does not account for');
+	assert.equal(patterns.length, SECTIONS.length + 1, 'a route that SECTIONS in scripts/site.mjs does not account for');
 });
 
 test("no Docker page is built at the site's setup page, which the Worker passes through to the site", () => {
@@ -177,4 +176,36 @@ test("a page's address in the sitemap is its folder for an index.html, and its f
 		sitemapXml(['https://skipcheck.io/a/?x=1&y=2']),
 		'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://skipcheck.io/a/?x=1&amp;y=2</loc></url>\n</urlset>\n',
 	);
+});
+
+test("a landing page's and a walkthrough's structured data is JSON-LD that parses, of the expected types", () => {
+	const dataOf = (page) => {
+		const scripts = [...page.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)];
+		assert.equal(scripts.length, 1, page);
+		return JSON.parse(scripts[0][1]);
+	};
+	const client = PROJECTS.find((project) => project.id === 'tm1-client');
+	const url = 'https://skipcheck.io/tm1-client/';
+	// A description with </script> in it can't end the element early
+	const code = dataOf(head({ title: 'T', description: 'D </script>', canonical: url, styles: [], scripts: [], data: softwareSourceCode(client, { description: 'D </script>', url }) }));
+	assert.equal(code['@context'], 'https://schema.org');
+	assert.equal(code['@type'], 'SoftwareSourceCode');
+	assert.equal(code.description, 'D </script>');
+	assert.equal(code.url, url);
+	assert.equal(code.codeRepository, 'https://github.com/ajmyers/skipcheck-tm1');
+	assert.deepEqual(code.programmingLanguage, ['Java', 'Python', 'C#', 'TypeScript']);
+	assert.equal(code.license, 'https://www.apache.org/licenses/LICENSE-2.0');
+	assert.deepEqual([code.author['@type'], code.author.name, code.author.url], ['Person', 'Andrew Myers', 'https://ajmyers.net/']);
+	assert.deepEqual([code.isPartOf['@type'], code.isPartOf['@id']], ['WebSite', 'https://skipcheck.io/#website']);
+	const starter = PROJECTS.find((project) => project.id === 'tm1-spring-boot-starter');
+	assert.deepEqual(softwareSourceCode(starter, { description: 'D', url }).programmingLanguage, ['Java']);
+
+	const walkthrough = url + 'walkthroughs/connect/';
+	const article = dataOf(head({ title: 'T', description: 'D', canonical: walkthrough, styles: [], scripts: [], data: techArticle(client, { headline: 'Connect', description: 'D', url: walkthrough }) }));
+	assert.equal(article['@type'], 'TechArticle');
+	assert.deepEqual([article.headline, article.description, article.url], ['Connect', 'D', walkthrough]);
+	assert.equal(article.author.name, 'Andrew Myers');
+	assert.equal(article.about['@id'], code['@id'], "a walkthrough is about its landing page's code");
+
+	assert.doesNotMatch(head({ title: 'T', canonical: url, styles: [], scripts: [] }), /ld\+json/);
 });

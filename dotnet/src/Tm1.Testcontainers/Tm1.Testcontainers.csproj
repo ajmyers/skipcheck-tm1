@@ -4,6 +4,7 @@
     <RootNamespace>Skipcheck.Tm1.Testcontainers</RootNamespace>
     <PackageId>Skipcheck.Tm1.Testcontainers</PackageId>
     <Version>0.1.0-dev</Version>
+    <PackageProjectUrl>https://skipcheck.io/tm1-testcontainers/</PackageProjectUrl>
     <Description>Testcontainers for IBM Planning Analytics: TM1, its admin server, TM1 Web, Planning Analytics Workspace, Cognos and Keycloak in Docker for .NET tests</Description>
   </PropertyGroup>
   <ItemGroup>

@@ -4,7 +4,7 @@
   "description": "Testcontainers for IBM Planning Analytics: TM1, its Admin Server, TM1 Web, Planning Analytics Workspace, Cognos and Keycloak in Docker for Node tests, as the Java tm1-testcontainers",
   "license": "Apache-2.0",
   "author": "Andrew Myers (https://ajmyers.net)",
-  "homepage": "https://skipcheck.io",
+  "homepage": "https://skipcheck.io/tm1-testcontainers/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ajmyers/skipcheck-tm1.git",

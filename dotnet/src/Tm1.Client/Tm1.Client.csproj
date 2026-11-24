@@ -4,6 +4,7 @@
     <RootNamespace>Skipcheck.Tm1.Client</RootNamespace>
     <PackageId>Skipcheck.Tm1.Client</PackageId>
     <Version>0.1.0-dev</Version>
+    <PackageProjectUrl>https://skipcheck.io/tm1-client/</PackageProjectUrl>
     <Description>.NET client for the IBM Planning Analytics (TM1) REST API, generated from its $metadata</Description>
     <GeneratedDir>$(BaseIntermediateOutputPath)generated/</GeneratedDir>
     <SpecFile>$(RepositoryRoot)/spec/tm1-api.json</SpecFile>

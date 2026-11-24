@@ -4,8 +4,8 @@
 // at skipcheck.io/<project>/: its landing page, its docs at /<project>/docs/ and its API reference
 // at /<project>/api/java/. They are dressed as part of the site: every HTML page gets the site's
 // masthead and footer, fetched from skipcheck.io/partials/ and cached, so a change to the site's
-// nav reaches these pages without a rebuild. skipcheck.dev serves the same pages, each naming its
-// skipcheck.io address as canonical.
+// nav reaches these pages without a rebuild. Each names its skipcheck.io address as canonical.
+// skipcheck.dev doesn't reach here: Cloudflare redirects it to skipcheck.io first.
 //
 // The Docker pages, from the READMEs under docker/, are served the same way at /pa-docker/ (but
 // for the site's setup page, /pa-docker/setup/, which goes to the site), and

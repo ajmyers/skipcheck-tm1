@@ -24,6 +24,13 @@ dependencies = [
     "pytest>=8",
 ]
 
+# What PyPI links to: the project's page on skipcheck.io, its Python docs, and its code here
+[project.urls]
+Homepage = "https://skipcheck.io/tm1-testcontainers/"
+Documentation = "https://skipcheck.io/tm1-testcontainers/docs/python/"
+Source = "https://github.com/ajmyers/skipcheck-tm1/tree/master/python/tm1-testcontainers"
+Issues = "https://github.com/ajmyers/skipcheck-tm1/issues"
+
 [project.optional-dependencies]
 test = ["pytest>=8"]
 

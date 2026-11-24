@@ -33,7 +33,7 @@ import { inline, parse, slug } from './markdown.mjs';
 import { exampleOutput, strayRecordings } from './output.mjs';
 import { docsVersion, installHtml, packageOf } from './packages.mjs';
 import { promptHtml, promptText } from './prompts.mjs';
-import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, DOC_LANGUAGES, escape, head, languagesOf, PA_DOCKER, PROJECTS, regions, repoDir, siteDir, tabGroup } from './site.mjs';
+import { CANONICAL_ORIGIN, codeBlock, copyAssets, distDir, DOC_LANGUAGES, escape, head, languagesOf, PA_DOCKER, PROJECTS, regions, repoDir, siteDir, softwareSourceCode, tabGroup, techArticle } from './site.mjs';
 import { walkthroughsOf } from './walkthroughs.mjs';
 
 const version = await docsVersion();
@@ -209,13 +209,15 @@ for (const { project, content } of landings) {
 	await mkdir(out, { recursive: true });
 	await copyAssets(project);
 	const several = languagesOf(project).length > 1;
+	const canonical = CANONICAL_ORIGIN + '/' + project.id + '/';
 	const page =
 		head({
 			title: project.title + ' · Skipcheck',
 			description: meta.description,
-			canonical: CANONICAL_ORIGIN + '/' + project.id + '/',
+			canonical,
 			styles: ['/styles.css', 'assets/tabs.css', 'assets/landing.css'],
 			scripts: ['/highlight.js', ...(several ? ['assets/tabs.js'] : [])],
+			data: softwareSourceCode(project, { description: meta.description, url: canonical }),
 		}) +
 		'<body><main id="main" class="project">' +
 		body +
@@ -256,13 +258,15 @@ for (const { project, content } of landings) {
 			await mkdir(out, { recursive: true });
 			await copyAssets(project);
 			const several = languagesOf(project).length > 1;
+			const canonical = CANONICAL_ORIGIN + '/' + project.id + '/walkthroughs/' + walkthrough.slug + '/';
 			const page =
 				head({
 					title: meta.title + ' · ' + project.title + ' · Skipcheck',
 					description: meta.description,
-					canonical: CANONICAL_ORIGIN + '/' + project.id + '/walkthroughs/' + walkthrough.slug + '/',
+					canonical,
 					styles: ['/styles.css', 'assets/tabs.css', 'assets/landing.css'],
 					scripts: ['/highlight.js', ...(several ? ['assets/tabs.js'] : [])],
+					data: techArticle(project, { headline: meta.title, description: meta.description, url: canonical }),
 				}) +
 				'<body><main id="main" class="project walkthrough">' +
 				body +
