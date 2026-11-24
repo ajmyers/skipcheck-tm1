@@ -15,7 +15,7 @@ namespace Skipcheck.Tm1.Client.Services;
 /// <para>Add an attribute to every element of a hierarchy:</para>
 /// <code>
 /// await tm1.Attributes.CreateAsync(AttributeSet.Elements("Region", "Region"),
-///     AttributeDefinitionPatch.Builder().Name("Manager").Type(AttributeType.String).Build());
+///     AttributeDefinitionCreate.Builder().Name("Manager").Type(AttributeType.String).Build());
 /// </code>
 /// <para>List the attributes cubes have:</para>
 /// <code>

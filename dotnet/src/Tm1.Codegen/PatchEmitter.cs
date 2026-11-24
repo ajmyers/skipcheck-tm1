@@ -7,8 +7,8 @@ using System.Text.Json;
 
 namespace Skipcheck.Tm1.Codegen;
 
-/// <summary>Emits Patches.g.cs: a patch per type, as the Java model's <c>CubePatch</c>:
-/// <c>CubePatch.Builder().Name("Sales").BindDimensions(dims.Key("Region")).Build()</c>. Only the
+/// <summary>Emits Patches.g.cs: the write types, a patch and a create, as the Java model's <c>CubeCreate</c>:
+/// <c>CubeCreate.Builder().Name("Sales").BindDimensions(dims.Key("Region")).Build()</c>. Only the
 /// properties set are sent, an explicit <c>null</c> included; a subtype's patch sends its
 /// <c>@odata.type</c> first.</summary>
 public sealed class PatchEmitter
@@ -318,8 +318,9 @@ public sealed class PatchEmitter
     /// <c>Builder(read)</c>: a builder holding what a read holds of the offered setters, nulls left out. A
     /// structured value goes through its own patch's; a patch leaves out what a PATCH doesn't apply and the
     /// collections it appends to (copying one would add its members again). A navigation the read holds
-    /// expanded is bound where its targets' paths follow from it; an open type's undeclared properties are
-    /// copied. As the Java generator's <c>builder(read)</c>, in its order. For a root's patch, the private
+    /// expanded is bound where its targets' paths follow from it, though a patch binds only a single-valued
+    /// one, never a collection (sent back, it would replace or append to what's there), and one held empty
+    /// isn't bound; an open type's undeclared properties are copied, but for nulls and annotations. As the Java generator's <c>builder(read)</c>, in its order. For a root's patch, the private
     /// <c>Unknown(read)</c> its <c>Of</c> falls back to.
     /// </summary>
     private void EmitFrom(JsonElement t, bool create, string builderName, List<WriteProperty> properties, string method = "Builder")
@@ -331,7 +332,7 @@ public sealed class PatchEmitter
         if (method == "Builder")
         {
             _out.Append(
-                $"    /// <summary>A builder holding what <paramref name=\"read\"/> holds that {what}: change it with the builder's setters. A navigation the read holds expanded is bound, where its targets' paths follow from it: an entity set's by key, an element's or member's by its <c>UniqueName</c>; one it doesn't hold, or a subset or a view (whose path the read can't tell), isn't, nor are nested ones or nulls.</summary>\n"
+                $"    /// <summary>A builder holding what <paramref name=\"read\"/> holds that {what}: change it with the builder's setters. A navigation the read holds expanded is bound, where its targets' paths follow from it: an entity set's by key, an element's or member's by its <c>UniqueName</c>; one it doesn't hold, or holds empty, or a subset or a view (whose path the read can't tell), isn't, nor are nested ones or nulls{(create ? "" : ", nor a collection, which a PATCH would replace or append to")}.</summary>\n"
             );
             _out.Append("    /// <param name=\"read\">An entity read from TM1.</param>\n");
             _out.Append($"    public static {builderName} Builder({name} read)\n    {{\n");
@@ -387,7 +388,9 @@ public sealed class PatchEmitter
             );
         }
         Flush();
-        foreach (var p in properties.Where(p => p.Navigation && p.Bind))
+        // A patch from a read binds no collection: sent back, it would replace or append to what's there,
+        // whichever TM1 does for it, on an unrelated change
+        foreach (var p in properties.Where(p => p.Navigation && p.Bind && (create || !p.Collection)))
         {
             if (ReadBinding(p, members[p.Json]) is { } binding)
             {
@@ -418,7 +421,7 @@ public sealed class PatchEmitter
     /// <summary>
     /// The code binding a navigation a read holds: by key for a target in an entity set, by <c>UniqueName</c>
     /// for an element or a member; null for any other (a subset, public or private, or a view, whose cube the
-    /// read doesn't say). A collection is bound only when every member's path can be made.
+    /// read doesn't say). A collection is bound only when it has members and every member's path can be made.
     /// </summary>
     private string? ReadBinding(WriteProperty p, string member)
     {

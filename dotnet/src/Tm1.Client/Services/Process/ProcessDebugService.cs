@@ -30,8 +30,8 @@ namespace Skipcheck.Tm1.Client.Services;
 /// <code>
 /// var line = await tm1.ProcessDebugging.DebuggingAsync("Load Sales", new Dictionary&lt;string, object?&gt;(), async context =>
 /// {
-///     await tm1.ProcessDebugging.AddBreakpointAsync(context.Id!, ProcessDebugContextBreakpointCreate.Builder()
-///         .Id(1).Enabled(true).HitMode(ProcessDebugContextHitMode.BreakAlways).Build());
+///     await tm1.ProcessDebugging.AddBreakpointAsync(context.Id!, ProcessDebugContextLineBreakpointCreate.Builder()
+///         .Id(1).ProcessName("Load Sales").Procedure(ProcessProcedure.Prolog).LineNumber(3).Enabled(true).Build());
 ///     await tm1.ProcessDebugging.ResumeAsync(context.Id!);
 ///     return await tm1.ProcessDebugging.CallStackAsync(context.Id!).FirstAsync();
 /// });

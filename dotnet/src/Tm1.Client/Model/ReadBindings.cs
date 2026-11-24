@@ -13,9 +13,13 @@ internal static class ReadBindings
     /// <summary>An entity in a set, by its key: <c>Dimensions('Region')</c>.</summary>
     internal static ODataPath? ByKey(string set, object? key) => key is null ? null : ODataPath.Of(set).Key(key);
 
-    /// <summary>Entities in a set, by their keys: null if any key is missing.</summary>
+    /// <summary>Entities in a set, by their keys: null if any key is missing, or there are none.</summary>
     internal static ODataPath[]? ByKeys(string set, IReadOnlyList<object?> keys)
     {
+        if (keys.Count == 0)
+        {
+            return null;
+        }
         var result = new ODataPath[keys.Count];
         for (var i = 0; i < result.Length; i++)
         {
@@ -92,9 +96,14 @@ internal static class ReadBindings
         return ODataPath.Of("Dimensions").Key(parts[0]).Nav("Hierarchies").Key(parts[1]).Nav(collection).Key(parts[2]);
     }
 
-    /// <summary>Elements or members, by their <c>UniqueName</c>s: null if any can't be made.</summary>
+    /// <summary>Elements or members, by their <c>UniqueName</c>s: null if any can't be made, or there are
+    /// none.</summary>
     internal static ODataPath[]? AllInHierarchy(string collection, IReadOnlyList<object?> uniqueNames)
     {
+        if (uniqueNames.Count == 0)
+        {
+            return null;
+        }
         var result = new ODataPath[uniqueNames.Count];
         for (var i = 0; i < result.Length; i++)
         {

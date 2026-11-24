@@ -31,10 +31,11 @@ public class WritesConformanceTests
             var type = model.GetType($"{typeof(Process).Namespace}.{typeName}")!;
             var write = model.GetType($"{typeof(Process).Namespace}.{typeName}{(c.GetProperty("write").GetString() == "create" ? "Create" : "Patch")}")!;
             var read = c.GetProperty("read").Deserialize(type, Tm1Json.Options)!;
-            var builder = write.GetMethod("Builder", [type])!.Invoke(null, [read])!;
             var hasError = c.TryGetProperty("error", out var error);
             try
             {
+                // Builder(read) can refuse too: a root's create, a read of a type with none
+                var builder = write.GetMethod("Builder", [type])!.Invoke(null, [read])!;
                 var built = (Tm1Patch)builder.GetType().GetMethod("Build", Type.EmptyTypes)!.Invoke(builder, null)!;
                 var got = JsonNode.Parse(JsonSerializer.Serialize(built, Tm1Json.Options));
                 if (hasError)

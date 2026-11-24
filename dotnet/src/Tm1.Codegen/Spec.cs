@@ -66,11 +66,11 @@ public sealed class Spec
     /// <summary>Whether the spec says which write types and setters to generate (#338).</summary>
     public bool VerifiedOnly => Offers.Count > 0;
 
-    /// <summary>The entity set whose members are of <paramref name="t"/>'s type, or a type it derives from; or
-    /// null.</summary>
+    /// <summary>The entity set whose members are of <paramref name="t"/>'s type, or failing that of the
+    /// nearest type it derives from; or null. As the Java, Python and TypeScript generators.</summary>
     public string? EntitySet(JsonElement t)
     {
-        foreach (var level in Chain(t))
+        foreach (var level in Enumerable.Reverse(Chain(t)))
         {
             foreach (var s in Array(Container, "entitySets"))
             {
@@ -83,8 +83,10 @@ public sealed class Spec
         return null;
     }
 
-    /// <summary>The key of <paramref name="t"/>'s type, declared on it or a type it derives from.</summary>
-    public List<string> Key(JsonElement t) => Chain(t).Select(l => Array(l, "key").Select(k => k.GetString()!).ToList()).FirstOrDefault(k => k.Count > 0) ?? [];
+    /// <summary>The key of <paramref name="t"/>'s type, declared on it or failing that on the nearest type it
+    /// derives from.</summary>
+    public List<string> Key(JsonElement t) =>
+        Enumerable.Reverse(Chain(t)).Select(l => Array(l, "key").Select(k => k.GetString()!).ToList()).FirstOrDefault(k => k.Count > 0) ?? [];
 
     public static string? Str(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
