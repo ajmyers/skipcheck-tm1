@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.jspecify.annotations.Nullable;
 
@@ -32,18 +33,18 @@ import io.skipcheck.tm1.csdl.CsdlStructuredType;
 import tools.jackson.databind.JsonNode;
 
 /**
- * The probe: finds the properties each entity type has that {@code $metadata} doesn't
- * declare.
+ * The probe: what TM1 does that its {@code $metadata} doesn't say.
  *
  * <ol>
+ * <li>Fixtures on every server ({@link ProbeFixtures}).</li>
  * <li>Candidate names: those in the server's binary ({@link BinaryNames}), the names an
  * earlier probe found, and every name {@code $metadata} declares.</li>
- * <li>A path per entity type ({@link ProbePaths}), through the fixtures
- * ({@link ProbeFixtures}).</li>
- * <li>Every candidate in a {@code $select} at each path ({@link PropertyNameOracle}).
- * What TM1 accepts that the type doesn't declare is undeclared.</li>
- * <li>The undeclared properties read from an entity, for the kind of value each
- * holds.</li>
+ * <li>A path per entity type ({@link ProbePaths}), on each server.</li>
+ * <li>Every candidate in a {@code $select} at each path ({@link PropertyNameOracle}), the
+ * servers sharing the types. What TM1 accepts that the type doesn't declare is
+ * undeclared, and is read from an entity for the kind of value it holds.</li>
+ * <li>The writes ({@link WriteProbe}), on the first server, with the undeclared
+ * properties selected too.</li>
  * </ol>
  */
 public final class Tm1Probe {
@@ -96,14 +97,41 @@ public final class Tm1Probe {
 		NavigableMap<String, NavigableSet<String>> refused = new ConcurrentSkipListMap<>();
 		NavigableSet<String> unverifiable = new ConcurrentSkipListSet<>();
 		NavigableSet<String> unreached = new ConcurrentSkipListSet<>();
+		WriteProbe.Result writes;
+		List<Map<String, String>> seeds = onEachServer(ProbeFixtures::create);
+		try {
+			onEachServer(client -> {
+				int share = servers.indexOf(client);
+				probe(share, seeds.get(share), candidates, undeclared, refused, unverifiable, unreached);
+				return Boolean.TRUE;
+			});
+			// After the names: the writes select the undeclared properties too
+			writes = new WriteProbe(servers.get(0), metadata, undeclared, WriteProbe.bundledCases(),
+					ProbeFixtures.PREFIX, log)
+				.run();
+		}
+		finally {
+			onEachServer(client -> {
+				ProbeFixtures.delete(client);
+				return Boolean.TRUE;
+			});
+		}
+		return new ProbeReport(productVersion, schemaVersion, sha256(binary), candidates.size(), undeclared, refused,
+				unverifiable, unreached, writes.writes(), writes.collections());
+	}
+
+	/**
+	 * Runs something on every server at once; each one's result, in the servers' order.
+	 */
+	private <T> List<T> onEachServer(Function<ProbeClient, T> task) {
+		List<T> results = new ArrayList<>();
 		try (ExecutorService pool = Executors.newFixedThreadPool(servers.size())) {
-			List<Future<?>> work = new ArrayList<>();
-			for (int i = 0; i < servers.size(); i++) {
-				int share = i;
-				work.add(pool.submit(() -> probe(share, candidates, undeclared, refused, unverifiable, unreached)));
+			List<Future<T>> futures = new ArrayList<>();
+			for (ProbeClient server : servers) {
+				futures.add(pool.submit(() -> task.apply(server)));
 			}
-			for (Future<?> w : work) {
-				w.get();
+			for (Future<T> future : futures) {
+				results.add(future.get());
 			}
 		}
 		catch (InterruptedException e) {
@@ -113,51 +141,44 @@ public final class Tm1Probe {
 		catch (ExecutionException e) {
 			throw new IllegalStateException("The probe failed", e.getCause());
 		}
-		return new ProbeReport(productVersion, schemaVersion, sha256(binary), candidates.size(), undeclared, refused,
-				unverifiable, unreached);
+		return results;
 	}
 
 	/**
-	 * One server's share: the types whose index, in name order, is {@code share} modulo
-	 * the servers.
+	 * One server's share of the names: the types whose index, in name order, is
+	 * {@code share} modulo the servers.
 	 */
-	private void probe(int share, Set<String> candidates, Map<String, NavigableMap<String, String>> undeclared,
-			Map<String, NavigableSet<String>> refused, Set<String> unverifiable, Set<String> unreached) {
+	private void probe(int share, Map<String, String> seeds, Set<String> candidates,
+			Map<String, NavigableMap<String, String>> undeclared, Map<String, NavigableSet<String>> refused,
+			Set<String> unverifiable, Set<String> unreached) {
 		ProbeClient client = servers.get(share);
 		PropertyNameOracle oracle = new PropertyNameOracle(client, parallelism);
-		Map<String, String> seeds = ProbeFixtures.create(client);
-		try {
-			NavigableMap<String, ProbePaths.Reach> reach = new ProbePaths(metadata, client, oracle,
-					ProbeFixtures.PREFIX)
-				.find(seeds);
-			List<Map.Entry<String, ProbePaths.Reach>> types = List.copyOf(reach.entrySet());
-			for (int t = share; t < types.size(); t += servers.size()) {
-				String type = types.get(t).getKey();
-				ProbePaths.Reach where = types.get(t).getValue();
-				String path = where.path();
-				if (path == null) {
-					(where.entity() == null ? unreached : unverifiable).add(type);
-					log.accept(type + ": " + (where.entity() == null ? "no path found" : "TM1 doesn't check names"));
-					continue;
-				}
-				Set<String> declared = declared(type);
-				NavigableSet<String> accepted = oracle.accepted(path, candidates);
-				NavigableSet<String> extra = new TreeSet<>(accepted);
-				extra.removeAll(declared);
-				NavigableSet<String> missing = new TreeSet<>(declared);
-				missing.removeAll(accepted);
-				if (!extra.isEmpty()) {
-					undeclared.put(type, kinds(client, where.entity(), extra));
-				}
-				if (!missing.isEmpty()) {
-					refused.put(type, missing);
-				}
-				log.accept(type + " at " + path + ": undeclared " + extra
-						+ (missing.isEmpty() ? "" : ", declared but refused " + missing));
+		NavigableMap<String, ProbePaths.Reach> reach = new ProbePaths(metadata, client, oracle, ProbeFixtures.PREFIX)
+			.find(seeds);
+		List<Map.Entry<String, ProbePaths.Reach>> types = List.copyOf(reach.entrySet());
+		for (int t = share; t < types.size(); t += servers.size()) {
+			String type = types.get(t).getKey();
+			ProbePaths.Reach where = types.get(t).getValue();
+			String path = where.path();
+			if (path == null) {
+				(where.entity() == null ? unreached : unverifiable).add(type);
+				log.accept(type + ": " + (where.entity() == null ? "no path found" : "TM1 doesn't check names"));
+				continue;
 			}
-		}
-		finally {
-			ProbeFixtures.delete(client);
+			Set<String> declared = declared(type);
+			NavigableSet<String> accepted = oracle.accepted(path, candidates);
+			NavigableSet<String> extra = new TreeSet<>(accepted);
+			extra.removeAll(declared);
+			NavigableSet<String> missing = new TreeSet<>(declared);
+			missing.removeAll(accepted);
+			if (!extra.isEmpty()) {
+				undeclared.put(type, kinds(client, where.entity(), extra));
+			}
+			if (!missing.isEmpty()) {
+				refused.put(type, missing);
+			}
+			log.accept(type + " at " + path + ": undeclared " + extra
+					+ (missing.isEmpty() ? "" : ", declared but refused " + missing));
 		}
 	}
 
@@ -169,10 +190,10 @@ public final class Tm1Probe {
 			return kinds;
 		}
 		ProbeClient.Answer answer = client.get(PropertyNameOracle.select(entity, String.join(",", names)));
-		if (!answer.ok() || answer.body() == null) {
+		JsonNode body = answer.body();
+		if (!answer.ok() || body == null) {
 			return kinds;
 		}
-		JsonNode body = answer.body();
 		for (String name : names) {
 			JsonNode value = body.get(name);
 			if (value != null) {

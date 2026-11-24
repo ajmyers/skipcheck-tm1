@@ -34,14 +34,18 @@ import tools.jackson.databind.node.ObjectNode;
  * @param unverifiable entity types TM1 doesn't check {@code $select} names for, so they
  * may have undeclared properties the probe can't see
  * @param unreached entity types the probe found no path to
+ * @param writes per write case, what TM1 does with each property in a POST and a PATCH
+ * ({@link WriteProbe})
+ * @param collections per collection case, what a PATCH of the collection does
  */
 public record ProbeReport(String productVersion, String schemaVersion, String binarySha256, int candidates,
 		NavigableMap<String, NavigableMap<String, String>> undeclared,
 		NavigableMap<String, NavigableSet<String>> declaredRefused, NavigableSet<String> unverifiable,
-		NavigableSet<String> unreached) {
+		NavigableSet<String> unreached, NavigableMap<String, JsonNode> writes,
+		NavigableMap<String, JsonNode> collections) {
 
 	/** The format's version; a reader refuses one it doesn't know. */
-	public static final int PROBE_VERSION = 1;
+	public static final int PROBE_VERSION = 2;
 
 	private static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 
@@ -55,6 +59,8 @@ public record ProbeReport(String productVersion, String schemaVersion, String bi
 		declaredRefused = Collections.unmodifiableNavigableMap(r);
 		unverifiable = Collections.unmodifiableNavigableSet(new TreeSet<>(unverifiable));
 		unreached = Collections.unmodifiableNavigableSet(new TreeSet<>(unreached));
+		writes = Collections.unmodifiableNavigableMap(new TreeMap<>(writes));
+		collections = Collections.unmodifiableNavigableMap(new TreeMap<>(collections));
 	}
 
 	/**
@@ -91,6 +97,10 @@ public record ProbeReport(String productVersion, String schemaVersion, String bi
 		declaredRefused.forEach((type, names) -> names.forEach(r.putArray(type)::add));
 		unverifiable.forEach(root.putArray("unverifiable")::add);
 		unreached.forEach(root.putArray("unreached")::add);
+		ObjectNode w = root.putObject("writes");
+		writes.forEach(w::set);
+		ObjectNode c = root.putObject("collections");
+		collections.forEach(c::set);
 		return JSON.writeValueAsString(root) + "\n";
 	}
 
@@ -104,8 +114,10 @@ public record ProbeReport(String productVersion, String schemaVersion, String bi
 	public static NavigableSet<String> undeclaredNames(String json) {
 		JsonNode root = JSON.readTree(json);
 		int version = root.path("probeVersion").asInt();
-		if (version != PROBE_VERSION) {
-			throw new IllegalArgumentException("Unknown probeVersion " + version + "; this reads " + PROBE_VERSION);
+		// Version 1 had no writes; its undeclared properties read the same
+		if (version < 1 || version > PROBE_VERSION) {
+			throw new IllegalArgumentException(
+					"Unknown probeVersion " + version + "; this reads 1 to " + PROBE_VERSION);
 		}
 		NavigableSet<String> names = new TreeSet<>();
 		for (Map.Entry<String, JsonNode> type : root.path("undeclared").properties()) {

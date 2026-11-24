@@ -21,7 +21,8 @@ class ProbeReportTest {
 		return new ProbeReport("11.8.03500.6", "11.8.35", "ab12", 3,
 				new TreeMap<>(Map.of("Subset", new TreeMap<>(Map.of("ExpandAbove", "boolean", "Alias", "string")),
 						"Process", new TreeMap<>(Map.of("UIData", "string")))),
-				new TreeMap<>(), new TreeSet<>(Set.of("View", "Annotation")), new TreeSet<>(Set.of("GitPlan")));
+				new TreeMap<>(), new TreeSet<>(Set.of("View", "Annotation")), new TreeSet<>(Set.of("GitPlan")),
+				new TreeMap<>(), new TreeMap<>());
 	}
 
 	@Test
