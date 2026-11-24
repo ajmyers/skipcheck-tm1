@@ -47,6 +47,10 @@ public final class ProbeFixtures {
 					"""
 							{"Name": "%1$sMeasures", "Hierarchies": [{"Name": "%1$sMeasures",
 							 "Elements": [{"Name": "%1$sValue", "Type": "Numeric"}, {"Name": "%1$sNote", "Type": "String"}]}]}"""),
+			// A dimension no fixture cube has, for a binding to add
+			step("POST", "Dimensions", """
+					{"Name": "%1$sOther", "Hierarchies": [{"Name": "%1$sOther",
+					 "Elements": [{"Name": "%1$sO", "Type": "Numeric"}]}]}"""),
 			step("POST", "Cubes",
 					"""
 							{"Name": "%1$sCube", "Dimensions@odata.bind": ["Dimensions('%1$sDim')", "Dimensions('%1$sMeasures')"],
@@ -107,8 +111,9 @@ public final class ProbeFixtures {
 
 	private static final List<String> DELETES = List.of("Chores('%1$sChore')", "Processes('%1$sAscii')",
 			"Processes('%1$sView')", "Cubes('%1$sCube')", "Dimensions('%1$sDim')", "Dimensions('%1$sMeasures')",
-			"Users('%1$sUser')", "Groups('%1$sGroup')", "CubeAttributes('%1$sCubeAttribute')",
-			"ProcessAttributes('%1$sProcessAttribute')", "Sandboxes('%1$sSandbox')");
+			"Dimensions('%1$sOther')", "Users('%1$sUser')", "Groups('%1$sGroup')",
+			"CubeAttributes('%1$sCubeAttribute')", "ProcessAttributes('%1$sProcessAttribute')",
+			"Sandboxes('%1$sSandbox')");
 
 	private ProbeFixtures() {
 	}

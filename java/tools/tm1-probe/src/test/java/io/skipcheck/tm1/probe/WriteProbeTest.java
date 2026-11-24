@@ -262,6 +262,128 @@ class WriteProbeTest {
 			.isEqualTo("ignored");
 	}
 
+	private static final String PAL_METADATA = """
+			<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+			 <edmx:DataServices>
+			  <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="ibm.tm1.api.v1" Alias="tm1">
+			   <EntityType Name="Pal"><Key><PropertyRef Name="Name"/></Key>
+			    <Property Name="Name" Type="Edm.String" Nullable="false"/>
+			    <NavigationProperty Name="Friends" Type="Collection(tm1.Pal)"/>
+			    <NavigationProperty Name="Best" Type="tm1.Pal"/>
+			    <NavigationProperty Name="Rivals" Type="Collection(tm1.Rival)"/>
+			   </EntityType>
+			   <EntityType Name="Rival"><Key><PropertyRef Name="Name"/></Key>
+			    <Property Name="Name" Type="Edm.String" Nullable="false"/>
+			   </EntityType>
+			   <EntityContainer Name="API"><EntitySet Name="Pals" EntityType="tm1.Pal"/></EntityContainer>
+			  </Schema>
+			 </edmx:DataServices>
+			</edmx:Edmx>""";
+
+	private static final Pattern PAL = Pattern.compile("Pals\\('([^']*)'\\)(/\\w+)?");
+
+	/**
+	 * Pals whose Friends a create binds or nests, and a PATCH binds (and refuses to
+	 * nest); Best is ignored either way.
+	 */
+	static final class Pals implements FakeTm1.Handler {
+
+		final Map<String, List<String>> friends = new LinkedHashMap<>();
+
+		Pals() {
+			friends.put("PSource", new ArrayList<>());
+			friends.put("PTarget", new ArrayList<>());
+		}
+
+		private void add(String pal, JsonNode body, boolean nest) {
+			body.path("Friends@odata.bind").forEach(p -> friends.get(pal).add(WriteProbe.keyOf(p.asString())));
+			if (nest) {
+				for (JsonNode nested : body.path("Friends")) {
+					String name = nested.path("Name").asString();
+					friends.put(name, new ArrayList<>());
+					friends.get(pal).add(name);
+				}
+			}
+		}
+
+		@Override
+		public FakeTm1.Reply handle(String method, String target, @Nullable JsonNode body) {
+			if (method.equals("POST") && target.equals("Pals") && body != null) {
+				String name = body.path("Name").asString();
+				friends.put(name, new ArrayList<>());
+				add(name, body, true);
+				return FakeTm1.Reply.ok("{\"Name\": \"" + name + "\"}");
+			}
+			Matcher m = PAL.matcher(target.replaceAll("\\?.*", ""));
+			if (!m.matches() || !friends.containsKey(m.group(1))) {
+				return new FakeTm1.Reply(404, null);
+			}
+			String pal = m.group(1);
+			if (m.group(2) != null) {
+				if (m.group(2).equals("/Best")) {
+					return new FakeTm1.Reply(204, null);
+				}
+				if (m.group(2).equals("/Rivals")) {
+					return FakeTm1.Reply.ok("{\"value\": []}");
+				}
+				StringBuilder value = new StringBuilder();
+				for (String f : friends.get(pal)) {
+					value.append(value.isEmpty() ? "" : ",").append("{\"Name\": \"").append(f).append("\"}");
+				}
+				return FakeTm1.Reply.ok("{\"value\": [" + value + "]}");
+			}
+			return switch (method) {
+				case "GET" -> FakeTm1.Reply.ok("{\"Name\": \"" + pal + "\"}");
+				case "DELETE" -> {
+					friends.remove(pal);
+					yield new FakeTm1.Reply(204, null);
+				}
+				case "PATCH" -> {
+					if (body != null && body.has("Friends")) {
+						yield FakeTm1.Reply.refused();
+					}
+					if (body != null) {
+						add(pal, body, false);
+					}
+					yield new FakeTm1.Reply(204, null);
+				}
+				default -> new FakeTm1.Reply(405, null);
+			};
+		}
+
+	}
+
+	@Test
+	void probesEachNavigationBoundAndNestedInACreateAndAPatch() throws Exception {
+		CsdlDocument metadata = CsdlParser.parse(PAL_METADATA);
+		String cases = """
+				{"targets": {"Pal": "Pals('{p}Target')"},
+				 "cases": [{"id": "Pal", "type": "Pal", "collection": "Pals", "source": "Pals('{p}Source')", "base": {}}]}""";
+		Pals pals = new Pals();
+		JsonNode navigations;
+		try (FakeTm1 tm1 = new FakeTm1(pals)) {
+			ProbeClient client = new ProbeClient(tm1.url(), "Basic x");
+			navigations = new WriteProbe(client, metadata, Map.of(), ProbeClient.JSON.readTree(cases), "P", s -> {
+			}).run().writes().get("Pal").path("navigations");
+		}
+		assertThat(navigations.propertyNames()).containsExactly("Best", "Friends", "Rivals");
+		JsonNode friends = navigations.path("Friends");
+		assertThat(outcome(friends.path("post").path("bind"))).isEqualTo("applied");
+		assertThat(outcome(friends.path("post").path("nested"))).isEqualTo("applied");
+		assertThat(outcome(friends.path("patch").path("bind"))).isEqualTo("applied");
+		assertThat(outcome(friends.path("patch").path("nested"))).isEqualTo("rejected");
+		JsonNode best = navigations.path("Best");
+		for (String method : List.of("post", "patch")) {
+			assertThat(outcome(best.path(method).path("bind"))).as(method).isEqualTo("ignored");
+			assertThat(outcome(best.path(method).path("nested"))).as(method).isEqualTo("ignored");
+			// Nothing to bind a Rival to, nor a case to nest one from
+			assertThat(outcome(navigations.path("Rivals").path(method).path("bind"))).isEqualTo("untested");
+			assertThat(outcome(navigations.path("Rivals").path(method).path("nested"))).isEqualTo("untested");
+		}
+		// Every object a try made, nested ones included, is gone
+		assertThat(pals.friends.keySet()).containsExactlyInAnyOrder("PSource", "PTarget");
+	}
+
 	@Test
 	void tellsAReplacingCollectionFromAnAppendingOne() throws Exception {
 		assertThat(outcome(probe().collections().get("Thing/Items"))).isEqualTo("replaces");

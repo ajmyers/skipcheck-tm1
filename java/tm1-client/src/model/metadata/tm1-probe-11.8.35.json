@@ -134,6 +134,7 @@
           "code" : "278"
         }
       },
+      "navigations" : { },
       "rename" : {
         "outcome" : "rejected",
         "status" : 400,
@@ -221,6 +222,44 @@
           "outcome" : "rejected",
           "status" : 400,
           "code" : "278"
+        }
+      },
+      "navigations" : {
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "Tasks" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
         }
       },
       "rename" : {
@@ -357,6 +396,120 @@
           "outcome" : "accepted"
         }
       },
+      "navigations" : {
+        "Annotations" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "Dimensions" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "PrivateViews" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "ViewAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "Views" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        }
+      },
       "rename" : {
         "outcome" : "ignored"
       }
@@ -405,6 +558,86 @@
         },
         "UniqueName" : {
           "outcome" : "accepted"
+        }
+      },
+      "navigations" : {
+        "DefaultHierarchy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          }
+        },
+        "Hierarchies" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "HierarchyAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
         }
       },
       "rename" : {
@@ -484,6 +717,98 @@
           "outcome" : "accepted"
         }
       },
+      "navigations" : {
+        "Components" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          }
+        },
+        "Edges" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "Hierarchy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "Parents" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        }
+      },
       "rename" : {
         "outcome" : "ignored"
       }
@@ -500,6 +825,26 @@
       "post" : { },
       "patch" : { },
       "patchNull" : { },
+      "navigations" : {
+        "Users" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          }
+        }
+      },
       "rename" : {
         "outcome" : "ignored"
       }
@@ -612,6 +957,254 @@
           "outcome" : "accepted"
         }
       },
+      "navigations" : {
+        "AllMember" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "DefaultMember" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "Dimension" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "Edges" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "ElementAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "Elements" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          }
+        },
+        "Levels" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "Members" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "PrivateSubsets" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "SessionSubsets" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "SubsetAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "Subsets" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        }
+      },
       "rename" : {
         "outcome" : "ignored"
       }
@@ -653,6 +1246,44 @@
           "outcome" : "rejected",
           "status" : 400,
           "code" : "278"
+        }
+      },
+      "navigations" : {
+        "Cube" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
         }
       },
       "rename" : {
@@ -749,6 +1380,44 @@
           "outcome" : "rejected",
           "status" : 400,
           "code" : "278"
+        }
+      },
+      "navigations" : {
+        "Cube" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
         }
       },
       "rename" : {
@@ -900,6 +1569,44 @@
           "outcome" : "rejected",
           "status" : 400,
           "code" : "278"
+        }
+      },
+      "navigations" : {
+        "ErrorLogs" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
         }
       },
       "rename" : {
@@ -1055,6 +1762,44 @@
           "code" : "278"
         }
       },
+      "navigations" : {
+        "ErrorLogs" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        }
+      },
       "rename" : {
         "outcome" : "rejected",
         "status" : 400,
@@ -1114,6 +1859,7 @@
           "outcome" : "accepted"
         }
       },
+      "navigations" : { },
       "rename" : {
         "outcome" : "ignored"
       }
@@ -1184,6 +1930,66 @@
         },
         "UniqueName" : {
           "outcome" : "accepted"
+        }
+      },
+      "navigations" : {
+        "Elements" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "Hierarchy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
         }
       },
       "rename" : {
@@ -1260,6 +2066,66 @@
           "outcome" : "accepted"
         }
       },
+      "navigations" : {
+        "Elements" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "Hierarchy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
+        }
+      },
       "rename" : {
         "outcome" : "ignored"
       }
@@ -1332,6 +2198,44 @@
         },
         "Type" : {
           "outcome" : "accepted"
+        }
+      },
+      "navigations" : {
+        "Groups" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "applied"
+            }
+          }
+        },
+        "Sessions" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "untested"
+            },
+            "nested" : {
+              "outcome" : "untested"
+            }
+          }
         }
       },
       "rename" : {
