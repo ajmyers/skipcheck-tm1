@@ -8,6 +8,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.WildcardType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,6 +19,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.jspecify.annotations.Nullable;
@@ -31,7 +35,8 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * What every generated create and patch builder offers, which every client's builders
  * must match ({@code spec/conformance/builders.json}): for each {@code XPatch} and
- * {@code XCreate}, its {@code @odata.type}, the JSON names its setters write, the
+ * {@code XCreate}, its {@code @odata.type}, the JSON names its setters write, the write
+ * type each setter of a structured value takes ({@code "Edges": "EdgeCreate[]"}), the
  * properties its {@code build()} requires, and whether it takes undeclared properties.
  * Each client drives its own generated builders to find them, so the check is on what
  * each generator emitted, not on a restatement of its rules. This client's builders are
@@ -102,6 +107,7 @@ class BuilderManifestTest {
 		Map<String, @Nullable Object> base = values(builder.invoke(null));
 		// Each setter on a builder of its own: the name it writes
 		Map<Method, String> setters = new LinkedHashMap<>();
+		TreeMap<String, String> valueTypes = new TreeMap<>();
 		for (Method m : setters(builder.invoke(null).getClass())) {
 			Object b = builder.invoke(null);
 			m.invoke(b, arguments(m));
@@ -109,6 +115,10 @@ class BuilderManifestTest {
 			wrote.removeAll(base.keySet());
 			assertThat(wrote).as(patch.getSimpleName() + "." + m.getName() + " writes one property").hasSize(1);
 			setters.put(m, wrote.get(0));
+			String value = valueType(m);
+			if (value != null) {
+				valueTypes.put(wrote.get(0), value);
+			}
 		}
 		// A property is required when a builder with every other setter called refuses to
 		// build
@@ -142,7 +152,34 @@ class BuilderManifestTest {
 		required.forEach(req::add);
 		ArrayNode names = out.putArray("setters");
 		new TreeSet<>(setters.values()).forEach(names::add);
+		ObjectNode values = out.putObject("values");
+		valueTypes.forEach(values::put);
 		return out;
+	}
+
+	/**
+	 * The write type a setter takes, as {@code XPatch} or {@code XCreate}, with
+	 * {@code []} for a list of them; null for anything else (a primitive, a binding's
+	 * path).
+	 */
+	private static @Nullable String valueType(Method m) {
+		if (m.getParameterCount() != 1) {
+			return null;
+		}
+		Type t = m.getGenericParameterTypes()[0];
+		String suffix = "";
+		if (t instanceof ParameterizedType p && p.getRawType() == List.class) {
+			t = p.getActualTypeArguments()[0];
+			suffix = "[]";
+			if (t instanceof WildcardType w) {
+				t = w.getUpperBounds()[0];
+			}
+		}
+		if (t instanceof Class<?> c && c.getPackageName().equals(PACKAGE)
+				&& (c.getSimpleName().endsWith("Patch") || c.getSimpleName().endsWith("Create"))) {
+			return c.getSimpleName() + suffix;
+		}
+		return null;
 	}
 
 	private static List<Method> setters(Class<?> builder) {

@@ -37,12 +37,15 @@ import tools.jackson.databind.json.JsonMapper;
  * write type serves its holder's create and PATCH alike;</li>
  * <li>a navigation, nested or bound ({@code @odata.bind}), it applied, or a collection it
  * replaced or appended to;</li>
- * <li>{@code Name} and the required properties, when the least create was accepted;
+ * <li>the keys it sent ({@code Name}, a breakpoint's {@code ID}, an edge's parent and
+ * component) and the required properties, when the least create was accepted;
  * {@code Name} in a patch, when a rename applied.</li>
  * </ul>
- * A setter a subtype verifies counts for its root. A write type with nothing to offer
- * isn't generated, unless a subtype's or an offered setter's value needs it (an open
- * type, a root). An offered nested setter whose value type offers nothing is dropped.
+ * A patch doesn't offer a binding a PATCH appends with (a subset's {@code Elements}):
+ * binding reads as "set to", so a service's own add does that. A setter a subtype
+ * verifies counts for its root. A write type with nothing to offer isn't generated,
+ * unless a subtype's or an offered setter's value needs it (an open type, a root). An
+ * offered nested setter whose value type offers nothing is dropped.
  *
  * @param builders per write type ({@code CubeCreate}), its setters, each with why
  */
@@ -111,6 +114,11 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 
 		private final Set<String> exceptionsUsed = new TreeSet<>();
 
+		/**
+		 * Bindings a PATCH appends with, by {@code Type|Setter}: not offered in a patch.
+		 */
+		private final Set<String> appendingBinds = new TreeSet<>();
+
 		Builder(JsonNode probe, CsdlDocument metadata, Overlay overlay) {
 			metadata.structuredTypes().forEach(t -> types.putIfAbsent(t.name(), t));
 			this.exceptions = overlay.writes();
@@ -154,7 +162,13 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 					}
 				}
 				if (w.path("minimal").path("outcome").asString("").equals("accepted")) {
-					verify(type, "post", "Name", "minimal create");
+					// The keys it sent (a probe file from before it recorded them: Name)
+					if (w.has("keys")) {
+						w.path("keys").forEach(k -> verify(type, "post", k.asString(), "minimal create"));
+					}
+					else {
+						verify(type, "post", "Name", "minimal create");
+					}
 					w.path("required").forEach(r -> verify(type, "post", r.asString(), "minimal create"));
 				}
 				if (w.path("rename").path("outcome").asString("").equals("applied")) {
@@ -166,6 +180,9 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 				String[] id = c.getKey().split("/", 2);
 				if (DOES.contains(outcome) && id.length == 2) {
 					verify(id[0], "patch", id[1], outcome);
+				}
+				if (outcome.equals("appends") && id.length == 2 && id[1].endsWith(BIND)) {
+					appendingBinds.add(id[0] + "|" + id[1]);
 				}
 			}
 		}
@@ -182,6 +199,12 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 					String builder = t.name() + suffix;
 					Map<String, Offer> setters = new TreeMap<>();
 					for (String setter : candidates(t.name())) {
+						if (suffix.equals("Patch") && appendingBinds.contains(t.name() + "|" + setter)) {
+							// Binding reads as "set to": one a PATCH appends with is left
+							// to the
+							// service's own add (a subset's addElements)
+							continue;
+						}
 						Offer why = entity ? verifiedFor(t.name(), suffix.equals("Create") ? "post" : "patch", setter)
 								: Optional.ofNullable(verifiedFor(t.name(), "post", setter))
 									.orElse(verifiedFor(t.name(), "patch", setter));
@@ -237,7 +260,7 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 					}
 					Map<String, Offer> setters = out.getOrDefault(builder, new TreeMap<>());
 					for (String setter : new ArrayList<>(setters.keySet())) {
-						String value = valueType(builder, setter);
+						String value = valueType(builder, setter, out);
 						if (value == null) {
 							continue;
 						}
@@ -258,7 +281,7 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 						needed.add(b + suffix);
 					}
 					for (String setter : out.getOrDefault(builder, Map.of()).keySet()) {
-						String value = valueType(builder, setter);
+						String value = valueType(builder, setter, out);
 						if (value != null) {
 							needed.add(value);
 						}
@@ -299,10 +322,10 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 		/**
 		 * The write type a setter's value is written with, or null for a bound navigation
 		 * or a primitive: a complex type's {@code Patch}; for an entity, its
-		 * {@code Create} in a create, and in a patch's collection (each member is written
-		 * whole), else its {@code Patch}.
+		 * {@code Create} where it has one (a nested entity is new: in a deep insert, or a
+		 * collection a PATCH replaces or appends to), else its {@code Patch}.
 		 */
-		private @Nullable String valueType(String builder, String setter) {
+		private @Nullable String valueType(String builder, String setter, Map<String, Map<String, Offer>> out) {
 			if (setter.endsWith(BIND)) {
 				return null;
 			}
@@ -319,7 +342,7 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 			if (!(t instanceof CsdlEntityType)) {
 				return value + "Patch";
 			}
-			return builder.endsWith("Create") || ref.get().collection() ? value + "Create" : value + "Patch";
+			return out.containsKey(value + "Create") ? value + "Create" : value + "Patch";
 		}
 
 		private @Nullable Offer verifiedFor(String type, String write, String setter) {

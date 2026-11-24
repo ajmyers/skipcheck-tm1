@@ -10,10 +10,11 @@ import java.util.Objects;
 import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Annotation;
+import io.skipcheck.tm1.client.model.AnnotationCreate;
 import io.skipcheck.tm1.client.model.AnnotationPatch;
 import io.skipcheck.tm1.client.model.ApplicationContextFacet;
 import io.skipcheck.tm1.client.model.ApplicationContextFacetValue;
-import io.skipcheck.tm1.client.model.ApplicationContextFacetValuePatch;
+import io.skipcheck.tm1.client.model.ApplicationContextFacetValueCreate;
 import io.skipcheck.tm1.client.model.Attachment;
 import io.skipcheck.tm1.client.model.Member;
 import io.skipcheck.tm1.client.model.Tm1Operations;
@@ -117,10 +118,10 @@ public final class AnnotationService {
 					.key(dimension)
 					.nav("Members")
 					.key(element)));
-		return create(AnnotationPatch.builder()
+		return create(AnnotationCreate.builder()
 			.text(text)
 			.applicationContext(List
-				.of(ApplicationContextFacetValuePatch.builder().bindFacet(FACETS.key("}Cubes")).value(cube).build()))
+				.of(ApplicationContextFacetValueCreate.builder().bindFacet(FACETS.key("}Cubes")).value(cube).build()))
 			.bindDimensionalContext(members.toArray(ODataPath[]::new))
 			.property("objectName", cube)
 			.property("commentValue", text)
@@ -135,7 +136,7 @@ public final class AnnotationService {
 	 * @return the annotation as made, with its ID
 	 */
 	@Tm1Endpoint("EntitySet Annotations")
-	public Mono<Annotation> create(AnnotationPatch annotation) {
+	public Mono<Annotation> create(AnnotationCreate annotation) {
 		return session.execute(Tm1Request.post(ANNOTATIONS, annotation, Annotation.class));
 	}
 

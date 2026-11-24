@@ -16,14 +16,13 @@ import io.skipcheck.tm1.client.error.Tm1ConflictException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Dimension;
-import io.skipcheck.tm1.client.model.EdgePatch;
+import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.Hierarchy;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.HierarchyPatch;
 import io.skipcheck.tm1.client.model.Member;
-import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 
 /**
@@ -95,7 +94,7 @@ class HierarchyServiceTest {
 					.name("Alt")
 					.elements(List.of(ElementCreate.builder().name("Total").type(ElementType.CONSOLIDATED).build(),
 							ElementCreate.builder().name("North").type(ElementType.NUMERIC).build()))
-					.edges(List.of(EdgePatch.builder().parentName("Total").componentName("North").weight(1.0).build()))
+					.edges(List.of(EdgeCreate.builder().parentName("Total").componentName("North").weight(1.0).build()))
 					.build());
 		assertThat(created.name()).isEqualTo("Alt");
 		assertThat(tm1().last().key()).isEqualTo("POST Dimensions('Region')/Hierarchies");
@@ -140,12 +139,9 @@ class HierarchyServiceTest {
 
 	@Test
 	void anUpdateWithStructureIsRefused() {
-		ODataPath elements = ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements");
 		List<HierarchyPatch> patches = List.of(
 				HierarchyPatch.builder().elements(List.of(ElementCreate.builder().name("a").build())).build(),
-				HierarchyPatch.builder().edges(List.of()).build(),
-				HierarchyPatch.builder().bindElements(elements.key("a")).build(),
-				HierarchyPatch.builder().bindEdges().build());
+				HierarchyPatch.builder().edges(List.of()).build());
 		for (HierarchyPatch patch : patches) {
 			assertThat(conformance.fail("hierarchies", "update", "Region", "Region", patch))
 				.isInstanceOf(IllegalArgumentException.class)
@@ -163,7 +159,7 @@ class HierarchyServiceTest {
 		Object none = conformance.call("hierarchies", "replaceStructure", "Version", "Version",
 				List.of(ElementCreate.builder().name("All Versions").type(ElementType.CONSOLIDATED).build(),
 						ElementCreate.builder().name("Actual").type(ElementType.NUMERIC).build()),
-				List.of(EdgePatch.builder().parentName("All Versions").componentName("Actual").weight(1.0).build()));
+				List.of(EdgeCreate.builder().parentName("All Versions").componentName("Actual").weight(1.0).build()));
 		assertThat(none).isNull();
 		assertThat(tm1().last().key()).isEqualTo("PATCH Dimensions('Version')/Hierarchies('Version')");
 		assertThat(tm1().last().text()).isEqualTo(

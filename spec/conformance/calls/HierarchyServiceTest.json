@@ -170,58 +170,6 @@
 			"params" : [
 				"dimension",
 				"hierarchy",
-				"patch"
-			],
-			"args" : [
-				"Region",
-				"Region",
-				{
-					"$patch" : "HierarchyPatch",
-					"json" : {
-						"Elements@odata.bind" : [
-							"Dimensions('Region')/Hierarchies('Region')/Elements('a')"
-						]
-					}
-				}
-			],
-			"exchanges" : [ ],
-			"error" : {
-				"exception" : "IllegalArgumentException",
-				"category" : "argument"
-			}
-		},
-		{
-			"id" : "HierarchyServiceTest#anUpdateWithStructureIsRefused#4",
-			"service" : "hierarchies",
-			"method" : "update",
-			"params" : [
-				"dimension",
-				"hierarchy",
-				"patch"
-			],
-			"args" : [
-				"Region",
-				"Region",
-				{
-					"$patch" : "HierarchyPatch",
-					"json" : {
-						"Edges@odata.bind" : [ ]
-					}
-				}
-			],
-			"exchanges" : [ ],
-			"error" : {
-				"exception" : "IllegalArgumentException",
-				"category" : "argument"
-			}
-		},
-		{
-			"id" : "HierarchyServiceTest#anUpdateWithStructureIsRefused#5",
-			"service" : "hierarchies",
-			"method" : "update",
-			"params" : [
-				"dimension",
-				"hierarchy",
 				"patch",
 				"etag"
 			],
@@ -1047,7 +995,7 @@
 				],
 				[
 					{
-						"$patch" : "EdgePatch",
+						"$patch" : "EdgeCreate",
 						"json" : {
 							"ParentName" : "All Versions",
 							"ComponentName" : "Actual",

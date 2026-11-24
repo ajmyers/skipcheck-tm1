@@ -20,9 +20,10 @@ import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.Process;
 import io.skipcheck.tm1.client.model.ProcessDebugContext;
 import io.skipcheck.tm1.client.model.ProcessDebugContextBreakpoint;
+import io.skipcheck.tm1.client.model.ProcessDebugContextBreakpointCreate;
 import io.skipcheck.tm1.client.model.ProcessDebugContextBreakpointPatch;
 import io.skipcheck.tm1.client.model.ProcessDebugContextLineBreakpoint;
-import io.skipcheck.tm1.client.model.ProcessDebugContextLineBreakpointPatch;
+import io.skipcheck.tm1.client.model.ProcessDebugContextLineBreakpointCreate;
 import io.skipcheck.tm1.client.model.ProcessDebugContextStackFrame;
 import io.skipcheck.tm1.client.model.ProcessDebugContextStatus;
 import io.skipcheck.tm1.client.model.ProcessDebugContextVariable;
@@ -131,7 +132,7 @@ class ProcessDebugServiceTest {
 		tm1().json(201, "{\"@odata.type\":\"#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint\",\"ID\":1,"
 				+ "\"Enabled\":true,\"LineNumber\":3}");
 		ProcessDebugContextBreakpoint added = conformance.call("processDebugging", "addBreakpoint", "d1",
-				ProcessDebugContextLineBreakpointPatch.builder()
+				ProcessDebugContextLineBreakpointCreate.builder()
 					.id(1)
 					.enabled(true)
 					.processName("Load")
@@ -145,7 +146,7 @@ class ProcessDebugServiceTest {
 
 		tm1().json(201, "{\"ID\":0}");
 		conformance.call("processDebugging", "addBreakpoint", "d1",
-				ProcessDebugContextBreakpointPatch.builder().id(0).build());
+				ProcessDebugContextBreakpointCreate.builder().id(0).build());
 		assertThat(tm1().last().text()).isEqualTo("{\"ID\":0}");
 
 		tm1().status(204);
@@ -163,18 +164,18 @@ class ProcessDebugServiceTest {
 	void aSecondBreakpointWithTheSameIdConflicts() {
 		tm1().error(409, "278", "A breakpoint with ID 1 already exists");
 		conformance.fail("processDebugging", "addBreakpoint", "d1",
-				ProcessDebugContextBreakpointPatch.builder().id(1).build());
+				ProcessDebugContextBreakpointCreate.builder().id(1).build());
 	}
 
 	@Test
 	void refusesABreakpointWithoutAnIdOfZeroOrMore() {
 		Throwable none = conformance.fail("processDebugging", "addBreakpoint", "d1",
-				ProcessDebugContextLineBreakpointPatch.builder().lineNumber(3).build());
+				ProcessDebugContextLineBreakpointCreate.builder().lineNumber(3).build());
 		assertThat(none).isInstanceOf(IllegalArgumentException.class);
 		conformance.fail("processDebugging", "addBreakpoint", "d1",
-				ProcessDebugContextBreakpointPatch.builder().id(-1).build());
+				ProcessDebugContextBreakpointCreate.builder().id(-1).build());
 		conformance.fail("processDebugging", "addBreakpoint", "d1",
-				ProcessDebugContextBreakpointPatch.builder().id(null).build());
+				ProcessDebugContextBreakpointCreate.builder().id(null).build());
 		assertThat(tm1().requests()).isEmpty();
 	}
 

@@ -10,7 +10,7 @@ import java.util.Objects;
 import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Dimension;
-import io.skipcheck.tm1.client.model.EdgePatch;
+import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.Hierarchy;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
@@ -138,7 +138,7 @@ public final class HierarchyService {
 	 */
 	@Tm1Endpoint("Navigation Dimension/Hierarchies")
 	public Mono<Void> replaceStructure(String dimension, String hierarchy, List<ElementCreate> elements,
-			List<EdgePatch> edges) {
+			List<EdgeCreate> edges) {
 		HierarchyPatch patch = HierarchyPatch.builder().elements(elements).edges(edges).build();
 		return session.execute(Tm1Request.patch(hierarchy(dimension, hierarchy), patch));
 	}

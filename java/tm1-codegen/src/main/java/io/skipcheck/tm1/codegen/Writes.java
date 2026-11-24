@@ -146,11 +146,6 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 		Map<String, Map<String, String>> collections = new TreeMap<>();
 		for (Map.Entry<String, JsonNode> c : root.path("writes").properties()) {
 			JsonNode w = c.getValue();
-			// Probed and recorded, but not yet generated from: a type the probe has just
-			// taken in, until the generators offer only verified writes (#338)
-			if (!w.path("generate").asBoolean(true)) {
-				continue;
-			}
 			String type = w.path("type").asString(c.getKey().split("/", -1)[0]);
 			merge(create.computeIfAbsent(type, k -> new TreeMap<>()), w.path("post"));
 			merge(patch.computeIfAbsent(type, k -> new TreeMap<>()), w.path("patch"));

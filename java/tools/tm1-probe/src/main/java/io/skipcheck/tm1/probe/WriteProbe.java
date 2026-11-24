@@ -20,6 +20,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 import org.jspecify.annotations.Nullable;
 
@@ -222,6 +223,23 @@ public final class WriteProbe {
 		}
 
 		/**
+		 * The keys a create sends: Name, a numbered key, the key parts the case names.
+		 */
+		List<String> sentKeys() {
+			Set<String> out = new TreeSet<>(keys);
+			if (named) {
+				out.add("Name");
+			}
+			if (numbered != null) {
+				out.add(numbered);
+			}
+			if (assigned != null) {
+				out.remove(assigned);
+			}
+			return List.copyOf(out);
+		}
+
+		/**
 		 * Whether TM1 renames one by a PATCH of {@code Name}: only a named one, found by
 		 * it.
 		 */
@@ -406,10 +424,6 @@ public final class WriteProbe {
 		JsonNode values = c.path("values");
 		ObjectNode result = NODES.objectNode();
 		result.put("type", type);
-		if (!c.path("generate").asBoolean(true)) {
-			// Recorded only: the generators leave it out (#338)
-			result.put("generate", false);
-		}
 
 		// A case can select by another type: a document posted to a folder reads as a
 		// DocumentReference, which has none of a Document's own properties
@@ -462,6 +476,8 @@ public final class WriteProbe {
 		}
 		ObjectNode defaults = readBack(minimal.where(), select);
 		shape.remove(minimal);
+		// The keys it was sent with, which a create needs too: none TM1 assigns
+		shape.sentKeys().forEach(result.putArray("keys")::add);
 		ArrayNode required = result.putArray("required");
 		Set<String> notRequired = new TreeSet<>();
 		c.path("notRequired").forEach(n -> notRequired.add(n.asString()));
@@ -545,9 +561,6 @@ public final class WriteProbe {
 		String at = text(c.path("source").asString(), "");
 		ObjectNode result = NODES.objectNode();
 		result.put("type", type);
-		if (!c.path("generate").asBoolean(true)) {
-			result.put("generate", false);
-		}
 		ProbeClient.Answer source = client.get(at);
 		if (!source.ok() || source.body() == null) {
 			result.set("source", outcome(source));
@@ -1710,7 +1723,16 @@ public final class WriteProbe {
 		return result;
 	}
 
-	static ObjectNode outcome(ProbeClient.Answer answer) {
+	private ObjectNode outcome(ProbeClient.Answer answer) {
+		return outcomeOf(answer, prefix);
+	}
+
+	/**
+	 * What an answer says, for the probe file: accepted, or rejected with its status,
+	 * code and message, the probe's own names in it written {@code {name}} (a try's fresh
+	 * one) and {@code {p}}, so the file reads the same from run to run.
+	 */
+	static ObjectNode outcomeOf(ProbeClient.Answer answer, @Nullable String prefix) {
 		ObjectNode result = NODES.objectNode();
 		if (answer.ok()) {
 			result.put("outcome", "accepted");
@@ -1721,6 +1743,14 @@ public final class WriteProbe {
 		JsonNode code = answer.body() == null ? null : answer.body().path("error").get("code");
 		if (code != null && !code.isNull()) {
 			result.put("code", code.asString());
+		}
+		JsonNode message = answer.body() == null ? null : answer.body().path("error").get("message");
+		if (message != null && message.isString()) {
+			String text = message.asString();
+			if (prefix != null && !prefix.isEmpty()) {
+				text = text.replaceAll(Pattern.quote(prefix) + "W\\d+", "{name}").replace(prefix, "{p}");
+			}
+			result.put("message", text);
 		}
 		return result;
 	}

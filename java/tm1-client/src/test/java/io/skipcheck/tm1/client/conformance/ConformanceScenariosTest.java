@@ -113,14 +113,15 @@ class ConformanceScenariosTest {
 
 	/**
 	 * Answers each step's one request with what the step expects (a {@code finally}
-	 * step's with {@code 204}), so the scenario runs offline.
+	 * step's with {@code 204}), so the scenario runs offline; with what a step saves too,
+	 * as {@code saved_<name>}, when it doesn't expect it.
 	 */
 	private static ExchangeFunction expected(JsonNode scenario, Map<String, String> names) {
 		ConformanceTm1 plumbing = new ConformanceTm1();
 		Deque<ClientResponse> answers = new ArrayDeque<>();
 		for (JsonNode step : scenario.get("steps")) {
 			if (sends(step)) {
-				answers.add(answer(ConformanceScenarios.substitute(step.get("expect"), names)));
+				answers.add(answer(saving(step, ConformanceScenarios.substitute(step.get("expect"), names))));
 			}
 		}
 		scenario.path("finally").forEach(step -> answers.add(ClientResponse.create(HttpStatus.NO_CONTENT).build()));
@@ -134,6 +135,21 @@ class ConformanceScenariosTest {
 				.map(body -> answers.isEmpty() ? json(599, "{\"error\":{\"message\":\"unscripted\"}}")
 						: answers.poll());
 		};
+	}
+
+	/** The expectation with the fields the step saves, if it lacks them. */
+	private static JsonNode saving(JsonNode step, JsonNode expect) {
+		if (!step.has("save")) {
+			return expect;
+		}
+		ObjectNode out = (ObjectNode) expect.deepCopy();
+		ObjectNode fields = out.has("fields") ? (ObjectNode) out.get("fields") : out.putObject("fields");
+		for (var s : step.get("save").properties()) {
+			if (!fields.has(s.getValue().asString())) {
+				fields.put(s.getValue().asString(), "saved_" + s.getKey());
+			}
+		}
+		return out;
 	}
 
 	private static ClientResponse answer(JsonNode expect) {
@@ -301,6 +317,26 @@ class ConformanceScenariosTest {
 		assertThat(failures).isEmpty();
 		assertThat(traffic.exchanges().stream().map(e -> e.get("step").asString()).distinct())
 			.hasSize(scenario.get("steps").size() + scenario.get("finally").size());
+	}
+
+	@Test
+	void savesAFieldOfAResultForTheStepsAfterIt() {
+		JsonNode scenario = ConformanceScenarios.load(ConformanceScenarios.directory().resolve("annotations.json"));
+		Map<String, String> names = ConformanceScenarios.names(scenario);
+		ConformanceScenarios.Traffic traffic = new ConformanceScenarios.Traffic(ConformanceTm1.ROOT);
+		assertThat(ConformanceScenarios.run(client(traffic, expected(scenario, names)), traffic, scenario, names))
+			.isEmpty();
+		assertThat(names).containsEntry("note", "saved_note").containsEntry("built", "saved_built");
+		assertThat(traffic.exchanges())
+			.extracting(
+					e -> e.get("request").get("method").asString() + " " + e.get("request").get("target").asString())
+			.contains("PATCH Annotations('saved_built')", "DELETE Annotations('saved_note')");
+
+		ObjectNode step = ConformanceCodec.json().createObjectNode();
+		step.putObject("save").put("note", "ID");
+		ObjectNode outcome = ConformanceCodec.json().createObjectNode();
+		outcome.putObject("result").put("Text", "no ID");
+		assertThat(ConformanceScenarios.save(step, outcome, names)).startsWith("no ID to save as note");
 	}
 
 	@Test

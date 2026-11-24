@@ -64,7 +64,7 @@
 			"service" : "edges",
 			"method" : "create",
 			"params" : [ "dimension", "hierarchy", "edge" ],
-			"args" : [ "${dim}", "${dim}", { "$patch" : "EdgePatch", "json" : { "ParentName" : "Total", "ComponentName" : "East", "Weight" : 1.0 } } ],
+			"args" : [ "${dim}", "${dim}", { "$patch" : "EdgeCreate", "json" : { "ParentName" : "Total", "ComponentName" : "East", "Weight" : 1.0 } } ],
 			"expect" : { "fields" : { "ParentName" : "Total", "ComponentName" : "East" } }
 		},
 		{

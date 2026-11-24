@@ -203,7 +203,7 @@
 					"json" : "PUBLIC"
 				},
 				{
-					"$patch" : "FolderPatch",
+					"$patch" : "FolderCreate",
 					"json" : {
 						"@odata.type" : "#ibm.tm1.api.v1.Folder",
 						"Name" : "Planning"
@@ -641,7 +641,7 @@
 					"json" : "PUBLIC"
 				},
 				{
-					"$patch" : "FolderPatch",
+					"$patch" : "FolderCreate",
 					"json" : {
 						"@odata.type" : "#ibm.tm1.api.v1.Folder",
 						"Name" : "Planning"
@@ -718,7 +718,7 @@
 					"json" : "PUBLIC"
 				},
 				{
-					"$patch" : "DocumentPatch",
+					"$patch" : "DocumentCreate",
 					"json" : {
 						"@odata.type" : "#ibm.tm1.api.v1.Document",
 						"Name" : "notes.txt"
@@ -795,7 +795,7 @@
 					"json" : "PUBLIC"
 				},
 				{
-					"$patch" : "LinkPatch",
+					"$patch" : "LinkCreate",
 					"json" : {
 						"@odata.type" : "#ibm.tm1.api.v1.Link",
 						"Name" : "ibm",
@@ -876,7 +876,7 @@
 					"json" : "PUBLIC"
 				},
 				{
-					"$patch" : "CubeReferencePatch",
+					"$patch" : "CubeReferenceCreate",
 					"json" : {
 						"@odata.type" : "#ibm.tm1.api.v1.CubeReference",
 						"Name" : "}ClientGroups",
@@ -955,7 +955,7 @@
 					"json" : "PRIVATE"
 				},
 				{
-					"$patch" : "FolderPatch",
+					"$patch" : "FolderCreate",
 					"json" : {
 						"@odata.type" : "#ibm.tm1.api.v1.Folder",
 						"Name" : "mine"

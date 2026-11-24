@@ -106,8 +106,7 @@
 					{
 						"Name": "pRegion",
 						"Prompt": "A region",
-						"Value": "North",
-						"Type": "String"
+						"Value": "North"
 					}
 				]
 			}
@@ -154,8 +153,7 @@
 					{
 						"Name": "pRegion",
 						"Prompt": "A region",
-						"Value": "North",
-						"Type": "String"
+						"Value": "North"
 					}
 				],
 				"Variables": [
@@ -182,7 +180,6 @@
 				}
 			},
 			"expect": {
-				"ServerName": "tm1",
 				"EncryptionAtRest": {
 					"@odata.type": "#ibm.tm1.api.v1.VaultSettings",
 					"KeyRef": "key",
@@ -199,6 +196,125 @@
 				"Rules": "SKIPCHECK;"
 			},
 			"error": "Dimensions"
+		},
+		{
+			"id": "a cube's create binds the dimensions a read holds, by key",
+			"type": "Cube",
+			"write": "create",
+			"read": {
+				"Name": "Sales",
+				"Dimensions": [
+					{
+						"Name": "Region"
+					},
+					{
+						"Name": "Product"
+					}
+				]
+			},
+			"expect": {
+				"Name": "Sales",
+				"Dimensions@odata.bind": [
+					"Dimensions('Region')",
+					"Dimensions('Product')"
+				]
+			}
+		},
+		{
+			"id": "a subset's create binds its elements by UniqueName, in its dimension's own hierarchy too, and with ] escaped",
+			"type": "Subset",
+			"write": "create",
+			"read": {
+				"Name": "s",
+				"Elements": [
+					{
+						"Name": "North",
+						"UniqueName": "[Region].[Region].[North]"
+					},
+					{
+						"Name": "S]x",
+						"UniqueName": "[Region].[S]]x]"
+					}
+				]
+			},
+			"expect": {
+				"Name": "s",
+				"Elements@odata.bind": [
+					"Dimensions('Region')/Hierarchies('Region')/Elements('North')",
+					"Dimensions('Region')/Hierarchies('Region')/Elements('S%5Dx')"
+				]
+			}
+		},
+		{
+			"id": "a collection isn't bound when a member's path can't be made",
+			"type": "Subset",
+			"write": "create",
+			"read": {
+				"Name": "s",
+				"Elements": [
+					{
+						"Name": "North",
+						"UniqueName": "[Region].[Region].[North]"
+					},
+					{
+						"Name": "South"
+					}
+				]
+			},
+			"expect": {
+				"Name": "s"
+			}
+		},
+		{
+			"id": "a view title binds its selected element, not its subset, which could be public or private",
+			"type": "ViewTitle",
+			"write": "patch",
+			"read": {
+				"Subset": {
+					"Name": "s",
+					"UniqueName": "[Region].[Region].[s]"
+				},
+				"Selected": {
+					"Name": "North",
+					"UniqueName": "[Region].[Region].[North]"
+				}
+			},
+			"expect": {
+				"Selected@odata.bind": "Dimensions('Region')/Hierarchies('Region')/Elements('North')"
+			}
+		},
+		{
+			"id": "a user's patch binds the groups a PATCH replaces",
+			"type": "User",
+			"write": "patch",
+			"read": {
+				"Name": "u",
+				"Groups": [
+					{
+						"Name": "ADMIN"
+					}
+				]
+			},
+			"expect": {
+				"Groups@odata.bind": [
+					"Groups('ADMIN')"
+				]
+			}
+		},
+		{
+			"id": "a root's create starts from a read of any of its types, with that type's",
+			"type": "View",
+			"write": "create",
+			"read": {
+				"@odata.type": "#ibm.tm1.api.v1.MDXView",
+				"Name": "v",
+				"MDX": "SELECT {} ON 0 FROM [Sales]"
+			},
+			"expect": {
+				"@odata.type": "#ibm.tm1.api.v1.MDXView",
+				"Name": "v",
+				"MDX": "SELECT {} ON 0 FROM [Sales]"
+			}
 		}
 	]
 }

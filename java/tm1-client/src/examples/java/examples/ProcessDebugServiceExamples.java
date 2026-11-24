@@ -7,7 +7,7 @@ import java.util.Objects;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.ProcessDebugContext;
-import io.skipcheck.tm1.client.model.ProcessDebugContextLineBreakpointPatch;
+import io.skipcheck.tm1.client.model.ProcessDebugContextLineBreakpointCreate;
 import io.skipcheck.tm1.client.model.ProcessProcedure;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.process.ProcessDebugService;
@@ -27,7 +27,7 @@ final class ProcessDebugServiceExamples {
 		ProcessDebugService debug = tm1.processDebugging();
 		return debug.debugging("Load Sales", Map.of("pVersion", "Forecast"), context -> {
 			String id = Objects.requireNonNull(context.id());
-			ProcessDebugContextLineBreakpointPatch line3 = ProcessDebugContextLineBreakpointPatch.builder()
+			ProcessDebugContextLineBreakpointCreate line3 = ProcessDebugContextLineBreakpointCreate.builder()
 				.id(1) // TM1 needs an ID chosen by the caller
 				.processName("Load Sales")
 				.procedure(ProcessProcedure.PROLOG)

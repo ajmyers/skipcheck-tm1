@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.DimensionCreate;
-import io.skipcheck.tm1.client.model.EdgePatch;
+import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
@@ -88,8 +88,8 @@ class LevelAndMemberServiceTm1Test {
 		return ElementCreate.builder().name(name).type(ElementType.CONSOLIDATED).build();
 	}
 
-	private static EdgePatch edge(String parent, String component) {
-		return EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
+	private static EdgeCreate edge(String parent, String component) {
+		return EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
 	}
 
 }

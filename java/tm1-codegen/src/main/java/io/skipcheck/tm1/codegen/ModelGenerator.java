@@ -40,6 +40,7 @@ import com.palantir.javapoet.TypeSpec;
 import com.palantir.javapoet.WildcardTypeName;
 import io.skipcheck.tm1.csdl.CsdlAnnotation;
 import io.skipcheck.tm1.csdl.CsdlDocument;
+import io.skipcheck.tm1.csdl.CsdlEntityContainer;
 import io.skipcheck.tm1.csdl.CsdlEntityType;
 import io.skipcheck.tm1.csdl.CsdlEnumType;
 import io.skipcheck.tm1.csdl.CsdlNavigationProperty;
@@ -179,6 +180,8 @@ public final class ModelGenerator {
 	/** Each subtype's root, by the subtype's qualified name. */
 	private final Map<String, CsdlStructuredType> roots = new HashMap<>();
 
+	private final Offers offers;
+
 	/**
 	 * A generator for {@code metadata}, with the bundled overlay.
 	 * @param metadata the {@code $metadata} document
@@ -227,8 +230,26 @@ public final class ModelGenerator {
 	 * @throws IllegalArgumentException if a type derives from a derived type
 	 */
 	public ModelGenerator(CsdlDocument metadata, Overlay overlay, Undeclared undeclared, Writes writes) {
+		this(metadata, overlay, undeclared, writes, Offers.NONE);
+	}
+
+	/**
+	 * A generator for {@code metadata}, with what a probe found, and the write types to
+	 * generate: only those {@code offers} lists, each with only its setters.
+	 * @param metadata the {@code $metadata} document, with the undeclared properties
+	 * added
+	 * @param overlay what TM1 does differently from {@code metadata}, with the undeclared
+	 * properties' departures
+	 * @param undeclared the undeclared properties, to tag
+	 * @param writes what writes do, for what a create needs and {@code from}
+	 * @param offers the write types and their setters; with none, every type gets a
+	 * patch, offering what the writes don't refuse
+	 * @throws IllegalArgumentException if a type derives from a derived type
+	 */
+	public ModelGenerator(CsdlDocument metadata, Overlay overlay, Undeclared undeclared, Writes writes, Offers offers) {
 		this.metadata = metadata;
 		this.writes = writes;
+		this.offers = offers;
 		overlay.departures().forEach((key, note) -> this.tags.put(key, new Departure("TYPE", List.of(), plain(note))));
 		overlay.lenientDates()
 			.forEach((key, note) -> this.tags.put(key, new Departure("LENIENT_DATE", List.of(), plain(note))));
@@ -274,6 +295,7 @@ public final class ModelGenerator {
 					t.annotations())));
 		});
 		metadata.structuredTypes()
+			.filter(this::patchable)
 			.sorted(Comparator.comparing(CsdlStructuredType::name))
 			.forEach(t -> files.add(file(revised(patch(t), t.annotations()))));
 		// Creates, for the entity types the probe has writes for, and the roots their
@@ -283,6 +305,7 @@ public final class ModelGenerator {
 			.sorted(Comparator.comparing(CsdlStructuredType::name))
 			.forEach(t -> files.add(file(revised(create(t), t.annotations()))));
 		files.add(file(catalog()));
+		files.add(file(readBindings()));
 		return files;
 	}
 
@@ -625,9 +648,23 @@ public final class ModelGenerator {
 			.orElse(type.name());
 	}
 
-	/** A setter or bind method of a patch builder, for one property. */
+	/**
+	 * A write type's property, for its setter and bind methods: {@code set} whether it
+	 * has its setter (for a navigation, the nested one), {@code bind} whether a
+	 * navigation has its {@code @odata.bind} one.
+	 */
 	private record PatchProperty(String method, TypeName type, String json, String doc, boolean navigation,
-			boolean collection, Revisions revisions) {
+			boolean collection, Revisions revisions, boolean set, boolean bind) {
+
+		PatchProperty(String method, TypeName type, String json, String doc, boolean navigation, boolean collection,
+				Revisions revisions) {
+			this(method, type, json, doc, navigation, collection, revisions, true, navigation);
+		}
+
+		PatchProperty offering(boolean set, boolean bind) {
+			return new PatchProperty(method, type, json, doc, navigation, collection, revisions, set, bind);
+		}
+
 	}
 
 	private List<PatchProperty> patchProperties(CsdlStructuredType type) {
@@ -725,7 +762,7 @@ public final class ModelGenerator {
 					+ ". {@code build()} checks what a create needs. {@code builder(read)} starts one from a read entity, to recreate it.\n\n<p>\n"
 					: "") + "A write of {@link " + record
 					+ "}: for a {@code PATCH}, only the properties set are sent, an explicit {@code null} included; for a {@code POST}, the new entity's properties, nested patches for deep inserts and {@code @odata.bind} references to existing entities.\n\n<p>\n"
-					+ (root != null ? "Extends {@link " + patchName(root).simpleName()
+					+ (root != null ? "Extends {@link " + (create ? createName(root) : patchName(root)).simpleName()
 							+ "} and sends {@code @odata.type} {@code " + typeId(type) + "}. " : "")
 					+ (extensible ? "Each subtype's patch extends this one. " : "")
 					+ "Generated from {@code $metadata}.\n");
@@ -852,15 +889,45 @@ public final class ModelGenerator {
 		if (subtypes == null) {
 			spec.addMethod(from(type, root, builder, create));
 		}
-		else if (!create) {
+		else if (create) {
+			// A hierarchy's root: its create starts from a read of any of its types, with
+			// that type's builder, which extends this one's
+			ClassName rootRecord = ClassName.get(PACKAGE, javaTypeName(type.name()));
+			CodeBlock.Builder cases = CodeBlock.builder();
+			for (CsdlStructuredType sub : subtypes.stream().filter(this::creatable).toList()) {
+				cases.beginControlFlow("if (read instanceof $T v)", ClassName.get(PACKAGE, javaTypeName(sub.name())))
+					.addStatement("return $T.builder(v)", createName(sub))
+					.endControlFlow();
+			}
+			cases.addStatement("throw new $T($S + read.getClass().getSimpleName() + $S)",
+					IllegalArgumentException.class, "A ", " has no create: TM1 makes none of its type");
+			spec.addMethod(MethodSpec.methodBuilder("builder")
+				.addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+				.addParameter(rootRecord, "read")
+				.returns(builder)
+				.addJavadoc(
+						"A create of what {@code read} holds that a {@code POST} applies, to recreate it, by its type: that type's {@code builder(read)}.\n@param read an entity read from TM1\n@return a builder\n@throws IllegalArgumentException if TM1 makes none of its type\n")
+				.addCode(cases.build())
+				.build());
+		}
+		else {
 			// A hierarchy's root: its patch reads a value of any of its types, by its
 			// type
 			ClassName rootRecord = ClassName.get(PACKAGE, javaTypeName(type.name()));
 			ClassName fallback = rootRecord.nestedClass(type.isAbstract() ? "Unknown" : "Plain");
 			spec.addMethod(from(type, null, builder, false, fallback));
+			// A subtype without a patch would reach the cast to the fallback below and
+			// fail at run time: refuse it here instead
+			for (CsdlStructuredType sub : subtypes) {
+				if (!sub.isAbstract() && !patchable(sub)) {
+					throw new IllegalStateException(name.simpleName() + " has a subtype without a patch, " + sub.name()
+							+ ", which its of() can't write: offer " + sub.name()
+							+ "Patch, or none of the hierarchy's");
+				}
+			}
 			// instanceof, not a switch on the type: the client is built for Java 17
 			CodeBlock.Builder cases = CodeBlock.builder();
-			for (CsdlStructuredType sub : subtypes) {
+			for (CsdlStructuredType sub : subtypes.stream().filter(this::patchable).toList()) {
 				cases.beginControlFlow("if (read instanceof $T v)", ClassName.get(PACKAGE, javaTypeName(sub.name())))
 					.addStatement("return $T.builder(v).build()", patchName(sub))
 					.endControlFlow();
@@ -886,11 +953,25 @@ public final class ModelGenerator {
 		if (!(type instanceof CsdlEntityType)) {
 			return false;
 		}
+		if (verifiedOnly()) {
+			return offers.get(type.name() + "Create") != null;
+		}
 		if (writes.get(type.name()) != null) {
 			return true;
 		}
 		List<CsdlStructuredType> subtypes = hierarchies.get(qualified(type));
 		return subtypes != null && subtypes.stream().anyMatch(s -> writes.get(s.name()) != null);
+	}
+
+	/**
+	 * Whether a type gets a patch: every type does, unless the offers say which (#338).
+	 */
+	private boolean patchable(CsdlStructuredType type) {
+		return !verifiedOnly() || offers.get(type.name() + "Patch") != null;
+	}
+
+	private boolean verifiedOnly() {
+		return !offers.builders().isEmpty();
 	}
 
 	private static ClassName createName(CsdlStructuredType type) {
@@ -903,6 +984,19 @@ public final class ModelGenerator {
 	 * a patch, what a PATCH doesn't reject or ignore, navigations included.
 	 */
 	private List<PatchProperty> writable(CsdlStructuredType level, CsdlStructuredType type, boolean create) {
+		if (verifiedOnly()) {
+			Map<String, Offers.Offer> offered = Objects.requireNonNullElse(
+					offers.get(type.name() + (create ? "Create" : "Patch")), Map.<String, Offers.Offer>of());
+			List<PatchProperty> out = new ArrayList<>();
+			for (PatchProperty p : patchProperties(level)) {
+				boolean set = offered.containsKey(p.json());
+				boolean bind = p.navigation() && offered.containsKey(p.json() + "@odata.bind");
+				if (set || bind) {
+					out.add(p.offering(set, bind));
+				}
+			}
+			return out;
+		}
 		return patchProperties(level).stream()
 			.filter(p -> create ? p.navigation() || creates(type, p.json()) : offersInPatch(type, p.json()))
 			.toList();
@@ -978,11 +1072,11 @@ public final class ModelGenerator {
 					? "A create of what {@code read} holds that a {@code POST} applies, to recreate it: change it with the builder's setters.\n"
 					: "A patch of what {@code read} holds that a {@code PATCH} applies, leaving out collections a {@code PATCH} appends to: change it with the builder's setters.\n")
 			.addJavadoc(
-					"Navigation properties aren't copied, nor nulls.\n@param read an entity read from TM1\n@return a builder\n")
+					"A navigation the read holds expanded is bound, where its targets' paths follow from it: an entity set's by key, an element's or member's by its {@code UniqueName}; one it doesn't hold, or a subset or a view (whose path the read can't tell), isn't, nor are nested ones or nulls.\n@param read an entity read from TM1\n@return a builder\n")
 			.addStatement("$T b = new $T()", builder, builder);
 		for (PatchProperty p : properties) {
 			String accessor = accessors.get(p.json());
-			if (p.navigation() || accessor == null || (!create && w != null && !w.patches(p.json()))) {
+			if (p.navigation() || !p.set() || accessor == null || (!create && w != null && !w.patches(p.json()))) {
 				continue;
 			}
 			CodeBlock value = convert(p, "read." + accessor + "()");
@@ -993,12 +1087,204 @@ public final class ModelGenerator {
 				.addStatement("b.$L($L)", p.method(), value)
 				.endControlFlow();
 		}
+		for (PatchProperty p : properties) {
+			String accessor = accessors.get(p.json());
+			if (p.navigation() && p.bind() && accessor != null) {
+				readBinding(type, p, accessor).ifPresent(from::addCode);
+			}
+		}
 		if (open(type) && accessors.containsKey(DYNAMIC)) {
 			from.beginControlFlow("if (read.$L() != null)", accessors.get(DYNAMIC))
 				.addStatement("read.$L().forEach(b::property)", accessors.get(DYNAMIC))
 				.endControlFlow();
 		}
 		return from.addStatement("return b").build();
+	}
+
+	/**
+	 * The code binding a navigation a read holds: by key for a target in an entity set,
+	 * by {@code UniqueName} for an element or a member; empty for any other (a subset,
+	 * public or private, or a view, whose cube the read doesn't say). A collection is
+	 * bound only when every member's path can be made.
+	 */
+	private Optional<CodeBlock> readBinding(CsdlStructuredType type, PatchProperty p, String accessor) {
+		CsdlNavigationProperty nav = null;
+		for (CsdlStructuredType level : metadata.typeHierarchy(qualified(type))) {
+			for (CsdlNavigationProperty n : level.navigationProperties()) {
+				if (n.name().equals(p.json())) {
+					nav = n;
+				}
+			}
+		}
+		if (nav == null) {
+			return Optional.empty();
+		}
+		Optional<CsdlStructuredType> target = metadata.structuredType(metadata.qualify(nav.type().name()));
+		if (target.isEmpty() || !(target.get() instanceof CsdlEntityType)) {
+			return Optional.empty();
+		}
+		String set = null;
+		List<String> key = List.of();
+		for (CsdlStructuredType level : metadata.typeHierarchy(qualified(target.get()))) {
+			if (level instanceof CsdlEntityType e && !e.key().isEmpty() && key.isEmpty()) {
+				key = e.key();
+			}
+			if (set == null) {
+				String q = qualified(level);
+				set = metadata.entityContainer()
+					.flatMap(c -> c.entitySets()
+						.stream()
+						.filter(s -> metadata.qualify(s.entityType()).equals(q))
+						.map(CsdlEntityContainer.EntitySet::name)
+						.findFirst())
+					.orElse(null);
+			}
+		}
+		String helper;
+		String argument;
+		String collectionName;
+		if (set != null && key.size() == 1) {
+			helper = nav.type().collection() ? "byKeys" : "byKey";
+			argument = componentName(key.get(0));
+			collectionName = set;
+		}
+		else if (target.get().name().equals("Element") || target.get().name().equals("Member")) {
+			helper = nav.type().collection() ? "allInHierarchy" : "inHierarchy";
+			argument = "uniqueName";
+			collectionName = target.get().name() + "s";
+		}
+		else {
+			return Optional.empty();
+		}
+		ClassName path = ODATA_PATH;
+		String bind = "bind" + capitalize(p.method());
+		CodeBlock.Builder code = CodeBlock.builder().beginControlFlow("if (read.$L() != null)", accessor);
+		if (nav.type().collection()) {
+			code.addStatement("$T[] targets = ReadBindings.$L($S, read.$L().stream().map(v -> v.$L()).toList())", path,
+					helper, collectionName, accessor, argument);
+		}
+		else {
+			code.addStatement("$T targets = ReadBindings.$L($S, read.$L().$L())", path, helper, collectionName,
+					accessor, argument);
+		}
+		code.beginControlFlow("if (targets != null)").addStatement("b.$L(targets)", bind).endControlFlow();
+		return Optional.of(code.endControlFlow().build());
+	}
+
+	/**
+	 * {@code ReadBindings}: the paths {@code builder(read)} binds a read's navigations
+	 * to, package-private to the generated model.
+	 */
+	private TypeSpec.Builder readBindings() {
+		TypeName nullablePath = ODATA_PATH.annotated(AnnotationSpec.builder(NULLABLE).build());
+		TypeName paths = ArrayTypeName.of(ODATA_PATH).annotated(AnnotationSpec.builder(NULLABLE).build());
+		TypeName nullableObject = ClassName.get(Object.class).annotated(AnnotationSpec.builder(NULLABLE).build());
+		TypeName keys = ParameterizedTypeName.get(ClassName.get(List.class),
+				WildcardTypeName.subtypeOf(nullableObject));
+		TypeName nullableString = ClassName.get(String.class).annotated(AnnotationSpec.builder(NULLABLE).build());
+		return TypeSpec.classBuilder("ReadBindings")
+			.addModifiers(Modifier.FINAL)
+			.addAnnotation(GENERATED)
+			.addJavadoc(
+					"The paths a write's {@code builder(read)} binds a read's navigations to: null where one can't be made.\n")
+			.addMethod(MethodSpec.constructorBuilder().addModifiers(Modifier.PRIVATE).build())
+			.addMethod(MethodSpec.methodBuilder("byKey")
+				.addModifiers(Modifier.STATIC)
+				.returns(nullablePath)
+				.addParameter(String.class, "set")
+				.addParameter(nullableObject, "key")
+				.addJavadoc("An entity in a set, by its key: {@code Dimensions('Region')}.\n")
+				.addStatement("return key == null ? null : $T.of(set).key(key)", ODATA_PATH)
+				.build())
+			.addMethod(MethodSpec.methodBuilder("byKeys")
+				.addModifiers(Modifier.STATIC)
+				.returns(paths)
+				.addParameter(String.class, "set")
+				.addParameter(keys, "keys")
+				.addJavadoc("Entities in a set, by their keys: null if any key is missing.\n")
+				.addStatement("$T[] out = new $T[keys.size()]", ODATA_PATH, ODATA_PATH)
+				.beginControlFlow("for (int i = 0; i < out.length; i++)")
+				.addStatement("$T path = byKey(set, keys.get(i))", nullablePath)
+				.beginControlFlow("if (path == null)")
+				.addStatement("return null")
+				.endControlFlow()
+				.addStatement("out[i] = path")
+				.endControlFlow()
+				.addStatement("return out")
+				.build())
+			.addMethod(MethodSpec.methodBuilder("inHierarchy")
+				.addModifiers(Modifier.STATIC)
+				.returns(nullablePath)
+				.addParameter(String.class, "collection")
+				.addParameter(nullableString, "uniqueName")
+				.addJavadoc(
+						"An element or member, by its {@code UniqueName}: {@code [d].[h].[e]}, or {@code [d].[e]} in the dimension's own hierarchy, with {@code ]]} for {@code ]}. Null for any other shape.\n")
+				.beginControlFlow("if (uniqueName == null)")
+				.addStatement("return null")
+				.endControlFlow()
+				.addStatement("$T<String> parts = new $T<>()", List.class, ArrayList.class)
+				.addStatement("int i = 0")
+				.beginControlFlow("while (i < uniqueName.length())")
+				.beginControlFlow("if (uniqueName.charAt(i) != '[')")
+				.addStatement("return null")
+				.endControlFlow()
+				.addStatement("$T part = new $T()", StringBuilder.class, StringBuilder.class)
+				.addStatement("int j = i + 1")
+				.beginControlFlow("while (true)")
+				.beginControlFlow("if (j >= uniqueName.length())")
+				.addStatement("return null")
+				.endControlFlow()
+				.addStatement("char c = uniqueName.charAt(j)")
+				.beginControlFlow("if (c == ']')")
+				.beginControlFlow("if (j + 1 < uniqueName.length() && uniqueName.charAt(j + 1) == ']')")
+				.addStatement("part.append(']')")
+				.addStatement("j += 2")
+				.addStatement("continue")
+				.endControlFlow()
+				.addStatement("break")
+				.endControlFlow()
+				.addStatement("part.append(c)")
+				.addStatement("j++")
+				.endControlFlow()
+				.addStatement("parts.add(part.toString())")
+				.addStatement("i = j + 1")
+				.beginControlFlow("if (i < uniqueName.length())")
+				.beginControlFlow("if (uniqueName.charAt(i) != '.')")
+				.addStatement("return null")
+				.endControlFlow()
+				.addStatement("i++")
+				.beginControlFlow("if (i == uniqueName.length())")
+				.addStatement("return null")
+				.endControlFlow()
+				.endControlFlow()
+				.endControlFlow()
+				.beginControlFlow("if (parts.size() == 2)")
+				.addStatement("parts.add(1, parts.get(0))")
+				.endControlFlow()
+				.beginControlFlow("if (parts.size() != 3)")
+				.addStatement("return null")
+				.endControlFlow()
+				.addStatement(
+						"return $T.of($S).key(parts.get(0)).nav($S).key(parts.get(1)).nav(collection).key(parts.get(2))",
+						ODATA_PATH, "Dimensions", "Hierarchies")
+				.build())
+			.addMethod(MethodSpec.methodBuilder("allInHierarchy")
+				.addModifiers(Modifier.STATIC)
+				.returns(paths)
+				.addParameter(String.class, "collection")
+				.addParameter(keys, "uniqueNames")
+				.addJavadoc("Elements or members, by their {@code UniqueName}s: null if any can't be made.\n")
+				.addStatement("$T[] out = new $T[uniqueNames.size()]", ODATA_PATH, ODATA_PATH)
+				.beginControlFlow("for (int i = 0; i < out.length; i++)")
+				.addStatement("Object name = uniqueNames.get(i)")
+				.addStatement("$T path = name instanceof String s ? inHierarchy(collection, s) : null", nullablePath)
+				.beginControlFlow("if (path == null)")
+				.addStatement("return null")
+				.endControlFlow()
+				.addStatement("out[i] = path")
+				.endControlFlow()
+				.addStatement("return out")
+				.build());
 	}
 
 	/**
@@ -1053,6 +1339,16 @@ public final class ModelGenerator {
 
 	private static void addPatchMethods(TypeSpec.Builder builder, ClassName builderName, PatchProperty property,
 			boolean inherited) {
+		if (property.set()) {
+			addSetter(builder, builderName, property, inherited);
+		}
+		if (property.bind()) {
+			addBinder(builder, builderName, property, inherited);
+		}
+	}
+
+	private static void addSetter(TypeSpec.Builder builder, ClassName builderName, PatchProperty property,
+			boolean inherited) {
 		TypeName nullable = property.type().annotated(AnnotationSpec.builder(NULLABLE).build());
 		MethodSpec.Builder set = MethodSpec.methodBuilder(property.method())
 			.addModifiers(Modifier.PUBLIC)
@@ -1074,9 +1370,10 @@ public final class ModelGenerator {
 			set.addStatement("this.values.put($S, $L)", property.json(), property.method());
 		}
 		builder.addMethod(set.addStatement("return this").build());
-		if (!property.navigation()) {
-			return;
-		}
+	}
+
+	private static void addBinder(TypeSpec.Builder builder, ClassName builderName, PatchProperty property,
+			boolean inherited) {
 		String bind = "bind" + capitalize(property.method());
 		MethodSpec.Builder bindMethod = MethodSpec.methodBuilder(bind)
 			.addModifiers(Modifier.PUBLIC)

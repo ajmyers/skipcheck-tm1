@@ -977,7 +977,7 @@
 			"args" : [
 				"Nightly",
 				{
-					"$patch" : "ChoreTaskPatch",
+					"$patch" : "ChoreTaskCreate",
 					"json" : {
 						"Process@odata.bind" : "Processes('Load')",
 						"Parameters" : [

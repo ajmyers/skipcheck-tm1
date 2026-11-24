@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
+import io.skipcheck.tm1.client.model.AdministrationSettingsPatch;
 import io.skipcheck.tm1.client.model.LogLevel;
 import io.skipcheck.tm1.client.model.Logger;
 import io.skipcheck.tm1.client.model.Server;
@@ -61,11 +62,16 @@ class ServerServiceTm1Test {
 		deprecated(read.name());
 
 		tm1.server()
-			.updateStaticConfiguration(ServerSettingsPatch.builder().serverName(fixed.serverName()).build())
+			.updateStaticConfiguration(ServerSettingsPatch.builder()
+				.administration(
+						AdministrationSettingsPatch.builder().serverName(fixed.administration().serverName()).build())
+				.build())
 			.block(WAIT);
 		assertThatThrownBy(() -> tm1.session()
-			.execute(Tm1Request.patch(ODataPath.of("ActiveConfiguration"),
-					ServerSettingsPatch.builder().serverName(active.serverName()).build()))
+			.execute(Tm1Request.patch(ODataPath.of("ActiveConfiguration"), ServerSettingsPatch.builder()
+				.administration(
+						AdministrationSettingsPatch.builder().serverName(active.administration().serverName()).build())
+				.build()))
 			.block(WAIT)).as("the active configuration is read only").isInstanceOf(Tm1BadRequestException.class);
 		assertThat(active.access().cam().clientPingCAMPassport().isString())
 			.as("a duration here, though declared Int32")

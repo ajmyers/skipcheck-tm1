@@ -57,10 +57,6 @@ class ProbedWritesCoverageTest {
 		for (Path probe : probes) {
 			JsonNode writes = JSON.readTree(probe.toFile()).path("writes");
 			for (String id : writes.propertyNames()) {
-				// Recorded, but not generated from yet (#338): no client writes it
-				if (!writes.path(id).path("generate").asBoolean(true)) {
-					continue;
-				}
 				// "Subset/dynamic" and "Subset/static" are both Subset's
 				String type = id.split("/", 2)[0];
 				for (String write : List.of("post", "patch")) {

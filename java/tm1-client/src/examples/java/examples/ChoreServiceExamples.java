@@ -12,8 +12,8 @@ import io.skipcheck.tm1.client.model.ChoreCreate;
 import io.skipcheck.tm1.client.model.ChoreExecutionMode;
 import io.skipcheck.tm1.client.model.ChorePatch;
 import io.skipcheck.tm1.client.model.ChoreTask;
+import io.skipcheck.tm1.client.model.ChoreTaskCreate;
 import io.skipcheck.tm1.client.model.ChoreTaskParameterPatch;
-import io.skipcheck.tm1.client.model.ChoreTaskPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import reactor.core.publisher.Mono;
 
@@ -27,7 +27,7 @@ final class ChoreServiceExamples {
 		// @start region = create
 		// A daily chore at 02:00 UTC, inactive until it's switched on. A task gives
 		// every parameter of its process a value.
-		ChoreTaskPatch loadActuals = ChoreTaskPatch.builder()
+		ChoreTaskCreate loadActuals = ChoreTaskCreate.builder()
 			.bindProcess(ODataPath.of("Processes").key("Load Sales"))
 			.parameters(List.of(ChoreTaskParameterPatch.builder().name("pVersion").value("Actual").build(),
 					ChoreTaskParameterPatch.builder().name("pYear").value(2026).build()))
@@ -48,7 +48,7 @@ final class ChoreServiceExamples {
 	Mono<Long> addTask(Tm1Client tm1) {
 		// @start region = add-task
 		// A task goes at the end; TM1 numbers the steps from 0
-		ChoreTaskPatch loadForecast = ChoreTaskPatch.builder()
+		ChoreTaskCreate loadForecast = ChoreTaskCreate.builder()
 			.bindProcess(ODataPath.of("Processes").key("Load Sales"))
 			.parameters(List.of(ChoreTaskParameterPatch.builder().name("pVersion").value("Forecast").build(),
 					ChoreTaskParameterPatch.builder().name("pYear").value(2026).build()))

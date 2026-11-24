@@ -98,7 +98,7 @@ public final class SubsetService {
 
 	/**
 	 * {@code POST …/Subsets}: creates a subset: static with {@code Elements@odata.bind}
-	 * ({@code SubsetPatch.Builder#bindElements}), dynamic with an {@code Expression}.
+	 * ({@code SubsetCreate.Builder#bindElements}), dynamic with an {@code Expression}.
 	 * @param dimension the dimension's name
 	 * @param hierarchy the hierarchy's name
 	 * @param scope where to create it

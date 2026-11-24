@@ -130,7 +130,6 @@
 				],
 				"objectName": "{p}Cube"
 			},
-			"generate": false,
 			"values": {
 				"ApplicationContext/Value": "{p}Titled"
 			}
@@ -157,7 +156,6 @@
 			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
 			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}ChoreRef'",
 			"assigned": "ID",
-			"generate": false,
 			"base": {
 				"@odata.type": "#ibm.tm1.api.v1.ChoreReference",
 				"Chore@odata.bind": "Chores('{p}Chore')"
@@ -200,7 +198,9 @@
 				"$comment": "A process other than the one the base binds",
 				"Process": "Processes('{p}View')"
 			},
-			"generate": false
+			"notRequired": [
+				"Parameters"
+			]
 		},
 		{
 			"id": "Cube",
@@ -227,7 +227,6 @@
 			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
 			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}CubeRef'",
 			"assigned": "ID",
-			"generate": false,
 			"base": {
 				"@odata.type": "#ibm.tm1.api.v1.CubeReference",
 				"Cube@odata.bind": "Cubes('{p}Cube')"
@@ -255,7 +254,6 @@
 			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
 			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}DimensionRef'",
 			"assigned": "ID",
-			"generate": false,
 			"base": {
 				"@odata.type": "#ibm.tm1.api.v1.DimensionReference",
 				"Dimension@odata.bind": "Dimensions('{p}Dim')"
@@ -276,7 +274,6 @@
 			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
 			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}Doc'",
 			"assigned": "ID",
-			"generate": false,
 			"base": {
 				"@odata.type": "#ibm.tm1.api.v1.Document"
 			},
@@ -319,8 +316,7 @@
 					"method": "DELETE",
 					"path": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Elements('{name}')"
 				}
-			],
-			"generate": false
+			]
 		},
 		{
 			"id": "Element",
@@ -340,7 +336,6 @@
 			"base": {
 				"@odata.type": "#ibm.tm1.api.v1.Folder"
 			},
-			"generate": false,
 			"values": {
 				"Attributes": {
 					"Caption": "A probe folder"
@@ -382,7 +377,6 @@
 					"Caption": "A probe link"
 				}
 			},
-			"generate": false,
 			"assigned": "ID"
 		},
 		{
@@ -415,8 +409,7 @@
 				"pt",
 				"ru",
 				"zh"
-			],
-			"generate": false
+			]
 		},
 		{
 			"id": "Logger",
@@ -425,8 +418,7 @@
 			"source": "Loggers('TM1.Server')",
 			"skip": [
 				"Name"
-			],
-			"generate": false
+			]
 		},
 		{
 			"id": "MDXView",
@@ -581,7 +573,6 @@
 			"source": "ProcessDebugContexts('{context}')/Breakpoints(0)",
 			"named": false,
 			"numbered": "ID",
-			"generate": false,
 			"base": {
 				"@odata.type": "#ibm.tm1.api.v1.ProcessDebugContextDataBreakpoint",
 				"Enabled": true,
@@ -637,7 +628,6 @@
 			"source": "ProcessDebugContexts('{context}')/Breakpoints(0)",
 			"named": false,
 			"numbered": "ID",
-			"generate": false,
 			"base": {
 				"@odata.type": "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint",
 				"Enabled": true,
@@ -697,7 +687,6 @@
 			"source": "ProcessDebugContexts('{context}')/Breakpoints(0)",
 			"named": false,
 			"numbered": "ID",
-			"generate": false,
 			"base": {
 				"@odata.type": "#ibm.tm1.api.v1.ProcessDebugContextLockBreakpoint",
 				"Enabled": true,
@@ -756,7 +745,6 @@
 			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
 			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}ProcessRef'",
 			"assigned": "ID",
-			"generate": false,
 			"base": {
 				"@odata.type": "#ibm.tm1.api.v1.ProcessReference",
 				"Process@odata.bind": "Processes('{p}Ascii')"
@@ -785,7 +773,6 @@
 			"singleton": true,
 			"source": "StaticConfiguration",
 			"skip": [],
-			"generate": false,
 			"values": {
 				"Administration/StartupChores": [
 					"{p}Chore"
@@ -835,7 +822,6 @@
 			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
 			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}SubsetRef'",
 			"assigned": "ID",
-			"generate": false,
 			"base": {
 				"@odata.type": "#ibm.tm1.api.v1.SubsetReference",
 				"Subset@odata.bind": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets('{p}Static')"
@@ -872,7 +858,6 @@
 			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
 			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}ViewRef'",
 			"assigned": "ID",
-			"generate": false,
 			"base": {
 				"@odata.type": "#ibm.tm1.api.v1.ViewReference",
 				"View@odata.bind": "Cubes('{p}Cube')/Views('{p}Native')"

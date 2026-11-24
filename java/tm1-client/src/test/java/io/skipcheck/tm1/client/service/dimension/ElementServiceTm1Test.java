@@ -26,7 +26,7 @@ import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.Edge;
-import io.skipcheck.tm1.client.model.EdgePatch;
+import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.Element;
 import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementPatch;
@@ -165,8 +165,8 @@ class ElementServiceTm1Test {
 		return ElementCreate.builder().name(name).type(type).build();
 	}
 
-	private static EdgePatch edge(String parent, String component) {
-		return EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
+	private static EdgeCreate edge(String parent, String component) {
+		return EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
 	}
 
 }

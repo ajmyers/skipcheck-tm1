@@ -127,8 +127,8 @@ class PayloadCaptureTest {
 				.name(NAME)
 				.elements(List.of(element("North", ElementType.NUMERIC), element("South", ElementType.NUMERIC),
 						element("Total", ElementType.CONSOLIDATED), element("Label", ElementType.STRING)))
-				.edges(List.of(EdgePatch.builder().parentName("Total").componentName("North").weight(1.0).build(),
-						EdgePatch.builder().parentName("Total").componentName("South").weight(1.0).build()))
+				.edges(List.of(EdgeCreate.builder().parentName("Total").componentName("North").weight(1.0).build(),
+						EdgeCreate.builder().parentName("Total").componentName("South").weight(1.0).build()))
 				.build()))
 			.build(), JsonNode.class)).block(WAIT);
 		session.execute(Tm1Request.post(ODataPath.of("Dimensions"),
@@ -210,7 +210,7 @@ class PayloadCaptureTest {
 					.active(false)
 					.executionMode(ChoreExecutionMode.SINGLE_COMMIT)
 					.frequency(Duration.ofDays(1))
-					.tasks(List.of(ChoreTaskPatch.builder()
+					.tasks(List.of(ChoreTaskCreate.builder()
 						.bindProcess(ODataPath.of("Processes").key(NAME))
 						.parameters(List.of(ChoreTaskParameterPatch.builder().name("pRegion").value("South").build()))
 						.build()))

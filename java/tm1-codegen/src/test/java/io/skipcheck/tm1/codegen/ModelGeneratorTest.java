@@ -3,6 +3,7 @@
 package io.skipcheck.tm1.codegen;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -10,6 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Stream;
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -138,7 +140,7 @@ class ModelGeneratorTest {
 	void generatesASealedInterfacePerHierarchyReadByOdataType() {
 		assertThat(sample().generate()).extracting(f -> f.typeSpec().name())
 			.containsExactly("CubeKind", "Box", "Cube", "NativeView", "View", "BoxPatch", "CubePatch",
-					"NativeViewPatch", "ViewPatch", "Tm1Operations");
+					"NativeViewPatch", "ViewPatch", "Tm1Operations", "ReadBindings");
 		String view = source(sample(), "View");
 		assertThat(view).contains("public sealed interface View permits NativeView, View.Unknown")
 			.contains(
@@ -168,8 +170,9 @@ class ModelGeneratorTest {
 		try (Stream<Path> walk = Files.walk(out)) {
 			sources = walk.filter(p -> p.toString().endsWith(".java")).toList();
 		}
-		assertThat(sources).as("31 enums, 122 records, 7 hierarchies, 129 patches, the catalog, package-info")
-			.hasSize(291);
+		assertThat(sources)
+			.as("31 enums, 122 records, 7 hierarchies, 129 patches, the catalog, the read bindings, package-info")
+			.hasSize(292);
 
 		JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
 		DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
@@ -208,6 +211,15 @@ class ModelGeneratorTest {
 			.as("inherited setters keep the subtype's builder")
 			.contains("@Override public Builder name(@Nullable String name) { super.name(name); return this; }")
 			.contains("@Override public NativeViewPatch build()");
+	}
+
+	@Test
+	void refusesARootPatchWhoseSubtypeHasNone() {
+		Offers offers = new Offers(Map.of("ViewPatch", Map.of("Name", new Offers.Offer("verified", "applied"))));
+		ModelGenerator generator = new ModelGenerator(CsdlParser.parse(SAMPLE), Overlay.NONE, Undeclared.NONE,
+				Writes.NONE, offers);
+		assertThatThrownBy(generator::generate).isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("ViewPatch has a subtype without a patch, NativeView");
 	}
 
 	@Test

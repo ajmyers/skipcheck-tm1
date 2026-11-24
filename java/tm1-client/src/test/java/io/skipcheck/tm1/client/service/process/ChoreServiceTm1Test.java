@@ -24,12 +24,12 @@ import io.skipcheck.tm1.client.model.ChoreCreate;
 import io.skipcheck.tm1.client.model.ChoreExecutionMode;
 import io.skipcheck.tm1.client.model.ChorePatch;
 import io.skipcheck.tm1.client.model.ChoreTask;
+import io.skipcheck.tm1.client.model.ChoreTaskCreate;
 import io.skipcheck.tm1.client.model.ChoreTaskParameterPatch;
 import io.skipcheck.tm1.client.model.ChoreTaskPatch;
 import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessParameterPatch;
-import io.skipcheck.tm1.client.model.ProcessVariableType;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
@@ -64,17 +64,8 @@ class ChoreServiceTm1Test {
 		tm1.processes()
 			.create(ProcessCreate.builder()
 				.name(process)
-				.parameters(List.of(
-						ProcessParameterPatch.builder()
-							.name("pName")
-							.value("")
-							.type(ProcessVariableType.STRING)
-							.build(),
-						ProcessParameterPatch.builder()
-							.name("pCount")
-							.value(0)
-							.type(ProcessVariableType.NUMERIC)
-							.build()))
+				.parameters(List.of(ProcessParameterPatch.builder().name("pName").value("").build(),
+						ProcessParameterPatch.builder().name("pCount").value(0).build()))
 				.prologProcedure("If(DimensionExists(pName) = 0);\n  DimensionCreate(pName);\nEndIf;\n")
 				.build())
 			.block(WAIT);
@@ -140,7 +131,7 @@ class ChoreServiceTm1Test {
 	void needsEveryProcessParameterInATask() {
 		assertThatThrownBy(() -> chores
 			.addTask(chore,
-					ChoreTaskPatch.builder()
+					ChoreTaskCreate.builder()
 						.bindProcess(ODataPath.of("Processes").key(process))
 						.parameters(List.of(parameter("pName", "x")))
 						.build())
@@ -182,8 +173,8 @@ class ChoreServiceTm1Test {
 		return Boolean.TRUE.equals(chores.get(chore, ODataQuery.none()).block(WAIT).active());
 	}
 
-	private ChoreTaskPatch task(String marker) {
-		return ChoreTaskPatch.builder()
+	private ChoreTaskCreate task(String marker) {
+		return ChoreTaskCreate.builder()
 			.bindProcess(ODataPath.of("Processes").key(process))
 			.parameters(List.of(parameter("pName", marker), parameter("pCount", 1)))
 			.build();

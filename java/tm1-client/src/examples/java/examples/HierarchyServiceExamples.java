@@ -5,7 +5,7 @@ package examples;
 import java.util.List;
 
 import io.skipcheck.tm1.client.Tm1Client;
-import io.skipcheck.tm1.client.model.EdgePatch;
+import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.Hierarchy;
@@ -30,8 +30,8 @@ final class HierarchyServiceExamples {
 				.elements(List.of(ElementCreate.builder().name("Smith").type(ElementType.CONSOLIDATED).build(),
 						ElementCreate.builder().name("North").type(ElementType.NUMERIC).build(),
 						ElementCreate.builder().name("South").type(ElementType.NUMERIC).build()))
-				.edges(List.of(EdgePatch.builder().parentName("Smith").componentName("North").weight(1.0).build(),
-						EdgePatch.builder().parentName("Smith").componentName("South").weight(1.0).build()))
+				.edges(List.of(EdgeCreate.builder().parentName("Smith").componentName("North").weight(1.0).build(),
+						EdgeCreate.builder().parentName("Smith").componentName("South").weight(1.0).build()))
 				.build());
 		// @end
 	}
@@ -45,8 +45,8 @@ final class HierarchyServiceExamples {
 		ElementCreate budget = ElementCreate.builder().name("Budget").type(ElementType.NUMERIC).build();
 		return tm1.hierarchies()
 			.replaceStructure("Version", "Version", List.of(all, actual, budget), List.of(
-					EdgePatch.builder().parentName("All Versions").componentName("Actual").weight(1.0).build(),
-					EdgePatch.builder().parentName("All Versions").componentName("Budget").weight(1.0).build()));
+					EdgeCreate.builder().parentName("All Versions").componentName("Actual").weight(1.0).build(),
+					EdgeCreate.builder().parentName("All Versions").componentName("Budget").weight(1.0).build()));
 		// @end
 	}
 

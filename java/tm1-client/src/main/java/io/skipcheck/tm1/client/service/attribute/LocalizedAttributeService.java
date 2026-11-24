@@ -6,7 +6,7 @@ import java.util.Objects;
 
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.LocalizedAttributes;
-import io.skipcheck.tm1.client.model.LocalizedAttributesPatch;
+import io.skipcheck.tm1.client.model.LocalizedAttributesCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.Tm1Endpoint;
@@ -106,7 +106,7 @@ public final class LocalizedAttributeService {
 	@Tm1Endpoint("Navigation View/LocalizedAttributes")
 	@Tm1Endpoint("Navigation Process/LocalizedAttributes")
 	@Tm1Endpoint("Navigation Chore/LocalizedAttributes")
-	public Mono<LocalizedAttributes> create(AttributeOwner owner, LocalizedAttributesPatch translations) {
+	public Mono<LocalizedAttributes> create(AttributeOwner owner, LocalizedAttributesCreate translations) {
 		return session.execute(Tm1Request.post(localized(owner), translations, LocalizedAttributes.class));
 	}
 

@@ -229,8 +229,7 @@
 						"Parameters" : [
 							{
 								"Name" : "p",
-								"Value" : "v",
-								"Type" : "String"
+								"Value" : "v"
 							}
 						],
 						"PrologProcedure" : "LogOutput('INFO', p);\n"
@@ -254,8 +253,7 @@
 								"Parameters" : [
 									{
 										"Name" : "p",
-										"Value" : "v",
-										"Type" : "String"
+										"Value" : "v"
 									}
 								],
 								"PrologProcedure" : "LogOutput('INFO', p);\n"
@@ -341,8 +339,7 @@
 						"Parameters" : [
 							{
 								"Name" : "p",
-								"Value" : "v",
-								"Type" : "String"
+								"Value" : "v"
 							}
 						],
 						"PrologProcedure" : "LogOutput('INFO', p);\n"
@@ -365,8 +362,7 @@
 							"Parameters" : [
 								{
 									"Name" : "p",
-									"Value" : "v",
-									"Type" : "String"
+									"Value" : "v"
 								}
 							],
 							"PrologProcedure" : "LogOutput('INFO', p);\n"
@@ -479,8 +475,7 @@
 						"Parameters" : [
 							{
 								"Name" : "p",
-								"Value" : "v",
-								"Type" : "String"
+								"Value" : "v"
 							}
 						],
 						"PrologProcedure" : "LogOutput('INFO', p);\n"
@@ -516,8 +511,7 @@
 								"Parameters" : [
 									{
 										"Name" : "p",
-										"Value" : "v",
-										"Type" : "String"
+										"Value" : "v"
 									}
 								],
 								"PrologProcedure" : "LogOutput('INFO', p);\n"

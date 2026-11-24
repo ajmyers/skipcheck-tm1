@@ -4,8 +4,6 @@ package io.skipcheck.tm1.client.service.annotation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,10 +15,11 @@ import io.skipcheck.tm1.client.conformance.Conformance;
 import io.skipcheck.tm1.client.conformance.ConformanceTm1;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.Annotation;
+import io.skipcheck.tm1.client.model.AnnotationCreate;
 import io.skipcheck.tm1.client.model.AnnotationPatch;
 import io.skipcheck.tm1.client.model.ApplicationContextFacet;
 import io.skipcheck.tm1.client.model.ApplicationContextFacetValue;
-import io.skipcheck.tm1.client.model.ApplicationContextFacetValuePatch;
+import io.skipcheck.tm1.client.model.ApplicationContextFacetValueCreate;
 import io.skipcheck.tm1.client.model.Attachment;
 import io.skipcheck.tm1.client.model.Member;
 import io.skipcheck.tm1.client.odata.Filter;
@@ -121,9 +120,9 @@ class AnnotationServiceTest {
 	void createsAnAnnotationBuiltByHand() {
 		tm1().json(201, "{\"ID\":\"C}Sales~a\",\"Text\":\"by hand\"}");
 		Annotation made = conformance.call("annotations", "create",
-				AnnotationPatch.builder()
+				AnnotationCreate.builder()
 					.text("by hand")
-					.applicationContext(List.of(ApplicationContextFacetValuePatch.builder()
+					.applicationContext(List.of(ApplicationContextFacetValueCreate.builder()
 						.bindFacet(ODataPath.of("ApplicationContextFacets").key("}Cubes"))
 						.value("Sales")
 						.build()))
@@ -149,13 +148,6 @@ class AnnotationServiceTest {
 		assertThat(patch.text()).isEqualTo("{\"Text\":\"second note\",\"commentValue\":\"second note\"}");
 		assertThat(patch.header("If-Match")).isNull();
 
-		tm1().status(204);
-		conformance.call("annotations", "update", ID,
-				AnnotationPatch.builder()
-					.lastUpdated(OffsetDateTime.of(2026, 1, 2, 3, 4, 0, 120_000_000, ZoneOffset.ofHoursMinutes(5, 30)))
-					.created(OffsetDateTime.of(2026, 1, 2, 3, 4, 5, 0, ZoneOffset.UTC))
-					.build());
-		assertThat(tm1().last().json().get("Created").asString()).startsWith("2026-01-02T03:04");
 	}
 
 	@Test

@@ -14,6 +14,7 @@ import io.skipcheck.tm1.client.model.Chore;
 import io.skipcheck.tm1.client.model.ChoreCreate;
 import io.skipcheck.tm1.client.model.ChorePatch;
 import io.skipcheck.tm1.client.model.ChoreTask;
+import io.skipcheck.tm1.client.model.ChoreTaskCreate;
 import io.skipcheck.tm1.client.model.ChoreTaskPatch;
 import io.skipcheck.tm1.client.model.Process;
 import io.skipcheck.tm1.client.model.Tm1Operations;
@@ -29,7 +30,7 @@ import reactor.core.publisher.Mono;
  * and running them now.
  *
  * <p>
- * A task binds a process ({@code ChoreTaskPatch.Builder#bindProcess}) and gives each of
+ * A task binds a process ({@code ChoreTaskCreate.Builder#bindProcess}) and gives each of
  * its parameters a value; its {@code Step}, its place in the chore, is TM1's to number.
  *
  * <p>
@@ -145,7 +146,7 @@ public final class ChoreService {
 	 * @return the task as created, with the {@code Step} TM1 gave it
 	 */
 	@Tm1Endpoint("Navigation Chore/Tasks")
-	public Mono<ChoreTask> addTask(String name, ChoreTaskPatch task) {
+	public Mono<ChoreTask> addTask(String name, ChoreTaskCreate task) {
 		return session.execute(Tm1Request.post(chore(name).nav("Tasks"), task, ChoreTask.class));
 	}
 

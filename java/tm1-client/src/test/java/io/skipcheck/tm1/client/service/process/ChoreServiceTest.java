@@ -22,6 +22,7 @@ import io.skipcheck.tm1.client.model.ChoreCreate;
 import io.skipcheck.tm1.client.model.ChoreExecutionMode;
 import io.skipcheck.tm1.client.model.ChorePatch;
 import io.skipcheck.tm1.client.model.ChoreTask;
+import io.skipcheck.tm1.client.model.ChoreTaskCreate;
 import io.skipcheck.tm1.client.model.ChoreTaskParameterPatch;
 import io.skipcheck.tm1.client.model.ChoreTaskPatch;
 import io.skipcheck.tm1.client.model.Process;
@@ -43,8 +44,8 @@ class ChoreServiceTest {
 		return conformance.tm1();
 	}
 
-	private static ChoreTaskPatch task(String process, String version) {
-		return ChoreTaskPatch.builder()
+	private static ChoreTaskCreate task(String process, String version) {
+		return ChoreTaskCreate.builder()
 			.bindProcess(ODataPath.of("Processes").key(process))
 			.parameters(List.of(ChoreTaskParameterPatch.builder().name("pVersion").value(version).build(),
 					ChoreTaskParameterPatch.builder().name("pYear").value(2026).build()))

@@ -6,7 +6,7 @@ import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Attributes;
 import io.skipcheck.tm1.client.model.AttributesPatch;
 import io.skipcheck.tm1.client.model.LocalizedAttributes;
-import io.skipcheck.tm1.client.model.LocalizedAttributesPatch;
+import io.skipcheck.tm1.client.model.LocalizedAttributesCreate;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.attribute.AttributeOwner;
 import reactor.core.publisher.Mono;
@@ -25,7 +25,7 @@ final class LocalizedAttributeServiceExamples {
 		// locale's translations are created once: TM1 can't change them here.
 		return tm1.localizedAttributes()
 			.create(AttributeOwner.element("Region", "Region", "North"),
-					LocalizedAttributesPatch.builder()
+					LocalizedAttributesCreate.builder()
 						.localeID("fr")
 						.attributes(AttributesPatch.builder().property("Long Name", "Région Nord").build())
 						.build());

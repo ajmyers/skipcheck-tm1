@@ -16,6 +16,7 @@ import io.skipcheck.tm1.client.model.AdministrationSettingsPatch;
 import io.skipcheck.tm1.client.model.Configuration;
 import io.skipcheck.tm1.client.model.LogLevel;
 import io.skipcheck.tm1.client.model.Logger;
+import io.skipcheck.tm1.client.model.LoggerPatch;
 import io.skipcheck.tm1.client.model.Server;
 import io.skipcheck.tm1.client.model.ServerSettings;
 import io.skipcheck.tm1.client.model.ServerSettingsPatch;
@@ -82,7 +83,9 @@ class ServerServiceTest {
 	void aSettingTm1RefusesFails() {
 		tm1().error(400, "278", "Invalid value for ServerName");
 		conformance.fail("server", "updateStaticConfiguration",
-				ServerSettingsPatch.builder().serverName("renamed").build());
+				ServerSettingsPatch.builder()
+					.administration(AdministrationSettingsPatch.builder().serverName("renamed").build())
+					.build());
 	}
 
 	@Test
@@ -105,6 +108,14 @@ class ServerServiceTest {
 
 		tm1().status(204);
 		conformance.call("server", "setLoggerLevel", "TM1.Process", LogLevel.DEBUG);
+		assertThat(tm1().last().key()).isEqualTo("PATCH Loggers('TM1.Process')");
+		assertThat(tm1().last().text()).isEqualTo("{\"Level\":\"Debug\"}");
+	}
+
+	@Test
+	void updatesALoggerWithAPatch() {
+		tm1().status(204);
+		conformance.call("server", "updateLogger", "TM1.Process", LoggerPatch.builder().level(LogLevel.DEBUG).build());
 		assertThat(tm1().last().key()).isEqualTo("PATCH Loggers('TM1.Process')");
 		assertThat(tm1().last().text()).isEqualTo("{\"Level\":\"Debug\"}");
 	}

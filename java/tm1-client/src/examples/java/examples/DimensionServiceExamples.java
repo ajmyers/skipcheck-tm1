@@ -7,7 +7,7 @@ import java.util.List;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Dimension;
 import io.skipcheck.tm1.client.model.DimensionCreate;
-import io.skipcheck.tm1.client.model.EdgePatch;
+import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.Hierarchy;
@@ -43,8 +43,8 @@ final class DimensionServiceExamples {
 				.hierarchies(List.of(HierarchyCreate.builder()
 					.name("Region")
 					.elements(List.of(total, north, south))
-					.edges(List.of(EdgePatch.builder().parentName("Total").componentName("North").weight(1.0).build(),
-							EdgePatch.builder().parentName("Total").componentName("South").weight(1.0).build()))
+					.edges(List.of(EdgeCreate.builder().parentName("Total").componentName("North").weight(1.0).build(),
+							EdgeCreate.builder().parentName("Total").componentName("South").weight(1.0).build()))
 					.build()))
 				.build());
 		// @end

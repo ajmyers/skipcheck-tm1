@@ -17,6 +17,7 @@ import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Process;
 import io.skipcheck.tm1.client.model.ProcessDebugContext;
 import io.skipcheck.tm1.client.model.ProcessDebugContextBreakpoint;
+import io.skipcheck.tm1.client.model.ProcessDebugContextBreakpointCreate;
 import io.skipcheck.tm1.client.model.ProcessDebugContextBreakpointPatch;
 import io.skipcheck.tm1.client.model.ProcessDebugContextStackFrame;
 import io.skipcheck.tm1.client.model.ProcessDebugContextStatus;
@@ -222,8 +223,8 @@ public final class ProcessDebugService {
 	}
 
 	/**
-	 * {@code POST …/Breakpoints}: adds a breakpoint, its kind given by the patch
-	 * ({@code ProcessDebugContextLineBreakpointPatch}, …Data…, …Lock…).
+	 * {@code POST …/Breakpoints}: adds a breakpoint, its kind given by the create
+	 * ({@code ProcessDebugContextLineBreakpointCreate}, …Data…, …Lock…).
 	 *
 	 * <p>
 	 * The caller chooses the breakpoint's {@code ID}: TM1 (11.8) stores one sent without
@@ -233,10 +234,11 @@ public final class ProcessDebugService {
 	 * @param breakpoint the breakpoint, with an {@code ID} of 0 or more, unique in the
 	 * context
 	 * @return the breakpoint as created
-	 * @throws IllegalArgumentException if the patch has no {@code ID} of 0 or more
+	 * @throws IllegalArgumentException if the create has no {@code ID} of 0 or more
 	 */
 	@Tm1Endpoint("Navigation ProcessDebugContext/Breakpoints")
-	public Mono<ProcessDebugContextBreakpoint> addBreakpoint(String id, ProcessDebugContextBreakpointPatch breakpoint) {
+	public Mono<ProcessDebugContextBreakpoint> addBreakpoint(String id,
+			ProcessDebugContextBreakpointCreate breakpoint) {
 		if (!(breakpoint.json().get("ID") instanceof Number number) || number.longValue() < 0) {
 			throw new IllegalArgumentException(
 					"A breakpoint needs an ID of 0 or more: TM1 stores one without as -1, which can't be changed or removed");

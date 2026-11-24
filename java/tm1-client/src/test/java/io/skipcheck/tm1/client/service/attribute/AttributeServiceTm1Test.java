@@ -29,7 +29,7 @@ import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.LocalizedAttributes;
-import io.skipcheck.tm1.client.model.LocalizedAttributesPatch;
+import io.skipcheck.tm1.client.model.LocalizedAttributesCreate;
 import io.skipcheck.tm1.client.model.SubsetCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -142,7 +142,7 @@ class AttributeServiceTm1Test {
 		try {
 			localized
 				.create(owner,
-						LocalizedAttributesPatch.builder()
+						LocalizedAttributesCreate.builder()
 							.localeID("fr")
 							.attributes(AttributesPatch.builder().property(label, "Nord").build())
 							.build())
@@ -153,7 +153,7 @@ class AttributeServiceTm1Test {
 				.block(WAIT)).contains("fr");
 			assertThat(value(reader, label)).isEqualTo("Nord");
 
-			LocalizedAttributesPatch changed = LocalizedAttributesPatch.builder()
+			LocalizedAttributesCreate changed = LocalizedAttributesCreate.builder()
 				.localeID("fr")
 				.attributes(AttributesPatch.builder().property(label, "Le Nord").build())
 				.build();
@@ -175,14 +175,18 @@ class AttributeServiceTm1Test {
 	void needsTheAttributeDefinedAndRefusesWritesThroughAMember() {
 		assertThatThrownBy(() -> tm1.localizedAttributes()
 			.create(AttributeOwner.element(d, d, "North"),
-					LocalizedAttributesPatch.builder()
+					LocalizedAttributesCreate.builder()
 						.localeID("fr")
 						.attributes(AttributesPatch.builder().caption("Nord").build())
 						.build())
 			.block(WAIT)).as("Caption isn't an attribute until it's defined")
 			.isInstanceOf(Tm1BadRequestException.class);
 		assertThatThrownBy(() -> tm1.localizedAttributes()
-			.create(AttributeOwner.member(d, d, "North"), LocalizedAttributesPatch.builder().localeID("fr").build())
+			.create(AttributeOwner.member(d, d, "North"),
+					LocalizedAttributesCreate.builder()
+						.localeID("fr")
+						.attributes(AttributesPatch.builder().caption("Nord").build())
+						.build())
 			.block(WAIT)).as("POST not supported on a member's").isInstanceOf(Tm1BadRequestException.class);
 	}
 

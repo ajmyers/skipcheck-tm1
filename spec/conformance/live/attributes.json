@@ -36,7 +36,7 @@
 			"service" : "localizedAttributes",
 			"method" : "create",
 			"params" : [ "owner", "translations" ],
-			"args" : [ { "$type" : "AttributeOwner", "factory" : "element", "args" : [ "${dimension}", "${dimension}", "North" ] }, { "$patch" : "LocalizedAttributesPatch", "json" : { "LocaleID" : "fr", "Attributes" : { "${label}" : "Nord" } } } ],
+			"args" : [ { "$type" : "AttributeOwner", "factory" : "element", "args" : [ "${dimension}", "${dimension}", "North" ] }, { "$patch" : "LocalizedAttributesCreate", "json" : { "LocaleID" : "fr", "Attributes" : { "${label}" : "Nord" } } } ],
 			"expect" : { "fields" : { "LocaleID" : "fr" } }
 		},
 		{
@@ -57,7 +57,7 @@
 			"service" : "localizedAttributes",
 			"method" : "create",
 			"params" : [ "owner", "translations" ],
-			"args" : [ { "$type" : "AttributeOwner", "factory" : "element", "args" : [ "${dimension}", "${dimension}", "North" ] }, { "$patch" : "LocalizedAttributesPatch", "json" : { "LocaleID" : "fr", "Attributes" : { "${label}" : "Le Nord" } } } ],
+			"args" : [ { "$type" : "AttributeOwner", "factory" : "element", "args" : [ "${dimension}", "${dimension}", "North" ] }, { "$patch" : "LocalizedAttributesCreate", "json" : { "LocaleID" : "fr", "Attributes" : { "${label}" : "Le Nord" } } } ],
 			"expect" : { "error" : { "category" : "api", "status" : 400 } }
 		},
 		{
@@ -71,7 +71,7 @@
 			"service" : "localizedAttributes",
 			"method" : "create",
 			"params" : [ "owner", "translations" ],
-			"args" : [ { "$type" : "AttributeOwner", "factory" : "hierarchy", "args" : [ "${dimension}", "${dimension}" ] }, { "$patch" : "LocalizedAttributesPatch", "json" : { "LocaleID" : "de", "Attributes" : { "${code}" : "Region" } } } ],
+			"args" : [ { "$type" : "AttributeOwner", "factory" : "hierarchy", "args" : [ "${dimension}", "${dimension}" ] }, { "$patch" : "LocalizedAttributesCreate", "json" : { "LocaleID" : "de", "Attributes" : { "${code}" : "Region" } } } ],
 			"expect" : { "fields" : { "LocaleID" : "de" } }
 		},
 		{

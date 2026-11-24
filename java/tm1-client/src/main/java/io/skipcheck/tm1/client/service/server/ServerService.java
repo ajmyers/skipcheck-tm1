@@ -9,6 +9,7 @@ import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Configuration;
 import io.skipcheck.tm1.client.model.LogLevel;
 import io.skipcheck.tm1.client.model.Logger;
+import io.skipcheck.tm1.client.model.LoggerPatch;
 import io.skipcheck.tm1.client.model.Server;
 import io.skipcheck.tm1.client.model.ServerSettings;
 import io.skipcheck.tm1.client.model.ServerSettingsPatch;
@@ -141,6 +142,19 @@ public final class ServerService {
 	public Mono<Void> setLoggerLevel(String name, LogLevel level) {
 		return session.execute(Tm1Request.patch(LOGGERS.key(Objects.requireNonNull(name, "name")),
 				Map.of("Level", Objects.requireNonNull(level.json(), "level"))));
+	}
+
+	/**
+	 * {@code PATCH Loggers('name')}: changes a logger, at once. TM1 (11.8) changes only
+	 * its {@code Level}, which {@link #setLoggerLevel} sets as well.
+	 * @param name the logger's name
+	 * @param patch the changes
+	 * @return completes when it's changed
+	 */
+	@Tm1Endpoint("EntitySet Loggers")
+	public Mono<Void> updateLogger(String name, LoggerPatch patch) {
+		return session.execute(Tm1Request.patch(LOGGERS.key(Objects.requireNonNull(name, "name")),
+				Objects.requireNonNull(patch, "patch")));
 	}
 
 }

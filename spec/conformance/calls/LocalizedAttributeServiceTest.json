@@ -24,9 +24,12 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
-						"LocaleID" : "fr"
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord"
+						}
 					}
 				}
 			],
@@ -42,7 +45,10 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"LocaleID" : "fr"
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord"
+							}
 						}
 					},
 					"response" : {
@@ -86,9 +92,12 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
-						"LocaleID" : "fr"
+						"LocaleID" : "fr",
+						"Attributes" : {
+							"Caption" : "Nord"
+						}
 					}
 				}
 			],
@@ -104,7 +113,10 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"LocaleID" : "fr"
+							"LocaleID" : "fr",
+							"Attributes" : {
+								"Caption" : "Nord"
+							}
 						}
 					},
 					"response" : {
@@ -201,7 +213,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "fr",
 						"Attributes" : {
@@ -274,7 +286,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "fr",
 						"Attributes" : {
@@ -348,7 +360,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "fr",
 						"Attributes" : {
@@ -422,7 +434,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "fr",
 						"Attributes" : {
@@ -501,7 +513,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "fr",
 						"Attributes" : {
@@ -580,7 +592,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "fr",
 						"Attributes" : {
@@ -652,7 +664,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "fr",
 						"Attributes" : {
@@ -730,7 +742,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "fr",
 						"Attributes" : {
@@ -808,7 +820,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "fr",
 						"Attributes" : {
@@ -880,7 +892,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "fr",
 						"Attributes" : {
@@ -952,7 +964,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "fr",
 						"Attributes" : {
@@ -1024,7 +1036,7 @@
 					]
 				},
 				{
-					"$patch" : "LocalizedAttributesPatch",
+					"$patch" : "LocalizedAttributesCreate",
 					"json" : {
 						"LocaleID" : "de",
 						"Attributes" : {
