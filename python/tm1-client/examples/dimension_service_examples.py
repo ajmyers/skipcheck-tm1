@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from skipcheck_tm1 import ODataQuery, Tm1Client
-from skipcheck_tm1.model import Dimension, DimensionCreate, EdgePatch, ElementCreate, ElementType, Hierarchy, HierarchyCreate
+from skipcheck_tm1.model import Dimension, DimensionCreate, EdgeCreate, ElementCreate, ElementType, Hierarchy, HierarchyCreate
 
 
 def list_names(tm1: Tm1Client) -> list[str | None]:
@@ -22,7 +22,7 @@ def create(tm1: Tm1Client) -> Dimension:
     total = ElementCreate.builder().name("Total").type(ElementType.CONSOLIDATED).build()
     north = ElementCreate.builder().name("North").type(ElementType.NUMERIC).build()
     south = ElementCreate.builder().name("South").type(ElementType.NUMERIC).build()
-    edges = [EdgePatch.builder().parent_name("Total").component_name(leaf).weight(1.0).build() for leaf in ("North", "South")]
+    edges = [EdgeCreate.builder().parent_name("Total").component_name(leaf).weight(1.0).build() for leaf in ("North", "South")]
     hierarchy = HierarchyCreate.builder().name("Region").elements([total, north, south]).edges(edges).build()
     return tm1.dimensions.create(DimensionCreate.builder().name("Region").hierarchies([hierarchy]).build())
     # @end

@@ -14,7 +14,7 @@ import pytest
 from skipcheck_tm1 import ODataQuery
 from skipcheck_tm1.aio.services.attribute import AttributeOwner, AttributeSet
 from skipcheck_tm1.aio.services.dimension import SubsetScope
-from skipcheck_tm1.model import AttributeDefinition, AttributeDefinitionCreate, AttributesPatch, AttributeType, LocalizedAttributesPatch
+from skipcheck_tm1.model import AttributeDefinition, AttributeDefinitionCreate, AttributesPatch, AttributeType, LocalizedAttributesCreate
 
 from ..conftest import Api, FakeTm1, target
 
@@ -86,7 +86,7 @@ def test_translations_of_every_owner(api: Api, fake: FakeTm1, owner: AttributeOw
     # Attributes other than Caption come back as undeclared (open type) properties
     assert french.attributes.caption == "Nord"
     assert french.attributes.model_extra["Long Name"] == "Région Nord"
-    patch = LocalizedAttributesPatch.builder().locale_id("fr").attributes(AttributesPatch.builder().property("Long Name", "Région Nord").build()).build()
+    patch = LocalizedAttributesCreate.builder().locale_id("fr").attributes(AttributesPatch.builder().property("Long Name", "Région Nord").build()).build()
     api.run(api.client.localized_attributes.create(owner, patch))
     assert (target(fake.last), body(fake.last)) == (
         f"POST {path}/LocalizedAttributes",

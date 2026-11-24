@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from skipcheck_tm1 import Tm1Client
-from skipcheck_tm1.model import Edge, EdgePatch
+from skipcheck_tm1.model import Edge, EdgeCreate, EdgePatch
 
 
 def list_edges(tm1: Tm1Client) -> list[str]:
@@ -25,7 +25,7 @@ def reweight(tm1: Tm1Client) -> None:
 def move(tm1: Tm1Client) -> Edge:
     # @start region = move
     # Move North from Total to Total Sales: add the new edge, then delete the old
-    edge = tm1.edges.create("Region", "Region", EdgePatch.builder().parent_name("Total Sales").component_name("North").weight(1.0).build())
+    edge = tm1.edges.create("Region", "Region", EdgeCreate.builder().parent_name("Total Sales").component_name("North").weight(1.0).build())
     tm1.edges.delete("Region", "Region", "Total", "North")
     return edge
     # @end

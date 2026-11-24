@@ -110,6 +110,12 @@ class ServerService(Service):
         body = {"Level": level.value}
         await self._session.execute(Tm1Request.patch(_LOGGERS.key(_require(name, "name")), body))
 
+    @endpoint("EntitySet Loggers")
+    async def update_logger(self, name: str, patch: Any) -> None:
+        """``PATCH Loggers('name')``: changes a logger (a ``LoggerPatch``), at once. TM1 (11.8) changes
+        only its ``Level``, which :meth:`set_logger_level` sets as well."""
+        await self._session.execute(Tm1Request.patch(_LOGGERS.key(_require(name, "name")), _require(patch, "patch")))
+
 
 class LogService(Service):
     """The server's logs: the message log, the transaction log (cell changes), the audit log

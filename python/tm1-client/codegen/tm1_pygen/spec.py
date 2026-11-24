@@ -53,6 +53,12 @@ class Spec:
     def endpoints(self) -> list[dict[str, Any]]:
         return self.doc["endpoints"]
 
+    @property
+    def offers(self) -> dict[str, dict[str, Any]]:
+        """Per write type (``CubeCreate``), the setters it offers, each with why (verified, kept); none
+        in a spec from before the probe verified them."""
+        return self.doc.get("offers", {})
+
     # Lookups
 
     @cached_property

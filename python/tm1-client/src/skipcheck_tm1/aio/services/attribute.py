@@ -115,7 +115,7 @@ class LocalizedAttributeService(Service):
     translations are created once: TM1 can't change them here)::
 
         await tm1.localized_attributes.create(AttributeOwner.element("Region", "Region", "North"),
-            LocalizedAttributesPatch.builder()
+            LocalizedAttributesCreate.builder()
             .locale_id("fr")
             .attributes(AttributesPatch.builder().property("Long Name", "Région Nord").build())
             .build())

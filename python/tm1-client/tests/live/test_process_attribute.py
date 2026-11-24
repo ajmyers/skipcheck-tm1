@@ -15,7 +15,7 @@ from skipcheck_tm1._sync.services.attribute import AttributeOwner, AttributeSet
 from skipcheck_tm1.model import (
     ChoreCreate,
     ChoreExecutionMode,
-    ChoreTaskPatch,
+    ChoreTaskCreate,
     ProcessCreate,
 )
 
@@ -43,7 +43,7 @@ def process_and_chore(tm1: Tm1Client, name: str) -> Iterator[tuple[str, str]]:
             .active(False)
             .execution_mode(ChoreExecutionMode.SINGLE_COMMIT)
             .frequency(timedelta(days=1))
-            .tasks([ChoreTaskPatch.builder().bind_process(ODataPath.of("Processes").key(process)).build()])
+            .tasks([ChoreTaskCreate.builder().bind_process(ODataPath.of("Processes").key(process)).build()])
             .build()
         )
         try:

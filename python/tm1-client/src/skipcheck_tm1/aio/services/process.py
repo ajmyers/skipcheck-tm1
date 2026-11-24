@@ -111,8 +111,8 @@ class ProcessService(Service):
             ProcessCreate.builder()
             .name("Load Sales")
             .parameters([
-                ProcessParameterPatch.builder().name("pVersion").value("Actual").type(ProcessVariableType.STRING).build(),
-                ProcessParameterPatch.builder().name("pYear").value(2026).type(ProcessVariableType.NUMERIC).build(),
+                ProcessParameterPatch.builder().name("pVersion").value("Actual").build(),
+                ProcessParameterPatch.builder().name("pYear").value(2026).build(),
             ])
             .prolog_procedure("LogOutput('INFO', 'Loading ' | pVersion | ' for ' | NumberToString(pYear));\\n")
             .build()
@@ -295,7 +295,7 @@ class ProcessDebugService(Service):
 
         async def where(context):
             line3 = (
-                ProcessDebugContextLineBreakpointPatch.builder()
+                ProcessDebugContextLineBreakpointCreate.builder()
                 .id(1)  # TM1 needs an ID chosen by the caller
                 .process_name("Load Sales").procedure(ProcessProcedure.PROLOG).line_number(3).enabled(True)
                 .build()
@@ -393,12 +393,12 @@ class ProcessDebugService(Service):
 
     @endpoint("Navigation ProcessDebugContext/Breakpoints")
     async def add_breakpoint(self, id: str, breakpoint: Any) -> ProcessDebugContextBreakpoint:
-        """``POST …/Breakpoints``: adds a breakpoint, its kind given by the patch
-        (``ProcessDebugContextLineBreakpointPatch``, …Data…, …Lock…).
+        """``POST …/Breakpoints``: adds a breakpoint, its kind given by the create
+        (``ProcessDebugContextLineBreakpointCreate``, …Data…, …Lock…).
 
         The caller chooses the breakpoint's ``ID``: TM1 (11.8) stores one sent without an ID
         as -1, which it then refuses in a path, so it can't be changed or removed, and a
-        second one without an ID conflicts (409). Raises ``ValueError`` if the patch has no
+        second one without an ID conflicts (409). Raises ``ValueError`` if the create has no
         ``ID`` of 0 or more."""
         body = body_of(_require(breakpoint, "breakpoint"))
         number = body.get("ID") if isinstance(body, dict) else None
@@ -471,14 +471,14 @@ class ChoreService(Service):
     """Chores: scheduled runs of processes, as ordered tasks. ``/Chores``, their tasks, and
     running them now.
 
-    A task binds a process (``ChoreTaskPatch.Builder.bind_process``) and gives each of its
+    A task binds a process (``ChoreTaskCreate.Builder.bind_process``) and gives each of its
     parameters a value; its ``Step``, its place in the chore, is TM1's to number (from 0,
     renumbered when one is removed).
 
     Create a daily chore with one task::
 
         load_actuals = (
-            ChoreTaskPatch.builder()
+            ChoreTaskCreate.builder()
             .bind_process(ODataPath.of("Processes").key("Load Sales"))
             .parameters([
                 ChoreTaskParameterPatch.builder().name("pVersion").value("Actual").build(),

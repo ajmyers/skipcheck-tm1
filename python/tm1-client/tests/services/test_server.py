@@ -13,7 +13,7 @@ from typing import Any
 import httpx2
 
 from skipcheck_tm1 import ODataQuery
-from skipcheck_tm1.model import LogLevel, Server, ServerSettingsPatch
+from skipcheck_tm1.model import AdministrationSettingsPatch, LoggerPatch, LogLevel, Server, ServerSettingsPatch
 
 from ..conftest import Api, FakeTm1, target
 
@@ -57,8 +57,9 @@ def test_reads_the_server_and_its_configuration(api: Api, fake: FakeTm1) -> None
     assert target(fake.last) == "GET Configuration"
 
     fake.respond = lambda r: None
-    api.run(api.client.server.update_static_configuration(ServerSettingsPatch.builder().server_name("tm2").build()))
-    assert (target(fake.last), body(fake.last)) == ("PATCH StaticConfiguration", {"ServerName": "tm2"})
+    patch = ServerSettingsPatch.builder().administration(AdministrationSettingsPatch.builder().server_name("tm2").build()).build()
+    api.run(api.client.server.update_static_configuration(patch))
+    assert (target(fake.last), body(fake.last)) == ("PATCH StaticConfiguration", {"Administration": {"ServerName": "tm2"}})
 
 
 def test_loggers(api: Api, fake: FakeTm1) -> None:
@@ -71,6 +72,12 @@ def test_loggers(api: Api, fake: FakeTm1) -> None:
     assert target(fake.last) == "GET Loggers('TM1.Process')"
     fake.respond = lambda r: None
     api.run(api.client.server.set_logger_level("TM1.Process", LogLevel.DEBUG))
+    assert (target(fake.last), body(fake.last)) == ("PATCH Loggers('TM1.Process')", {"Level": "Debug"})
+
+
+def test_updates_a_logger_with_a_patch(api: Api, fake: FakeTm1) -> None:
+    fake.respond = lambda r: None
+    api.run(api.client.server.update_logger("TM1.Process", LoggerPatch.builder().level(LogLevel.DEBUG).build()))
     assert (target(fake.last), body(fake.last)) == ("PATCH Loggers('TM1.Process')", {"Level": "Debug"})
 
 

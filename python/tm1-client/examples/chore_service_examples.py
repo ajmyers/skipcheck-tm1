@@ -12,8 +12,8 @@ from skipcheck_tm1.model import (
     ChoreCreate,
     ChoreExecutionMode,
     ChorePatch,
+    ChoreTaskCreate,
     ChoreTaskParameterPatch,
-    ChoreTaskPatch,
 )
 
 
@@ -22,7 +22,7 @@ def create(tm1: Tm1Client) -> Chore:
     # A daily chore at 02:00 UTC, inactive until it's switched on. A task gives
     # every parameter of its process a value.
     load_actuals = (
-        ChoreTaskPatch.builder()
+        ChoreTaskCreate.builder()
         .bind_process(ODataPath.of("Processes").key("Load Sales"))
         .parameters(
             [
@@ -51,7 +51,7 @@ def add_task(tm1: Tm1Client) -> int | None:
     # @start region = add-task
     # A task goes at the end; TM1 numbers the steps from 0
     load_forecast = (
-        ChoreTaskPatch.builder()
+        ChoreTaskCreate.builder()
         .bind_process(ODataPath.of("Processes").key("Load Sales"))
         .parameters(
             [

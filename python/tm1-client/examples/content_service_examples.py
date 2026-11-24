@@ -7,7 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from skipcheck_tm1 import ODataPath, Tm1Client
-from skipcheck_tm1.model import Cube, CubeReference, CubeReferencePatch, DocumentPatch, Entry, FolderPatch, LinkPatch
+from skipcheck_tm1.model import Cube, CubeReference, CubeReferenceCreate, DocumentCreate, Entry, FolderCreate, LinkCreate
 from skipcheck_tm1.services import ContentPath, ContentScope
 
 
@@ -24,9 +24,9 @@ def application(tm1: Tm1Client) -> Entry:
     # @start region = application
     # An application: a folder with a link and a reference to a cube
     planning = ContentPath.applications().child("Planning")
-    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name("Planning").build())
-    tm1.contents.create(planning, ContentScope.PUBLIC, LinkPatch.builder().name("Guide").url("https://example.com/planning-guide").build())
-    sales = CubeReferencePatch.builder().name("Sales").bind_cube(ODataPath.of("Cubes").key("Sales")).build()
+    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name("Planning").build())
+    tm1.contents.create(planning, ContentScope.PUBLIC, LinkCreate.builder().name("Guide").url("https://example.com/planning-guide").build())
+    sales = CubeReferenceCreate.builder().name("Sales").bind_cube(ODataPath.of("Cubes").key("Sales")).build()
     return tm1.contents.create(planning, ContentScope.PUBLIC, sales)
     # @end
 
@@ -36,7 +36,7 @@ def upload(tm1: Tm1Client, file: Path) -> None:
     # A document made in an application is a reference to one TM1 keeps in Blobs; the
     # reference, as create returns it, is where its content goes
     planning = ContentPath.applications().child("Planning")
-    reference = tm1.contents.create(planning, ContentScope.PUBLIC, DocumentPatch.builder().name("notes.txt").build())
+    reference = tm1.contents.create(planning, ContentScope.PUBLIC, DocumentCreate.builder().name("notes.txt").build())
     tm1.contents.upload(planning.child(reference), file.read_bytes())
     # @end
 

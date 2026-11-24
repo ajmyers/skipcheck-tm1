@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from skipcheck_tm1 import ODataQuery, Tm1Client
-from skipcheck_tm1.model import Process, ProcessCreate, ProcessExecuteResult, ProcessParameterPatch, ProcessVariableType
+from skipcheck_tm1.model import Process, ProcessCreate, ProcessExecuteResult, ProcessParameterPatch
 
 
 def create(tm1: Tm1Client) -> Process:
@@ -16,8 +16,8 @@ def create(tm1: Tm1Client) -> Process:
         .name("Load Sales")
         .parameters(
             [
-                ProcessParameterPatch.builder().name("pVersion").value("Actual").type(ProcessVariableType.STRING).build(),
-                ProcessParameterPatch.builder().name("pYear").value(2026).type(ProcessVariableType.NUMERIC).build(),
+                ProcessParameterPatch.builder().name("pVersion").value("Actual").build(),
+                ProcessParameterPatch.builder().name("pYear").value(2026).build(),
             ]
         )
         .prolog_procedure("LogOutput('INFO', 'Loading ' | pVersion | ' for ' | NumberToString(pYear));\n")

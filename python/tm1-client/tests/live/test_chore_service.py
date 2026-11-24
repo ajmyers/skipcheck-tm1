@@ -24,6 +24,7 @@ from skipcheck_tm1.model import (
     ChoreExecutionMode,
     ChorePatch,
     ChoreTask,
+    ChoreTaskCreate,
     ChoreTaskParameterPatch,
     ChoreTaskPatch,
 )
@@ -45,7 +46,7 @@ class Chores:
 
     def task(self, marker: str) -> Any:
         return (
-            ChoreTaskPatch.builder()
+            ChoreTaskCreate.builder()
             .bind_process(ODataPath.of("Processes").key(self.process))
             .parameters([parameter("pName", marker), parameter("pCount", 1)])
             .build()
@@ -115,7 +116,7 @@ def test_needs_every_process_parameter_in_a_task(tm1: Tm1Client, chores: Chores)
     with pytest.raises(Tm1Error):
         tm1.chores.add_task(
             chores.chore,
-            ChoreTaskPatch.builder().bind_process(ODataPath.of("Processes").key(chores.process)).parameters([parameter("pName", "x")]).build(),
+            ChoreTaskCreate.builder().bind_process(ODataPath.of("Processes").key(chores.process)).parameters([parameter("pName", "x")]).build(),
         )
 
 

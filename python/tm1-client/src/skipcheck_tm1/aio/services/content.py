@@ -38,14 +38,14 @@ class ContentService(Service):
     Build an application: a folder with a link and a reference to a cube::
 
         planning = ContentPath.applications().child("Planning")
-        await tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name("Planning").build())
-        await tm1.contents.create(planning, ContentScope.PUBLIC, LinkPatch.builder().name("Guide").url("https://example.com/planning-guide").build())
-        await tm1.contents.create(planning, ContentScope.PUBLIC, CubeReferencePatch.builder().name("Sales").bind_cube(ODataPath.of("Cubes").key("Sales")).build())
+        await tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name("Planning").build())
+        await tm1.contents.create(planning, ContentScope.PUBLIC, LinkCreate.builder().name("Guide").url("https://example.com/planning-guide").build())
+        await tm1.contents.create(planning, ContentScope.PUBLIC, CubeReferenceCreate.builder().name("Sales").bind_cube(ODataPath.of("Cubes").key("Sales")).build())
 
     Upload a document: made in an application, it's a reference to one TM1 keeps in Blobs,
     and the reference, as ``create`` returns it, is where its content goes::
 
-        reference = await tm1.contents.create(planning, ContentScope.PUBLIC, DocumentPatch.builder().name("notes.txt").build())
+        reference = await tm1.contents.create(planning, ContentScope.PUBLIC, DocumentCreate.builder().name("notes.txt").build())
         await tm1.contents.upload(planning.child(reference), data)
 
     Download a document's content::
@@ -94,8 +94,8 @@ class ContentService(Service):
 
     @endpoint("Navigation Folder/Contents", "Navigation Folder/PrivateContents")
     async def create(self, folder: ContentPath, scope: ContentScope, entry: Any) -> Entry:
-        """Makes an entry in a folder: a ``FolderPatch``, ``DocumentPatch``, ``LinkPatch`` or a
-        reference, such as a ``CubeReferencePatch`` with ``bind_cube(ODataPath.of("Cubes").key("Sales"))``.
+        """Makes an entry in a folder: a ``FolderCreate``, ``DocumentCreate``, ``LinkCreate`` or a
+        reference, such as a ``CubeReferenceCreate`` with ``bind_cube(ODataPath.of("Cubes").key("Sales"))``.
         A document made outside ``Blobs`` comes back as a ``DocumentReference``, with an empty
         document behind it; :meth:`upload` gives it content. Returns the entry as made, with the
         ``ID`` to find it by."""

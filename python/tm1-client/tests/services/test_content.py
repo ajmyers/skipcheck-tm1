@@ -12,7 +12,7 @@ import pytest
 from skipcheck_tm1 import ODataPath, ODataQuery
 from skipcheck_tm1._sync.services.content import ContentPath, ContentScope
 from skipcheck_tm1.aio.services.content import ContentPath as AsyncContentPath
-from skipcheck_tm1.model import CubeReference, CubeReferencePatch, DocumentReference, Folder, FolderPatch, LinkPatch
+from skipcheck_tm1.model import CubeReference, CubeReferenceCreate, DocumentReference, Folder, FolderCreate, LinkCreate
 
 from ..conftest import Api, FakeTm1, target
 
@@ -65,16 +65,16 @@ def test_reads_the_tree(api: Api, fake: FakeTm1) -> None:
 
 def test_makes_copies_moves_and_deletes(api: Api, fake: FakeTm1) -> None:
     fake.respond = lambda r: {"@odata.type": "#ibm.tm1.api.v1.Folder", "Name": "Planning", "ID": "Planning"}
-    api.run(api.client.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name("Planning").build()))
+    api.run(api.client.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name("Planning").build()))
     assert (target(fake.last), body(fake.last)) == (
         "POST Contents('Applications')/Contents",
         {"@odata.type": "#ibm.tm1.api.v1.Folder", "Name": "Planning"},
     )
-    api.run(api.client.contents.create(PLANNING, ContentScope.PRIVATE, LinkPatch.builder().name("Guide").url("https://example.com").build()))
+    api.run(api.client.contents.create(PLANNING, ContentScope.PRIVATE, LinkCreate.builder().name("Guide").url("https://example.com").build()))
     assert target(fake.last) == "POST Contents('Applications')/Contents('Planning')/PrivateContents"
     api.run(
         api.client.contents.create(
-            PLANNING, ContentScope.PUBLIC, CubeReferencePatch.builder().name("Sales").bind_cube(ODataPath.of("Cubes").key("Sales")).build()
+            PLANNING, ContentScope.PUBLIC, CubeReferenceCreate.builder().name("Sales").bind_cube(ODataPath.of("Cubes").key("Sales")).build()
         )
     )
     assert body(fake.last) == {"@odata.type": "#ibm.tm1.api.v1.CubeReference", "Name": "Sales", "Cube@odata.bind": "Cubes('Sales')"}

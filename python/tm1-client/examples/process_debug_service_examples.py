@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from skipcheck_tm1 import Tm1Client
-from skipcheck_tm1.model import ProcessDebugContext, ProcessDebugContextLineBreakpointPatch, ProcessProcedure
+from skipcheck_tm1.model import ProcessDebugContext, ProcessDebugContextLineBreakpointCreate, ProcessProcedure
 
 
 def breakpoint(tm1: Tm1Client) -> list[str]:
@@ -17,7 +17,7 @@ def breakpoint(tm1: Tm1Client) -> list[str]:
     def stop_at_line_3(context: ProcessDebugContext) -> list[str]:
         assert context.id is not None
         line3 = (
-            ProcessDebugContextLineBreakpointPatch.builder()
+            ProcessDebugContextLineBreakpointCreate.builder()
             .id(1)  # TM1 needs an ID chosen by the caller
             .process_name("Load Sales")
             .procedure(ProcessProcedure.PROLOG)

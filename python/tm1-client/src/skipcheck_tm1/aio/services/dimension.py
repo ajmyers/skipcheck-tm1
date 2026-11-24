@@ -88,8 +88,8 @@ class DimensionService(Service):
                 .name("Region")
                 .elements([total, north, south])
                 .edges([
-                    EdgePatch.builder().parent_name("Total").component_name("North").weight(1.0).build(),
-                    EdgePatch.builder().parent_name("Total").component_name("South").weight(1.0).build(),
+                    EdgeCreate.builder().parent_name("Total").component_name("North").weight(1.0).build(),
+                    EdgeCreate.builder().parent_name("Total").component_name("South").weight(1.0).build(),
                 ])
                 .build()
             ])
@@ -223,8 +223,8 @@ class HierarchyService(Service):
                 ElementCreate.builder().name("South").type(ElementType.NUMERIC).build(),
             ])
             .edges([
-                EdgePatch.builder().parent_name("Smith").component_name("North").weight(1.0).build(),
-                EdgePatch.builder().parent_name("Smith").component_name("South").weight(1.0).build(),
+                EdgeCreate.builder().parent_name("Smith").component_name("North").weight(1.0).build(),
+                EdgeCreate.builder().parent_name("Smith").component_name("South").weight(1.0).build(),
             ])
             .build())
 
@@ -235,8 +235,8 @@ class HierarchyService(Service):
         actual = ElementCreate.builder().name("Actual").type(ElementType.NUMERIC).build()
         budget = ElementCreate.builder().name("Budget").type(ElementType.NUMERIC).build()
         await tm1.hierarchies.replace_structure("Version", "Version", [all_, actual, budget], [
-            EdgePatch.builder().parent_name("All Versions").component_name("Actual").weight(1.0).build(),
-            EdgePatch.builder().parent_name("All Versions").component_name("Budget").weight(1.0).build(),
+            EdgeCreate.builder().parent_name("All Versions").component_name("Actual").weight(1.0).build(),
+            EdgeCreate.builder().parent_name("All Versions").component_name("Budget").weight(1.0).build(),
         ])
 
     Read the roots of a hierarchy, the members with no parent, in order::
@@ -504,7 +504,7 @@ class EdgeService(Service):
     Move an element to another parent: add the new edge, then delete the old::
 
         edge = await tm1.edges.create("Region", "Region",
-            EdgePatch.builder().parent_name("Total Sales").component_name("North").weight(1.0).build())
+            EdgeCreate.builder().parent_name("Total Sales").component_name("North").weight(1.0).build())
         await tm1.edges.delete("Region", "Region", "Total", "North")
     """
 

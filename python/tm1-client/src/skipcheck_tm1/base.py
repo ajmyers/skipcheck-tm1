@@ -38,7 +38,7 @@ from pydantic import (
     model_validator,
 )
 
-from .odata import Bind, duration, string_literal
+from .odata import Bind, ODataPath, duration, string_literal
 
 if TYPE_CHECKING:
     pass
@@ -220,15 +220,35 @@ class Tm1Patch:
             self._values[name + "@odata.bind"] = [str(t) for t in targets]
             return self
 
-        def _copy(self, read: Any, names: tuple[str, ...], declared: tuple[str, ...] | None) -> Any:
-            """What ``read``, a model read from TM1, holds of ``names``, nulls left out; and, for an open
-            type (``declared`` given), its undeclared properties. Nothing when ``read`` is None."""
+        def _copy(
+            self,
+            read: Any,
+            names: tuple[str | tuple[str, Any], ...],
+            declared: tuple[str, ...] | None,
+            bindings: tuple[tuple[str, str, str, str], ...] = (),
+        ) -> Any:
+            """What ``read``, a model read from TM1, holds of ``names``, nulls left out: each a name, or
+            ``(name, write type)`` for a structured value, converted with that type's ``builder(read)``.
+            Then the navigations ``bindings`` names, ``(name, how, collection, key)``, bound where their
+            paths can be made (:func:`read_binding`); and, for an open type (``declared`` given), its
+            undeclared properties. Nothing when ``read`` is None."""
             if read is None:
                 return self
             data = read.to_odata()
-            for name in names:
-                if data.get(name) is not None:
+            for entry in names:
+                name, write = entry if isinstance(entry, tuple) else (entry, None)
+                if data.get(name) is None:
+                    continue
+                if write is None:
                     self._set(name, data[name])
+                else:
+                    value = _field(read, name)
+                    self._set(name, [write.builder(v).build() for v in value] if isinstance(value, list) else write.builder(value).build())
+            for name, how, collection, key in bindings:
+                if data.get(name) is not None:
+                    targets = read_binding(how, collection, data[name], key)
+                    if targets is not None:
+                        self._values[name + "@odata.bind"] = targets
             if declared is not None:
                 for name, value in data.items():
                     if name not in declared and not name.startswith("@") and value is not None:
@@ -238,6 +258,72 @@ class Tm1Patch:
         def build(self) -> Any:
             """The patch, with the properties set so far."""
             return self._patch(self._values)
+
+
+def _field(read: Any, name: str) -> Any:
+    """A model's field by its name in TM1's JSON."""
+    for field, info in type(read).model_fields.items():
+        if (info.alias or field) == name:
+            return getattr(read, field)
+    return None
+
+
+def read_binding(how: str, collection: str, value: Any, key: str) -> str | list[str] | None:
+    """The path, or paths, a write's ``builder(read)`` binds a navigation the read holds to (``value``,
+    as TM1's JSON): None where one can't be made, and for a collection where any can't. ``how`` is
+    ``by_key`` (or ``by_keys``), an entity in the set ``collection`` by its ``key`` property:
+    ``Dimensions('Region')``; or ``in_hierarchy`` (or ``all_in_hierarchy``), an element or member by
+    its ``UniqueName``, in ``collection`` (``Elements``, ``Members``) of its hierarchy. As the Java
+    model's ``ReadBindings``."""
+
+    def one(v: Any) -> str | None:
+        k = v.get(key) if isinstance(v, dict) else None
+        if how in ("by_key", "by_keys"):
+            return None if k is None else str(ODataPath.of(collection).key(k))
+        path = in_hierarchy(collection, k) if isinstance(k, str) else None
+        return None if path is None else str(path)
+
+    if how in ("by_key", "in_hierarchy"):
+        return one(value)
+    paths = [one(v) for v in value]
+    return None if any(p is None for p in paths) else [p for p in paths if p is not None]
+
+
+def in_hierarchy(collection: str, unique_name: str) -> ODataPath | None:
+    """An element or member by its ``UniqueName``: ``[d].[h].[e]``, or ``[d].[e]`` in the dimension's
+    own hierarchy, with ``]]`` for ``]``. None for any other shape."""
+    parts: list[str] = []
+    i = 0
+    while i < len(unique_name):
+        if unique_name[i] != "[":
+            return None
+        part: list[str] = []
+        j = i + 1
+        while True:
+            if j >= len(unique_name):
+                return None
+            c = unique_name[j]
+            if c == "]":
+                if j + 1 < len(unique_name) and unique_name[j + 1] == "]":
+                    part.append("]")
+                    j += 2
+                    continue
+                break
+            part.append(c)
+            j += 1
+        parts.append("".join(part))
+        i = j + 1
+        if i < len(unique_name):
+            if unique_name[i] != ".":
+                return None
+            i += 1
+            if i == len(unique_name):
+                return None
+    if len(parts) == 2:
+        parts.insert(1, parts[0])
+    if len(parts) != 3:
+        return None
+    return ODataPath.of("Dimensions").key(parts[0]).nav("Hierarchies").key(parts[1]).nav(collection).key(parts[2])
 
 
 def to_odata(value: Any) -> Any:

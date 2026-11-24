@@ -126,9 +126,20 @@ def _sends(step: dict[str, Any]) -> bool:
     return error is None or error.get("category") == "api"
 
 
+def _saving(step: dict[str, Any], expect: dict[str, Any]) -> dict[str, Any]:
+    """The expectation with the fields the step saves, as ``saved_<name>``, if it lacks them."""
+    if "save" not in step:
+        return expect
+    fields = dict(expect.get("fields", {}))
+    for name, field in step["save"].items():
+        fields.setdefault(field, "saved_" + name)
+    return {**expect, "fields": fields}
+
+
 def _answering_as_expected(scenario: dict[str, Any], names: dict[str, str]) -> FakeTm1:
-    """Answers each step's one request with what the step expects, and a finally step's with 204."""
-    answers = [_expected(live.substitute(step["expect"], names)) for step in scenario["steps"] if _sends(step)]
+    """Answers each step's one request with what the step expects (with what it saves too, when it
+    doesn't expect it), and a finally step's with 204."""
+    answers = [_expected(_saving(step, live.substitute(step["expect"], names))) for step in scenario["steps"] if _sends(step)]
     answers += [httpx2.Response(204) for _ in scenario.get("finally", [])]
     fake = FakeTm1()
     fake.respond = lambda request: answers.pop(0) if answers else httpx2.Response(599, text="unscripted")
@@ -169,6 +180,21 @@ def test_runs_a_scenario_sending_one_request_per_step(traffic_dir: Path, name: s
     compare = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(compare)
     assert compare.main(["x", str(traffic_dir)]) == 0
+
+
+def test_saves_a_field_of_a_result_for_the_steps_after_it() -> None:
+    scenario = json.loads((live.SCENARIOS / "annotations.json").read_text(encoding="utf-8"))
+    names = live.names_for(scenario)
+    traffic = live.Traffic(BASE)
+    fake = _answering_as_expected(scenario, names)
+    http = httpx2.Client(transport=httpx2.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
+    assert live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names) == []
+    assert names["note"] == "saved_note" and names["built"] == "saved_built"
+    sent = [f"{e['request']['method']} {e['request']['target']}" for e in traffic.exchanges]
+    assert "PATCH Annotations('saved_built')" in sent and "DELETE Annotations('saved_note')" in sent
+
+    why = live.save({"save": {"note": "ID"}}, {"result": {"Text": "no ID"}}, names)
+    assert why is not None and why.startswith("no ID to save as note")
 
 
 def _data_tm1(names: dict[str, str]) -> FakeTm1:

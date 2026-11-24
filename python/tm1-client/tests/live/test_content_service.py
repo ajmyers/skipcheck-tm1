@@ -12,7 +12,7 @@ import pytest
 
 from skipcheck_tm1 import ODataPath, Tm1BadRequestError, Tm1Client, Tm1NotFoundError, Tm1Request
 from skipcheck_tm1._sync.services.content import ContentPath, ContentScope
-from skipcheck_tm1.model import CubeReference, CubeReferencePatch, DocumentPatch, DocumentReference, Folder, FolderPatch, Link, LinkPatch
+from skipcheck_tm1.model import CubeReference, CubeReferenceCreate, DocumentCreate, DocumentReference, Folder, FolderCreate, Link, LinkCreate
 
 from .conftest import CONFIGURED, REASON, target
 
@@ -25,9 +25,9 @@ def test_lists_the_roots(tm1: Tm1Client) -> None:
 
 def test_keeps_a_document_in_blobs_behind_a_reference(tm1: Tm1Client, name: str) -> None:
     folder = ContentPath.applications().child(name)
-    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name).build())
+    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name).build())
     try:
-        made = tm1.contents.create(folder, ContentScope.PUBLIC, DocumentPatch.builder().name("notes.txt").build())
+        made = tm1.contents.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name("notes.txt").build())
         assert isinstance(made, DocumentReference), "a document made in an application is a reference"
         assert made.id == "notes.txt.blob", "found by ID, the name plus a suffix"
         notes = folder.child(made)
@@ -54,15 +54,15 @@ def test_keeps_a_document_in_blobs_behind_a_reference(tm1: Tm1Client, name: str)
 def test_makes_links_and_references_and_moves_them(tm1: Tm1Client, name: str) -> None:
     folder = ContentPath.applications().child(name)
     other = ContentPath.applications().child(name + "-2")
-    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name).build())
-    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name + "-2").build())
+    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name).build())
+    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name + "-2").build())
     try:
-        link = tm1.contents.create(folder, ContentScope.PUBLIC, LinkPatch.builder().name("ibm").url("https://www.ibm.com").build())
+        link = tm1.contents.create(folder, ContentScope.PUBLIC, LinkCreate.builder().name("ibm").url("https://www.ibm.com").build())
         assert link.id == "ibm.extr"
         reference = tm1.contents.create(
             folder,
             ContentScope.PUBLIC,
-            CubeReferencePatch.builder().name("}ClientGroups").bind_cube(ODataPath.of("Cubes").key("}ClientGroups")).build(),
+            CubeReferenceCreate.builder().name("}ClientGroups").bind_cube(ODataPath.of("Cubes").key("}ClientGroups")).build(),
         )
         assert reference.id == "}ClientGroups.cube"
         listed = tm1.contents.contents(folder, ContentScope.PUBLIC, expand="tm1.CubeReference/Cube($select=Name)")
@@ -80,7 +80,7 @@ def test_makes_links_and_references_and_moves_them(tm1: Tm1Client, name: str) ->
         assert moved.id == "ibm.extr"
         assert [e.id for e in tm1.contents.contents(other, ContentScope.PUBLIC)] == ["ibm.extr"]
 
-        tm1.contents.create(folder, ContentScope.PRIVATE, FolderPatch.builder().name("mine").build())
+        tm1.contents.create(folder, ContentScope.PRIVATE, FolderCreate.builder().name("mine").build())
         assert [e.id for e in tm1.contents.contents(folder, ContentScope.PRIVATE)] == ["mine"]
         assert isinstance(tm1.contents.get(folder.child("mine", ContentScope.PRIVATE)), Folder)
         assert tm1.contents.localized_attributes(folder) == []
@@ -91,9 +91,9 @@ def test_makes_links_and_references_and_moves_them(tm1: Tm1Client, name: str) ->
 
 def test_refuses_a_chunked_upload(tm1: Tm1Client, name: str) -> None:
     folder = ContentPath.applications().child(name)
-    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name).build())
+    tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name).build())
     try:
-        made = tm1.contents.create(folder, ContentScope.PUBLIC, DocumentPatch.builder().name("notes.txt").build())
+        made = tm1.contents.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name("notes.txt").build())
         url, user, password = target()
         content = f"{url.rstrip('/')}/{folder.child(made.id).path()}/tm1.DocumentReference/Document/Content"
 
