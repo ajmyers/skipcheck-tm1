@@ -33,9 +33,11 @@ include("tm1-bom")
 // Tools built on the libraries (not published)
 include("tools:example")
 include("tools:docs-doclet")
+include("tools:tm1-probe")
 
 // The Java modules live in java/, beside python/, dotnet/ and typescript/. Their project names
 // stay as they were, so tasks are still :tm1-client:test.
 rootProject.children.forEach { it.projectDir = file("java/${it.name}") }
 project(":tools:example").projectDir = file("java/tools/example")
 project(":tools:docs-doclet").projectDir = file("java/tools/docs-doclet")
+project(":tools:tm1-probe").projectDir = file("java/tools/tm1-probe")

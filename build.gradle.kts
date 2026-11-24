@@ -17,6 +17,8 @@
 //
 //   ./gradlew liveTest --continue  every client's tests against a real TM1, then the comparison of
 //                                  what each sent (needs a TM1 source: see scripts/live-tests.sh)
+//   ./gradlew probeTm1             probes a TM1 for what its $metadata doesn't say, and writes it
+//                                  beside the snapshot (java/tools/tm1-probe/README.md)
 //
 // They're opt-in: ./gradlew build stays the Java build, which needs only a JDK.
 
@@ -183,6 +185,27 @@ tasks.register("liveTest") {
 	group = "verification"
 	description = "Runs every client's tests against a real TM1, then compares what each sent. Use --continue to run them all when one fails."
 	dependsOn(liveTestJava, liveTestPython, liveTestDotnet, liveTestTypescript, compareLiveTraffic)
+}
+
+// The probe: what a TM1 version does that its $metadata doesn't say (java/tools/tm1-probe/README.md).
+// It reads the server's binary out of the container it starts, so it needs a TM1 source the
+// container mounts: TM1_URL, a server already running, won't do.
+val probeSources = liveSources - "TM1_URL"
+val probeTm1Prepare = tasks.register("probeTm1Prepare") {
+	description = "Checks a TM1 source is configured for the probe."
+	val configured = probeSources.map { providers.environmentVariable(it) }
+	val names = probeSources
+	outputs.upToDateWhen { false }
+	doLast {
+		if (configured.none { it.isPresent }) {
+			throw GradleException("No TM1 source configured: set one of " + names.joinToString(", ") + ". See java/tools/tm1-probe/README.md.")
+		}
+	}
+}
+tasks.register("probeTm1") {
+	group = "verification"
+	description = "Probes a TM1 for what its \$metadata doesn't declare, and writes java/tm1-client/src/model/metadata/tm1-probe-<schema>.json."
+	dependsOn(probeTm1Prepare, ":tools:tm1-probe:probe")
 }
 
 // The package tests: each ecosystem's packages built as a release builds them, installed

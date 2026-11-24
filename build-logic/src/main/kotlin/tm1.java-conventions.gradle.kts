@@ -91,7 +91,7 @@ tasks.withType<Test>().configureEach {
 		// ...and PAW
 		"PAW_ZIP", "PAW_BUNDLE_DIR", "PAW_ACCEPT_LICENSE",
 		// Opt-in switches for tests that write files (see tm1-client's metadata tests)
-		"TM1_UPDATE_METADATA_SNAPSHOT",
+		"TM1_UPDATE_METADATA_SNAPSHOT", "TM1_PROBE",
 	)) {
 		inputs.property(name, providers.environmentVariable(name).orElse(""))
 	}
