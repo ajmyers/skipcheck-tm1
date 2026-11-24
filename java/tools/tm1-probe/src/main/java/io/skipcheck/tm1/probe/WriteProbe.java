@@ -185,6 +185,9 @@ public final class WriteProbe {
 
 		final @Nullable String assigned;
 
+		/** A key the caller picks as a number (a breakpoint's ID): fresh for each try. */
+		final @Nullable String numbered;
+
 		final Set<String> keys = new TreeSet<>();
 
 		final JsonNode setup;
@@ -203,6 +206,7 @@ public final class WriteProbe {
 			named = c.path("named").asBoolean(true);
 			address = c.path("address").isString() ? c.path("address").asString() : null;
 			assigned = c.path("assigned").isString() ? c.path("assigned").asString() : null;
+			numbered = c.path("numbered").isString() ? c.path("numbered").asString() : null;
 			setup = c.path("setup");
 			teardown = c.path("teardown");
 			c.path("key").forEach(k -> keys.add(k.asString()));
@@ -211,6 +215,9 @@ public final class WriteProbe {
 			}
 			if (assigned != null) {
 				keys.add(assigned);
+			}
+			if (numbered != null) {
+				keys.add(numbered);
 			}
 		}
 
@@ -223,10 +230,10 @@ public final class WriteProbe {
 		}
 
 		String fresh() {
-			// A case's names, in turn, where TM1 takes only some (a locale): else a new
-			// one
-			String name = names.isEmpty() ? prefix + "W" + String.format(Locale.ROOT, "%03d", sequence++)
-					: names.get(next++ % names.size());
+			// A number, for a key the caller picks as one; a case's names, in turn, where
+			// TM1 takes only some (a locale); else a new name
+			String name = numbered != null ? String.valueOf(100 + sequence++) : names.isEmpty()
+					? prefix + "W" + String.format(Locale.ROOT, "%03d", sequence++) : names.get(next++ % names.size());
 			if (assigned == null) {
 				client.send("DELETE", addressed(name), null);
 			}
@@ -238,6 +245,9 @@ public final class WriteProbe {
 			ObjectNode body = merge(substitute(base, name), NODES.objectNode());
 			if (named) {
 				body.put("Name", name);
+			}
+			if (numbered != null) {
+				body.put(numbered, Integer.parseInt(name));
 			}
 			return body;
 		}
@@ -266,6 +276,9 @@ public final class WriteProbe {
 
 		/** Where an object TM1 doesn't assign a key to is found. */
 		String addressed(String name) {
+			if (numbered != null) {
+				return collection + "(" + name + ")";
+			}
 			return address != null ? text(address, name) : path(collection, name);
 		}
 
@@ -305,7 +318,86 @@ public final class WriteProbe {
 		return template.replace("{p}", prefix).replace("{name}", name);
 	}
 
+	/**
+	 * A case, with its {@code prepare} steps run first and {@code finish} steps after,
+	 * whatever happens: what the case's objects live in, made for it, such as a debug
+	 * session for breakpoints. A step can capture a field of its answer
+	 * ({@code "capture": {"field": "ID", "as": "context"}}), which the case then uses as
+	 * {@code {context}}; and repeat until a field of its answer has a value
+	 * ({@code "until": {"field": "Status", "is": "Complete"}}), at most 10 times.
+	 */
 	private JsonNode probeCase(JsonNode c) {
+		if (!c.has("prepare")) {
+			return probeShaped(c);
+		}
+		Map<String, String> vars = new TreeMap<>();
+		JsonNode prepared = c;
+		try {
+			for (JsonNode step : c.path("prepare")) {
+				JsonNode s = withVars(step, vars);
+				ProbeClient.Answer answer = client.send(s.path("method").asString(),
+						text(s.path("path").asString(), ""), s.has("body") ? substitute(s.path("body"), "") : null);
+				if (!answer.ok()) {
+					ObjectNode result = NODES.objectNode();
+					result.put("type", c.path("type").asString());
+					result.set("prepare", outcome(answer));
+					return result;
+				}
+				if (s.has("capture") && answer.body() != null) {
+					vars.put(s.path("capture").path("as").asString(),
+							answer.body().path(s.path("capture").path("field").asString()).asString());
+				}
+			}
+			prepared = withVars(c, vars);
+			return probeShaped(prepared);
+		}
+		finally {
+			for (JsonNode step : withVars(c.path("finish"), vars)) {
+				for (int i = 0; i < 10; i++) {
+					ProbeClient.Answer answer = client.send(step.path("method").asString(),
+							text(step.path("path").asString(), ""),
+							step.has("body") ? substitute(step.path("body"), "") : null);
+					JsonNode until = step.path("until");
+					if (until.isMissingNode() || answer.body() == null || !answer.ok()
+							|| answer.body()
+								.path(until.path("field").asString())
+								.asString()
+								.equals(until.path("is").asString())) {
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	/** A node with {@code {var}} replaced in every string, keys included. */
+	private static JsonNode withVars(JsonNode node, Map<String, String> vars) {
+		if (vars.isEmpty()) {
+			return node;
+		}
+		if (node.isString()) {
+			String s = node.asString();
+			for (Map.Entry<String, String> v : vars.entrySet()) {
+				s = s.replace("{" + v.getKey() + "}", v.getValue());
+			}
+			return NODES.stringNode(s);
+		}
+		if (node.isArray()) {
+			ArrayNode out = NODES.arrayNode();
+			node.forEach(n -> out.add(withVars(n, vars)));
+			return out;
+		}
+		if (node.isObject()) {
+			ObjectNode out = NODES.objectNode();
+			node.properties()
+				.forEach(e -> out.set(withVars(NODES.stringNode(e.getKey()), vars).asString(),
+						withVars(e.getValue(), vars)));
+			return out;
+		}
+		return node;
+	}
+
+	private JsonNode probeShaped(JsonNode c) {
 		if (c.path("singleton").asBoolean(false)) {
 			return probeSingleton(c);
 		}
@@ -319,8 +411,13 @@ public final class WriteProbe {
 			result.put("generate", false);
 		}
 
-		String select = select(type);
-		ProbeClient.Answer source = client.get(text(c.path("source").asString(), "") + "?" + select);
+		// A case can select by another type: a document posted to a folder reads as a
+		// DocumentReference, which has none of a Document's own properties
+		String selectType = c.path("selectType").asString(type);
+		String select = select(selectType);
+		String from = text(c.path("source").asString(), "");
+		// A source can be a query (a folder's contents, by name): the select goes with it
+		ProbeClient.Answer source = client.get(from + (from.contains("?") ? "&" : "?") + select);
 		if (!source.ok() || source.body() == null) {
 			result.set("source", outcome(source));
 			return result;
@@ -499,6 +596,9 @@ public final class WriteProbe {
 	 */
 	private JsonNode tryPost(Shape shape, String select, String property, JsonNode value,
 			@Nullable JsonNode defaultValue) {
+		if (!selects(select, property)) {
+			return NODES.objectNode().put("outcome", "unread");
+		}
 		List<String> navs = carried(shape.type, property);
 		if (!navs.isEmpty()) {
 			return tryPostLinks(shape, property, value, navs);
@@ -510,7 +610,7 @@ public final class WriteProbe {
 		JsonNode got = made.ok() ? readBack(made.where(), select).get(property) : null;
 		shape.remove(made);
 		if (!made.answer().ok()) {
-			return outcome(made.answer());
+			return refused(made.answer(), "POST", shape.collection, property, body);
 		}
 		JsonNode baseline = defaultValue;
 		Made again = shape.post(name);
@@ -523,6 +623,9 @@ public final class WriteProbe {
 
 	/** A PATCH of one property on a fresh object, compared with what it read before. */
 	private JsonNode tryPatch(Shape shape, String select, String property, JsonNode value) {
+		if (!selects(select, property)) {
+			return NODES.objectNode().put("outcome", "unread");
+		}
 		List<String> navs = carried(shape.type, property);
 		if (!navs.isEmpty()) {
 			return tryPatchLinks(shape, property, value, navs);
@@ -539,7 +642,7 @@ public final class WriteProbe {
 		JsonNode got = answer.ok() ? readBack(made.where(), select).get(property) : null;
 		JsonNode result = answer.ok()
 				? logged(classify(got, value, baseline), shape.collection, property, "PATCH", value, got)
-				: outcome(answer);
+				: refused(answer, "PATCH", shape.collection, property, body);
 		shape.remove(made);
 		return result;
 	}
@@ -1495,6 +1598,25 @@ public final class WriteProbe {
 	private Map<String, String> undeclaredOf(String type) {
 		Map<String, String> found = undeclared.get(type);
 		return found == null ? Map.of() : found;
+	}
+
+	/**
+	 * A refused write's outcome, logged with what was sent and TM1's message, for a
+	 * person to tell TM1's refusal from a value the probe shouldn't have sent; the report
+	 * keeps the status and code only.
+	 */
+	private JsonNode refused(ProbeClient.Answer answer, String method, String collection, String property,
+			JsonNode sent) {
+		JsonNode message = answer.body() == null ? null : answer.body().path("error").get("message");
+		log.accept("refused: " + method + " " + collection + " " + property + ": sent " + sent + ", "
+				+ (message == null ? answer.status() : message.asString()));
+		return outcome(answer);
+	}
+
+	/** Whether a {@code $select} names a property: one it doesn't can't be read back. */
+	private static boolean selects(String select, String property) {
+		String names = select.startsWith("$select=") ? select.substring("$select=".length()) : select;
+		return List.of(names.split(",", -1)).contains(property);
 	}
 
 	/** A {@code $select} of every structural property, declared or not. */

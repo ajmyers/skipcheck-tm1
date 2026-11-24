@@ -425,6 +425,124 @@
         "code" : "278"
       }
     },
+    "ChoreReference" : {
+      "type" : "ChoreReference",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "accepted"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ "Chore@odata.bind" ],
+      "post" : {
+        "Attributes" : {
+          "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
+        }
+      },
+      "patch" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "ID" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Name" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "patchNull" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : {
+        "Chore" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "ContainedBy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        }
+      }
+    },
     "ChoreTask" : {
       "type" : "ChoreTask",
       "generate" : false,
@@ -776,6 +894,124 @@
         "outcome" : "ignored"
       }
     },
+    "CubeReference" : {
+      "type" : "CubeReference",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "accepted"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ "Cube@odata.bind" ],
+      "post" : {
+        "Attributes" : {
+          "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
+        }
+      },
+      "patch" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "ID" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Name" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "patchNull" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : {
+        "ContainedBy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "Cube" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        }
+      }
+    },
     "Dimension" : {
       "type" : "Dimension",
       "postRead" : {
@@ -912,6 +1148,251 @@
       },
       "rename" : {
         "outcome" : "ignored"
+      }
+    },
+    "DimensionReference" : {
+      "type" : "DimensionReference",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "accepted"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ "Dimension@odata.bind" ],
+      "post" : {
+        "Attributes" : {
+          "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
+        }
+      },
+      "patch" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "ID" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Name" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "patchNull" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : {
+        "ContainedBy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "Dimension" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        }
+      }
+    },
+    "Document" : {
+      "type" : "Document",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "accepted"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ ],
+      "post" : {
+        "Attributes" : {
+          "outcome" : "ignored"
+        },
+        "Content" : {
+          "outcome" : "untested"
+        },
+        "LastUpdated" : {
+          "outcome" : "unread"
+        },
+        "Size" : {
+          "outcome" : "unread"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
+        }
+      },
+      "patch" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Content" : {
+          "outcome" : "untested"
+        },
+        "LastUpdated" : {
+          "outcome" : "unread"
+        },
+        "Size" : {
+          "outcome" : "unread"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "ID" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Name" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "patchNull" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Content" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "LastUpdated" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Size" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : {
+        "ContainedBy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        }
       }
     },
     "Edge" : {
@@ -1937,6 +2418,15 @@
       },
       "navigations" : { }
     },
+    "Logger" : {
+      "type" : "Logger",
+      "generate" : false,
+      "patch" : {
+        "Level" : {
+          "outcome" : "applied"
+        }
+      }
+    },
     "MDXView" : {
       "type" : "MDXView",
       "postRead" : {
@@ -2804,6 +3294,402 @@
         "code" : "278"
       }
     },
+    "ProcessDebugContextDataBreakpoint" : {
+      "type" : "ProcessDebugContextDataBreakpoint",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "rejected",
+        "status" : 409,
+        "code" : "278"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ ],
+      "post" : {
+        "Enabled" : {
+          "outcome" : "applied"
+        },
+        "Expression" : {
+          "outcome" : "applied"
+        },
+        "HitCount" : {
+          "outcome" : "applied"
+        },
+        "HitMode" : {
+          "outcome" : "applied"
+        },
+        "VariableName" : {
+          "outcome" : "applied"
+        }
+      },
+      "patch" : {
+        "Enabled" : {
+          "outcome" : "applied"
+        },
+        "Expression" : {
+          "outcome" : "applied"
+        },
+        "HitCount" : {
+          "outcome" : "applied"
+        },
+        "HitMode" : {
+          "outcome" : "applied"
+        },
+        "VariableName" : {
+          "outcome" : "applied"
+        },
+        "ID" : {
+          "outcome" : "ignored"
+        }
+      },
+      "patchNull" : {
+        "Enabled" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Expression" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "HitCount" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "HitMode" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "VariableName" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : { }
+    },
+    "ProcessDebugContextLineBreakpoint" : {
+      "type" : "ProcessDebugContextLineBreakpoint",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "rejected",
+        "status" : 409,
+        "code" : "278"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ ],
+      "post" : {
+        "Enabled" : {
+          "outcome" : "applied"
+        },
+        "Expression" : {
+          "outcome" : "applied"
+        },
+        "HitCount" : {
+          "outcome" : "applied"
+        },
+        "HitMode" : {
+          "outcome" : "applied"
+        },
+        "LineNumber" : {
+          "outcome" : "applied"
+        },
+        "Procedure" : {
+          "outcome" : "applied"
+        },
+        "ProcessName" : {
+          "outcome" : "applied"
+        }
+      },
+      "patch" : {
+        "Enabled" : {
+          "outcome" : "applied"
+        },
+        "Expression" : {
+          "outcome" : "applied"
+        },
+        "HitCount" : {
+          "outcome" : "applied"
+        },
+        "HitMode" : {
+          "outcome" : "applied"
+        },
+        "LineNumber" : {
+          "outcome" : "applied"
+        },
+        "Procedure" : {
+          "outcome" : "applied"
+        },
+        "ProcessName" : {
+          "outcome" : "applied"
+        },
+        "ID" : {
+          "outcome" : "ignored"
+        }
+      },
+      "patchNull" : {
+        "Enabled" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Expression" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "HitCount" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "HitMode" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "LineNumber" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Procedure" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "ProcessName" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : { }
+    },
+    "ProcessDebugContextLockBreakpoint" : {
+      "type" : "ProcessDebugContextLockBreakpoint",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "rejected",
+        "status" : 409,
+        "code" : "278"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ ],
+      "post" : {
+        "Enabled" : {
+          "outcome" : "applied"
+        },
+        "Expression" : {
+          "outcome" : "applied"
+        },
+        "HitCount" : {
+          "outcome" : "applied"
+        },
+        "HitMode" : {
+          "outcome" : "applied"
+        },
+        "LockMode" : {
+          "outcome" : "applied"
+        },
+        "ObjectName" : {
+          "outcome" : "applied"
+        },
+        "ObjectType" : {
+          "outcome" : "applied"
+        }
+      },
+      "patch" : {
+        "Enabled" : {
+          "outcome" : "applied"
+        },
+        "Expression" : {
+          "outcome" : "applied"
+        },
+        "HitCount" : {
+          "outcome" : "applied"
+        },
+        "HitMode" : {
+          "outcome" : "applied"
+        },
+        "LockMode" : {
+          "outcome" : "applied"
+        },
+        "ObjectName" : {
+          "outcome" : "applied"
+        },
+        "ObjectType" : {
+          "outcome" : "applied"
+        },
+        "ID" : {
+          "outcome" : "ignored"
+        }
+      },
+      "patchNull" : {
+        "Enabled" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Expression" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "HitCount" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "HitMode" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "LockMode" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "ObjectName" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "ObjectType" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : { }
+    },
+    "ProcessReference" : {
+      "type" : "ProcessReference",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "accepted"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ "Process@odata.bind" ],
+      "post" : {
+        "Attributes" : {
+          "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
+        }
+      },
+      "patch" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "ID" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Name" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "patchNull" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : {
+        "ContainedBy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "Process" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        }
+      }
+    },
     "Sandbox" : {
       "type" : "Sandbox",
       "postRead" : {
@@ -3454,6 +4340,124 @@
         "outcome" : "ignored"
       }
     },
+    "SubsetReference" : {
+      "type" : "SubsetReference",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "accepted"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ "Subset@odata.bind" ],
+      "post" : {
+        "Attributes" : {
+          "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
+        }
+      },
+      "patch" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "ID" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Name" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "patchNull" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : {
+        "ContainedBy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "Subset" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        }
+      }
+    },
     "User" : {
       "type" : "User",
       "postRead" : {
@@ -3564,6 +4568,124 @@
       },
       "rename" : {
         "outcome" : "ignored"
+      }
+    },
+    "ViewReference" : {
+      "type" : "ViewReference",
+      "generate" : false,
+      "postRead" : {
+        "outcome" : "accepted"
+      },
+      "minimal" : {
+        "outcome" : "accepted"
+      },
+      "required" : [ "View@odata.bind" ],
+      "post" : {
+        "Attributes" : {
+          "outcome" : "ignored"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "ignored"
+        }
+      },
+      "patch" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Attributes/Caption" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "ID" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        },
+        "Name" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "patchNull" : {
+        "Attributes" : {
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
+        }
+      },
+      "navigations" : {
+        "ContainedBy" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "LocalizedAttributes" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "ignored"
+            },
+            "nested" : {
+              "outcome" : "ignored"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        },
+        "View" : {
+          "post" : {
+            "bind" : {
+              "outcome" : "applied"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          },
+          "patch" : {
+            "bind" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            },
+            "nested" : {
+              "outcome" : "rejected",
+              "status" : 400,
+              "code" : "278"
+            }
+          }
+        }
       }
     }
   },
