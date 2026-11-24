@@ -845,8 +845,32 @@ public final class ModelGenerator {
 		}
 		b.addMethod(build.build());
 		spec.addType(b.build());
-		if (!hierarchies.containsKey(qualified(type))) {
+		List<CsdlStructuredType> subtypes = hierarchies.get(qualified(type));
+		if (subtypes == null) {
 			spec.addMethod(from(type, root, builder, create));
+		}
+		else if (!create) {
+			// A hierarchy's root: its patch reads a value of any of its types, by its
+			// type
+			ClassName rootRecord = ClassName.get(PACKAGE, javaTypeName(type.name()));
+			ClassName fallback = rootRecord.nestedClass(type.isAbstract() ? "Unknown" : "Plain");
+			spec.addMethod(from(type, null, builder, false, fallback));
+			// instanceof, not a switch on the type: the client is built for Java 17
+			CodeBlock.Builder cases = CodeBlock.builder();
+			for (CsdlStructuredType sub : subtypes) {
+				cases.beginControlFlow("if (read instanceof $T v)", ClassName.get(PACKAGE, javaTypeName(sub.name())))
+					.addStatement("return $T.builder(v).build()", patchName(sub))
+					.endControlFlow();
+			}
+			cases.addStatement("return builder(($T) read).build()", fallback);
+			spec.addMethod(MethodSpec.methodBuilder("of")
+				.addModifiers(Modifier.STATIC)
+				.addParameter(rootRecord, "read")
+				.returns(name)
+				.addJavadoc(
+						"A patch of what {@code read} holds that a write takes, by its type: for nested values.\n@param read a value read from TM1\n@return the patch\n")
+				.addCode(cases.build())
+				.build());
 		}
 		return spec;
 	}
@@ -913,7 +937,11 @@ public final class ModelGenerator {
 	 */
 	private MethodSpec from(CsdlStructuredType type, @Nullable CsdlStructuredType root, ClassName builder,
 			boolean create) {
-		ClassName record = ClassName.get(PACKAGE, javaTypeName(type.name()));
+		return from(type, root, builder, create, ClassName.get(PACKAGE, javaTypeName(type.name())));
+	}
+
+	private MethodSpec from(CsdlStructuredType type, @Nullable CsdlStructuredType root, ClassName builder,
+			boolean create, ClassName record) {
 		Writes.TypeWrites w = writes.get(type.name());
 		Map<String, String> accessors = new HashMap<>();
 		components(type).forEach(c -> accessors.put(c.json(), c.name()));
@@ -961,20 +989,20 @@ public final class ModelGenerator {
 		TypeName t = p.type();
 		if (t instanceof ParameterizedTypeName list) {
 			TypeName element = list.typeArguments().get(0);
-			if (element instanceof WildcardTypeName) {
-				return null;
+			if (element instanceof WildcardTypeName w) {
+				element = w.upperBounds().get(0);
 			}
 			if (element.equals(ClassName.get(Object.class))) {
 				return CodeBlock.of("$T.<Object>copyOf($L)", List.class, value);
 			}
 			if (element instanceof ClassName c && isPatch(c)) {
-				return fromable(c) ? CodeBlock.of("$L.stream().map(v -> $T.builder(v).build()).toList()", value, c)
-						: null;
+				return root(c) ? CodeBlock.of("$L.stream().map(v -> $T.of(v)).toList()", value, c)
+						: CodeBlock.of("$L.stream().map(v -> $T.builder(v).build()).toList()", value, c);
 			}
 			return CodeBlock.of("$L", value);
 		}
 		if (t instanceof ClassName c && isPatch(c)) {
-			return fromable(c) ? CodeBlock.of("$T.builder($L).build()", c, value) : null;
+			return root(c) ? CodeBlock.of("$T.of($L)", c, value) : CodeBlock.of("$T.builder($L).build()", c, value);
 		}
 		return CodeBlock.of("$L", value);
 	}
@@ -986,12 +1014,12 @@ public final class ModelGenerator {
 	/**
 	 * Whether a patch has {@code builder(read)}: its type isn't the root of a hierarchy.
 	 */
-	private boolean fromable(ClassName patch) {
+	private boolean root(ClassName patch) {
 		String csdl = patch.simpleName().substring(0, patch.simpleName().length() - "Patch".length());
 		return metadata.structuredTypes()
 			.filter(t -> javaTypeName(t.name()).equals(csdl))
 			.findFirst()
-			.map(t -> !hierarchies.containsKey(qualified(t)))
+			.map(t -> hierarchies.containsKey(qualified(t)))
 			.orElse(false);
 	}
 

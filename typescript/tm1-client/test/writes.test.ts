@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { Chore, ChoreCreate, ChorePatch, CubeCreate, Element, ElementCreate, ODataPath, readAs } from "../src/index.js";
+import { Chore, ChoreCreate, ChorePatch, CubeCreate, Element, ElementCreate, ODataPath, readAs, ServerSettings, ServerSettingsPatch } from "../src/index.js";
 
 /** The Java client's `WritesTest`: the create types and `builder(read)`, a write made from a read
  * entity holding only what TM1 applies, by the probe (`tm1-probe-<schema>.json`'s writes). */
@@ -32,6 +32,17 @@ describe("writes made from what was read", () => {
     expect(create).toContain("Frequency");
     expect(create).not.toContain("Attributes");
     expect(create).not.toContain("Tasks");
+  });
+
+  it("copies a value whose type has subtypes as its own type", () => {
+    const read = readAs(ServerSettings, {
+      ServerName: "tm1",
+      EncryptionAtRest: { "@odata.type": "#ibm.tm1.api.v1.VaultSettings", KeyRef: "key", ServiceEndpoint: "https://vault" },
+    });
+    const encryption = JSON.parse(JSON.stringify(ServerSettingsPatch.builder(read).build())).EncryptionAtRest as Record<string, unknown>;
+    expect(encryption["@odata.type"]).toBe("#ibm.tm1.api.v1.VaultSettings");
+    expect(encryption.KeyRef).toBe("key");
+    expect(encryption.ServiceEndpoint).toBe("https://vault");
   });
 
   it("refuses a create without what TM1 needs", () => {

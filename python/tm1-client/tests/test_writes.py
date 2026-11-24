@@ -38,6 +38,19 @@ def test_patches_from_a_read_entity_leaving_out_what_a_patch_rejects_or_appends(
     assert "Frequency" in create and "Attributes" not in create and "Tasks" not in create
 
 
+def test_copies_a_value_whose_type_has_subtypes_as_its_own_type() -> None:
+    read = m.ServerSettings.model_validate(
+        {
+            "ServerName": "tm1",
+            "EncryptionAtRest": {"@odata.type": "#ibm.tm1.api.v1.VaultSettings", "KeyRef": "key", "ServiceEndpoint": "https://vault"},
+        }
+    )
+    encryption = m.ServerSettingsPatch.builder(read).build().json()["EncryptionAtRest"]
+    assert encryption["@odata.type"] == "#ibm.tm1.api.v1.VaultSettings"
+    assert encryption["KeyRef"] == "key"
+    assert encryption["ServiceEndpoint"] == "https://vault"
+
+
 def test_refuses_a_create_without_what_tm1_needs() -> None:
     with pytest.raises(ValueError, match="Dimensions"):
         m.CubeCreate.builder().name("Sales").build()

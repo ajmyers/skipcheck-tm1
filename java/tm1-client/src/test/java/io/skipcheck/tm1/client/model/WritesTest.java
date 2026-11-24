@@ -53,6 +53,17 @@ class WritesTest {
 	}
 
 	@Test
+	void copiesAValueWhoseTypeHasSubtypesAsItsOwnType() {
+		ServerSettings read = JSON.readValue("""
+				{"ServerName": "tm1", "EncryptionAtRest": {"@odata.type": "#ibm.tm1.api.v1.VaultSettings",
+				 "KeyRef": "key", "ServiceEndpoint": "https://vault"}}""", ServerSettings.class);
+		JsonNode encryption = json(ServerSettingsPatch.builder(read).build()).path("EncryptionAtRest");
+		assertThat(encryption.path("@odata.type").asString()).isEqualTo("#ibm.tm1.api.v1.VaultSettings");
+		assertThat(encryption.path("KeyRef").asString()).isEqualTo("key");
+		assertThat(encryption.path("ServiceEndpoint").asString()).isEqualTo("https://vault");
+	}
+
+	@Test
 	void refusesACreateWithoutWhatTm1Needs() {
 		assertThatThrownBy(() -> CubeCreate.builder().name("Sales").build()).isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("Dimensions");

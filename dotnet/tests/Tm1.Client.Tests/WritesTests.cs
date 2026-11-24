@@ -53,6 +53,20 @@ public class WritesTests
     }
 
     [Fact]
+    public void CopiesAValueWhoseTypeHasSubtypesAsItsOwnType()
+    {
+        var read = JsonSerializer.Deserialize<ServerSettings>(
+            """{"ServerName": "tm1", "EncryptionAtRest": {"@odata.type": "#ibm.tm1.api.v1.VaultSettings", "KeyRef": "key", "ServiceEndpoint": "https://vault"}}""",
+            Tm1Json.Options
+        )!;
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize<Tm1Patch>(ServerSettingsPatch.Builder(read).Build(), Tm1Json.Options));
+        var encryption = doc.RootElement.GetProperty("EncryptionAtRest");
+        Assert.Equal("#ibm.tm1.api.v1.VaultSettings", encryption.GetProperty("@odata.type").GetString());
+        Assert.Equal("key", encryption.GetProperty("KeyRef").GetString());
+        Assert.Equal("https://vault", encryption.GetProperty("ServiceEndpoint").GetString());
+    }
+
+    [Fact]
     public void RefusesACreateWithoutWhatTm1Needs()
     {
         var error = Assert.Throws<InvalidOperationException>(() => CubeCreate.Builder().Name("Sales").Build());
