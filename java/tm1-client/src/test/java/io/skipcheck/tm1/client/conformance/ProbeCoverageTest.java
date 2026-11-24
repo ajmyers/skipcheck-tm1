@@ -97,6 +97,14 @@ class ProbeCoverageTest {
 			String builder = entry.contains(".") ? entry.substring(0, entry.indexOf('.')) : entry;
 			assertThat(builders.has(builder)).as("probe-coverage.json names " + entry + ", which no client has")
 				.isTrue();
+			if (entry.contains(".")) {
+				String setter = entry.substring(entry.indexOf('.') + 1);
+				boolean offered = false;
+				for (JsonNode s : builders.path(builder).path("setters")) {
+					offered |= s.asString().equals(setter);
+				}
+				assertThat(offered).as("probe-coverage.json names " + entry + ", a setter no client offers").isTrue();
+			}
 		}
 	}
 

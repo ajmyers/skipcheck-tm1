@@ -395,13 +395,13 @@
       "odataType" : null,
       "open" : false,
       "required" : [ ],
-      "setters" : [ "AllMember", "AllMember@odata.bind", "ComponentsSortSense", "ComponentsSortType", "DefaultMember", "DefaultMember@odata.bind", "Dimension", "Dimension@odata.bind", "Edges", "Edges@odata.bind", "ElementAttributes", "ElementAttributes@odata.bind", "Elements", "Elements@odata.bind", "ElementsSortSense", "ElementsSortType", "Levels", "Levels@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Members", "Members@odata.bind", "Name", "PrivateSubsets", "PrivateSubsets@odata.bind", "SessionSubsets", "SessionSubsets@odata.bind", "SubsetAttributes", "SubsetAttributes@odata.bind", "Subsets", "Subsets@odata.bind", "ViewPrivateSubsets" ]
+      "setters" : [ "AllMember", "AllMember@odata.bind", "ComponentsSortSense", "ComponentsSortType", "DefaultMember", "DefaultMember@odata.bind", "Dimension", "Dimension@odata.bind", "Edges", "Edges@odata.bind", "ElementAttributes", "ElementAttributes@odata.bind", "Elements", "Elements@odata.bind", "ElementsSortSense", "ElementsSortType", "Levels", "Levels@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Members", "Members@odata.bind", "Name", "PrivateSubsets", "PrivateSubsets@odata.bind", "SessionSubsets", "SessionSubsets@odata.bind", "SubsetAttributes", "SubsetAttributes@odata.bind", "Subsets", "Subsets@odata.bind" ]
     },
     "HierarchyPatch" : {
       "odataType" : null,
       "open" : false,
       "required" : [ ],
-      "setters" : [ "AllMember", "AllMember@odata.bind", "ComponentsSortSense", "ComponentsSortType", "DefaultMember", "DefaultMember@odata.bind", "Dimension", "Dimension@odata.bind", "Edges", "Edges@odata.bind", "ElementAttributes", "ElementAttributes@odata.bind", "Elements", "Elements@odata.bind", "ElementsSortSense", "ElementsSortType", "Levels", "Levels@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Members", "Members@odata.bind", "PrivateSubsets", "PrivateSubsets@odata.bind", "SessionSubsets", "SessionSubsets@odata.bind", "SubsetAttributes", "SubsetAttributes@odata.bind", "Subsets", "Subsets@odata.bind", "ViewPrivateSubsets" ]
+      "setters" : [ "AllMember", "AllMember@odata.bind", "ComponentsSortSense", "ComponentsSortType", "DefaultMember", "DefaultMember@odata.bind", "Dimension", "Dimension@odata.bind", "Edges", "Edges@odata.bind", "ElementAttributes", "ElementAttributes@odata.bind", "Elements", "Elements@odata.bind", "ElementsSortSense", "ElementsSortType", "Levels", "Levels@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Members", "Members@odata.bind", "PrivateSubsets", "PrivateSubsets@odata.bind", "SessionSubsets", "SessionSubsets@odata.bind", "SubsetAttributes", "SubsetAttributes@odata.bind", "Subsets", "Subsets@odata.bind" ]
     },
     "JavaSettingsPatch" : {
       "odataType" : null,

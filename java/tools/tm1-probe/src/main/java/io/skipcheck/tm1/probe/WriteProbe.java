@@ -364,7 +364,9 @@ public final class WriteProbe {
 		ObjectNode post = result.putObject("post");
 		ObjectNode patch = result.putObject("patch");
 		ObjectNode patchNull = result.putObject("patchNull");
-		for (String property : sortedFields(read)) {
+		// Every property the type has, declared or undeclared, not only what the
+		// fixture's read returned: TM1 leaves some out of a read
+		for (String property : properties(type, read)) {
 			if (shape.keys.contains(property)) {
 				continue;
 			}
@@ -384,6 +386,7 @@ public final class WriteProbe {
 			shape.remove(m);
 		}
 
+		probeKeys(type, shape, select, patch);
 		probeSecrets(c, shape, post, patch);
 		result.set("navigations", probeNavigations(type, shape, c));
 
@@ -539,6 +542,44 @@ public final class WriteProbe {
 	}
 
 	/**
+	 * The case's keys other than {@code Name} (a rename has its own try): each changed in
+	 * a PATCH of a fresh object, which is then looked for where it was. {@code ignored}
+	 * when it's still there with the key it had, {@code applied} when it isn't, or
+	 * {@code rejected}.
+	 */
+	private void probeKeys(String type, Shape shape, String select, ObjectNode patch) {
+		for (String key : shape.keys) {
+			if (key.equals("Name")) {
+				continue;
+			}
+			Made made = shape.post(shape.fresh());
+			if (!made.ok()) {
+				patch.set(key, outcome(made.answer()));
+				shape.remove(made);
+				continue;
+			}
+			JsonNode before = readBack(made.where(), select).get(key);
+			JsonNode value = madeUp(type, key, before);
+			if (value == null) {
+				value = NODES.stringNode("Probe");
+			}
+			ObjectNode body = NODES.objectNode();
+			body.set(key, value);
+			ProbeClient.Answer answer = client.send("PATCH", made.where(), body);
+			ObjectNode result = NODES.objectNode();
+			if (!answer.ok()) {
+				patch.set(key, outcome(answer));
+			}
+			else {
+				JsonNode after = readBack(made.where(), select).get(key);
+				result.put("outcome", after != null && same(after, before) ? "ignored" : "applied");
+				patch.set(key, result);
+			}
+			shape.remove(made);
+		}
+	}
+
+	/**
 	 * The case's secrets ({@code "secrets": {"Password": ["one", "two"]}}): properties
 	 * TM1 never reads back, checked by their effect instead. A create with the first, and
 	 * a PATCH to the second, is applied when the object then signs in with it and not
@@ -589,8 +630,8 @@ public final class WriteProbe {
 			ObjectNode post = n.putObject("post");
 			ObjectNode patch = n.putObject("patch");
 			// The case's own target for a type, else the cases'
-			JsonNode targets = c.path("targets").path(target).isString() ? c.path("targets") : cases.path("targets");
-			String bound = targets.path(target).isString() ? text(targets.path(target).asString(), "") : null;
+			JsonNode targets = c.path("targets").has(target) ? c.path("targets") : cases.path("targets");
+			String bound = target(targets.path(target));
 			if (bound == null) {
 				post.putObject("bind").put("outcome", "untested");
 				patch.putObject("bind").put("outcome", "untested");
@@ -608,8 +649,18 @@ public final class WriteProbe {
 				post.set("bind", navPost(shape, nav, () -> bind));
 				patch.set("bind", navPatch(shape, nav, () -> bind));
 			}
+			JsonNode nestBody = cases.path("nest").path(target);
 			JsonNode nestedCase = caseFor(target);
-			if (nestedCase == null || !nestedCase.path("named").asBoolean(true)) {
+			if (nestBody.isObject()) {
+				// A body to nest, for a type without a case to make one from
+				Supplier<Sent> nestedBody = () -> {
+					JsonNode made = substitute(nestBody, prefix + "N" + String.format(Locale.ROOT, "%03d", sequence++));
+					return new Sent(nav, many ? NODES.arrayNode().add(made) : made, bodyKey(made), null);
+				};
+				post.set("nested", navPost(shape, nav, nestedBody));
+				patch.set("nested", navPatch(shape, nav, nestedBody));
+			}
+			else if (nestedCase == null || !nestedCase.path("named").asBoolean(true)) {
 				post.putObject("nested").put("outcome", "untested");
 				patch.putObject("nested").put("outcome", "untested");
 			}
@@ -631,8 +682,49 @@ public final class WriteProbe {
 	 * What a navigation write sends: the property, its value, the key the navigation
 	 * should then hold, and what to delete after (a nested entity), or null.
 	 */
-	private record Sent(String property, JsonNode value, String key, @Nullable String cleanup) {
+	private record Sent(String property, JsonNode value, @Nullable String key, @Nullable String cleanup) {
 	}
+
+	/**
+	 * A binding target: a path, or {@code {"from": path, "key": field, "path":
+	 * template}}, found at run time (a key TM1 assigns: a session's ID); with no
+	 * {@code key}, the first member's {@code @odata.id}. Null when there's none, or
+	 * nothing to find.
+	 */
+	private @Nullable String target(JsonNode spec) {
+		if (spec.isString()) {
+			return text(spec.asString(), "");
+		}
+		if (!spec.isObject()) {
+			return null;
+		}
+		ProbeClient.Answer found = client.get(text(spec.path("from").asString(), ""));
+		if (!found.ok() || found.body() == null) {
+			return null;
+		}
+		JsonNode first = found.body().path("value").isArray() ? found.body().path("value").path(0) : found.body();
+		if (!spec.has("key")) {
+			return first.path("@odata.id").isString() ? first.path("@odata.id").asString() : null;
+		}
+		JsonNode key = first.path(spec.path("key").asString());
+		if (key.isMissingNode() || key.isNull()) {
+			return null;
+		}
+		return text(spec.path("path").asString(), "").replace("{key}", key.asString());
+	}
+
+	/** The key a nested body's entity is listed by, or null to count any change. */
+	private static @Nullable String bodyKey(JsonNode body) {
+		for (String field : KEYS) {
+			if (body.path(field).isString()) {
+				return body.path(field).asString();
+			}
+		}
+		return null;
+	}
+
+	/** What a navigation's members are listed by, in this order. */
+	private static final List<String> KEYS = List.of("Name", "ID", "LocaleID", "ComponentName", "Step", "Timestamp");
 
 	private JsonNode navPost(Shape shape, String nav, Supplier<Sent> make) {
 		String name = shape.fresh();
@@ -656,8 +748,8 @@ public final class WriteProbe {
 		if (after == null || baseline == null) {
 			return result.put("outcome", "unread");
 		}
-		return result.put("outcome",
-				after.equals(baseline) ? "ignored" : after.contains(sent.key()) ? "applied" : "transformed");
+		return result.put("outcome", after.equals(baseline) ? "ignored"
+				: sent.key() == null || after.contains(sent.key()) ? "applied" : "transformed");
 	}
 
 	private JsonNode navPatch(Shape shape, String nav, Supplier<Sent> make) {
@@ -685,7 +777,7 @@ public final class WriteProbe {
 		if (after.equals(before)) {
 			outcome = "ignored";
 		}
-		else if (!after.contains(sent.key())) {
+		else if (sent.key() != null && !after.contains(sent.key())) {
 			outcome = "transformed";
 		}
 		else if (before.isEmpty()) {
@@ -733,16 +825,34 @@ public final class WriteProbe {
 	}
 
 	private static String memberKey(JsonNode item) {
-		if (item.path("Name").isString()) {
-			return item.path("Name").asString();
+		for (String field : KEYS) {
+			if (item.has(field) && !item.path(field).isNull()) {
+				return item.path(field).asString(item.path(field).toString());
+			}
 		}
-		return item.has("ID") ? item.path("ID").asString(item.path("ID").toString()) : item.toString();
+		return item.toString();
 	}
 
 	/** The key a binding's path names last: {@code Elements('A')} binds {@code A}. */
 	static String keyOf(String path) {
-		int open = path.lastIndexOf("('");
-		return open < 0 ? path : path.substring(open + 2, path.length() - 2).replace("''", "'");
+		if (path.endsWith("')")) {
+			// Elements('A'), and a part of a key: Edges(ParentName='T',ComponentName='A')
+			// The opening quote: back from the end, past doubled (escaped) ones
+			int open = path.length() - 3;
+			while (open >= 0) {
+				if (path.charAt(open) == '\'') {
+					if (open > 0 && path.charAt(open - 1) == '\'') {
+						open -= 2;
+						continue;
+					}
+					break;
+				}
+				open--;
+			}
+			return path.substring(open + 1, path.length() - 2).replace("''", "'");
+		}
+		int open = path.lastIndexOf('(');
+		return open < 0 || !path.endsWith(")") ? path : path.substring(open + 1, path.length() - 1);
 	}
 
 	/**
@@ -866,7 +976,12 @@ public final class WriteProbe {
 		if (fixture != null && !same(fixture, defaultValue)) {
 			return fixture;
 		}
-		return madeUp(type, property, defaultValue);
+		JsonNode made = madeUp(type, property, defaultValue);
+		// Undeclared and never read back: a string, to see what TM1 does with a write
+		if (made == null && "unread".equals(undeclaredOf(type).get(property))) {
+			return NODES.stringNode("Probe");
+		}
+		return made;
 	}
 
 	private @Nullable JsonNode madeUp(String type, String property, @Nullable JsonNode current) {
@@ -922,6 +1037,31 @@ public final class WriteProbe {
 			}
 		}
 		return Optional.empty();
+	}
+
+	/**
+	 * The properties to probe: what the read returned, every structural property the type
+	 * declares, and every undeclared one the probe found, but no navigations.
+	 */
+	private List<String> properties(String type, JsonNode read) {
+		TreeSet<String> names = new TreeSet<>(read.propertyNames());
+		for (CsdlStructuredType level : metadata.typeHierarchy(qualified(type))) {
+			level.properties().forEach(p -> names.add(p.name()));
+		}
+		undeclaredOf(type).forEach((name, kind) -> {
+			if (!kind.equals("navigation")) {
+				names.add(name);
+			}
+		});
+		return new ArrayList<>(names);
+	}
+
+	/**
+	 * The undeclared properties the probe found for a type, and the kind each reads as.
+	 */
+	private Map<String, String> undeclaredOf(String type) {
+		Map<String, String> found = undeclared.get(type);
+		return found == null ? Map.of() : found;
 	}
 
 	/** A {@code $select} of every structural property, declared or not. */

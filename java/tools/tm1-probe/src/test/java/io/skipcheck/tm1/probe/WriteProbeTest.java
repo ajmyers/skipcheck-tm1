@@ -37,6 +37,7 @@ class WriteProbeTest {
 			    <Property Name="Derived" Type="Edm.String"/>
 			    <Property Name="Normalised" Type="Edm.String"/>
 			    <Property Name="Items" Type="Collection(tm1.Item)"/>
+			    <Property Name="Hidden" Type="Edm.String"/>
 			   </EntityType>
 			   <EntityContainer Name="API"><EntitySet Name="Things" EntityType="tm1.Thing"/></EntityContainer>
 			  </Schema>
@@ -225,8 +226,11 @@ class WriteProbeTest {
 		assertThat(thing.path("required").size()).isZero();
 		for (String method : List.of("post", "patch")) {
 			JsonNode m = thing.path(method);
-			assertThat(m.propertyNames()).containsExactly("Derived", "Dropped", "Items", "Kept", "Normalised",
+			// Hidden isn't in the read: probed all the same, as every property the type
+			// has is
+			assertThat(m.propertyNames()).containsExactly("Derived", "Dropped", "Hidden", "Items", "Kept", "Normalised",
 					"Refused");
+			assertThat(outcome(m.path("Hidden"))).as(method).isEqualTo("ignored");
 			assertThat(outcome(m.path("Kept"))).as(method).isEqualTo("applied");
 			assertThat(outcome(m.path("Dropped"))).as(method).isEqualTo("ignored");
 			assertThat(outcome(m.path("Refused"))).as(method).isEqualTo("rejected");
@@ -527,6 +531,14 @@ class WriteProbeTest {
 	@Test
 	void isTheSameEveryRun() throws Exception {
 		assertThat(probe()).isEqualTo(probe());
+	}
+
+	@Test
+	void readsTheKeyABindingPathNamesLast() {
+		assertThat(WriteProbe.keyOf("Dimensions('D')/Hierarchies('D')/Elements('A')")).isEqualTo("A");
+		assertThat(WriteProbe.keyOf("Users('O''Neil')")).isEqualTo("O'Neil");
+		assertThat(WriteProbe.keyOf("Chores('C')/Tasks(0)")).isEqualTo("0");
+		assertThat(WriteProbe.keyOf("Edges(ParentName='T',ComponentName='A')")).isEqualTo("A");
 	}
 
 	@Test

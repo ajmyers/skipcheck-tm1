@@ -4184,6 +4184,7 @@
 						"ElementsSortType" : "applied",
 						"Structure" : "ignored",
 						"UniqueName" : "ignored",
+						"ViewPrivateSubsets" : "ignored",
 						"Visible" : "ignored"
 					}
 				},
@@ -4197,6 +4198,7 @@
 						"ElementsSortType" : "applied",
 						"Structure" : "ignored",
 						"UniqueName" : "ignored",
+						"ViewPrivateSubsets" : "ignored",
 						"Visible" : "ignored"
 					},
 					"nullRefused" : [
