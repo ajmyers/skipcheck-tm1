@@ -4,23 +4,24 @@ import { describe, expect } from "vitest";
 import {
   allOperations,
   Cube,
+  CubeCreate,
   CubePatch,
   Dimension,
-  DimensionPatch,
+  DimensionCreate,
   Element,
-  ElementPatch,
+  ElementCreate,
   ElementType,
-  HierarchyPatch,
-  MDXViewPatch,
+  HierarchyCreate,
+  type MDXView,
+  MDXViewCreate,
   Member,
   ODataPath,
   ODataQuery,
   Server,
   Tm1Request,
+  type Tm1Session,
   typeOf,
   View,
-  type MDXView,
-  type Tm1Session,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 import { sessions } from "./raw-tm1.js";
@@ -60,7 +61,7 @@ describe("The generated model on TM1" + liveReason, () => {
     const views = ODataPath.of("Cubes").key("}ClientGroups").nav("Views");
     try {
       const created = await session.execute(
-        Tm1Request.post(views, MDXViewPatch.builder().name(view).mdx("SELECT {[}Groups].[}Groups].MEMBERS} ON 0 FROM [}ClientGroups]").build(), View),
+        Tm1Request.post(views, MDXViewCreate.builder().name(view).mdx("SELECT {[}Groups].[}Groups].MEMBERS} ON 0 FROM [}ClientGroups]").build(), View),
       );
       expect(typeOf(View, created)).toBe("MDXView");
       expect((created as MDXView).MDX).toContain("}Groups");
@@ -114,14 +115,14 @@ describe("The generated model on TM1" + liveReason, () => {
       await session.execute(
         Tm1Request.post(
           ODataPath.of("Dimensions"),
-          DimensionPatch.builder()
+          DimensionCreate.builder()
             .name(n)
             .hierarchies([
-              HierarchyPatch.builder()
+              HierarchyCreate.builder()
                 .name(n)
                 .elements([
-                  ElementPatch.builder().name("North").type(ElementType.Numeric).build(),
-                  ElementPatch.builder().name("South").type(ElementType.Numeric).build(),
+                  ElementCreate.builder().name("North").type(ElementType.Numeric).build(),
+                  ElementCreate.builder().name("South").type(ElementType.Numeric).build(),
                 ])
                 .build(),
             ])
@@ -130,7 +131,7 @@ describe("The generated model on TM1" + liveReason, () => {
         ),
       );
       await session.execute(
-        Tm1Request.post(ODataPath.of("Cubes"), CubePatch.builder().name(n).bindDimensions(dimension, ODataPath.of("Dimensions").key("}Groups")).build(), Cube),
+        Tm1Request.post(ODataPath.of("Cubes"), CubeCreate.builder().name(n).bindDimensions(dimension, ODataPath.of("Dimensions").key("}Groups")).build(), Cube),
       );
 
       const created = await session.execute(

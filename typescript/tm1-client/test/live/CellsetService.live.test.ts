@@ -2,9 +2,9 @@
 
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import {
-  CubePatch,
-  MDXViewPatch,
-  NativeViewPatch,
+  CubeCreate,
+  MDXViewCreate,
+  NativeViewCreate,
   ODataQuery,
   Tm1NotFoundException,
   ViewAxisSelectionPatch,
@@ -33,7 +33,7 @@ describe("CellsetService on TM1" + liveReason, () => {
     tm1 = await Live.client();
     await Fixtures.dimension(tm1, region, REGIONS);
     await Fixtures.dimension(tm1, measure, MEASURES);
-    await tm1.cubes.create(CubePatch.builder().name(cube).bindDimensions(Fixtures.dimensionPath(region), Fixtures.dimensionPath(measure)).build());
+    await tm1.cubes.create(CubeCreate.builder().name(cube).bindDimensions(Fixtures.dimensionPath(region), Fixtures.dimensionPath(measure)).build());
     // Ordinals run across the columns (measures) first: cell (row r, column c) is r * 2 + c
     let value = 1;
     for (const r of REGIONS)
@@ -138,13 +138,13 @@ describe("CellsetService on TM1" + liveReason, () => {
   });
 
   tm1Test("executes MDX and native views", async () => {
-    await tm1.views.create(cube, ViewScope.Public, MDXViewPatch.builder().name("Mdx").mdx(mdx).build());
+    await tm1.views.create(cube, ViewScope.Public, MDXViewCreate.builder().name("Mdx").mdx(mdx).build());
     for (const d of [region, measure]) await Fixtures.subsetAll(tm1, d);
     const axis = (d: string): ViewAxisSelectionPatch => ViewAxisSelectionPatch.builder().bindSubset(Fixtures.subset(d)).build();
     await tm1.views.create(
       cube,
       ViewScope.Public,
-      NativeViewPatch.builder()
+      NativeViewCreate.builder()
         .name("Native")
         .columns([axis(measure)])
         .rows([axis(region)])

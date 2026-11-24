@@ -30,7 +30,7 @@ public class ProcessServiceTests
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "Load", ["@odata.etag"] = "W/\"1\"" };
         Assert.Equal("W/\"1\"", (await tm1.Processes.GetAsync("Load")).ETag);
         Assert.Equal("Processes('Load')", _tm1.Last.Target);
-        await tm1.Processes.CreateAsync(ProcessPatch.Builder().Name("Load").PrologProcedure("x=1;").Build());
+        await tm1.Processes.CreateAsync(ProcessCreate.Builder().Name("Load").PrologProcedure("x=1;").Build());
         Assert.Equal(("POST", "Processes", """{"Name":"Load","PrologProcedure":"x=1;"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => null;
@@ -53,7 +53,7 @@ public class ProcessServiceTests
         Assert.Equal(("POST", "Processes('Load')/tm1.Compile", "{}"), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => FakeTm1.Collection();
-        Assert.Empty(await tm1.Processes.CompileAsync(ProcessPatch.Builder().Name("x").Build()).ToListAsync());
+        Assert.Empty(await tm1.Processes.CompileAsync(ProcessCreate.Builder().Name("x").Build()).ToListAsync());
         Assert.Equal(("POST", "CompileProcess", """{"Process":{"Name":"x"}}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
     }
 
@@ -72,7 +72,7 @@ public class ProcessServiceTests
         await tm1.Processes.ExecuteWithReturnAsync("Load");
         Assert.Equal(("Processes('Load')/tm1.ExecuteWithReturn", "{}"), (_tm1.Last.Target, _tm1.Last.Text));
 
-        await tm1.Processes.ExecuteWithReturnAsync(ProcessPatch.Builder().Name("adhoc").Build(), new Dictionary<string, object?> { ["p"] = "v" });
+        await tm1.Processes.ExecuteWithReturnAsync(ProcessCreate.Builder().Name("adhoc").Build(), new Dictionary<string, object?> { ["p"] = "v" });
         Assert.Equal("ExecuteProcessWithReturn", _tm1.Last.Target);
         Assert.Equal("""{"Process":{"Name":"adhoc"},"Parameters":[{"Name":"p","Value":"v"}]}""", _tm1.Last.Text);
     }
@@ -87,7 +87,7 @@ public class ProcessServiceTests
             ("POST", "Processes('Load')/tm1.Execute", """{"Parameters":[{"Name":"p","Value":1}]}"""),
             (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text)
         );
-        await tm1.Processes.ExecuteAsync(ProcessPatch.Builder().Name("adhoc").Build());
+        await tm1.Processes.ExecuteAsync(ProcessCreate.Builder().Name("adhoc").Build());
         Assert.Equal(("ExecuteProcess", """{"Process":{"Name":"adhoc"}}"""), (_tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => FakeTm1.Collection(new { Timestamp = "2026-01-02T03:04:05Z" });

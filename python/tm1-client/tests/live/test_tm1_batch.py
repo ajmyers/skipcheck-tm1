@@ -10,7 +10,7 @@ import uuid
 import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client, Tm1Error, Tm1NotFoundError, Tm1Request
-from skipcheck_tm1.model import Cube, DimensionPatch, ElementPatch, HierarchyPatch, ProcessExecuteStatusCode, ProcessPatch
+from skipcheck_tm1.model import Cube, DimensionCreate, ElementCreate, HierarchyCreate, ProcessCreate, ProcessExecuteStatusCode
 
 from .conftest import CONFIGURED, REASON
 
@@ -20,15 +20,15 @@ pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 def test_runs_reads_writes_and_failures_together(tm1: Tm1Client) -> None:
     dimension = "batch" + uuid.uuid4().hex[:8]
     process = "tm1-client-" + uuid.uuid4().hex[:8]
-    tm1.dimensions.create(DimensionPatch.builder().name(dimension).hierarchies([HierarchyPatch.builder().name(dimension).build()]).build())
-    tm1.processes.create(ProcessPatch.builder().name(process).prolog_procedure("x = 1;\n").build())
+    tm1.dimensions.create(DimensionCreate.builder().name(dimension).hierarchies([HierarchyCreate.builder().name(dimension).build()]).build())
+    tm1.processes.create(ProcessCreate.builder().name(process).prolog_procedure("x = 1;\n").build())
     try:
         batch = tm1.batch()
         queued = batch.client
         cube = queued.cubes.get("}ClientGroups", ODataQuery.none().select(Cube.NAME))
         missing = queued.cubes.get("not-a-cube")
-        north = queued.elements.create(dimension, dimension, ElementPatch.builder().name("North").build())
-        twice = queued.elements.create(dimension, dimension, ElementPatch.builder().name("North").build())
+        north = queued.elements.create(dimension, dimension, ElementCreate.builder().name("North").build())
+        twice = queued.elements.create(dimension, dimension, ElementCreate.builder().name("North").build())
         listed = queued.elements.list(dimension, dimension)
         run = queued.processes.execute_with_return(process)
         elements = ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements")
@@ -53,7 +53,7 @@ def test_runs_reads_writes_and_failures_together(tm1: Tm1Client) -> None:
 
 def test_runs_requests_in_order(tm1: Tm1Client) -> None:
     dimension = "batch" + uuid.uuid4().hex[:8]
-    tm1.dimensions.create(DimensionPatch.builder().name(dimension).hierarchies([HierarchyPatch.builder().name(dimension).build()]).build())
+    tm1.dimensions.create(DimensionCreate.builder().name(dimension).hierarchies([HierarchyCreate.builder().name(dimension).build()]).build())
     try:
         batch = tm1.batch()
         queued = batch.client
@@ -62,7 +62,7 @@ def test_runs_requests_in_order(tm1: Tm1Client) -> None:
         # Ten times over, so that requests run side by side would show
         for i in range(10):
             before.append(queued.elements.get(dimension, dimension, f"e{i}"))
-            queued.elements.create(dimension, dimension, ElementPatch.builder().name(f"e{i}").build())
+            queued.elements.create(dimension, dimension, ElementCreate.builder().name(f"e{i}").build())
             after.append(queued.elements.get(dimension, dimension, f"e{i}"))
 
         batch.run()

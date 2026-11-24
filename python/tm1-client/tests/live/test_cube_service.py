@@ -13,6 +13,7 @@ import pytest
 from skipcheck_tm1 import ODataQuery, Tm1Client, Tm1NotFoundError, Tm1PreconditionFailedError, Tm1Request
 from skipcheck_tm1.model import (
     Cube,
+    CubeCreate,
     CubePatch,
 )
 
@@ -32,7 +33,7 @@ pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 def cube(tm1: Tm1Client, name: str) -> Iterator[tuple[str, str, str]]:
     region = dimension(tm1, name + "-region", [element("North"), element("South")])
     measure = dimension(tm1, name + "-measure", [element("Amount")])
-    tm1.cubes.create(CubePatch.builder().name(name).bind_dimensions(dim(region), dim(measure)).build())
+    tm1.cubes.create(CubeCreate.builder().name(name).bind_dimensions(dim(region), dim(measure)).build())
     yield name, region, measure
     try:
         tm1.cubes.delete(name)

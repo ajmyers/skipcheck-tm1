@@ -62,7 +62,7 @@ public sealed class AttributeService : Tm1Service
     [Tm1Endpoint("Navigation Cube/ViewAttributes")]
     [Tm1Endpoint("EntitySet ProcessAttributes")]
     [Tm1Endpoint("EntitySet ChoreAttributes")]
-    public Task<AttributeDefinition> CreateAsync(AttributeSet set, AttributeDefinitionPatch attribute, CancellationToken cancellationToken = default) =>
+    public Task<AttributeDefinition> CreateAsync(AttributeSet set, AttributeDefinitionCreate attribute, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<AttributeDefinition>(Require(set, nameof(set)).Path, Require(attribute, nameof(attribute))), cancellationToken);
 
     /// <summary><c>DELETE</c>: removes an attribute, with its values, from every object of the set's kind.</summary>

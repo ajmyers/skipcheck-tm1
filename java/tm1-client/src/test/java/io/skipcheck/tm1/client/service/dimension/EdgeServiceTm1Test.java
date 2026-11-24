@@ -15,12 +15,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
-import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.EdgePatch;
 import io.skipcheck.tm1.client.model.Element;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
@@ -55,9 +55,9 @@ class EdgeServiceTm1Test {
 	void createDimension() {
 		d = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(d)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(d)
 					.elements(List.of(element("Total", ElementType.CONSOLIDATED), element("North", ElementType.NUMERIC),
 							element("South", ElementType.NUMERIC), element("East", ElementType.NUMERIC)))
@@ -95,8 +95,8 @@ class EdgeServiceTm1Test {
 		return tm1.elements().components(d, d, parent, ODataQuery.none()).map(Element::name).collectList().block(WAIT);
 	}
 
-	private static ElementPatch element(String name, ElementType type) {
-		return ElementPatch.builder().name(name).type(type).build();
+	private static ElementCreate element(String name, ElementType type) {
+		return ElementCreate.builder().name(name).type(type).build();
 	}
 
 	private static EdgePatch edge(String parent, String component) {

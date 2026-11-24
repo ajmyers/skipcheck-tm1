@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Tm1Model } from "../../model.js";
-import { Dimension, Hierarchy, Tm1Operations, type DimensionPatch } from "../../generated/index.js";
+import { Dimension, type DimensionCreate, type DimensionPatch, Hierarchy, Tm1Operations } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";
 import { Tm1Request } from "../../request.js";
@@ -21,9 +21,9 @@ const DIMENSIONS = ODataPath.of("Dimensions");
  * ```
  * Create a dimension with its hierarchy, elements and edges in one request:
  * ```ts
- * await tm1.dimensions.create(DimensionPatch.builder().name("Region").hierarchies([
- *   HierarchyPatch.builder().name("Region")
- *     .elements([ElementPatch.builder().name("Total").type(ElementType.Consolidated).build(), ElementPatch.builder().name("North").build()])
+ * await tm1.dimensions.create(DimensionCreate.builder().name("Region").hierarchies([
+ *   HierarchyCreate.builder().name("Region")
+ *     .elements([ElementCreate.builder().name("Total").type(ElementType.Consolidated).build(), ElementCreate.builder().name("North").build()])
  *     .edges([EdgePatch.builder().parentName("Total").componentName("North").weight(1).build()])
  *     .build(),
  * ]).build());
@@ -74,7 +74,7 @@ export class DimensionService extends Tm1Service {
 
   /** `POST Dimensions`: creates a dimension, with its hierarchies, elements and edges if the patch
    * has them (a deep insert). It needs a name; returns the dimension as created. */
-  create(dimension: DimensionPatch, options?: Tm1CallOptions): Promise<Dimension> {
+  create(dimension: DimensionCreate, options?: Tm1CallOptions): Promise<Dimension> {
     return this.session.execute(Tm1Request.post(DIMENSIONS, required(dimension, "dimension"), Dimension), options);
   }
 

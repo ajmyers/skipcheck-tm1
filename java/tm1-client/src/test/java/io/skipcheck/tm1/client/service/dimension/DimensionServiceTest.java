@@ -18,13 +18,15 @@ import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.error.Tm1ServerException;
 import io.skipcheck.tm1.client.model.Dimension;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.DimensionPatch;
 import io.skipcheck.tm1.client.model.EdgePatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.Hierarchy;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.odata.Filter;
+import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 
 /**
@@ -128,12 +130,12 @@ class DimensionServiceTest {
 	@Test
 	void createsADimensionWithItsStructure() {
 		tm1().json(201, "{\"Name\":\"Region\"}");
-		Dimension created = conformance.call("dimensions", "create", DimensionPatch.builder()
+		Dimension created = conformance.call("dimensions", "create", DimensionCreate.builder()
 			.name("Region")
-			.hierarchies(List.of(HierarchyPatch.builder()
+			.hierarchies(List.of(HierarchyCreate.builder()
 				.name("Region")
-				.elements(List.of(ElementPatch.builder().name("Total").type(ElementType.CONSOLIDATED).build(),
-						ElementPatch.builder().name("North").type(ElementType.NUMERIC).build()))
+				.elements(List.of(ElementCreate.builder().name("Total").type(ElementType.CONSOLIDATED).build(),
+						ElementCreate.builder().name("North").type(ElementType.NUMERIC).build()))
 				.edges(List.of(EdgePatch.builder().parentName("Total").componentName("North").weight(1.0).build()))
 				.build()))
 			.build());
@@ -149,14 +151,14 @@ class DimensionServiceTest {
 	@Test
 	void creatingADimensionThatExistsConflicts() {
 		tm1().error(409, "278", "Dimension 'Region' already exists.");
-		Throwable error = conformance.fail("dimensions", "create", DimensionPatch.builder().name("Region").build());
+		Throwable error = conformance.fail("dimensions", "create", DimensionCreate.builder().name("Region").build());
 		assertThat(error).isInstanceOf(Tm1ConflictException.class);
 	}
 
 	@Test
 	void aDimensionWithoutANameIsABadRequest() {
 		tm1().error(400, "278", "Name is required.");
-		Throwable error = conformance.fail("dimensions", "create", DimensionPatch.builder().build());
+		Throwable error = conformance.fail("dimensions", "create", DimensionCreate.builder().build());
 		assertThat(error).isInstanceOf(Tm1BadRequestException.class);
 		assertThat(tm1().last().text()).isEqualTo("{}");
 	}
@@ -164,7 +166,7 @@ class DimensionServiceTest {
 	@Test
 	void aNameTm1RefusesIsAnInvalidUniqueName() {
 		tm1().error(400, "248", "Invalid name.");
-		Throwable error = conformance.fail("dimensions", "create", DimensionPatch.builder().name("a]b").build());
+		Throwable error = conformance.fail("dimensions", "create", DimensionCreate.builder().name("a]b").build());
 		assertThat(error).isInstanceOfSatisfying(Tm1BadRequestException.class,
 				e -> assertThat(e.kind()).isEqualTo(Tm1ErrorKind.INVALID_UNIQUE_NAME));
 	}
@@ -172,27 +174,31 @@ class DimensionServiceTest {
 	@Test
 	void updatesWithAndWithoutAnEtag() {
 		tm1().status(204);
+		ODataPath alternate = ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Alternate");
 		Object none = conformance.call("dimensions", "update", "Region",
-				DimensionPatch.builder().uniqueName("[Region]").build());
+				DimensionPatch.builder().bindDefaultHierarchy(alternate).build());
 		assertThat(none).isNull();
 		ConformanceTm1.Recorded patch = tm1().last();
 		assertThat(patch.key()).isEqualTo("PATCH Dimensions('Region')");
-		assertThat(patch.text()).isEqualTo("{\"UniqueName\":\"[Region]\"}");
+		assertThat(patch.text())
+			.isEqualTo("{\"DefaultHierarchy@odata.bind\":\"Dimensions('Region')/Hierarchies('Alternate')\"}");
 		assertThat(patch.header("If-Match")).isNull();
 
 		tm1().status(204);
 		conformance.call("dimensions", "update", "O'Brien",
-				DimensionPatch.builder().allLeavesHierarchyName(null).build(), "W/\"1\"");
+				DimensionPatch.builder().bindDefaultHierarchy(alternate).build(), "W/\"1\"");
 		assertThat(tm1().last().target()).isEqualTo("Dimensions('O''Brien')");
 		assertThat(tm1().last().header("If-Match")).isEqualTo("W/\"1\"");
-		assertThat(tm1().last().text()).isEqualTo("{\"AllLeavesHierarchyName\":null}");
 	}
 
 	@Test
 	void aStaleEtagIsRefused() {
 		tm1().error(412, "278", "stale");
 		Throwable error = conformance.fail("dimensions", "update", "Region",
-				DimensionPatch.builder().name("Region").build(), "W/\"0\"");
+				DimensionPatch.builder()
+					.bindDefaultHierarchy(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region"))
+					.build(),
+				"W/\"0\"");
 		assertThat(error).isInstanceOf(Tm1PreconditionFailedException.class);
 	}
 

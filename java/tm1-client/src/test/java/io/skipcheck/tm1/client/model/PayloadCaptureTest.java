@@ -121,9 +121,9 @@ class PayloadCaptureTest {
 				ODataPath.of("Dimensions").key(MEASURE))) {
 			session.execute(Tm1Request.delete(old)).onErrorComplete().block(WAIT);
 		}
-		session.execute(Tm1Request.post(ODataPath.of("Dimensions"), DimensionPatch.builder()
+		session.execute(Tm1Request.post(ODataPath.of("Dimensions"), DimensionCreate.builder()
 			.name(NAME)
-			.hierarchies(List.of(HierarchyPatch.builder()
+			.hierarchies(List.of(HierarchyCreate.builder()
 				.name(NAME)
 				.elements(List.of(element("North", ElementType.NUMERIC), element("South", ElementType.NUMERIC),
 						element("Total", ElementType.CONSOLIDATED), element("Label", ElementType.STRING)))
@@ -132,9 +132,9 @@ class PayloadCaptureTest {
 				.build()))
 			.build(), JsonNode.class)).block(WAIT);
 		session.execute(Tm1Request.post(ODataPath.of("Dimensions"),
-				DimensionPatch.builder()
+				DimensionCreate.builder()
 					.name(MEASURE)
-					.hierarchies(List.of(HierarchyPatch.builder()
+					.hierarchies(List.of(HierarchyCreate.builder()
 						.name(MEASURE)
 						.elements(List.of(element("Amount", ElementType.NUMERIC), element("Note", ElementType.STRING)))
 						.build()))
@@ -143,23 +143,23 @@ class PayloadCaptureTest {
 			.block(WAIT);
 		ODataPath hierarchy = ODataPath.of("Dimensions").key(NAME).nav("Hierarchies").key(NAME);
 		session.execute(Tm1Request.post(hierarchy.nav("ElementAttributes"),
-				AttributeDefinitionPatch.builder().name("Caption").type(AttributeType.STRING).build(), JsonNode.class))
+				AttributeDefinitionCreate.builder().name("Caption").type(AttributeType.STRING).build(), JsonNode.class))
 			.block(WAIT);
 		session.execute(Tm1Request.post(hierarchy.nav("Subsets"),
-				SubsetPatch.builder()
+				SubsetCreate.builder()
 					.name("Leaves")
 					.bindElements(hierarchy.nav("Elements").key("North"), hierarchy.nav("Elements").key("South"))
 					.build(),
 				JsonNode.class))
 			.block(WAIT);
 		session.execute(Tm1Request.post(hierarchy.nav("Subsets"),
-				SubsetPatch.builder().name("All").expression("{TM1SUBSETALL([" + NAME + "].[" + NAME + "])}").build(),
+				SubsetCreate.builder().name("All").expression("{TM1SUBSETALL([" + NAME + "].[" + NAME + "])}").build(),
 				JsonNode.class))
 			.block(WAIT);
 
 		ODataPath cube = ODataPath.of("Cubes").key(NAME);
 		session.execute(Tm1Request.post(ODataPath.of("Cubes"),
-				CubePatch.builder()
+				CubeCreate.builder()
 					.name(NAME)
 					.rules("SKIPCHECK;\n['Total', 'Note'] = S: 'consolidated';\n")
 					.bindDimensions(ODataPath.of("Dimensions").key(NAME), ODataPath.of("Dimensions").key(MEASURE))
@@ -188,7 +188,7 @@ class PayloadCaptureTest {
 			.onErrorComplete()
 			.block(WAIT);
 		session.execute(Tm1Request.post(cube.nav("Views"),
-				MDXViewPatch.builder()
+				MDXViewCreate.builder()
 					.name("By region")
 					.mdx("SELECT {[" + MEASURE + "].[" + MEASURE + "].Members} ON 0, {[" + NAME + "].[" + NAME
 							+ "].Members} ON 1 FROM [" + NAME + "]")
@@ -196,14 +196,14 @@ class PayloadCaptureTest {
 				JsonNode.class))
 			.block(WAIT);
 
-		session.execute(Tm1Request.post(ODataPath.of("Processes"), ProcessPatch.builder()
+		session.execute(Tm1Request.post(ODataPath.of("Processes"), ProcessCreate.builder()
 			.name(NAME)
 			.prologProcedure("nRows = 0;\n")
 			.parameters(
 					List.of(ProcessParameterPatch.builder().name("pRegion").prompt("Region").value("North").build()))
 			.build(), JsonNode.class)).block(WAIT);
 		session.execute(Tm1Request.post(ODataPath.of("Chores"),
-				ChorePatch.builder()
+				ChoreCreate.builder()
 					.name(NAME)
 					.startTime(OffsetDateTime.parse("2026-01-01T02:00:00Z"))
 					.dstSensitive(false)
@@ -219,8 +219,8 @@ class PayloadCaptureTest {
 			.block(WAIT);
 	}
 
-	private static ElementPatch element(String name, ElementType type) {
-		return ElementPatch.builder().name(name).type(type).build();
+	private static ElementCreate element(String name, ElementType type) {
+		return ElementCreate.builder().name(name).type(type).build();
 	}
 
 	private static String schemaVersion(Tm1ServerContainer tm1) throws Exception {

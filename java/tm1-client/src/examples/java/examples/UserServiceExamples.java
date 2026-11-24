@@ -5,6 +5,7 @@ package examples;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Group;
 import io.skipcheck.tm1.client.model.User;
+import io.skipcheck.tm1.client.model.UserCreate;
 import io.skipcheck.tm1.client.model.UserPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -21,7 +22,7 @@ final class UserServiceExamples {
 		// A user in two existing groups, bound by their paths
 		ODataPath groups = ODataPath.of("Groups");
 		return tm1.users()
-			.create(UserPatch.builder()
+			.create(UserCreate.builder()
 				.name("alice")
 				.password("initial-password")
 				.bindGroups(groups.key("Planners"), groups.key("Sales"))

@@ -23,7 +23,7 @@ public sealed class SandboxAndChangeSetLiveTests : IAsyncLifetime
         {
             await LiveModel.DimensionAsync(_tm1, d, "X", "Y");
         }
-        await _tm1.Cubes.CreateAsync(CubePatch.Builder().Name(_cube).BindDimensions(LiveModel.Dim(A), LiveModel.Dim(B)).Build());
+        await _tm1.Cubes.CreateAsync(CubeCreate.Builder().Name(_cube).BindDimensions(LiveModel.Dim(A), LiveModel.Dim(B)).Build());
     }
 
     public async Task DisposeAsync()
@@ -40,7 +40,7 @@ public sealed class SandboxAndChangeSetLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task KeepsSandboxWritesApartUntilPublished()
     {
-        await _tm1.Sandboxes.CreateAsync(SandboxPatch.Builder().Name("S").Build());
+        await _tm1.Sandboxes.CreateAsync(SandboxCreate.Builder().Name("S").Build());
         Assert.Contains("S", await _tm1.Sandboxes.ListAsync().Select(s => s.Name).ToListAsync());
         await _tm1.WithSandbox("S").Cells.UpdateAsync(_cube, Cell("X"), 5);
         Assert.Equal(5.0, await Value(_tm1.WithSandbox("S"), "X"));
@@ -52,8 +52,8 @@ public sealed class SandboxAndChangeSetLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task MergesDiscardsLoadsAndUnloads()
     {
-        await _tm1.Sandboxes.CreateAsync(SandboxPatch.Builder().Name("S").Build());
-        await _tm1.Sandboxes.CreateAsync(SandboxPatch.Builder().Name("T").Build());
+        await _tm1.Sandboxes.CreateAsync(SandboxCreate.Builder().Name("S").Build());
+        await _tm1.Sandboxes.CreateAsync(SandboxCreate.Builder().Name("T").Build());
         await _tm1.WithSandbox("S").Cells.UpdateAsync(_cube, Cell("X"), 7);
         await _tm1.Sandboxes.MergeAsync("S", "T");
         Assert.Equal(7.0, await Value(_tm1.WithSandbox("T"), "X"));

@@ -26,15 +26,15 @@ public static class DimensionServiceExamples
     {
         // @start region = create
         // Region, with one hierarchy of the same name: Total = North + South
-        var total = ElementPatch.Builder().Name("Total").Type(ElementType.Consolidated).Build();
-        var north = ElementPatch.Builder().Name("North").Type(ElementType.Numeric).Build();
-        var south = ElementPatch.Builder().Name("South").Type(ElementType.Numeric).Build();
+        var total = ElementCreate.Builder().Name("Total").Type(ElementType.Consolidated).Build();
+        var north = ElementCreate.Builder().Name("North").Type(ElementType.Numeric).Build();
+        var south = ElementCreate.Builder().Name("South").Type(ElementType.Numeric).Build();
         return await tm1.Dimensions.CreateAsync(
-            DimensionPatch
+            DimensionCreate
                 .Builder()
                 .Name("Region")
                 .Hierarchies([
-                    HierarchyPatch
+                    HierarchyCreate
                         .Builder()
                         .Name("Region")
                         .Elements([total, north, south])

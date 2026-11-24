@@ -68,7 +68,7 @@ public sealed class DimensionService : Tm1Service
     /// <summary><c>POST Dimensions</c>: creates a dimension, with its hierarchies, elements and edges if
     /// the patch has them (a deep insert). It needs a name; returns the dimension as created.</summary>
     [Tm1Endpoint("EntitySet Dimensions")]
-    public Task<Dimension> CreateAsync(DimensionPatch dimension, CancellationToken cancellationToken = default) =>
+    public Task<Dimension> CreateAsync(DimensionCreate dimension, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<Dimension>(Dimensions, Require(dimension, nameof(dimension))), cancellationToken);
 
     /// <summary><c>PATCH Dimensions('name')</c>: changes the properties the patch sets.

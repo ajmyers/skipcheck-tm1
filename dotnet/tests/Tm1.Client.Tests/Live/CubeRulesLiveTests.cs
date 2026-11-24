@@ -34,7 +34,7 @@ public sealed class CubeRulesLiveTests : IAsyncLifetime
             [LiveModel.Edge("Total", "North"), LiveModel.Edge("Total", "South")]
         );
         await LiveModel.DimensionAsync(_tm1, Measure, "Amount", "Double");
-        await Cubes.CreateAsync(CubePatch.Builder().Name(_cube).Rules(RulesText).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure)).Build());
+        await Cubes.CreateAsync(CubeCreate.Builder().Name(_cube).Rules(RulesText).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure)).Build());
     }
 
     public async Task DisposeAsync()

@@ -2,19 +2,20 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
 import {
-  CubePatch,
+  CubeCreate,
+  type MDXView,
+  MDXViewCreate,
   MDXViewPatch,
-  NativeViewPatch,
+  type NativeView,
+  NativeViewCreate,
   ODataQuery,
+  type Tm1Client,
   Tm1PreconditionFailedException,
+  typeOf,
   View,
   ViewAxisSelectionPatch,
   ViewScope,
   ViewTitlePatch,
-  typeOf,
-  type MDXView,
-  type NativeView,
-  type Tm1Client,
 } from "../../src/index.js";
 import { Fixtures } from "./data-fixtures.js";
 import { Live, liveReason, tm1Test } from "./live.js";
@@ -52,7 +53,7 @@ describe("ViewService on TM1" + liveReason, () => {
       await Fixtures.subsetAll(tm1, d);
     }
     await tm1.cubes.create(
-      CubePatch.builder().name(cube).bindDimensions(Fixtures.dimensionPath(region), Fixtures.dimensionPath(measure), Fixtures.dimensionPath(year)).build(),
+      CubeCreate.builder().name(cube).bindDimensions(Fixtures.dimensionPath(region), Fixtures.dimensionPath(measure), Fixtures.dimensionPath(year)).build(),
     );
   });
 
@@ -63,8 +64,8 @@ describe("ViewService on TM1" + liveReason, () => {
   });
 
   const mdx = (): string => `SELECT {[${measure}].[${measure}].Members} ON 0, {[${region}].[${region}].Members} ON 1 FROM [${cube}]`;
-  const nativeView = (name: string): NativeViewPatch =>
-    NativeViewPatch.builder()
+  const nativeView = (name: string): NativeViewCreate =>
+    NativeViewCreate.builder()
       .name(name)
       .columns([ViewAxisSelectionPatch.builder().bindSubset(Fixtures.subset(measure)).build()])
       .rows([ViewAxisSelectionPatch.builder().bindSubset(Fixtures.subset(region)).build()])
@@ -77,7 +78,7 @@ describe("ViewService on TM1" + liveReason, () => {
       .build();
 
   tm1Test("creates, reads, updates and deletes both kinds of view", async () => {
-    await tm1.views.create(cube, ViewScope.Public, MDXViewPatch.builder().name("Mdx").mdx(mdx()).build());
+    await tm1.views.create(cube, ViewScope.Public, MDXViewCreate.builder().name("Mdx").mdx(mdx()).build());
     await tm1.views.create(cube, ViewScope.Public, nativeView("Native"));
     const all = await tm1.views.list(cube, ViewScope.Public).toArray();
     expect(all.map((v) => v.Name).sort()).toEqual(["Mdx", "Native"]);
@@ -100,7 +101,7 @@ describe("ViewService on TM1" + liveReason, () => {
   });
 
   tm1Test("keeps private views apart", async () => {
-    await tm1.views.create(cube, ViewScope.Private, MDXViewPatch.builder().name("Mine").mdx(mdx()).build());
+    await tm1.views.create(cube, ViewScope.Private, MDXViewCreate.builder().name("Mine").mdx(mdx()).build());
     expect((await tm1.views.list(cube, ViewScope.Private).toArray()).map((v) => v.Name)).toEqual(["Mine"]);
     expect(await tm1.views.list(cube, ViewScope.Public).toArray()).toEqual([]);
   });
@@ -121,7 +122,7 @@ describe("ViewService on TM1" + liveReason, () => {
 
   tm1Test("expands native views' axes in a list with MDX views", async () => {
     await tm1.views.create(cube, ViewScope.Public, nativeView("Native"));
-    await tm1.views.create(cube, ViewScope.Public, MDXViewPatch.builder().name("Mdx").mdx(mdx()).build());
+    await tm1.views.create(cube, ViewScope.Public, MDXViewCreate.builder().name("Mdx").mdx(mdx()).build());
     const all = await tm1.views.list(cube, ViewScope.Public, ODataQuery.none().expand("tm1.NativeView/Columns/Subset")).toArray();
     const natives = all.filter((v) => typeOf(View, v) === "NativeView") as NativeView[];
     expect(natives).toHaveLength(1);

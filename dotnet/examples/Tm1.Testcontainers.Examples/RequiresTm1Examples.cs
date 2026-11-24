@@ -27,16 +27,16 @@ public static class RequiresTm1Examples
             try
             {
                 var created = await tm1.Dimensions.CreateAsync(
-                    DimensionPatch
+                    DimensionCreate
                         .Builder()
                         .Name(region)
                         .Hierarchies([
-                            HierarchyPatch
+                            HierarchyCreate
                                 .Builder()
                                 .Name(region)
                                 .Elements([
-                                    ElementPatch.Builder().Name("North").Type(ElementType.Numeric).Build(),
-                                    ElementPatch.Builder().Name("South").Type(ElementType.Numeric).Build(),
+                                    ElementCreate.Builder().Name("North").Type(ElementType.Numeric).Build(),
+                                    ElementCreate.Builder().Name("South").Type(ElementType.Numeric).Build(),
                                 ])
                                 .Build(),
                         ])

@@ -12,11 +12,11 @@ import pytest
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client, Tm1Request
 from skipcheck_tm1.aio.services.cube import ViewScope
 from skipcheck_tm1.model import (
+    CubeCreate,
     CubeDrillthrough,
-    CubePatch,
-    NativeViewPatch,
+    NativeViewCreate,
+    ProcessCreate,
     ProcessParameterPatch,
-    ProcessPatch,
     ProcessVariableType,
     ViewAxisSelectionPatch,
 )
@@ -38,18 +38,18 @@ def drill(tm1: Tm1Client, name: str) -> Iterator[Any]:
     a, b = name + "-a", name + "-b"
     for d in (a, b):
         dimension(tm1, d, [element("X"), element("Y")], subset=True)
-    tm1.cubes.create(CubePatch.builder().name(name).bind_dimensions(dim(a), dim(b)).drillthrough_rules(f"[] = S: '{process[len('}Drill_') :]}';\n").build())
+    tm1.cubes.create(CubeCreate.builder().name(name).bind_dimensions(dim(a), dim(b)).drillthrough_rules(f"[] = S: '{process[len('}Drill_') :]}';\n").build())
 
     def axis(d: str) -> Any:
         return ViewAxisSelectionPatch.builder().bind_subset(dim(d).nav("Hierarchies").key(d).nav("Subsets").key("All")).build()
 
-    tm1.views.create(name, ViewScope.PUBLIC, NativeViewPatch.builder().name("Detail").columns([axis(b)]).rows([axis(a)]).build())
+    tm1.views.create(name, ViewScope.PUBLIC, NativeViewCreate.builder().name("Detail").columns([axis(b)]).rows([axis(a)]).build())
 
     def parameter(p: str) -> Any:
         return ProcessParameterPatch.builder().name(p).value("").type(ProcessVariableType.STRING).build()
 
     patch = (
-        ProcessPatch.builder()
+        ProcessCreate.builder()
         .name(process)
         .parameters([parameter("pCube"), parameter("p0"), parameter("p1")])
         .epilog_procedure(f"ReturnViewHandle('{name}', 'Detail');\n")

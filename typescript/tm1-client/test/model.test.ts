@@ -5,14 +5,16 @@ import {
   Attributes,
   AttributesPatch,
   Cube,
+  CubeCreate,
   CubePatch,
-  DimensionPatch,
+  DimensionCreate,
   Element,
-  ElementPatch,
+  ElementCreate,
   ElementType,
   Filter,
-  HierarchyPatch,
+  HierarchyCreate,
   MDXView,
+  MDXViewCreate,
   MDXViewPatch,
   Member,
   ODataPath,
@@ -20,6 +22,7 @@ import {
   readAs,
   typeOf,
   View,
+  ViewCreate,
   type ViewPatch,
 } from "../src/index.js";
 
@@ -96,19 +99,20 @@ describe("the generated model", () => {
 
   it("sends only what a patch sets, in order, with explicit nulls and bindings", () => {
     const dimensions = ODataPath.of("Dimensions");
-    const patch = (): CubePatch => CubePatch.builder().name("Sales").rules(null).bindDimensions(dimensions.key("Region"), dimensions.key("Month")).build();
-    expect(JSON.stringify(patch())).toBe('{"Name":"Sales","Rules":null,"Dimensions@odata.bind":["Dimensions(\'Region\')","Dimensions(\'Month\')"]}');
+    const patch = (): CubePatch => CubePatch.builder().rules(null).bindDimensions(dimensions.key("Region"), dimensions.key("Month")).build();
+    expect(JSON.stringify(patch())).toBe('{"Rules":null,"Dimensions@odata.bind":["Dimensions(\'Region\')","Dimensions(\'Month\')"]}');
     expect(patch().equals(patch())).toBe(true);
-    expect(patch().equals(CubePatch.builder().name("Sales").build())).toBe(false);
+    expect(patch().equals(CubePatch.builder().rules(null).build())).toBe(false);
   });
 
   it("nests patches for deep inserts, and writes enums as TM1 does", () => {
-    const dimension = DimensionPatch.builder()
+    // A deep insert is a create, nested creates and all
+    const dimension = DimensionCreate.builder()
       .name("Region")
       .hierarchies([
-        HierarchyPatch.builder()
+        HierarchyCreate.builder()
           .name("Region")
-          .elements([ElementPatch.builder().name("North").type(ElementType.Numeric).build()])
+          .elements([ElementCreate.builder().name("North").type(ElementType.Numeric).build()])
           .build(),
       ])
       .build();
@@ -116,12 +120,18 @@ describe("the generated model", () => {
   });
 
   it("sends a subtype's patch with its @odata.type, and keeps its builder when chaining", () => {
-    // name() is View's setter: it hands back MDXView's builder, so mdx() is still there
-    const view = MDXViewPatch.builder().name("v").mdx("SELECT").build();
-    expect(JSON.stringify(view)).toBe('{"@odata.type":"#ibm.tm1.api.v1.MDXView","Name":"v","MDX":"SELECT"}');
-    const asRoot: ViewPatch = view;
+    const patch = MDXViewPatch.builder().mdx("SELECT").build();
+    expect(JSON.stringify(patch)).toBe('{"@odata.type":"#ibm.tm1.api.v1.MDXView","MDX":"SELECT"}');
+    const asRoot: ViewPatch = patch;
     expect(asRoot.toJSON()).toHaveProperty(["@odata.type"]);
-    expect(JSON.stringify(CubePatch.builder().views([view]).build())).toContain("#ibm.tm1.api.v1.MDXView");
+    // A subtype's create, nested in its root's place; name() is View's setter: it hands back
+    // MDXView's builder, so mdx() is still there
+    const view = MDXViewCreate.builder().name("v").mdx("SELECT").build();
+    const created: ViewCreate = view;
+    expect(created.toJSON()).toHaveProperty(["@odata.type"], "#ibm.tm1.api.v1.MDXView");
+    expect(JSON.stringify(CubeCreate.builder().bindDimensions(ODataPath.of("Dimensions").key("Region")).views([view]).build())).toContain(
+      "#ibm.tm1.api.v1.MDXView",
+    );
   });
 
   it("keeps attribute values beyond the caption", () => {

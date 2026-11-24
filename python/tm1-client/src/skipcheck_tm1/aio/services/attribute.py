@@ -49,7 +49,7 @@ class AttributeService(Service):
     Add a text attribute to every element of the Region hierarchy::
 
         await tm1.attributes.create(AttributeSet.elements("Region", "Region"),
-            AttributeDefinitionPatch.builder().name("Manager").type(AttributeType.STRING).build())
+            AttributeDefinitionCreate.builder().name("Manager").type(AttributeType.STRING).build())
 
     List the attributes that every cube has::
 

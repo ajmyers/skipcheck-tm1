@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { ElementPatch, ODataPath, ODataQuery, SubsetPatch, SubsetScope } from "../../src/index.js";
+import { ElementCreate, ODataPath, ODataQuery, SubsetCreate, SubsetPatch, SubsetScope } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 const HIERARCHY = "Dimensions('Region')/Hierarchies('Region')";
@@ -34,7 +34,7 @@ describe("SubsetService", () => {
     tm1.respond = () => ({ Name: "West Coast" });
     await client.subsets.get("Region", "Region", scope, "West Coast");
     expect([tm1.last.method, tm1.last.target]).toEqual(["GET", subsets + "('West%20Coast')"]);
-    await client.subsets.create("Region", "Region", scope, SubsetPatch.builder().name("Leaves").expression("{TM1SUBSETALL([Region])}").build());
+    await client.subsets.create("Region", "Region", scope, SubsetCreate.builder().name("Leaves").expression("{TM1SUBSETALL([Region])}").build());
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", subsets, '{"Name":"Leaves","Expression":"{TM1SUBSETALL([Region])}"}']);
 
     tm1.respond = () => null;
@@ -50,10 +50,10 @@ describe("SubsetService", () => {
   it("refuses an update with elements, sending nothing", () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    const set = SubsetPatch.builder()
-      .elements([ElementPatch.builder().name("West").build()])
+    const set = SubsetCreate.builder()
+      .elements([ElementCreate.builder().name("West").build()])
       .build();
-    const bound = SubsetPatch.builder().bindElements(ODataPath.of("x")).build();
+    const bound = SubsetCreate.builder().bindElements(ODataPath.of("x")).build();
     expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", set)).toThrow(RangeError);
     expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", set)).toThrow(/addElements/);
     expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", bound, 'W/"1"')).toThrow(RangeError);
@@ -106,7 +106,9 @@ describe("SubsetService", () => {
     const tm1 = new FakeTm1();
     tm1.respond = () => ({ Name: "$session" });
     const client = tm1.client();
-    expect((await client.subsets.createSessionSubset("Region", "Region", SubsetPatch.builder().expression("{[Region].[West]}").build())).Name).toBe("$session");
+    expect((await client.subsets.createSessionSubset("Region", "Region", SubsetCreate.builder().expression("{[Region].[West]}").build())).Name).toBe(
+      "$session",
+    );
     expect([tm1.last.method, tm1.last.target]).toEqual(["POST", HIERARCHY + "/tm1.CreateSessionSubset"]);
     expect(tm1.last.text).toBe('{"Subset":{"Expression":"{[Region].[West]}"}}');
     await client.subsets.createSessionSubsetFrom("Region", "Region", SubsetScope.Private, "Mine");

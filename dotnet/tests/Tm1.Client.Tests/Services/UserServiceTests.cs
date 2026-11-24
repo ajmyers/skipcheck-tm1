@@ -35,7 +35,7 @@ public class UserServiceTests
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "jsmith" };
         var tm1 = _tm1.Client();
         var groups = ODataPath.Of("Groups");
-        await tm1.Users.CreateAsync(UserPatch.Builder().Name("jsmith").Password("pw").BindGroups(groups.Key("Finance"), groups.Key("Planners")).Build());
+        await tm1.Users.CreateAsync(UserCreate.Builder().Name("jsmith").Password("pw").BindGroups(groups.Key("Finance"), groups.Key("Planners")).Build());
         Assert.Equal(("POST", "Users"), (_tm1.Last.Method, _tm1.Last.Target));
         Assert.Equal("""{"Name":"jsmith","Password":"pw","Groups@odata.bind":["Groups('Finance')","Groups('Planners')"]}""", _tm1.Last.Text);
 

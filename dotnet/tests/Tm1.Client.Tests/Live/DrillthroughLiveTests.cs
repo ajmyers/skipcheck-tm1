@@ -33,7 +33,7 @@ public sealed class DrillthroughLiveTests : IAsyncLifetime
             await LiveModel.SubsetAllAsync(_tm1, d);
         }
         await _tm1.Cubes.CreateAsync(
-            CubePatch
+            CubeCreate
                 .Builder()
                 .Name(_cube)
                 .BindDimensions(LiveModel.Dim(_dimensions[0]), LiveModel.Dim(_dimensions[1]))
@@ -43,7 +43,7 @@ public sealed class DrillthroughLiveTests : IAsyncLifetime
         await _tm1.Views.CreateAsync(
             _cube,
             ViewScope.Public,
-            NativeViewPatch
+            NativeViewCreate
                 .Builder()
                 .Name("Detail")
                 .Columns([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(_dimensions[1])).Build()])
@@ -54,7 +54,7 @@ public sealed class DrillthroughLiveTests : IAsyncLifetime
         await _tm1.Session.ExecuteAsync(
             Tm1Request.Post(
                 ODataPath.Of("Processes"),
-                ProcessPatch
+                ProcessCreate
                     .Builder()
                     .Name(_process)
                     .Parameters([Parameter("pCube"), Parameter("p0"), Parameter("p1")])

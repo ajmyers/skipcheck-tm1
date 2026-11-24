@@ -8,7 +8,7 @@
 			"service" : "dimensions",
 			"method" : "create",
 			"params" : [ "dimension" ],
-			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${dim}", "Hierarchies" : [ { "Name" : "${dim}", "Elements" : [ { "Name" : "Total", "Type" : "Consolidated" }, { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" }, { "Name" : "East", "Type" : "Numeric" } ], "Edges" : [ { "ParentName" : "Total", "ComponentName" : "North", "Weight" : 1.0 }, { "ParentName" : "Total", "ComponentName" : "South", "Weight" : 1.0 } ] } ] } } ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${dim}", "Hierarchies" : [ { "Name" : "${dim}", "Elements" : [ { "Name" : "Total", "Type" : "Consolidated" }, { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" }, { "Name" : "East", "Type" : "Numeric" } ], "Edges" : [ { "ParentName" : "Total", "ComponentName" : "North", "Weight" : 1.0 }, { "ParentName" : "Total", "ComponentName" : "South", "Weight" : 1.0 } ] } ] } } ],
 			"expect" : { "fields" : { "Name" : "${dim}" } }
 		},
 		{

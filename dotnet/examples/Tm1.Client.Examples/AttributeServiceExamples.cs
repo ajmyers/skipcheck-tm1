@@ -19,7 +19,7 @@ public static class AttributeServiceExamples
         // A text attribute on every element of the Region hierarchy
         return await tm1.Attributes.CreateAsync(
             AttributeSet.Elements("Region", "Region"),
-            AttributeDefinitionPatch.Builder().Name("Manager").Type(AttributeType.String).Build()
+            AttributeDefinitionCreate.Builder().Name("Manager").Type(AttributeType.String).Build()
         );
         // @end
     }

@@ -10,6 +10,7 @@ import {
   CAMSettings,
   ChorePatch,
   Cube,
+  CubeCreate,
   CubePatch,
   MessageLogEntry,
   NativeView,
@@ -19,10 +20,10 @@ import {
   ODataQuery,
   readAs,
   Tm1Duration,
+  type Tm1Model,
   typeOf,
   User,
   View,
-  type Tm1Model,
 } from "../src/index.js";
 import { Repo } from "./support/repo.js";
 
@@ -195,14 +196,14 @@ describe("payloads", () => {
 
   it("writes patches as set", () => {
     const dimensions = ODataPath.of("Dimensions");
-    const patch = CubePatch.builder().name("Sales").bindDimensions(dimensions.key("Region"), dimensions.key("Month")).rules(null).build();
+    const patch = CubeCreate.builder().name("Sales").bindDimensions(dimensions.key("Region"), dimensions.key("Month")).rules(null).build();
     expect(JSON.stringify(patch)).toBe('{"Name":"Sales","Dimensions@odata.bind":["Dimensions(\'Region\')","Dimensions(\'Month\')"],"Rules":null}');
-    expect(JSON.stringify(NativeViewPatch.builder().name("v").suppressEmptyRows(true).build())).toBe(
-      '{"@odata.type":"#ibm.tm1.api.v1.NativeView","Name":"v","SuppressEmptyRows":true}',
+    expect(JSON.stringify(NativeViewPatch.builder().suppressEmptyRows(true).build())).toBe(
+      '{"@odata.type":"#ibm.tm1.api.v1.NativeView","SuppressEmptyRows":true}',
     );
     expect(JSON.stringify(ChorePatch.builder().frequency("P1D").build())).toBe('{"Frequency":"P1D"}');
     expect(JSON.stringify(AttributesPatch.builder().property("Caption", "x").build())).toBe('{"Caption":"x"}');
-    expect(CubePatch.builder().name("a").build().equals(CubePatch.builder().name("a").build())).toBe(true);
+    expect(CubePatch.builder().rules("a").build().equals(CubePatch.builder().rules("a").build())).toBe(true);
   });
 
   it("has field constants for queries", () => {

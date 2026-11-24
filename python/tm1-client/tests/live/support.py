@@ -12,19 +12,19 @@ from typing import Any
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client, Tm1Request
 from skipcheck_tm1._sync.services.attribute import AttributeOwner
 from skipcheck_tm1.model import (
-    AttributeDefinitionPatch,
+    AttributeDefinitionCreate,
     AttributesPatch,
     AttributeType,
-    DimensionPatch,
+    DimensionCreate,
     EdgePatch,
-    ElementPatch,
+    ElementCreate,
     ElementType,
-    HierarchyPatch,
+    HierarchyCreate,
     LocalizedAttributesPatch,
+    ProcessCreate,
     ProcessParameterPatch,
-    ProcessPatch,
     ProcessVariableType,
-    SubsetPatch,
+    SubsetCreate,
 )
 
 # Dimensions made through the raw session, for tests that aren't about the dimension services
@@ -35,7 +35,7 @@ def dim(name: str) -> ODataPath:
 
 
 def element(name: str, type: ElementType = ElementType.NUMERIC) -> Any:
-    return ElementPatch.builder().name(name).type(type).build()
+    return ElementCreate.builder().name(name).type(type).build()
 
 
 def edge(parent: str, component: str) -> Any:
@@ -43,14 +43,14 @@ def edge(parent: str, component: str) -> Any:
 
 
 def dimension(tm1: Tm1Client, name: str, elements: list[Any], edges: list[Any] | None = None, subset: bool = False) -> str:
-    hierarchy = HierarchyPatch.builder().name(name).elements(elements)
+    hierarchy = HierarchyCreate.builder().name(name).elements(elements)
     if edges:
         hierarchy = hierarchy.edges(edges)
-    patch = DimensionPatch.builder().name(name).hierarchies([hierarchy.build()]).build()
+    patch = DimensionCreate.builder().name(name).hierarchies([hierarchy.build()]).build()
     tm1.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), patch, None))
     if subset:
         path = dim(name).nav("Hierarchies").key(name).nav("Subsets")
-        all_ = SubsetPatch.builder().name("All").expression(f"{{TM1SUBSETALL([{name}].[{name}])}}").build()
+        all_ = SubsetCreate.builder().name("All").expression(f"{{TM1SUBSETALL([{name}].[{name}])}}").build()
         tm1.session.execute(Tm1Request.post(path, all_, None))
     return name
 
@@ -78,27 +78,27 @@ def first_value(client: Tm1Client, mdx: str) -> Any:
 # Dimensions made through DimensionService
 
 
-def numeric(name: str) -> ElementPatch:
-    return ElementPatch.builder().name(name).type(ElementType.NUMERIC).build()
+def numeric(name: str) -> ElementCreate:
+    return ElementCreate.builder().name(name).type(ElementType.NUMERIC).build()
 
 
-def consolidated(name: str) -> ElementPatch:
-    return ElementPatch.builder().name(name).type(ElementType.CONSOLIDATED).build()
+def consolidated(name: str) -> ElementCreate:
+    return ElementCreate.builder().name(name).type(ElementType.CONSOLIDATED).build()
 
 
-def string(name: str) -> ElementPatch:
-    return ElementPatch.builder().name(name).type(ElementType.STRING).build()
+def string(name: str) -> ElementCreate:
+    return ElementCreate.builder().name(name).type(ElementType.STRING).build()
 
 
-def dimension_of(name: str, elements: list[ElementPatch], edges: list[EdgePatch] | None = None) -> DimensionPatch:
-    hierarchy = HierarchyPatch.builder().name(name).elements(elements)
+def dimension_of(name: str, elements: list[ElementCreate], edges: list[EdgePatch] | None = None) -> DimensionCreate:
+    hierarchy = HierarchyCreate.builder().name(name).elements(elements)
     if edges:
         hierarchy = hierarchy.edges(edges)
-    return DimensionPatch.builder().name(name).hierarchies([hierarchy.build()]).build()
+    return DimensionCreate.builder().name(name).hierarchies([hierarchy.build()]).build()
 
 
 @contextmanager
-def made(tm1: Tm1Client, name: str, patch: DimensionPatch) -> Iterator[str]:
+def made(tm1: Tm1Client, name: str, patch: DimensionCreate) -> Iterator[str]:
     tm1.dimensions.create(patch)
     try:
         yield name
@@ -117,8 +117,8 @@ def label() -> str:
     return "Label " + uuid.uuid4().hex[:4]
 
 
-def string_attribute(name: str) -> AttributeDefinitionPatch:
-    return AttributeDefinitionPatch.builder().name(name).type(AttributeType.STRING).build()
+def string_attribute(name: str) -> AttributeDefinitionCreate:
+    return AttributeDefinitionCreate.builder().name(name).type(AttributeType.STRING).build()
 
 
 def french(attribute: str, value: str) -> LocalizedAttributesPatch:
@@ -134,7 +134,7 @@ def french_value(tm1: Tm1Client, owner: AttributeOwner, attribute: str) -> objec
 
 def process_definition(name: str, prolog: str) -> Any:
     return (
-        ProcessPatch.builder()
+        ProcessCreate.builder()
         .name(name)
         .parameters(
             [

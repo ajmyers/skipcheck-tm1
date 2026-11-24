@@ -8,6 +8,7 @@ import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Cube;
 import io.skipcheck.tm1.client.model.NativeView;
 import io.skipcheck.tm1.client.model.View;
+import io.skipcheck.tm1.client.model.ViewCreate;
 import io.skipcheck.tm1.client.model.ViewPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -119,7 +120,7 @@ public final class ViewService {
 	 */
 	@Tm1Endpoint("Navigation Cube/Views")
 	@Tm1Endpoint("Navigation Cube/PrivateViews")
-	public Mono<View> create(String cube, ViewScope scope, ViewPatch view) {
+	public Mono<View> create(String cube, ViewScope scope, ViewCreate view) {
 		return session.execute(Tm1Request.post(views(cube, scope), view, View.class));
 	}
 

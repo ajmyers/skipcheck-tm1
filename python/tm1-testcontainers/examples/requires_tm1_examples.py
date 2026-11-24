@@ -11,7 +11,7 @@ from collections.abc import Iterator
 import pytest
 
 from skipcheck_tm1 import Tm1Client, Tm1Error, Tm1Version
-from skipcheck_tm1.model import DimensionPatch, ElementPatch, ElementType, HierarchyPatch
+from skipcheck_tm1.model import DimensionCreate, ElementCreate, ElementType, HierarchyCreate
 from skipcheck_tm1_testcontainers import CognosContainer, CognosSource, PawContainer, Tm1ServerContainer, Tm1WebContainer
 
 # @start region = test-class
@@ -38,10 +38,10 @@ def region(tm1: Tm1Client) -> Iterator[str]:
 
 
 def test_creates_the_regions(tm1: Tm1Client, region: str) -> None:
-    north = ElementPatch.builder().name("North").type(ElementType.NUMERIC).build()
-    south = ElementPatch.builder().name("South").type(ElementType.NUMERIC).build()
-    hierarchy = HierarchyPatch.builder().name(region).elements([north, south]).build()
-    created = tm1.dimensions.create(DimensionPatch.builder().name(region).hierarchies([hierarchy]).build())
+    north = ElementCreate.builder().name("North").type(ElementType.NUMERIC).build()
+    south = ElementCreate.builder().name("South").type(ElementType.NUMERIC).build()
+    hierarchy = HierarchyCreate.builder().name(region).elements([north, south]).build()
+    created = tm1.dimensions.create(DimensionCreate.builder().name(region).hierarchies([hierarchy]).build())
     assert created.name == region
     # @end
 

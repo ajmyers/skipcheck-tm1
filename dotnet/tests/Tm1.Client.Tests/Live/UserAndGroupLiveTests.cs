@@ -35,7 +35,7 @@ public sealed class UserAndGroupLiveTests : IAsyncLifetime
         _tm1 = Live.Client();
         await _tm1.Groups.CreateAsync(_g1);
         await _tm1.Groups.CreateAsync(_g2);
-        await _tm1.Users.CreateAsync(UserPatch.Builder().Name(_user).Password("pw").BindGroups(ODataPath.Of("Groups").Key(_g1)).Build());
+        await _tm1.Users.CreateAsync(UserCreate.Builder().Name(_user).Password("pw").BindGroups(ODataPath.Of("Groups").Key(_g1)).Build());
     }
 
     public async Task DisposeAsync()

@@ -25,14 +25,17 @@ public class HierarchyServiceTests
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "Leaves" };
         Assert.Equal("Leaves", (await tm1.Hierarchies.GetAsync("Region", "Leaves")).Name);
         Assert.Equal(("GET", "Dimensions('Region')/Hierarchies('Leaves')"), (_tm1.Last.Method, _tm1.Last.Target));
-        await tm1.Hierarchies.CreateAsync("Region", HierarchyPatch.Builder().Name("Leaves").Build());
+        await tm1.Hierarchies.CreateAsync("Region", HierarchyCreate.Builder().Name("Leaves").Build());
         Assert.Equal(("POST", "Dimensions('Region')/Hierarchies", """{"Name":"Leaves"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => null;
-        await tm1.Hierarchies.UpdateAsync("Region", "Leaves", HierarchyPatch.Builder().Visible(false).Build());
-        Assert.Equal(("PATCH", "Dimensions('Region')/Hierarchies('Leaves')", """{"Visible":false}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
+        await tm1.Hierarchies.UpdateAsync("Region", "Leaves", HierarchyPatch.Builder().ElementsSortType("ByName").Build());
+        Assert.Equal(
+            ("PATCH", "Dimensions('Region')/Hierarchies('Leaves')", """{"ElementsSortType":"ByName"}"""),
+            (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text)
+        );
         Assert.False(_tm1.Last.Headers.ContainsKey("if-match"));
-        await tm1.Hierarchies.UpdateAsync("Region", "Leaves", HierarchyPatch.Builder().Visible(true).Build(), "W/\"2\"");
+        await tm1.Hierarchies.UpdateAsync("Region", "Leaves", HierarchyPatch.Builder().ElementsSortSense("Descending").Build(), "W/\"2\"");
         Assert.Equal("W/\"2\"", _tm1.Last.Headers["if-match"]);
         await tm1.Hierarchies.DeleteAsync("Region", "Leaves");
         Assert.Equal(("DELETE", "Dimensions('Region')/Hierarchies('Leaves')"), (_tm1.Last.Method, _tm1.Last.Target));
@@ -42,7 +45,7 @@ public class HierarchyServiceTests
     public async Task AnUpdateWithStructureIsRefused()
     {
         var tm1 = _tm1.Client();
-        var withElements = HierarchyPatch.Builder().Elements([ElementPatch.Builder().Name("x").Build()]).Build();
+        var withElements = HierarchyPatch.Builder().Elements([ElementCreate.Builder().Name("x").Build()]).Build();
         var withBinding = HierarchyPatch.Builder().BindElements(ODataPath.Of("Dimensions").Key("d")).Build();
         var withEdges = HierarchyPatch.Builder().Edges([]).Build();
         foreach (var patch in new[] { withElements, withBinding, withEdges })
@@ -68,7 +71,7 @@ public class HierarchyServiceTests
             .Hierarchies.ReplaceStructureAsync(
                 "Region",
                 "Region",
-                [ElementPatch.Builder().Name("All").Type(ElementType.Consolidated).Build()],
+                [ElementCreate.Builder().Name("All").Type(ElementType.Consolidated).Build()],
                 [EdgePatch.Builder().ParentName("All").ComponentName("North").Weight(1.0).Build()]
             );
         Assert.Equal(("PATCH", "Dimensions('Region')/Hierarchies('Region')"), (_tm1.Last.Method, _tm1.Last.Target));

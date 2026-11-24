@@ -30,8 +30,8 @@ def test_patches_from_a_read_entity_leaving_out_what_a_patch_rejects_or_appends(
             "Tasks": [{"Step": 0, "Parameters": [{"Name": "pValue", "Value": "1"}]}],
         }
     )
-    # A PATCH refuses Attributes, and appends Tasks: neither is copied
-    assert set(m.ChorePatch.builder(read).build().json()) == {"Name", "Active", "Frequency"}
+    # A PATCH refuses Attributes and a rename, and appends Tasks: none is copied
+    assert set(m.ChorePatch.builder(read).build().json()) == {"Active", "Frequency"}
     # A create ignores Attributes too (they're written through the attribute cubes). Tasks is a
     # navigation: none is copied, as a task's Process would have to be bound again
     create = m.ChoreCreate.builder(read).build().json()

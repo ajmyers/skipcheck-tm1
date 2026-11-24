@@ -15,7 +15,7 @@ from skipcheck_tm1.aio.services.cube import ViewScope
 from skipcheck_tm1.aio.services.data import Tuples
 from skipcheck_tm1.model import (
     CellsetUpdatePatch,
-    CubePatch,
+    CubeCreate,
     CubeUpdatePatch,
     ElementType,
     UpdateOrder,
@@ -43,7 +43,7 @@ def cells_cube(tm1: Tm1Client, name: str) -> Iterator[Any]:
         [edge("Total", "North"), edge("Total", "South")],
     )
     measure = dimension(tm1, name + "-measure", [element("Amount"), element("Note", ElementType.STRING)])
-    tm1.cubes.create(CubePatch.builder().name(name).bind_dimensions(dim(region), dim(measure)).build())
+    tm1.cubes.create(CubeCreate.builder().name(name).bind_dimensions(dim(region), dim(measure)).build())
 
     class Cube:
         def __init__(self) -> None:

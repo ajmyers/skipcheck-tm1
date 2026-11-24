@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from skipcheck_tm1 import ODataQuery, Tm1Client
-from skipcheck_tm1.model import Element, ElementPatch, ElementType
+from skipcheck_tm1.model import Element, ElementCreate, ElementType
 
 
 def consolidations(tm1: Tm1Client) -> list[str | None]:
@@ -19,7 +19,7 @@ def consolidations(tm1: Tm1Client) -> list[str | None]:
 def add_child(tm1: Tm1Client) -> None:
     # @start region = add-child
     # A new element is a root; SetComponent then puts it last under Total
-    tm1.elements.create("Region", "Region", ElementPatch.builder().name("West").type(ElementType.NUMERIC).build())
+    tm1.elements.create("Region", "Region", ElementCreate.builder().name("West").type(ElementType.NUMERIC).build())
     tm1.elements.set_component("Region", "Region", "Total", "West")
     # @end
 

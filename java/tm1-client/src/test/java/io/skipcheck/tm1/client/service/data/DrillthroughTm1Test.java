@@ -17,18 +17,18 @@ import org.junit.jupiter.api.Test;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Cellset;
+import io.skipcheck.tm1.client.model.CubeCreate;
 import io.skipcheck.tm1.client.model.CubeDrillthrough;
-import io.skipcheck.tm1.client.model.CubePatch;
-import io.skipcheck.tm1.client.model.DimensionPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.Drillthrough;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
-import io.skipcheck.tm1.client.model.NativeViewPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
+import io.skipcheck.tm1.client.model.NativeViewCreate;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessParameterPatch;
-import io.skipcheck.tm1.client.model.ProcessPatch;
 import io.skipcheck.tm1.client.model.ProcessVariableType;
-import io.skipcheck.tm1.client.model.SubsetPatch;
+import io.skipcheck.tm1.client.model.SubsetCreate;
 import io.skipcheck.tm1.client.model.ViewAxisSelectionPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -66,22 +66,25 @@ class DrillthroughTm1Test {
 		dimensions = List.of(cube + "-a", cube + "-b");
 		for (String d : dimensions) {
 			tm1.dimensions()
-				.create(DimensionPatch.builder()
+				.create(DimensionCreate.builder()
 					.name(d)
-					.hierarchies(List.of(HierarchyPatch.builder()
+					.hierarchies(List.of(HierarchyCreate.builder()
 						.name(d)
-						.elements(List.of(ElementPatch.builder().name("X").type(ElementType.NUMERIC).build(),
-								ElementPatch.builder().name("Y").type(ElementType.NUMERIC).build()))
+						.elements(List.of(ElementCreate.builder().name("X").type(ElementType.NUMERIC).build(),
+								ElementCreate.builder().name("Y").type(ElementType.NUMERIC).build()))
 						.build()))
 					.build())
 				.block(WAIT);
 			tm1.subsets()
 				.create(d, d, SubsetScope.PUBLIC,
-						SubsetPatch.builder().name("All").expression("{TM1SUBSETALL([" + d + "].[" + d + "])}").build())
+						SubsetCreate.builder()
+							.name("All")
+							.expression("{TM1SUBSETALL([" + d + "].[" + d + "])}")
+							.build())
 				.block(WAIT);
 		}
 		tm1.cubes()
-			.create(CubePatch.builder()
+			.create(CubeCreate.builder()
 				.name(cube)
 				.bindDimensions(ODataPath.of("Dimensions").key(dimensions.get(0)),
 						ODataPath.of("Dimensions").key(dimensions.get(1)))
@@ -90,7 +93,7 @@ class DrillthroughTm1Test {
 			.block(WAIT);
 		tm1.views()
 			.create(cube, ViewScope.PUBLIC,
-					NativeViewPatch.builder()
+					NativeViewCreate.builder()
 						.name("Detail")
 						.columns(List.of(axis(dimensions.get(1))))
 						.rows(List.of(axis(dimensions.get(0))))
@@ -99,7 +102,7 @@ class DrillthroughTm1Test {
 		// Processes are phase 5's; the raw session makes the drillthrough process here
 		tm1.session()
 			.execute(Tm1Request.post(ODataPath.of("Processes"),
-					ProcessPatch.builder()
+					ProcessCreate.builder()
 						.name(process)
 						.parameters(List.of(parameter("pCube"), parameter("p0"), parameter("p1")))
 						.epilogProcedure("ReturnViewHandle('" + cube + "', 'Detail');\n")

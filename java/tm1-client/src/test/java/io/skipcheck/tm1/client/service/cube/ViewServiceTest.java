@@ -15,11 +15,12 @@ import io.skipcheck.tm1.client.error.Tm1ConflictException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Cube;
+import io.skipcheck.tm1.client.model.MDXViewCreate;
 import io.skipcheck.tm1.client.model.MDXViewPatch;
 import io.skipcheck.tm1.client.model.NativeView;
+import io.skipcheck.tm1.client.model.NativeViewCreate;
 import io.skipcheck.tm1.client.model.NativeViewPatch;
 import io.skipcheck.tm1.client.model.View;
-import io.skipcheck.tm1.client.model.ViewPatch;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 
 /**
@@ -85,7 +86,7 @@ class ViewServiceTest {
 	void createsUpdatesAndDeletes() {
 		tm1().json(201, "{\"Name\":\"Mdx\",\"MDX\":\"SELECT {} ON 0 FROM [Sales]\"}");
 		View created = conformance.call("views", "create", "Sales", ViewScope.PUBLIC,
-				MDXViewPatch.builder().name("Mdx").mdx("SELECT {} ON 0 FROM [Sales]").build());
+				MDXViewCreate.builder().name("Mdx").mdx("SELECT {} ON 0 FROM [Sales]").build());
 		assertThat(created.name()).isEqualTo("Mdx");
 		assertThat(tm1().last().key()).isEqualTo("POST Cubes('Sales')/Views");
 		assertThat(tm1().last().text()).isEqualTo(
@@ -93,7 +94,12 @@ class ViewServiceTest {
 
 		tm1().json(201, "{\"Name\":\"Native\"}");
 		conformance.call("views", "create", "Sales", ViewScope.PRIVATE,
-				NativeViewPatch.builder().name("Native").suppressEmptyRows(true).build());
+				NativeViewCreate.builder()
+					.name("Native")
+					.columns(List.of())
+					.rows(List.of())
+					.suppressEmptyRows(true)
+					.build());
 		assertThat(tm1().last().key()).isEqualTo("POST Cubes('Sales')/PrivateViews");
 
 		tm1().status(204);
@@ -104,10 +110,11 @@ class ViewServiceTest {
 
 		tm1().status(204);
 		conformance.call("views", "update", "Sales", ViewScope.PRIVATE, "Native",
-				ViewPatch.builder().name("Renamed").build(), "W/\"3\"");
+				NativeViewPatch.builder().suppressEmptyRows(false).build(), "W/\"3\"");
 		assertThat(tm1().last().key()).isEqualTo("PATCH Cubes('Sales')/PrivateViews('Native')");
 		assertThat(tm1().last().header("If-Match")).isEqualTo("W/\"3\"");
-		assertThat(tm1().last().text()).isEqualTo("{\"Name\":\"Renamed\"}");
+		assertThat(tm1().last().text())
+			.isEqualTo("{\"@odata.type\":\"#ibm.tm1.api.v1.NativeView\",\"SuppressEmptyRows\":false}");
 
 		tm1().status(204);
 		conformance.call("views", "delete", "Sales", ViewScope.PUBLIC, "Joe's view");
@@ -122,7 +129,7 @@ class ViewServiceTest {
 	void aViewThatExistsIsAConflictAndAStaleEtagIsRefused() {
 		tm1().error(409, "278", "'Mdx' already exists");
 		Throwable conflict = conformance.fail("views", "create", "Sales", ViewScope.PUBLIC,
-				MDXViewPatch.builder().name("Mdx").mdx("SELECT").build());
+				MDXViewCreate.builder().name("Mdx").mdx("SELECT").build());
 		assertThat(conflict).isInstanceOf(Tm1ConflictException.class);
 
 		tm1().error(412, "278", "stale");

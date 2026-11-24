@@ -24,7 +24,7 @@ public static class SandboxServiceExamples
             ["Measure"] = "Revenue",
         };
         var whatIf = tm1.WithSandbox("What If");
-        await tm1.Sandboxes.CreateAsync(SandboxPatch.Builder().Name("What If").Build());
+        await tm1.Sandboxes.CreateAsync(SandboxCreate.Builder().Name("What If").Build());
         await whatIf.Cells.UpdateAsync("Sales", cell, 1500);
         await tm1.Sandboxes.PublishAsync("What If");
         // @end

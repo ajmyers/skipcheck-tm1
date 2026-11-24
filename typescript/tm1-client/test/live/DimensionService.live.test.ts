@@ -3,26 +3,29 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import {
   Dimension,
+  DimensionCreate,
   DimensionPatch,
-  ElementPatch,
+  ElementCreate,
   ElementType,
   Filter,
   Hierarchy,
-  HierarchyPatch,
+  HierarchyCreate,
+  ODataPath,
   ODataQuery,
+  type Tm1Client,
   Tm1NotFoundException,
   Tm1PreconditionFailedException,
-  type Tm1Client,
+  Tm1Request,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
-const element = (name: string): ElementPatch => ElementPatch.builder().name(name).type(ElementType.Numeric).build();
+const element = (name: string): ElementCreate => ElementCreate.builder().name(name).type(ElementType.Numeric).build();
 
-const dimension = (name: string): DimensionPatch =>
-  DimensionPatch.builder()
+const dimension = (name: string): DimensionCreate =>
+  DimensionCreate.builder()
     .name(name)
     .hierarchies([
-      HierarchyPatch.builder()
+      HierarchyCreate.builder()
         .name(name)
         .elements([element("North"), element("South")])
         .build(),
@@ -74,7 +77,8 @@ describe("DimensionService on TM1" + liveReason, () => {
   tm1Test("updates only when the ETag is current", () =>
     withDimension(async (name) => {
       const etag = (await tm1.dimensions.get(name))["@odata.etag"]!;
-      const patch = DimensionPatch.builder().name(name).build();
+      // A dimension PATCH applies no scalar property TM1 keeps: an empty one still checks the ETag
+      const patch = DimensionPatch.builder().build();
       await tm1.dimensions.update(name, patch, etag);
 
       await tm1.dimensions.addAllLeavesHierarchy(name);
@@ -86,18 +90,12 @@ describe("DimensionService on TM1" + liveReason, () => {
 
   tm1Test("ignores hierarchies and the all-leaves name in a patch", () =>
     withDimension(async (name) => {
-      await tm1.dimensions.update(
-        name,
-        DimensionPatch.builder()
-          .allLeavesHierarchyName("AllLeaves")
-          .hierarchies([
-            HierarchyPatch.builder()
-              .name(name)
-              .elements([element("North"), element("South"), element("East")])
-              .build(),
-          ])
-          .build(),
-      );
+      // DimensionPatch offers neither, as TM1 ignores both: sent as they are, to pin it
+      const hierarchy = HierarchyCreate.builder()
+        .name(name)
+        .elements([element("North"), element("South"), element("East")])
+        .build();
+      await tm1.session.execute(Tm1Request.patch(ODataPath.of("Dimensions").key(name), { AllLeavesHierarchyName: "AllLeaves", Hierarchies: [hierarchy] }));
       const read = await tm1.dimensions.get(name, withElements);
       // TM1 accepts the PATCH and ignores it
       expect(read.AllLeavesHierarchyName ?? "").toBe("");

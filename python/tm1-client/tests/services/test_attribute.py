@@ -14,7 +14,7 @@ import pytest
 from skipcheck_tm1 import ODataQuery
 from skipcheck_tm1.aio.services.attribute import AttributeOwner, AttributeSet
 from skipcheck_tm1.aio.services.dimension import SubsetScope
-from skipcheck_tm1.model import AttributeDefinition, AttributeDefinitionPatch, AttributesPatch, AttributeType, LocalizedAttributesPatch
+from skipcheck_tm1.model import AttributeDefinition, AttributeDefinitionCreate, AttributesPatch, AttributeType, LocalizedAttributesPatch
 
 from ..conftest import Api, FakeTm1, target
 
@@ -67,7 +67,7 @@ def test_attribute_definitions_of_every_set(api: Api, fake: FakeTm1, attribute_s
     fake.respond = lambda r: {"Name": "Manager"}
     api.run(api.client.attributes.get(attribute_set, "Manager"))
     assert target(fake.last) == f"GET {path}('Manager')"
-    api.run(api.client.attributes.create(attribute_set, AttributeDefinitionPatch.builder().name("Manager").type(AttributeType.STRING).build()))
+    api.run(api.client.attributes.create(attribute_set, AttributeDefinitionCreate.builder().name("Manager").type(AttributeType.STRING).build()))
     assert (target(fake.last), body(fake.last)) == (f"POST {path}", {"Name": "Manager", "Type": "String"})
     fake.respond = lambda r: None
     api.run(api.client.attributes.delete(attribute_set, "Manager"))

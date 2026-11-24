@@ -16,6 +16,7 @@ from skipcheck_tm1 import (
 )
 from skipcheck_tm1.model import (
     Hierarchy,
+    HierarchyCreate,
     HierarchyPatch,
     Member,
 )
@@ -48,9 +49,9 @@ def region(tm1: Tm1Client, name: str) -> Iterator[str]:
         yield d
 
 
-def structure(name: str) -> HierarchyPatch:
+def structure(name: str) -> HierarchyCreate:
     return (
-        HierarchyPatch.builder()
+        HierarchyCreate.builder()
         .name(name)
         .elements([consolidated("Total"), numeric("North"), numeric("South"), numeric("East")])
         .edges([edge("Total", "North"), edge("Total", "South")])

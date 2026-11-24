@@ -26,7 +26,7 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
             return;
         }
         _tm1 = Live.Client();
-        await _tm1.Processes.CreateAsync(ProcessPatch.Builder().Name(_process).PrologProcedure("nA = 1;\nnB = nA + 1;\nnC = nB + 1;\n").Build());
+        await _tm1.Processes.CreateAsync(ProcessCreate.Builder().Name(_process).PrologProcedure("nA = 1;\nnB = nA + 1;\nnC = nB + 1;\n").Build());
     }
 
     public async Task DisposeAsync()

@@ -3,12 +3,12 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import {
   CheckFeedersSelection,
-  CubePatch,
-  DimensionPatch,
+  CubeCreate,
+  DimensionCreate,
   EdgePatch,
-  ElementPatch,
+  ElementCreate,
   ElementType,
-  HierarchyPatch,
+  HierarchyCreate,
   ODataPath,
   ODataQuery,
   Tm1Request,
@@ -18,7 +18,7 @@ import { Live, liveReason, tm1Test } from "./live.js";
 
 const RULES = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\nFEEDERS;\n['Amount'] => ['Double'];\n";
 
-const element = (name: string, type: ElementType): ElementPatch => ElementPatch.builder().name(name).type(type).build();
+const element = (name: string, type: ElementType): ElementCreate => ElementCreate.builder().name(name).type(type).build();
 const edge = (parent: string, component: string): EdgePatch => EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
 const elementPath = (dimension: string, name: string): string =>
   ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements").key(name).toString();
@@ -42,10 +42,10 @@ describe("Cube rules on TM1" + liveReason, () => {
     if (!Live.configured) return;
     tm1 = await Live.client();
     await tm1.dimensions.create(
-      DimensionPatch.builder()
+      DimensionCreate.builder()
         .name(region)
         .hierarchies([
-          HierarchyPatch.builder()
+          HierarchyCreate.builder()
             .name(region)
             .elements([element("Total", ElementType.Consolidated), element("North", ElementType.Numeric), element("South", ElementType.Numeric)])
             .edges([edge("Total", "North"), edge("Total", "South")])
@@ -54,10 +54,10 @@ describe("Cube rules on TM1" + liveReason, () => {
         .build(),
     );
     await tm1.dimensions.create(
-      DimensionPatch.builder()
+      DimensionCreate.builder()
         .name(measure)
         .hierarchies([
-          HierarchyPatch.builder()
+          HierarchyCreate.builder()
             .name(measure)
             .elements([element("Amount", ElementType.Numeric), element("Double", ElementType.Numeric)])
             .build(),
@@ -65,7 +65,7 @@ describe("Cube rules on TM1" + liveReason, () => {
         .build(),
     );
     await tm1.cubes.create(
-      CubePatch.builder().name(cube).rules(RULES).bindDimensions(ODataPath.of("Dimensions").key(region), ODataPath.of("Dimensions").key(measure)).build(),
+      CubeCreate.builder().name(cube).rules(RULES).bindDimensions(ODataPath.of("Dimensions").key(region), ODataPath.of("Dimensions").key(measure)).build(),
     );
   });
 

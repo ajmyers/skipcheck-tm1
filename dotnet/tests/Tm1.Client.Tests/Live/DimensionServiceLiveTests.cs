@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Skipcheck.Tm1.Client.Errors;
@@ -39,7 +40,8 @@ public class DimensionServiceLiveTests
         await using var made = await LiveDimension.Made.Of(n => LiveDimension.DimensionOf(n, [LiveDimension.Numeric("North"), LiveDimension.Numeric("South")]));
         var (tm1, d) = (made.Tm1, made.Name);
         var etag = (await tm1.Dimensions.GetAsync(d)).ETag!;
-        var patch = DimensionPatch.Builder().Name(d).Build();
+        // A dimension PATCH applies no scalar property TM1 keeps: an empty one still checks the ETag
+        var patch = DimensionPatch.Builder().Build();
         await tm1.Dimensions.UpdateAsync(d, patch, etag);
         await tm1.Dimensions.AddAllLeavesHierarchyAsync(d);
         Assert.NotEqual(etag, (await tm1.Dimensions.GetAsync(d)).ETag); // a new hierarchy changes it
@@ -51,19 +53,17 @@ public class DimensionServiceLiveTests
     {
         await using var made = await LiveDimension.Made.Of(n => LiveDimension.DimensionOf(n, [LiveDimension.Numeric("North"), LiveDimension.Numeric("South")]));
         var (tm1, d) = (made.Tm1, made.Name);
-        await tm1.Dimensions.UpdateAsync(
-            d,
-            DimensionPatch
-                .Builder()
-                .AllLeavesHierarchyName("AllLeaves")
-                .Hierarchies([
-                    HierarchyPatch
-                        .Builder()
-                        .Name(d)
-                        .Elements([LiveDimension.Numeric("North"), LiveDimension.Numeric("South"), LiveDimension.Numeric("East")])
-                        .Build(),
-                ])
-                .Build()
+        // DimensionPatch offers neither, as TM1 ignores both: sent as they are, to pin it
+        var hierarchy = HierarchyCreate
+            .Builder()
+            .Name(d)
+            .Elements([LiveDimension.Numeric("North"), LiveDimension.Numeric("South"), LiveDimension.Numeric("East")])
+            .Build();
+        await tm1.Session.ExecuteAsync(
+            Tm1Request.Patch(
+                ODataPath.Of("Dimensions").Key(d),
+                new Dictionary<string, object?> { ["AllLeavesHierarchyName"] = "AllLeaves", ["Hierarchies"] = new[] { hierarchy } }
+            )
         );
         var read = await tm1.Dimensions.GetAsync(d, ODataQuery.None().Expand(Dimension.Fields.Hierarchies, h => h.Expand(Hierarchy.Fields.Elements)));
         Assert.True(string.IsNullOrEmpty(read.AllLeavesHierarchyName), "TM1 accepts the PATCH and ignores it");

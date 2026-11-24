@@ -19,6 +19,7 @@ import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.CalculationComponent;
 import io.skipcheck.tm1.client.model.CheckFeedersSelection;
 import io.skipcheck.tm1.client.model.Cube;
+import io.skipcheck.tm1.client.model.CubeCreate;
 import io.skipcheck.tm1.client.model.CubePatch;
 import io.skipcheck.tm1.client.model.Dimension;
 import io.skipcheck.tm1.client.model.FedCellDescriptor;
@@ -116,7 +117,7 @@ class CubeServiceTest {
 		ODataPath dimensions = ODataPath.of("Dimensions");
 		tm1().json(201, "{\"Name\":\"Sales\"}");
 		Cube created = conformance.call("cubes", "create",
-				CubePatch.builder()
+				CubeCreate.builder()
 					.name("Sales")
 					.bindDimensions(dimensions.key("Region"), dimensions.key("Month"))
 					.build());

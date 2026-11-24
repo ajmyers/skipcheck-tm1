@@ -8,14 +8,14 @@
 			"service" : "dimensions",
 			"method" : "create",
 			"params" : [ "dimension" ],
-			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${dimension}", "Hierarchies" : [ { "Name" : "${dimension}", "Elements" : [ { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" } ] } ] } } ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${dimension}", "Hierarchies" : [ { "Name" : "${dimension}", "Elements" : [ { "Name" : "North", "Type" : "Numeric" }, { "Name" : "South", "Type" : "Numeric" } ] } ] } } ],
 			"expect" : { "fields" : { "Name" : "${dimension}" } }
 		},
 		{
 			"service" : "attributes",
 			"method" : "create",
 			"params" : [ "set", "attribute" ],
-			"args" : [ { "$type" : "AttributeSet", "factory" : "elements", "args" : [ "${dimension}", "${dimension}" ] }, { "$patch" : "AttributeDefinitionPatch", "json" : { "Name" : "${label}", "Type" : "String" } } ],
+			"args" : [ { "$type" : "AttributeSet", "factory" : "elements", "args" : [ "${dimension}", "${dimension}" ] }, { "$patch" : "AttributeDefinitionCreate", "json" : { "Name" : "${label}", "Type" : "String" } } ],
 			"expect" : { "fields" : { "Name" : "${label}", "Type" : "String" } }
 		},
 		{
@@ -64,7 +64,7 @@
 			"service" : "attributes",
 			"method" : "create",
 			"params" : [ "set", "attribute" ],
-			"args" : [ { "$type" : "AttributeSet", "factory" : "hierarchies", "args" : [ "${dimension}" ] }, { "$patch" : "AttributeDefinitionPatch", "json" : { "Name" : "${code}", "Type" : "String" } } ],
+			"args" : [ { "$type" : "AttributeSet", "factory" : "hierarchies", "args" : [ "${dimension}" ] }, { "$patch" : "AttributeDefinitionCreate", "json" : { "Name" : "${code}", "Type" : "String" } } ],
 			"expect" : { "fields" : { "Name" : "${code}", "Type" : "String" } }
 		},
 		{

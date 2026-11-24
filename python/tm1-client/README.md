@@ -6,14 +6,14 @@ It comes in two flavors with one API: sync (`skipcheck_tm1`) and asyncio (`skipc
 
 ```python
 from skipcheck_tm1 import Filter, ODataPath, ODataQuery, Tm1Client
-from skipcheck_tm1.model import Cube, CubePatch
+from skipcheck_tm1.model import Cube, CubeCreate, CubePatch
 
 with Tm1Client.builder().base_url("http://localhost:8010/api/v1/").basic_auth("admin", "apple").build() as tm1:
     for cube in tm1.cubes.model_cubes(ODataQuery.none().select(Cube.NAME).filter(Filter.starts_with(Cube.NAME, "Sales"))):
         print(cube.name)
 
     dimensions = ODataPath.of("Dimensions")
-    tm1.cubes.create(CubePatch.builder().name("Plan").bind_dimensions(dimensions.key("Region"), dimensions.key("Year")).build())
+    tm1.cubes.create(CubeCreate.builder().name("Plan").bind_dimensions(dimensions.key("Region"), dimensions.key("Year")).build())
 
     rules = "SKIPCHECK;\n['Margin'] = N: ['Revenue'] - ['Cost'];"
     if not tm1.cubes.check_rules("Plan", rules):
@@ -41,7 +41,7 @@ async with AsyncTm1Client.builder().base_url("http://localhost:8010/api/v1/").ba
 | `Flux<T>` | `list[T]`; log tails and cellset streams are iterators |
 | `ODataQuery query` parameter | `query: ODataQuery | None = None`, and keyword shortcuts (`select=…`, `top=…`) |
 | Overloads (`update(name, patch)`, `update(name, patch, etag)`) | Optional parameters (`update(name, patch, etag=None)`) |
-| `CubePatch.builder().name("x").build()` | the same, in snake case; a model instance (`Cube(name="x")`) works too |
+| `CubeCreate.builder().name("x").build()` | the same, in snake case; a model instance (`Cube(name="x")`) works too |
 | `Cube.NAME`, `Filter.and(…)` | `Cube.NAME`, `Filter.and_(…)` (`and`, `or`, `not` are keywords) |
 | `Tm1Client.builder()…build()`, `withSandbox`, `withAsync`, `batch()` | `Tm1Client.builder()…build()`, `with_sandbox`, `with_async`, `batch()` |
 | `Tm1SessionPool`, `Tm1Identity`, `Tm1Timeouts`, `Tm1ErrorClassifier` | the same names |

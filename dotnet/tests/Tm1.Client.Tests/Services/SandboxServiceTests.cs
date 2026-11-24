@@ -26,7 +26,7 @@ public class SandboxServiceTests
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "What if" };
         Assert.Equal("What if", (await tm1.Sandboxes.GetAsync("What if")).Name);
         Assert.Equal("Sandboxes('What%20if')", _tm1.Last.Target);
-        await tm1.Sandboxes.CreateAsync(SandboxPatch.Builder().Name("What if").Build());
+        await tm1.Sandboxes.CreateAsync(SandboxCreate.Builder().Name("What if").Build());
         Assert.Equal(("POST", "Sandboxes", """{"Name":"What if"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => null;

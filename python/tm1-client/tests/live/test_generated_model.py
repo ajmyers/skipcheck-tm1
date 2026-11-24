@@ -13,13 +13,13 @@ from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Error, Tm1Request, Tm1Sessio
 from skipcheck_tm1._generated.operations import Tm1Operations
 from skipcheck_tm1.model import (
     Cube,
-    CubePatch,
+    CubeCreate,
     Dimension,
-    DimensionPatch,
+    DimensionCreate,
     Element,
-    ElementPatch,
+    ElementCreate,
     ElementType,
-    HierarchyPatch,
+    HierarchyCreate,
     MDXView,
     Member,
     Server,
@@ -92,21 +92,21 @@ def test_creates_a_dimension_and_a_cube_from_patches_then_patches_and_clears_its
 
     with session() as s:
         try:
-            north = ElementPatch.builder().name("North").type(ElementType.NUMERIC).build()
-            south = ElementPatch.builder().name("South").type(ElementType.NUMERIC).build()
-            hierarchy = HierarchyPatch.builder().name(name).elements([north, south]).build()
-            s.execute(Tm1Request.post(ODataPath.of("Dimensions"), DimensionPatch.builder().name(name).hierarchies([hierarchy]).build(), Dimension))
+            north = ElementCreate.builder().name("North").type(ElementType.NUMERIC).build()
+            south = ElementCreate.builder().name("South").type(ElementType.NUMERIC).build()
+            hierarchy = HierarchyCreate.builder().name(name).elements([north, south]).build()
+            s.execute(Tm1Request.post(ODataPath.of("Dimensions"), DimensionCreate.builder().name(name).hierarchies([hierarchy]).build(), Dimension))
             groups = ODataPath.of("Dimensions").key("}Groups")
-            s.execute(Tm1Request.post(ODataPath.of("Cubes"), CubePatch.builder().name(name).bind_dimensions(dimension, groups).build(), Cube))
+            s.execute(Tm1Request.post(ODataPath.of("Cubes"), CubeCreate.builder().name(name).bind_dimensions(dimension, groups).build(), Cube))
 
             created = s.execute(Tm1Request.get(cube, ODataQuery.none().expand(Cube.DIMENSIONS, lambda d: d.select(Dimension.NAME)), Cube))
             assert [d.name for d in created.dimensions] == ["Sandboxes", name, "}Groups"], "TM1 lists its virtual Sandboxes dimension first"
             elements = list(s.stream(Tm1Request.list(dimension.nav("Hierarchies").key(name).nav("Elements"), ODataQuery.none(), Element)))
             assert sorted((e.name, e.type) for e in elements) == [("North", ElementType.NUMERIC), ("South", ElementType.NUMERIC)]
 
-            s.execute(Tm1Request.patch(cube, CubePatch.builder().rules("SKIPCHECK;").build()))
+            s.execute(Tm1Request.patch(cube, CubeCreate.builder().rules("SKIPCHECK;").build()))
             assert "SKIPCHECK" in (rules(s) or "")
-            s.execute(Tm1Request.patch(cube, CubePatch.builder().rules(None).build()))
+            s.execute(Tm1Request.patch(cube, CubeCreate.builder().rules(None).build()))
             assert not rules(s), "an explicit null clears them"
         finally:
             _quietly(s, Tm1Request.delete(cube))

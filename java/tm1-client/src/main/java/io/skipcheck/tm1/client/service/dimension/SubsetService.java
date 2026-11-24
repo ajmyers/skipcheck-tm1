@@ -15,6 +15,7 @@ import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Element;
 import io.skipcheck.tm1.client.model.Hierarchy;
 import io.skipcheck.tm1.client.model.Subset;
+import io.skipcheck.tm1.client.model.SubsetCreate;
 import io.skipcheck.tm1.client.model.SubsetPatch;
 import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.client.odata.ODataPath;
@@ -107,7 +108,7 @@ public final class SubsetService {
 	@Tm1Endpoint("Navigation Hierarchy/Subsets")
 	@Tm1Endpoint("Navigation Hierarchy/PrivateSubsets")
 	@Tm1Endpoint("Navigation Hierarchy/SessionSubsets")
-	public Mono<Subset> create(String dimension, String hierarchy, SubsetScope scope, SubsetPatch subset) {
+	public Mono<Subset> create(String dimension, String hierarchy, SubsetScope scope, SubsetCreate subset) {
 		return session.execute(Tm1Request.post(subsets(dimension, hierarchy, scope),
 				Objects.requireNonNull(subset, "subset"), Subset.class));
 	}
@@ -337,7 +338,7 @@ public final class SubsetService {
 	 * @return the session subset, with the name TM1 gave it
 	 */
 	@Tm1Endpoint("Action Hierarchy/CreateSessionSubset")
-	public Mono<Subset> createSessionSubset(String dimension, String hierarchy, SubsetPatch definition) {
+	public Mono<Subset> createSessionSubset(String dimension, String hierarchy, SubsetCreate definition) {
 		return session.execute(action(Tm1Operations.HIERARCHY_CREATE_SESSION_SUBSET, hierarchy(dimension, hierarchy),
 				Map.of("Subset", definition), Subset.class));
 	}

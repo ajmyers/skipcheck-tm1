@@ -4,7 +4,7 @@ package examples;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.AttributeDefinition;
-import io.skipcheck.tm1.client.model.AttributeDefinitionPatch;
+import io.skipcheck.tm1.client.model.AttributeDefinitionCreate;
 import io.skipcheck.tm1.client.model.AttributeType;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.attribute.AttributeSet;
@@ -22,7 +22,7 @@ final class AttributeServiceExamples {
 		// A text attribute on every element of the Region hierarchy
 		return tm1.attributes()
 			.create(AttributeSet.elements("Region", "Region"),
-					AttributeDefinitionPatch.builder().name("Manager").type(AttributeType.STRING).build());
+					AttributeDefinitionCreate.builder().name("Manager").type(AttributeType.STRING).build());
 		// @end
 	}
 

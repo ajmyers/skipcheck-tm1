@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { MDXViewPatch, ODataQuery, Tm1PreconditionFailedException, View, ViewPatch, ViewScope, typeOf } from "../../src/index.js";
+import {
+  MDXViewCreate,
+  MDXViewPatch,
+  NativeViewPatch,
+  ODataQuery,
+  Tm1PreconditionFailedException,
+  typeOf,
+  View,
+  ViewCreate,
+  ViewScope,
+} from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 /** ViewService against a fake TM1: public and private views by their navigation, as the Java
@@ -42,17 +52,21 @@ describe("ViewService", () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
     tm1.respond = () => ({ Name: "Mine" });
-    const created = await client.views.create("Sales", ViewScope.Private, ViewPatch.builder().name("Mine").build());
+    const created = await client.views.create("Sales", ViewScope.Private, ViewCreate.builder().name("Mine").build());
     expect(created.Name).toBe("Mine");
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Cubes('Sales')/PrivateViews", '{"Name":"Mine"}']);
-    await client.views.create("Sales", ViewScope.Public, MDXViewPatch.builder().name("Mdx").mdx("SELECT").build());
+    await client.views.create("Sales", ViewScope.Public, MDXViewCreate.builder().name("Mdx").mdx("SELECT").build());
     expect([tm1.last.target, tm1.last.json]).toEqual(["Cubes('Sales')/Views", { "@odata.type": "#ibm.tm1.api.v1.MDXView", Name: "Mdx", MDX: "SELECT" }]);
 
     tm1.respond = () => null;
-    await client.views.update("Sales", ViewScope.Public, "Default", ViewPatch.builder().name("Renamed").build());
-    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["PATCH", "Cubes('Sales')/Views('Default')", '{"Name":"Renamed"}']);
+    await client.views.update("Sales", ViewScope.Public, "Default", NativeViewPatch.builder().suppressEmptyRows(false).build());
+    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual([
+      "PATCH",
+      "Cubes('Sales')/Views('Default')",
+      '{"@odata.type":"#ibm.tm1.api.v1.NativeView","SuppressEmptyRows":false}',
+    ]);
     expect(tm1.last.headers["if-match"]).toBeUndefined();
-    await client.views.update("Sales", ViewScope.Public, "Default", ViewPatch.builder().name("Renamed").build(), 'W/"3"');
+    await client.views.update("Sales", ViewScope.Public, "Default", NativeViewPatch.builder().suppressEmptyRows(false).build(), 'W/"3"');
     expect(tm1.last.headers["if-match"]).toBe('W/"3"');
 
     await client.views.delete("Sales", ViewScope.Public, "Default");

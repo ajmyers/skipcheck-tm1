@@ -22,11 +22,10 @@ describe("departures from $metadata", () => {
     expect(readAs(Subset, { Name: "Top", Alias: "Caption" }).Alias).toBe("Caption");
 
     const patch = ProcessPatch.builder()
-      .name("Load")
       .uiData(process.UIData ?? null)
       .variablesUIData(process.VariablesUIData ?? null)
       .build();
-    expect(JSON.stringify(patch)).toBe('{"Name":"Load","UIData":"CubeAction=1511\\f","VariablesUIData":["VarType=32\\f"]}');
+    expect(JSON.stringify(patch)).toBe('{"UIData":"CubeAction=1511\\f","VariablesUIData":["VarType=32\\f"]}');
     expect(JSON.stringify(SubsetPatch.builder().alias("Caption").build())).toBe('{"Alias":"Caption"}');
   });
 

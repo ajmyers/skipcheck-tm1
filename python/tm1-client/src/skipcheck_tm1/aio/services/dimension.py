@@ -77,14 +77,14 @@ class DimensionService(Service):
     Create a dimension with its hierarchy, elements and edges in one request (Region, with
     one hierarchy of the same name: Total = North + South)::
 
-        total = ElementPatch.builder().name("Total").type(ElementType.CONSOLIDATED).build()
-        north = ElementPatch.builder().name("North").type(ElementType.NUMERIC).build()
-        south = ElementPatch.builder().name("South").type(ElementType.NUMERIC).build()
+        total = ElementCreate.builder().name("Total").type(ElementType.CONSOLIDATED).build()
+        north = ElementCreate.builder().name("North").type(ElementType.NUMERIC).build()
+        south = ElementCreate.builder().name("South").type(ElementType.NUMERIC).build()
         await tm1.dimensions.create(
-            DimensionPatch.builder()
+            DimensionCreate.builder()
             .name("Region")
             .hierarchies([
-                HierarchyPatch.builder()
+                HierarchyCreate.builder()
                 .name("Region")
                 .elements([total, north, south])
                 .edges([
@@ -215,12 +215,12 @@ class HierarchyService(Service):
     Add a hierarchy to a dimension, with its elements and edges (a second hierarchy of Region,
     rolling the same leaves up by manager)::
 
-        await tm1.hierarchies.create("Region", HierarchyPatch.builder()
+        await tm1.hierarchies.create("Region", HierarchyCreate.builder()
             .name("By Manager")
             .elements([
-                ElementPatch.builder().name("Smith").type(ElementType.CONSOLIDATED).build(),
-                ElementPatch.builder().name("North").type(ElementType.NUMERIC).build(),
-                ElementPatch.builder().name("South").type(ElementType.NUMERIC).build(),
+                ElementCreate.builder().name("Smith").type(ElementType.CONSOLIDATED).build(),
+                ElementCreate.builder().name("North").type(ElementType.NUMERIC).build(),
+                ElementCreate.builder().name("South").type(ElementType.NUMERIC).build(),
             ])
             .edges([
                 EdgePatch.builder().parent_name("Smith").component_name("North").weight(1.0).build(),
@@ -231,9 +231,9 @@ class HierarchyService(Service):
     Replace a hierarchy's structure, knowing that TM1 deletes every other element of the
     hierarchy, with its data::
 
-        all_ = ElementPatch.builder().name("All Versions").type(ElementType.CONSOLIDATED).build()
-        actual = ElementPatch.builder().name("Actual").type(ElementType.NUMERIC).build()
-        budget = ElementPatch.builder().name("Budget").type(ElementType.NUMERIC).build()
+        all_ = ElementCreate.builder().name("All Versions").type(ElementType.CONSOLIDATED).build()
+        actual = ElementCreate.builder().name("Actual").type(ElementType.NUMERIC).build()
+        budget = ElementCreate.builder().name("Budget").type(ElementType.NUMERIC).build()
         await tm1.hierarchies.replace_structure("Version", "Version", [all_, actual, budget], [
             EdgePatch.builder().parent_name("All Versions").component_name("Actual").weight(1.0).build(),
             EdgePatch.builder().parent_name("All Versions").component_name("Budget").weight(1.0).build(),
@@ -376,7 +376,7 @@ class ElementService(Service):
     Add an element under a consolidation. A new element is a root until it has a parent;
     ``set_component`` then puts it last under Total::
 
-        await tm1.elements.create("Region", "Region", ElementPatch.builder().name("West").type(ElementType.NUMERIC).build())
+        await tm1.elements.create("Region", "Region", ElementCreate.builder().name("West").type(ElementType.NUMERIC).build())
         await tm1.elements.set_component("Region", "Region", "Total", "West")
 
     Read a consolidation's children, in order::
@@ -725,12 +725,12 @@ class SubsetService(Service):
 
         elements = ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements")
         await tm1.subsets.create("Region", "Region", SubsetScope.PUBLIC,
-            SubsetPatch.builder().name("Key Regions").bind_elements(elements.key("North"), elements.key("South")).build())
+            SubsetCreate.builder().name("Key Regions").bind_elements(elements.key("North"), elements.key("South")).build())
 
     Create a dynamic subset from an MDX expression, evaluated each time it's read::
 
         await tm1.subsets.create("Region", "Region", SubsetScope.PUBLIC,
-            SubsetPatch.builder().name("All Leaves")
+            SubsetCreate.builder().name("All Leaves")
             .expression("{TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)}").build())
 
     Replace a static subset's elements: a PATCH appends elements, so empty the list, then add
@@ -743,7 +743,7 @@ class SubsetService(Service):
     subset itself, ignoring the name sent)::
 
         subset = await tm1.subsets.create_session_subset("Region", "Region",
-            SubsetPatch.builder().name("Regions").expression("{[Region].[Region].[Total].Children}").build())
+            SubsetCreate.builder().name("Regions").expression("{[Region].[Region].[Total].Children}").build())
         elements = await tm1.subsets.elements("Region", "Region", SubsetScope.SESSION, subset.name,
             ODataQuery.none().select(Element.NAME))
     """
@@ -772,7 +772,7 @@ class SubsetService(Service):
     @endpoint(*_SUBSET_SETS)
     async def create(self, dimension: str, hierarchy: str, scope: SubsetScope, subset: Any) -> Subset:
         """``POST …/Subsets``: creates a subset: static with ``Elements@odata.bind``
-        (``SubsetPatch.Builder.bind_elements``), dynamic with an ``Expression``."""
+        (``SubsetCreate.Builder.bind_elements``), dynamic with an ``Expression``."""
         path = _subsets(dimension, hierarchy, scope)
         return await self._session.execute(Tm1Request.post(path, _require(subset, "subset"), Subset))
 

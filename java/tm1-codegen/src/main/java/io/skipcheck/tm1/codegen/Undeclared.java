@@ -174,7 +174,8 @@ public record Undeclared(String schemaVersion, Map<String, Property> properties)
 				departures.put(key, READ_AS_JSON);
 			}
 		});
-		return new Overlay(departures, overlay.lenientDates(), overlay.endpoints(), overlay.undeclared());
+		return new Overlay(departures, overlay.lenientDates(), overlay.endpoints(), overlay.undeclared(),
+				overlay.writeOnly());
 	}
 
 	/**

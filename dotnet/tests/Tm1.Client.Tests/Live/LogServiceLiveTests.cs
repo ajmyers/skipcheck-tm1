@@ -66,7 +66,7 @@ public class LogServiceLiveTests
     {
         await using var tm1 = Live.Client();
         var user = Live.Name();
-        await tm1.Users.CreateAsync(UserPatch.Builder().Name(user).Password("pw").Build());
+        await tm1.Users.CreateAsync(UserCreate.Builder().Name(user).Password("pw").Build());
         try
         {
             var newest = await tm1.Logs.TransactionLogAsync(true, true, ODataQuery.None().Top(50)).ToListAsync();
@@ -97,7 +97,7 @@ public class LogServiceLiveTests
     {
         await using var tm1 = Live.Client();
         var process = Live.Name();
-        await tm1.Processes.CreateAsync(ProcessPatch.Builder().Name(process).PrologProcedure("ProcessError;\n").Build());
+        await tm1.Processes.CreateAsync(ProcessCreate.Builder().Name(process).PrologProcedure("ProcessError;\n").Build());
         try
         {
             var filename = (await tm1.Processes.ExecuteWithReturnAsync(process, null, ODataQuery.None().Expand("ErrorLogFile"))).ErrorLogFile!.Filename!;

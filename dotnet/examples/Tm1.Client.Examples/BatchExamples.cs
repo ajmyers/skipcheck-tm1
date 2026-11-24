@@ -36,7 +36,7 @@ public static class BatchExamples
         {
             try
             {
-                var created = await batch.Client.Elements.CreateAsync("City", "City", ElementPatch.Builder().Name(city).Build());
+                var created = await batch.Client.Elements.CreateAsync("City", "City", ElementCreate.Builder().Name(city).Build());
                 return created.Name!;
             }
             catch (Tm1Exception e)

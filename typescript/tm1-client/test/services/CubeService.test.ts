@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { Cube, CubePatch, Filter, ODataPath, ODataQuery, Tm1PreconditionFailedException } from "../../src/index.js";
+import { Cube, CubeCreate, CubePatch, Filter, ODataPath, ODataQuery, Tm1PreconditionFailedException } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 /** CubeService against a fake TM1: each method sends what the Java client's does, and reads TM1's
@@ -30,7 +30,7 @@ describe("CubeService", () => {
     expect(tm1.last.target).toBe("Cubes('Sales')?$select=Name");
 
     const dimensions = ODataPath.of("Dimensions");
-    await client.cubes.create(CubePatch.builder().name("Sales").bindDimensions(dimensions.key("Region"), dimensions.key("Month")).build());
+    await client.cubes.create(CubeCreate.builder().name("Sales").bindDimensions(dimensions.key("Region"), dimensions.key("Month")).build());
     expect(tm1.last.method).toBe("POST");
     expect(tm1.last.text).toBe('{"Name":"Sales","Dimensions@odata.bind":["Dimensions(\'Region\')","Dimensions(\'Month\')"]}');
 

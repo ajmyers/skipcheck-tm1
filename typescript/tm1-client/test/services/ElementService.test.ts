@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { AttributesPatch, ElementPatch, ElementType, ODataQuery } from "../../src/index.js";
+import { ElementCreate, ElementPatch, ElementPatchBuilder, ElementType, ODataQuery } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 const ELEMENTS = "Dimensions('Region')/Hierarchies('Region')/Elements";
@@ -21,7 +21,7 @@ describe("ElementService", () => {
     tm1.respond = () => ({ Name: "West" });
     expect((await client.elements.get("Region", "Region", "West")).Name).toBe("West");
     expect([tm1.last.method, tm1.last.target]).toEqual(["GET", `${ELEMENTS}('West')`]);
-    expect((await client.elements.create("Region", "Region", ElementPatch.builder().name("West").type(ElementType.Numeric).build())).Name).toBe("West");
+    expect((await client.elements.create("Region", "Region", ElementCreate.builder().name("West").type(ElementType.Numeric).build())).Name).toBe("West");
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", ELEMENTS, '{"Name":"West","Type":"Numeric"}']);
 
     tm1.respond = () => null;
@@ -37,12 +37,11 @@ describe("ElementService", () => {
   it("refuses an update with a name or attributes", () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    const rename = ElementPatch.builder().name("East").build();
-    expect(() => client.elements.update("Region", "Region", "West", rename)).toThrow(/can't be renamed/);
-    expect(() => client.elements.update("Region", "Region", "West", rename, 'W/"1"')).toThrow(RangeError);
-    const attributes = ElementPatch.builder().attributes(AttributesPatch.builder().caption("W").build()).build();
-    expect(() => client.elements.update("Region", "Region", "West", attributes, 'W/"1"')).toThrow(/\}ElementAttributes_/);
-    expect(() => client.elements.update("Region", "Region", "West", attributes)).toThrow(RangeError);
+    // Refused at compile time: ElementPatch offers neither, as TM1 ignores the name and refuses
+    // Attributes in an element's PATCH
+    expect(Object.getOwnPropertyNames(ElementPatchBuilder.prototype)).not.toContain("name");
+    expect(Object.getOwnPropertyNames(ElementPatchBuilder.prototype)).not.toContain("attributes");
+    void client;
     expect(tm1.requests).toEqual([]);
   });
 

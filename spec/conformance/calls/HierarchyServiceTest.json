@@ -253,7 +253,7 @@
 			"args" : [
 				"Region",
 				{
-					"$patch" : "HierarchyPatch",
+					"$patch" : "HierarchyCreate",
 					"json" : {
 						"Name" : "Alt",
 						"Elements" : [
@@ -337,7 +337,7 @@
 			"args" : [
 				"Region",
 				{
-					"$patch" : "HierarchyPatch",
+					"$patch" : "HierarchyCreate",
 					"json" : {
 						"Name" : "Region"
 					}
@@ -1031,14 +1031,14 @@
 				"Version",
 				[
 					{
-						"$patch" : "ElementPatch",
+						"$patch" : "ElementCreate",
 						"json" : {
 							"Name" : "All Versions",
 							"Type" : "Consolidated"
 						}
 					},
 					{
-						"$patch" : "ElementPatch",
+						"$patch" : "ElementCreate",
 						"json" : {
 							"Name" : "Actual",
 							"Type" : "Numeric"
@@ -1110,7 +1110,7 @@
 				"Version",
 				[
 					{
-						"$patch" : "ElementPatch",
+						"$patch" : "ElementCreate",
 						"json" : {
 							"Name" : "Actual",
 							"Type" : "Numeric"
@@ -1426,7 +1426,7 @@
 				{
 					"$patch" : "HierarchyPatch",
 					"json" : {
-						"Visible" : false
+						"ElementsSortType" : "ByName"
 					}
 				}
 			],
@@ -1442,7 +1442,7 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"Visible" : false
+							"ElementsSortType" : "ByName"
 						}
 					},
 					"response" : {
@@ -1469,7 +1469,7 @@
 				{
 					"$patch" : "HierarchyPatch",
 					"json" : {
-						"UniqueName" : "x"
+						"ElementsSortSense" : "Descending"
 					}
 				},
 				"W/\"2\""
@@ -1487,7 +1487,7 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"UniqueName" : "x"
+							"ElementsSortSense" : "Descending"
 						}
 					},
 					"response" : {

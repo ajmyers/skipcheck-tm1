@@ -30,11 +30,8 @@ public class DeparturesTests
         Assert.StartsWith("#region Prolog", process.Code);
         Assert.Equal("Caption", JsonSerializer.Deserialize<Subset>("""{"Name": "Top", "Alias": "Caption"}""", Tm1Json.Options)!.Alias);
 
-        var patch = ProcessPatch.Builder().Name("Load").UiData(process.UiData).VariablesUIData(process.VariablesUIData).Build();
-        Assert.Equal(
-            """{"Name":"Load","UIData":"CubeAction=1511\f","VariablesUIData":["VarType=32\f"]}""",
-            JsonSerializer.Serialize<Tm1Patch>(patch, Tm1Json.Options)
-        );
+        var patch = ProcessPatch.Builder().UiData(process.UiData).VariablesUIData(process.VariablesUIData).Build();
+        Assert.Equal("""{"UIData":"CubeAction=1511\f","VariablesUIData":["VarType=32\f"]}""", JsonSerializer.Serialize<Tm1Patch>(patch, Tm1Json.Options));
         Assert.Equal("""{"Alias":"Caption"}""", JsonSerializer.Serialize<Tm1Patch>(SubsetPatch.Builder().Alias("Caption").Build(), Tm1Json.Options));
     }
 

@@ -120,7 +120,7 @@
 			],
 			"args" : [
 				{
-					"$patch" : "SandboxPatch",
+					"$patch" : "SandboxCreate",
 					"json" : {
 						"Name" : "S"
 					}
@@ -172,7 +172,7 @@
 			],
 			"args" : [
 				{
-					"$patch" : "SandboxPatch",
+					"$patch" : "SandboxCreate",
 					"json" : {
 						"Name" : "S",
 						"IncludeInSandboxDimension" : true
@@ -228,8 +228,7 @@
 				{
 					"$patch" : "SandboxPatch",
 					"json" : {
-						"Name" : "T",
-						"IsActive" : null
+						"IncludeInSandboxDimension" : false
 					}
 				}
 			],
@@ -245,8 +244,7 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"Name" : "T",
-							"IsActive" : null
+							"IncludeInSandboxDimension" : false
 						}
 					},
 					"response" : {
@@ -265,13 +263,13 @@
 				"name"
 			],
 			"args" : [
-				"T"
+				"S"
 			],
 			"exchanges" : [
 				{
 					"request" : {
 						"method" : "DELETE",
-						"target" : "Sandboxes('T')",
+						"target" : "Sandboxes('S')",
 						"headers" : {
 							"accept" : "application/json",
 							"odata-maxversion" : "4.0",

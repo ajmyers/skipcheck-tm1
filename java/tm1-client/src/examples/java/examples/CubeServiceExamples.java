@@ -4,6 +4,7 @@ package examples;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Cube;
+import io.skipcheck.tm1.client.model.CubeCreate;
 import io.skipcheck.tm1.client.model.CubePatch;
 import io.skipcheck.tm1.client.odata.Filter;
 import io.skipcheck.tm1.client.odata.ODataPath;
@@ -34,7 +35,7 @@ final class CubeServiceExamples {
 		// A cube over two existing dimensions, in this order
 		ODataPath dimensions = ODataPath.of("Dimensions");
 		return tm1.cubes()
-			.create(CubePatch.builder()
+			.create(CubeCreate.builder()
 				.name("Sales")
 				.bindDimensions(dimensions.key("Region"), dimensions.key("Month"))
 				.build());

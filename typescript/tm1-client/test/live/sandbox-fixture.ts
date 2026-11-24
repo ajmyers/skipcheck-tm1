@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, beforeEach } from "vitest";
-import { CubePatch, type Tm1Client } from "../../src/index.js";
+import { CubeCreate, type Tm1Client } from "../../src/index.js";
 import { Fixtures } from "./data-fixtures.js";
 import { Live } from "./live.js";
 
@@ -23,7 +23,7 @@ export function twoByTwo(): {
     tm1 = await Live.client();
     cube = Live.name();
     for (const d of [a(), b()]) await Fixtures.dimension(tm1, d, ["X", "Y"]);
-    await tm1.cubes.create(CubePatch.builder().name(cube).bindDimensions(Fixtures.dimensionPath(a()), Fixtures.dimensionPath(b())).build());
+    await tm1.cubes.create(CubeCreate.builder().name(cube).bindDimensions(Fixtures.dimensionPath(a()), Fixtures.dimensionPath(b())).build());
   });
 
   afterEach(async () => {

@@ -38,12 +38,9 @@ class DeparturesTest {
 		assertThat(JSON.readValue("{\"Name\": \"Top\", \"Alias\": \"Caption\"}", Subset.class).alias())
 			.isEqualTo("Caption");
 
-		assertThat(JSON.writeValueAsString(ProcessPatch.builder()
-			.name("Load")
-			.uiData(process.uiData())
-			.variablesUIData(process.variablesUIData())
-			.build()))
-			.isEqualTo("{\"Name\":\"Load\",\"UIData\":\"CubeAction=1511\\f\",\"VariablesUIData\":[\"VarType=32\\f\"]}");
+		assertThat(JSON.writeValueAsString(
+				ProcessPatch.builder().uiData(process.uiData()).variablesUIData(process.variablesUIData()).build()))
+			.isEqualTo("{\"UIData\":\"CubeAction=1511\\f\",\"VariablesUIData\":[\"VarType=32\\f\"]}");
 		assertThat(JSON.writeValueAsString(SubsetPatch.builder().alias("Caption").build()))
 			.isEqualTo("{\"Alias\":\"Caption\"}");
 	}

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
-import { DimensionPatch, EdgePatch, ElementPatch, ElementType, HierarchyPatch, type Tm1Client } from "../../src/index.js";
+import { DimensionCreate, EdgePatch, ElementCreate, ElementType, HierarchyCreate, type Tm1Client } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 /** EdgeService against a real TM1, on Total = North + South, with East and Label besides: the Java
@@ -24,12 +24,12 @@ describe("EdgeService on TM1" + liveReason, () => {
   beforeEach(async () => {
     if (!Live.configured) return;
     d = Live.name();
-    const element = (name: string, type: ElementType): ElementPatch => ElementPatch.builder().name(name).type(type).build();
+    const element = (name: string, type: ElementType): ElementCreate => ElementCreate.builder().name(name).type(type).build();
     await tm1.dimensions.create(
-      DimensionPatch.builder()
+      DimensionCreate.builder()
         .name(d)
         .hierarchies([
-          HierarchyPatch.builder()
+          HierarchyCreate.builder()
             .name(d)
             .elements([
               element("Total", ElementType.Consolidated),

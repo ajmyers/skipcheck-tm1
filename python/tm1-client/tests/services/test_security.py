@@ -12,7 +12,14 @@ import httpx2
 import pytest
 
 from skipcheck_tm1 import Filter, ODataPath, ODataQuery, Tm1NotFoundError
-from skipcheck_tm1.model import Group, Session, Thread, User, UserPatch
+from skipcheck_tm1.model import (
+    Group,
+    Session,
+    Thread,
+    User,
+    UserCreate,
+    UserPatch,
+)
 
 from ..conftest import Api, FakeTm1, target
 
@@ -35,7 +42,7 @@ def test_users(api: Api, fake: FakeTm1) -> None:
     api.run(users.active_user())
     assert target(fake.last) == "GET ActiveUser"
     groups = ODataPath.of("Groups")
-    api.run(users.create(UserPatch.builder().name("alice").password("pw").bind_groups(groups.key("Planners"), groups.key("Sales")).build()))
+    api.run(users.create(UserCreate.builder().name("alice").password("pw").bind_groups(groups.key("Planners"), groups.key("Sales")).build()))
     assert (target(fake.last), body(fake.last)) == (
         "POST Users",
         {"Name": "alice", "Password": "pw", "Groups@odata.bind": ["Groups('Planners')", "Groups('Sales')"]},
@@ -59,8 +66,8 @@ def test_groups_are_set_whole_never_through_a_ref_delete(api: Api, fake: FakeTm1
     # A user PATCH with Groups replaces them: refused, so it's never done by accident
     sent = len(fake.requests)
     for patch in (
-        UserPatch.builder().bind_groups(ODataPath.of("Groups").key("x")).build(),
-        UserPatch.builder().groups([]).build(),
+        UserCreate.builder().bind_groups(ODataPath.of("Groups").key("x")).build(),
+        UserCreate.builder().groups([]).build(),
         {"Groups@odata.bind": []},
         User(name="alice", groups=[]),
     ):

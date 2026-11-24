@@ -13,8 +13,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessExecuteStatusCode;
-import io.skipcheck.tm1.client.model.ProcessPatch;
 import io.skipcheck.tm1.client.model.Thread;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
@@ -48,7 +48,7 @@ class Tm1SessionAsyncTm1Test {
 	@Test
 	void runsAProcessAndReadsACollectionThroughTheMonitor() {
 		String process = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
-		tm1.processes().create(ProcessPatch.builder().name(process).prologProcedure("x = 1;\n").build()).block(WAIT);
+		tm1.processes().create(ProcessCreate.builder().name(process).prologProcedure("x = 1;\n").build()).block(WAIT);
 		try {
 			assertThat(async.processes()
 				.executeWithReturn(process, Map.of(), ODataQuery.none())
@@ -65,7 +65,7 @@ class Tm1SessionAsyncTm1Test {
 	void stopsTheWorkOnTm1WhenCancelled() throws InterruptedException {
 		String process = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.processes()
-			.create(ProcessPatch.builder()
+			.create(ProcessCreate.builder()
 				.name(process)
 				.prologProcedure("i = 0;\nWhile(i < 300000000);\n  i = i + 1;\nEnd;\n")
 				.build())

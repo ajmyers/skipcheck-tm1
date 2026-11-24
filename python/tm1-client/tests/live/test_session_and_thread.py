@@ -15,7 +15,7 @@ from skipcheck_tm1 import (
     Tm1Error,
     Tm1ServerError,
 )
-from skipcheck_tm1.model import ProcessPatch
+from skipcheck_tm1.model import ProcessCreate
 
 from .conftest import ADMIN, CONFIGURED, REASON, other_client
 
@@ -41,7 +41,7 @@ def test_reads_sessions_their_users_and_threads_and_closes_another(tm1: Tm1Clien
 
 
 def test_cancels_a_running_process_through_its_thread(tm1: Tm1Client, name: str) -> None:
-    tm1.processes.create(ProcessPatch.builder().name(name).prolog_procedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n").build())
+    tm1.processes.create(ProcessCreate.builder().name(name).prolog_procedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n").build())
     runner = other_client()
     outcome: list[BaseException | object] = []
 

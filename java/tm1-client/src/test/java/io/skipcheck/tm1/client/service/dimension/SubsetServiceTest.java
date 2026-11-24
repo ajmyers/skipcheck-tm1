@@ -17,9 +17,10 @@ import io.skipcheck.tm1.client.error.Tm1ErrorKind;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Element;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.Hierarchy;
 import io.skipcheck.tm1.client.model.Subset;
+import io.skipcheck.tm1.client.model.SubsetCreate;
 import io.skipcheck.tm1.client.model.SubsetPatch;
 import io.skipcheck.tm1.client.odata.Filter;
 import io.skipcheck.tm1.client.odata.ODataPath;
@@ -145,7 +146,7 @@ class SubsetServiceTest {
 	void createsStaticAndDynamicSubsets() {
 		tm1().json(201, "{\"Name\":\"Key Regions\"}");
 		Subset created = conformance.call("subsets", "create", "Region", "Region", SubsetScope.PUBLIC,
-				SubsetPatch.builder()
+				SubsetCreate.builder()
 					.name("Key Regions")
 					.bindElements(ELEMENTS.key("North"), ELEMENTS.key("South"))
 					.build());
@@ -158,7 +159,7 @@ class SubsetServiceTest {
 
 		tm1().json(201, "{\"Name\":\"Leaves\",\"Expression\":\"{TM1SUBSETALL([Region])}\"}");
 		Subset dynamic = conformance.call("subsets", "create", "Region", "Region", SubsetScope.PRIVATE,
-				SubsetPatch.builder().name("Leaves").expression("{TM1SUBSETALL([Region])}").build());
+				SubsetCreate.builder().name("Leaves").expression("{TM1SUBSETALL([Region])}").build());
 		assertThat(dynamic.expression()).isEqualTo("{TM1SUBSETALL([Region])}");
 		assertThat(tm1().last().key()).isEqualTo("POST " + HIERARCHY + "/PrivateSubsets");
 		assertThat(tm1().last().text()).isEqualTo("{\"Name\":\"Leaves\",\"Expression\":\"{TM1SUBSETALL([Region])}\"}");
@@ -168,7 +169,7 @@ class SubsetServiceTest {
 	void aSubsetThatExistsIsRefused() {
 		tm1().error(400, "278", "Subset 'Leaves' already exists.");
 		Throwable error = conformance.fail("subsets", "create", "Region", "Region", SubsetScope.PUBLIC,
-				SubsetPatch.builder().name("Leaves").expression("{}").build());
+				SubsetCreate.builder().name("Leaves").expression("{}").build());
 		assertThat(error).isInstanceOfSatisfying(Tm1ApiException.class,
 				e -> assertThat(e.kind()).isEqualTo(Tm1ErrorKind.ALREADY_EXISTS));
 	}
@@ -204,7 +205,7 @@ class SubsetServiceTest {
 	@Test
 	void refusesAnUpdateWithElementsSendingNothing() {
 		Throwable set = conformance.fail("subsets", "update", "Region", "Region", SubsetScope.PUBLIC, "s",
-				SubsetPatch.builder().elements(List.of(ElementPatch.builder().name("West").build())).build());
+				SubsetPatch.builder().elements(List.of(ElementCreate.builder().name("West").build())).build());
 		assertThat(set).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("addElements");
 
 		Throwable bound = conformance.fail("subsets", "update", "Region", "Region", SubsetScope.PUBLIC, "s",
@@ -304,7 +305,7 @@ class SubsetServiceTest {
 	void createsSessionSubsetsFromADefinitionOrAnotherSubset() {
 		tm1().json("{\"Name\":\"yExesF4AAIABAAAQ\",\"Expression\":\"{[Region].[West]}\"}");
 		Subset defined = conformance.call("subsets", "createSessionSubset", "Region", "Region",
-				SubsetPatch.builder().name("Wanted").expression("{[Region].[West]}").build());
+				SubsetCreate.builder().name("Wanted").expression("{[Region].[West]}").build());
 		assertThat(defined.name()).isEqualTo("yExesF4AAIABAAAQ");
 		assertThat(tm1().last().key()).isEqualTo("POST " + HIERARCHY + "/tm1.CreateSessionSubset");
 		assertThat(tm1().last().text())
@@ -312,7 +313,7 @@ class SubsetServiceTest {
 
 		tm1().json("{\"Name\":\"yExesF4AAIABAAAR\"}");
 		conformance.call("subsets", "createSessionSubset", "Region", "Region",
-				SubsetPatch.builder().bindElements(ELEMENTS.key("West")).build());
+				SubsetCreate.builder().bindElements(ELEMENTS.key("West")).build());
 		assertThat(tm1().last().text())
 			.isEqualTo("{\"Subset\":{\"Elements@odata.bind\":[\"" + HIERARCHY + "/Elements('West')\"]}}");
 

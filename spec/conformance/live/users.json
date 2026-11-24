@@ -22,7 +22,7 @@
 			"service" : "users",
 			"method" : "create",
 			"params" : [ "user" ],
-			"args" : [ { "$patch" : "UserPatch", "json" : { "Name" : "${user}", "Password" : "pw", "Groups@odata.bind" : [ "Groups('${g1}')" ] } } ],
+			"args" : [ { "$patch" : "UserCreate", "json" : { "Name" : "${user}", "Password" : "pw", "Groups@odata.bind" : [ "Groups('${g1}')" ] } } ],
 			"expect" : { "fields" : { "Name" : "${user}" } }
 		},
 		{

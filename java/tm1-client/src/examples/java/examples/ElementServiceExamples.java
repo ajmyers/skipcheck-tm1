@@ -4,7 +4,7 @@ package examples;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Element;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
@@ -33,7 +33,7 @@ final class ElementServiceExamples {
 		// @start region = add-child
 		// A new element is a root; SetComponent then puts it last under Total
 		return tm1.elements()
-			.create("Region", "Region", ElementPatch.builder().name("West").type(ElementType.NUMERIC).build())
+			.create("Region", "Region", ElementCreate.builder().name("West").type(ElementType.NUMERIC).build())
 			.then(tm1.elements().setComponent("Region", "Region", "Total", "West"));
 		// @end
 	}

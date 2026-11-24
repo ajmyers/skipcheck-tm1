@@ -18,6 +18,7 @@ import io.skipcheck.tm1.client.conformance.ConformanceTm1;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Chore;
+import io.skipcheck.tm1.client.model.ChoreCreate;
 import io.skipcheck.tm1.client.model.ChoreExecutionMode;
 import io.skipcheck.tm1.client.model.ChorePatch;
 import io.skipcheck.tm1.client.model.ChoreTask;
@@ -90,7 +91,7 @@ class ChoreServiceTest {
 	void createsAChoreWithItsTasks() {
 		tm1().json(201, "{\"Name\":\"Nightly\"}");
 		Chore created = conformance.call("chores", "create",
-				ChorePatch.builder()
+				ChoreCreate.builder()
 					.name("Nightly")
 					.startTime(OffsetDateTime.parse("2026-01-01T02:00:00Z"))
 					.dstSensitive(false)
@@ -107,7 +108,7 @@ class ChoreServiceTest {
 	void createsAChoreWithAnOffsetStart() {
 		tm1().json(201, "{\"Name\":\"Hourly\"}");
 		conformance.call("chores", "create",
-				ChorePatch.builder()
+				ChoreCreate.builder()
 					.name("Hourly")
 					.startTime(OffsetDateTime.parse("2026-03-04T05:06:07.5+02:00"))
 					.frequency(Duration.ofMinutes(90))
@@ -119,7 +120,7 @@ class ChoreServiceTest {
 	@Test
 	void anExistingChoreConflicts() {
 		tm1().error(409, "278", "Chore 'Nightly' already exists");
-		conformance.fail("chores", "create", ChorePatch.builder().name("Nightly").build());
+		conformance.fail("chores", "create", ChoreCreate.builder().name("Nightly").build());
 	}
 
 	@Test

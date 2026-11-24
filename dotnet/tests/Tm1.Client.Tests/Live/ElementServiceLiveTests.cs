@@ -56,19 +56,8 @@ public class ElementServiceLiveTests
     {
         await using var made = await ElementsDimension();
         var (tm1, d) = (made.Tm1, made.Name);
-        Assert.Contains(
-            "renamed",
-            Assert
-                .Throws<ArgumentException>(() =>
-                {
-                    _ = tm1.Elements.UpdateAsync(d, d, "East", ElementPatch.Builder().Name("Est").Build());
-                })
-                .Message
-        );
-        Assert.Throws<ArgumentException>(() =>
-        {
-            _ = tm1.Elements.UpdateAsync(d, d, "East", ElementPatch.Builder().Name("Est").Build(), "W/\"x\"");
-        });
+        // ElementPatch offers neither: TM1 ignores the name and refuses Attributes
+        Assert.DoesNotContain(typeof(ElementPatch.PatchBuilder).GetMethods(), m => m.Name is "Name" or "Attributes");
         var east = ODataPath.Of("Dimensions").Key(d).Nav("Hierarchies").Key(d).Nav("Elements").Key("East");
         await tm1.Session.ExecuteAsync(Tm1Request.Patch(east, new Dictionary<string, object?> { ["Name"] = "Est" }));
         Assert.Equal("East", (await tm1.Elements.GetAsync(d, d, "East")).Name); // TM1 ignores the new name

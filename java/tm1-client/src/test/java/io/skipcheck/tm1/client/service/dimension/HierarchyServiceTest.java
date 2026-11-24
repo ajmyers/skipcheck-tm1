@@ -17,9 +17,10 @@ import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Dimension;
 import io.skipcheck.tm1.client.model.EdgePatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.Hierarchy;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.HierarchyPatch;
 import io.skipcheck.tm1.client.model.Member;
 import io.skipcheck.tm1.client.odata.ODataPath;
@@ -90,10 +91,10 @@ class HierarchyServiceTest {
 	void createsAHierarchyWithItsStructure() {
 		tm1().json(201, "{\"Name\":\"Alt\"}");
 		Hierarchy created = conformance.call("hierarchies", "create", "Region",
-				HierarchyPatch.builder()
+				HierarchyCreate.builder()
 					.name("Alt")
-					.elements(List.of(ElementPatch.builder().name("Total").type(ElementType.CONSOLIDATED).build(),
-							ElementPatch.builder().name("North").type(ElementType.NUMERIC).build()))
+					.elements(List.of(ElementCreate.builder().name("Total").type(ElementType.CONSOLIDATED).build(),
+							ElementCreate.builder().name("North").type(ElementType.NUMERIC).build()))
 					.edges(List.of(EdgePatch.builder().parentName("Total").componentName("North").weight(1.0).build()))
 					.build());
 		assertThat(created.name()).isEqualTo("Alt");
@@ -107,7 +108,7 @@ class HierarchyServiceTest {
 	void creatingAHierarchyThatExistsConflicts() {
 		tm1().error(409, "278", "Hierarchy 'Region' already exists.");
 		Throwable error = conformance.fail("hierarchies", "create", "Region",
-				HierarchyPatch.builder().name("Region").build());
+				HierarchyCreate.builder().name("Region").build());
 		assertThat(error).isInstanceOf(Tm1ConflictException.class);
 	}
 
@@ -115,17 +116,17 @@ class HierarchyServiceTest {
 	void updatesWithAndWithoutAnEtag() {
 		tm1().status(204);
 		Object none = conformance.call("hierarchies", "update", "Region", "Region",
-				HierarchyPatch.builder().visible(false).build());
+				HierarchyPatch.builder().elementsSortType("ByName").build());
 		assertThat(none).isNull();
 		assertThat(tm1().last().key()).isEqualTo("PATCH " + H);
-		assertThat(tm1().last().text()).isEqualTo("{\"Visible\":false}");
+		assertThat(tm1().last().text()).isEqualTo("{\"ElementsSortType\":\"ByName\"}");
 		assertThat(tm1().last().header("If-Match")).isNull();
 
 		tm1().status(204);
-		conformance.call("hierarchies", "update", "Region", "Region", HierarchyPatch.builder().uniqueName("x").build(),
-				"W/\"2\"");
+		conformance.call("hierarchies", "update", "Region", "Region",
+				HierarchyPatch.builder().elementsSortSense("Descending").build(), "W/\"2\"");
 		assertThat(tm1().last().header("If-Match")).isEqualTo("W/\"2\"");
-		assertThat(tm1().last().text()).isEqualTo("{\"UniqueName\":\"x\"}");
+		assertThat(tm1().last().text()).isEqualTo("{\"ElementsSortSense\":\"Descending\"}");
 	}
 
 	@Test
@@ -141,7 +142,7 @@ class HierarchyServiceTest {
 	void anUpdateWithStructureIsRefused() {
 		ODataPath elements = ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements");
 		List<HierarchyPatch> patches = List.of(
-				HierarchyPatch.builder().elements(List.of(ElementPatch.builder().name("a").build())).build(),
+				HierarchyPatch.builder().elements(List.of(ElementCreate.builder().name("a").build())).build(),
 				HierarchyPatch.builder().edges(List.of()).build(),
 				HierarchyPatch.builder().bindElements(elements.key("a")).build(),
 				HierarchyPatch.builder().bindEdges().build());
@@ -160,8 +161,8 @@ class HierarchyServiceTest {
 	void replacesTheStructure() {
 		tm1().status(204);
 		Object none = conformance.call("hierarchies", "replaceStructure", "Version", "Version",
-				List.of(ElementPatch.builder().name("All Versions").type(ElementType.CONSOLIDATED).build(),
-						ElementPatch.builder().name("Actual").type(ElementType.NUMERIC).build()),
+				List.of(ElementCreate.builder().name("All Versions").type(ElementType.CONSOLIDATED).build(),
+						ElementCreate.builder().name("Actual").type(ElementType.NUMERIC).build()),
 				List.of(EdgePatch.builder().parentName("All Versions").componentName("Actual").weight(1.0).build()));
 		assertThat(none).isNull();
 		assertThat(tm1().last().key()).isEqualTo("PATCH Dimensions('Version')/Hierarchies('Version')");
@@ -172,7 +173,7 @@ class HierarchyServiceTest {
 
 		tm1().status(204);
 		conformance.call("hierarchies", "replaceStructure", "Version", "Version",
-				List.of(ElementPatch.builder().name("Actual").type(ElementType.NUMERIC).build()), List.of());
+				List.of(ElementCreate.builder().name("Actual").type(ElementType.NUMERIC).build()), List.of());
 		assertThat(tm1().last().text())
 			.isEqualTo("{\"Elements\":[{\"Name\":\"Actual\",\"Type\":\"Numeric\"}],\"Edges\":[]}");
 	}

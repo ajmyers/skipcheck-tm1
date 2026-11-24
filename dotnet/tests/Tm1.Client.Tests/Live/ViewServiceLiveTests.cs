@@ -28,7 +28,7 @@ public sealed class ViewServiceLiveTests : IAsyncLifetime
             await LiveModel.SubsetAllAsync(_tm1, d);
         }
         await _tm1.Cubes.CreateAsync(
-            CubePatch.Builder().Name(_cube).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure), LiveModel.Dim(Year)).Build()
+            CubeCreate.Builder().Name(_cube).BindDimensions(LiveModel.Dim(Region), LiveModel.Dim(Measure), LiveModel.Dim(Year)).Build()
         );
     }
 
@@ -42,7 +42,7 @@ public sealed class ViewServiceLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task CreatesReadsUpdatesAndDeletesBothKindsOfView()
     {
-        await Views.CreateAsync(_cube, ViewScope.Public, MDXViewPatch.Builder().Name("Mdx").Mdx(Mdx()).Build());
+        await Views.CreateAsync(_cube, ViewScope.Public, MDXViewCreate.Builder().Name("Mdx").Mdx(Mdx()).Build());
         await Views.CreateAsync(_cube, ViewScope.Public, NativeView("Native"));
         var all = await Views.ListAsync(_cube, ViewScope.Public).ToListAsync();
         Assert.Equal(["Mdx", "Native"], all.Select(v => v.Name).Order());
@@ -65,7 +65,7 @@ public sealed class ViewServiceLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task KeepsPrivateViewsApart()
     {
-        await Views.CreateAsync(_cube, ViewScope.Private, MDXViewPatch.Builder().Name("Mine").Mdx(Mdx()).Build());
+        await Views.CreateAsync(_cube, ViewScope.Private, MDXViewCreate.Builder().Name("Mine").Mdx(Mdx()).Build());
         Assert.Equal(["Mine"], await Views.ListAsync(_cube, ViewScope.Private).Select(v => v.Name).ToListAsync());
         Assert.Empty(await Views.ListAsync(_cube, ViewScope.Public).ToListAsync());
     }
@@ -89,14 +89,14 @@ public sealed class ViewServiceLiveTests : IAsyncLifetime
     public async Task ExpandsNativeViewsAxesInAListWithMdxViews()
     {
         await Views.CreateAsync(_cube, ViewScope.Public, NativeView("Native"));
-        await Views.CreateAsync(_cube, ViewScope.Public, MDXViewPatch.Builder().Name("Mdx").Mdx(Mdx()).Build());
+        await Views.CreateAsync(_cube, ViewScope.Public, MDXViewCreate.Builder().Name("Mdx").Mdx(Mdx()).Build());
         var all = await Views.ListAsync(_cube, ViewScope.Public, ODataQuery.None().Expand("tm1.NativeView/Columns/Subset")).ToListAsync();
         Assert.Equal("All", Assert.Single(Assert.Single(all.OfType<NativeView>()).Columns!).Subset!.Name);
         Assert.Single(all.OfType<MDXView>());
     }
 
-    private NativeViewPatch NativeView(string name) =>
-        NativeViewPatch
+    private NativeViewCreate NativeView(string name) =>
+        NativeViewCreate
             .Builder()
             .Name(name)
             .Columns([ViewAxisSelectionPatch.Builder().BindSubset(LiveModel.Subset(Measure)).Build()])

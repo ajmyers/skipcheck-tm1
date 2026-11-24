@@ -102,28 +102,27 @@ class GeneratedModelTest {
 	@Test
 	void sendsOnlyWhatAPatchSetsInOrderWithExplicitNullsAndBindings() {
 		CubePatch patch = CubePatch.builder()
-			.name("Sales")
 			.rules(null)
 			.bindDimensions(ODataPath.of("Dimensions").key("Region"), ODataPath.of("Dimensions").key("Month"))
 			.build();
-		assertThat(JSON.writeValueAsString(patch)).isEqualTo(
-				"{\"Name\":\"Sales\",\"Rules\":null,\"Dimensions@odata.bind\":[\"Dimensions('Region')\",\"Dimensions('Month')\"]}");
+		assertThat(JSON.writeValueAsString(patch))
+			.isEqualTo("{\"Rules\":null,\"Dimensions@odata.bind\":[\"Dimensions('Region')\",\"Dimensions('Month')\"]}");
 		assertThat(patch)
 			.isEqualTo(CubePatch.builder()
-				.name("Sales")
 				.rules(null)
 				.bindDimensions(ODataPath.of("Dimensions").key("Region"), ODataPath.of("Dimensions").key("Month"))
 				.build())
-			.isNotEqualTo(CubePatch.builder().name("Sales").build());
+			.isNotEqualTo(CubePatch.builder().rules(null).build());
 	}
 
 	@Test
 	void nestsPatchesForDeepInsertsAndWritesEnumsAsTm1Does() {
-		DimensionPatch dimension = DimensionPatch.builder()
+		// A deep insert is a create, nested creates and all
+		DimensionCreate dimension = DimensionCreate.builder()
 			.name("Region")
-			.hierarchies(List.of(HierarchyPatch.builder()
+			.hierarchies(List.of(HierarchyCreate.builder()
 				.name("Region")
-				.elements(List.of(ElementPatch.builder().name("North").type(ElementType.NUMERIC).build()))
+				.elements(List.of(ElementCreate.builder().name("North").type(ElementType.NUMERIC).build()))
 				.build()))
 			.build();
 		assertThat(JSON.writeValueAsString(dimension)).isEqualTo(
@@ -132,13 +131,19 @@ class GeneratedModelTest {
 
 	@Test
 	void sendsASubtypesPatchWithItsOdataTypeAndKeepsItsBuilderWhenChaining() {
-		MDXViewPatch view = MDXViewPatch.builder().name("v").mdx("SELECT").build();
-		assertThat(JSON.writeValueAsString(view))
-			.isEqualTo("{\"@odata.type\":\"#ibm.tm1.api.v1.MDXView\",\"Name\":\"v\",\"MDX\":\"SELECT\"}");
-		ViewPatch asRoot = view;
+		MDXViewPatch patch = MDXViewPatch.builder().mdx("SELECT").build();
+		assertThat(JSON.writeValueAsString(patch))
+			.isEqualTo("{\"@odata.type\":\"#ibm.tm1.api.v1.MDXView\",\"MDX\":\"SELECT\"}");
+		ViewPatch asRoot = patch;
 		assertThat(asRoot.json()).containsKey("@odata.type");
-		assertThat(JSON.writeValueAsString(CubePatch.builder().views(List.of(view)).build()))
-			.contains("#ibm.tm1.api.v1.MDXView");
+		// A subtype's create, nested in its root's place
+		MDXViewCreate view = MDXViewCreate.builder().name("v").mdx("SELECT").build();
+		ViewCreate created = view;
+		assertThat(created.json()).containsEntry("@odata.type", "#ibm.tm1.api.v1.MDXView");
+		assertThat(JSON.writeValueAsString(CubeCreate.builder()
+			.bindDimensions(ODataPath.of("Dimensions").key("Region"))
+			.views(List.of(view))
+			.build())).contains("#ibm.tm1.api.v1.MDXView");
 	}
 
 	@Test

@@ -24,8 +24,8 @@ describe("writes made from what was read", () => {
       Attributes: { Caption: "Nightly" },
       Tasks: [{ Step: 0, Parameters: [{ Name: "pValue", Value: "1" }] }],
     });
-    // A PATCH refuses Attributes, and appends Tasks: neither is copied
-    expect(Object.keys(JSON.parse(JSON.stringify(ChorePatch.builder(read).build()))).sort()).toEqual(["Active", "Frequency", "Name"]);
+    // A PATCH refuses Attributes and a rename, and appends Tasks: none is copied
+    expect(Object.keys(JSON.parse(JSON.stringify(ChorePatch.builder(read).build()))).sort()).toEqual(["Active", "Frequency"]);
     // A create ignores Attributes too (they're written through the attribute cubes). Tasks is a
     // navigation: none is copied, as a task's Process would have to be bound again
     const create = Object.keys(JSON.parse(JSON.stringify(ChoreCreate.builder(read).build())));

@@ -17,10 +17,10 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Dimension;
-import io.skipcheck.tm1.client.model.DimensionPatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.testcontainers.CognosContainer;
 import io.skipcheck.tm1.testcontainers.CognosSource;
@@ -72,12 +72,12 @@ final class RequiresTm1Examples {
 		@Test
 		void createsTheRegions() {
 			Dimension created = tm1.dimensions()
-				.create(DimensionPatch.builder()
+				.create(DimensionCreate.builder()
 					.name(region)
-					.hierarchies(List.of(HierarchyPatch.builder()
+					.hierarchies(List.of(HierarchyCreate.builder()
 						.name(region)
-						.elements(List.of(ElementPatch.builder().name("North").type(ElementType.NUMERIC).build(),
-								ElementPatch.builder().name("South").type(ElementType.NUMERIC).build()))
+						.elements(List.of(ElementCreate.builder().name("North").type(ElementType.NUMERIC).build(),
+								ElementCreate.builder().name("South").type(ElementType.NUMERIC).build()))
 						.build()))
 					.build())
 				.block(WAIT);

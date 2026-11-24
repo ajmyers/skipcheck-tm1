@@ -67,7 +67,7 @@ public sealed class CubeService : Tm1Service
     /// <c>CubePatch.PatchBuilder.BindDimensions</c>, and optionally its rules. It needs a name and at
     /// least two dimensions; returns the cube as created.</summary>
     [Tm1Endpoint("EntitySet Cubes")]
-    public Task<Cube> CreateAsync(CubePatch cube, CancellationToken cancellationToken = default) =>
+    public Task<Cube> CreateAsync(CubeCreate cube, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<Cube>(Cubes, Require(cube, nameof(cube))), cancellationToken);
 
     /// <summary><c>PATCH Cubes('name')</c>: changes the properties the patch sets, typically <c>Rules</c>

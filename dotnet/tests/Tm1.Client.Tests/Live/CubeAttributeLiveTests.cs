@@ -18,7 +18,7 @@ public class CubeAttributeLiveTests
 {
     private static string Label() => "Label " + Guid.NewGuid().ToString("N")[..4];
 
-    private static AttributeDefinitionPatch StringAttribute(string name) => AttributeDefinitionPatch.Builder().Name(name).Type(AttributeType.String).Build();
+    private static AttributeDefinitionCreate StringAttribute(string name) => AttributeDefinitionCreate.Builder().Name(name).Type(AttributeType.String).Build();
 
     private static LocalizedAttributesPatch French(string attribute, string value) =>
         LocalizedAttributesPatch.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Property(attribute, value).Build()).Build();
@@ -48,19 +48,19 @@ public class CubeAttributeLiveTests
                     dim,
                     dim,
                     SubsetScope.Public,
-                    SubsetPatch.Builder().Name("All").Expression($"{{TM1SUBSETALL([{dim}].[{dim}])}}").Build()
+                    SubsetCreate.Builder().Name("All").Expression($"{{TM1SUBSETALL([{dim}].[{dim}])}}").Build()
                 );
             }
-            await tm1.Cubes.CreateAsync(CubePatch.Builder().Name(name).BindDimensions(dimensions.Key(dims[0]), dimensions.Key(dims[1])).Build());
+            await tm1.Cubes.CreateAsync(CubeCreate.Builder().Name(name).BindDimensions(dimensions.Key(dims[0]), dimensions.Key(dims[1])).Build());
             await tm1.Views.CreateAsync(
                 name,
                 ViewScope.Public,
-                MDXViewPatch.Builder().Name("V").Mdx($"SELECT {{[{dims[0]}].[{dims[0]}].Members}} ON 0 FROM [{name}]").Build()
+                MDXViewCreate.Builder().Name("V").Mdx($"SELECT {{[{dims[0]}].[{dims[0]}].Members}} ON 0 FROM [{name}]").Build()
             );
             ViewAxisSelectionPatch Axis(string dim) =>
                 ViewAxisSelectionPatch.Builder().BindSubset(dimensions.Key(dim).Nav("Hierarchies").Key(dim).Nav("Subsets").Key("All")).Build();
             // A view attribute needs a public native view
-            await tm1.Views.CreateAsync(name, ViewScope.Public, NativeViewPatch.Builder().Name("N").Columns([Axis(dims[0])]).Rows([Axis(dims[1])]).Build());
+            await tm1.Views.CreateAsync(name, ViewScope.Public, NativeViewCreate.Builder().Name("N").Columns([Axis(dims[0])]).Rows([Axis(dims[1])]).Build());
 
             foreach (
                 var (set, owner) in new[]

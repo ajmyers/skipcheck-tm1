@@ -6,10 +6,10 @@ import java.util.List;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.EdgePatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.Hierarchy;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.Member;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
@@ -25,11 +25,11 @@ final class HierarchyServiceExamples {
 		// @start region = create
 		// A second hierarchy of Region, rolling the same leaves up by manager
 		return tm1.hierarchies()
-			.create("Region", HierarchyPatch.builder()
+			.create("Region", HierarchyCreate.builder()
 				.name("By Manager")
-				.elements(List.of(ElementPatch.builder().name("Smith").type(ElementType.CONSOLIDATED).build(),
-						ElementPatch.builder().name("North").type(ElementType.NUMERIC).build(),
-						ElementPatch.builder().name("South").type(ElementType.NUMERIC).build()))
+				.elements(List.of(ElementCreate.builder().name("Smith").type(ElementType.CONSOLIDATED).build(),
+						ElementCreate.builder().name("North").type(ElementType.NUMERIC).build(),
+						ElementCreate.builder().name("South").type(ElementType.NUMERIC).build()))
 				.edges(List.of(EdgePatch.builder().parentName("Smith").componentName("North").weight(1.0).build(),
 						EdgePatch.builder().parentName("Smith").componentName("South").weight(1.0).build()))
 				.build());
@@ -40,9 +40,9 @@ final class HierarchyServiceExamples {
 		// @start region = replace
 		// Makes the elements and edges exactly these: TM1 deletes every other element of
 		// the hierarchy, with its data
-		ElementPatch all = ElementPatch.builder().name("All Versions").type(ElementType.CONSOLIDATED).build();
-		ElementPatch actual = ElementPatch.builder().name("Actual").type(ElementType.NUMERIC).build();
-		ElementPatch budget = ElementPatch.builder().name("Budget").type(ElementType.NUMERIC).build();
+		ElementCreate all = ElementCreate.builder().name("All Versions").type(ElementType.CONSOLIDATED).build();
+		ElementCreate actual = ElementCreate.builder().name("Actual").type(ElementType.NUMERIC).build();
+		ElementCreate budget = ElementCreate.builder().name("Budget").type(ElementType.NUMERIC).build();
 		return tm1.hierarchies()
 			.replaceStructure("Version", "Version", List.of(all, actual, budget), List.of(
 					EdgePatch.builder().parentName("All Versions").componentName("Actual").weight(1.0).build(),

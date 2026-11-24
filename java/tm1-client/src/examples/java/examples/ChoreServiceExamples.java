@@ -8,6 +8,7 @@ import java.util.List;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Chore;
+import io.skipcheck.tm1.client.model.ChoreCreate;
 import io.skipcheck.tm1.client.model.ChoreExecutionMode;
 import io.skipcheck.tm1.client.model.ChorePatch;
 import io.skipcheck.tm1.client.model.ChoreTask;
@@ -32,7 +33,7 @@ final class ChoreServiceExamples {
 					ChoreTaskParameterPatch.builder().name("pYear").value(2026).build()))
 			.build();
 		return tm1.chores()
-			.create(ChorePatch.builder()
+			.create(ChoreCreate.builder()
 				.name("Nightly Load")
 				.startTime(OffsetDateTime.parse("2026-01-01T02:00:00Z"))
 				.dstSensitive(false)

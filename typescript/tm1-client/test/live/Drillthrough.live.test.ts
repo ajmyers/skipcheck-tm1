@@ -2,9 +2,9 @@
 
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import {
-  CubePatch,
+  CubeCreate,
   Drillthrough,
-  NativeViewPatch,
+  NativeViewCreate,
   ODataPath,
   ODataQuery,
   Tm1Request,
@@ -35,7 +35,7 @@ describe("DrillthroughService on TM1" + liveReason, () => {
       await Fixtures.subsetAll(tm1, d);
     }
     await tm1.cubes.create(
-      CubePatch.builder()
+      CubeCreate.builder()
         .name(cube)
         .bindDimensions(...dimensions.map((d) => Fixtures.dimensionPath(d)))
         .drillthroughRules(`[] = S: '${process.slice("}Drill_".length)}';\n`)
@@ -44,7 +44,7 @@ describe("DrillthroughService on TM1" + liveReason, () => {
     await tm1.views.create(
       cube,
       ViewScope.Public,
-      NativeViewPatch.builder()
+      NativeViewCreate.builder()
         .name("Detail")
         .columns([axis(dimensions[1]!)])
         .rows([axis(dimensions[0]!)])

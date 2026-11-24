@@ -13,10 +13,10 @@ import pytest
 from skipcheck_tm1 import ODataPath, Tm1Client
 from skipcheck_tm1._sync.services.attribute import AttributeOwner, AttributeSet
 from skipcheck_tm1.model import (
+    ChoreCreate,
     ChoreExecutionMode,
-    ChorePatch,
     ChoreTaskPatch,
-    ProcessPatch,
+    ProcessCreate,
 )
 
 from .conftest import CONFIGURED, REASON
@@ -33,10 +33,10 @@ pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 @pytest.fixture
 def process_and_chore(tm1: Tm1Client, name: str) -> Iterator[tuple[str, str]]:
     process, chore = name, name + "-chore"
-    tm1.processes.create(ProcessPatch.builder().name(process).prolog_procedure("nX = 1;\n").build())
+    tm1.processes.create(ProcessCreate.builder().name(process).prolog_procedure("nX = 1;\n").build())
     try:
         tm1.chores.create(
-            ChorePatch.builder()
+            ChoreCreate.builder()
             .name(chore)
             .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=UTC))
             .dst_sensitive(False)

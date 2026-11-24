@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  MDXViewPatch,
-  NativeViewPatch,
+  MDXViewCreate,
+  NativeViewCreate,
   ODataPath,
   ODataQuery,
   View,
@@ -25,7 +25,7 @@ export function createNative(tm1: Tm1Client): Promise<View> {
   const regions = dimensions.key("Region").nav("Hierarchies").key("Region").nav("Subsets").key("Leaves");
   const versions = dimensions.key("Version").nav("Hierarchies").key("Version");
   const measures = dimensions.key("Measure").nav("Hierarchies").key("Measure");
-  const view = NativeViewPatch.builder()
+  const view = NativeViewCreate.builder()
     .name("Revenue by Region")
     .columns([ViewAxisSelectionPatch.builder().bindSubset(months).build()])
     .rows([ViewAxisSelectionPatch.builder().bindSubset(regions).build()])
@@ -46,7 +46,7 @@ export function createMdx(tm1: Tm1Client): Promise<View> {
     "SELECT {[Month].[Month].[Jan], [Month].[Month].[Feb]} ON 0," +
     " {TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)} ON 1 FROM [Sales]" +
     " WHERE ([Version].[Version].[Actual], [Measure].[Measure].[Revenue])";
-  return tm1.views.create("Sales", ViewScope.Private, MDXViewPatch.builder().name("My Revenue").mdx(mdx).build());
+  return tm1.views.create("Sales", ViewScope.Private, MDXViewCreate.builder().name("My Revenue").mdx(mdx).build());
   // @end
 }
 

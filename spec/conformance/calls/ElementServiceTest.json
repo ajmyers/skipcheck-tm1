@@ -99,89 +99,6 @@
 			"result" : [ ]
 		},
 		{
-			"id" : "ElementServiceTest#anUpdateWithANameOrAttributesIsRefused#1",
-			"service" : "elements",
-			"method" : "update",
-			"params" : [
-				"dimension",
-				"hierarchy",
-				"element",
-				"patch"
-			],
-			"args" : [
-				"Region",
-				"Region",
-				"West",
-				{
-					"$patch" : "ElementPatch",
-					"json" : {
-						"Name" : "East"
-					}
-				}
-			],
-			"exchanges" : [ ],
-			"error" : {
-				"exception" : "IllegalArgumentException",
-				"category" : "argument"
-			}
-		},
-		{
-			"id" : "ElementServiceTest#anUpdateWithANameOrAttributesIsRefused#2",
-			"service" : "elements",
-			"method" : "update",
-			"params" : [
-				"dimension",
-				"hierarchy",
-				"element",
-				"patch",
-				"etag"
-			],
-			"args" : [
-				"Region",
-				"Region",
-				"West",
-				{
-					"$patch" : "ElementPatch",
-					"json" : {
-						"Name" : "East"
-					}
-				},
-				"W/\"1\""
-			],
-			"exchanges" : [ ],
-			"error" : {
-				"exception" : "IllegalArgumentException",
-				"category" : "argument"
-			}
-		},
-		{
-			"id" : "ElementServiceTest#anUpdateWithANameOrAttributesIsRefused#3",
-			"service" : "elements",
-			"method" : "update",
-			"params" : [
-				"dimension",
-				"hierarchy",
-				"element",
-				"patch"
-			],
-			"args" : [
-				"Region",
-				"Region",
-				"West",
-				{
-					"$patch" : "ElementPatch",
-					"json" : {
-						"Attributes" : { }
-					}
-				}
-			],
-			"exchanges" : [ ],
-			"error" : {
-				"exception" : "IllegalArgumentException",
-				"category" : "argument"
-			}
-		},
-		{
 			"id" : "ElementServiceTest#changingTheTypeOfAConsolidationWithChildrenIsABadRequest#1",
 			"service" : "elements",
 			"method" : "update",
@@ -252,7 +169,7 @@
 				"Region",
 				"Region",
 				{
-					"$patch" : "ElementPatch",
+					"$patch" : "ElementCreate",
 					"json" : {
 						"Name" : "West",
 						"Type" : "Numeric"
@@ -308,7 +225,7 @@
 				"Region",
 				"Region",
 				{
-					"$patch" : "ElementPatch",
+					"$patch" : "ElementCreate",
 					"json" : {
 						"Name" : "West",
 						"Type" : "Numeric"

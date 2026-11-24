@@ -133,18 +133,18 @@ class GeneratedModelTm1Test {
 		ODataPath cube = ODataPath.of("Cubes").key(name);
 		try {
 			session.execute(Tm1Request.post(ODataPath.of("Dimensions"),
-					DimensionPatch.builder()
+					DimensionCreate.builder()
 						.name(name)
-						.hierarchies(List.of(HierarchyPatch.builder()
+						.hierarchies(List.of(HierarchyCreate.builder()
 							.name(name)
-							.elements(List.of(ElementPatch.builder().name("North").type(ElementType.NUMERIC).build(),
-									ElementPatch.builder().name("South").type(ElementType.NUMERIC).build()))
+							.elements(List.of(ElementCreate.builder().name("North").type(ElementType.NUMERIC).build(),
+									ElementCreate.builder().name("South").type(ElementType.NUMERIC).build()))
 							.build()))
 						.build(),
 					Dimension.class))
 				.block(WAIT);
 			session.execute(Tm1Request.post(ODataPath.of("Cubes"),
-					CubePatch.builder()
+					CubeCreate.builder()
 						.name(name)
 						.bindDimensions(dimension, ODataPath.of("Dimensions").key("}Groups"))
 						.build(),
@@ -166,9 +166,9 @@ class GeneratedModelTm1Test {
 			assertThat(elements).extracting(Element::name, Element::type)
 				.containsExactlyInAnyOrder(tuple("North", ElementType.NUMERIC), tuple("South", ElementType.NUMERIC));
 
-			session.execute(Tm1Request.patch(cube, CubePatch.builder().rules("SKIPCHECK;").build())).block(WAIT);
+			session.execute(Tm1Request.patch(cube, CubeCreate.builder().rules("SKIPCHECK;").build())).block(WAIT);
 			assertThat(rules(session, cube)).contains("SKIPCHECK");
-			session.execute(Tm1Request.patch(cube, CubePatch.builder().rules(null).build())).block(WAIT);
+			session.execute(Tm1Request.patch(cube, CubeCreate.builder().rules(null).build())).block(WAIT);
 			assertThat(rules(session, cube)).as("an explicit null clears them").isNullOrEmpty();
 		}
 		finally {

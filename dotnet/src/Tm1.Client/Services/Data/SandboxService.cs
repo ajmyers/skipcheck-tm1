@@ -41,7 +41,7 @@ public sealed class SandboxService : Tm1Service
 
     /// <summary><c>POST Sandboxes</c>: creates an empty sandbox; it needs a name.</summary>
     [Tm1Endpoint("EntitySet Sandboxes")]
-    public Task<Sandbox> CreateAsync(SandboxPatch sandbox, CancellationToken cancellationToken = default) =>
+    public Task<Sandbox> CreateAsync(SandboxCreate sandbox, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<Sandbox>(Sandboxes, Require(sandbox, nameof(sandbox))), cancellationToken);
 
     /// <summary><c>PATCH Sandboxes('name')</c>: changes the properties the patch sets, such as

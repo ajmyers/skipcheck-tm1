@@ -27,8 +27,8 @@ def test_reads_and_writes_back_the_properties_tm1_does_not_declare() -> None:
     assert process.code is not None and process.code.startswith("#region Prolog")
     assert m.Subset.model_validate({"Name": "Top", "Alias": "Caption"}).alias == "Caption"
 
-    patch = m.ProcessPatch.builder().name("Load").ui_data(process.ui_data).variables_ui_data(process.variables_ui_data).build()
-    assert patch.json() == {"Name": "Load", "UIData": "CubeAction=1511\f", "VariablesUIData": ["VarType=32\f"]}
+    patch = m.ProcessPatch.builder().ui_data(process.ui_data).variables_ui_data(process.variables_ui_data).build()
+    assert patch.json() == {"UIData": "CubeAction=1511\f", "VariablesUIData": ["VarType=32\f"]}
     assert m.SubsetPatch.builder().alias("Caption").build().json() == {"Alias": "Caption"}
 
 

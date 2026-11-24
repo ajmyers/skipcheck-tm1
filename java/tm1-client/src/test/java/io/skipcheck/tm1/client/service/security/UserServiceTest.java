@@ -16,9 +16,10 @@ import io.skipcheck.tm1.client.error.Tm1ConflictException;
 import io.skipcheck.tm1.client.error.Tm1ErrorKind;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.Group;
-import io.skipcheck.tm1.client.model.GroupPatch;
+import io.skipcheck.tm1.client.model.GroupCreate;
 import io.skipcheck.tm1.client.model.Session;
 import io.skipcheck.tm1.client.model.User;
+import io.skipcheck.tm1.client.model.UserCreate;
 import io.skipcheck.tm1.client.model.UserPatch;
 import io.skipcheck.tm1.client.model.UserType;
 import io.skipcheck.tm1.client.odata.Filter;
@@ -112,7 +113,7 @@ class UserServiceTest {
 		ODataPath groups = ODataPath.of("Groups");
 		tm1().json(201, "{\"Name\":\"alice\",\"Type\":\"User\"}");
 		User created = conformance.call("users", "create",
-				UserPatch.builder()
+				UserCreate.builder()
 					.name("alice")
 					.friendlyName("Alice")
 					.password("initial-password")
@@ -128,7 +129,7 @@ class UserServiceTest {
 	@Test
 	void anExistingUserIsRefused() {
 		tm1().error(400, "278", "User 'alice' already exists.");
-		Throwable error = conformance.fail("users", "create", UserPatch.builder().name("alice").build());
+		Throwable error = conformance.fail("users", "create", UserCreate.builder().name("alice").build());
 		assertThat(error).isInstanceOfSatisfying(Tm1ConflictException.class,
 				e -> assertThat(e.kind()).isEqualTo(Tm1ErrorKind.ALREADY_EXISTS));
 	}
@@ -156,7 +157,7 @@ class UserServiceTest {
 		assertThat(bound).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("setGroups");
 
 		Throwable set = conformance.fail("users", "update", "alice",
-				UserPatch.builder().groups(List.of(GroupPatch.builder().name("Planners").build())).build());
+				UserPatch.builder().groups(List.of(GroupCreate.builder().name("Planners").build())).build());
 		assertThat(set).isInstanceOf(IllegalArgumentException.class);
 		assertThat(tm1().requests()).isEmpty();
 	}

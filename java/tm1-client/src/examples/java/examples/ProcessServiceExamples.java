@@ -9,9 +9,9 @@ import java.util.Map;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.ErrorLogFile;
 import io.skipcheck.tm1.client.model.Process;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessExecuteResult;
 import io.skipcheck.tm1.client.model.ProcessParameterPatch;
-import io.skipcheck.tm1.client.model.ProcessPatch;
 import io.skipcheck.tm1.client.model.ProcessVariableType;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Mono;
@@ -25,7 +25,7 @@ final class ProcessServiceExamples {
 	Mono<Process> create(Tm1Client tm1) {
 		// @start region = create
 		// TM1 saves code that doesn't compile, so compile the definition first
-		ProcessPatch process = ProcessPatch.builder()
+		ProcessCreate process = ProcessCreate.builder()
 			.name("Load Sales")
 			.parameters(List.of(
 					ProcessParameterPatch.builder()
@@ -68,7 +68,7 @@ final class ProcessServiceExamples {
 	Mono<ProcessExecuteResult> runUnsaved(Tm1Client tm1) {
 		// @start region = run-unsaved
 		// A one-off run of code that isn't saved as a process
-		ProcessPatch cleanup = ProcessPatch.builder()
+		ProcessCreate cleanup = ProcessCreate.builder()
 			.name("Clear Sales Staging")
 			.prologProcedure("CubeClearData('Sales Staging');\n")
 			.build();

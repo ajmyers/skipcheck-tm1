@@ -5,12 +5,13 @@ import {
   Filter,
   ODataQuery,
   Process,
+  ProcessCreate,
+  type ProcessExecuteStatusCode,
   ProcessParameterPatch,
   ProcessPatch,
+  type Tm1Client,
   Tm1NotFoundException,
   Tm1PreconditionFailedException,
-  type ProcessExecuteStatusCode,
-  type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
@@ -25,8 +26,8 @@ If(pCount = 4);
 EndIf;
 `;
 
-function definition(name: string, prolog: string): ProcessPatch {
-  return ProcessPatch.builder()
+function definition(name: string, prolog: string): ProcessCreate {
+  return ProcessCreate.builder()
     .name(name)
     .parameters([
       ProcessParameterPatch.builder().name("pName").value("").type("String").build(),

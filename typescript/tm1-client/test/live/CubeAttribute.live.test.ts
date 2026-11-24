@@ -2,16 +2,16 @@
 
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import {
-  AttributeDefinitionPatch,
+  AttributeDefinitionCreate,
   AttributeOwner,
   AttributeSet,
   AttributesPatch,
   AttributeType,
-  CubePatch,
+  CubeCreate,
   LocalizedAttributesPatch,
-  MDXViewPatch,
-  NativeViewPatch,
-  SubsetPatch,
+  MDXViewCreate,
+  NativeViewCreate,
+  SubsetCreate,
   ViewAxisSelectionPatch,
   ViewScope,
   type Tm1Client,
@@ -30,18 +30,18 @@ describe("Cube and view attributes on TM1" + liveReason, () => {
     tm1 = await Live.client();
     for (const d of dimensions) await createDimension(tm1, d, ["X"]);
     await tm1.cubes.create(
-      CubePatch.builder()
+      CubeCreate.builder()
         .name(cube)
         .bindDimensions(...dimensions.map((d) => DIMENSIONS.key(d)))
         .build(),
     );
     const [a, b] = dimensions as [string, string];
-    await tm1.views.create(cube, ViewScope.Public, MDXViewPatch.builder().name("V").mdx(`SELECT {[${a}].[${a}].Members} ON 0 FROM [${cube}]`).build());
-    for (const d of dimensions) await createSubset(tm1, d, SubsetPatch.builder().name("All").expression(`{TM1SUBSETALL([${d}].[${d}])}`).build());
+    await tm1.views.create(cube, ViewScope.Public, MDXViewCreate.builder().name("V").mdx(`SELECT {[${a}].[${a}].Members} ON 0 FROM [${cube}]`).build());
+    for (const d of dimensions) await createSubset(tm1, d, SubsetCreate.builder().name("All").expression(`{TM1SUBSETALL([${d}].[${d}])}`).build());
     await tm1.views.create(
       cube,
       ViewScope.Public,
-      NativeViewPatch.builder()
+      NativeViewCreate.builder()
         .name("N")
         .columns([axis(a)])
         .rows([axis(b)])
@@ -63,7 +63,7 @@ describe("Cube and view attributes on TM1" + liveReason, () => {
     const set = kind === "cube" ? AttributeSet.cubes() : AttributeSet.views(cube);
     const owner = kind === "cube" ? AttributeOwner.cube(cube) : AttributeOwner.view(cube, ViewScope.Public, "V");
     const label = "Label " + shortId();
-    await tm1.attributes.create(set, AttributeDefinitionPatch.builder().name(label).type(AttributeType.String).build());
+    await tm1.attributes.create(set, AttributeDefinitionCreate.builder().name(label).type(AttributeType.String).build());
     try {
       expect((await tm1.attributes.list(set).toArray()).map((a) => a.Name)).toContain(label);
       await tm1.localizedAttributes.create(

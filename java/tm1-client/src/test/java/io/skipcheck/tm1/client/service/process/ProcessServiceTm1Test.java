@@ -21,6 +21,7 @@ import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Process;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessErrorLog;
 import io.skipcheck.tm1.client.model.ProcessExecuteResult;
 import io.skipcheck.tm1.client.model.ProcessExecuteStatusCode;
@@ -164,8 +165,8 @@ class ProcessServiceTm1Test {
 		return parameters;
 	}
 
-	private static ProcessPatch definition(String name, String prolog) {
-		return ProcessPatch.builder()
+	private static ProcessCreate definition(String name, String prolog) {
+		return ProcessCreate.builder()
 			.name(name)
 			.parameters(List.of(
 					ProcessParameterPatch.builder().name("pName").value("").type(ProcessVariableType.STRING).build(),

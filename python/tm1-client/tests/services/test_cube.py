@@ -11,7 +11,12 @@ import httpx2
 import pytest
 
 from skipcheck_tm1 import Filter, ODataPath, ODataQuery, Tm1PreconditionFailedError
-from skipcheck_tm1.model import CheckFeedersSelection, Cube, CubePatch
+from skipcheck_tm1.model import (
+    CheckFeedersSelection,
+    Cube,
+    CubeCreate,
+    CubePatch,
+)
 
 from ..conftest import Api, FakeTm1, target
 
@@ -39,7 +44,7 @@ def test_gets_creates_updates_and_deletes(api: Api, fake: FakeTm1) -> None:
     assert target(fake.last) == "GET Cubes('Sales')?$select=Name"
 
     dimensions = ODataPath.of("Dimensions")
-    api.run(api.client.cubes.create(CubePatch.builder().name("Sales").bind_dimensions(dimensions.key("Region"), dimensions.key("Month")).build()))
+    api.run(api.client.cubes.create(CubeCreate.builder().name("Sales").bind_dimensions(dimensions.key("Region"), dimensions.key("Month")).build()))
     assert target(fake.last) == "POST Cubes"
     assert body(fake.last) == {"Name": "Sales", "Dimensions@odata.bind": ["Dimensions('Region')", "Dimensions('Month')"]}
 

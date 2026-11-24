@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Group, ODataPath, ODataQuery, UserPatch, type Tm1Client, type User } from "@skipcheck/tm1-client";
+import { Group, ODataPath, ODataQuery, type Tm1Client, type User, UserCreate, UserPatch } from "@skipcheck/tm1-client";
 
 // Examples for UserService, quoted in its documentation.
 
@@ -8,7 +8,7 @@ export function create(tm1: Tm1Client): Promise<User> {
   // @start region = create
   // A user in two existing groups, bound by their paths
   const groups = ODataPath.of("Groups");
-  const alice = UserPatch.builder().name("alice").password("initial-password").bindGroups(groups.key("Planners"), groups.key("Sales")).build();
+  const alice = UserCreate.builder().name("alice").password("initial-password").bindGroups(groups.key("Planners"), groups.key("Sales")).build();
   return tm1.users.create(alice);
   // @end
 }

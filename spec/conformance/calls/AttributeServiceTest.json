@@ -75,7 +75,7 @@
 					]
 				},
 				{
-					"$patch" : "AttributeDefinitionPatch",
+					"$patch" : "AttributeDefinitionCreate",
 					"json" : {
 						"Name" : "Owner",
 						"Type" : "String"
@@ -135,7 +135,7 @@
 					"args" : [ ]
 				},
 				{
-					"$patch" : "AttributeDefinitionPatch",
+					"$patch" : "AttributeDefinitionCreate",
 					"json" : {
 						"Name" : "Code",
 						"Type" : "String"
@@ -195,7 +195,7 @@
 					]
 				},
 				{
-					"$patch" : "AttributeDefinitionPatch",
+					"$patch" : "AttributeDefinitionCreate",
 					"json" : {
 						"Name" : "Code",
 						"Type" : "String"
@@ -256,7 +256,7 @@
 					]
 				},
 				{
-					"$patch" : "AttributeDefinitionPatch",
+					"$patch" : "AttributeDefinitionCreate",
 					"json" : {
 						"Name" : "Code",
 						"Type" : "String"
@@ -317,7 +317,7 @@
 					]
 				},
 				{
-					"$patch" : "AttributeDefinitionPatch",
+					"$patch" : "AttributeDefinitionCreate",
 					"json" : {
 						"Name" : "Code",
 						"Type" : "String"
@@ -375,7 +375,7 @@
 					"args" : [ ]
 				},
 				{
-					"$patch" : "AttributeDefinitionPatch",
+					"$patch" : "AttributeDefinitionCreate",
 					"json" : {
 						"Name" : "Code",
 						"Type" : "String"
@@ -435,7 +435,7 @@
 					]
 				},
 				{
-					"$patch" : "AttributeDefinitionPatch",
+					"$patch" : "AttributeDefinitionCreate",
 					"json" : {
 						"Name" : "Code",
 						"Type" : "String"
@@ -493,7 +493,7 @@
 					"args" : [ ]
 				},
 				{
-					"$patch" : "AttributeDefinitionPatch",
+					"$patch" : "AttributeDefinitionCreate",
 					"json" : {
 						"Name" : "Code",
 						"Type" : "String"
@@ -551,7 +551,7 @@
 					"args" : [ ]
 				},
 				{
-					"$patch" : "AttributeDefinitionPatch",
+					"$patch" : "AttributeDefinitionCreate",
 					"json" : {
 						"Name" : "Code",
 						"Type" : "String"
@@ -612,7 +612,7 @@
 					]
 				},
 				{
-					"$patch" : "AttributeDefinitionPatch",
+					"$patch" : "AttributeDefinitionCreate",
 					"json" : {
 						"Name" : "Weight",
 						"Type" : "Numeric"

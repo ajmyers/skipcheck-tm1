@@ -15,9 +15,10 @@ from skipcheck_tm1 import (
 )
 from skipcheck_tm1.model import (
     Dimension,
+    DimensionCreate,
     DimensionPatch,
     Hierarchy,
-    HierarchyPatch,
+    HierarchyCreate,
 )
 
 from .conftest import CONFIGURED, REASON
@@ -48,7 +49,7 @@ def test_creates_reads_lists_and_deletes_a_dimension(tm1: Tm1Client, name: str) 
 def test_updates_only_when_the_etag_is_current(tm1: Tm1Client, name: str) -> None:
     with made(tm1, name, dimension_of(name, [numeric("North"), numeric("South")])) as d:
         etag = tm1.dimensions.get(d).etag
-        patch = DimensionPatch.builder().name(d).build()
+        patch = DimensionCreate.builder().name(d).build()
         tm1.dimensions.update(d, patch, etag)
         tm1.dimensions.add_all_leaves_hierarchy(d)
         assert tm1.dimensions.get(d).etag != etag, "a new hierarchy changes it"
@@ -62,7 +63,7 @@ def test_ignores_hierarchies_and_the_all_leaves_name_in_a_patch(tm1: Tm1Client, 
             d,
             DimensionPatch.builder()
             .all_leaves_hierarchy_name("AllLeaves")
-            .hierarchies([HierarchyPatch.builder().name(d).elements([numeric("North"), numeric("South"), numeric("East")]).build()])
+            .hierarchies([HierarchyCreate.builder().name(d).elements([numeric("North"), numeric("South"), numeric("East")]).build()])
             .build(),
         )
         read = tm1.dimensions.get(d, ODataQuery.none().expand(Dimension.HIERARCHIES, lambda h: h.expand(Hierarchy.ELEMENTS)))

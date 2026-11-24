@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterAll;
@@ -14,15 +15,18 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Dimension;
+import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.DimensionPatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.Hierarchy;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.odata.Filter;
+import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
@@ -81,7 +85,9 @@ class DimensionServiceTm1Test {
 		dimensions.create(dimension(name)).block(WAIT);
 		try {
 			String etag = dimensions.get(name, ODataQuery.none()).block(WAIT).etag();
-			DimensionPatch patch = DimensionPatch.builder().name(name).build();
+			// A dimension PATCH applies no scalar property TM1 keeps: an empty one still
+			// checks the ETag
+			DimensionPatch patch = DimensionPatch.builder().build();
 			dimensions.update(name, patch, etag).block(WAIT);
 
 			dimensions.addAllLeavesHierarchy(name).block(WAIT);
@@ -100,15 +106,15 @@ class DimensionServiceTm1Test {
 		String name = unique();
 		dimensions.create(dimension(name)).block(WAIT);
 		try {
-			dimensions
-				.update(name,
-						DimensionPatch.builder()
-							.allLeavesHierarchyName("AllLeaves")
-							.hierarchies(List.of(HierarchyPatch.builder()
-								.name(name)
-								.elements(List.of(element("North"), element("South"), element("East")))
-								.build()))
-							.build())
+			// DimensionPatch offers neither, as TM1 ignores both: sent as they are, to
+			// pin it
+			tm1.session()
+				.execute(Tm1Request.patch(ODataPath.of("Dimensions").key(name),
+						Map.of("AllLeavesHierarchyName", "AllLeaves", "Hierarchies",
+								List.of(HierarchyCreate.builder()
+									.name(name)
+									.elements(List.of(element("North"), element("South"), element("East")))
+									.build()))))
 				.block(WAIT);
 			Dimension read = dimensions
 				.get(name, ODataQuery.none().expand(Dimension.HIERARCHIES, h -> h.expand(Hierarchy.ELEMENTS)))
@@ -155,16 +161,16 @@ class DimensionServiceTm1Test {
 		}
 	}
 
-	private static DimensionPatch dimension(String name) {
-		return DimensionPatch.builder()
+	private static DimensionCreate dimension(String name) {
+		return DimensionCreate.builder()
 			.name(name)
 			.hierarchies(List
-				.of(HierarchyPatch.builder().name(name).elements(List.of(element("North"), element("South"))).build()))
+				.of(HierarchyCreate.builder().name(name).elements(List.of(element("North"), element("South"))).build()))
 			.build();
 	}
 
-	private static ElementPatch element(String name) {
-		return ElementPatch.builder().name(name).type(ElementType.NUMERIC).build();
+	private static ElementCreate element(String name) {
+		return ElementCreate.builder().name(name).type(ElementType.NUMERIC).build();
 	}
 
 	private static String unique() {

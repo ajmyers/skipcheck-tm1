@@ -14,14 +14,14 @@ from skipcheck_tm1._sync.services.attribute import AttributeOwner, AttributeSet
 from skipcheck_tm1._sync.services.cube import ViewScope
 from skipcheck_tm1._sync.services.dimension import SubsetScope
 from skipcheck_tm1.model import (
-    CubePatch,
-    DimensionPatch,
-    ElementPatch,
+    CubeCreate,
+    DimensionCreate,
+    ElementCreate,
     ElementType,
-    HierarchyPatch,
-    MDXViewPatch,
-    NativeViewPatch,
-    SubsetPatch,
+    HierarchyCreate,
+    MDXViewCreate,
+    NativeViewCreate,
+    SubsetCreate,
     ViewAxisSelectionPatch,
 )
 
@@ -43,22 +43,22 @@ def cube(tm1: Tm1Client, name: str) -> Iterator[str]:
     dims = [name + "-a", name + "-b"]
     for dim in dims:
         tm1.dimensions.create(
-            DimensionPatch.builder()
+            DimensionCreate.builder()
             .name(dim)
-            .hierarchies([HierarchyPatch.builder().name(dim).elements([ElementPatch.builder().name("X").type(ElementType.NUMERIC).build()]).build()])
+            .hierarchies([HierarchyCreate.builder().name(dim).elements([ElementCreate.builder().name("X").type(ElementType.NUMERIC).build()]).build()])
             .build()
         )
-        tm1.subsets.create(dim, dim, SubsetScope.PUBLIC, SubsetPatch.builder().name("All").expression(f"{{TM1SUBSETALL([{dim}].[{dim}])}}").build())
+        tm1.subsets.create(dim, dim, SubsetScope.PUBLIC, SubsetCreate.builder().name("All").expression(f"{{TM1SUBSETALL([{dim}].[{dim}])}}").build())
     try:
         dimensions = ODataPath.of("Dimensions")
-        tm1.cubes.create(CubePatch.builder().name(name).bind_dimensions(dimensions.key(dims[0]), dimensions.key(dims[1])).build())
+        tm1.cubes.create(CubeCreate.builder().name(name).bind_dimensions(dimensions.key(dims[0]), dimensions.key(dims[1])).build())
         mdx = f"SELECT {{[{dims[0]}].[{dims[0]}].Members}} ON 0 FROM [{name}]"
-        tm1.views.create(name, ViewScope.PUBLIC, MDXViewPatch.builder().name("V").mdx(mdx).build())
+        tm1.views.create(name, ViewScope.PUBLIC, MDXViewCreate.builder().name("V").mdx(mdx).build())
 
         def axis(dim: str) -> ViewAxisSelectionPatch:
             return ViewAxisSelectionPatch.builder().bind_subset(dimensions.key(dim).nav("Hierarchies").key(dim).nav("Subsets").key("All")).build()
 
-        tm1.views.create(name, ViewScope.PUBLIC, NativeViewPatch.builder().name("N").columns([axis(dims[0])]).rows([axis(dims[1])]).build())
+        tm1.views.create(name, ViewScope.PUBLIC, NativeViewCreate.builder().name("N").columns([axis(dims[0])]).rows([axis(dims[1])]).build())
         yield name
     finally:
         try:

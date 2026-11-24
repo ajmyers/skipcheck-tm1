@@ -13,9 +13,9 @@ import pytest
 from skipcheck_tm1 import ODataQuery, Tm1Client, Tm1NotFoundError
 from skipcheck_tm1.aio.services.cube import ViewScope
 from skipcheck_tm1.model import (
-    CubePatch,
-    MDXViewPatch,
-    NativeViewPatch,
+    CubeCreate,
+    MDXViewCreate,
+    NativeViewCreate,
     ViewAxisSelectionPatch,
 )
 
@@ -37,7 +37,7 @@ MEASURES = ["Amount", "Count"]
 def cellset_cube(tm1: Tm1Client, name: str) -> Iterator[Any]:
     region = dimension(tm1, name + "-region", [element(e) for e in REGIONS], subset=True)
     measure = dimension(tm1, name + "-measure", [element(e) for e in MEASURES], subset=True)
-    tm1.cubes.create(CubePatch.builder().name(name).bind_dimensions(dim(region), dim(measure)).build())
+    tm1.cubes.create(CubeCreate.builder().name(name).bind_dimensions(dim(region), dim(measure)).build())
     value = 1
     for r in REGIONS:
         for m in MEASURES:
@@ -121,8 +121,8 @@ def test_executes_mdx_and_native_views(tm1: Tm1Client, cellset_cube: Any) -> Non
     def axis(d: str) -> Any:
         return ViewAxisSelectionPatch.builder().bind_subset(dim(d).nav("Hierarchies").key(d).nav("Subsets").key("All")).build()
 
-    tm1.views.create(cube, ViewScope.PUBLIC, MDXViewPatch.builder().name("Mdx").mdx(mdx).build())
-    tm1.views.create(cube, ViewScope.PUBLIC, NativeViewPatch.builder().name("Native").columns([axis(measure)]).rows([axis(region)]).build())
+    tm1.views.create(cube, ViewScope.PUBLIC, MDXViewCreate.builder().name("Mdx").mdx(mdx).build())
+    tm1.views.create(cube, ViewScope.PUBLIC, NativeViewCreate.builder().name("Native").columns([axis(measure)]).rows([axis(region)]).build())
     for view in ("Mdx", "Native"):
         cellset = tm1.cellsets.execute_view(cube, ViewScope.PUBLIC, view, ODataQuery.none().expand("Cells", lambda c: c.select("Value")))
         try:

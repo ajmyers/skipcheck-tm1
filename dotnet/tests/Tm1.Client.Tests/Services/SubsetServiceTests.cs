@@ -31,7 +31,7 @@ public class SubsetServiceTests
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "West Coast" };
         await tm1.Subsets.GetAsync("Region", "Region", scope, "West Coast");
         Assert.Equal(("GET", subsets + "('West%20Coast')"), (_tm1.Last.Method, _tm1.Last.Target));
-        await tm1.Subsets.CreateAsync("Region", "Region", scope, SubsetPatch.Builder().Name("Leaves").Expression("{TM1SUBSETALL([Region])}").Build());
+        await tm1.Subsets.CreateAsync("Region", "Region", scope, SubsetCreate.Builder().Name("Leaves").Expression("{TM1SUBSETALL([Region])}").Build());
         Assert.Equal(("POST", subsets, """{"Name":"Leaves","Expression":"{TM1SUBSETALL([Region])}"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => null;
@@ -48,7 +48,7 @@ public class SubsetServiceTests
     public void AnUpdateWithElementsIsRefused()
     {
         var tm1 = _tm1.Client();
-        var set = SubsetPatch.Builder().Elements([ElementPatch.Builder().Name("West").Build()]).Build();
+        var set = SubsetPatch.Builder().Elements([ElementCreate.Builder().Name("West").Build()]).Build();
         var bound = SubsetPatch.Builder().BindElements(ODataPath.Of("x")).Build();
         var e = Assert.Throws<ArgumentException>(() =>
         {
@@ -111,7 +111,7 @@ public class SubsetServiceTests
     {
         _tm1.Respond = _ => new Dictionary<string, object?> { ["Name"] = "$session" };
         var tm1 = _tm1.Client();
-        await tm1.Subsets.CreateSessionSubsetAsync("Region", "Region", SubsetPatch.Builder().Expression("{[Region].[West]}").Build());
+        await tm1.Subsets.CreateSessionSubsetAsync("Region", "Region", SubsetCreate.Builder().Expression("{[Region].[West]}").Build());
         Assert.Equal(("POST", Hierarchy + "/tm1.CreateSessionSubset"), (_tm1.Last.Method, _tm1.Last.Target));
         Assert.Equal("""{"Subset":{"Expression":"{[Region].[West]}"}}""", _tm1.Last.Text);
         await tm1.Subsets.CreateSessionSubsetFromAsync("Region", "Region", SubsetScope.Private, "Mine");

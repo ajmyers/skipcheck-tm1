@@ -7,7 +7,14 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from skipcheck_tm1 import ODataPath, Tm1Client
-from skipcheck_tm1.model import Chore, ChoreExecutionMode, ChorePatch, ChoreTaskParameterPatch, ChoreTaskPatch
+from skipcheck_tm1.model import (
+    Chore,
+    ChoreCreate,
+    ChoreExecutionMode,
+    ChorePatch,
+    ChoreTaskParameterPatch,
+    ChoreTaskPatch,
+)
 
 
 def create(tm1: Tm1Client) -> Chore:
@@ -26,7 +33,7 @@ def create(tm1: Tm1Client) -> Chore:
         .build()
     )
     nightly = (
-        ChorePatch.builder()
+        ChoreCreate.builder()
         .name("Nightly Load")
         .start_time(datetime(2026, 1, 1, 2, 0, tzinfo=UTC))
         .dst_sensitive(False)

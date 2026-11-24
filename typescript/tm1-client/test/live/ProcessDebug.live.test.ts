@@ -6,7 +6,7 @@ import {
   ODataQuery,
   ProcessDebugContextBreakpoint,
   ProcessDebugContextLineBreakpointPatch,
-  ProcessPatch,
+  ProcessCreate,
   Tm1BadRequestException,
   Tm1Request,
   typeOf,
@@ -28,7 +28,7 @@ describe("ProcessDebugService on TM1" + liveReason, () => {
   beforeAll(async () => {
     if (!Live.configured) return;
     tm1 = await Live.client();
-    await tm1.processes.create(ProcessPatch.builder().name(process).prologProcedure("nA = 1;\nnB = nA + 1;\nnC = nB + 1;\n").build());
+    await tm1.processes.create(ProcessCreate.builder().name(process).prologProcedure("nA = 1;\nnB = nA + 1;\nnC = nB + 1;\n").build());
   });
 
   afterAll(async () => {

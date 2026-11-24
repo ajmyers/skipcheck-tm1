@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { ODataQuery, ProcessPatch, UserPatch, type MessageLogEntry, type Tm1Client, type Tm1Stream } from "../../src/index.js";
+import { ODataQuery, ProcessCreate, UserCreate, type MessageLogEntry, type Tm1Client, type Tm1Stream } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -75,7 +75,7 @@ describe("LogService on TM1" + liveReason, () => {
 
   tm1Test("reads a password's hash that isn't UTF-8 as replacement characters", async () => {
     const user = Live.name();
-    await tm1.users.create(UserPatch.builder().name(user).password("pw").build());
+    await tm1.users.create(UserCreate.builder().name(user).password("pw").build());
     try {
       const newest = await tm1.logs.transactionLog(true, true, ODataQuery.none().top(50)).toArray();
       // The password's hash, which TM1 sends as bytes that aren't UTF-8
@@ -97,7 +97,7 @@ describe("LogService on TM1" + liveReason, () => {
 
   tm1Test("reads a process error log", async () => {
     const process = Live.name();
-    await tm1.processes.create(ProcessPatch.builder().name(process).prologProcedure("ProcessError;\n").build());
+    await tm1.processes.create(ProcessCreate.builder().name(process).prologProcedure("ProcessError;\n").build());
     try {
       const result = await tm1.processes.executeWithReturn(process, {}, ODataQuery.none().expand("ErrorLogFile"));
       const filename = result.ErrorLogFile!.Filename!;

@@ -38,7 +38,7 @@ public sealed class SessionAndThreadLiveTests
     {
         await using var tm1 = Live.Client();
         var process = Live.Name();
-        await tm1.Processes.CreateAsync(ProcessPatch.Builder().Name(process).PrologProcedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n").Build());
+        await tm1.Processes.CreateAsync(ProcessCreate.Builder().Name(process).PrologProcedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n").Build());
         var runner = OtherClient.Build();
         var run = runner.Processes.ExecuteWithReturnAsync(process);
         try

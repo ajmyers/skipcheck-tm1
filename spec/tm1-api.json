@@ -7594,7 +7594,7 @@
 						"Enabled" : "ignored",
 						"FriendlyName" : "applied",
 						"IsActive" : "ignored",
-						"Password" : "ignored",
+						"Password" : "writeOnly",
 						"Type" : "ignored"
 					}
 				},
@@ -7603,7 +7603,7 @@
 						"Enabled" : "applied",
 						"FriendlyName" : "applied",
 						"IsActive" : "ignored",
-						"Password" : "ignored",
+						"Password" : "writeOnly",
 						"Type" : "ignored"
 					},
 					"nullRefused" : [

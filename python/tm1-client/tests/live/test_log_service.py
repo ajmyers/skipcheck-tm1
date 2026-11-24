@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from skipcheck_tm1 import ODataQuery, Tm1Client
-from skipcheck_tm1.model import ProcessPatch, UserPatch
+from skipcheck_tm1.model import ProcessCreate, UserCreate
 
 from .conftest import CONFIGURED, REASON, client
 
@@ -58,7 +58,7 @@ def test_reads_the_transaction_and_audit_logs(tm1: Tm1Client) -> None:
 
 
 def test_reads_a_passwords_hash_that_isnt_utf8_as_replacement_characters(tm1: Tm1Client, name: str) -> None:
-    tm1.users.create(UserPatch.builder().name(name).password("pw").build())
+    tm1.users.create(UserCreate.builder().name(name).password("pw").build())
     try:
         newest = tm1.logs.transaction_log(True, True, ODataQuery.none().top(50))
         # The password's hash, which TM1 sends as bytes that aren't UTF-8
@@ -70,7 +70,7 @@ def test_reads_a_passwords_hash_that_isnt_utf8_as_replacement_characters(tm1: Tm
 
 def test_reads_a_process_error_log(tm1: Tm1Client, name: str) -> None:
     # Through the generated API, so this doesn't depend on ProcessService
-    tm1.api.processes.create(ProcessPatch.builder().name(name).prolog_procedure("ProcessError;\n").build())
+    tm1.api.processes.create(ProcessCreate.builder().name(name).prolog_procedure("ProcessError;\n").build())
     try:
         result = tm1.api.processes[name].execute_with_return(query=ODataQuery.none().expand("ErrorLogFile"))
         filename = result.error_log_file.filename

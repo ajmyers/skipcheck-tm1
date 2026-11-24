@@ -20,12 +20,13 @@ import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Cube;
+import io.skipcheck.tm1.client.model.CubeCreate;
 import io.skipcheck.tm1.client.model.CubePatch;
 import io.skipcheck.tm1.client.model.Dimension;
-import io.skipcheck.tm1.client.model.DimensionPatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.DimensionCreate;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.odata.Filter;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -71,7 +72,7 @@ class CubeServiceTm1Test {
 		measure = cube + "-measure";
 		dimension(region, "North", "South");
 		dimension(measure, "Amount");
-		cubes.create(CubePatch.builder().name(cube).bindDimensions(dim(region), dim(measure)).build()).block(WAIT);
+		cubes.create(CubeCreate.builder().name(cube).bindDimensions(dim(region), dim(measure)).build()).block(WAIT);
 	}
 
 	@AfterEach
@@ -144,12 +145,12 @@ class CubeServiceTm1Test {
 
 	private static void dimension(String name, String... elements) {
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(name)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(name)
 					.elements(Arrays.stream(elements)
-						.map(e -> ElementPatch.builder().name(e).type(ElementType.NUMERIC).build())
+						.map(e -> ElementCreate.builder().name(e).type(ElementType.NUMERIC).build())
 						.toList())
 					.build()))
 				.build())

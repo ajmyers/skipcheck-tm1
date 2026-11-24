@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { ODataQuery, SandboxPatch } from "../../src/index.js";
+import { ODataQuery, SandboxCreate, SandboxPatch } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 /** SandboxService against a fake TM1: the sandboxes themselves and their actions, as the Java
@@ -18,7 +18,7 @@ describe("SandboxService", () => {
     tm1.respond = () => ({ Name: "What if" });
     expect((await client.sandboxes.get("What if")).Name).toBe("What if");
     expect(`${tm1.last.method} ${tm1.last.target}`).toBe("GET Sandboxes('What%20if')");
-    expect((await client.sandboxes.create(SandboxPatch.builder().name("What if").build())).Name).toBe("What if");
+    expect((await client.sandboxes.create(SandboxCreate.builder().name("What if").build())).Name).toBe("What if");
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Sandboxes", '{"Name":"What if"}']);
 
     tm1.respond = () => null;
@@ -27,7 +27,7 @@ describe("SandboxService", () => {
     await client.sandboxes.delete("What if");
     expect(`${tm1.last.method} ${tm1.last.target}`).toBe("DELETE Sandboxes('What%20if')");
     const sent = tm1.requests.length;
-    expect(() => client.sandboxes.create(null as unknown as SandboxPatch)).toThrow(TypeError);
+    expect(() => client.sandboxes.create(null as unknown as SandboxCreate)).toThrow(TypeError);
     expect(tm1.requests.length).toBe(sent);
   });
 

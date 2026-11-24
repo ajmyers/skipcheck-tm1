@@ -77,7 +77,7 @@
 					"json" : "PUBLIC"
 				},
 				{
-					"$patch" : "MDXViewPatch",
+					"$patch" : "MDXViewCreate",
 					"json" : {
 						"@odata.type" : "#ibm.tm1.api.v1.MDXView",
 						"Name" : "Mdx",
@@ -208,7 +208,7 @@
 					"json" : "PUBLIC"
 				},
 				{
-					"$patch" : "MDXViewPatch",
+					"$patch" : "MDXViewCreate",
 					"json" : {
 						"@odata.type" : "#ibm.tm1.api.v1.MDXView",
 						"Name" : "Mdx",
@@ -270,10 +270,12 @@
 					"json" : "PRIVATE"
 				},
 				{
-					"$patch" : "NativeViewPatch",
+					"$patch" : "NativeViewCreate",
 					"json" : {
 						"@odata.type" : "#ibm.tm1.api.v1.NativeView",
 						"Name" : "Native",
+						"Columns" : [ ],
+						"Rows" : [ ],
 						"SuppressEmptyRows" : true
 					}
 				}
@@ -292,6 +294,8 @@
 						"json" : {
 							"@odata.type" : "#ibm.tm1.api.v1.NativeView",
 							"Name" : "Native",
+							"Columns" : [ ],
+							"Rows" : [ ],
 							"SuppressEmptyRows" : true
 						}
 					},
@@ -383,9 +387,10 @@
 				},
 				"Native",
 				{
-					"$patch" : "ViewPatch",
+					"$patch" : "NativeViewPatch",
 					"json" : {
-						"Name" : "Renamed"
+						"@odata.type" : "#ibm.tm1.api.v1.NativeView",
+						"SuppressEmptyRows" : false
 					}
 				},
 				"W/\"3\""
@@ -403,7 +408,8 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"Name" : "Renamed"
+							"@odata.type" : "#ibm.tm1.api.v1.NativeView",
+							"SuppressEmptyRows" : false
 						}
 					},
 					"response" : {

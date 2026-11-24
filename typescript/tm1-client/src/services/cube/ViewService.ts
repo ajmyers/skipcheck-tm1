@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Cube, NativeView, View, type ViewPatch } from "../../generated/index.js";
+import { Cube, NativeView, View, type ViewCreate, type ViewPatch } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import { Tm1Request } from "../../request.js";
 import type { Tm1CallOptions } from "../../session/session.js";
@@ -32,7 +32,7 @@ const VIEWS = ["Navigation Cube/Views", "Navigation Cube/PrivateViews"] as const
  * ```
  * Create an MDX view from its query:
  * ```ts
- * await tm1.views.create("Sales", ViewScope.Public, MDXViewPatch.builder().name("Mdx").mdx("SELECT … FROM [Sales]").build());
+ * await tm1.views.create("Sales", ViewScope.Public, MDXViewCreate.builder().name("Mdx").mdx("SELECT … FROM [Sales]").build());
  * ```
  * Read the subsets on a native view's axes:
  * ```ts
@@ -75,7 +75,7 @@ export class ViewService extends Tm1Service {
    * `NativeViewPatch`), and a native view's axes bind subsets. TM1 (11.8) refuses a native view that
    * leaves any of the cube's dimensions off its columns, rows and titles (400, "All cube dimensions
    * must be placed on an axis"). Returns the view as created. */
-  create(cube: string, scope: ViewScope, view: ViewPatch, options?: Tm1CallOptions): Promise<View> {
+  create(cube: string, scope: ViewScope, view: ViewCreate, options?: Tm1CallOptions): Promise<View> {
     return this.session.execute(Tm1Request.post(views(cube, scope), required(view, "view"), View), options);
   }
 

@@ -35,14 +35,21 @@ public class DimensionServiceTests
         Assert.Equal(("Region", "W/\"1\""), (dimension.Name, dimension.ETag));
         Assert.Equal("Dimensions('Region')?$select=Name", _tm1.Last.Target);
 
-        await tm1.Dimensions.CreateAsync(DimensionPatch.Builder().Name("Region").Build());
+        await tm1.Dimensions.CreateAsync(DimensionCreate.Builder().Name("Region").Build());
         Assert.Equal(("POST", "Dimensions", """{"Name":"Region"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => null;
-        await tm1.Dimensions.UpdateAsync("Region", DimensionPatch.Builder().Name("Region").Build());
+        await tm1.Dimensions.UpdateAsync(
+            "Region",
+            DimensionPatch.Builder().BindDefaultHierarchy(ODataPath.Of("Dimensions").Key("Region").Nav("Hierarchies").Key("Region")).Build()
+        );
         Assert.Equal(("PATCH", "Dimensions('Region')"), (_tm1.Last.Method, _tm1.Last.Target));
         Assert.False(_tm1.Last.Headers.ContainsKey("if-match"));
-        await tm1.Dimensions.UpdateAsync("Region", DimensionPatch.Builder().Name("Region").Build(), "W/\"1\"");
+        await tm1.Dimensions.UpdateAsync(
+            "Region",
+            DimensionPatch.Builder().BindDefaultHierarchy(ODataPath.Of("Dimensions").Key("Region").Nav("Hierarchies").Key("Region")).Build(),
+            "W/\"1\""
+        );
         Assert.Equal("W/\"1\"", _tm1.Last.Headers["if-match"]);
         await tm1.Dimensions.DeleteAsync("O'Brien");
         Assert.Equal(("DELETE", "Dimensions('O''Brien')"), (_tm1.Last.Method, _tm1.Last.Target));

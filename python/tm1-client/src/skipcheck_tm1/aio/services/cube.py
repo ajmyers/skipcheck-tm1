@@ -50,7 +50,7 @@ class CubeService(Service):
     Create a cube over existing dimensions, bound in order::
 
         dimensions = ODataPath.of("Dimensions")
-        await tm1.cubes.create(CubePatch.builder().name("Sales").bind_dimensions(dimensions.key("Region"), dimensions.key("Month")).build())
+        await tm1.cubes.create(CubeCreate.builder().name("Sales").bind_dimensions(dimensions.key("Region"), dimensions.key("Month")).build())
 
     Change a cube's rules, checking them first::
 
@@ -86,7 +86,7 @@ class CubeService(Service):
     @endpoint("EntitySet Cubes")
     async def create(self, cube: Any) -> Cube:
         """``POST Cubes``: creates a cube over existing dimensions, bound in order with
-        ``CubePatch.Builder.bind_dimensions``, and optionally its rules. It needs a name and at
+        ``CubeCreate.Builder.bind_dimensions``, and optionally its rules. It needs a name and at
         least two dimensions; returns the cube as created."""
         return await self._session.execute(Tm1Request.post(_CUBES, _require(cube, "cube"), Cube))
 
@@ -230,7 +230,7 @@ class ViewService(Service):
         regions = dimensions.key("Region").nav("Hierarchies").key("Region").nav("Subsets").key("Leaves")
         versions = dimensions.key("Version").nav("Hierarchies").key("Version")
         measures = dimensions.key("Measure").nav("Hierarchies").key("Measure")
-        await tm1.views.create("Sales", ViewScope.PUBLIC, NativeViewPatch.builder()
+        await tm1.views.create("Sales", ViewScope.PUBLIC, NativeViewCreate.builder()
             .name("Revenue by Region")
             .columns([ViewAxisSelectionPatch.builder().bind_subset(months).build()])
             .rows([ViewAxisSelectionPatch.builder().bind_subset(regions).build()])
@@ -248,7 +248,7 @@ class ViewService(Service):
         mdx = ("SELECT {[Month].[Month].[Jan], [Month].[Month].[Feb]} ON 0,"
                " {TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)} ON 1 FROM [Sales]"
                " WHERE ([Version].[Version].[Actual], [Measure].[Measure].[Revenue])")
-        await tm1.views.create("Sales", ViewScope.PRIVATE, MDXViewPatch.builder().name("My Revenue").mdx(mdx).build())
+        await tm1.views.create("Sales", ViewScope.PRIVATE, MDXViewCreate.builder().name("My Revenue").mdx(mdx).build())
 
     List a cube's views, telling the kinds apart by type::
 
@@ -294,7 +294,7 @@ class ViewService(Service):
     @endpoint("Navigation Cube/Views", "Navigation Cube/PrivateViews")
     async def create(self, cube: str, scope: ViewScope, view: Any) -> View:
         """``POST Cubes('c')/Views``: creates a view; the patch's type says which kind
-        (``MDXViewPatch``, ``NativeViewPatch``), and a native view's axes bind subsets. It
+        (``MDXViewCreate``, ``NativeViewCreate``), and a native view's axes bind subsets. It
         needs a name. TM1 (11.8) refuses a native view that leaves any of the cube's
         dimensions off its columns, rows and titles (400, "All cube dimensions must be placed
         on an axis")."""

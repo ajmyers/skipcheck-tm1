@@ -69,9 +69,9 @@ public sealed class ProcessService : Tm1Service
         Session.ExecuteAsync(Tm1Request.Get<Process>(ProcessPath(name), query), cancellationToken);
 
     /// <summary><c>POST Processes</c>: creates a process; it needs a name. TM1 (11.8) saves code that
-    /// doesn't compile: check it with <see cref="CompileAsync(ProcessPatch, CancellationToken)"/> first.</summary>
+    /// doesn't compile: check it with <see cref="CompileAsync(ProcessCreate, CancellationToken)"/> first.</summary>
     [Tm1Endpoint("EntitySet Processes")]
-    public Task<Process> CreateAsync(ProcessPatch process, CancellationToken cancellationToken = default) =>
+    public Task<Process> CreateAsync(ProcessCreate process, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<Process>(Processes, Require(process, nameof(process))), cancellationToken);
 
     /// <summary><c>PATCH Processes('name')</c>: changes the properties the patch sets, such as a
@@ -103,7 +103,7 @@ public sealed class ProcessService : Tm1Service
     /// <summary><c>CompileProcess</c>: compiles a process definition that needn't be saved, such as one
     /// about to be created. Needs schema 11.0.0.</summary>
     [Tm1Endpoint("ActionImport CompileProcess")]
-    public IAsyncEnumerable<ProcessSyntaxError> CompileAsync(ProcessPatch definition, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<ProcessSyntaxError> CompileAsync(ProcessCreate definition, CancellationToken cancellationToken = default)
     {
         var operation = Tm1Operations.CompileProcess;
         var body = new Dictionary<string, object?> { ["Process"] = Require(definition, nameof(definition)) };
@@ -136,7 +136,7 @@ public sealed class ProcessService : Tm1Service
     [Tm1Endpoint("ActionImport ExecuteProcessWithReturn")]
     [Tm1Endpoint("Navigation ProcessExecuteResult/ErrorLogFile")]
     public Task<ProcessExecuteResult> ExecuteWithReturnAsync(
-        ProcessPatch definition,
+        ProcessCreate definition,
         IReadOnlyDictionary<string, object?>? parameters = null,
         ODataQuery? query = null,
         CancellationToken cancellationToken = default
@@ -164,7 +164,7 @@ public sealed class ProcessService : Tm1Service
     /// schema 11.0.0; deprecated in 11.3.0: use <c>ExecuteWithReturnAsync</c>.</summary>
     [Obsolete("Deprecated in TM1 schema 11.3.0: use ExecuteWithReturnAsync.")]
     [Tm1Endpoint("ActionImport ExecuteProcess")]
-    public Task ExecuteAsync(ProcessPatch definition, IReadOnlyDictionary<string, object?>? parameters = null, CancellationToken cancellationToken = default)
+    public Task ExecuteAsync(ProcessCreate definition, IReadOnlyDictionary<string, object?>? parameters = null, CancellationToken cancellationToken = default)
     {
         var body = ProcessFormats.WithParameters(new() { ["Process"] = Require(definition, nameof(definition)) }, parameters);
         return Session.ExecuteAsync(Tm1Request.Post(Root(Tm1Operations.ExecuteProcess), body), cancellationToken);

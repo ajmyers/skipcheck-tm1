@@ -13,6 +13,7 @@ import io.skipcheck.tm1.client.model.Group;
 import io.skipcheck.tm1.client.model.Session;
 import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.client.model.User;
+import io.skipcheck.tm1.client.model.UserCreate;
 import io.skipcheck.tm1.client.model.UserPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -94,7 +95,7 @@ public final class UserService {
 	 * @return the user as created
 	 */
 	@Tm1Endpoint("EntitySet Users")
-	public Mono<User> create(UserPatch user) {
+	public Mono<User> create(UserCreate user) {
 		return session.execute(Tm1Request.post(USERS, user, User.class));
 	}
 

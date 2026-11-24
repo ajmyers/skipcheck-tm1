@@ -67,6 +67,22 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 		}
 
 		/**
+		 * Whether a patch offers a property: everything but what a PATCH rejects or
+		 * ignores, and {@code Name} where a PATCH doesn't rename. Collections stay,
+		 * whatever a PATCH does with them: their docs say.
+		 * @param property the property's name
+		 * @return whether a patch offers it
+		 */
+		public boolean offersInPatch(String property) {
+			if (property.equals("Name")) {
+				return rename == null || rename.equals("applied");
+			}
+			String outcome = patch.get(property);
+			return outcome == null || !(outcome.equals("rejected") || outcome.equals("ignored"));
+			// writeOnly counts as offered
+		}
+
+		/**
 		 * Whether a PATCH sets a property, as {@link #creates} does for a POST.
 		 * @param property the property's name
 		 * @return whether a patch offers it
@@ -76,8 +92,8 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 		}
 
 		private static boolean writes(@Nullable String outcome) {
-			return outcome == null || outcome.equals("applied") || outcome.equals("transformed")
-					|| outcome.equals("untested");
+			return outcome == null || outcome.equals("applied") || outcome.equals("writeOnly")
+					|| outcome.equals("transformed") || outcome.equals("untested");
 		}
 
 	}
@@ -98,6 +114,19 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 	 * @return the writes
 	 */
 	public static Writes read(String probeJson) {
+		return read(probeJson, Overlay.NONE);
+	}
+
+	/**
+	 * Reads the writes from a probe file, with the overlay's {@code writeOnly} properties
+	 * counted as written: the probe reads them as ignored, as TM1 never sends them back.
+	 * @param probeJson the probe file's content
+	 * @param overlay the overlay
+	 * @return the writes
+	 * @throws IllegalArgumentException if the overlay names a write-only property the
+	 * probe has no writes for
+	 */
+	public static Writes read(String probeJson, Overlay overlay) {
 		JsonNode root = JSON.readTree(probeJson);
 		Map<String, Map<String, String>> create = new TreeMap<>();
 		Map<String, Map<String, String>> patch = new TreeMap<>();
@@ -128,6 +157,17 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 			String property = id[1].replace("@odata.bind", "");
 			collections.computeIfAbsent(id[0], k -> new TreeMap<>())
 				.merge(property, c.getValue().path("outcome").asString(""), (a, b) -> a);
+		}
+		for (String key : overlay.writeOnly().keySet()) {
+			String[] parts = key.split("/", -1);
+			Map<String, String> c = create.get(parts[0]);
+			Map<String, String> p = patch.get(parts[0]);
+			if (c == null || p == null || !(c.containsKey(parts[1]) || p.containsKey(parts[1]))) {
+				throw new IllegalArgumentException(
+						"The overlay's writeOnly names " + key + ", which the probe has no writes for");
+			}
+			c.put(parts[1], "writeOnly");
+			p.put(parts[1], "writeOnly");
 		}
 		Map<String, TypeWrites> types = new TreeMap<>();
 		for (Map.Entry<String, Map<String, String>> e : create.entrySet()) {

@@ -20,15 +20,15 @@ import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.Cellset;
 import io.skipcheck.tm1.client.model.CellsetCell;
-import io.skipcheck.tm1.client.model.CubePatch;
-import io.skipcheck.tm1.client.model.DimensionPatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.CubeCreate;
+import io.skipcheck.tm1.client.model.DimensionCreate;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
-import io.skipcheck.tm1.client.model.MDXViewPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
+import io.skipcheck.tm1.client.model.MDXViewCreate;
 import io.skipcheck.tm1.client.model.Member;
-import io.skipcheck.tm1.client.model.NativeViewPatch;
-import io.skipcheck.tm1.client.model.SubsetPatch;
+import io.skipcheck.tm1.client.model.NativeViewCreate;
+import io.skipcheck.tm1.client.model.SubsetCreate;
 import io.skipcheck.tm1.client.model.ViewAxisSelectionPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -73,7 +73,7 @@ class CellsetServiceTm1Test {
 		region = dimension(cube + "-region", REGIONS);
 		measure = dimension(cube + "-measure", MEASURES);
 		tm1.cubes()
-			.create(CubePatch.builder()
+			.create(CubeCreate.builder()
 				.name(cube)
 				.bindDimensions(ODataPath.of("Dimensions").key(region), ODataPath.of("Dimensions").key(measure))
 				.build())
@@ -182,16 +182,19 @@ class CellsetServiceTm1Test {
 
 	@Test
 	void executesMdxAndNativeViews() {
-		tm1.views().create(cube, ViewScope.PUBLIC, MDXViewPatch.builder().name("Mdx").mdx(mdx).build()).block(WAIT);
+		tm1.views().create(cube, ViewScope.PUBLIC, MDXViewCreate.builder().name("Mdx").mdx(mdx).build()).block(WAIT);
 		for (String d : List.of(region, measure)) {
 			tm1.subsets()
 				.create(d, d, SubsetScope.PUBLIC,
-						SubsetPatch.builder().name("All").expression("{TM1SUBSETALL([" + d + "].[" + d + "])}").build())
+						SubsetCreate.builder()
+							.name("All")
+							.expression("{TM1SUBSETALL([" + d + "].[" + d + "])}")
+							.build())
 				.block(WAIT);
 		}
 		tm1.views()
 			.create(cube, ViewScope.PUBLIC,
-					NativeViewPatch.builder()
+					NativeViewCreate.builder()
 						.name("Native")
 						.columns(List.of(axis(measure)))
 						.rows(List.of(axis(region)))
@@ -261,12 +264,12 @@ class CellsetServiceTm1Test {
 
 	private static String dimension(String name, List<String> elements) {
 		tm1.dimensions()
-			.create(DimensionPatch.builder()
+			.create(DimensionCreate.builder()
 				.name(name)
-				.hierarchies(List.of(HierarchyPatch.builder()
+				.hierarchies(List.of(HierarchyCreate.builder()
 					.name(name)
 					.elements(elements.stream()
-						.map(e -> ElementPatch.builder().name(e).type(ElementType.NUMERIC).build())
+						.map(e -> ElementCreate.builder().name(e).type(ElementType.NUMERIC).build())
 						.toList())
 					.build()))
 				.build())

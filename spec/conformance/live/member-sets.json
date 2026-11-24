@@ -8,7 +8,7 @@
 			"service" : "dimensions",
 			"method" : "create",
 			"params" : [ "dimension" ],
-			"args" : [ { "$patch" : "DimensionPatch", "json" : { "Name" : "${dim}", "Hierarchies" : [ { "Name" : "${dim}", "Elements" : [ { "Name" : "A", "Type" : "Numeric" }, { "Name" : "B", "Type" : "Numeric" }, { "Name" : "C", "Type" : "Numeric" } ] } ] } } ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${dim}", "Hierarchies" : [ { "Name" : "${dim}", "Elements" : [ { "Name" : "A", "Type" : "Numeric" }, { "Name" : "B", "Type" : "Numeric" }, { "Name" : "C", "Type" : "Numeric" } ] } ] } } ],
 			"expect" : { "fields" : { "Name" : "${dim}" } }
 		},
 		{

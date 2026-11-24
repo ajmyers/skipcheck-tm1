@@ -4,12 +4,12 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { StartedTestContainer } from "testcontainers";
 import {
-  DimensionPatch,
-  ElementPatch,
+  DimensionCreate,
+  ElementCreate,
   GitCommitDetails,
   GitCredentials,
   GitPlan,
-  HierarchyPatch,
+  HierarchyCreate,
   Tm1BadRequestException,
   Tm1Exception,
   Tm1NotFoundException,
@@ -145,12 +145,12 @@ describe("GitService on TM1" + gitReason, () => {
         await fails(() => tm1.git.push("main", null, COMMIT, none, true), "Cannot create bare commit");
 
         await tm1.dimensions.create(
-          DimensionPatch.builder()
+          DimensionCreate.builder()
             .name(dimension)
             .hierarchies([
-              HierarchyPatch.builder()
+              HierarchyCreate.builder()
                 .name(dimension)
-                .elements([ElementPatch.builder().name("North").build()])
+                .elements([ElementCreate.builder().name("North").build()])
                 .build(),
             ])
             .build(),

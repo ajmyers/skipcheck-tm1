@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Dimension, DimensionPatch, EdgePatch, ElementPatch, ElementType, Hierarchy, HierarchyPatch, ODataQuery, type Tm1Client } from "@skipcheck/tm1-client";
+import {
+  Dimension,
+  DimensionCreate,
+  EdgePatch,
+  ElementCreate,
+  ElementType,
+  Hierarchy,
+  HierarchyCreate,
+  ODataQuery,
+  type Tm1Client,
+} from "@skipcheck/tm1-client";
 
 // Examples for DimensionService, quoted in its documentation.
 
@@ -15,10 +25,10 @@ export async function list(tm1: Tm1Client): Promise<string[]> {
 export function create(tm1: Tm1Client): Promise<Dimension> {
   // @start region = create
   // Region, with one hierarchy of the same name: Total = North + South
-  const total = ElementPatch.builder().name("Total").type(ElementType.Consolidated).build();
-  const north = ElementPatch.builder().name("North").type(ElementType.Numeric).build();
-  const south = ElementPatch.builder().name("South").type(ElementType.Numeric).build();
-  const region = HierarchyPatch.builder()
+  const total = ElementCreate.builder().name("Total").type(ElementType.Consolidated).build();
+  const north = ElementCreate.builder().name("North").type(ElementType.Numeric).build();
+  const south = ElementCreate.builder().name("South").type(ElementType.Numeric).build();
+  const region = HierarchyCreate.builder()
     .name("Region")
     .elements([total, north, south])
     .edges([
@@ -26,7 +36,7 @@ export function create(tm1: Tm1Client): Promise<Dimension> {
       EdgePatch.builder().parentName("Total").componentName("South").weight(1).build(),
     ])
     .build();
-  return tm1.dimensions.create(DimensionPatch.builder().name("Region").hierarchies([region]).build());
+  return tm1.dimensions.create(DimensionCreate.builder().name("Region").hierarchies([region]).build());
   // @end
 }
 

@@ -6,9 +6,9 @@ import java.util.List;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.MDXView;
-import io.skipcheck.tm1.client.model.MDXViewPatch;
+import io.skipcheck.tm1.client.model.MDXViewCreate;
 import io.skipcheck.tm1.client.model.NativeView;
-import io.skipcheck.tm1.client.model.NativeViewPatch;
+import io.skipcheck.tm1.client.model.NativeViewCreate;
 import io.skipcheck.tm1.client.model.View;
 import io.skipcheck.tm1.client.model.ViewAxisSelectionPatch;
 import io.skipcheck.tm1.client.model.ViewTitlePatch;
@@ -35,7 +35,7 @@ final class ViewServiceExamples {
 		ODataPath measures = dimensions.key("Measure").nav("Hierarchies").key("Measure");
 		return tm1.views()
 			.create("Sales", ViewScope.PUBLIC,
-					NativeViewPatch.builder()
+					NativeViewCreate.builder()
 						.name("Revenue by Region")
 						.columns(List.of(ViewAxisSelectionPatch.builder().bindSubset(months).build()))
 						.rows(List.of(ViewAxisSelectionPatch.builder().bindSubset(regions).build()))
@@ -60,7 +60,7 @@ final class ViewServiceExamples {
 				+ " {TM1FILTERBYLEVEL({TM1SUBSETALL([Region].[Region])}, 0)} ON 1 FROM [Sales]"
 				+ " WHERE ([Version].[Version].[Actual], [Measure].[Measure].[Revenue])";
 		return tm1.views()
-			.create("Sales", ViewScope.PRIVATE, MDXViewPatch.builder().name("My Revenue").mdx(mdx).build());
+			.create("Sales", ViewScope.PRIVATE, MDXViewCreate.builder().name("My Revenue").mdx(mdx).build());
 		// @end
 	}
 

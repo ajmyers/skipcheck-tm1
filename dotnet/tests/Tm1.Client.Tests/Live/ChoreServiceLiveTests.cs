@@ -33,7 +33,7 @@ public sealed class ChoreServiceLiveTests : IAsyncLifetime
         }
         _tm1 = Live.Client();
         await _tm1.Processes.CreateAsync(
-            ProcessPatch
+            ProcessCreate
                 .Builder()
                 .Name(Process)
                 .Parameters([
@@ -44,7 +44,7 @@ public sealed class ChoreServiceLiveTests : IAsyncLifetime
                 .Build()
         );
         await Chores.CreateAsync(
-            ChorePatch
+            ChoreCreate
                 .Builder()
                 .Name(Chore)
                 .StartTime(DateTimeOffset.Parse("2026-01-01T02:00:00Z", System.Globalization.CultureInfo.InvariantCulture))

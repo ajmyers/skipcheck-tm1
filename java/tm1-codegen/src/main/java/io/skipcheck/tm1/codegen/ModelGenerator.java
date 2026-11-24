@@ -668,7 +668,10 @@ public final class ModelGenerator {
 				return t;
 			});
 		}
-		ClassName patch = patchName(structured.get());
+		// A nested entity is new, in a deep insert or a collection a PATCH replaces: it's
+		// a
+		// create, where its type has one
+		ClassName patch = creatable(structured.get()) ? createName(structured.get()) : patchName(structured.get());
 		if (!ref.collection()) {
 			return Optional.of(patch);
 		}
@@ -899,10 +902,27 @@ public final class ModelGenerator {
 	 * takes, by the probe's writes (all, for a type with none); for a patch, all of them.
 	 */
 	private List<PatchProperty> writable(CsdlStructuredType level, CsdlStructuredType type, boolean create) {
-		if (!create) {
-			return patchProperties(level);
+		return patchProperties(level).stream()
+			.filter(p -> p.navigation() || (create ? creates(type, p.json()) : offersInPatch(type, p.json())))
+			.toList();
+	}
+
+	/**
+	 * Whether a patch of {@code type} offers a property: not if a PATCH rejects or
+	 * ignores it, by the probe; for the root of a hierarchy without writes of its own, if
+	 * any probed subtype's patch offers it.
+	 */
+	private boolean offersInPatch(CsdlStructuredType type, String property) {
+		Writes.TypeWrites w = writes.get(type.name());
+		if (w != null) {
+			return w.offersInPatch(property);
 		}
-		return patchProperties(level).stream().filter(p -> p.navigation() || creates(type, p.json())).toList();
+		List<Writes.TypeWrites> probed = hierarchies.getOrDefault(qualified(type), List.of())
+			.stream()
+			.map(s -> writes.get(s.name()))
+			.filter(Objects::nonNull)
+			.toList();
+		return probed.isEmpty() || probed.stream().allMatch(s -> s.offersInPatch(property));
 	}
 
 	/**
@@ -996,26 +1016,34 @@ public final class ModelGenerator {
 				return CodeBlock.of("$T.<Object>copyOf($L)", List.class, value);
 			}
 			if (element instanceof ClassName c && isPatch(c)) {
+				if (root(c) && c.simpleName().endsWith("Create")) {
+					return null;
+				}
 				return root(c) ? CodeBlock.of("$L.stream().map(v -> $T.of(v)).toList()", value, c)
 						: CodeBlock.of("$L.stream().map(v -> $T.builder(v).build()).toList()", value, c);
 			}
 			return CodeBlock.of("$L", value);
 		}
 		if (t instanceof ClassName c && isPatch(c)) {
+			if (root(c) && c.simpleName().endsWith("Create")) {
+				return null;
+			}
 			return root(c) ? CodeBlock.of("$T.of($L)", c, value) : CodeBlock.of("$T.builder($L).build()", c, value);
 		}
 		return CodeBlock.of("$L", value);
 	}
 
 	private static boolean isPatch(ClassName c) {
-		return c.packageName().equals(PACKAGE) && c.simpleName().endsWith("Patch");
+		return c.packageName().equals(PACKAGE)
+				&& (c.simpleName().endsWith("Patch") || c.simpleName().endsWith("Create"));
 	}
 
 	/**
 	 * Whether a patch has {@code builder(read)}: its type isn't the root of a hierarchy.
 	 */
 	private boolean root(ClassName patch) {
-		String csdl = patch.simpleName().substring(0, patch.simpleName().length() - "Patch".length());
+		String suffix = patch.simpleName().endsWith("Create") ? "Create" : "Patch";
+		String csdl = patch.simpleName().substring(0, patch.simpleName().length() - suffix.length());
 		return metadata.structuredTypes()
 			.filter(t -> javaTypeName(t.name()).equals(csdl))
 			.findFirst()

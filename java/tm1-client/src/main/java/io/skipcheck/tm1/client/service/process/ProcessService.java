@@ -13,6 +13,7 @@ import org.jspecify.annotations.Nullable;
 import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Process;
+import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessErrorLog;
 import io.skipcheck.tm1.client.model.ProcessExecuteResult;
 import io.skipcheck.tm1.client.model.ProcessPatch;
@@ -87,12 +88,12 @@ public final class ProcessService {
 
 	/**
 	 * {@code POST Processes}: creates a process. TM1 (11.8) saves code that doesn't
-	 * compile: check it with {@link #compile(ProcessPatch)} first.
+	 * compile: check it with {@link #compile(ProcessCreate)} first.
 	 * @param process the new process; it needs a name
 	 * @return the process as created
 	 */
 	@Tm1Endpoint("EntitySet Processes")
-	public Mono<Process> create(ProcessPatch process) {
+	public Mono<Process> create(ProcessCreate process) {
 		return session.execute(Tm1Request.post(PROCESSES, process, Process.class));
 	}
 
@@ -151,7 +152,7 @@ public final class ProcessService {
 	 * @return the syntax errors, by procedure and line; none if it compiles
 	 */
 	@Tm1Endpoint("ActionImport CompileProcess")
-	public Flux<ProcessSyntaxError> compile(ProcessPatch definition) {
+	public Flux<ProcessSyntaxError> compile(ProcessCreate definition) {
 		Tm1Operation operation = Tm1Operations.COMPILE_PROCESS;
 		return session.stream(
 				Tm1Request
@@ -195,7 +196,7 @@ public final class ProcessService {
 	 */
 	@Tm1Endpoint("ActionImport ExecuteProcessWithReturn")
 	@Tm1Endpoint("Navigation ProcessExecuteResult/ErrorLogFile")
-	public Mono<ProcessExecuteResult> executeWithReturn(ProcessPatch definition, Map<String, ?> parameters,
+	public Mono<ProcessExecuteResult> executeWithReturn(ProcessCreate definition, Map<String, ?> parameters,
 			ODataQuery query) {
 		Tm1Operation operation = Tm1Operations.EXECUTE_PROCESS_WITH_RETURN;
 		return session.execute(
@@ -230,11 +231,11 @@ public final class ProcessService {
 	 * @param parameters the values to run it with, by name, in order; may be empty
 	 * @return completes when it's run
 	 * @deprecated Deprecated in TM1 schema 11.3.0: use
-	 * {@link #executeWithReturn(ProcessPatch, Map, ODataQuery)}.
+	 * {@link #executeWithReturn(ProcessCreate, Map, ODataQuery)}.
 	 */
 	@Deprecated(since = "11.3.0")
 	@Tm1Endpoint("ActionImport ExecuteProcess")
-	public Mono<Void> execute(ProcessPatch definition, Map<String, ?> parameters) {
+	public Mono<Void> execute(ProcessCreate definition, Map<String, ?> parameters) {
 		return session.execute(Tm1Request.post(root(Tm1Operations.EXECUTE_PROCESS),
 				withParameters(Map.of("Process", Objects.requireNonNull(definition, "definition")), parameters),
 				Void.class));

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Group, Session, Tm1Operations, User, type UserPatch } from "../../generated/index.js";
+import { Group, Session, Tm1Operations, User, type UserCreate, type UserPatch } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import { Tm1Request } from "../../request.js";
 import type { Tm1CallOptions } from "../../session/session.js";
@@ -20,7 +20,7 @@ const USERS = ODataPath.of("Users");
  * Create a user in some groups, binding them by path:
  * ```ts
  * const groups = ODataPath.of("Groups");
- * await tm1.users.create(UserPatch.builder().name("jsmith").password("pw").bindGroups(groups.key("Finance"), groups.key("Planners")).build());
+ * await tm1.users.create(UserCreate.builder().name("jsmith").password("pw").bindGroups(groups.key("Finance"), groups.key("Planners")).build());
  * ```
  * Take a user out of one group by setting the rest:
  * ```ts
@@ -67,7 +67,7 @@ export class UserService extends Tm1Service {
 
   /** `POST Users`: creates a user, in the groups the patch binds (`UserPatch.builder().bindGroups(…)`).
    * It needs a name, and a password for Basic security; returns the user as created. */
-  create(user: UserPatch, options?: Tm1CallOptions): Promise<User> {
+  create(user: UserCreate, options?: Tm1CallOptions): Promise<User> {
     return this.session.execute(Tm1Request.post(USERS, required(user, "user"), User), options);
   }
 

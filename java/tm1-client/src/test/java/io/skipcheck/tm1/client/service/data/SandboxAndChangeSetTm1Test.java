@@ -16,13 +16,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.Tm1Client;
-import io.skipcheck.tm1.client.model.CubePatch;
-import io.skipcheck.tm1.client.model.DimensionPatch;
-import io.skipcheck.tm1.client.model.ElementPatch;
+import io.skipcheck.tm1.client.model.CubeCreate;
+import io.skipcheck.tm1.client.model.DimensionCreate;
+import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
-import io.skipcheck.tm1.client.model.HierarchyPatch;
+import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.Sandbox;
-import io.skipcheck.tm1.client.model.SandboxPatch;
+import io.skipcheck.tm1.client.model.SandboxCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
@@ -48,18 +48,18 @@ class SandboxAndChangeSetTm1Test {
 		cube = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		for (String d : List.of(cube + "-a", cube + "-b")) {
 			tm1.dimensions()
-				.create(DimensionPatch.builder()
+				.create(DimensionCreate.builder()
 					.name(d)
-					.hierarchies(List.of(HierarchyPatch.builder()
+					.hierarchies(List.of(HierarchyCreate.builder()
 						.name(d)
-						.elements(List.of(ElementPatch.builder().name("X").type(ElementType.NUMERIC).build(),
-								ElementPatch.builder().name("Y").type(ElementType.NUMERIC).build()))
+						.elements(List.of(ElementCreate.builder().name("X").type(ElementType.NUMERIC).build(),
+								ElementCreate.builder().name("Y").type(ElementType.NUMERIC).build()))
 						.build()))
 					.build())
 				.block(WAIT);
 		}
 		tm1.cubes()
-			.create(CubePatch.builder()
+			.create(CubeCreate.builder()
 				.name(cube)
 				.bindDimensions(ODataPath.of("Dimensions").key(cube + "-a"),
 						ODataPath.of("Dimensions").key(cube + "-b"))
@@ -79,7 +79,7 @@ class SandboxAndChangeSetTm1Test {
 
 	@Test
 	void keepsSandboxWritesApartUntilPublished() {
-		tm1.sandboxes().create(SandboxPatch.builder().name("S").build()).block(WAIT);
+		tm1.sandboxes().create(SandboxCreate.builder().name("S").build()).block(WAIT);
 		assertThat(tm1.sandboxes().list(ODataQuery.none()).map(Sandbox::name).collectList().block(WAIT)).contains("S");
 		tm1.withSandbox("S").cells().update(cube, cell("X"), 5).block(WAIT);
 		assertThat(value(tm1.withSandbox("S"), "X")).isEqualTo(5.0);
@@ -91,8 +91,8 @@ class SandboxAndChangeSetTm1Test {
 
 	@Test
 	void mergesDiscardsLoadsAndUnloads() {
-		tm1.sandboxes().create(SandboxPatch.builder().name("S").build()).block(WAIT);
-		tm1.sandboxes().create(SandboxPatch.builder().name("T").build()).block(WAIT);
+		tm1.sandboxes().create(SandboxCreate.builder().name("S").build()).block(WAIT);
+		tm1.sandboxes().create(SandboxCreate.builder().name("T").build()).block(WAIT);
 		tm1.withSandbox("S").cells().update(cube, cell("X"), 7).block(WAIT);
 		tm1.sandboxes().merge("S", "T").block(WAIT);
 		assertThat(value(tm1.withSandbox("T"), "X")).isEqualTo(7.0);

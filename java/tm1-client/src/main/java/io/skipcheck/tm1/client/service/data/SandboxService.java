@@ -10,6 +10,7 @@ import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.ConflictResolution;
 import io.skipcheck.tm1.client.model.Sandbox;
+import io.skipcheck.tm1.client.model.SandboxCreate;
 import io.skipcheck.tm1.client.model.SandboxPatch;
 import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.client.odata.ODataPath;
@@ -78,7 +79,7 @@ public final class SandboxService {
 	 * @return the sandbox as created
 	 */
 	@Tm1Endpoint("EntitySet Sandboxes")
-	public Mono<Sandbox> create(SandboxPatch sandbox) {
+	public Mono<Sandbox> create(SandboxCreate sandbox) {
 		return session.execute(Tm1Request.post(SANDBOXES, sandbox, Sandbox.class));
 	}
 

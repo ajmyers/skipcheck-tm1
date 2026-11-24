@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { AttributeDefinitionPatch, AttributeSet, AttributeType, ODataQuery } from "../../src/index.js";
+import { AttributeDefinitionCreate, AttributeSet, AttributeType, ODataQuery } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 /** AttributeService and AttributeSet against a fake TM1: each sends what the Java client's does
@@ -28,7 +28,7 @@ describe("AttributeService", () => {
     tm1.respond = () => ({ Name: "Manager", Type: "String" });
     expect((await client.attributes.get(set, "Manager")).Name).toBe("Manager");
     expect([tm1.last.method, tm1.last.target]).toEqual(["GET", `${path}('Manager')`]);
-    const made = await client.attributes.create(set, AttributeDefinitionPatch.builder().name("Manager").type(AttributeType.String).build());
+    const made = await client.attributes.create(set, AttributeDefinitionCreate.builder().name("Manager").type(AttributeType.String).build());
     expect(made.Type).toBe("String");
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", path, '{"Name":"Manager","Type":"String"}']);
 
