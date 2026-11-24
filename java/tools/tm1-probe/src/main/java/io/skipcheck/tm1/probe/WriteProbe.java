@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -17,11 +18,13 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import org.jspecify.annotations.Nullable;
 
 import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlEnumType;
+import io.skipcheck.tm1.csdl.CsdlNavigationProperty;
 import io.skipcheck.tm1.csdl.CsdlProperty;
 import io.skipcheck.tm1.csdl.CsdlStructuredType;
 import tools.jackson.databind.JsonNode;
@@ -228,6 +231,7 @@ public final class WriteProbe {
 		}
 
 		probeSecrets(c, collection, base, post, patch);
+		result.set("navigations", probeNavigations(type, collection, base));
 
 		// Renaming by PATCH
 		String before = fresh(collection);
@@ -330,6 +334,214 @@ public final class WriteProbe {
 			patch.set(property, patched.ok() ? signedIn(name, second, first) : outcome(patched));
 			delete(collection, name);
 		}
+	}
+
+	/**
+	 * Every navigation of the type, in a create and a PATCH, bound to a fixture (the
+	 * cases' {@code targets}, by entity type) and nested (the target type's own case,
+	 * under a fresh name, deleted after), each read back by {@code GET …/Navigation} and
+	 * compared with what the object held without it: {@code applied}, {@code appends},
+	 * {@code replaces}, {@code ignored}, {@code transformed}, {@code mixed},
+	 * {@code rejected}, {@code unread} (TM1 took it but won't list the navigation), or
+	 * {@code untested} (nothing to bind or nest).
+	 */
+	private ObjectNode probeNavigations(String type, String collection, JsonNode base) {
+		List<CsdlNavigationProperty> navigations = new ArrayList<>();
+		for (CsdlStructuredType level : metadata.typeHierarchy(qualified(type))) {
+			navigations.addAll(level.navigationProperties());
+		}
+		navigations.sort(Comparator.comparing(CsdlNavigationProperty::name));
+		ObjectNode out = NODES.objectNode();
+		for (CsdlNavigationProperty navigation : navigations) {
+			String nav = navigation.name();
+			String target = simple(navigation.type().name());
+			boolean many = navigation.type().collection();
+			ObjectNode n = out.putObject(nav);
+			ObjectNode post = n.putObject("post");
+			ObjectNode patch = n.putObject("patch");
+			String bound = cases.path("targets").path(target).isString()
+					? cases.path("targets").path(target).asString().replace("{p}", prefix) : null;
+			if (bound == null) {
+				post.putObject("bind").put("outcome", "untested");
+				patch.putObject("bind").put("outcome", "untested");
+			}
+			else {
+				// Added to what the base binds already (a cube's dimensions), not in
+				// place of it
+				JsonNode value = NODES.stringNode(bound);
+				if (many) {
+					ArrayNode all = NODES.arrayNode();
+					base.path(nav + "@odata.bind").forEach(all::add);
+					value = all.add(bound);
+				}
+				Sent bind = new Sent(nav + "@odata.bind", value, keyOf(bound), null);
+				post.set("bind", navPost(collection, base, nav, () -> bind));
+				patch.set("bind", navPatch(collection, base, nav, () -> bind));
+			}
+			JsonNode nestedCase = caseFor(target);
+			if (nestedCase == null) {
+				post.putObject("nested").put("outcome", "untested");
+				patch.putObject("nested").put("outcome", "untested");
+			}
+			else {
+				Supplier<Sent> nested = () -> {
+					String into = nestedCase.path("collection").asString().replace("{p}", prefix);
+					String name = fresh(into);
+					ObjectNode body = withName(substitute(nestedCase.path("base"), ""), name);
+					return new Sent(nav, many ? NODES.arrayNode().add(body) : body, name, path(into, name));
+				};
+				post.set("nested", navPost(collection, base, nav, nested));
+				patch.set("nested", navPatch(collection, base, nav, nested));
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * What a navigation write sends: the property, its value, the key the navigation
+	 * should then hold, and what to delete after (a nested entity), or null.
+	 */
+	private record Sent(String property, JsonNode value, String key, @Nullable String cleanup) {
+	}
+
+	private JsonNode navPost(String collection, JsonNode base, String nav, Supplier<Sent> make) {
+		String name = fresh(collection);
+		Sent sent = make.get();
+		ObjectNode body = withName(base, name);
+		body.set(sent.property(), sent.value());
+		ProbeClient.Answer answer = client.send("POST", collection, body);
+		List<String> after = answer.ok() ? navKeys(collection, name, nav) : null;
+		delete(collection, name);
+		cleanup(sent);
+		if (!answer.ok()) {
+			return outcome(answer);
+		}
+		List<String> baseline = null;
+		if (client.send("POST", collection, withName(base, name)).ok()) {
+			baseline = navKeys(collection, name, nav);
+		}
+		delete(collection, name);
+		ObjectNode result = NODES.objectNode();
+		if (after == null || baseline == null) {
+			return result.put("outcome", "unread");
+		}
+		return result.put("outcome",
+				after.equals(baseline) ? "ignored" : after.contains(sent.key()) ? "applied" : "transformed");
+	}
+
+	private JsonNode navPatch(String collection, JsonNode base, String nav, Supplier<Sent> make) {
+		String name = fresh(collection);
+		client.send("POST", collection, withName(base, name));
+		List<String> before = navKeys(collection, name, nav);
+		Sent sent = make.get();
+		ObjectNode body = NODES.objectNode();
+		body.set(sent.property(), sent.value());
+		ProbeClient.Answer answer = client.send("PATCH", path(collection, name), body);
+		List<String> after = answer.ok() ? navKeys(collection, name, nav) : null;
+		delete(collection, name);
+		cleanup(sent);
+		if (!answer.ok()) {
+			return outcome(answer);
+		}
+		ObjectNode result = NODES.objectNode();
+		if (after == null || before == null) {
+			return result.put("outcome", "unread");
+		}
+		String outcome;
+		if (after.equals(before)) {
+			outcome = "ignored";
+		}
+		else if (!after.contains(sent.key())) {
+			outcome = "transformed";
+		}
+		else if (before.isEmpty()) {
+			outcome = "applied";
+		}
+		else if (after.containsAll(before)) {
+			outcome = "appends";
+		}
+		else if (Collections.disjoint(after, before)) {
+			outcome = "replaces";
+		}
+		else {
+			outcome = "mixed";
+		}
+		return result.put("outcome", outcome);
+	}
+
+	private void cleanup(Sent sent) {
+		if (sent.cleanup() != null) {
+			client.send("DELETE", sent.cleanup(), null);
+		}
+	}
+
+	/**
+	 * The keys a navigation holds: each member's {@code Name}, else its {@code ID}, in
+	 * order; none when a single-valued one is unset; null when TM1 won't list it.
+	 */
+	private @Nullable List<String> navKeys(String collection, String name, String nav) {
+		ProbeClient.Answer answer = client.get(path(collection, name) + "/" + nav);
+		if (answer.status() == 204 || answer.status() == 404) {
+			return List.of();
+		}
+		if (!answer.ok() || answer.body() == null) {
+			return null;
+		}
+		JsonNode body = answer.body();
+		List<String> keys = new ArrayList<>();
+		if (body.path("value").isArray()) {
+			body.path("value").forEach(item -> keys.add(memberKey(item)));
+		}
+		else {
+			keys.add(memberKey(body));
+		}
+		return keys;
+	}
+
+	private static String memberKey(JsonNode item) {
+		if (item.path("Name").isString()) {
+			return item.path("Name").asString();
+		}
+		return item.has("ID") ? item.path("ID").asString(item.path("ID").toString()) : item.toString();
+	}
+
+	/** The key a binding's path names last: {@code Elements('A')} binds {@code A}. */
+	static String keyOf(String path) {
+		int open = path.lastIndexOf("('");
+		return open < 0 ? path : path.substring(open + 2, path.length() - 2).replace("''", "'");
+	}
+
+	/**
+	 * The case a nested entity of a type is made from: the one the cases' {@code nest}
+	 * names for it, else the first by id for the type, else for a type derived from it.
+	 */
+	private @Nullable JsonNode caseFor(String type) {
+		String chosen = cases.path("nest").path(type).asString("");
+		for (JsonNode c : cases.path("cases")) {
+			if (!chosen.isEmpty() && c.path("id").asString().equals(chosen)) {
+				return c;
+			}
+		}
+		JsonNode exact = null;
+		JsonNode derived = null;
+		for (JsonNode c : cases.path("cases")) {
+			String t = c.path("type").asString();
+			if (t.equals(type)) {
+				exact = first(exact, c);
+			}
+			else if (metadata.typeHierarchy(qualified(t)).stream().anyMatch(l -> l.name().equals(type))) {
+				derived = first(derived, c);
+			}
+		}
+		return exact != null ? exact : derived;
+	}
+
+	private static JsonNode first(@Nullable JsonNode found, JsonNode c) {
+		return found == null || c.path("id").asString().compareTo(found.path("id").asString()) < 0 ? c : found;
+	}
+
+	private static String simple(String qualifiedName) {
+		return qualifiedName.substring(qualifiedName.lastIndexOf('.') + 1);
 	}
 
 	private JsonNode signedIn(String name, String set, String other) {

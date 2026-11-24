@@ -1,5 +1,23 @@
 {
 	"$comment": "What the write probe tries, for each type (WriteProbe): where to create it, the least a create needs (base, plus Name), a fixture to read a full set of properties from, and values for properties no value can be made up for. {p} is the fixtures' prefix, {name} the name of the object a test creates. Hand-written; extend it as new types or properties need probing.",
+	"targets": {
+		"$comment": "Per entity type, a fixture a navigation of that type is bound to: what a binding in a create or a PATCH of each probed type's navigations points at. A type with none gets its bindings untested.",
+		"AttributeDefinition": "CubeAttributes('{p}CubeAttribute')",
+		"Chore": "Chores('{p}Chore')",
+		"Cube": "Cubes('{p}Cube')",
+		"Dimension": "Dimensions('{p}Other')",
+		"Element": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Elements('{p}B')",
+		"Group": "Groups('{p}Group')",
+		"Hierarchy": "Dimensions('{p}Dim')/Hierarchies('{p}Alternate')",
+		"Process": "Processes('{p}Ascii')",
+		"Subset": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets('{p}Static')",
+		"User": "Users('{p}User')",
+		"View": "Cubes('{p}Cube')/Views('{p}Mdx')"
+	},
+	"nest": {
+		"$comment": "Per entity type, the case a nested entity of it is made from, where the first case by id won't do: an MDX view's query names the fixture cube, so a view nested in a new cube is a native one.",
+		"View": "NativeView"
+	},
 	"cases": [
 		{
 			"id": "AttributeDefinition",
