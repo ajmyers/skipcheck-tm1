@@ -249,6 +249,71 @@ def _model(spec: Spec, t: dict[str, Any]) -> list[str]:
     return out
 
 
+WRITES = {"applied", "transformed", "untested"}
+
+
+def _writes(outcome: str | None) -> bool:
+    return outcome is None or outcome in WRITES
+
+
+def creates(t: dict[str, Any], prop: str, spec: Spec | None = None) -> bool:
+    """Whether a POST of ``t`` takes ``prop``, by the probe's writes (yes, for a type it has none for). For
+    the root of a hierarchy without its own, whether every subtype with writes takes it, so each
+    subtype's create offers at least what its root's does."""
+    w = t.get("write")
+    if w is None and spec is not None:
+        probed = [d for d in spec.derived(t) if d.get("write")]
+        return all(creates(d, prop) for d in probed)
+    return w is None or _writes(w["create"]["properties"].get(prop))
+
+
+def patches(t: dict[str, Any], prop: str) -> bool:
+    """Whether a PATCH of ``t`` applies ``prop``, leaving out collections it replaces or appends to."""
+    w = t.get("write")
+    return w is None or (_writes(w["patch"]["properties"].get(prop)) and prop not in w.get("collections", {}))
+
+
+def creatable(spec: Spec, t: dict[str, Any]) -> bool:
+    """Whether a type gets a create: the probe has writes for it, or a subtype it's the root of does."""
+    if t["kind"] != "entity":
+        return False
+    if t.get("write"):
+        return True
+    return any(d.get("write") for d in spec.derived(t))
+
+
+def _copied_names(spec: Spec, t: dict[str, Any], create: bool) -> list[str]:
+    """The properties ``builder(read)`` copies: structural ones, of the type and its base, a write takes."""
+    out: list[str] = []
+    for level in spec.chain(t):
+        for p in level["properties"]:
+            if p["type"] != "Edm.Stream" and p["name"] not in out and (creates(t, p["name"], spec) if create else patches(t, p["name"])):
+                out.append(p["name"])
+    return out
+
+
+def _builder_method(spec: Spec, t: dict[str, Any], name: str, create: bool | None) -> list[str]:
+    """``builder(read=None)``: an empty builder, or, given an entity read from TM1, one holding what it
+    holds that the write takes, as the Java model's ``builder(read)``. A hierarchy's root
+    (``create`` None) has only the empty one, as in Java."""
+    out = ["", "    @classmethod"]
+    if create is None:
+        out += [f"    def builder(cls) -> {name}.Builder:", "        return cls.Builder(cls)"]
+        return out
+    copied = tuple(_copied_names(spec, t, create))
+    what = "a POST applies, to recreate it" if create else "a PATCH applies, leaving out collections a PATCH replaces or appends to"
+    declared = None
+    if any(level["open"] for level in spec.chain(t)):
+        declared = tuple(p["name"] for level in spec.chain(t) for p in level["properties"] + level["navigationProperties"])
+    out += [
+        f"    def builder(cls, read: Any = None) -> {name}.Builder:",
+        f'        """A builder with nothing set; or, given an entity read from TM1, one holding what it holds that {what}.',
+        '        Navigation properties aren\'t copied, nor nulls."""',
+        f"        return cls.Builder(cls)._copy(read, {copied!r}, {declared!r})  # type: ignore[no-any-return]",
+    ]
+    return out
+
+
 def emit_patches(spec: Spec) -> str:
     """Patch builders, as the Java model's ``CubePatch.builder().name("Sales").build()``: only
     what's set is sent, explicit ``None`` included, with ``bind_…`` for ``@odata.bind``."""
@@ -282,10 +347,7 @@ def emit_patches(spec: Spec) -> str:
         out.append(f'    """A write of ``{t["name"]}``: only the properties set are sent."""')
         out.append("")
         out.append(f"    odata_type = {('#' + t['qualifiedName'])!r}" if t.get("baseType") else "    odata_type = None")
-        out.append("")
-        out.append("    @classmethod")
-        out.append(f"    def builder(cls) -> {name}.Builder:")
-        out.append("        return cls.Builder(cls)")
+        out += _builder_method(spec, t, name, None if spec.derived(t) else False)
         out.append("")
         builder_base = f"{base}.Builder"
         out.append(f"    class Builder({builder_base}):")
@@ -319,6 +381,55 @@ def emit_patches(spec: Spec) -> str:
             methods += 1
         if not methods:
             out.append("        pass")
+    for t in ordered:
+        if not creatable(spec, t):
+            continue
+        name = t["name"] + "Create"
+        names_all.append(name)
+        base = spec.type_by_name[t["baseType"]]["name"] + "Create" if t.get("baseType") else "Tm1Patch"
+        has = "as the probe found" if t.get("write") else "all, as the probe has no writes for this type"
+        out += ["", "", f"class {name}({base}):"]
+        out.append(f'    """A create of ``{t["name"]}``, for a POST: only the properties set are sent, and only those TM1')
+        out.append(f"    applies in a create are offered ({has}). ``build()`` checks what a create needs. As the Java")
+        out.append(f'    model\'s ``{name}``."""')
+        out.append("")
+        out.append(f"    odata_type = {('#' + t['qualifiedName'])!r}" if t.get("baseType") else "    odata_type = None")
+        out += _builder_method(spec, t, name, None if spec.derived(t) else True)
+        out.append("")
+        out.append(f"    class Builder({base}.Builder):")
+        out.append(f'        """Builds a ``{name}``; each setter replaces what an earlier call set."""')
+        taken = {"build", "property"}
+        for p in t["properties"]:
+            if p["type"] == "Edm.Stream" or not creates(t, p["name"], spec):
+                continue
+            m = names.unique(
+                names.field_name(p["name"]).rstrip("_") if names.field_name(p["name"]).rstrip("_") not in taken else names.field_name(p["name"]), taken
+            )
+            out.append("")
+            out.append(f"        def {m}(self, value: Any) -> Self:")
+            out.append(f"            return self._set({p['name']!r}, value)  # type: ignore[return-value]")
+        for n in t["navigationProperties"]:
+            m = names.unique(names.field_name(n["name"]).rstrip("_"), taken)
+            out.append("")
+            out.append(f"        def {m}(self, value: Any) -> Self:")
+            out.append(f"            return self._set({n['name']!r}, value)  # type: ignore[return-value]")
+            if spec.is_entity(n["type"]):
+                bind = names.unique("bind_" + names.field_name(n["name"]).rstrip("_"), taken)
+                out.append("")
+                if n["collection"]:
+                    out.append(f"        def {bind}(self, *targets: ODataPath | str) -> Self:")
+                    out.append(f"            return self._bind_all({n['name']!r}, targets)  # type: ignore[return-value]")
+                else:
+                    out.append(f"        def {bind}(self, target: ODataPath | str) -> Self:")
+                    out.append(f"            return self._bind({n['name']!r}, target)  # type: ignore[return-value]")
+        required = (t.get("write") or {}).get("create", {}).get("required", [])
+        if required:
+            out.append("")
+            out.append("        def build(self) -> Any:")
+            out.append("            for needed in " + repr(tuple(r.replace("@odata.bind", "") for r in required)) + ":")
+            out.append('                if needed not in self._values and needed + "@odata.bind" not in self._values:')
+            out.append(f'                    raise ValueError(f"A {t["name"]} create needs {{needed}}: TM1 refuses one without it")')
+            out.append("            return super().build()")
     out.append("")
     out.append("__all__ = [" + ", ".join(repr(n) for n in names_all) + "]")
     out.append("")

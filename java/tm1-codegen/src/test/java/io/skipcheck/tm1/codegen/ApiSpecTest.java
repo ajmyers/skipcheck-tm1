@@ -70,7 +70,7 @@ class ApiSpecTest {
 	private static String exportWithProbe() throws IOException {
 		Tm1Codegen.Model model = Tm1Codegen.Model.of(SNAPSHOT);
 		return new ApiSpecExporter(model.metadata(), model.overlay(), SNAPSHOT.getFileName().toString(),
-				model.undeclared(), model.probe())
+				model.undeclared(), model.writes(), model.probe())
 			.export();
 	}
 

@@ -3,6 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
+using Skipcheck.Tm1.Client.Json;
 using Skipcheck.Tm1.Client.OData;
 
 namespace Skipcheck.Tm1.Client.Model;
@@ -84,6 +86,35 @@ public abstract class Tm1Patch : IEquatable<Tm1Patch>
             _values[name + ODataJson.BindSuffix] = targets.Select(t => t.ToString()).ToList();
             return (TSelf)this;
         }
+
+        /// <summary>Sets what <paramref name="read"/>, an entity read from TM1, holds of
+        /// <paramref name="names"/>, nulls left out; and, for an open type (<paramref name="declared"/>
+        /// given), its undeclared properties. The generated <c>Builder(read)</c> calls it.</summary>
+        internal TSelf Copy(object read, IEnumerable<string> names, IReadOnlyCollection<string>? declared)
+        {
+            var json = JsonSerializer.SerializeToElement(read, read.GetType(), Tm1Json.Options);
+            foreach (var name in names)
+            {
+                if (json.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null)
+                {
+                    _values[name] = value.Clone();
+                }
+            }
+            if (declared is not null)
+            {
+                foreach (var p in json.EnumerateObject())
+                {
+                    if (!declared.Contains(p.Name) && !p.Name.StartsWith('@') && p.Value.ValueKind != JsonValueKind.Null)
+                    {
+                        _values[p.Name] = p.Value.Clone();
+                    }
+                }
+            }
+            return (TSelf)this;
+        }
+
+        /// <summary>Whether a property, or a binding of it, has been set.</summary>
+        protected bool Has(string name) => _values.ContainsKey(name) || _values.ContainsKey(name + ODataJson.BindSuffix);
 
         /// <summary>The patch, with what's been set so far.</summary>
         public TPatch Build() => _build(_values);

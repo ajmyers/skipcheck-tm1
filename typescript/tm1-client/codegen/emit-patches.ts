@@ -32,27 +32,93 @@ export function emitPatches(spec: Spec): string {
     out += emitPatch(spec, t);
   };
   for (const t of spec.types) visit(t);
+  // Creates, for the types the probe has writes for, and the roots their creates extend
+  const created = new Set<string>();
+  const visitCreate = (t: SpecType): void => {
+    if (created.has(t.name) || !creatable(spec, t)) return;
+    const base = spec.base(t);
+    if (base) visitCreate(base);
+    created.add(t.name);
+    out += emitPatch(spec, t, true);
+  };
+  for (const t of spec.types) visitCreate(t);
   return out;
 }
 
-function emitPatch(spec: Spec, t: SpecType): string {
+const WRITING = new Set(["applied", "transformed", "untested"]);
+
+function writes(outcome: string | undefined): boolean {
+  return outcome === undefined || WRITING.has(outcome);
+}
+
+/** Whether a POST of `t` takes a property, by the probe's writes (yes, for a type it has none for). */
+export function creates(t: SpecType, prop: string, spec?: Spec): boolean {
+  // The root of a hierarchy without writes of its own offers what every probed subtype takes, so
+  // each subtype's create offers at least what its root's does
+  if (!t.write && spec)
+    return spec
+      .derived(t)
+      .filter((d) => !!d.write)
+      .every((d) => creates(d, prop));
+  return writes(t.write?.create.properties[prop]);
+}
+
+/** Whether a PATCH of `t` applies a property, leaving out collections it replaces or appends to. */
+export function patches(t: SpecType, prop: string): boolean {
+  return writes(t.write?.patch.properties[prop]) && !(t.write?.collections && prop in t.write.collections);
+}
+
+/** Whether a type gets a create: the probe has writes for it, or a subtype it's the root of does. */
+export function creatable(spec: Spec, t: SpecType): boolean {
+  return t.kind === "entity" && (!!t.write || spec.derived(t).some((d) => !!d.write));
+}
+
+function emitPatch(spec: Spec, t: SpecType, create = false): string {
   const name = t.name;
-  const patch = name + "Patch";
+  const suffix = create ? "Create" : "Patch";
+  const patch = name + suffix;
   const builder = patch + "Builder";
   const base = spec.base(t);
   const typeId = base ? JSON.stringify("#" + t.qualifiedName) : "null";
-  let out = `\n/** A write of {@link model.${name}}: only the properties set are sent. */\n`;
-  out += `export class ${patch} extends ${base ? base.name + "Patch" : "Tm1Patch"} {\n`;
-  out += `  /** A builder with nothing set${base ? " but `@odata.type`" : ""}. */\n`;
-  out += `  static ${base ? "override " : ""}builder(): ${builder} {\n    return new ${builder}();\n  }\n}\n\n`;
+  const ticks = "`@odata.type`";
+  let out = create
+    ? `\n/** A create of {@link model.${name}}, for a POST: only the properties set are sent, and only those TM1 applies in a create are offered${t.write ? ", as the probe found" : ""}. Its build() checks what a create needs. */\n`
+    : `\n/** A write of {@link model.${name}}: only the properties set are sent. */\n`;
+  out += `export class ${patch} extends ${base ? base.name + suffix : "Tm1Patch"} {\n`;
+  if (spec.derived(t).length) {
+    out += `  /** A builder with nothing set${base ? " but " + ticks : ""}. */\n`;
+    out += `  static ${base ? "override " : ""}builder(): ${builder} {\n    return new ${builder}();\n  }\n}\n\n`;
+  } else {
+    const copied: string[] = [];
+    for (const level of spec.chain(t))
+      for (const p of level.properties ?? [])
+        if (p.type !== "Edm.Stream" && !copied.includes(p.name) && (create ? creates(t, p.name, spec) : patches(t, p.name))) copied.push(p.name);
+    const declared = spec.chain(t).some((l) => l.open)
+      ? JSON.stringify(spec.chain(t).flatMap((l) => [...(l.properties ?? []), ...(l.navigationProperties ?? [])].map((p) => p.name)))
+      : "null";
+    const what = create ? "a POST applies, to recreate it" : "a PATCH applies, leaving out collections a PATCH replaces or appends to";
+    out += `  /** A builder with nothing set${base ? " but " + ticks : ""}; or, given an entity read from TM1, one holding what it holds that ${what}. Navigation properties aren't copied, nor nulls. */\n`;
+    out += `  static ${base ? "override " : ""}builder(read?: model.${name}): ${builder} {\n`;
+    out += `    const b = new ${builder}();\n    return read ? b.copy(read, ${JSON.stringify(copied)}, ${declared}) : b;\n  }\n}\n\n`;
+  }
   out += `/** Builds a {@link ${patch}}; each setter replaces what an earlier call set. */\n`;
   out += `export class ${builder} extends Tm1PatchBuilder<${patch}> {\n`;
   out += `  constructor() {\n    super((values) => new ${patch}(values), ${typeId});\n  }\n`;
   const taken = new Set(["build", "property", "set", "bind", "bindAll", "constructor"]);
+  const required = create ? (t.write?.create.required ?? []) : [];
+  if (required.length) {
+    out += `\n  /** The create, with what's been set so far. @throws Error if it lacks what a create needs. */\n`;
+    out += `  override build(): ${patch} {\n`;
+    for (const r of required) {
+      const bare = r.replace("@odata.bind", "");
+      out += `    if (!this.has(${JSON.stringify(bare)})) throw new Error(${JSON.stringify(`A ${name} create needs ${bare}: TM1 refuses one without it`)});\n`;
+    }
+    out += "    return super.build();\n  }\n";
+  }
   for (const level of spec.chain(t)) {
     for (const p of level.properties ?? []) {
       const type = p.departure ? "unknown" : patchType(spec, p.type, !!p.collection);
-      if (type === undefined) continue;
+      if (type === undefined || (create && !creates(t, p.name, spec))) continue;
       const method = Names.unique(Names.method(p.name), taken);
       out += `\n  ${method}(value: ${type}): this {\n    return this.set(${JSON.stringify(p.name)}, value);\n  }\n`;
     }

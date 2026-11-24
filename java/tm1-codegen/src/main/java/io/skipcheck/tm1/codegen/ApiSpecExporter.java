@@ -67,6 +67,8 @@ public final class ApiSpecExporter {
 
 	private final Undeclared undeclared;
 
+	private final Writes writes;
+
 	private final @Nullable String probe;
 
 	private final String snapshot;
@@ -93,6 +95,24 @@ public final class ApiSpecExporter {
 	 */
 	public ApiSpecExporter(CsdlDocument metadata, Overlay overlay, String snapshot, Undeclared undeclared,
 			@Nullable String probe) {
+		this(metadata, overlay, snapshot, undeclared, Writes.NONE, probe);
+	}
+
+	/**
+	 * An exporter, with what a probe found: the undeclared properties, and what a POST
+	 * and a PATCH do with each property.
+	 * @param metadata the {@code $metadata} document, with the undeclared properties
+	 * added
+	 * @param overlay what TM1 does differently from it, with the undeclared properties'
+	 * departures
+	 * @param snapshot the snapshot's file name, recorded in the spec
+	 * @param undeclared the undeclared properties, marked in the spec
+	 * @param writes what writes do, exported as each type's write section
+	 * @param probe the probe file's name, recorded in the spec, or null if there's none
+	 */
+	public ApiSpecExporter(CsdlDocument metadata, Overlay overlay, String snapshot, Undeclared undeclared,
+			Writes writes, @Nullable String probe) {
+		this.writes = Objects.requireNonNull(writes, "writes");
 		this.metadata = Objects.requireNonNull(metadata, "metadata");
 		this.overlay = Objects.requireNonNull(overlay, "overlay");
 		this.snapshot = Objects.requireNonNull(snapshot, "snapshot");
@@ -211,6 +231,24 @@ public final class ApiSpecExporter {
 					property.putObject("lenientDate").put("note", lenient);
 					lenientUsed.add(key);
 				}
+			}
+			Writes.TypeWrites w = writes.get(t.name());
+			if (w != null) {
+				ObjectNode write = node.putObject("write");
+				write.putArray("observedIn").add(writes.schemaVersion());
+				ObjectNode create = write.putObject("create");
+				w.required().forEach(create.putArray("required")::add);
+				ObjectNode createProperties = create.putObject("properties");
+				w.create().forEach(createProperties::put);
+				ObjectNode patch = write.putObject("patch");
+				ObjectNode patchProperties = patch.putObject("properties");
+				w.patch().forEach(patchProperties::put);
+				w.nullRefused().forEach(patch.putArray("nullRefused")::add);
+				if (w.rename() != null) {
+					patch.put("rename", w.rename());
+				}
+				ObjectNode collections = write.putObject("collections");
+				w.collections().forEach(collections::put);
 			}
 			ArrayNode navigation = node.putArray("navigationProperties");
 			for (CsdlNavigationProperty n : t.navigationProperties()) {

@@ -39,7 +39,7 @@ public final class Tm1Codegen {
 			Path snapshot = Path.of(args[1]);
 			Model model = Model.of(snapshot);
 			String spec = new ApiSpecExporter(model.metadata(), model.overlay(), snapshot.getFileName().toString(),
-					model.undeclared(), model.probe())
+					model.undeclared(), model.writes(), model.probe())
 				.export();
 			Path out = Path.of(args[2]);
 			if (out.getParent() != null) {
@@ -53,15 +53,16 @@ public final class Tm1Codegen {
 					"Usage: Tm1Codegen <snapshot.xml> <output directory> | Tm1Codegen spec <snapshot.xml> <spec.json>");
 		}
 		Model model = Model.of(Path.of(args[0]));
-		new ModelGenerator(model.metadata(), model.overlay(), model.undeclared()).writeTo(Path.of(args[1]));
+		new ModelGenerator(model.metadata(), model.overlay(), model.undeclared(), model.writes())
+			.writeTo(Path.of(args[1]));
 	}
 
 	/**
 	 * What the model is generated from: the snapshot, with the properties the probe file
-	 * beside it ({@code tm1-probe-<schema>.json}) found undeclared, and the bundled
-	 * overlay.
+	 * beside it ({@code tm1-probe-<schema>.json}) found undeclared, what it found writes
+	 * do, and the bundled overlay.
 	 */
-	record Model(CsdlDocument metadata, Overlay overlay, Undeclared undeclared, @Nullable String probe) {
+	record Model(CsdlDocument metadata, Overlay overlay, Undeclared undeclared, Writes writes, @Nullable String probe) {
 
 		static Model of(Path snapshot) throws IOException {
 			CsdlDocument metadata = read(snapshot);
@@ -70,10 +71,11 @@ public final class Tm1Codegen {
 			Path dir = snapshot.toAbsolutePath().getParent();
 			Path probe = dir == null ? null : dir.resolve("tm1-probe-" + version + ".json");
 			if (probe == null || !Files.exists(probe)) {
-				return new Model(metadata, overlay, Undeclared.NONE, null);
+				return new Model(metadata, overlay, Undeclared.NONE, Writes.NONE, null);
 			}
-			Undeclared undeclared = Undeclared.read(Files.readString(probe, StandardCharsets.UTF_8), overlay, metadata);
-			return new Model(undeclared.applyTo(metadata), undeclared.applyTo(overlay), undeclared,
+			String json = Files.readString(probe, StandardCharsets.UTF_8);
+			Undeclared undeclared = Undeclared.read(json, overlay, metadata);
+			return new Model(undeclared.applyTo(metadata), undeclared.applyTo(overlay), undeclared, Writes.read(json),
 					probe.getFileName().toString());
 		}
 
