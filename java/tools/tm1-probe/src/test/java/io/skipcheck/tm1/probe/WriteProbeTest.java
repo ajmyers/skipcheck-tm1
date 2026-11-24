@@ -553,6 +553,113 @@ class WriteProbeTest {
 		assertThat(outcome(thing.path("patch").path("Items/Name"))).isEqualTo("applied");
 	}
 
+	private static final String POINT_METADATA = """
+			<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+			 <edmx:DataServices>
+			  <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="ibm.tm1.api.v1" Alias="tm1">
+			   <EntityType Name="Point"><Key><PropertyRef Name="ID"/></Key>
+			    <Property Name="ID" Type="Edm.Int32" Nullable="false"/>
+			    <Property Name="Label" Type="Edm.String"/>
+			   </EntityType>
+			   <EntityContainer Name="API"/>
+			  </Schema>
+			 </edmx:DataServices>
+			</edmx:Edmx>""";
+
+	/**
+	 * Points that live in a session a POST to Sessions starts, keyed by an ID the caller
+	 * picks; a Label of "bad" is refused; Close ends the session on its second call.
+	 */
+	static final class Points implements FakeTm1.Handler {
+
+		final Map<Integer, String> points = new LinkedHashMap<>();
+
+		int closes;
+
+		boolean open;
+
+		@Override
+		public FakeTm1.Reply handle(String method, String target, @Nullable JsonNode body) {
+			String path = target.replaceAll("\\?.*", "");
+			if (method.equals("POST") && path.equals("Sessions")) {
+				open = true;
+				closes = 0;
+				return FakeTm1.Reply.ok("{\"ID\": \"s1\"}");
+			}
+			if (method.equals("POST") && path.equals("Sessions('s1')/tm1.Close")) {
+				closes++;
+				open = closes < 2;
+				return FakeTm1.Reply.ok("{\"Status\": \"" + (open ? "Running" : "Complete") + "\"}");
+			}
+			if (method.equals("POST") && path.equals("Sessions('s1')/Points") && body != null) {
+				if (body.path("Label").asString("").equals("bad")) {
+					return new FakeTm1.Reply(400,
+							ProbeClient.JSON.readTree("{\"error\": {\"code\": \"278\", \"message\": \"Bad label\"}}"));
+				}
+				points.put(body.path("ID").asInt(), body.path("Label").asString(""));
+				return FakeTm1.Reply.ok("{\"ID\": " + body.path("ID").asInt() + "}");
+			}
+			Matcher m = Pattern.compile("Sessions\\('s1'\\)/Points\\((\\d+)\\)").matcher(path);
+			if (!m.matches() || !points.containsKey(Integer.valueOf(m.group(1)))) {
+				return new FakeTm1.Reply(404, null);
+			}
+			int id = Integer.parseInt(m.group(1));
+			return switch (method) {
+				case "GET" -> FakeTm1.Reply.ok("{\"ID\": " + id + ", \"Label\": \"" + points.get(id) + "\"}");
+				case "DELETE" -> {
+					points.remove(id);
+					yield new FakeTm1.Reply(204, null);
+				}
+				case "PATCH" -> {
+					if (body != null && body.has("Label")) {
+						points.put(id, body.path("Label").asString());
+					}
+					yield new FakeTm1.Reply(204, null);
+				}
+				default -> new FakeTm1.Reply(405, null);
+			};
+		}
+
+	}
+
+	@Test
+	void probesInWhatItPreparesByKeysItPicksAndFinishesAfter() throws Exception {
+		String cases = """
+				{"cases": [{"id": "Point", "type": "Point", "collection": "Sessions('{context}')/Points",
+				  "source": "Sessions('{context}')/Points(0)", "named": false, "numbered": "ID", "base": {"Label": "a"},
+				  "prepare": [{"method": "POST", "path": "Sessions", "body": {}, "capture": {"field": "ID", "as": "context"}},
+				   {"method": "POST", "path": "Sessions('{context}')/Points", "body": {"ID": 0, "Label": "source"}}],
+				  "finish": [{"method": "DELETE", "path": "Sessions('{context}')/Points(0)"},
+				   {"method": "POST", "path": "Sessions('{context}')/tm1.Close", "body": {}, "until": {"field": "Status", "is": "Complete"}}]},
+				 {"id": "Refused", "type": "Point", "collection": "Sessions('{context}')/Points",
+				  "source": "Sessions('{context}')/Points(0)", "named": false, "numbered": "ID", "base": {"Label": "a"},
+				  "values": {"Label": "bad"},
+				  "prepare": [{"method": "POST", "path": "Sessions", "body": {}, "capture": {"field": "ID", "as": "context"}},
+				   {"method": "POST", "path": "Sessions('{context}')/Points", "body": {"ID": 0, "Label": "source"}}],
+				  "finish": [{"method": "DELETE", "path": "Sessions('{context}')/Points(0)"},
+				   {"method": "POST", "path": "Sessions('{context}')/tm1.Close", "body": {}, "until": {"field": "Status", "is": "Complete"}}]}]}""";
+		Points points = new Points();
+		List<String> log = new ArrayList<>();
+		JsonNode point;
+		try (FakeTm1 tm1 = new FakeTm1(points)) {
+			ProbeClient client = new ProbeClient(tm1.url(), "Basic x");
+			point = new WriteProbe(client, CsdlParser.parse(POINT_METADATA), Map.of(), ProbeClient.JSON.readTree(cases),
+					"P", log::add)
+				.run()
+				.writes()
+				.get("Point");
+		}
+		assertThat(outcome(point.path("minimal"))).isEqualTo("accepted");
+		assertThat(outcome(point.path("post").path("Label"))).isEqualTo("applied");
+		assertThat(outcome(point.path("patch").path("Label"))).isEqualTo("applied");
+		assertThat(points.points).as("every point made, the source too, removed").isEmpty();
+		assertThat(points.closes).as("each session closed until it says Complete").isEqualTo(2);
+		assertThat(points.open).isFalse();
+		// A refused write is logged with what was sent and TM1's message
+		assertThat(log).anySatisfy(l -> assertThat(l).startsWith("refused: POST Sessions('s1')/Points Label: sent ")
+			.endsWith("Bad label"));
+	}
+
 	@Test
 	void readsTheKeyABindingPathNamesLast() {
 		assertThat(WriteProbe.keyOf("Dimensions('D')/Hierarchies('D')/Elements('A')")).isEqualTo("A");

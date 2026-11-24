@@ -100,6 +100,9 @@ public final class ProbeFixtures {
 							               {"Name": "vMeasure", "Type": "String", "Position": 2, "StartByte": 0, "EndByte": 0},
 							               {"Name": "Value", "Type": "Numeric", "Position": 3, "StartByte": 0, "EndByte": 0}]}"""),
 			// A process that fails, run once, for an error log to bind to
+			// A process to debug, for breakpoints
+			step("POST", "Processes", """
+					{"Name": "%1$sDebug", "PrologProcedure": "x = 1;\\r\\ny = 2;\\r\\nz = 3;\\r\\n"}"""),
 			step("POST", "Processes", """
 					{"Name": "%1$sFail", "PrologProcedure": "ProcessError;\\r\\n"}"""),
 			step("POST", "Processes('%1$sFail')/tm1.ExecuteWithReturn", "{}"),
@@ -110,6 +113,10 @@ public final class ProbeFixtures {
 							{"Name": "%1$sChore", "StartTime": "2026-01-01T00:00:00Z", "DSTSensitive": false, "Active": false,
 							 "ExecutionMode": "SingleCommit", "Frequency": "P1DT00H00M00S",
 							 "Tasks": [{"Process@odata.bind": "Processes('%1$sAscii')", "Parameters": [{"Name": "pValue", "Value": "1"}]}]}"""),
+			// Another chore, for a reference to be bound to instead
+			step("POST", "Chores", """
+					{"Name": "%1$sChore2", "StartTime": "2026-01-01T00:00:00Z", "DSTSensitive": false, "Active": false,
+					 "ExecutionMode": "SingleCommit", "Frequency": "P1DT00H00M00S", "Tasks": []}"""),
 			step("POST", "Groups", """
 					{"Name": "%1$sGroup"}"""), step("POST", "Users", """
 					{"Name": "%1$sUser", "Password": "probe", "Groups@odata.bind": ["Groups('%1$sGroup')"]}"""),
@@ -123,6 +130,27 @@ public final class ProbeFixtures {
 			// TM1 keeps links out of the root folder
 			step("POST", "Contents('Applications')/Contents('%1$sFolder')/Contents", """
 					{"@odata.type": "#ibm.tm1.api.v1.Link", "Name": "%1$sLink", "URL": "https://example.com/probe"}"""),
+			// One of each reference, and a document, for their cases to read
+			step("POST", "Contents('Applications')/Contents('%1$sFolder')/Contents",
+					"""
+							{"@odata.type": "#ibm.tm1.api.v1.CubeReference", "Name": "%1$sCubeRef", "Cube@odata.bind": "Cubes('%1$sCube')"}"""),
+			step("POST", "Contents('Applications')/Contents('%1$sFolder')/Contents",
+					"""
+							{"@odata.type": "#ibm.tm1.api.v1.DimensionReference", "Name": "%1$sDimensionRef", "Dimension@odata.bind": "Dimensions('%1$sDim')"}"""),
+			step("POST", "Contents('Applications')/Contents('%1$sFolder')/Contents",
+					"""
+							{"@odata.type": "#ibm.tm1.api.v1.ProcessReference", "Name": "%1$sProcessRef", "Process@odata.bind": "Processes('%1$sAscii')"}"""),
+			step("POST", "Contents('Applications')/Contents('%1$sFolder')/Contents",
+					"""
+							{"@odata.type": "#ibm.tm1.api.v1.ChoreReference", "Name": "%1$sChoreRef", "Chore@odata.bind": "Chores('%1$sChore')"}"""),
+			step("POST", "Contents('Applications')/Contents('%1$sFolder')/Contents",
+					"""
+							{"@odata.type": "#ibm.tm1.api.v1.SubsetReference", "Name": "%1$sSubsetRef", "Subset@odata.bind": "Dimensions('%1$sDim')/Hierarchies('%1$sDim')/Subsets('%1$sStatic')"}"""),
+			step("POST", "Contents('Applications')/Contents('%1$sFolder')/Contents",
+					"""
+							{"@odata.type": "#ibm.tm1.api.v1.ViewReference", "Name": "%1$sViewRef", "View@odata.bind": "Cubes('%1$sCube')/Views('%1$sNative')"}"""),
+			step("POST", "Contents('Applications')/Contents('%1$sFolder')/Contents", """
+					{"@odata.type": "#ibm.tm1.api.v1.Document", "Name": "%1$sDoc"}"""),
 			step("POST", "Cubes('%1$sCube')/LocalizedAttributes", """
 					{"LocaleID": "fr", "Attributes": {"%1$sCubeAttribute": "Le cube"}}"""), step("POST", "Annotations",
 					"""
@@ -133,11 +161,22 @@ public final class ProbeFixtures {
 							  "Dimensions('%1$sMeasures')/Hierarchies('%1$sMeasures')/Members('%1$sValue')"],
 							 "objectName": "%1$sCube"}"""));
 
-	private static final List<String> DELETES = List.of("Chores('%1$sChore')", "Processes('%1$sAscii')",
-			"Processes('%1$sView')", "Processes('%1$sFail')", "Cubes('%1$sCube')", "Cubes('%1$sTitled')",
-			"Dimensions('%1$sDim')", "Dimensions('%1$sMeasures')", "Dimensions('%1$sOther')", "Users('%1$sUser')",
-			"Groups('%1$sGroup')", "CubeAttributes('%1$sCubeAttribute')", "ProcessAttributes('%1$sProcessAttribute')",
-			"Sandboxes('%1$sSandbox')", // TM1 gives a link the ID of its name and .extr
+	private static final List<String> DELETES = List.of("Chores('%1$sChore')", "Chores('%1$sChore2')",
+			"Processes('%1$sAscii')", "Processes('%1$sView')", "Processes('%1$sFail')", "Processes('%1$sDebug')",
+			"Cubes('%1$sCube')", "Cubes('%1$sTitled')", "Dimensions('%1$sDim')", "Dimensions('%1$sMeasures')",
+			"Dimensions('%1$sOther')", "Users('%1$sUser')", "Groups('%1$sGroup')",
+			"CubeAttributes('%1$sCubeAttribute')", "ProcessAttributes('%1$sProcessAttribute')",
+			"Sandboxes('%1$sSandbox')", // TM1
+										// gives
+										// a
+										// link
+										// the
+										// ID
+										// of
+										// its
+										// name
+										// and
+										// .extr
 			"Contents('Applications')/Contents('%1$sFolder')/Contents('%1$sLink.extr')",
 			"Contents('Applications')/Contents('%1$sFolder')");
 

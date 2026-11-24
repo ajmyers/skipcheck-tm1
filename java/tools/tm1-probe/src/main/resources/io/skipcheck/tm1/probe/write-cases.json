@@ -152,6 +152,27 @@
 			"base": {}
 		},
 		{
+			"id": "ChoreReference",
+			"type": "ChoreReference",
+			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
+			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}ChoreRef'",
+			"assigned": "ID",
+			"generate": false,
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.ChoreReference",
+				"Chore@odata.bind": "Chores('{p}Chore')"
+			},
+			"targets": {
+				"$comment": "Not what the base binds, for a binding to change",
+				"Chore": "Chores('{p}Chore2')"
+			},
+			"values": {
+				"Attributes": {
+					"Caption": "A probe reference"
+				}
+			}
+		},
+		{
 			"id": "ChoreTask",
 			"type": "ChoreTask",
 			"collection": "Chores('{p}Chore')/Tasks",
@@ -201,11 +222,71 @@
 			}
 		},
 		{
+			"id": "CubeReference",
+			"type": "CubeReference",
+			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
+			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}CubeRef'",
+			"assigned": "ID",
+			"generate": false,
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.CubeReference",
+				"Cube@odata.bind": "Cubes('{p}Cube')"
+			},
+			"targets": {
+				"$comment": "Not what the base binds, for a binding to change",
+				"Cube": "Cubes('{p}Titled')"
+			},
+			"values": {
+				"Attributes": {
+					"Caption": "A probe reference"
+				}
+			}
+		},
+		{
 			"id": "Dimension",
 			"type": "Dimension",
 			"collection": "Dimensions",
 			"source": "Dimensions('{p}Dim')",
 			"base": {}
+		},
+		{
+			"id": "DimensionReference",
+			"type": "DimensionReference",
+			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
+			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}DimensionRef'",
+			"assigned": "ID",
+			"generate": false,
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.DimensionReference",
+				"Dimension@odata.bind": "Dimensions('{p}Dim')"
+			},
+			"targets": {
+				"$comment": "Not what the base binds, for a binding to change",
+				"Dimension": "Dimensions('{p}Other')"
+			},
+			"values": {
+				"Attributes": {
+					"Caption": "A probe reference"
+				}
+			}
+		},
+		{
+			"id": "Document",
+			"type": "Document",
+			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
+			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}Doc'",
+			"assigned": "ID",
+			"generate": false,
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.Document"
+			},
+			"selectType": "Entry",
+			"$comment": "TM1 keeps a posted document as a DocumentReference (its ID ending .blob), so it's read by what every entry has.",
+			"values": {
+				"Attributes": {
+					"Caption": "A probe document"
+				}
+			}
 		},
 		{
 			"id": "Edge",
@@ -334,6 +415,16 @@
 				"pt",
 				"ru",
 				"zh"
+			],
+			"generate": false
+		},
+		{
+			"id": "Logger",
+			"type": "Logger",
+			"singleton": true,
+			"source": "Loggers('TM1.Server')",
+			"skip": [
+				"Name"
 			],
 			"generate": false
 		},
@@ -483,6 +574,204 @@
 			}
 		},
 		{
+			"id": "ProcessDebugContextDataBreakpoint",
+			"$comment": "In a debug session of its own, started for the case and finished after: the caller picks a breakpoint's ID (TM1 stores one without as -1, which can't be removed). The breakpoint the case reads is somewhere else than the base's, as TM1 refuses two at one place.",
+			"type": "ProcessDebugContextDataBreakpoint",
+			"collection": "ProcessDebugContexts('{context}')/Breakpoints",
+			"source": "ProcessDebugContexts('{context}')/Breakpoints(0)",
+			"named": false,
+			"numbered": "ID",
+			"generate": false,
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.ProcessDebugContextDataBreakpoint",
+				"Enabled": true,
+				"VariableName": "y"
+			},
+			"prepare": [
+				{
+					"method": "POST",
+					"path": "Processes('{p}Debug')/tm1.Debug",
+					"body": {},
+					"capture": {
+						"field": "ID",
+						"as": "context"
+					}
+				},
+				{
+					"method": "POST",
+					"path": "ProcessDebugContexts('{context}')/Breakpoints",
+					"body": {
+						"@odata.type": "#ibm.tm1.api.v1.ProcessDebugContextDataBreakpoint",
+						"Enabled": true,
+						"VariableName": "z",
+						"ID": 0
+					}
+				}
+			],
+			"finish": [
+				{
+					"method": "DELETE",
+					"path": "ProcessDebugContexts('{context}')/Breakpoints(0)"
+				},
+				{
+					"method": "POST",
+					"path": "ProcessDebugContexts('{context}')/tm1.Continue",
+					"body": {},
+					"until": {
+						"field": "Status",
+						"is": "Complete"
+					}
+				}
+			],
+			"values": {
+				"Expression": "x = 1",
+				"VariableName": "x"
+			},
+			"freeSource": true
+		},
+		{
+			"id": "ProcessDebugContextLineBreakpoint",
+			"$comment": "In a debug session of its own, started for the case and finished after: the caller picks a breakpoint's ID (TM1 stores one without as -1, which can't be removed). The breakpoint the case reads is somewhere else than the base's, as TM1 refuses two at one place.",
+			"type": "ProcessDebugContextLineBreakpoint",
+			"collection": "ProcessDebugContexts('{context}')/Breakpoints",
+			"source": "ProcessDebugContexts('{context}')/Breakpoints(0)",
+			"named": false,
+			"numbered": "ID",
+			"generate": false,
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint",
+				"Enabled": true,
+				"ProcessName": "{p}Debug",
+				"Procedure": "Prolog",
+				"LineNumber": 2
+			},
+			"prepare": [
+				{
+					"method": "POST",
+					"path": "Processes('{p}Debug')/tm1.Debug",
+					"body": {},
+					"capture": {
+						"field": "ID",
+						"as": "context"
+					}
+				},
+				{
+					"method": "POST",
+					"path": "ProcessDebugContexts('{context}')/Breakpoints",
+					"body": {
+						"@odata.type": "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint",
+						"Enabled": true,
+						"ProcessName": "{p}Debug",
+						"Procedure": "Prolog",
+						"LineNumber": 1,
+						"ID": 0
+					}
+				}
+			],
+			"finish": [
+				{
+					"method": "DELETE",
+					"path": "ProcessDebugContexts('{context}')/Breakpoints(0)"
+				},
+				{
+					"method": "POST",
+					"path": "ProcessDebugContexts('{context}')/tm1.Continue",
+					"body": {},
+					"until": {
+						"field": "Status",
+						"is": "Complete"
+					}
+				}
+			],
+			"values": {
+				"Expression": "x = 1",
+				"LineNumber": 3
+			},
+			"freeSource": true
+		},
+		{
+			"id": "ProcessDebugContextLockBreakpoint",
+			"$comment": "In a debug session of its own, started for the case and finished after: the caller picks a breakpoint's ID (TM1 stores one without as -1, which can't be removed). The breakpoint the case reads is somewhere else than the base's, as TM1 refuses two at one place.",
+			"type": "ProcessDebugContextLockBreakpoint",
+			"collection": "ProcessDebugContexts('{context}')/Breakpoints",
+			"source": "ProcessDebugContexts('{context}')/Breakpoints(0)",
+			"named": false,
+			"numbered": "ID",
+			"generate": false,
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.ProcessDebugContextLockBreakpoint",
+				"Enabled": true,
+				"ObjectName": "{p}Cube",
+				"ObjectType": "Cube",
+				"LockMode": "Write"
+			},
+			"prepare": [
+				{
+					"method": "POST",
+					"path": "Processes('{p}Debug')/tm1.Debug",
+					"body": {},
+					"capture": {
+						"field": "ID",
+						"as": "context"
+					}
+				},
+				{
+					"method": "POST",
+					"path": "ProcessDebugContexts('{context}')/Breakpoints",
+					"body": {
+						"@odata.type": "#ibm.tm1.api.v1.ProcessDebugContextLockBreakpoint",
+						"Enabled": true,
+						"ObjectName": "{p}Dim",
+						"ObjectType": "Dimension",
+						"LockMode": "Write",
+						"ID": 0
+					}
+				}
+			],
+			"finish": [
+				{
+					"method": "DELETE",
+					"path": "ProcessDebugContexts('{context}')/Breakpoints(0)"
+				},
+				{
+					"method": "POST",
+					"path": "ProcessDebugContexts('{context}')/tm1.Continue",
+					"body": {},
+					"until": {
+						"field": "Status",
+						"is": "Complete"
+					}
+				}
+			],
+			"values": {
+				"Expression": "x = 1",
+				"LockMode": "Read",
+				"ObjectName": "{p}Titled"
+			},
+			"freeSource": true
+		},
+		{
+			"id": "ProcessReference",
+			"type": "ProcessReference",
+			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
+			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}ProcessRef'",
+			"assigned": "ID",
+			"generate": false,
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.ProcessReference",
+				"Process@odata.bind": "Processes('{p}Ascii')"
+			},
+			"targets": {
+				"$comment": "Not what the base binds, for a binding to change",
+				"Process": "Processes('{p}View')"
+			},
+			"values": {
+				"Attributes": {
+					"Caption": "A probe reference"
+				}
+			}
+		},
+		{
 			"id": "Sandbox",
 			"type": "Sandbox",
 			"collection": "Sandboxes",
@@ -534,6 +823,27 @@
 			}
 		},
 		{
+			"id": "SubsetReference",
+			"type": "SubsetReference",
+			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
+			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}SubsetRef'",
+			"assigned": "ID",
+			"generate": false,
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.SubsetReference",
+				"Subset@odata.bind": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets('{p}Static')"
+			},
+			"targets": {
+				"$comment": "Not what the base binds, for a binding to change",
+				"Subset": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets('{p}Dynamic')"
+			},
+			"values": {
+				"Attributes": {
+					"Caption": "A probe reference"
+				}
+			}
+		},
+		{
 			"id": "User",
 			"type": "User",
 			"collection": "Users",
@@ -547,6 +857,27 @@
 					"Probe-pass-1",
 					"Probe-pass-2"
 				]
+			}
+		},
+		{
+			"id": "ViewReference",
+			"type": "ViewReference",
+			"collection": "Contents('Applications')/Contents('{p}Folder')/Contents",
+			"source": "Contents('Applications')/Contents('{p}Folder')/Contents?$filter=Name eq '{p}ViewRef'",
+			"assigned": "ID",
+			"generate": false,
+			"base": {
+				"@odata.type": "#ibm.tm1.api.v1.ViewReference",
+				"View@odata.bind": "Cubes('{p}Cube')/Views('{p}Native')"
+			},
+			"targets": {
+				"$comment": "Not what the base binds, for a binding to change",
+				"View": "Cubes('{p}Cube')/Views('{p}Mdx')"
+			},
+			"values": {
+				"Attributes": {
+					"Caption": "A probe reference"
+				}
 			}
 		}
 	],
