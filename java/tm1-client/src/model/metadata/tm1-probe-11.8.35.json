@@ -154,7 +154,7 @@
           "outcome" : "applied"
         },
         "Attributes" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "DSTSensitive" : {
           "outcome" : "applied"
@@ -245,7 +245,7 @@
           "outcome" : "applied"
         },
         "Attributes" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "CalculationThresholdForStorage" : {
           "outcome" : "applied"
@@ -301,10 +301,10 @@
           "outcome" : "applied"
         },
         "LastDataUpdate" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "LastSchemaUpdate" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "Rules" : {
           "outcome" : "applied"
@@ -375,10 +375,10 @@
           "outcome" : "ignored"
         },
         "Attributes" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "UniqueName" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -391,7 +391,7 @@
           "code" : "278"
         },
         "UniqueName" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         }
       },
       "patchNull" : {
@@ -422,7 +422,7 @@
       "required" : [ ],
       "post" : {
         "Attributes" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "DisplayString" : {
           "outcome" : "ignored"
@@ -437,7 +437,7 @@
           "outcome" : "applied"
         },
         "UniqueName" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -459,7 +459,7 @@
           "outcome" : "applied"
         },
         "UniqueName" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         }
       },
       "patchNull" : {
@@ -515,7 +515,7 @@
       "required" : [ ],
       "post" : {
         "Attributes" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "Cardinality" : {
           "outcome" : "ignored"
@@ -536,7 +536,7 @@
           "outcome" : "ignored"
         },
         "UniqueName" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "Visible" : {
           "outcome" : "ignored"
@@ -567,7 +567,7 @@
           "outcome" : "ignored"
         },
         "UniqueName" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "Visible" : {
           "outcome" : "ignored"
@@ -627,7 +627,7 @@
       "required" : [ "MDX" ],
       "post" : {
         "Attributes" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "MDX" : {
           "outcome" : "applied"
@@ -672,7 +672,7 @@
       "required" : [ "Columns", "Rows" ],
       "post" : {
         "Attributes" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "Columns" : {
           "outcome" : "untested"
@@ -766,7 +766,7 @@
       "required" : [ ],
       "post" : {
         "Attributes" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "Code" : {
           "outcome" : "transformed"
@@ -919,7 +919,7 @@
       "required" : [ ],
       "post" : {
         "Attributes" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "Code" : {
           "outcome" : "transformed"
@@ -1132,7 +1132,7 @@
           "outcome" : "applied"
         },
         "Attributes" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "ExpandAbove" : {
           "outcome" : "applied"
@@ -1141,7 +1141,7 @@
           "outcome" : "applied"
         },
         "UniqueName" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -1160,7 +1160,7 @@
           "outcome" : "applied"
         },
         "UniqueName" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         }
       },
       "patchNull" : {
@@ -1206,7 +1206,7 @@
           "outcome" : "applied"
         },
         "Attributes" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         },
         "ExpandAbove" : {
           "outcome" : "applied"
@@ -1215,7 +1215,7 @@
           "outcome" : "applied"
         },
         "UniqueName" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         }
       },
       "patch" : {
@@ -1234,7 +1234,7 @@
           "outcome" : "applied"
         },
         "UniqueName" : {
-          "outcome" : "transformed"
+          "outcome" : "ignored"
         }
       },
       "patchNull" : {

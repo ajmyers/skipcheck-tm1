@@ -428,6 +428,28 @@ with the server's `Core.SchemaVersion` and product version. `Tm1Session.version(
 `Server.ProductVersion` inside the session, once per login. `Tm1Dialect.V11` (mechanism 3) maps
 an address to its `/api/v1/` root. Version ranges (mechanism 2) have no branches yet, as intended.
 
+**What a probe records, across versions (#318).** `$metadata` doesn't say what TM1 does with a
+write, nor which properties it sends undeclared, so `./gradlew probeTm1` asks a running server and
+writes `tm1-probe-<schema>.json` beside the snapshot (#312). The generated models take undeclared
+properties (#310) and write types (#311) from it. Versions are handled as `$metadata`'s are:
+
+- **One file per schema version**, committed, as the snapshots are. The newest snapshot's file
+  drives the model; older files are history.
+- **Drift is detected by a live test**, as `MetadataDriftTest` does for `$metadata`:
+  `ProbeDriftTm1Test` re-probes the configured TM1 (the known names and the write cases, not the
+  whole binary). On a version with a committed file, the result must equal it, which also catches a
+  fix pack that changes behaviour under the same `Core.SchemaVersion`. On another version, it
+  reports the differences and passes.
+- **History in the spec.** The export reads every probe file: undeclared properties as a union with
+  `observedIn` (safe as is, since every property is optional), and write outcomes per version where
+  versions differ, as `Core.Revisions` records history for `$metadata`.
+- **Permissive at compile time, exact at run time.** A setter exists if any version applies the
+  property, and its doc names the versions where it doesn't. Where a version really differs,
+  `builder(read)` and the services leave the property out for that server, by `Tm1Session.version()`
+  (mechanism 2), and a version-gated live test pins each side.
+- **Built when needed.** With one TM1 version available (§12.4), only the drift test is worth
+  building now; merging and run-time checks come with the first real second version.
+
 **Deprecations.** Deprecated operations (e.g. `Process.Execute`, deprecated in 11.3.0 in favor
 of `ExecuteWithReturn`; `Chore.Activate`) are still covered, because servers still expose
 them. They get Java `@Deprecated` with a pointer to the replacement.

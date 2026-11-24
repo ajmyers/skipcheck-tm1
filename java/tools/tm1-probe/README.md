@@ -39,6 +39,20 @@ two to start the containers. Then review and commit the file it wrote.
 - **When the probe changes.** Run it on the same version: the file shouldn't change unless the
   probe now finds more. A change in the probe's output format bumps `probeVersion`.
 
+## Versions
+
+One file per schema version, as the `$metadata` snapshots are. For a new TM1 version:
+
+1. Capture its `$metadata` (`MetadataSnapshotUpdateTest`) and run `./gradlew probeTm1` against it:
+   it writes `tm1-probe-<new schema>.json`.
+2. Diff that against the last version's file: undeclared properties added or gone, write outcomes and
+   collection behaviours that changed.
+3. Commit both. Today the generators read the file for the snapshot's own version only; merging the
+   versions' files into the spec, and checking a server's version at run time where behaviour
+   differs, is planned ([#318](https://github.com/ajmyers/skipcheck-tm1/issues/318), plan §9). So is
+   a live drift test that compares a server with the committed file, as `MetadataDriftTest` does for
+   `$metadata`.
+
 ## What it does
 
 1. **Candidates.** Every identifier-like name in the server's binary (`bin64/tm1s.exe`, copied out
