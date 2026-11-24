@@ -1,0 +1,295 @@
+{
+	"specVersion" : 1,
+	"name" : "writes",
+	"description" : "What the probe found TM1 applies, written through every client's create and patch types: each property a create or a patch applies, by tm1-probe-<schema>.json, that no other scenario writes, read back after its create and after its patch. ProbedWritesCoverageTest holds the scenarios to the probe.",
+	"names" : [ "dim", "month", "cube", "native", "process", "chore", "sandbox", "subset", "user" ],
+	"steps" : [
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${dim}", "Hierarchies" : [ { "Name" : "${dim}", "Elements" : [ { "Name" : "A", "Type" : "Numeric" }, { "Name" : "B", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${dim}" } }
+		},
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${month}", "Hierarchies" : [ { "Name" : "${month}", "Elements" : [ { "Name" : "Jan", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${month}" } }
+		},
+		{
+			"service" : "hierarchies",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy" ],
+			"args" : [ "${dim}", { "$patch" : "HierarchyCreate", "json" : { "Name" : "Alt", "Elements" : [ { "Name" : "A", "Type" : "Numeric" } ], "ElementsSortType" : "ByName", "ElementsSortSense" : "Descending", "ComponentsSortType" : "ByName", "ComponentsSortSense" : "Descending" } } ],
+			"expect" : { "fields" : { "Name" : "Alt" } }
+		},
+		{
+			"service" : "hierarchies",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "query" ],
+			"args" : [ "${dim}", "Alt", { "$query" : { "select" : [ "ElementsSortType", "ElementsSortSense", "ComponentsSortType", "ComponentsSortSense" ] } } ],
+			"expect" : { "fields" : { "ElementsSortType" : "ByName", "ElementsSortSense" : "Descending", "ComponentsSortType" : "ByName", "ComponentsSortSense" : "Descending" } }
+		},
+		{
+			"service" : "hierarchies",
+			"method" : "update",
+			"params" : [ "dimension", "hierarchy", "patch" ],
+			"args" : [ "${dim}", "Alt", { "$patch" : "HierarchyPatch", "json" : { "ElementsSortType" : "ByInput", "ElementsSortSense" : "Ascending", "ComponentsSortType" : "ByInput", "ComponentsSortSense" : "Ascending" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "hierarchies",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "query" ],
+			"args" : [ "${dim}", "Alt", { "$query" : { "select" : [ "ElementsSortType", "ElementsSortSense", "ComponentsSortType", "ComponentsSortSense" ] } } ],
+			"expect" : { "fields" : { "ElementsSortType" : "ByInput", "ElementsSortSense" : "Ascending", "ComponentsSortType" : "ByInput", "ComponentsSortSense" : "Ascending" } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "create",
+			"params" : [ "cube" ],
+			"args" : [ { "$patch" : "CubeCreate", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${dim}')", "Dimensions('${month}')" ], "Rules" : "SKIPCHECK;", "DrillthroughRules" : "['A'] = S: 'x';", "AllowPersistentHolds" : true, "CalculationThresholdForStorage" : 50, "CellSecurityMostRestrictive" : true, "ViewStorageMaxMemory" : 1000 } } ],
+			"expect" : { "fields" : { "Name" : "${cube}" } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${cube}", { "$query" : { "select" : [ "AllowPersistentHolds", "CalculationThresholdForStorage", "CellSecurityMostRestrictive", "ViewStorageMaxMemory" ] } } ],
+			"expect" : { "fields" : { "AllowPersistentHolds" : true, "CalculationThresholdForStorage" : 50, "CellSecurityMostRestrictive" : true, "ViewStorageMaxMemory" : 1000 } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${cube}", { "$patch" : "CubePatch", "json" : { "DrillthroughRules" : "['A'] = S: 'y';", "AllowPersistentHolds" : false, "CalculationThresholdForStorage" : 60, "CellSecurityMostRestrictive" : false, "ViewStorageMaxMemory" : 2000 } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "cubes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${cube}", { "$query" : { "select" : [ "AllowPersistentHolds", "CalculationThresholdForStorage", "CellSecurityMostRestrictive", "ViewStorageMaxMemory" ] } } ],
+			"expect" : { "fields" : { "AllowPersistentHolds" : false, "CalculationThresholdForStorage" : 60, "CellSecurityMostRestrictive" : false, "ViewStorageMaxMemory" : 2000 } }
+		},
+		{
+			"service" : "views",
+			"method" : "create",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "NativeViewCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "Name" : "${native}", "Columns" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${month}')/Hierarchies('${month}')", "Expression" : "{TM1SUBSETALL([${month}].[${month}])}" } } ], "Rows" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${dim}')/Hierarchies('${dim}')", "Expression" : "{TM1SUBSETALL([${dim}].[${dim}])}" } } ], "SuppressEmptyRows" : true, "SuppressEmptyColumns" : true, "FormatString" : "0.00" } } ],
+			"expect" : { "fields" : { "Name" : "${native}" } }
+		},
+		{
+			"service" : "views",
+			"method" : "get",
+			"params" : [ "cube", "scope", "view", "query" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${native}", { "$query" : {  } } ],
+			"expect" : { "fields" : { "SuppressEmptyRows" : true, "SuppressEmptyColumns" : true, "FormatString" : "0.00" } }
+		},
+		{
+			"service" : "views",
+			"method" : "update",
+			"params" : [ "cube", "scope", "view", "patch" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${native}", { "$patch" : "NativeViewPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "SuppressEmptyRows" : false, "SuppressEmptyColumns" : false, "FormatString" : "0.0" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "views",
+			"method" : "get",
+			"params" : [ "cube", "scope", "view", "query" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${native}", { "$query" : {  } } ],
+			"expect" : { "fields" : { "SuppressEmptyRows" : false, "SuppressEmptyColumns" : false, "FormatString" : "0.0" } }
+		},
+		{
+			"service" : "processes",
+			"method" : "create",
+			"params" : [ "process" ],
+			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${process}", "HasSecurityAccess" : true, "PrologProcedure" : "nA = 1;\r\n", "MetadataProcedure" : "nB = 2;\r\n", "DataProcedure" : "nC = 3;\r\n", "EpilogProcedure" : "nD = 4;\r\n", "DataSource" : { "Type" : "None" }, "Parameters" : [ { "Name" : "pName", "Prompt" : "", "Value" : "", "Type" : "String" } ], "Variables" : [  ], "UIData" : "CubeAction=1511\f", "VariablesUIData" : [  ] } } ],
+			"expect" : { "fields" : { "Name" : "${process}" } }
+		},
+		{
+			"service" : "processes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${process}", { "$query" : { "select" : [ "HasSecurityAccess", "PrologProcedure", "MetadataProcedure", "DataProcedure", "EpilogProcedure", "UIData" ] } } ],
+			"expect" : { "fields" : { "HasSecurityAccess" : true, "PrologProcedure" : "nA = 1;\r\n", "MetadataProcedure" : "nB = 2;\r\n", "DataProcedure" : "nC = 3;\r\n", "EpilogProcedure" : "nD = 4;\r\n", "UIData" : "CubeAction=1511\f" } }
+		},
+		{
+			"service" : "processes",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${process}", { "$patch" : "ProcessPatch", "json" : { "HasSecurityAccess" : false, "PrologProcedure" : "nA = 10;\r\n", "MetadataProcedure" : "nB = 20;\r\n", "DataProcedure" : "nC = 30;\r\n", "DataSource" : { "Type" : "None" }, "Parameters" : [ { "Name" : "pOther", "Prompt" : "", "Value" : "", "Type" : "String" } ], "Variables" : [  ], "UIData" : "CubeAction=1512\f", "VariablesUIData" : [  ] } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "processes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${process}", { "$query" : { "select" : [ "HasSecurityAccess", "PrologProcedure", "MetadataProcedure", "DataProcedure", "UIData" ] } } ],
+			"expect" : { "fields" : { "HasSecurityAccess" : false, "PrologProcedure" : "nA = 10;\r\n", "MetadataProcedure" : "nB = 20;\r\n", "DataProcedure" : "nC = 30;\r\n", "UIData" : "CubeAction=1512\f" } }
+		},
+		{
+			"service" : "chores",
+			"method" : "create",
+			"params" : [ "chore" ],
+			"args" : [ { "$patch" : "ChoreCreate", "json" : { "Name" : "${chore}", "StartTime" : "2026-01-01T02:00:00Z", "DSTSensitive" : false, "Frequency" : "PT24H", "ExecutionMode" : "SingleCommit", "Active" : false, "Tasks" : [ { "Process@odata.bind" : "Processes('${process}')", "Parameters" : [ { "Name" : "pOther", "Value" : "x" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${chore}" } }
+		},
+		{
+			"service" : "chores",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${chore}", { "$patch" : "ChorePatch", "json" : { "StartTime" : "2026-02-01T03:00:00Z", "DSTSensitive" : true, "Frequency" : "PT12H", "ExecutionMode" : "MultipleCommit" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "chores",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${chore}", { "$query" : { "select" : [ "DSTSensitive", "ExecutionMode" ] } } ],
+			"expect" : { "fields" : { "DSTSensitive" : true, "ExecutionMode" : "MultipleCommit" } }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "create",
+			"params" : [ "sandbox" ],
+			"args" : [ { "$patch" : "SandboxCreate", "json" : { "Name" : "${sandbox}", "IncludeInSandboxDimension" : false } } ],
+			"expect" : { "fields" : { "Name" : "${sandbox}" } }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${sandbox}", { "$query" : { "select" : [ "IncludeInSandboxDimension" ] } } ],
+			"expect" : { "fields" : { "IncludeInSandboxDimension" : false } }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${sandbox}", { "$patch" : "SandboxPatch", "json" : { "IncludeInSandboxDimension" : true } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${sandbox}", { "$query" : { "select" : [ "IncludeInSandboxDimension" ] } } ],
+			"expect" : { "fields" : { "IncludeInSandboxDimension" : true } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "SubsetCreate", "json" : { "Name" : "${subset}", "Expression" : "{TM1SUBSETALL([${dim}].[${dim}])}", "Alias" : "Caption", "ExpandAbove" : true } } ],
+			"expect" : { "fields" : { "Name" : "${subset}" } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}", { "$query" : { "select" : [ "Alias", "ExpandAbove" ] } } ],
+			"expect" : { "fields" : { "Alias" : "Caption", "ExpandAbove" : true } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "update",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "patch" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}", { "$patch" : "SubsetPatch", "json" : { "Alias" : "", "ExpandAbove" : false } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "subsets",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}", { "$query" : { "select" : [ "Alias", "ExpandAbove" ] } } ],
+			"expect" : { "fields" : { "Alias" : "", "ExpandAbove" : false } }
+		},
+		{
+			"service" : "users",
+			"method" : "create",
+			"params" : [ "user" ],
+			"args" : [ { "$patch" : "UserCreate", "json" : { "Name" : "${user}", "Password" : "pw", "FriendlyName" : "${user} friend" } } ],
+			"expect" : { "fields" : { "Name" : "${user}" } }
+		},
+		{
+			"service" : "users",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${user}", { "$query" : { "select" : [ "FriendlyName", "Enabled" ] } } ],
+			"expect" : { "fields" : { "FriendlyName" : "${user} friend", "Enabled" : true } }
+		},
+		{
+			"service" : "users",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${user}", { "$patch" : "UserPatch", "json" : { "Enabled" : false } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "users",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${user}", { "$query" : { "select" : [ "Enabled" ] } } ],
+			"expect" : { "fields" : { "Enabled" : false } }
+		}
+	],
+	"finally" : [
+		{
+			"service" : "users",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${user}" ]
+		},
+		{
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}" ]
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${sandbox}" ]
+		},
+		{
+			"service" : "chores",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${chore}" ]
+		},
+		{
+			"service" : "processes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${process}" ]
+		},
+		{
+			"service" : "views",
+			"method" : "delete",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${native}" ]
+		},
+		{
+			"service" : "cubes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${cube}" ]
+		},
+		{
+			"service" : "dimensions",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${dim}" ]
+		},
+		{
+			"service" : "dimensions",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${month}" ]
+		}
+	]
+}
