@@ -225,8 +225,11 @@ export function searchBox({ label, placeholder, index }) {
 	);
 }
 
-/** The head of a generated page. styles, scripts and modules (scripts that are ES modules) are addresses, in order. */
-export function head({ title, description, canonical, styles, scripts, modules = [] }) {
+/**
+ * The head of a generated page. styles, scripts and modules (scripts that are ES modules) are addresses, in order. data, if
+ * given, is the page's structured data for search engines (softwareSourceCode, techArticle), written as JSON-LD.
+ */
+export function head({ title, description, canonical, styles, scripts, modules = [], data }) {
 	return (
 		'<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
 		'<title>' +
@@ -241,12 +244,55 @@ export function head({ title, description, canonical, styles, scripts, modules =
 		(description ? '<meta property="og:type" content="website"><meta property="og:title" content="' + escape(title) + '"><meta property="og:description" content="' + escape(description) + '">' : '') +
 		(canonical ? '<meta property="og:url" content="' + escape(canonical) + '">' : '') +
 		(description ? SOCIAL_IMAGE_TAGS : '') +
+		(data ? '<script type="application/ld+json">' + jsonLd(data) + '</script>' : '') +
 		'</head>'
 	);
 }
 
-/** The address the pages name as canonical: skipcheck.dev serves the same pages. */
+/** The address the pages name as canonical, and their structured data as theirs. */
 export const CANONICAL_ORIGIN = 'https://skipcheck.io';
+
+// The structured data (schema.org, as JSON-LD) of the landing pages and the walkthroughs, from what their heads
+// already say. A browser doesn't run a script of type application/ld+json, so the CSP's script-src doesn't apply to it.
+// The site (ajmyers/skipcheck.io) describes itself on its home page, as the WebSite these pages are part of, by its @id.
+const WEBSITE = { '@type': 'WebSite', '@id': CANONICAL_ORIGIN + '/#website', url: CANONICAL_ORIGIN + '/' };
+const AUTHOR = { '@type': 'Person', name: 'Andrew Myers', url: 'https://ajmyers.net/', sameAs: ['https://github.com/ajmyers', 'https://www.linkedin.com/in/andrew-myers-netflix/'] };
+
+/** The JSON of a script element: a < is escaped, so a description with </script> in it can't end the element. */
+const jsonLd = (data) => JSON.stringify(data).replace(/</g, '\\u003c');
+
+/** A project's landing page, as the code it's about: its languages, where the code is, its license and who wrote it. */
+export function softwareSourceCode(project, { description, url }) {
+	return {
+		'@context': 'https://schema.org',
+		'@type': 'SoftwareSourceCode',
+		'@id': url + '#code',
+		name: project.title,
+		description,
+		url,
+		codeRepository: 'https://github.com/ajmyers/skipcheck-tm1',
+		// .NET is a platform: the code its pages show is C#
+		programmingLanguage: languagesOf(project).map((language) => (language.id === 'dotnet' ? 'C#' : language.label)),
+		license: 'https://www.apache.org/licenses/LICENSE-2.0',
+		author: AUTHOR,
+		isPartOf: WEBSITE,
+	};
+}
+
+/** A walkthrough, as an article about its project's code (the landing page's softwareSourceCode, by its @id). */
+export function techArticle(project, { headline, description, url }) {
+	const landing = CANONICAL_ORIGIN + '/' + project.id + '/';
+	return {
+		'@context': 'https://schema.org',
+		'@type': 'TechArticle',
+		headline,
+		description,
+		url,
+		author: AUTHOR,
+		about: { '@type': 'SoftwareSourceCode', '@id': landing + '#code', name: project.title, url: landing },
+		isPartOf: WEBSITE,
+	};
+}
 
 /** The link preview image of the pages with a description, as og:image: the site's own, which
  * ajmyers/skipcheck.io renders and serves (social/ there). Absolute, as link previews need. */
