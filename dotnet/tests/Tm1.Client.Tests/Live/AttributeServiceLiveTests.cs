@@ -111,8 +111,6 @@ public class AttributeServiceLiveTests
         // Caption isn't an attribute until it's defined
         await Assert.ThrowsAsync<Tm1BadRequestException>(() => tm1.LocalizedAttributes.CreateAsync(AttributeOwner.Element(d, d, "North"), caption));
         // POST isn't supported on a member's
-        await Assert.ThrowsAsync<Tm1BadRequestException>(() =>
-            tm1.LocalizedAttributes.CreateAsync(AttributeOwner.Member(d, d, "North"), LocalizedAttributesCreate.Builder().LocaleID("fr").Build())
-        );
+        await Assert.ThrowsAsync<Tm1BadRequestException>(() => tm1.LocalizedAttributes.CreateAsync(AttributeOwner.Member(d, d, "North"), caption));
     }
 }

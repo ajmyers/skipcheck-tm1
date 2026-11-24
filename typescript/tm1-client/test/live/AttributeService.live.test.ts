@@ -110,7 +110,10 @@ describe("AttributeService and LocalizedAttributeService on TM1" + liveReason, (
       "Caption isn't an attribute until it's defined",
     ).rejects.toBeInstanceOf(Tm1BadRequestException);
     await expect(
-      tm1.localizedAttributes.create(AttributeOwner.member(d, d, "North"), LocalizedAttributesCreate.builder().localeID("fr").build()),
+      tm1.localizedAttributes.create(
+        AttributeOwner.member(d, d, "North"),
+        LocalizedAttributesCreate.builder().localeID("fr").attributes(AttributesPatch.builder().caption("Nord").build()).build(),
+      ),
       "POST not supported on a member's",
     ).rejects.toBeInstanceOf(Tm1BadRequestException);
   });

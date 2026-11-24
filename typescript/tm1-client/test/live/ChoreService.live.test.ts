@@ -8,6 +8,7 @@ import {
   ChoreTask,
   ChoreTaskCreate,
   ChoreTaskParameterPatch,
+  ChoreTaskPatch,
   ODataPath,
   ODataQuery,
   ProcessCreate,
@@ -86,7 +87,7 @@ describe("ChoreService on TM1" + liveReason, () => {
     await tm1.chores.updateTask(
       chore,
       1,
-      ChoreTaskCreate.builder()
+      ChoreTaskPatch.builder()
         .parameters([parameter("pName", "third-" + id), parameter("pCount", 2)])
         .build(),
     );
