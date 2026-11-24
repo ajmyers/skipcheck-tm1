@@ -83,7 +83,7 @@ def emit(spec: Spec) -> str:
         "",
         "from datetime import date, datetime, time, timedelta",
         "from decimal import Decimal",
-        "from typing import Any, ClassVar",
+        "from typing import Annotated, Any, ClassVar",
         "from uuid import UUID",
         "",
         "from pydantic import ConfigDict, Field",
@@ -91,6 +91,7 @@ def emit(spec: Spec) -> str:
         "from ..base import LenientDateTime, Tm1Enum, Tm1Model",
         "from ..odata import Bind, ODataProperty",
         "from .._calls import register_endpoint",
+        "from ..version import Tm1Departure",
         "",
         "__all__ = [",
     ]
@@ -160,6 +161,20 @@ def _enum(e: dict[str, Any]) -> list[str]:
     return out
 
 
+def departure_tag(p: dict[str, Any]) -> str | None:
+    """The ``Tm1Departure`` a property's field carries, as Java's ``@Tm1Departure``, or None."""
+    if p.get("undeclared"):
+        u = p["undeclared"]
+        kind, observed, note = "UNDECLARED", tuple(u.get("observedIn", [])), p.get("description") or ""
+    elif p.get("departure"):
+        kind, observed, note = "TYPE", (), p["departure"].get("note", "")
+    elif p.get("lenientDate"):
+        kind, observed, note = "LENIENT_DATE", (), p["lenientDate"].get("note", "")
+    else:
+        return None
+    return f"Tm1Departure(Tm1Departure.Kind.{kind}, {observed!r}, {note.replace('`', '')!r})"
+
+
 def _model(spec: Spec, t: dict[str, Any]) -> list[str]:
     base = spec.type_by_name[t["baseType"]]["name"] if t.get("baseType") else "Tm1Model"
     root = spec.root(t)
@@ -203,7 +218,9 @@ def _model(spec: Spec, t: dict[str, Any]) -> list[str]:
             continue
         name = fields[("p", p["name"])]
         out.append("")
-        out.append(f'    {name}: {tp} | None = Field(None, alias="{p["name"]}")')
+        tag = departure_tag(p)
+        annotated = f"Annotated[{tp} | None, {tag}]" if tag else f"{tp} | None"
+        out.append(f'    {name}: {annotated} = Field(None, alias="{p["name"]}")')
         doc = p.get("description") or f"The ``{p['name']}`` property."
         if departure:
             doc += "\n\n" + md(departure["note"])

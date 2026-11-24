@@ -13,11 +13,17 @@
 	},
 	"endpoints": {
 		"Navigation User/Groups": {
-			"forbid": ["create", "delete"],
+			"forbid": [
+				"create",
+				"delete"
+			],
 			"note": "TM1 (11.8): `DELETE Users('u')/Groups('g')` (and its `$ref`) deletes the group itself, for everyone, not the link. Binding `Groups` in a user PATCH replaces them; a POST through it tries to create a group."
 		},
 		"Navigation Group/Users": {
-			"forbid": ["create", "delete"],
+			"forbid": [
+				"create",
+				"delete"
+			],
 			"note": "Deleting through this navigation deletes the user itself, not the membership."
 		},
 		"EntitySet Contents": {
@@ -40,6 +46,18 @@
 		},
 		"Action Cellset/Update": {
 			"note": "TM1 (11.8): writes only `BeginOrdinal`'s cell."
+		}
+	},
+	"undeclared": {
+		"Process/VariablesUIData": {
+			"type": "Collection(Edm.String)",
+			"note": "One entry per variable, such as VarType=32\\fColType=827\\f."
+		},
+		"Thread/SessionID": {
+			"type": "Edm.Int64"
+		},
+		"Thread/ThreadID": {
+			"type": "Edm.Int64"
 		}
 	}
 }

@@ -115,6 +115,8 @@ public final class ModelGenerator {
 
 	private static final ClassName SINCE = ClassName.get("io.skipcheck.tm1.client.version", "Since");
 
+	private static final ClassName TM1_DEPARTURE = ClassName.get("io.skipcheck.tm1.client.version", "Tm1Departure");
+
 	private static final AnnotationSpec SUPPRESS_DEPRECATION = AnnotationSpec.builder(SuppressWarnings.class)
 		.addMember("value", "$S", "deprecation")
 		.build();
@@ -162,6 +164,12 @@ public final class ModelGenerator {
 
 	private final CsdlDocument metadata;
 
+	/**
+	 * {@code @Tm1Departure} for each member that departs from {@code $metadata}, by
+	 * {@code Type/Property}.
+	 */
+	private final Map<String, Departure> tags = new LinkedHashMap<>();
+
 	/** Roots of inheritance hierarchies, by qualified name, with their subtypes. */
 	private final Map<String, List<CsdlStructuredType>> hierarchies = new LinkedHashMap<>();
 
@@ -186,7 +194,28 @@ public final class ModelGenerator {
 	 * doesn't do and the generator doesn't support yet
 	 */
 	public ModelGenerator(CsdlDocument metadata, Overlay overlay) {
+		this(metadata, overlay, Undeclared.NONE);
+	}
+
+	/**
+	 * A generator for {@code metadata}, with properties a probe found that it doesn't
+	 * declare.
+	 * @param metadata the {@code $metadata} document, with the undeclared properties
+	 * {@linkplain Undeclared#applyTo(CsdlDocument) added}
+	 * @param overlay what TM1 does differently from {@code metadata}, with the undeclared
+	 * properties' {@linkplain Undeclared#applyTo(Overlay) departures}
+	 * @param undeclared the undeclared properties, to tag
+	 * @throws IllegalArgumentException if a type derives from a derived type, which TM1
+	 * doesn't do and the generator doesn't support yet
+	 */
+	public ModelGenerator(CsdlDocument metadata, Overlay overlay, Undeclared undeclared) {
 		this.metadata = metadata;
+		overlay.departures().forEach((key, note) -> this.tags.put(key, new Departure("TYPE", List.of(), plain(note))));
+		overlay.lenientDates()
+			.forEach((key, note) -> this.tags.put(key, new Departure("LENIENT_DATE", List.of(), plain(note))));
+		undeclared.properties()
+			.forEach((key, p) -> this.tags.put(key,
+					new Departure("UNDECLARED", List.of(undeclared.schemaVersion()), plain(p.note()))));
 		this.departures = javadocs(overlay.departures());
 		this.lenientDates = javadocs(overlay.lenientDates());
 		metadata.structuredTypes().sorted(Comparator.comparing(CsdlStructuredType::name)).forEach(type -> {
@@ -361,7 +390,7 @@ public final class ModelGenerator {
 								paramText(property.annotations(), property.name())
 										+ (departure == null ? "" : ". " + departure)
 										+ (lenient == null ? "" : ". " + lenient),
-								revisions(property.annotations()), lenient != null)));
+								revisions(level, property), lenient != null)));
 			}
 			for (CsdlNavigationProperty navigation : level.navigationProperties()) {
 				javaType(navigation.type()).ifPresent(t -> components
@@ -540,7 +569,7 @@ public final class ModelGenerator {
 		for (CsdlProperty property : type.properties()) {
 			if (javaType(property.type()).isPresent()) {
 				fields.add(constant(unique(constantName(property.name()), names), property.name(),
-						paramText(property.annotations(), property.name()), revisions(property.annotations())));
+						paramText(property.annotations(), property.name()), revisions(type, property)));
 			}
 		}
 		for (CsdlNavigationProperty navigation : type.navigationProperties()) {
@@ -584,7 +613,7 @@ public final class ModelGenerator {
 			patchType(property.type()).map(t -> departs ? (TypeName) ClassName.get(Object.class) : t)
 				.ifPresent(t -> properties.add(new PatchProperty(unique(componentName(property.name()), names), t,
 						property.name(), paramText(property.annotations(), property.name()), false,
-						property.type().collection(), revisions(property.annotations()))));
+						property.type().collection(), revisions(type, property))));
 		}
 		for (CsdlNavigationProperty navigation : type.navigationProperties()) {
 			patchType(navigation.type())
@@ -823,17 +852,49 @@ public final class ModelGenerator {
 		builder.addMethod(bindMethod.addJavadoc("$L", property.revisions().tag()).addStatement("return this").build());
 	}
 
+	/** How a member departs from {@code $metadata}, for {@code @Tm1Departure}. */
+	private record Departure(String kind, List<String> observedIn, String note) {
+
+		AnnotationSpec annotation() {
+			AnnotationSpec.Builder a = AnnotationSpec.builder(TM1_DEPARTURE)
+				.addMember("value", "$T.$L", TM1_DEPARTURE.nestedClass("Kind"), kind);
+			if (!observedIn.isEmpty()) {
+				a.addMember("observedIn", "{$L}",
+						String.join(", ", observedIn.stream().map(v -> '"' + v + '"').toList()));
+			}
+			return a.addMember("note", "$S", note).build();
+		}
+
+	}
+
+	/** A Markdown note as plain text, for an annotation. */
+	private static String plain(String markdown) {
+		return markdown.replace("`", "");
+	}
+
 	/**
 	 * What {@code Core.Revisions} says about an element: the version that added it, and
-	 * the one that deprecated it with IBM's reason.
+	 * the one that deprecated it with IBM's reason; and how it departs from
+	 * {@code $metadata}, if it does.
 	 */
-	private record Revisions(@Nullable String since, @Nullable String deprecatedIn, @Nullable String reason) {
+	private record Revisions(@Nullable String since, @Nullable String deprecatedIn, @Nullable String reason,
+			@Nullable Departure departure) {
 
-		static final Revisions NONE = new Revisions(null, null, null);
+		static final Revisions NONE = new Revisions(null, null, null, null);
 
-		/** {@code @Since} and {@code @Deprecated(since = …)}, as they apply. */
+		Revisions with(@Nullable Departure d) {
+			return new Revisions(since, deprecatedIn, reason, d);
+		}
+
+		/**
+		 * {@code @Since}, {@code @Deprecated(since = …)} and {@code @Tm1Departure}, as
+		 * they apply.
+		 */
 		List<AnnotationSpec> annotations() {
 			List<AnnotationSpec> annotations = new ArrayList<>();
+			if (departure != null) {
+				annotations.add(departure.annotation());
+			}
 			if (since != null) {
 				annotations.add(AnnotationSpec.builder(SINCE).addMember("value", "$S", since).build());
 			}
@@ -868,7 +929,12 @@ public final class ModelGenerator {
 			.findFirst()
 			.orElse(null);
 		return new Revisions(CsdlRevision.addedIn(annotations).orElse(null),
-				CsdlRevision.deprecatedIn(annotations).orElse(null), reason);
+				CsdlRevision.deprecatedIn(annotations).orElse(null), reason, null);
+	}
+
+	/** A property's revisions, with how it departs from {@code $metadata}, if it does. */
+	private Revisions revisions(CsdlStructuredType owner, CsdlProperty property) {
+		return revisions(property.annotations()).with(tags.get(owner.name() + "/" + property.name()));
 	}
 
 	/**

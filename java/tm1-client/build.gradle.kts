@@ -69,6 +69,8 @@ val generateModel = tasks.register<JavaExec>("generateModel") {
 	classpath = codegen
 	mainClass = "io.skipcheck.tm1.codegen.Tm1Codegen"
 	inputs.file(snapshot).withPathSensitivity(PathSensitivity.RELATIVE)
+	// What a probe found that the snapshot doesn't declare (java/tools/tm1-probe)
+	inputs.files(fileTree(snapshot.asFile.parentFile) { include("tm1-probe-*.json") }).withPathSensitivity(PathSensitivity.RELATIVE)
 	outputs.dir(modelSources)
 	outputs.cacheIf { true }
 	args(snapshot.asFile.path, modelSources.get().asFile.path)

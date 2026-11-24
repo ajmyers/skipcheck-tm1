@@ -66,6 +66,38 @@ public sealed class ModelEmitter
     }
 
     /// <summary>A property's member names across a type's hierarchy, unique, root first.</summary>
+    /// <summary>The <c>[Tm1Departure]</c> a property carries, as Java's <c>@Tm1Departure</c>, or null.</summary>
+    public static string? DepartureTag(JsonElement p)
+    {
+        string kind;
+        IEnumerable<string> observed = [];
+        string note;
+        if (p.TryGetProperty("undeclared", out var u))
+        {
+            kind = "Undeclared";
+            observed = u.TryGetProperty("observedIn", out var o) ? o.EnumerateArray().Select(v => v.GetString()!) : [];
+            note = Spec.Str(p, "description") ?? "";
+        }
+        else if (p.TryGetProperty("departure", out var d))
+        {
+            kind = "Type";
+            note = Spec.Str(d, "note") ?? "";
+        }
+        else if (p.TryGetProperty("lenientDate", out var l))
+        {
+            kind = "LenientDate";
+            note = Spec.Str(l, "note") ?? "";
+        }
+        else
+        {
+            return null;
+        }
+        var versions = string.Join(", ", observed.Select(Literal));
+        return $"[Tm1Departure(Tm1DepartureKind.{kind}, ObservedIn = [{versions}], Note = {Literal(note.Replace("`", ""))})]";
+    }
+
+    private static string Literal(string s) => "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+
     public static Dictionary<string, string> MemberNames(Spec spec, JsonElement t)
     {
         var taken = new HashSet<string> { "ETag", "Fields", "DynamicProperties" };
@@ -97,6 +129,7 @@ public sealed class ModelEmitter
             using System.Text.Json.Serialization;
             using Skipcheck.Tm1.Client.Json;
             using Skipcheck.Tm1.Client.OData;
+            using Skipcheck.Tm1.Client.Version;
 
             namespace Skipcheck.Tm1.Client.Model;
 
@@ -210,6 +243,10 @@ public sealed class ModelEmitter
             else
             {
                 continue;
+            }
+            if (DepartureTag(p) is { } tag)
+            {
+                attributes.Add(tag);
             }
             var doc = Spec.Str(p, "description");
             if (p.TryGetProperty("departure", out var dep))

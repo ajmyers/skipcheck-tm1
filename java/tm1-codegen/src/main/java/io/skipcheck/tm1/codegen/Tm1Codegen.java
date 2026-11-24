@@ -8,6 +8,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.jspecify.annotations.Nullable;
+
 import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlParser;
 
@@ -35,7 +37,9 @@ public final class Tm1Codegen {
 	public static void main(String[] args) throws IOException {
 		if (args.length == 3 && "spec".equals(args[0])) {
 			Path snapshot = Path.of(args[1]);
-			String spec = new ApiSpecExporter(read(snapshot), Overlay.bundled(), snapshot.getFileName().toString())
+			Model model = Model.of(snapshot);
+			String spec = new ApiSpecExporter(model.metadata(), model.overlay(), snapshot.getFileName().toString(),
+					model.undeclared(), model.probe())
 				.export();
 			Path out = Path.of(args[2]);
 			if (out.getParent() != null) {
@@ -48,7 +52,31 @@ public final class Tm1Codegen {
 			throw new IllegalArgumentException(
 					"Usage: Tm1Codegen <snapshot.xml> <output directory> | Tm1Codegen spec <snapshot.xml> <spec.json>");
 		}
-		new ModelGenerator(read(Path.of(args[0]))).writeTo(Path.of(args[1]));
+		Model model = Model.of(Path.of(args[0]));
+		new ModelGenerator(model.metadata(), model.overlay(), model.undeclared()).writeTo(Path.of(args[1]));
+	}
+
+	/**
+	 * What the model is generated from: the snapshot, with the properties the probe file
+	 * beside it ({@code tm1-probe-<schema>.json}) found undeclared, and the bundled
+	 * overlay.
+	 */
+	record Model(CsdlDocument metadata, Overlay overlay, Undeclared undeclared, @Nullable String probe) {
+
+		static Model of(Path snapshot) throws IOException {
+			CsdlDocument metadata = read(snapshot);
+			Overlay overlay = Overlay.bundled();
+			String version = metadata.schemaVersion().orElse("");
+			Path dir = snapshot.toAbsolutePath().getParent();
+			Path probe = dir == null ? null : dir.resolve("tm1-probe-" + version + ".json");
+			if (probe == null || !Files.exists(probe)) {
+				return new Model(metadata, overlay, Undeclared.NONE, null);
+			}
+			Undeclared undeclared = Undeclared.read(Files.readString(probe, StandardCharsets.UTF_8), overlay, metadata);
+			return new Model(undeclared.applyTo(metadata), undeclared.applyTo(overlay), undeclared,
+					probe.getFileName().toString());
+		}
+
 	}
 
 	private static CsdlDocument read(Path snapshot) throws IOException {

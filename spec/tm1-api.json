@@ -3,6 +3,7 @@
 	"specVersion" : 1,
 	"source" : {
 		"snapshot" : "tm1-schema-11.8.35.xml",
+		"probe" : "tm1-probe-11.8.35.json",
 		"schemaVersion" : "11.8.35",
 		"odataVersion" : "4.0"
 	},
@@ -1663,6 +1664,23 @@
 					"nullable" : false,
 					"description" : "Read-only property that provides a unique identifier for the cellset for the current session.",
 					"longDescription" : "The ID does not persist outside of a session because a cellset is transient. You cannot depend on the ID being consistent. If you try to access a cellset by using a previous ID value after the session has ended or when the cellset has been deleted, an error is received."
+				},
+				{
+					"name" : "Content",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					},
+					"departure" : {
+						"read" : "json",
+						"note" : "Its type isn't known, so it's read as JSON."
+					}
 				}
 			],
 			"navigationProperties" : [
@@ -1890,6 +1908,19 @@
 					"nullable" : true,
 					"description" : "A Boolean that indicates whether drill-through scripts are defined on the cell.",
 					"since" : "10.2.2.6"
+				},
+				{
+					"name" : "TM1FormatString",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
 				}
 			],
 			"navigationProperties" : [
@@ -2418,6 +2449,100 @@
 					"collection" : false,
 					"nullable" : true,
 					"description" : "Captions and resource attributes of the cube."
+				},
+				{
+					"name" : "AllowPersistentHolds",
+					"type" : "Edm.Boolean",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
+				},
+				{
+					"name" : "CalculationThresholdForStorage",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					},
+					"departure" : {
+						"read" : "json",
+						"note" : "Its type isn't known, so it's read as JSON."
+					}
+				},
+				{
+					"name" : "CellSecurityDefaultValue",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					},
+					"departure" : {
+						"read" : "json",
+						"note" : "Its type isn't known, so it's read as JSON."
+					}
+				},
+				{
+					"name" : "CellSecurityMostRestrictive",
+					"type" : "Edm.Boolean",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
+				},
+				{
+					"name" : "ViewStorageMaxMemory",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					},
+					"departure" : {
+						"read" : "json",
+						"note" : "Its type isn't known, so it's read as JSON."
+					}
+				},
+				{
+					"name" : "ViewStorageMinTime",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					},
+					"departure" : {
+						"read" : "json",
+						"note" : "Its type isn't known, so it's read as JSON."
+					}
 				}
 			],
 			"navigationProperties" : [
@@ -2935,6 +3060,23 @@
 					"collection" : false,
 					"nullable" : true,
 					"description" : "The attributes of the element."
+				},
+				{
+					"name" : "DisplayString",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					},
+					"departure" : {
+						"read" : "json",
+						"note" : "Its type isn't known, so it's read as JSON."
+					}
 				}
 			],
 			"navigationProperties" : [
@@ -3775,6 +3917,75 @@
 					"collection" : false,
 					"nullable" : true,
 					"description" : "The attributes of the hierarchy."
+				},
+				{
+					"name" : "ComponentsSortSense",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
+				},
+				{
+					"name" : "ComponentsSortType",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
+				},
+				{
+					"name" : "ElementsSortSense",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
+				},
+				{
+					"name" : "ElementsSortType",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
+				},
+				{
+					"name" : "ViewPrivateSubsets",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					},
+					"departure" : {
+						"read" : "json",
+						"note" : "Its type isn't known, so it's read as JSON."
+					}
 				}
 			],
 			"navigationProperties" : [
@@ -5057,6 +5268,45 @@
 					"collection" : false,
 					"nullable" : true,
 					"description" : "The attributes of the process."
+				},
+				{
+					"name" : "Code",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
+				},
+				{
+					"name" : "UIData",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
+				},
+				{
+					"name" : "VariablesUIData",
+					"type" : "Edm.String",
+					"collection" : true,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35. One entry per variable, such as VarType=32\\fColType=827\\f.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
 				}
 			],
 			"navigationProperties" : [
@@ -6095,6 +6345,19 @@
 					"collection" : false,
 					"nullable" : true,
 					"description" : "Indicates the interval, in seconds, that a client should ping the CAM server to keep their passport alive."
+				},
+				{
+					"name" : "DataModelEncrypted",
+					"type" : "Edm.Boolean",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
 				}
 			],
 			"navigationProperties" : [ ]
@@ -6381,6 +6644,32 @@
 					"collection" : false,
 					"nullable" : true,
 					"description" : "The attributes of the subset."
+				},
+				{
+					"name" : "Alias",
+					"type" : "Edm.String",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
+				},
+				{
+					"name" : "ExpandAbove",
+					"type" : "Edm.Boolean",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
 				}
 			],
 			"navigationProperties" : [
@@ -6634,6 +6923,32 @@
 					"collection" : false,
 					"nullable" : false,
 					"description" : "The info of the thread."
+				},
+				{
+					"name" : "SessionID",
+					"type" : "Edm.Int64",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
+				},
+				{
+					"name" : "ThreadID",
+					"type" : "Edm.Int64",
+					"collection" : false,
+					"nullable" : true,
+					"description" : "TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema 11.8.35.",
+					"undeclared" : {
+						"source" : "probe",
+						"observedIn" : [
+							"11.8.35"
+						]
+					}
 				}
 			],
 			"navigationProperties" : [
