@@ -38,6 +38,8 @@ tasks.register<Test>("probe") {
 	environment("TM1_PROBE", "true")
 	// How many identical servers share the types (4 unless set)
 	providers.environmentVariable("TM1_PROBE_SERVERS").orNull?.let { environment("TM1_PROBE_SERVERS", it) }
+	// writes: the writes alone, on the committed report's names (README.md)
+	providers.environmentVariable("TM1_PROBE_ONLY").orNull?.let { environment("TM1_PROBE_ONLY", it) }
 	systemProperty("tm1.probe.metadataDir", metadataDir.path)
 	// It reads a server, so it's never up to date
 	outputs.upToDateWhen { false }

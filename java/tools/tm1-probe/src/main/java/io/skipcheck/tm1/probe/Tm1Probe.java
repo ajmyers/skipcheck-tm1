@@ -121,6 +121,27 @@ public final class Tm1Probe {
 	}
 
 	/**
+	 * Probes the writes alone, on the first server, with what an earlier run found: its
+	 * undeclared properties are selected, and its other findings kept. For working on the
+	 * write cases ({@code TM1_PROBE_ONLY=writes}): the names take far longer, and don't
+	 * change with the cases.
+	 * @param earlier the committed report for this server's schema version
+	 * @return the earlier report with the new writes
+	 */
+	public ProbeReport runWrites(ProbeReport earlier) {
+		ProbeClient first = servers.get(0);
+		ProbeFixtures.create(first);
+		try {
+			return earlier.withWrites(new WriteProbe(first, metadata, earlier.undeclared(), WriteProbe.bundledCases(),
+					ProbeFixtures.PREFIX, log)
+				.run());
+		}
+		finally {
+			ProbeFixtures.delete(first);
+		}
+	}
+
+	/**
 	 * Runs something on every server at once; each one's result, in the servers' order.
 	 */
 	private <T> List<T> onEachServer(Function<ProbeClient, T> task) {

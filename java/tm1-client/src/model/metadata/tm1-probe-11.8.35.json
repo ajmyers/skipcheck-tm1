@@ -251,7 +251,9 @@
           "outcome" : "applied"
         },
         "CellSecurityDefaultValue" : {
-          "outcome" : "untested"
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         },
         "CellSecurityMostRestrictive" : {
           "outcome" : "applied"
@@ -288,7 +290,9 @@
           "outcome" : "applied"
         },
         "CellSecurityDefaultValue" : {
-          "outcome" : "untested"
+          "outcome" : "rejected",
+          "status" : 400,
+          "code" : "278"
         },
         "CellSecurityMostRestrictive" : {
           "outcome" : "applied"
@@ -948,7 +952,7 @@
           "outcome" : "applied"
         },
         "VariablesUIData" : {
-          "outcome" : "untested"
+          "outcome" : "applied"
         }
       },
       "patch" : {
@@ -988,7 +992,7 @@
           "outcome" : "applied"
         },
         "VariablesUIData" : {
-          "outcome" : "untested"
+          "outcome" : "applied"
         }
       },
       "patchNull" : {
@@ -1282,7 +1286,8 @@
           "outcome" : "ignored"
         },
         "Password" : {
-          "outcome" : "ignored"
+          "outcome" : "applied",
+          "verifiedBy" : "signIn"
         },
         "Type" : {
           "outcome" : "ignored"
@@ -1299,7 +1304,8 @@
           "outcome" : "ignored"
         },
         "Password" : {
-          "outcome" : "ignored"
+          "outcome" : "applied",
+          "verifiedBy" : "signIn"
         },
         "Type" : {
           "outcome" : "ignored"

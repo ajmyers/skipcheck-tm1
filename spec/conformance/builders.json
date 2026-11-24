@@ -179,7 +179,7 @@
       "odataType" : null,
       "open" : false,
       "required" : [ "Dimensions" ],
-      "setters" : [ "AllowPersistentHolds", "Annotations", "Annotations@odata.bind", "CalculationThresholdForStorage", "CellSecurityDefaultValue", "CellSecurityMostRestrictive", "Dimensions", "Dimensions@odata.bind", "DrillthroughRules", "LastDataUpdate", "LastSchemaUpdate", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "PrivateViews", "PrivateViews@odata.bind", "Rules", "ViewAttributes", "ViewAttributes@odata.bind", "ViewStorageMaxMemory", "Views", "Views@odata.bind" ]
+      "setters" : [ "AllowPersistentHolds", "Annotations", "Annotations@odata.bind", "CalculationThresholdForStorage", "CellSecurityMostRestrictive", "Dimensions", "Dimensions@odata.bind", "DrillthroughRules", "LastDataUpdate", "LastSchemaUpdate", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "PrivateViews", "PrivateViews@odata.bind", "Rules", "ViewAttributes", "ViewAttributes@odata.bind", "ViewStorageMaxMemory", "Views", "Views@odata.bind" ]
     },
     "CubeDrillthroughPatch" : {
       "odataType" : "#ibm.tm1.api.v1.CubeDrillthrough",
@@ -191,7 +191,7 @@
       "odataType" : null,
       "open" : false,
       "required" : [ ],
-      "setters" : [ "AllowPersistentHolds", "Annotations", "Annotations@odata.bind", "CalculationThresholdForStorage", "CellSecurityDefaultValue", "CellSecurityMostRestrictive", "DrillthroughRules", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "PrivateViews", "PrivateViews@odata.bind", "Rules", "ViewAttributes", "ViewAttributes@odata.bind", "ViewStorageMaxMemory", "Views", "Views@odata.bind" ]
+      "setters" : [ "AllowPersistentHolds", "Annotations", "Annotations@odata.bind", "CalculationThresholdForStorage", "CellSecurityMostRestrictive", "DrillthroughRules", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "PrivateViews", "PrivateViews@odata.bind", "Rules", "ViewAttributes", "ViewAttributes@odata.bind", "ViewStorageMaxMemory", "Views", "Views@odata.bind" ]
     },
     "CubeReferencePatch" : {
       "odataType" : "#ibm.tm1.api.v1.CubeReference",
