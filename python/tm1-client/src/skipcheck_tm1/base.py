@@ -220,6 +220,21 @@ class Tm1Patch:
             self._values[name + "@odata.bind"] = [str(t) for t in targets]
             return self
 
+        def _copy(self, read: Any, names: tuple[str, ...], declared: tuple[str, ...] | None) -> Any:
+            """What ``read``, a model read from TM1, holds of ``names``, nulls left out; and, for an open
+            type (``declared`` given), its undeclared properties. Nothing when ``read`` is None."""
+            if read is None:
+                return self
+            data = read.to_odata()
+            for name in names:
+                if data.get(name) is not None:
+                    self._set(name, data[name])
+            if declared is not None:
+                for name, value in data.items():
+                    if name not in declared and not name.startswith("@") and value is not None:
+                        self.property(name, value)
+            return self
+
         def property(self, name: str, value: Any) -> Self:
             """A property ``$metadata`` doesn't declare, which an open type can have."""
             self._values[name] = value

@@ -1213,6 +1213,29 @@
 					"description" : "The type of the attribute."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"Type"
+					],
+					"properties" : {
+						"Type" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Type" : "rejected"
+					},
+					"nullRefused" : [
+						"Type"
+					],
+					"rename" : "rejected"
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -2066,6 +2089,44 @@
 					"description" : "The attributes of the chore."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"Active" : "applied",
+						"Attributes" : "ignored",
+						"DSTSensitive" : "applied",
+						"ExecutionMode" : "applied",
+						"Frequency" : "applied",
+						"StartTime" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Active" : "applied",
+						"Attributes" : "rejected",
+						"DSTSensitive" : "applied",
+						"ExecutionMode" : "applied",
+						"Frequency" : "applied",
+						"StartTime" : "applied"
+					},
+					"nullRefused" : [
+						"Active",
+						"Attributes",
+						"DSTSensitive",
+						"ExecutionMode",
+						"Frequency",
+						"StartTime"
+					],
+					"rename" : "rejected"
+				},
+				"collections" : {
+					"Tasks" : "appends"
+				}
+			},
 			"navigationProperties" : [
 				{
 					"name" : "LocalizedAttributes",
@@ -2545,6 +2606,53 @@
 					}
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"Dimensions@odata.bind"
+					],
+					"properties" : {
+						"AllowPersistentHolds" : "applied",
+						"Attributes" : "ignored",
+						"CalculationThresholdForStorage" : "applied",
+						"CellSecurityDefaultValue" : "rejected",
+						"CellSecurityMostRestrictive" : "applied",
+						"DrillthroughRules" : "applied",
+						"LastDataUpdate" : "transformed",
+						"LastSchemaUpdate" : "transformed",
+						"Rules" : "applied",
+						"ViewStorageMaxMemory" : "applied",
+						"ViewStorageMinTime" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"AllowPersistentHolds" : "applied",
+						"Attributes" : "rejected",
+						"CalculationThresholdForStorage" : "applied",
+						"CellSecurityDefaultValue" : "rejected",
+						"CellSecurityMostRestrictive" : "applied",
+						"DrillthroughRules" : "applied",
+						"LastDataUpdate" : "ignored",
+						"LastSchemaUpdate" : "ignored",
+						"Rules" : "applied",
+						"ViewStorageMaxMemory" : "applied",
+						"ViewStorageMinTime" : "ignored"
+					},
+					"nullRefused" : [
+						"AllowPersistentHolds",
+						"Attributes",
+						"CellSecurityMostRestrictive"
+					],
+					"rename" : "ignored"
+				},
+				"collections" : {
+					"Dimensions" : "ignored"
+				}
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Dimensions",
@@ -2761,6 +2869,33 @@
 					"longDescription" : "Attributes have a finite domain within the context of the dimension that they belong to. For example, a dimension for a customer may have attributes that describe the city, region, and country that the customer belongs to."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"AllLeavesHierarchyName" : "ignored",
+						"Attributes" : "ignored",
+						"UniqueName" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"AllLeavesHierarchyName" : "ignored",
+						"Attributes" : "rejected",
+						"UniqueName" : "ignored"
+					},
+					"nullRefused" : [
+						"Attributes"
+					],
+					"rename" : "ignored"
+				},
+				"collections" : {
+					"Hierarchies" : "ignored"
+				}
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Hierarchies",
@@ -3079,6 +3214,37 @@
 					}
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"Attributes" : "ignored",
+						"DisplayString" : "ignored",
+						"Index" : "ignored",
+						"Level" : "ignored",
+						"Type" : "applied",
+						"UniqueName" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"DisplayString" : "ignored",
+						"Index" : "ignored",
+						"Level" : "ignored",
+						"Type" : "applied",
+						"UniqueName" : "ignored"
+					},
+					"nullRefused" : [
+						"Attributes"
+					],
+					"rename" : "ignored"
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Hierarchy",
@@ -3802,6 +3968,21 @@
 					"longDescription" : "There are three predefined groups on each server: Admin, DataAdmin, and SecurityAdmin. Other user groups can be created by an administrator as required."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : { }
+				},
+				"patch" : {
+					"properties" : { },
+					"nullRefused" : [ ],
+					"rename" : "ignored"
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Users",
@@ -3988,6 +4169,50 @@
 					}
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"Attributes" : "ignored",
+						"Cardinality" : "ignored",
+						"ComponentsSortSense" : "applied",
+						"ComponentsSortType" : "applied",
+						"ElementsSortSense" : "applied",
+						"ElementsSortType" : "applied",
+						"Structure" : "ignored",
+						"UniqueName" : "ignored",
+						"Visible" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"Cardinality" : "ignored",
+						"ComponentsSortSense" : "applied",
+						"ComponentsSortType" : "applied",
+						"ElementsSortSense" : "applied",
+						"ElementsSortType" : "applied",
+						"Structure" : "ignored",
+						"UniqueName" : "ignored",
+						"Visible" : "ignored"
+					},
+					"nullRefused" : [
+						"Attributes",
+						"ComponentsSortSense",
+						"ComponentsSortType",
+						"ElementsSortSense",
+						"ElementsSortType"
+					],
+					"rename" : "ignored"
+				},
+				"collections" : {
+					"Edges" : "replaces",
+					"Elements" : "replaces"
+				}
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Dimension",
@@ -4537,6 +4762,32 @@
 					"description" : "An MDX expression that defines a cube view."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"MDX"
+					],
+					"properties" : {
+						"Attributes" : "ignored",
+						"MDX" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"MDX" : "applied"
+					},
+					"nullRefused" : [
+						"Attributes",
+						"MDX"
+					],
+					"rename" : "ignored"
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -5067,6 +5318,46 @@
 					"description" : "The format of the elements in the view."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"Columns",
+						"Rows"
+					],
+					"properties" : {
+						"Attributes" : "ignored",
+						"Columns" : "untested",
+						"FormatString" : "applied",
+						"Rows" : "untested",
+						"SuppressEmptyColumns" : "applied",
+						"SuppressEmptyRows" : "applied",
+						"Titles" : "untested"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"Columns" : "untested",
+						"FormatString" : "applied",
+						"Rows" : "untested",
+						"SuppressEmptyColumns" : "applied",
+						"SuppressEmptyRows" : "applied",
+						"Titles" : "untested"
+					},
+					"nullRefused" : [
+						"Attributes",
+						"Columns",
+						"FormatString",
+						"Rows",
+						"Titles"
+					],
+					"rename" : "ignored"
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -5309,6 +5600,62 @@
 					}
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"Attributes" : "ignored",
+						"Code" : "transformed",
+						"DataProcedure" : "applied",
+						"DataSource" : "applied",
+						"EpilogProcedure" : "applied",
+						"HasSecurityAccess" : "applied",
+						"MetadataProcedure" : "applied",
+						"Parameters" : "applied",
+						"PrologProcedure" : "applied",
+						"UIData" : "applied",
+						"Variables" : "applied",
+						"VariablesUIData" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"Code" : "transformed",
+						"DataProcedure" : "applied",
+						"DataSource" : "applied",
+						"EpilogProcedure" : "applied",
+						"HasSecurityAccess" : "applied",
+						"MetadataProcedure" : "applied",
+						"Parameters" : "applied",
+						"PrologProcedure" : "applied",
+						"UIData" : "applied",
+						"Variables" : "applied",
+						"VariablesUIData" : "applied"
+					},
+					"nullRefused" : [
+						"Attributes",
+						"Code",
+						"DataProcedure",
+						"EpilogProcedure",
+						"HasSecurityAccess",
+						"MetadataProcedure",
+						"Parameters",
+						"PrologProcedure",
+						"UIData",
+						"Variables",
+						"VariablesUIData"
+					],
+					"rename" : "rejected"
+				},
+				"collections" : {
+					"Parameters" : "replaces",
+					"Variables" : "replaces"
+				}
+			},
 			"navigationProperties" : [
 				{
 					"name" : "LocalizedAttributes",
@@ -6252,6 +6599,33 @@
 					"since" : "11.0.0"
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"IncludeInSandboxDimension" : "applied",
+						"IsActive" : "ignored",
+						"IsLoaded" : "ignored",
+						"IsQueued" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"IncludeInSandboxDimension" : "applied",
+						"IsActive" : "ignored",
+						"IsLoaded" : "ignored",
+						"IsQueued" : "ignored"
+					},
+					"nullRefused" : [
+						"IncludeInSandboxDimension"
+					],
+					"rename" : "ignored"
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -6672,6 +7046,39 @@
 					}
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"Alias" : "applied",
+						"Attributes" : "ignored",
+						"ExpandAbove" : "applied",
+						"Expression" : "applied",
+						"UniqueName" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Alias" : "applied",
+						"Attributes" : "rejected",
+						"ExpandAbove" : "applied",
+						"Expression" : "applied",
+						"UniqueName" : "ignored"
+					},
+					"nullRefused" : [
+						"Alias",
+						"Attributes",
+						"ExpandAbove"
+					],
+					"rename" : "ignored"
+				},
+				"collections" : {
+					"Elements" : "rejected"
+				}
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Hierarchy",
@@ -7177,6 +7584,39 @@
 					"since" : "11.0.0"
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"Enabled" : "ignored",
+						"FriendlyName" : "rejected",
+						"IsActive" : "ignored",
+						"Password" : "ignored",
+						"Type" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Enabled" : "applied",
+						"FriendlyName" : "rejected",
+						"IsActive" : "ignored",
+						"Password" : "ignored",
+						"Type" : "ignored"
+					},
+					"nullRefused" : [
+						"Enabled",
+						"FriendlyName",
+						"Password"
+					],
+					"rename" : "ignored"
+				},
+				"collections" : {
+					"Groups" : "replaces"
+				}
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Groups",

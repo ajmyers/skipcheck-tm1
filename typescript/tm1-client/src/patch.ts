@@ -65,6 +65,24 @@ export abstract class Tm1PatchBuilder<P extends Tm1Patch> {
     return this;
   }
 
+  /** @internal What `read`, an entity read from TM1, holds of `names`, nulls left out; and, for an
+   * open type (`declared` given), its undeclared properties. The generated `builder(read)` calls it. */
+  copy(read: object, names: readonly string[], declared: readonly string[] | null): this {
+    const data = read as Record<string, unknown>;
+    for (const name of names) if (data[name] !== undefined && data[name] !== null) this.set(name, data[name]);
+    if (declared) {
+      for (const [name, value] of Object.entries(data)) {
+        if (!declared.includes(name) && !name.startsWith("@") && value !== undefined && value !== null) this.set(name, value);
+      }
+    }
+    return this;
+  }
+
+  /** Whether a property, or a binding of it, has been set. */
+  protected has(name: string): boolean {
+    return this.#values.has(name) || this.#values.has(name + "@odata.bind");
+  }
+
   /** The patch, with what's been set so far. */
   build(): P {
     return this.#make(this.#values);

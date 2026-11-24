@@ -30,6 +30,12 @@ export interface SpecType {
   deprecated?: { version?: string; reason?: string } | null;
   properties?: SpecProperty[];
   navigationProperties?: SpecProperty[];
+  write?: {
+    observedIn?: string[];
+    create: { required?: string[]; properties: Record<string, string> };
+    patch: { properties: Record<string, string>; nullRefused?: string[]; rename?: string };
+    collections?: Record<string, string>;
+  };
 }
 
 export interface SpecEnum {

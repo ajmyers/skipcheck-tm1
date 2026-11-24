@@ -164,6 +164,9 @@ public final class ModelGenerator {
 
 	private final CsdlDocument metadata;
 
+	/** What a POST and a PATCH do with each property, by type, from the probe. */
+	private final Writes writes;
+
 	/**
 	 * {@code @Tm1Departure} for each member that departs from {@code $metadata}, by
 	 * {@code Type/Property}.
@@ -209,7 +212,23 @@ public final class ModelGenerator {
 	 * doesn't do and the generator doesn't support yet
 	 */
 	public ModelGenerator(CsdlDocument metadata, Overlay overlay, Undeclared undeclared) {
+		this(metadata, overlay, undeclared, Writes.NONE);
+	}
+
+	/**
+	 * A generator for {@code metadata}, with what a probe found: the undeclared
+	 * properties, and what a POST and a PATCH do with each property.
+	 * @param metadata the {@code $metadata} document, with the undeclared properties
+	 * added
+	 * @param overlay what TM1 does differently from {@code metadata}, with the undeclared
+	 * properties' departures
+	 * @param undeclared the undeclared properties, to tag
+	 * @param writes what writes do, for the create types and {@code from}
+	 * @throws IllegalArgumentException if a type derives from a derived type
+	 */
+	public ModelGenerator(CsdlDocument metadata, Overlay overlay, Undeclared undeclared, Writes writes) {
 		this.metadata = metadata;
+		this.writes = writes;
 		overlay.departures().forEach((key, note) -> this.tags.put(key, new Departure("TYPE", List.of(), plain(note))));
 		overlay.lenientDates()
 			.forEach((key, note) -> this.tags.put(key, new Departure("LENIENT_DATE", List.of(), plain(note))));
@@ -257,6 +276,12 @@ public final class ModelGenerator {
 		metadata.structuredTypes()
 			.sorted(Comparator.comparing(CsdlStructuredType::name))
 			.forEach(t -> files.add(file(revised(patch(t), t.annotations()))));
+		// Creates, for the entity types the probe has writes for, and the roots their
+		// creates extend: a complex value is only ever part of another write
+		metadata.structuredTypes()
+			.filter(this::creatable)
+			.sorted(Comparator.comparing(CsdlStructuredType::name))
+			.forEach(t -> files.add(file(revised(create(t), t.annotations()))));
 		files.add(file(catalog()));
 		return files;
 	}
@@ -662,9 +687,22 @@ public final class ModelGenerator {
 	 * root's and writes {@code @odata.type} first.
 	 */
 	private TypeSpec.Builder patch(CsdlStructuredType type) {
-		ClassName name = patchName(type);
+		return write(type, false);
+	}
+
+	/**
+	 * A type's create ({@code XCreate}): as its patch, but with only the properties a
+	 * POST takes, by the probe's writes, and {@code build()} checks those a POST needs.
+	 */
+	private TypeSpec.Builder create(CsdlStructuredType type) {
+		return write(type, true);
+	}
+
+	private TypeSpec.Builder write(CsdlStructuredType type, boolean create) {
+		ClassName name = create ? createName(type) : patchName(type);
 		if (metadata.structuredTypes().anyMatch(t -> javaTypeName(t.name()).equals(name.simpleName()))) {
-			throw new IllegalArgumentException(name.simpleName() + " is a CSDL type, so its patch needs another name");
+			throw new IllegalArgumentException(
+					name.simpleName() + " is a CSDL type, so its write type needs another name");
 		}
 		CsdlStructuredType root = roots.get(qualified(type));
 		boolean extensible = hierarchies.containsKey(qualified(type));
@@ -677,14 +715,19 @@ public final class ModelGenerator {
 			.addModifiers(extensible ? new Modifier[] { Modifier.PUBLIC }
 					: new Modifier[] { Modifier.PUBLIC, Modifier.FINAL })
 			.addAnnotation(GENERATED)
-			.addJavadoc("$L", "A write of {@link " + record
+			.addJavadoc("$L", (create ? "A create of {@link " + record
+					+ "}, for a {@code POST}: only the properties set are sent, and only those TM1 applies in a create are offered"
+					+ (writes.get(type.name()) == null ? " (this type has no write probe yet, so all are)"
+							: ", as the probe found (" + writes.schemaVersion() + ")")
+					+ ". {@code build()} checks what a create needs. {@code builder(read)} starts one from a read entity, to recreate it.\n\n<p>\n"
+					: "") + "A write of {@link " + record
 					+ "}: for a {@code PATCH}, only the properties set are sent, an explicit {@code null} included; for a {@code POST}, the new entity's properties, nested patches for deep inserts and {@code @odata.bind} references to existing entities.\n\n<p>\n"
 					+ (root != null ? "Extends {@link " + patchName(root).simpleName()
 							+ "} and sends {@code @odata.type} {@code " + typeId(type) + "}. " : "")
 					+ (extensible ? "Each subtype's patch extends this one. " : "")
 					+ "Generated from {@code $metadata}.\n");
 		if (root != null) {
-			spec.superclass(patchName(root));
+			spec.superclass(create ? createName(root) : patchName(root));
 			spec.addMethod(MethodSpec.constructorBuilder()
 				.addParameter(valuesType, "values")
 				.addStatement("super(values)")
@@ -742,9 +785,9 @@ public final class ModelGenerator {
 			.addJavadoc("Builds a {@link $T}; each setter replaces what an earlier call set.\n", name);
 		MethodSpec.Builder ctor = MethodSpec.constructorBuilder();
 		if (root != null) {
-			b.superclass(patchName(root).nestedClass("Builder"));
+			b.superclass((create ? createName(root) : patchName(root)).nestedClass("Builder"));
 			ctor.addStatement("this.values.put($S, $S)", "@odata.type", typeId(type));
-			for (PatchProperty inherited : patchProperties(root)) {
+			for (PatchProperty inherited : writable(root, type, create)) {
 				addPatchMethods(b, builder, inherited, true);
 			}
 		}
@@ -760,7 +803,7 @@ public final class ModelGenerator {
 						.build());
 		}
 		b.addMethod(ctor.build());
-		for (PatchProperty own : patchProperties(type)) {
+		for (PatchProperty own : writable(type, type, create)) {
 			addPatchMethods(b, builder, own, false);
 		}
 		if (open(type)) {
@@ -782,14 +825,174 @@ public final class ModelGenerator {
 		MethodSpec.Builder build = MethodSpec.methodBuilder("build")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(name)
-			.addJavadoc("The patch, with what's been set so far.\n@return the patch\n")
-			.addStatement("return new $T(values)", name);
+			.addJavadoc("The $L, with what's been set so far.\n@return the $L\n$L", create ? "create" : "patch",
+					create ? "create" : "patch", create && !required(type).isEmpty()
+							? "@throws IllegalStateException if it lacks what a create needs\n" : "");
+		if (create) {
+			for (String needed : required(type)) {
+				String bare = needed.replace("@odata.bind", "");
+				build
+					.beginControlFlow("if (!values.containsKey($S) && !values.containsKey($S))", bare,
+							bare + "@odata.bind")
+					.addStatement("throw new $T($S)", IllegalStateException.class,
+							"A " + type.name() + " create needs " + bare + ": TM1 refuses one without it")
+					.endControlFlow();
+			}
+		}
+		build.addStatement("return new $T(values)", name);
 		if (root != null) {
 			build.addAnnotation(Override.class);
 		}
 		b.addMethod(build.build());
 		spec.addType(b.build());
+		if (!hierarchies.containsKey(qualified(type))) {
+			spec.addMethod(from(type, root, builder, create));
+		}
 		return spec;
+	}
+
+	/**
+	 * Whether a type gets a create: the probe has writes for it, or it's the root of a
+	 * hierarchy whose subtype does.
+	 */
+	private boolean creatable(CsdlStructuredType type) {
+		if (!(type instanceof CsdlEntityType)) {
+			return false;
+		}
+		if (writes.get(type.name()) != null) {
+			return true;
+		}
+		List<CsdlStructuredType> subtypes = hierarchies.get(qualified(type));
+		return subtypes != null && subtypes.stream().anyMatch(s -> writes.get(s.name()) != null);
+	}
+
+	private static ClassName createName(CsdlStructuredType type) {
+		return ClassName.get(PACKAGE, javaTypeName(type.name()) + "Create");
+	}
+
+	/**
+	 * The properties a write type offers: for a create, those a POST of {@code type}
+	 * takes, by the probe's writes (all, for a type with none); for a patch, all of them.
+	 */
+	private List<PatchProperty> writable(CsdlStructuredType level, CsdlStructuredType type, boolean create) {
+		if (!create) {
+			return patchProperties(level);
+		}
+		return patchProperties(level).stream().filter(p -> p.navigation() || creates(type, p.json())).toList();
+	}
+
+	/**
+	 * Whether a POST of {@code type} takes a property: by its writes; for the root of a
+	 * hierarchy without its own, if every subtype that has writes takes it, so each
+	 * subtype's create offers at least what its root's does.
+	 */
+	private boolean creates(CsdlStructuredType type, String property) {
+		Writes.TypeWrites w = writes.get(type.name());
+		if (w != null) {
+			return w.creates(property);
+		}
+		List<CsdlStructuredType> subtypes = hierarchies.getOrDefault(qualified(type), List.of());
+		return subtypes.stream()
+			.map(s -> writes.get(s.name()))
+			.filter(Objects::nonNull)
+			.allMatch(s -> s.creates(property));
+	}
+
+	/** What a create of {@code type} needs besides its name, by the probe. */
+	private List<String> required(CsdlStructuredType type) {
+		Writes.TypeWrites w = writes.get(type.name());
+		return w == null ? List.of() : w.required();
+	}
+
+	/**
+	 * {@code builder(read)}: a builder holding what a read entity has that this write
+	 * sets: for a create, what a POST applies; for a patch, what a PATCH applies, leaving
+	 * out the collections a PATCH replaces or appends to. Navigation properties aren't
+	 * copied, nor nulls. Structured values are converted with their own patch's
+	 * {@code from}.
+	 */
+	private MethodSpec from(CsdlStructuredType type, @Nullable CsdlStructuredType root, ClassName builder,
+			boolean create) {
+		ClassName record = ClassName.get(PACKAGE, javaTypeName(type.name()));
+		Writes.TypeWrites w = writes.get(type.name());
+		Map<String, String> accessors = new HashMap<>();
+		components(type).forEach(c -> accessors.put(c.json(), c.name()));
+		List<PatchProperty> properties = new ArrayList<>();
+		if (root != null) {
+			properties.addAll(writable(root, type, create));
+		}
+		properties.addAll(writable(type, type, create));
+		MethodSpec.Builder from = MethodSpec.methodBuilder("builder")
+			.addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+			.addParameter(record, "read")
+			.returns(builder)
+			.addJavadoc(create
+					? "A create of what {@code read} holds that a {@code POST} applies, to recreate it: change it with the builder's setters.\n"
+					: "A patch of what {@code read} holds that a {@code PATCH} applies, leaving out collections a {@code PATCH} replaces or appends to: change it with the builder's setters.\n")
+			.addJavadoc(
+					"Navigation properties aren't copied, nor nulls.\n@param read an entity read from TM1\n@return a builder\n")
+			.addStatement("$T b = new $T()", builder, builder);
+		for (PatchProperty p : properties) {
+			String accessor = accessors.get(p.json());
+			if (p.navigation() || accessor == null || (!create && w != null && !w.patches(p.json()))) {
+				continue;
+			}
+			CodeBlock value = convert(p, "read." + accessor + "()");
+			if (value == null) {
+				continue;
+			}
+			from.beginControlFlow("if (read.$L() != null)", accessor)
+				.addStatement("b.$L($L)", p.method(), value)
+				.endControlFlow();
+		}
+		if (open(type) && accessors.containsKey(DYNAMIC)) {
+			from.beginControlFlow("if (read.$L() != null)", accessors.get(DYNAMIC))
+				.addStatement("read.$L().forEach(b::property)", accessors.get(DYNAMIC))
+				.endControlFlow();
+		}
+		return from.addStatement("return b").build();
+	}
+
+	/**
+	 * A read value as a write setter takes it, or null when it can't be: structured
+	 * values through their patch's {@code from}, unless their type has subtypes.
+	 */
+	private @Nullable CodeBlock convert(PatchProperty p, String value) {
+		TypeName t = p.type();
+		if (t instanceof ParameterizedTypeName list) {
+			TypeName element = list.typeArguments().get(0);
+			if (element instanceof WildcardTypeName) {
+				return null;
+			}
+			if (element.equals(ClassName.get(Object.class))) {
+				return CodeBlock.of("$T.<Object>copyOf($L)", List.class, value);
+			}
+			if (element instanceof ClassName c && isPatch(c)) {
+				return fromable(c) ? CodeBlock.of("$L.stream().map(v -> $T.builder(v).build()).toList()", value, c)
+						: null;
+			}
+			return CodeBlock.of("$L", value);
+		}
+		if (t instanceof ClassName c && isPatch(c)) {
+			return fromable(c) ? CodeBlock.of("$T.builder($L).build()", c, value) : null;
+		}
+		return CodeBlock.of("$L", value);
+	}
+
+	private static boolean isPatch(ClassName c) {
+		return c.packageName().equals(PACKAGE) && c.simpleName().endsWith("Patch");
+	}
+
+	/**
+	 * Whether a patch has {@code builder(read)}: its type isn't the root of a hierarchy.
+	 */
+	private boolean fromable(ClassName patch) {
+		String csdl = patch.simpleName().substring(0, patch.simpleName().length() - "Patch".length());
+		return metadata.structuredTypes()
+			.filter(t -> javaTypeName(t.name()).equals(csdl))
+			.findFirst()
+			.map(t -> !hierarchies.containsKey(qualified(t)))
+			.orElse(false);
 	}
 
 	private static void addPatchMethods(TypeSpec.Builder builder, ClassName builderName, PatchProperty property,
