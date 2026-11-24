@@ -36,7 +36,9 @@ const PA_DOCKER_VISUAL = {
 	kind: 'terminal',
 	lines: [
 		{ text: '# Start everything you picked', tone: 'comment' },
-		{ text: 'curl -fsSL https://skipcheck.io/pa/setup.sh | sh -s -- up' },
+		{ text: 'curl -fsSL \\' },
+		{ text: '  https://skipcheck.io/pa/setup.sh \\' },
+		{ text: '  | sh -s -- up' },
 	],
 };
 
