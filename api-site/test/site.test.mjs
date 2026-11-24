@@ -91,15 +91,14 @@ test("an example's regions are read from its file, without their indentation", a
 	}
 });
 
-test('every project, the Docker pages and the docs landing page have a route on each zone, and the old addresses theirs', () => {
+test('every project, the Docker pages and the docs landing page have a route on skipcheck.io, and the old addresses theirs', () => {
 	const wrangler = readFileSync(fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)), 'utf8');
 	const patterns = [...wrangler.matchAll(/"pattern":\s*"([^"]+)"/g)].map((match) => match[1]);
-	for (const zone of ['skipcheck.io', 'skipcheck.dev']) {
-		for (const section of SECTIONS) assert.ok(patterns.includes('*' + zone + '/' + section.id + '*'), 'no route for ' + section.id + ' on ' + zone);
-		assert.ok(patterns.includes('*' + zone + '/projects/tm1*'), 'no route for the old addresses on ' + zone);
-	}
+	// skipcheck.dev redirects to skipcheck.io before any Worker runs, so it has none
+	for (const section of SECTIONS) assert.ok(patterns.includes('*skipcheck.io/' + section.id + '*'), 'no route for ' + section.id);
+	assert.ok(patterns.includes('*skipcheck.io/projects/tm1*'), 'no route for the old addresses');
 	assert.ok(['tm1-client', 'pa-docker', 'docs'].every((id) => SECTIONS.some((section) => section.id === id)), SECTIONS.map((section) => section.id).join(', '));
-	assert.equal(patterns.length, 2 * (SECTIONS.length + 1), 'a route that SECTIONS in scripts/site.mjs does not account for');
+	assert.equal(patterns.length, SECTIONS.length + 1, 'a route that SECTIONS in scripts/site.mjs does not account for');
 });
 
 test("no Docker page is built at the site's setup page, which the Worker passes through to the site", () => {
