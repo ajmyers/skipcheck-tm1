@@ -113,6 +113,63 @@
 			}
 		},
 		{
+			"id": "a process's patch copies the parameters and variables a PATCH replaces, and leaves out the name it refuses",
+			"type": "Process",
+			"write": "patch",
+			"read": {
+				"Name": "Load",
+				"PrologProcedure": "x = 1;",
+				"UIData": "CubeAction=1511\f",
+				"VariablesUIData": [
+					"VarType=32\f"
+				],
+				"Parameters": [
+					{
+						"Name": "pRegion",
+						"Prompt": "A region",
+						"Value": "North",
+						"Type": "String"
+					}
+				],
+				"Variables": [
+					{
+						"Name": "vRegion",
+						"Type": "String",
+						"Position": 1,
+						"StartByte": 0,
+						"EndByte": 0
+					}
+				],
+				"Attributes": {
+					"Caption": "Load"
+				}
+			},
+			"expect": {
+				"PrologProcedure": "x = 1;",
+				"UIData": "CubeAction=1511\f",
+				"VariablesUIData": [
+					"VarType=32\f"
+				],
+				"Parameters": [
+					{
+						"Name": "pRegion",
+						"Prompt": "A region",
+						"Value": "North",
+						"Type": "String"
+					}
+				],
+				"Variables": [
+					{
+						"Name": "vRegion",
+						"Type": "String",
+						"Position": 1,
+						"StartByte": 0,
+						"EndByte": 0
+					}
+				]
+			}
+		},
+		{
 			"id": "a value whose type has subtypes is copied as its own type",
 			"type": "ServerSettings",
 			"write": "patch",

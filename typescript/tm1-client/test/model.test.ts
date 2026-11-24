@@ -98,9 +98,9 @@ describe("the generated model", () => {
   });
 
   it("sends only what a patch sets, in order, with explicit nulls and bindings", () => {
-    const dimensions = ODataPath.of("Dimensions");
-    const patch = (): CubePatch => CubePatch.builder().rules(null).bindDimensions(dimensions.key("Region"), dimensions.key("Month")).build();
-    expect(JSON.stringify(patch())).toBe('{"Rules":null,"Dimensions@odata.bind":["Dimensions(\'Region\')","Dimensions(\'Month\')"]}');
+    const view = ODataPath.of("Cubes").key("Sales").nav("Views").key("Default");
+    const patch = (): CubePatch => CubePatch.builder().rules(null).bindViews(view).build();
+    expect(JSON.stringify(patch())).toBe('{"Rules":null,"Views@odata.bind":["Cubes(\'Sales\')/Views(\'Default\')"]}');
     expect(patch().equals(patch())).toBe(true);
     expect(patch().equals(CubePatch.builder().rules(null).build())).toBe(false);
   });

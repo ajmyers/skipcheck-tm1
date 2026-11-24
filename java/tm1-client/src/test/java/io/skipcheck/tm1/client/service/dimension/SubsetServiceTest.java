@@ -4,6 +4,7 @@ package io.skipcheck.tm1.client.service.dimension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 
@@ -17,7 +18,6 @@ import io.skipcheck.tm1.client.error.Tm1ErrorKind;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Element;
-import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.Hierarchy;
 import io.skipcheck.tm1.client.model.Subset;
 import io.skipcheck.tm1.client.model.SubsetCreate;
@@ -204,13 +204,11 @@ class SubsetServiceTest {
 
 	@Test
 	void refusesAnUpdateWithElementsSendingNothing() {
-		Throwable set = conformance.fail("subsets", "update", "Region", "Region", SubsetScope.PUBLIC, "s",
-				SubsetPatch.builder().elements(List.of(ElementCreate.builder().name("West").build())).build());
-		assertThat(set).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("addElements");
-
-		Throwable bound = conformance.fail("subsets", "update", "Region", "Region", SubsetScope.PUBLIC, "s",
-				SubsetPatch.builder().bindElements(ELEMENTS.key("West")).build(), "W/\"1\"");
-		assertThat(bound).isInstanceOf(IllegalArgumentException.class);
+		// Refused at compile time: SubsetPatch offers no Elements, as TM1 refuses them in
+		// a
+		// PATCH and appends a binding (addElements does that, by name)
+		assertThat(Arrays.stream(SubsetPatch.Builder.class.getMethods()).map(Method::getName))
+			.doesNotContain("elements", "bindElements");
 		assertThat(tm1().requests()).isEmpty();
 	}
 

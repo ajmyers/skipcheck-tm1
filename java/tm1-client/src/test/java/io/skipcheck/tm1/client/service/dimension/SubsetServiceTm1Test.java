@@ -3,10 +3,11 @@
 package io.skipcheck.tm1.client.service.dimension;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.reflect.Method;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -119,10 +120,10 @@ class SubsetServiceTm1Test {
 		subsets.clearElements(d, d, SubsetScope.PUBLIC, "S").block(WAIT);
 		assertThat(elements(SubsetScope.PUBLIC, "S")).isEmpty();
 
-		assertThatIllegalArgumentException()
-			.isThrownBy(() -> subsets.update(d, d, SubsetScope.PUBLIC, "S",
-					SubsetPatch.builder().bindElements(el("D")).build()))
-			.withMessageContaining("addElements");
+		// SubsetPatch offers no Elements: TM1 refuses them in a PATCH, and appends a
+		// binding
+		assertThat(Arrays.stream(SubsetPatch.Builder.class.getMethods()).map(Method::getName))
+			.doesNotContain("elements", "bindElements");
 	}
 
 	@Test

@@ -268,16 +268,22 @@ def creates(t: dict[str, Any], prop: str, spec: Spec | None = None) -> bool:
 
 
 def patches(t: dict[str, Any], prop: str) -> bool:
-    """Whether a PATCH of ``t`` applies ``prop``, leaving out collections it replaces or appends to."""
+    """Whether ``builder(read)`` copies ``prop`` into a patch of ``t``: a PATCH applies it, and it isn't a
+    collection a PATCH appends to (copying one would add its members again), ignores or rejects. A
+    collection a PATCH replaces is copied: the read holds all of it. As the Java generator."""
     w = t.get("write")
-    return w is None or (_writes(w["patch"]["properties"].get(prop)) and prop not in w.get("collections", {}))
+    if w is None:
+        return True
+    collection = w.get("collections", {}).get(prop)
+    return _writes(w["patch"]["properties"].get(prop)) and collection not in ("appends", "ignored", "rejected")
 
 
 def _offers_in_patch(w: dict[str, Any], prop: str) -> bool:
     if prop == "Name":
         return w["patch"].get("rename", "applied") == "applied"
     outcome = w["patch"]["properties"].get(prop)
-    return outcome not in ("rejected", "ignored")
+    collection = w.get("collections", {}).get(prop)
+    return outcome not in ("rejected", "ignored") and collection not in ("rejected", "ignored")
 
 
 def offers_in_patch(spec: Spec, t: dict[str, Any], prop: str) -> bool:
@@ -323,7 +329,7 @@ def _builder_method(spec: Spec, t: dict[str, Any], name: str, create: bool | Non
         out += [f"    def builder(cls) -> {name}.Builder:", "        return cls.Builder(cls)"]
         return out
     copied = tuple(_copied_names(spec, t, create))
-    what = "a POST applies, to recreate it" if create else "a PATCH applies, leaving out collections a PATCH replaces or appends to"
+    what = "a POST applies, to recreate it" if create else "a PATCH applies, leaving out collections a PATCH appends to"
     declared = None
     if any(level["open"] for level in spec.chain(t)):
         declared = tuple(p["name"] for level in spec.chain(t) for p in level["properties"] + level["navigationProperties"])
@@ -387,6 +393,9 @@ def emit_patches(spec: Spec) -> str:
             out.append(f"            return self._set({p['name']!r}, value)  # type: ignore[return-value]")
             methods += 1
         for n in t["navigationProperties"]:
+            # A navigation a PATCH ignores or rejects (a cube's Dimensions) isn't offered either
+            if not offers_in_patch(spec, t, n["name"]):
+                continue
             m = names.unique(names.field_name(n["name"]).rstrip("_"), taken)
             out.append("")
             out.append(f"        def {m}(self, value: Any) -> Self:")

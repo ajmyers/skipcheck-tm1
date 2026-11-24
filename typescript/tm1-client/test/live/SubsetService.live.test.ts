@@ -11,6 +11,7 @@ import {
   ODataQuery,
   SubsetCreate,
   SubsetPatch,
+  SubsetPatchBuilder,
   SubsetScope,
   type Tm1Client,
   Tm1PreconditionFailedException,
@@ -88,7 +89,9 @@ describe("SubsetService on TM1" + liveReason, () => {
     await tm1.subsets.clearElements(d, d, SubsetScope.Public, "S");
     expect(await elements(SubsetScope.Public, "S")).toEqual([]);
 
-    expect(() => tm1.subsets.update(d, d, SubsetScope.Public, "S", SubsetPatch.builder().bindElements(el("D")).build())).toThrow(/addElements/);
+    // SubsetPatch offers no Elements: TM1 refuses them in a PATCH, and appends a binding
+    expect(Object.getOwnPropertyNames(SubsetPatchBuilder.prototype)).not.toContain("elements");
+    expect(Object.getOwnPropertyNames(SubsetPatchBuilder.prototype)).not.toContain("bindElements");
   });
 
   tm1Test("places elements last, before or after others", async () => {

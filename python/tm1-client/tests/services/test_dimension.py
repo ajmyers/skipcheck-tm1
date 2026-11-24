@@ -358,6 +358,8 @@ def test_subsets_by_scope(api: Api, fake: FakeTm1, scope: SubsetScope) -> None:
 
 
 def test_a_subset_update_refuses_elements(api: Api, fake: FakeTm1) -> None:
+    # SubsetPatch offers no Elements: TM1 refuses them in a PATCH, and appends a binding
+    assert not hasattr(SubsetPatch.Builder, "elements") and not hasattr(SubsetPatch.Builder, "bind_elements")
     for patch in (SubsetCreate.builder().elements([]).build(), {"Elements@odata.bind": []}):
         with pytest.raises(ValueError, match="add_elements"):
             api.run(api.client.subsets.update("Region", "Region", SubsetScope.PUBLIC, "s", patch))

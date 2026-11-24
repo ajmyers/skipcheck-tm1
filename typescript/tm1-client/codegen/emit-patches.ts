@@ -64,15 +64,19 @@ export function creates(t: SpecType, prop: string, spec?: Spec): boolean {
   return writes(t.write?.create.properties[prop]);
 }
 
-/** Whether a PATCH of `t` applies a property, leaving out collections it replaces or appends to. */
+/** Whether `builder(read)` copies a property into a patch of `t`: a PATCH applies it, and it isn't a
+ * collection a PATCH appends to (copying one would add its members again), ignores or rejects. A
+ * collection a PATCH replaces is copied: the read holds all of it. As the Java generator. */
 export function patches(t: SpecType, prop: string): boolean {
-  return writes(t.write?.patch.properties[prop]) && !(t.write?.collections && prop in t.write.collections);
+  const collection = t.write?.collections?.[prop];
+  return writes(t.write?.patch.properties[prop]) && !["appends", "ignored", "rejected"].includes(collection ?? "");
 }
 
 function writeOffersInPatch(write: NonNullable<SpecType["write"]>, prop: string): boolean {
   if (prop === "Name") return write.patch.rename === undefined || write.patch.rename === null || write.patch.rename === "applied";
   const outcome = write.patch.properties[prop];
-  return outcome !== "rejected" && outcome !== "ignored";
+  const collection = write.collections?.[prop];
+  return outcome !== "rejected" && outcome !== "ignored" && collection !== "rejected" && collection !== "ignored";
 }
 
 /**
@@ -117,7 +121,7 @@ function emitPatch(spec: Spec, t: SpecType, create = false): string {
     const declared = spec.chain(t).some((l) => l.open)
       ? JSON.stringify(spec.chain(t).flatMap((l) => [...(l.properties ?? []), ...(l.navigationProperties ?? [])].map((p) => p.name)))
       : "null";
-    const what = create ? "a POST applies, to recreate it" : "a PATCH applies, leaving out collections a PATCH replaces or appends to";
+    const what = create ? "a POST applies, to recreate it" : "a PATCH applies, leaving out collections a PATCH appends to";
     out += `  /** A builder with nothing set${base ? " but " + ticks : ""}; or, given an entity read from TM1, one holding what it holds that ${what}. Navigation properties aren't copied, nor nulls. */\n`;
     out += `  static ${base ? "override " : ""}builder(read?: model.${name}): ${builder} {\n`;
     out += `    const b = new ${builder}();\n    return read ? b.copy(read, ${JSON.stringify(copied)}, ${declared}) : b;\n  }\n}\n\n`;
@@ -145,7 +149,8 @@ function emitPatch(spec: Spec, t: SpecType, create = false): string {
     }
     for (const n of level.navigationProperties ?? []) {
       const type = patchType(spec, n.type, !!n.collection);
-      if (type === undefined) continue;
+      // A navigation a PATCH ignores or rejects (a cube's Dimensions) isn't offered either
+      if (type === undefined || (!create && !offersInPatch(spec, t, n.name))) continue;
       const method = Names.unique(Names.method(n.name), taken);
       out += `\n  /** Sets \`${n.name}\` (nested, for a deep insert). */\n`;
       out += `  ${method}(value: ${type}): this {\n    return this.set(${JSON.stringify(n.name)}, value);\n  }\n`;

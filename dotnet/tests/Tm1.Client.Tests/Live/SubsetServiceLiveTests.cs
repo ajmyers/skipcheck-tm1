@@ -58,11 +58,8 @@ public class SubsetServiceLiveTests
         Assert.Equal(["A", "C", "B"], await SubsetElements(tm1, d, pub, "S")); // appended, in order
         await tm1.Subsets.ClearElementsAsync(d, d, pub, "S");
         Assert.Empty(await SubsetElements(tm1, d, pub, "S"));
-        var e = Assert.Throws<ArgumentException>(() =>
-        {
-            _ = tm1.Subsets.UpdateAsync(d, d, pub, "S", SubsetPatch.Builder().BindElements(El(d, "D")).Build());
-        });
-        Assert.Contains("AddElementsAsync", e.Message);
+        // SubsetPatch offers no Elements: TM1 refuses them in a PATCH, and appends a binding
+        Assert.DoesNotContain(typeof(SubsetPatch.PatchBuilder).GetMethods(), m => m.Name is "Elements" or "BindElements");
     }
 
     [Tm1Fact]

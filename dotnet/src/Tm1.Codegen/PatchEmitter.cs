@@ -76,10 +76,17 @@ public sealed class PatchEmitter
             ? Writes(Outcome(t, "create", prop))
             : _spec.Derived(t).Where(d => d.TryGetProperty("write", out _)).All(d => Writes(Outcome(d, "create", prop)));
 
-    /// <summary>Whether a PATCH applies a property, leaving out collections it replaces or appends to.</summary>
+    /// <summary>
+    /// Whether <c>Builder(read)</c> copies a property into a patch: a PATCH applies it, and it isn't a
+    /// collection a PATCH appends to (copying one would add its members again), ignores or rejects. A
+    /// collection a PATCH replaces is copied: the read holds all of it. As the Java generator.
+    /// </summary>
     private static bool Patches(JsonElement t, string prop) =>
-        Writes(Outcome(t, "patch", prop))
-        && !(t.TryGetProperty("write", out var w) && w.TryGetProperty("collections", out var c) && c.TryGetProperty(prop, out _));
+        Writes(Outcome(t, "patch", prop)) && Collection(t.TryGetProperty("write", out var w) ? w : default, prop) is not ("appends" or "ignored" or "rejected");
+
+    /// <summary>What the probe found a PATCH does with a collection or navigation: <c>replaces</c>, <c>appends</c>, <c>ignored</c>, <c>rejected</c>; or null.</summary>
+    private static string? Collection(JsonElement w, string prop) =>
+        w.ValueKind == JsonValueKind.Object && w.TryGetProperty("collections", out var c) && c.TryGetProperty(prop, out var o) ? o.GetString() : null;
 
     private static bool WriteOffersInPatch(JsonElement w, string prop)
     {
@@ -89,7 +96,7 @@ public sealed class PatchEmitter
             return !patch.TryGetProperty("rename", out var rename) || rename.ValueKind == JsonValueKind.Null || rename.GetString() == "applied";
         }
         var outcome = patch.GetProperty("properties").TryGetProperty(prop, out var o) ? o.GetString() : null;
-        return outcome is not ("rejected" or "ignored");
+        return outcome is not ("rejected" or "ignored") && Collection(w, prop) is not ("rejected" or "ignored");
     }
 
     /// <summary>
@@ -162,7 +169,7 @@ public sealed class PatchEmitter
                     )
                     + "]"
                 : "null";
-            var what = create ? "a POST applies, to recreate it" : "a PATCH applies, leaving out collections a PATCH replaces or appends to";
+            var what = create ? "a POST applies, to recreate it" : "a PATCH applies, leaving out collections a PATCH appends to";
             _out.Append(
                 $"    /// <summary>A builder holding what <paramref name=\"read\"/> holds that {what}: change it with the builder's setters. Navigation properties aren't copied, nor nulls.</summary>\n"
             );
@@ -211,7 +218,8 @@ public sealed class PatchEmitter
                 var nav = Spec.Str(n, "name")!;
                 var collection = Spec.Bool(n, "collection");
                 var type = PatchType(Spec.Str(n, "type")!, collection);
-                if (type is null)
+                // A navigation a PATCH ignores or rejects (a cube's Dimensions) isn't offered either
+                if (type is null || (!create && !OffersInPatch(t, nav)))
                 {
                     continue;
                 }
