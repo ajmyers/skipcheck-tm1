@@ -31,6 +31,12 @@ import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 @EnabledIfEnvironmentVariable(named = "TM1_PROBE", matches = "true")
 class ProbeRunTm1Test {
 
+	/**
+	 * {@code writes} to probe the writes alone, keeping the committed report's other
+	 * findings (one server is enough).
+	 */
+	static final String ONLY = "TM1_PROBE_ONLY";
+
 	/** How many servers to probe with; 4 unless set. */
 	static final String SERVERS = "TM1_PROBE_SERVERS";
 
@@ -52,7 +58,8 @@ class ProbeRunTm1Test {
 			}
 		}
 		// More servers, from the same source: one TM1 answers about 35,000 names a second
-		int count = Integer.parseInt(System.getenv().getOrDefault(SERVERS, "4"));
+		int count = "writes".equals(System.getenv(ONLY)) ? 1
+				: Integer.parseInt(System.getenv().getOrDefault(SERVERS, "4"));
 		List<Tm1ServerContainer> extra = new ArrayList<>();
 		for (int i = 1; i < count; i++) {
 			extra.add(new Tm1ServerContainer(tm1.getSource()));
@@ -65,8 +72,16 @@ class ProbeRunTm1Test {
 				clients.add(new ProbeClient(server.getRestUrl(), server.getAuthorization()));
 			}
 			CsdlDocument metadata = CsdlParser.parse(clients.get(0).text("$metadata"));
-			ProbeReport report = new Tm1Probe(clients, metadata, 4, System.out::println).run(binary,
-					Tm1Probe.earlierNames(earlier));
+			Tm1Probe probe = new Tm1Probe(clients, metadata, 4, System.out::println);
+			ProbeReport report;
+			if ("writes".equals(System.getenv(ONLY))) {
+				// The writes alone, on the committed report's names
+				Path committed = dir.resolve(ProbeReport.fileName(metadata.schemaVersion().orElse("")));
+				report = probe.runWrites(ProbeReport.fromJson(Files.readString(committed, StandardCharsets.UTF_8)));
+			}
+			else {
+				report = probe.run(binary, Tm1Probe.earlierNames(earlier));
+			}
 			Path file = dir.resolve(ProbeReport.fileName(report.schemaVersion()));
 			Files.writeString(file, report.toJson(), StandardCharsets.UTF_8);
 			System.out.println("Wrote " + file);
