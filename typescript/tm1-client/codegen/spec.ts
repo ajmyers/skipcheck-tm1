@@ -12,6 +12,7 @@ export interface SpecProperty {
   since?: string;
   deprecated?: { version?: string; reason?: string } | null;
   departure?: { read?: string; note?: string };
+  undeclared?: { source?: string; observedIn?: string[] };
   lenientDate?: { note?: string };
   containsTarget?: boolean;
 }

@@ -44,5 +44,6 @@ tasks.register<JavaExec>("exportSpec") {
 	mainClass = "io.skipcheck.tm1.codegen.Tm1Codegen"
 	args("spec", snapshot.path, spec.path)
 	inputs.file(snapshot)
+	inputs.files(fileTree(snapshot.parentFile) { include("tm1-probe-*.json") })
 	outputs.file(spec)
 }

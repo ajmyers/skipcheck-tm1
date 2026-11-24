@@ -21,6 +21,7 @@ Tm1Request.Response -> Tm1Response | a type of its own beside Tm1Request, as in 
 Tm1Request.Bytes | a body of Reactor's DataBuffers: TypeScript's Tm1Request.put takes a Uint8Array
 LenientOffsetDateTimeDeserializer | a Jackson deserializer the generated models use: TypeScript's JSON reader is lenient with dates itself
 Since | the annotation Java's generated models carry the schema version in: TypeScript's models don't record it, and a request checks what it needs with Tm1Capability
+Tm1Departure.value -> kind | Java's annotation names its one element value; a DEPARTURES entry calls it kind, beside the type and property it's about
 Tm1Endpoint | Java's annotation of the endpoints a service method calls: TypeScript's services list them in a static endpoints table
 ODataCollectionDecoder | a Java internal, public only because its session package uses it: it decodes Reactor's byte buffers as they arrive
 Utf8Repair | a Java internal, public only because its session package uses it: TypeScript's session decodes with a non-fatal TextDecoder, to the same effect

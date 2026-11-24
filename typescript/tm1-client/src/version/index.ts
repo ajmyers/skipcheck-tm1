@@ -59,6 +59,29 @@ export class Tm1Version {
   }
 }
 
+/** How a property departs from `$metadata`, as the Java client's `Tm1Departure.Kind`: TM1 sends
+ * it but `$metadata` doesn't declare it, TM1 sends it in another type than declared (it's read as
+ * JSON), or it's a date-time TM1 sometimes sends something else in (that reads as null). */
+export type Tm1DepartureKind = "UNDECLARED" | "TYPE" | "LENIENT_DATE";
+
+/** A property of the generated model that departs from TM1's `$metadata`, as the Java client's
+ * `@Tm1Departure`. TypeScript's types don't survive to run time, so the generated `DEPARTURES`
+ * lists every one, and each property's doc says so. Undeclared properties come from probing a running
+ * TM1 (`./gradlew probeTm1`); the others from `spec/tm1-overlay.json`. Every client tags the same
+ * members. */
+export interface Tm1Departure {
+  /** The type, such as `Process`. */
+  readonly type: string;
+  /** The property, by TM1's name, such as `UIData`. */
+  readonly property: string;
+  /** How it departs. */
+  readonly kind: Tm1DepartureKind;
+  /** The TM1 schema versions it was seen on, such as `11.8.35`; empty when it wasn't found by a probe. */
+  readonly observedIn: readonly string[];
+  /** What TM1 does, in words. */
+  readonly note: string;
+}
+
 /** What a {@link Tm1Capability} names: an entity set, a singleton, a bound or unbound operation, or
  * a property. */
 export type Tm1CapabilityKind = "EntitySet" | "Singleton" | "BoundOperation" | "UnboundOperation" | "Property";

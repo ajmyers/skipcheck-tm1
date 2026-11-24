@@ -31,9 +31,12 @@ import tools.jackson.databind.json.JsonMapper;
  * @param lenientDates date-time properties TM1 sometimes sends something else in, by
  * {@code Type/Property}, with a note: they're read as null then
  * @param endpoints notes about endpoints, by coverage-gate ID
+ * @param undeclared types for properties the probe found that {@code $metadata} doesn't
+ * declare, by {@code Type/Property}, where the kind of value it read isn't enough
+ * ({@link Undeclared})
  */
 public record Overlay(Map<String, String> departures, Map<String, String> lenientDates,
-		Map<String, EndpointNote> endpoints) {
+		Map<String, EndpointNote> endpoints, Map<String, UndeclaredType> undeclared) {
 
 	private static final Pattern CODE = Pattern.compile("`([^`]*)`");
 
@@ -42,6 +45,16 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 		departures = Collections.unmodifiableMap(new LinkedHashMap<>(departures));
 		lenientDates = Collections.unmodifiableMap(new LinkedHashMap<>(lenientDates));
 		endpoints = Collections.unmodifiableMap(new LinkedHashMap<>(endpoints));
+		undeclared = Collections.unmodifiableMap(new LinkedHashMap<>(undeclared));
+	}
+
+	/**
+	 * The type of a property {@code $metadata} doesn't declare.
+	 *
+	 * @param type its type, such as {@code Collection(Edm.String)}
+	 * @param note what's known of it, in Markdown, or null
+	 */
+	public record UndeclaredType(String type, @Nullable String note) {
 	}
 
 	/**
@@ -61,7 +74,7 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 	}
 
 	/** An overlay that changes nothing. */
-	public static final Overlay NONE = new Overlay(Map.of(), Map.of(), Map.of());
+	public static final Overlay NONE = new Overlay(Map.of(), Map.of(), Map.of(), Map.of());
 
 	/**
 	 * The overlay bundled with the generator: {@code spec/tm1-overlay.json}, copied onto
@@ -102,7 +115,13 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 			e.getValue().path("forbid").forEach(f -> forbid.add(f.asString()));
 			endpoints.put(e.getKey(), new EndpointNote(note.isString() ? note.asString() : null, forbid));
 		});
-		return new Overlay(departures, lenient, endpoints);
+		Map<String, UndeclaredType> undeclared = new LinkedHashMap<>();
+		root.path("undeclared").properties().forEach(e -> {
+			JsonNode note = e.getValue().path("note");
+			undeclared.put(e.getKey(),
+					new UndeclaredType(e.getValue().path("type").asString(), note.isString() ? note.asString() : null));
+		});
+		return new Overlay(departures, lenient, endpoints, undeclared);
 	}
 
 	/**

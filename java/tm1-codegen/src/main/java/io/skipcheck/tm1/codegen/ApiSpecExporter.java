@@ -12,6 +12,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.jspecify.annotations.Nullable;
+
 import io.skipcheck.tm1.csdl.CsdlAnnotation;
 import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlEntityContainer;
@@ -63,6 +65,10 @@ public final class ApiSpecExporter {
 
 	private final Overlay overlay;
 
+	private final Undeclared undeclared;
+
+	private final @Nullable String probe;
+
 	private final String snapshot;
 
 	/**
@@ -72,9 +78,26 @@ public final class ApiSpecExporter {
 	 * @param snapshot the snapshot's file name, recorded in the spec
 	 */
 	public ApiSpecExporter(CsdlDocument metadata, Overlay overlay, String snapshot) {
+		this(metadata, overlay, snapshot, Undeclared.NONE, null);
+	}
+
+	/**
+	 * An exporter, with properties a probe found that {@code $metadata} doesn't declare.
+	 * @param metadata the {@code $metadata} document, with the undeclared properties
+	 * {@linkplain Undeclared#applyTo(CsdlDocument) added}
+	 * @param overlay what TM1 does differently from it, with the undeclared properties'
+	 * {@linkplain Undeclared#applyTo(Overlay) departures}
+	 * @param snapshot the snapshot's file name, recorded in the spec
+	 * @param undeclared the undeclared properties, marked in the spec
+	 * @param probe the probe file's name, recorded in the spec, or null if there's none
+	 */
+	public ApiSpecExporter(CsdlDocument metadata, Overlay overlay, String snapshot, Undeclared undeclared,
+			@Nullable String probe) {
 		this.metadata = Objects.requireNonNull(metadata, "metadata");
 		this.overlay = Objects.requireNonNull(overlay, "overlay");
 		this.snapshot = Objects.requireNonNull(snapshot, "snapshot");
+		this.undeclared = Objects.requireNonNull(undeclared, "undeclared");
+		this.probe = probe;
 	}
 
 	/**
@@ -90,6 +113,9 @@ public final class ApiSpecExporter {
 		root.put("specVersion", SPEC_VERSION);
 		ObjectNode source = root.putObject("source");
 		source.put("snapshot", snapshot);
+		if (probe != null) {
+			source.put("probe", probe);
+		}
 		source.put("schemaVersion", metadata.schemaVersion().orElse(null));
 		source.put("odataVersion", metadata.version());
 		ArrayNode schemas = root.putArray("schemas");
@@ -170,6 +196,11 @@ public final class ApiSpecExporter {
 					property.put("default", p.defaultValue());
 				}
 				docs(property, p.annotations());
+				Undeclared.Property found = undeclared.get(t.name(), p.name());
+				if (found != null) {
+					ObjectNode mark = property.putObject("undeclared").put("source", "probe");
+					mark.putArray("observedIn").add(undeclared.schemaVersion());
+				}
 				String departure = overlay.departures().get(key);
 				if (departure != null) {
 					property.putObject("departure").put("read", "json").put("note", departure);

@@ -52,6 +52,7 @@ export function emitModel(spec: Spec): string {
   let out = HEADER;
   out += 'import { ODataLiterals, ODataProperty } from "../odata/index.js";\n';
   out += 'import { model, type Tm1Model } from "../model.js";\n';
+  out += 'import type { Tm1Departure } from "../version/index.js";\n';
   for (const e of spec.enums) {
     const members = e.members.map((m) => m.name);
     const fallback = members.includes("Unknown") ? "Unrecognized" : "Unknown";
@@ -78,7 +79,31 @@ export function emitModel(spec: Spec): string {
     out += `    return new ODataLiterals.Raw(ODataLiterals.enumMember(${JSON.stringify(e.qualifiedName)}, value));\n  },\n} as const;\n`;
   }
   for (const t of spec.types) out += emitType(spec, t);
+  out += emitDepartures(spec);
   return out;
+}
+
+/** How a property departs from `$metadata`, as Java's `@Tm1Departure`, or undefined. */
+export function departure(p: SpecProperty): { kind: string; observedIn: string[]; note: string } | undefined {
+  if (p.undeclared) return { kind: "UNDECLARED", observedIn: p.undeclared.observedIn ?? [], note: p.description ?? "" };
+  if (p.departure) return { kind: "TYPE", observedIn: [], note: p.departure.note ?? "" };
+  if (p.lenientDate) return { kind: "LENIENT_DATE", observedIn: [], note: p.lenientDate.note ?? "" };
+  return undefined;
+}
+
+/** `DEPARTURES`: every property that departs from `$metadata`, in the spec's order. TypeScript's
+ * types don't survive to run time, so this is what Java's `@Tm1Departure` is here. */
+function emitDepartures(spec: Spec): string {
+  let out = "\n/** Every property of the model that departs from TM1's `$metadata`, as the Java model's `@Tm1Departure`. */\n";
+  out += "export const DEPARTURES: readonly Tm1Departure[] = [\n";
+  for (const t of spec.types) {
+    for (const p of t.properties ?? []) {
+      const d = departure(p);
+      if (!d) continue;
+      out += `  { type: ${JSON.stringify(t.name)}, property: ${JSON.stringify(p.name)}, kind: ${JSON.stringify(d.kind)}, observedIn: ${JSON.stringify(d.observedIn)}, note: ${JSON.stringify(d.note.replaceAll("`", ""))} },\n`;
+    }
+  }
+  return out + "];\n";
 }
 
 function emitType(spec: Spec, t: SpecType): string {

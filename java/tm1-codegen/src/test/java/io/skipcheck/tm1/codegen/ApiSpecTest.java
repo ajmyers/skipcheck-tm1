@@ -20,6 +20,7 @@ import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlParser;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.MissingNode;
 
 /** The committed API spec is what the exporter makes of the snapshot and the overlay. */
 class ApiSpecTest {
@@ -32,7 +33,45 @@ class ApiSpecTest {
 	void committedSpecIsUpToDate() throws IOException {
 		assertThat(Files.readString(SPEC, StandardCharsets.UTF_8))
 			.as("spec/tm1-api.json is out of date: run ./gradlew :tm1-codegen:exportSpec")
-			.isEqualTo(export(Overlay.bundled()));
+			.isEqualTo(exportWithProbe());
+	}
+
+	@Test
+	void marksThePropertiesTheProbeFoundUndeclared() throws IOException {
+		JsonNode spec = JsonMapper.builder().build().readTree(exportWithProbe());
+		assertThat(spec.path("source").path("probe").asString()).isEqualTo("tm1-probe-11.8.35.json");
+		JsonNode uiData = property(spec, "Process", "UIData");
+		assertThat(uiData.path("type").asString()).isEqualTo("Edm.String");
+		assertThat(uiData.path("undeclared").path("source").asString()).isEqualTo("probe");
+		assertThat(uiData.path("undeclared").path("observedIn").get(0).asString()).isEqualTo("11.8.35");
+		JsonNode variables = property(spec, "Process", "VariablesUIData");
+		assertThat(variables.path("type").asString()).isEqualTo("Edm.String");
+		assertThat(variables.path("collection").asBoolean()).isTrue();
+		// The probe read it as null: it's read as JSON
+		assertThat(property(spec, "Element", "DisplayString").path("departure").path("read").asString())
+			.isEqualTo("json");
+		// Navigations aren't added: they'd be endpoints
+		assertThat(property(spec, "Cube", "MeasuresDimension").isMissingNode()).isTrue();
+	}
+
+	private static JsonNode property(JsonNode spec, String type, String name) {
+		for (JsonNode t : spec.path("types")) {
+			if (t.path("name").asString().equals(type)) {
+				for (JsonNode p : t.path("properties")) {
+					if (p.path("name").asString().equals(name)) {
+						return p;
+					}
+				}
+			}
+		}
+		return MissingNode.getInstance();
+	}
+
+	private static String exportWithProbe() throws IOException {
+		Tm1Codegen.Model model = Tm1Codegen.Model.of(SNAPSHOT);
+		return new ApiSpecExporter(model.metadata(), model.overlay(), SNAPSHOT.getFileName().toString(),
+				model.undeclared(), model.probe())
+			.export();
 	}
 
 	@Test

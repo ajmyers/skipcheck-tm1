@@ -10,7 +10,7 @@ java/tm1-client/src/model/metadata/tm1-probe-<v>.json   what the probe found (th
 
 A build tool: not published, and nothing at run time depends on it. It's still growing ([#312]).
 It finds **undeclared properties**, and **what each type does with each property in a POST and a
-PATCH**. Until the generators read the file, it's a record and a diff, not an input.
+PATCH**. `tm1-codegen` adds the undeclared properties to every client's model from it, each tagged as a departure from `$metadata` (`@Tm1Departure` in Java). The writes are a record and a diff for now: #311 is to generate from them.
 
 [#312]: https://github.com/ajmyers/skipcheck-tm1/issues/312
 

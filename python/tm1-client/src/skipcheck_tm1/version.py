@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 from .errors import Tm1ProtocolError, Tm1UnsupportedOperationError
 
-__all__ = ["Tm1Capabilities", "Tm1Capability", "Tm1Dialect", "Tm1Version"]
+__all__ = ["Tm1Capabilities", "Tm1Capability", "Tm1Departure", "Tm1Dialect", "Tm1Version"]
 
 _FORMAT = re.compile(r"\d+(\.\d+)*\Z")
 
@@ -86,6 +86,34 @@ def _version(v: Tm1Version | str) -> Tm1Version:
 
 def _simple(qualified: str) -> str:
     return qualified[qualified.rfind(".") + 1 :]
+
+
+@dataclass(frozen=True)
+class Tm1Departure:
+    """A field of the generated model that departs from TM1's ``$metadata``: a property
+    ``$metadata`` doesn't declare, one TM1 sends in another type than declared, or a date TM1
+    sometimes garbles. The field carries it in its metadata (``Annotated``), so every departure
+    can be found, and checked again on a new TM1 version; the Java client's ``@Tm1Departure``.
+
+    Undeclared properties come from probing a running TM1 (``./gradlew probeTm1``); the others
+    from ``spec/tm1-overlay.json``. Every client tags the same members."""
+
+    class Kind(enum.Enum):
+        """How a member departs from ``$metadata``."""
+
+        UNDECLARED = "undeclared"
+        """TM1 sends it, but ``$metadata`` doesn't declare it."""
+        TYPE = "type"
+        """TM1 sends it in another type than ``$metadata`` declares: it's read as JSON."""
+        LENIENT_DATE = "lenient-date"
+        """A date-time TM1 sometimes sends something else in: that reads as ``None``."""
+
+    kind: Tm1Departure.Kind
+    observed_in: tuple[str, ...] = ()
+    """The TM1 schema versions it was seen on, such as ``11.8.35``; empty when it wasn't found
+    by a probe."""
+    note: str = ""
+    """What TM1 does, in words."""
 
 
 @dataclass(frozen=True)

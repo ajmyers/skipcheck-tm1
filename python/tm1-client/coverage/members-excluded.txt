@@ -33,6 +33,7 @@ Tm1Request.Bytes | a body of Reactor's DataBuffers: Python's Tm1Request.put take
 ODataLiteral | Python's literals are duck-typed: a value with an odata_literal() method writes itself
 LenientOffsetDateTimeDeserializer | a Jackson deserializer the generated models use: Python's models take LenientDateTime, an Annotated datetime pydantic validates
 Since | the annotation Java's generated models carry the schema version in: Python's models don't record it, and a request checks what it needs with Tm1Capability
+Tm1Departure.value -> kind | Java's annotation names its one element value; this client's Tm1Departure, a dataclass in a field's metadata, calls it kind
 Tm1Endpoint | Java's annotation of the endpoints a service method calls: Python's services use the endpoint decorator
 ODataCollectionDecoder | a Java internal, public only because its session package uses it: it decodes Reactor's byte buffers as they arrive
 Utf8Repair | a Java internal, public only because its session package uses it: Python's session repairs a body's bytes privately
