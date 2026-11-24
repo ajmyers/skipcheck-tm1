@@ -53,7 +53,9 @@ describe("SubsetService", () => {
     expect(Object.getOwnPropertyNames(SubsetPatchBuilder.prototype)).not.toContain("bindElements");
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    const bound = SubsetCreate.builder().bindElements(ODataPath.of("x")).build();
+    // The compiler refuses a SubsetCreate as a SubsetPatch; a caller without it (JavaScript) is
+    // refused here
+    const bound = SubsetCreate.builder().bindElements(ODataPath.of("x")).build() as unknown as SubsetPatch;
     expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", bound)).toThrow(RangeError);
     expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", bound)).toThrow(/addElements/);
     expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", bound, 'W/"1"')).toThrow(RangeError);

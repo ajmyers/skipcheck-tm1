@@ -36,10 +36,10 @@ describe("HierarchyService", () => {
   it("refuses an update with structure", () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    const withElements = HierarchyCreate.builder()
+    const withElements = HierarchyPatch.builder()
       .elements([ElementCreate.builder().name("x").build()])
       .build();
-    const withEdges = HierarchyCreate.builder().edges([]).build();
+    const withEdges = HierarchyPatch.builder().edges([]).build();
     for (const patch of [withElements, withEdges]) {
       expect(() => client.hierarchies.update("Region", "Region", patch)).toThrow(/replaceStructure/);
       expect(() => client.hierarchies.update("Region", "Region", patch)).toThrow(RangeError);
