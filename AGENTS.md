@@ -37,9 +37,11 @@ Run the Gradle task for what you changed before you push. They're what CI runs.
   meaning in a client gets a line saying why in its `coverage/unit-excluded.txt` (or
   `live-excluded.txt`); "not ported yet" is not a reason.
 - The gates can't see a behaviour change that comes with no new Java test, so don't make one.
-- Each client has its own generator, reading `spec/tm1-api.json`. What the generated write types
-  offer is held to `spec/conformance/builders.json`, and what `builder(read)` writes to the cases
-  in `spec/conformance/writes.json`: a change to what `builder(read)` copies or binds comes with a
+- Each client has its own generator, reading `spec/tm1-api.json`. A write type's rules (its setters,
+  what `builder(read)` copies and binds) are made once, in `tm1-codegen`'s `Builders`, and exported
+  as the spec's `builders`: a generator writes that plan out, and works none of it out itself. What
+  the generated write types offer is held to `spec/conformance/builders.json`, and what
+  `builder(read)` writes to the cases in `spec/conformance/writes.json`: a change to what `builder(read)` copies or binds comes with a
   case there, edge cases included (an unknown subtype, a null, an empty collection).
 - A write the probe finds TM1 applies needs a step in a live scenario (`spec/conformance/live`):
   `ProbedWritesCoverageTest` fails until it has one, and `ProbeCoverageTest` fails when the
