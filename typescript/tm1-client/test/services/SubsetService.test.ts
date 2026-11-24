@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { ElementCreate, ODataPath, ODataQuery, SubsetCreate, SubsetPatch, SubsetScope } from "../../src/index.js";
+import { ElementCreate, ODataPath, ODataQuery, SubsetCreate, SubsetPatch, SubsetPatchBuilder, SubsetScope } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 const HIERARCHY = "Dimensions('Region')/Hierarchies('Region')";
@@ -48,6 +48,9 @@ describe("SubsetService", () => {
   });
 
   it("refuses an update with elements, sending nothing", () => {
+    // SubsetPatch offers no Elements: TM1 refuses them in a PATCH, and appends a binding
+    expect(Object.getOwnPropertyNames(SubsetPatchBuilder.prototype)).not.toContain("elements");
+    expect(Object.getOwnPropertyNames(SubsetPatchBuilder.prototype)).not.toContain("bindElements");
     const tm1 = new FakeTm1();
     const client = tm1.client();
     const set = SubsetCreate.builder()

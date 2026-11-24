@@ -899,11 +899,12 @@ public final class ModelGenerator {
 
 	/**
 	 * The properties a write type offers: for a create, those a POST of {@code type}
-	 * takes, by the probe's writes (all, for a type with none); for a patch, all of them.
+	 * takes, by the probe's writes (all, for a type with none), and every navigation; for
+	 * a patch, what a PATCH doesn't reject or ignore, navigations included.
 	 */
 	private List<PatchProperty> writable(CsdlStructuredType level, CsdlStructuredType type, boolean create) {
 		return patchProperties(level).stream()
-			.filter(p -> p.navigation() || (create ? creates(type, p.json()) : offersInPatch(type, p.json())))
+			.filter(p -> create ? p.navigation() || creates(type, p.json()) : offersInPatch(type, p.json()))
 			.toList();
 	}
 
@@ -951,9 +952,8 @@ public final class ModelGenerator {
 	/**
 	 * {@code builder(read)}: a builder holding what a read entity has that this write
 	 * sets: for a create, what a POST applies; for a patch, what a PATCH applies, leaving
-	 * out the collections a PATCH replaces or appends to. Navigation properties aren't
-	 * copied, nor nulls. Structured values are converted with their own patch's
-	 * {@code from}.
+	 * out the collections a PATCH appends to. Navigation properties aren't copied, nor
+	 * nulls. Structured values are converted with their own patch's {@code from}.
 	 */
 	private MethodSpec from(CsdlStructuredType type, @Nullable CsdlStructuredType root, ClassName builder,
 			boolean create) {
@@ -976,7 +976,7 @@ public final class ModelGenerator {
 			.returns(builder)
 			.addJavadoc(create
 					? "A create of what {@code read} holds that a {@code POST} applies, to recreate it: change it with the builder's setters.\n"
-					: "A patch of what {@code read} holds that a {@code PATCH} applies, leaving out collections a {@code PATCH} replaces or appends to: change it with the builder's setters.\n")
+					: "A patch of what {@code read} holds that a {@code PATCH} applies, leaving out collections a {@code PATCH} appends to: change it with the builder's setters.\n")
 			.addJavadoc(
 					"Navigation properties aren't copied, nor nulls.\n@param read an entity read from TM1\n@return a builder\n")
 			.addStatement("$T b = new $T()", builder, builder);

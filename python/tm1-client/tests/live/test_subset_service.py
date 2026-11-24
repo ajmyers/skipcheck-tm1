@@ -70,8 +70,10 @@ def test_appends_and_clears_elements_by_name_and_refuses_them_in_an_update(tm1: 
     assert subset_elements(tm1, d, public, "S") == ["A", "C", "B"], "appended, in order"
     tm1.subsets.clear_elements(d, d, public, "S")
     assert subset_elements(tm1, d, public, "S") == []
+    # SubsetPatch offers no Elements: TM1 refuses them in a PATCH, and appends a binding
+    assert not hasattr(SubsetPatch.Builder, "elements") and not hasattr(SubsetPatch.Builder, "bind_elements")
     with pytest.raises(ValueError, match="add_elements"):
-        tm1.subsets.update(d, d, public, "S", SubsetPatch.builder().bind_elements(el(d, "D")).build())
+        tm1.subsets.update(d, d, public, "S", {"Elements@odata.bind": [str(el(d, "D"))]})
 
 
 def test_places_elements_last_before_or_after_others(tm1: Tm1Client, abcd: str) -> None:

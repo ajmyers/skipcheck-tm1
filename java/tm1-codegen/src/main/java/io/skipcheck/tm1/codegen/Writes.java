@@ -67,9 +67,10 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 		}
 
 		/**
-		 * Whether a patch offers a property: everything but what a PATCH rejects or
-		 * ignores, and {@code Name} where a PATCH doesn't rename. Collections stay,
-		 * whatever a PATCH does with them: their docs say.
+		 * Whether a patch offers a property or navigation: everything but what a PATCH
+		 * rejects or ignores, a collection included, and {@code Name} where a PATCH
+		 * doesn't rename. A collection a PATCH replaces or appends to stays: its docs
+		 * say.
 		 * @param property the property's name
 		 * @return whether a patch offers it
 		 */
@@ -78,17 +79,26 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 				return rename == null || rename.equals("applied");
 			}
 			String outcome = patch.get(property);
-			return outcome == null || !(outcome.equals("rejected") || outcome.equals("ignored"));
+			String collection = collections.get(property);
+			return !refused(outcome) && !refused(collection);
 			// writeOnly counts as offered
 		}
 
 		/**
-		 * Whether a PATCH sets a property, as {@link #creates} does for a POST.
+		 * Whether {@code builder(read)} copies a property into a patch: a PATCH sets it,
+		 * as {@link #creates} says for a POST, and isn't a collection a PATCH appends to
+		 * (copying one would add its members again). A collection a PATCH replaces is
+		 * copied: the read holds all of it.
 		 * @param property the property's name
-		 * @return whether a patch offers it
+		 * @return whether a patch made from a read copies it
 		 */
 		public boolean patches(String property) {
-			return writes(patch.get(property)) && !collections.containsKey(property);
+			return writes(patch.get(property)) && !"appends".equals(collections.get(property))
+					&& !refused(collections.get(property));
+		}
+
+		private static boolean refused(@Nullable String outcome) {
+			return outcome != null && (outcome.equals("rejected") || outcome.equals("ignored"));
 		}
 
 		private static boolean writes(@Nullable String outcome) {

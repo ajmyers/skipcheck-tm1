@@ -47,18 +47,9 @@ public class SubsetServiceTests
     [Fact]
     public void AnUpdateWithElementsIsRefused()
     {
-        var tm1 = _tm1.Client();
-        var set = SubsetPatch.Builder().Elements([ElementCreate.Builder().Name("West").Build()]).Build();
-        var bound = SubsetPatch.Builder().BindElements(ODataPath.Of("x")).Build();
-        var e = Assert.Throws<ArgumentException>(() =>
-        {
-            _ = tm1.Subsets.UpdateAsync("Region", "Region", SubsetScope.Public, "s", set);
-        });
-        Assert.Contains("AddElementsAsync", e.Message);
-        Assert.Throws<ArgumentException>(() =>
-        {
-            _ = tm1.Subsets.UpdateAsync("Region", "Region", SubsetScope.Public, "s", bound, "W/\"1\"");
-        });
+        // Refused at compile time: SubsetPatch offers no Elements, as TM1 refuses them in a PATCH and
+        // appends a binding (AddElementsAsync does that, by name)
+        Assert.DoesNotContain(typeof(SubsetPatch.PatchBuilder).GetMethods(), m => m.Name is "Elements" or "BindElements");
         Assert.Empty(_tm1.Requests);
     }
 
