@@ -401,6 +401,13 @@ def emit_patches(spec: Spec) -> str:
                     out.append(f"        def {bind}(self, target: ODataPath | str) -> Self:")
                     out.append(f"            return self._bind({n['name']!r}, target)  # type: ignore[return-value]")
             methods += 1
+        # As the other clients: only an open type's builder takes properties $metadata doesn't declare
+        if t["open"]:
+            out.append("")
+            out.append("        def property(self, name: str, value: Any) -> Self:")
+            out.append('            """A property ``$metadata`` doesn\'t declare, which this open type can have, such as an attribute\'s value."""')
+            out.append("            return self._set(name, value)  # type: ignore[return-value]")
+            methods += 1
         if not methods:
             out.append("        pass")
     for t in ordered:
@@ -444,6 +451,11 @@ def emit_patches(spec: Spec) -> str:
                 else:
                     out.append(f"        def {bind}(self, target: ODataPath | str) -> Self:")
                     out.append(f"            return self._bind({n['name']!r}, target)  # type: ignore[return-value]")
+        if t["open"]:
+            out.append("")
+            out.append("        def property(self, name: str, value: Any) -> Self:")
+            out.append('            """A property ``$metadata`` doesn\'t declare, which this open type can have, such as an attribute\'s value."""')
+            out.append("            return self._set(name, value)  # type: ignore[return-value]")
         required = (t.get("write") or {}).get("create", {}).get("required", [])
         if required:
             out.append("")

@@ -1,0 +1,863 @@
+{
+  "description" : "What every generated create and patch builder offers: written by the Java client's BuilderManifestTest with -PrecordConformance, checked by every client's.",
+  "builders" : {
+    "AccessSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Authentication", "CAM", "CAPI", "HTTP", "LDAP", "Network", "SSL" ]
+    },
+    "AdministrationSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "AdminHost", "AllowReadOnlyChoreReschedule", "AuditLog", "Clients", "DataBaseDirectory", "DebugLog", "DisableSandboxing", "DownTime", "EnableSandboxDimension", "EventLog", "ExternalDatabase", "FileRetry", "Java", "Language", "MaskUserNameInServerTools", "PerfMonActive", "PerformanceMonitorOn", "RunningInBackground", "ServerLog", "ServerName", "StartupChores", "TM1Web", "TopLog", "UnicodeUpperLowerCase" ]
+    },
+    "AnnotationPatch" : {
+      "odataType" : null,
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "ApplicationContext", "ApplicationContext@odata.bind", "Attachments", "Attachments@odata.bind", "Created", "Creator", "DimensionalContext", "DimensionalContext@odata.bind", "ID", "LastUpdated", "LastUpdatedBy", "Text" ]
+    },
+    "ApplicationContextFacetPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Name", "Values", "Values@odata.bind" ]
+    },
+    "ApplicationContextFacetValuePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Facet", "Facet@odata.bind", "Value" ]
+    },
+    "AttachmentPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ContentType", "Description", "Name", "Size" ]
+    },
+    "AttributeDefinitionCreate" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ "Type" ],
+      "setters" : [ "Name", "Type" ]
+    },
+    "AttributeDefinitionPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ ]
+    },
+    "AttributesPatch" : {
+      "odataType" : null,
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "Caption" ]
+    },
+    "AuditDetailPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Description", "ID", "ObjectName", "ObjectType", "TimeStamp", "UserName" ]
+    },
+    "AuditLogEntryPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "AuditDetails", "AuditDetails@odata.bind", "Description", "ID", "ObjectName", "ObjectType", "TimeStamp", "UserName" ]
+    },
+    "AuditLogSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enable", "MaxFileSizeKilobytes", "MaxQueryMemoryKilobytes", "UpdateInterval" ]
+    },
+    "AuthenticationSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "IntegratedSecurityMode", "MaximumLoginAttempts", "SecurityPackageName", "ServicePrincipalName" ]
+    },
+    "CAMSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "CAMUseSSL", "ClientPingCAMPassport", "ClientURI", "CreateNewCAMClients", "PortalVariableFile", "ServerCAMURIRetryAttempts", "ServerURIs" ]
+    },
+    "CAPISettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ClientMessagePort", "ClientVersionMaximum", "ClientVersionMinimum", "ClientVersionPrecision", "MessageCompression", "Port", "ProgressMessage" ]
+    },
+    "CalculationComponentPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Components", "Cube", "Cube@odata.bind", "Statements", "Status", "Tuple", "Tuple@odata.bind", "Type", "Value" ]
+    },
+    "CellDescriptorPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Tuple", "Tuple@odata.bind" ]
+    },
+    "CellsetAxisPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Cardinality", "Hierarchies", "Hierarchies@odata.bind", "Ordinal", "Tuples", "Tuples@odata.bind" ]
+    },
+    "CellsetAxisTuplePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Members", "Members@odata.bind", "Ordinal" ]
+    },
+    "CellsetCellPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Annotated", "Annotations", "Annotations@odata.bind", "Consolidated", "DrillthroughScripts", "DrillthroughScripts@odata.bind", "FormatString", "FormattedValue", "HasDrillthrough", "HasPicklist", "Language", "Members", "Members@odata.bind", "NullIntersected", "Ordinal", "PicklistValues", "RuleDerived", "Status", "TM1FormatString", "Updateable", "Value" ]
+    },
+    "CellsetPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Axes", "Axes@odata.bind", "Cells", "Cells@odata.bind", "Content", "Cube", "Cube@odata.bind", "ID" ]
+    },
+    "CellsetUpdatePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Ordinal", "ReferenceCell", "ReferenceCell@odata.bind", "ReferenceCube", "ReferenceCube@odata.bind", "Value" ]
+    },
+    "ChoreCreate" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Active", "DSTSensitive", "ExecutionMode", "Frequency", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "StartTime", "Tasks", "Tasks@odata.bind" ]
+    },
+    "ChorePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Active", "DSTSensitive", "ExecutionMode", "Frequency", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "StartTime", "Tasks", "Tasks@odata.bind" ]
+    },
+    "ChoreReferencePatch" : {
+      "odataType" : "#ibm.tm1.api.v1.ChoreReference",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "Chore", "Chore@odata.bind", "ContainedBy", "ContainedBy@odata.bind", "ID", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name" ]
+    },
+    "ChoreTaskParameterPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Name", "Value" ]
+    },
+    "ChoreTaskPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Chore", "Chore@odata.bind", "Parameters", "Process", "Process@odata.bind", "Step" ]
+    },
+    "ClientSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ClientPropertiesSyncInterval", "PasswordMinimumLength", "RetainNonCAMGroupMembership" ]
+    },
+    "ConfigurationPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "AdminHost", "AllowSeparateNandCRules", "ClientCAMURIs", "ClientMessagePortNumber", "ClientPingCAMPassport", "DataBaseDirectory", "DisableSandboxing", "DistributedOutputDir", "ForceReevaluationOfFeedersForFedCellsOnDataChange", "HTTPPortNumber", "IntegratedSecurityMode", "JobQueuing", "PortNumber", "PrincipalName", "ProductVersion", "SecurityMode", "SecurityPackageName", "ServerCAMURI", "ServerName", "UnicodeUpperLowerCase", "WebCAMURI" ]
+    },
+    "CubeCreate" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ "Dimensions" ],
+      "setters" : [ "AllowPersistentHolds", "Annotations", "Annotations@odata.bind", "CalculationThresholdForStorage", "CellSecurityDefaultValue", "CellSecurityMostRestrictive", "Dimensions", "Dimensions@odata.bind", "DrillthroughRules", "LastDataUpdate", "LastSchemaUpdate", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "PrivateViews", "PrivateViews@odata.bind", "Rules", "ViewAttributes", "ViewAttributes@odata.bind", "ViewStorageMaxMemory", "Views", "Views@odata.bind" ]
+    },
+    "CubeDrillthroughPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.CubeDrillthrough",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Name" ]
+    },
+    "CubePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "AllowPersistentHolds", "Annotations", "Annotations@odata.bind", "CalculationThresholdForStorage", "CellSecurityDefaultValue", "CellSecurityMostRestrictive", "Dimensions", "Dimensions@odata.bind", "DrillthroughRules", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "PrivateViews", "PrivateViews@odata.bind", "Rules", "ViewAttributes", "ViewAttributes@odata.bind", "ViewStorageMaxMemory", "Views", "Views@odata.bind" ]
+    },
+    "CubeReferencePatch" : {
+      "odataType" : "#ibm.tm1.api.v1.CubeReference",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "ContainedBy", "ContainedBy@odata.bind", "Cube", "Cube@odata.bind", "ID", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name" ]
+    },
+    "CubeUpdatePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ReferenceCell", "ReferenceCell@odata.bind", "ReferenceCube", "ReferenceCube@odata.bind", "Tuple", "Tuple@odata.bind", "Value" ]
+    },
+    "DebugLogSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "LoggingDirectory" ]
+    },
+    "DimensionCreate" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "DefaultHierarchy", "DefaultHierarchy@odata.bind", "Hierarchies", "Hierarchies@odata.bind", "HierarchyAttributes", "HierarchyAttributes@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name" ]
+    },
+    "DimensionPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "DefaultHierarchy", "DefaultHierarchy@odata.bind", "Hierarchies", "Hierarchies@odata.bind", "HierarchyAttributes", "HierarchyAttributes@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind" ]
+    },
+    "DimensionReferencePatch" : {
+      "odataType" : "#ibm.tm1.api.v1.DimensionReference",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "ContainedBy", "ContainedBy@odata.bind", "Dimension", "Dimension@odata.bind", "ID", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name" ]
+    },
+    "DocumentPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.Document",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "ContainedBy", "ContainedBy@odata.bind", "ID", "LastUpdated", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "Size" ]
+    },
+    "DocumentReferencePatch" : {
+      "odataType" : "#ibm.tm1.api.v1.DocumentReference",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "ContainedBy", "ContainedBy@odata.bind", "Document", "Document@odata.bind", "ID", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name" ]
+    },
+    "DrillthroughPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Name" ]
+    },
+    "DrillthroughRowPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ ]
+    },
+    "EdgePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Component", "Component@odata.bind", "ComponentName", "Hierarchy", "Hierarchy@odata.bind", "Parent", "Parent@odata.bind", "ParentName", "Weight" ]
+    },
+    "ElementCreate" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Components", "Components@odata.bind", "Edges", "Edges@odata.bind", "Hierarchy", "Hierarchy@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "Parents", "Parents@odata.bind", "Type" ]
+    },
+    "ElementPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Components", "Components@odata.bind", "Edges", "Edges@odata.bind", "Hierarchy", "Hierarchy@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Parents", "Parents@odata.bind", "Type" ]
+    },
+    "EncryptionAtRestProviderSettingsPatch" : {
+      "odataType" : null,
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "KeyRef" ]
+    },
+    "EncryptionAtRestValidationReportPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "IsValid", "Issues" ]
+    },
+    "EntryPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "ContainedBy", "ContainedBy@odata.bind", "ID", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name" ]
+    },
+    "ErrorLogFilePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Filename" ]
+    },
+    "EventLogSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enable", "ScanFrequency", "ThresholdForPooledMemoryInMB", "ThresholdForThreadBlockingNumber", "ThresholdForThreadRunningTime", "ThresholdForThreadWaitingTime" ]
+    },
+    "ExternalDatabaseSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ODBCLibraryPath", "ODBCTimeoutInSeconds", "OracleErrorForceRowStatus", "SQLFetchType", "SQLRowsetSize", "TM1ConnectorforSAP", "UseNewConnectorforSAP" ]
+    },
+    "FedCellDescriptorPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Cube", "Cube@odata.bind", "Fed", "Tuple", "Tuple@odata.bind" ]
+    },
+    "FeederTracePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "FedCells", "Statements" ]
+    },
+    "FileRetrySettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "FileRetryCount", "FileRetryDelayMilliseconds", "FileRetryFileSpec" ]
+    },
+    "FolderPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.Folder",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "ContainedBy", "ContainedBy@odata.bind", "Contents", "Contents@odata.bind", "ID", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "PrivateContents", "PrivateContents@odata.bind" ]
+    },
+    "GitCommitPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Author", "ID", "Summary" ]
+    },
+    "GitConfigurationPatch" : {
+      "odataType" : null,
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ ]
+    },
+    "GitPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Config", "DeployedCommit", "Deployment", "Remote", "URL" ]
+    },
+    "GitPlanPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Branch", "Force", "ID" ]
+    },
+    "GitPullPlanPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.GitPullPlan",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Branch", "Commit", "ExecutionMode", "Force", "ID", "Operations" ]
+    },
+    "GitPushPlanPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.GitPushPlan",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Branch", "Force", "ID", "NewBranch", "NewCommit", "ParentCommit", "SourceFiles" ]
+    },
+    "GitRemotePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Branches", "Connected", "Tags" ]
+    },
+    "GroupCreate" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Name", "Users", "Users@odata.bind" ]
+    },
+    "GroupPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Users", "Users@odata.bind" ]
+    },
+    "HTTPSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "OriginAllowList", "Port", "RequestEntityMaxSizeInKB", "SessionMaxRequests", "SessionTimeout" ]
+    },
+    "HierarchyCreate" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "AllMember", "AllMember@odata.bind", "ComponentsSortSense", "ComponentsSortType", "DefaultMember", "DefaultMember@odata.bind", "Dimension", "Dimension@odata.bind", "Edges", "Edges@odata.bind", "ElementAttributes", "ElementAttributes@odata.bind", "Elements", "Elements@odata.bind", "ElementsSortSense", "ElementsSortType", "Levels", "Levels@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Members", "Members@odata.bind", "Name", "PrivateSubsets", "PrivateSubsets@odata.bind", "SessionSubsets", "SessionSubsets@odata.bind", "SubsetAttributes", "SubsetAttributes@odata.bind", "Subsets", "Subsets@odata.bind", "ViewPrivateSubsets" ]
+    },
+    "HierarchyPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "AllMember", "AllMember@odata.bind", "ComponentsSortSense", "ComponentsSortType", "DefaultMember", "DefaultMember@odata.bind", "Dimension", "Dimension@odata.bind", "Edges", "Edges@odata.bind", "ElementAttributes", "ElementAttributes@odata.bind", "Elements", "Elements@odata.bind", "ElementsSortSense", "ElementsSortType", "Levels", "Levels@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Members", "Members@odata.bind", "PrivateSubsets", "PrivateSubsets@odata.bind", "SessionSubsets", "SessionSubsets@odata.bind", "SubsetAttributes", "SubsetAttributes@odata.bind", "Subsets", "Subsets@odata.bind", "ViewPrivateSubsets" ]
+    },
+    "JavaSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ClassPath", "JVMArgs", "JVMPath" ]
+    },
+    "JobQueuingSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enable", "MaxWaitTime", "ThreadPoolSize", "ThreadSleepTime" ]
+    },
+    "KeyProtectSettingsPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.KeyProtectSettings",
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "AuthEndpoint", "AuthRef", "InstanceID", "KeyRef", "ServiceEndpoint" ]
+    },
+    "LDAPSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enable", "Host", "PasswordFile", "PasswordKeyFile", "Port", "SearchBase", "SearchField", "SkipSSLCRLVerification", "SkipSSLCertVerification", "UseServerAccount", "VerifyCertServerName", "VerifyServerSSLCert", "WellKnownUserName" ]
+    },
+    "LevelPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Cardinality", "Hierarchy", "Hierarchy@odata.bind", "Members", "Members@odata.bind", "Name", "Number", "Type", "UniqueName" ]
+    },
+    "LinkPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.Link",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "ContainedBy", "ContainedBy@odata.bind", "ID", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "URL" ]
+    },
+    "LocalKeyFileProviderSettingsPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.LocalKeyFileProviderSettings",
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "KeyRef" ]
+    },
+    "LocalizedAttributesPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "LocaleID" ]
+    },
+    "LockingSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "PullInvalidationSubsets", "SubsetElementLockBreathing", "UseLocalCopiesForPublicDynamicSubsets" ]
+    },
+    "LoggerPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Level", "Name" ]
+    },
+    "MDXViewCreate" : {
+      "odataType" : "#ibm.tm1.api.v1.MDXView",
+      "open" : true,
+      "required" : [ "MDX" ],
+      "setters" : [ "Cube", "Cube@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "MDX", "Name" ]
+    },
+    "MDXViewPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.MDXView",
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "Cube", "Cube@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "MDX" ]
+    },
+    "MTCubeLoadSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enabled", "MinFileSize", "UseBookmarkFiles", "Weight" ]
+    },
+    "MTFeedersSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "AtStartup", "Enabled" ]
+    },
+    "MTQSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ImmediateCheckForSplit", "MTFeeders", "MTFeedersAtStartup", "MTQQuery", "NumberOfThreadsToUse", "OperationProgressCheckSkipLoopSize", "SingleCellConsolidation", "UseAllThreads" ]
+    },
+    "MemberPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "Children", "Children@odata.bind", "Element", "Element@odata.bind", "Hierarchy", "Hierarchy@odata.bind", "IsPlaceholder", "Level", "Level@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "Ordinal", "Parent", "Parent@odata.bind", "Type", "UniqueName", "Weight" ]
+    },
+    "MemorySettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ApplyMaximumViewSizeToEntireTransaction", "CacheFriendlyMalloc", "DisableMemoryCache", "LockPagesInMemory", "MaximumMemoryForSubsetUndoKB", "MaximumUserSandboxSizeMB", "MaximumViewSizeMB" ]
+    },
+    "MessageLogEntryPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ID", "Level", "Logger", "Message", "SessionID", "ThreadID", "TimeStamp" ]
+    },
+    "ModellingSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "DefaultMeasuresDimension", "EnableNewHierarchyCreation", "MDXSelectCalculatedMemberInputs", "Rules", "Spreading", "Startup", "Synchronization", "TI", "UserDefinedCalculations" ]
+    },
+    "NameValuePairPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Name", "Value" ]
+    },
+    "NativeViewCreate" : {
+      "odataType" : "#ibm.tm1.api.v1.NativeView",
+      "open" : true,
+      "required" : [ "Columns", "Rows" ],
+      "setters" : [ "Columns", "Cube", "Cube@odata.bind", "FormatString", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "Rows", "SuppressEmptyColumns", "SuppressEmptyRows", "Titles" ]
+    },
+    "NativeViewPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.NativeView",
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "Columns", "Cube", "Cube@odata.bind", "FormatString", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Rows", "SuppressEmptyColumns", "SuppressEmptyRows", "Titles" ]
+    },
+    "NetworkSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "IPAddress", "IPVersion", "IdleConnectionTimeOut", "NetRecvBlockingWaitLimit", "NetRecvMaxClientIOWaitWithinAPIs", "ReceiveProgressResponseTimeout" ]
+    },
+    "PerformanceSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "JobQueuing", "Locking", "MTCubeLoad", "MTFeeders", "MTQ", "Memory", "PrivilegeGenerationOptimization", "Stargate", "ViewCalculation" ]
+    },
+    "ProcessCreate" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Code", "DataProcedure", "DataSource", "EpilogProcedure", "ErrorLogs", "ErrorLogs@odata.bind", "HasSecurityAccess", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "MetadataProcedure", "Name", "Parameters", "PrologProcedure", "UIData", "Variables", "VariablesUIData" ]
+    },
+    "ProcessDataSourcePatch" : {
+      "odataType" : null,
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "Type" ]
+    },
+    "ProcessDebugContextBreakpointPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enabled", "Expression", "HitCount", "HitMode", "ID" ]
+    },
+    "ProcessDebugContextDataBreakpointPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.ProcessDebugContextDataBreakpoint",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enabled", "Expression", "HitCount", "HitMode", "ID", "VariableName" ]
+    },
+    "ProcessDebugContextLineBreakpointPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enabled", "Expression", "HitCount", "HitMode", "ID", "LineNumber", "Procedure", "ProcessName" ]
+    },
+    "ProcessDebugContextLockBreakpointPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.ProcessDebugContextLockBreakpoint",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enabled", "Expression", "HitCount", "HitMode", "ID", "LockMode", "ObjectName", "ObjectType" ]
+    },
+    "ProcessDebugContextObjectLockPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "LockMode", "ObjectName", "ObjectType", "Scope" ]
+    },
+    "ProcessDebugContextPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Breakpoints", "Breakpoints@odata.bind", "CallStack", "CallStack@odata.bind", "CurrentBreakpoint", "CurrentBreakpoint@odata.bind", "ID", "LastActivityDuration", "ObjectLocks", "Process", "Process@odata.bind", "Result", "Status", "Thread", "Thread@odata.bind" ]
+    },
+    "ProcessDebugContextStackFramePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ID", "LineNumber", "Procedure", "Process", "Process@odata.bind", "RecordNumber", "Variables", "Variables@odata.bind" ]
+    },
+    "ProcessDebugContextVariablePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Name", "Value" ]
+    },
+    "ProcessErrorLogPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Timestamp" ]
+    },
+    "ProcessExecuteResultPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ErrorLogFile", "ErrorLogFile@odata.bind", "ProcessExecuteStatusCode" ]
+    },
+    "ProcessParameterPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Name", "Prompt", "Type", "Value" ]
+    },
+    "ProcessPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Code", "DataProcedure", "DataSource", "EpilogProcedure", "ErrorLogs", "ErrorLogs@odata.bind", "HasSecurityAccess", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "MetadataProcedure", "Parameters", "PrologProcedure", "UIData", "Variables", "VariablesUIData" ]
+    },
+    "ProcessReferencePatch" : {
+      "odataType" : "#ibm.tm1.api.v1.ProcessReference",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "ContainedBy", "ContainedBy@odata.bind", "ID", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "Process", "Process@odata.bind" ]
+    },
+    "ProcessSyntaxErrorPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "LineNumber", "Message", "Procedure" ]
+    },
+    "ProcessVariablePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "EndByte", "Name", "Position", "StartByte", "Type" ]
+    },
+    "RelationalDrillthroughPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.RelationalDrillthrough",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Name" ]
+    },
+    "RowsetPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ID", "Rows", "Rows@odata.bind" ]
+    },
+    "RowsetRowPatch" : {
+      "odataType" : null,
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "Ordinal" ]
+    },
+    "RuleSyntaxErrorPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "LineNumber", "Message" ]
+    },
+    "RulesSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "AllowSeparateNandCRules", "AutomaticallyAddCubeDependencies", "ForceReevaluationOfFeedersForFedCellsOnDataChange", "RulesOverwriteCellsOnLoad" ]
+    },
+    "SQLDataSourcePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Description", "Name" ]
+    },
+    "SSLSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "CertAuthority", "CertRevocationFile", "CertificateFile", "CertificateID", "ClientExportServerCertificate", "ClientExportServerKeyID", "Enable", "FIPSOperationMode", "KeyFile", "KeyLabel", "KeyStashFile", "NIST_SP800_131A_MODE", "PrivateKeyPwdFile", "PwdKeyFile", "TLSCipherList" ]
+    },
+    "SandboxCreate" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "IncludeInSandboxDimension", "Name" ]
+    },
+    "SandboxPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "IncludeInSandboxDimension" ]
+    },
+    "ServerLogSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enable", "LogReleaseLineCount" ]
+    },
+    "ServerPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ClientCAMURI", "ClientMessagePortNumber", "ClientPingCAMPassport", "DataModelEncrypted", "HTTPPortNumber", "IntegratedSecurityMode", "Name", "PortNumber", "ProductVersion", "SecurityPackageName", "ServicePrincipalName", "UsingSSL" ]
+    },
+    "ServerSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Access", "Administration", "EncryptionAtRest", "Modelling", "Performance", "ServerName" ]
+    },
+    "SessionPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Active", "Context", "ID", "Threads", "Threads@odata.bind", "User", "User@odata.bind" ]
+    },
+    "SpreadingSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ProportionSpreadToZeroCells", "SpreadingPrecision" ]
+    },
+    "StargateSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "AllRuleCalcStargateOptimization", "UseStargateForRules", "ZeroWeightOptimization" ]
+    },
+    "StartupSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "LoadPrivateSubsetsOnStartup", "MaximumCubeLoadThreads", "PersistentFeeders", "SkipLoadingAliases" ]
+    },
+    "SubsetCreate" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Alias", "Elements", "Elements@odata.bind", "ExpandAbove", "Expression", "Hierarchy", "Hierarchy@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name" ]
+    },
+    "SubsetPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Alias", "Elements", "Elements@odata.bind", "ExpandAbove", "Expression", "Hierarchy", "Hierarchy@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind" ]
+    },
+    "SubsetReferencePatch" : {
+      "odataType" : "#ibm.tm1.api.v1.SubsetReference",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "ContainedBy", "ContainedBy@odata.bind", "ID", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "Subset", "Subset@odata.bind" ]
+    },
+    "SynchronizationSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "MaximumSynchAttempts", "SyncUnitSize" ]
+    },
+    "TISettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "CognosTM1InterfacePath", "EnableTIDebugging", "MaximumTILockObjects", "UseExcelSerialDate" ]
+    },
+    "TM1WebSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ExcelWebPublishEnabled" ]
+    },
+    "ThreadPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Context", "ElapsedTime", "Function", "ID", "IXLocks", "Info", "Name", "ObjectName", "ObjectType", "RLocks", "Session", "Session@odata.bind", "SessionID", "State", "ThreadID", "Type", "WLocks", "WaitTime" ]
+    },
+    "TopLogSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enable", "ScanFrequency", "ScanMode" ]
+    },
+    "TransactionLogEntryPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "ChangeSetID", "Cube", "ID", "NewValue", "OldValue", "ReplicationTime", "StatusMessage", "TimeStamp", "Tuple", "User" ]
+    },
+    "TupleMemberPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.TupleMember",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "Children", "Children@odata.bind", "DisplayInfo", "DisplayInfoAbove", "Element", "Element@odata.bind", "Hierarchy", "Hierarchy@odata.bind", "IsPlaceholder", "Level", "Level@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "Ordinal", "Parent", "Parent@odata.bind", "Type", "UniqueName", "Weight" ]
+    },
+    "UserCreate" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "FriendlyName", "Groups", "Groups@odata.bind", "Name", "Password", "Sessions", "Sessions@odata.bind" ]
+    },
+    "UserPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Enabled", "FriendlyName", "Groups", "Groups@odata.bind", "Password", "Sessions", "Sessions@odata.bind" ]
+    },
+    "VaultSettingsPatch" : {
+      "odataType" : "#ibm.tm1.api.v1.VaultSettings",
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "AuthRef", "KeyRef", "ServiceEndpoint" ]
+    },
+    "ViewAxisSelectionPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Subset", "Subset@odata.bind" ]
+    },
+    "ViewCalculationSettingsPatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "CalculationThresholdForStorage", "CheckFeedersMaximumCells", "MagnitudeDifferenceToBeZero", "ViewConsolidationOptimization", "ViewConsolidationOptimizationMethod" ]
+    },
+    "ViewCreate" : {
+      "odataType" : null,
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "Cube", "Cube@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name" ]
+    },
+    "ViewPatch" : {
+      "odataType" : null,
+      "open" : true,
+      "required" : [ ],
+      "setters" : [ "Cube", "Cube@odata.bind", "LocalizedAttributes", "LocalizedAttributes@odata.bind" ]
+    },
+    "ViewReferencePatch" : {
+      "odataType" : "#ibm.tm1.api.v1.ViewReference",
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Attributes", "ContainedBy", "ContainedBy@odata.bind", "ID", "LocalizedAttributes", "LocalizedAttributes@odata.bind", "Name", "View", "View@odata.bind" ]
+    },
+    "ViewTitlePatch" : {
+      "odataType" : null,
+      "open" : false,
+      "required" : [ ],
+      "setters" : [ "Selected", "Selected@odata.bind", "Subset", "Subset@odata.bind" ]
+    }
+  }
+}

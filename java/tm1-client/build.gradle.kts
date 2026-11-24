@@ -110,10 +110,12 @@ tasks.withType<Test>().configureEach {
 	inputs.file(spec).withPathSensitivity(PathSensitivity.RELATIVE)
 	// Conformance fixtures (spec/conformance/calls): the tests check them, or with
 	// -PrecordConformance rewrite them from what the tests record
-	val calls = rootDir.resolve("spec/conformance/calls")
+	// (spec/conformance/calls), and the builder manifest (spec/conformance/builders.json) and
+	// the writes (writes.json) every client is held to
+	val conformance = rootDir.resolve("spec/conformance")
 	val record = providers.gradleProperty("recordConformance").isPresent
 	systemProperty("tm1.conformance.record", record)
-	inputs.dir(calls).withPathSensitivity(PathSensitivity.RELATIVE).optional()
+	inputs.dir(conformance).withPathSensitivity(PathSensitivity.RELATIVE).optional()
 	if (record) {
 		outputs.upToDateWhen { false }
 	}

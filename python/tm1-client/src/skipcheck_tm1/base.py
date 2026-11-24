@@ -41,7 +41,7 @@ from pydantic import (
 from .odata import Bind, duration, string_literal
 
 if TYPE_CHECKING:
-    from typing import Self
+    pass
 
 __all__ = ["LenientDateTime", "Tm1Enum", "Tm1Model", "Tm1Patch", "iso_datetime", "to_odata"]
 
@@ -232,12 +232,7 @@ class Tm1Patch:
             if declared is not None:
                 for name, value in data.items():
                     if name not in declared and not name.startswith("@") and value is not None:
-                        self.property(name, value)
-            return self
-
-        def property(self, name: str, value: Any) -> Self:
-            """A property ``$metadata`` doesn't declare, which an open type can have."""
-            self._values[name] = value
+                        self._values[name] = value
             return self
 
         def build(self) -> Any:
