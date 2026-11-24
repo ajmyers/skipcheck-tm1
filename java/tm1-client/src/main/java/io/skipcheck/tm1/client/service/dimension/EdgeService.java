@@ -8,6 +8,7 @@ import java.util.Objects;
 
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Edge;
+import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.EdgePatch;
 import io.skipcheck.tm1.client.model.Element;
 import io.skipcheck.tm1.client.model.Hierarchy;
@@ -80,7 +81,7 @@ public final class EdgeService {
 	 * @return the edge as created
 	 */
 	@Tm1Endpoint("Navigation Hierarchy/Edges")
-	public Mono<Edge> create(String dimension, String hierarchy, EdgePatch edge) {
+	public Mono<Edge> create(String dimension, String hierarchy, EdgeCreate edge) {
 		return session
 			.execute(Tm1Request.post(edges(dimension, hierarchy), Objects.requireNonNull(edge, "edge"), Edge.class));
 	}

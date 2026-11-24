@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { ElementCreate, ODataPath, ODataQuery, SubsetCreate, SubsetPatch, SubsetPatchBuilder, SubsetScope } from "../../src/index.js";
+import { ODataPath, ODataQuery, SubsetCreate, SubsetPatch, SubsetPatchBuilder, SubsetScope } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 const HIERARCHY = "Dimensions('Region')/Hierarchies('Region')";
@@ -53,12 +53,11 @@ describe("SubsetService", () => {
     expect(Object.getOwnPropertyNames(SubsetPatchBuilder.prototype)).not.toContain("bindElements");
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    const set = SubsetCreate.builder()
-      .elements([ElementCreate.builder().name("West").build()])
-      .build();
-    const bound = SubsetCreate.builder().bindElements(ODataPath.of("x")).build();
-    expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", set)).toThrow(RangeError);
-    expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", set)).toThrow(/addElements/);
+    // The compiler refuses a SubsetCreate as a SubsetPatch; a caller without it (JavaScript) is
+    // refused here
+    const bound = SubsetCreate.builder().bindElements(ODataPath.of("x")).build() as unknown as SubsetPatch;
+    expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", bound)).toThrow(RangeError);
+    expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", bound)).toThrow(/addElements/);
     expect(() => client.subsets.update("Region", "Region", SubsetScope.Public, "s", bound, 'W/"1"')).toThrow(RangeError);
     expect(tm1.requests).toEqual([]);
   });

@@ -26,10 +26,23 @@ public class ServerServiceLiveTests
 #pragma warning disable CS0618
         Assert.Equal(read.Name, (await tm1.Server.ConfigurationAsync()).ServerName);
 #pragma warning restore CS0618
-        await tm1.Server.UpdateStaticConfigurationAsync(ServerSettingsPatch.Builder().ServerName(fixedSettings.ServerName).Build());
+        await tm1.Server.UpdateStaticConfigurationAsync(
+            ServerSettingsPatch
+                .Builder()
+                .Administration(AdministrationSettingsPatch.Builder().ServerName(fixedSettings.Administration!.ServerName).Build())
+                .Build()
+        );
         // The active configuration is read only
         await Assert.ThrowsAsync<Tm1BadRequestException>(() =>
-            tm1.Session.ExecuteAsync(Tm1Request.Patch(ODataPath.Of("ActiveConfiguration"), ServerSettingsPatch.Builder().ServerName(active.ServerName).Build()))
+            tm1.Session.ExecuteAsync(
+                Tm1Request.Patch(
+                    ODataPath.Of("ActiveConfiguration"),
+                    ServerSettingsPatch
+                        .Builder()
+                        .Administration(AdministrationSettingsPatch.Builder().ServerName(active.Administration!.ServerName).Build())
+                        .Build()
+                )
+            )
         );
     }
 

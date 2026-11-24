@@ -36,8 +36,10 @@ class WritesConformanceTest {
 			Class<?> write = Class.forName(Process.class.getPackageName() + "." + c.path("type").asString()
 					+ (c.path("write").asString().equals("create") ? "Create" : "Patch"));
 			Object read = JSON.treeToValue(c.path("read"), type);
-			Object builder = write.getMethod("builder", type).invoke(null, read);
 			try {
+				// builder(read) can refuse too: a root's create, a read of a type with
+				// none
+				Object builder = write.getMethod("builder", type).invoke(null, read);
 				JsonNode got = JSON
 					.readTree(JSON.writeValueAsString(builder.getClass().getMethod("build").invoke(builder)));
 				if (c.has("error")) {

@@ -14,7 +14,7 @@ import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Document;
 import io.skipcheck.tm1.client.model.Entry;
-import io.skipcheck.tm1.client.model.EntryPatch;
+import io.skipcheck.tm1.client.model.EntryCreate;
 import io.skipcheck.tm1.client.model.Folder;
 import io.skipcheck.tm1.client.model.LocalizedAttributes;
 import io.skipcheck.tm1.client.model.Tm1Operations;
@@ -117,8 +117,8 @@ public final class ContentService {
 	}
 
 	/**
-	 * Makes an entry in a folder: a {@code FolderPatch}, {@code DocumentPatch},
-	 * {@code LinkPatch} or a reference, such as a {@code CubeReferencePatch} with
+	 * Makes an entry in a folder: a {@code FolderCreate}, {@code DocumentCreate},
+	 * {@code LinkCreate} or a reference, such as a {@code CubeReferenceCreate} with
 	 * {@code bindCube(ODataPath.of("Cubes").key("Sales"))}. A document made outside
 	 * {@code Blobs} comes back as a {@code DocumentReference}, with an empty document
 	 * behind it; {@link #upload} gives it content.
@@ -129,7 +129,7 @@ public final class ContentService {
 	 */
 	@Tm1Endpoint("Navigation Folder/Contents")
 	@Tm1Endpoint("Navigation Folder/PrivateContents")
-	public Mono<Entry> create(ContentPath folder, ContentScope scope, EntryPatch entry) {
+	public Mono<Entry> create(ContentPath folder, ContentScope scope, EntryCreate entry) {
 		return session.execute(Tm1Request.post(folder.path().nav(scope.navigation()), entry, Entry.class));
 	}
 

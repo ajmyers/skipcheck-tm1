@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { AnnotationPatch, ODataQuery } from "../../src/index.js";
+import { AnnotationCreate, AnnotationPatch, ODataQuery } from "../../src/index.js";
 import { FakeTm1, type Recorded } from "../support/fake-tm1.js";
 
 const sent = (r: Recorded): string => decodeURIComponent(`${r.method} ${r.target}`);
@@ -44,8 +44,8 @@ describe("AnnotationService", () => {
     expect(body.commentType).toBe("ANNOTATION");
     expect(body.commentLocation).toBe("Admin,ADMIN");
 
-    await client.annotations.create(AnnotationPatch.builder().text("by hand").build());
-    expect([sent(tm1.last), tm1.last.text]).toEqual(["POST Annotations", '{"Text":"by hand"}']);
+    await client.annotations.create(AnnotationCreate.builder().text("by hand").applicationContext([]).bindDimensionalContext().build());
+    expect([sent(tm1.last), tm1.last.text]).toEqual(["POST Annotations", '{"Text":"by hand","ApplicationContext":[],"DimensionalContext@odata.bind":[]}']);
   });
 
   it("reads, changes and deletes", async () => {

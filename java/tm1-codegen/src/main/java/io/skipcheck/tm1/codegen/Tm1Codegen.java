@@ -53,7 +53,7 @@ public final class Tm1Codegen {
 					"Usage: Tm1Codegen <snapshot.xml> <output directory> | Tm1Codegen spec <snapshot.xml> <spec.json>");
 		}
 		Model model = Model.of(Path.of(args[0]));
-		new ModelGenerator(model.metadata(), model.overlay(), model.undeclared(), model.writes())
+		new ModelGenerator(model.metadata(), model.overlay(), model.undeclared(), model.writes(), model.offers())
 			.writeTo(Path.of(args[1]));
 	}
 

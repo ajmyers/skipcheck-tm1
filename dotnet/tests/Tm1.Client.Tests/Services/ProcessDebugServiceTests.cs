@@ -73,7 +73,7 @@ public class ProcessDebugServiceTests
         Assert.Equal("ProcessDebugContexts('d1')/Breakpoints", _tm1.Last.Target);
 
         _tm1.Respond = _ => new Dictionary<string, object?> { ["ID"] = 1 };
-        var line = ProcessDebugContextLineBreakpointPatch.Builder().Id(1).Enabled(true).ProcessName("Load").LineNumber(3).Build();
+        var line = ProcessDebugContextLineBreakpointCreate.Builder().Id(1).Enabled(true).ProcessName("Load").LineNumber(3).Build();
         Assert.Equal(1, (await tm1.ProcessDebugging.AddBreakpointAsync("d1", line)).Id);
         Assert.Equal(("POST", "ProcessDebugContexts('d1')/Breakpoints"), (_tm1.Last.Method, _tm1.Last.Target));
         Assert.Equal(
@@ -93,10 +93,10 @@ public class ProcessDebugServiceTests
     {
         var tm1 = _tm1.Client();
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            tm1.ProcessDebugging.AddBreakpointAsync("d1", ProcessDebugContextLineBreakpointPatch.Builder().LineNumber(3).Build())
+            tm1.ProcessDebugging.AddBreakpointAsync("d1", ProcessDebugContextLineBreakpointCreate.Builder().LineNumber(3).Build())
         );
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            tm1.ProcessDebugging.AddBreakpointAsync("d1", ProcessDebugContextBreakpointPatch.Builder().Id(-1).Build())
+            tm1.ProcessDebugging.AddBreakpointAsync("d1", ProcessDebugContextBreakpointCreate.Builder().Id(-1).Build())
         );
         Assert.DoesNotContain(_tm1.Requests, r => r.Target.Contains("Breakpoints", StringComparison.Ordinal));
     }

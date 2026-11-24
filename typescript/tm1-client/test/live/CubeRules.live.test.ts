@@ -5,7 +5,7 @@ import {
   CheckFeedersSelection,
   CubeCreate,
   DimensionCreate,
-  EdgePatch,
+  EdgeCreate,
   ElementCreate,
   ElementType,
   HierarchyCreate,
@@ -19,7 +19,7 @@ import { Live, liveReason, tm1Test } from "./live.js";
 const RULES = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\nFEEDERS;\n['Amount'] => ['Double'];\n";
 
 const element = (name: string, type: ElementType): ElementCreate => ElementCreate.builder().name(name).type(type).build();
-const edge = (parent: string, component: string): EdgePatch => EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
+const edge = (parent: string, component: string): EdgeCreate => EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
 const elementPath = (dimension: string, name: string): string =>
   ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements").key(name).toString();
 

@@ -39,8 +39,8 @@ public static class DimensionServiceExamples
                         .Name("Region")
                         .Elements([total, north, south])
                         .Edges([
-                            EdgePatch.Builder().ParentName("Total").ComponentName("North").Weight(1.0).Build(),
-                            EdgePatch.Builder().ParentName("Total").ComponentName("South").Weight(1.0).Build(),
+                            EdgeCreate.Builder().ParentName("Total").ComponentName("North").Weight(1.0).Build(),
+                            EdgeCreate.Builder().ParentName("Total").ComponentName("South").Weight(1.0).Build(),
                         ])
                         .Build(),
                 ])

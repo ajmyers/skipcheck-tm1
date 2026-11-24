@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { EdgePatch, ODataQuery } from "../../src/index.js";
+import { EdgeCreate, EdgePatch, ODataQuery } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 const EDGES = "Dimensions('Region')/Hierarchies('Region')/Edges";
@@ -21,7 +21,7 @@ describe("EdgeService", () => {
     tm1.respond = () => ({ ParentName: "Total", ComponentName: "O'Brien", Weight: 2.0 });
     expect((await client.edges.get("Region", "Region", "Total", "O'Brien")).Weight).toBe(2.0);
     expect([tm1.last.method, tm1.last.target]).toEqual(["GET", EDGE]);
-    await client.edges.create("Region", "Region", EdgePatch.builder().parentName("Total").componentName("West").weight(1.0).build());
+    await client.edges.create("Region", "Region", EdgeCreate.builder().parentName("Total").componentName("West").weight(1.0).build());
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", EDGES, '{"ParentName":"Total","ComponentName":"West","Weight":1}']);
 
     tm1.respond = () => null;

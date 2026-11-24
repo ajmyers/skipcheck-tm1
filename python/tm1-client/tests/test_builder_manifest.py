@@ -2,13 +2,15 @@
 
 """What every generated create and patch builder offers, which every client's builders must match
 (spec/conformance/builders.json): a port of the Java client's BuilderManifestTest. Each builder is
-driven to find what it offers: a setter on a builder of its own gives the name it writes, and a
+driven to find what it offers: a setter on a builder of its own gives the name it writes, its
+parameter's annotation the write type a structured value takes (``"Edges": "EdgeCreate[]"``), and a
 property is required when a builder with every other setter called refuses to build."""
 
 from __future__ import annotations
 
 import inspect
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +33,18 @@ def setters(builder: Any) -> list[str]:
     )
 
 
+def value_type(builder: Any, setter: str) -> str | None:
+    """The write type a setter takes, as ``XPatch`` or ``XCreate``, with ``[]`` for a sequence of them;
+    None for anything else (a primitive, a binding's path)."""
+    parameters = list(inspect.signature(getattr(type(builder), setter)).parameters.values())[1:]
+    if len(parameters) != 1 or not isinstance(parameters[0].annotation, str):
+        return None
+    found = re.fullmatch(r"(Sequence\[)?(\w+)\]? \| None", parameters[0].annotation)
+    if found is None or not found[2].endswith(("Patch", "Create")) or not hasattr(patches, found[2]):
+        return None
+    return found[2] + ("[]" if found[1] else "")
+
+
 def call(builder: Any, setter: str) -> None:
     getattr(builder, setter)(ODataPath.of("x") if setter.startswith("bind_") else None)
 
@@ -38,12 +52,16 @@ def call(builder: Any, setter: str) -> None:
 def describe(patch: Any) -> dict[str, Any]:
     base = dict(patch.builder()._values)
     wrote: dict[str, str] = {}
+    values: dict[str, str] = {}
     for setter in setters(patch.builder()):
         b = patch.builder()
         call(b, setter)
         new = [k for k in b._values if k not in base]
         assert len(new) == 1, f"{patch.__name__}.{setter} writes one property: {new}"
         wrote[setter] = new[0]
+        value = value_type(b, setter)
+        if value is not None:
+            values[new[0]] = value
     required = []
     for group in sorted({bare(k) for k in wrote.values()}):
         b = patch.builder()
@@ -59,6 +77,7 @@ def describe(patch: Any) -> dict[str, Any]:
         "open": callable(getattr(patch.builder(), "property", None)),
         "required": required,
         "setters": sorted(wrote.values()),
+        "values": dict(sorted(values.items())),
     }
 
 

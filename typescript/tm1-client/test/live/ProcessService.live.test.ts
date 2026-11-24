@@ -6,12 +6,12 @@ import {
   ODataQuery,
   Process,
   ProcessCreate,
-  type ProcessExecuteStatusCode,
   ProcessParameterPatch,
   ProcessPatch,
-  type Tm1Client,
   Tm1NotFoundException,
   Tm1PreconditionFailedException,
+  type ProcessExecuteStatusCode,
+  type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
@@ -29,10 +29,7 @@ EndIf;
 function definition(name: string, prolog: string): ProcessCreate {
   return ProcessCreate.builder()
     .name(name)
-    .parameters([
-      ProcessParameterPatch.builder().name("pName").value("").type("String").build(),
-      ProcessParameterPatch.builder().name("pCount").value(0).type("Numeric").build(),
-    ])
+    .parameters([ProcessParameterPatch.builder().name("pName").value("").build(), ProcessParameterPatch.builder().name("pCount").value(0).build()])
     .prologProcedure(prolog)
     .build();
 }

@@ -5,12 +5,12 @@ import {
   ContentPath,
   ContentScope,
   CubeReference,
-  CubeReferencePatch,
-  DocumentPatch,
+  CubeReferenceCreate,
+  DocumentCreate,
   Entry,
-  FolderPatch,
+  FolderCreate,
   Link,
-  LinkPatch,
+  LinkCreate,
   ODataPath,
   ODataQuery,
   Tm1BadRequestException,
@@ -47,7 +47,7 @@ describe("ContentService on TM1" + liveReason, () => {
   /** A folder of its own in Applications, deleted afterwards. */
   async function inFolder(names: string[], test: (folders: ContentPath[]) => Promise<void>): Promise<void> {
     const folders = names.map((n) => ContentPath.applications().child(n));
-    for (const n of names) await tm1.contents.create(ContentPath.applications(), ContentScope.Public, FolderPatch.builder().name(n).build());
+    for (const n of names) await tm1.contents.create(ContentPath.applications(), ContentScope.Public, FolderCreate.builder().name(n).build());
     try {
       await test(folders);
     } finally {
@@ -62,7 +62,7 @@ describe("ContentService on TM1" + liveReason, () => {
 
   tm1Test("keeps a document in Blobs behind a reference", async () => {
     await inFolder([Live.name()], async ([folder]) => {
-      const made = await tm1.contents.create(folder!, ContentScope.Public, DocumentPatch.builder().name("notes.txt").build());
+      const made = await tm1.contents.create(folder!, ContentScope.Public, DocumentCreate.builder().name("notes.txt").build());
       // A document made in an application is a reference, found by ID, the name plus a suffix
       expect(typeOf(Entry, made)).toBe("DocumentReference");
       expect(made.ID).toBe("notes.txt.blob");
@@ -92,12 +92,12 @@ describe("ContentService on TM1" + liveReason, () => {
   tm1Test("makes links and references and moves them", async () => {
     const name = Live.name();
     await inFolder([name, name + "-2"], async ([folder, other]) => {
-      const link = await tm1.contents.create(folder!, ContentScope.Public, LinkPatch.builder().name("ibm").url("https://www.ibm.com").build());
+      const link = await tm1.contents.create(folder!, ContentScope.Public, LinkCreate.builder().name("ibm").url("https://www.ibm.com").build());
       expect(link.ID).toBe("ibm.extr");
       const reference = await tm1.contents.create(
         folder!,
         ContentScope.Public,
-        CubeReferencePatch.builder().name("}ClientGroups").bindCube(ODataPath.of("Cubes").key("}ClientGroups")).build(),
+        CubeReferenceCreate.builder().name("}ClientGroups").bindCube(ODataPath.of("Cubes").key("}ClientGroups")).build(),
       );
       expect(reference.ID).toBe("}ClientGroups.cube");
 
@@ -117,7 +117,7 @@ describe("ContentService on TM1" + liveReason, () => {
       expect(moved.ID).toBe("ibm.extr");
       expect((await tm1.contents.contents(other!, ContentScope.Public, ODataQuery.none()).toArray()).map((e) => e.ID)).toEqual(["ibm.extr"]);
 
-      await tm1.contents.create(folder!, ContentScope.Private, FolderPatch.builder().name("mine").build());
+      await tm1.contents.create(folder!, ContentScope.Private, FolderCreate.builder().name("mine").build());
       expect((await tm1.contents.contents(folder!, ContentScope.Private, ODataQuery.none()).toArray()).map((e) => e.ID)).toEqual(["mine"]);
       expect(typeOf(Entry, await tm1.contents.get(folder!.child("mine", ContentScope.Private), ODataQuery.none()))).toBe("Folder");
       expect(await tm1.contents.localizedAttributes(folder!, ODataQuery.none()).toArray()).toEqual([]);
@@ -126,7 +126,7 @@ describe("ContentService on TM1" + liveReason, () => {
 
   tm1Test("refuses a chunked upload", async () => {
     await inFolder([Live.name()], async ([folder]) => {
-      const made = await tm1.contents.create(folder!, ContentScope.Public, DocumentPatch.builder().name("notes.txt").build());
+      const made = await tm1.contents.create(folder!, ContentScope.Public, DocumentCreate.builder().name("notes.txt").build());
       const target = await Live.target();
       const root = target.url.endsWith("/") ? target.url : target.url + "/";
       // A stream of unknown length is sent chunked

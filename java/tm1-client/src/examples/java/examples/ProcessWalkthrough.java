@@ -13,7 +13,6 @@ import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessExecuteResult;
 import io.skipcheck.tm1.client.model.ProcessParameterPatch;
 import io.skipcheck.tm1.client.model.ProcessSyntaxError;
-import io.skipcheck.tm1.client.model.ProcessVariableType;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 
 /**
@@ -42,11 +41,7 @@ public final class ProcessWalkthrough {
 		// A process that sets a month's budget to its actual units plus 10%
 		ProcessCreate process = ProcessCreate.builder()
 			.name("Budget From Actual")
-			.parameters(List.of(ProcessParameterPatch.builder()
-				.name("pMonth")
-				.value("Jan")
-				.type(ProcessVariableType.STRING)
-				.build()))
+			.parameters(List.of(ProcessParameterPatch.builder().name("pMonth").value("Jan").build()))
 			.prologProcedure(
 					"""
 							nActual = CellGetN('SalesCube', 'Actual', 'France', 'S Series 1.8 L Sedan', 'Units', pMonth);

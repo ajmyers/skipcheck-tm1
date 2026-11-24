@@ -17,9 +17,11 @@ from skipcheck_tm1.model import (
     ChoreCreate,
     ChoreExecutionMode,
     ChorePatch,
+    ChoreTaskCreate,
     ChoreTaskParameterPatch,
     ChoreTaskPatch,
     ProcessCreate,
+    ProcessDebugContextLineBreakpointCreate,
     ProcessDebugContextLineBreakpointPatch,
     ProcessDebugContextStatus,
     ProcessErrorLog,
@@ -144,7 +146,7 @@ def test_debugs_and_steps(api: Api, fake: FakeTm1) -> None:
 
 def test_breakpoints_need_an_id(api: Api, fake: FakeTm1) -> None:
     debug = api.client.process_debugging
-    line3 = ProcessDebugContextLineBreakpointPatch.builder().id(1).process_name("Load").procedure(ProcessProcedure.PROLOG).line_number(3).enabled(True).build()
+    line3 = ProcessDebugContextLineBreakpointCreate.builder().id(1).process_name("Load").procedure(ProcessProcedure.PROLOG).line_number(3).enabled(True).build()
     fake.respond = lambda r: {"@odata.type": "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint", "ID": 1}
     api.run(debug.add_breakpoint("c1", line3))
     assert target(fake.last) == "POST ProcessDebugContexts('c1')/Breakpoints"
@@ -158,9 +160,9 @@ def test_breakpoints_need_an_id(api: Api, fake: FakeTm1) -> None:
     }
     sent = len(fake.requests)
     with pytest.raises(ValueError, match="ID of 0 or more"):
-        api.run(debug.add_breakpoint("c1", ProcessDebugContextLineBreakpointPatch.builder().line_number(3).build()))
+        api.run(debug.add_breakpoint("c1", ProcessDebugContextLineBreakpointCreate.builder().line_number(3).build()))
     with pytest.raises(ValueError):
-        api.run(debug.add_breakpoint("c1", ProcessDebugContextLineBreakpointPatch.builder().id(-1).build()))
+        api.run(debug.add_breakpoint("c1", ProcessDebugContextLineBreakpointCreate.builder().id(-1).build()))
     assert len(fake.requests) == sent
 
     fake.respond = lambda r: None
@@ -282,7 +284,7 @@ def test_chores(api: Api, fake: FakeTm1) -> None:
     api.run(chores.get("Nightly", expand="Tasks($expand=Process)"))
     assert target(fake.last) == "GET Chores('Nightly')?$expand=Tasks($expand%3DProcess)"
     task = (
-        ChoreTaskPatch.builder()
+        ChoreTaskCreate.builder()
         .bind_process(ODataPath.of("Processes").key("Load Sales"))
         .parameters([ChoreTaskParameterPatch.builder().name("pVersion").value("Actual").build()])
         .build()
@@ -325,7 +327,7 @@ def test_chore_tasks(api: Api, fake: FakeTm1) -> None:
     api.run(chores.tasks("Nightly"))
     assert target(fake.last) == "GET Chores('Nightly')/Tasks"
     fake.respond = lambda r: {"Step": 1}
-    assert api.run(chores.add_task("Nightly", ChoreTaskPatch.builder().bind_process(ODataPath.of("Processes").key("p")).build())).step == 1
+    assert api.run(chores.add_task("Nightly", ChoreTaskCreate.builder().bind_process(ODataPath.of("Processes").key("p")).build())).step == 1
     assert (target(fake.last), body(fake.last)) == ("POST Chores('Nightly')/Tasks", {"Process@odata.bind": "Processes('p')"})
     fake.respond = lambda r: None
     api.run(chores.update_task("Nightly", 1, ChoreTaskPatch.builder().parameters([]).build()))

@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Emits patches.ts: a patch per type, as the Java model's `CubePatch`:
-// `CubePatch.builder().rules(rules).build()`, and a create per probed type, as `CubeCreate`. Only the properties
-// set are sent, an explicit `null` included; a subtype's patch sends its `@odata.type` first.
+// Emits patches.ts: the write types the spec's offers list, as the Java model's: a patch, as
+// `CubePatch.builder().rules(rules).build()`, and a create, as `CubeCreate`, each offering only the
+// setters the probe verified or an exception kept (#338). Only the properties set are sent, an
+// explicit `null` included; a subtype's write sends its `@odata.type` first.
 
 import { element } from "./emit-model.js";
-import { HEADER, Names, type Spec, type SpecType } from "./spec.js";
+import { HEADER, Names, type Spec, type SpecProperty, type SpecType } from "./spec.js";
 
+const BIND = "@odata.bind";
+
+/** The type a setter takes: a complex type's patch; an entity's create where it has one (a nested
+ * entity is new), else its patch. As the Java generator. */
 function patchType(spec: Spec, typeName: string, collection: boolean): string | undefined {
   const t = spec.typeByName.get(typeName);
   let el: string | undefined;
-  // A nested entity is sent as its create where it has one: a deep insert creates it
   if (t) el = t.name + (creatable(spec, t) ? "Create" : "Patch");
   else el = element(spec, typeName);
   if (el === undefined) return undefined;
@@ -21,19 +25,20 @@ function patchType(spec: Spec, typeName: string, collection: boolean): string | 
 export function emitPatches(spec: Spec): string {
   let out = HEADER;
   out += 'import { Tm1Patch, Tm1PatchBuilder } from "../patch.js";\n';
-  out += 'import type { ODataPath } from "../odata/index.js";\n';
-  out += 'import type * as model from "./model.js";\n';
+  out += 'import { typeOf } from "../json.js";\n';
+  out += 'import { ODataPath } from "../odata/index.js";\n';
+  out += 'import * as model from "./model.js";\n';
+  out += READ_BINDINGS;
   // A class extends its base's, so bases come first
   const done = new Set<string>();
   const visit = (t: SpecType): void => {
-    if (done.has(t.name)) return;
+    if (done.has(t.name) || !patchable(spec, t)) return;
     const base = spec.base(t);
     if (base) visit(base);
     done.add(t.name);
     out += emitPatch(spec, t);
   };
   for (const t of spec.types) visit(t);
-  // Creates, for the types the probe has writes for, and the roots their creates extend
   const created = new Set<string>();
   const visitCreate = (t: SpecType): void => {
     if (created.has(t.name) || !creatable(spec, t)) return;
@@ -46,55 +51,221 @@ export function emitPatches(spec: Spec): string {
   return out;
 }
 
+/** The Java model's `ReadBindings`: the paths a write's `builder(read)` binds a read's navigations
+ * to, private to the module. */
+const READ_BINDINGS = `
+// The paths a write's builder(read) binds a read's navigations to: null where one can't be made,
+// as the Java model's ReadBindings
+
+/** An entity in a set, by its key: \`Dimensions('Region')\`. */
+function byKey(set: string, key: unknown): ODataPath | null {
+  return key === null || key === undefined ? null : ODataPath.of(set).key(key);
+}
+
+/** Entities in a set, by their keys: null if any key is missing, or there are none. */
+function byKeys(set: string, keys: readonly unknown[]): ODataPath[] | null {
+  if (!keys.length) return null;
+  const out: ODataPath[] = [];
+  for (const key of keys) {
+    const path = byKey(set, key);
+    if (path === null) return null;
+    out.push(path);
+  }
+  return out;
+}
+
+/** An element or member, by its \`UniqueName\`: \`[d].[h].[e]\`, or \`[d].[e]\` in the dimension's own
+ * hierarchy, with \`]]\` for \`]\`. Null for any other shape. */
+function inHierarchy(collection: string, uniqueName: unknown): ODataPath | null {
+  if (typeof uniqueName !== "string") return null;
+  const parts: string[] = [];
+  let i = 0;
+  while (i < uniqueName.length) {
+    if (uniqueName[i] !== "[") return null;
+    let part = "";
+    let j = i + 1;
+    for (;;) {
+      if (j >= uniqueName.length) return null;
+      const c = uniqueName[j]!;
+      if (c === "]") {
+        if (uniqueName[j + 1] === "]") {
+          part += "]";
+          j += 2;
+          continue;
+        }
+        break;
+      }
+      part += c;
+      j++;
+    }
+    parts.push(part);
+    i = j + 1;
+    if (i < uniqueName.length) {
+      if (uniqueName[i] !== ".") return null;
+      i++;
+      if (i === uniqueName.length) return null;
+    }
+  }
+  if (parts.length === 2) parts.splice(1, 0, parts[0]!);
+  if (parts.length !== 3) return null;
+  return ODataPath.of("Dimensions").key(parts[0]).nav("Hierarchies").key(parts[1]).nav(collection).key(parts[2]);
+}
+
+/** Elements or members, by their \`UniqueName\`s: null if any can't be made, or there are none. */
+function allInHierarchy(collection: string, uniqueNames: readonly unknown[]): ODataPath[] | null {
+  if (!uniqueNames.length) return null;
+  const out: ODataPath[] = [];
+  for (const name of uniqueNames) {
+    const path = inHierarchy(collection, name);
+    if (path === null) return null;
+    out.push(path);
+  }
+  return out;
+}
+`;
+
+/** Whether a type gets a patch: the offers list one. */
+export function patchable(spec: Spec, t: SpecType): boolean {
+  return spec.offered(t.name + "Patch") !== undefined;
+}
+
+/** Whether a type gets a create: it's an entity, and the offers list one. */
+export function creatable(spec: Spec, t: SpecType): boolean {
+  return t.kind === "entity" && spec.offered(t.name + "Create") !== undefined;
+}
+
 const WRITING = new Set(["applied", "writeOnly", "transformed", "untested"]);
-
-function writes(outcome: string | undefined): boolean {
-  return outcome === undefined || WRITING.has(outcome);
-}
-
-/** Whether a POST of `t` takes a property, by the probe's writes (yes, for a type it has none for). */
-export function creates(t: SpecType, prop: string, spec?: Spec): boolean {
-  // The root of a hierarchy without writes of its own offers what every probed subtype takes, so
-  // each subtype's create offers at least what its root's does
-  if (!t.write && spec)
-    return spec
-      .derived(t)
-      .filter((d) => !!d.write)
-      .every((d) => creates(d, prop));
-  return writes(t.write?.create.properties[prop]);
-}
 
 /** Whether `builder(read)` copies a property into a patch of `t`: a PATCH applies it, and it isn't a
  * collection a PATCH appends to (copying one would add its members again), ignores or rejects. A
  * collection a PATCH replaces is copied: the read holds all of it. As the Java generator. */
 export function patches(t: SpecType, prop: string): boolean {
+  const outcome = t.write?.patch.properties[prop];
   const collection = t.write?.collections?.[prop];
-  return writes(t.write?.patch.properties[prop]) && !["appends", "ignored", "rejected"].includes(collection ?? "");
+  return (outcome === undefined || WRITING.has(outcome)) && !["appends", "ignored", "rejected"].includes(collection ?? "");
 }
 
-function writeOffersInPatch(write: NonNullable<SpecType["write"]>, prop: string): boolean {
-  if (prop === "Name") return write.patch.rename === undefined || write.patch.rename === null || write.patch.rename === "applied";
-  const outcome = write.patch.properties[prop];
-  const collection = write.collections?.[prop];
-  return outcome !== "rejected" && outcome !== "ignored" && collection !== "rejected" && collection !== "ignored";
+/** How `builder(read)` binds a navigation the read holds, or undefined where the read can't tell the
+ * targets' paths: by key for a target in an entity set with a single key, by `UniqueName` for an
+ * element or a member; not a subset (public or private) or a view, whose cube the read doesn't
+ * say. As the Java generator. */
+function readBinding(spec: Spec, n: SpecProperty): { helper: string; argument: string; collection: string } | undefined {
+  const target = spec.typeByName.get(n.type);
+  if (!target || target.kind !== "entity") return undefined;
+  let set: string | undefined;
+  let key: string[] = [];
+  // The type, then the types it derives from, as Java's typeHierarchy
+  for (const level of spec.chain(target).reverse()) {
+    if (level.key?.length && !key.length) key = level.key;
+    set ??= (spec.doc.container.entitySets ?? []).find((s) => s.entityType === level.qualifiedName)?.name;
+  }
+  if (set !== undefined && key.length === 1) return { helper: n.collection ? "byKeys" : "byKey", argument: key[0]!, collection: set };
+  if (target.name === "Element" || target.name === "Member")
+    return { helper: n.collection ? "allInHierarchy" : "inHierarchy", argument: "UniqueName", collection: target.name + "s" };
+  return undefined;
 }
 
-/**
- * Whether a patch of `t` offers a property: not if a PATCH rejects or ignores it, by the probe, nor
- * `Name` where a PATCH doesn't rename; for the root of a hierarchy without writes of its own, if
- * every probed subtype's patch offers it. As the Java generator.
- */
-export function offersInPatch(spec: Spec, t: SpecType, prop: string): boolean {
-  if (t.write) return writeOffersInPatch(t.write, prop);
-  return spec
-    .derived(t)
-    .filter((d) => !!d.write)
-    .every((d) => writeOffersInPatch(d.write!, prop));
+/** What `builder(read)` does with a builder `b` and a read `read`, as statements: copies what the read
+ * holds that the write takes, binds the navigations whose paths follow from it (for a patch, only
+ * the single-valued: sent back, a collection would replace or append to what's there, whichever TM1
+ * does for it, on an unrelated change), then copies an open type's undeclared properties. As the
+ * Java generator's `from`. */
+function fromRead(spec: Spec, t: SpecType, create: boolean): { statements: string; plain: string | undefined } {
+  const offered = spec.offered(t.name + (create ? "Create" : "Patch"))!;
+  const copied: string[] = [];
+  // A structured value is copied as the write type its setter takes, through that type's
+  // builder(read), or a root patch's of(): what it holds that a write takes
+  const nested: string[] = [];
+  const bindings: string[] = [];
+  for (const level of spec.chain(t)) {
+    for (const p of level.properties ?? []) {
+      if (p.type === "Edm.Stream" || copied.includes(p.name) || !(p.name in offered) || (!create && !patches(t, p.name))) continue;
+      const value = p.departure ? undefined : spec.typeByName.get(p.type);
+      if (value) {
+        const write = value.name + (creatable(spec, value) ? "Create" : "Patch");
+        const root = spec.derived(value).length > 0;
+        // A root's create starts from a read only by its type, which a nested value's read
+        // doesn't settle: not copied, as the Java generator
+        if (root && write.endsWith("Create")) continue;
+        nested.push(`${JSON.stringify(p.name)}: (v: model.${value.name}) => ${root ? `of${write}(v)` : `${write}.builder(v).build()`}`);
+      }
+      copied.push(p.name);
+    }
+    for (const n of level.navigationProperties ?? []) {
+      if (!create && n.collection) continue;
+      const how = n.name + BIND in offered ? readBinding(spec, n) : undefined;
+      if (!how) continue;
+      const bind = "bind" + Names.member(n.name);
+      const read = `read[${JSON.stringify(n.name)}]`;
+      const argument = `[${JSON.stringify(how.argument)}]`;
+      bindings.push(
+        n.collection
+          ? `    if (${read}) {\n      const targets = ${how.helper}(${JSON.stringify(how.collection)}, ${read}.map((v) => v${argument}));\n      if (targets) b.${bind}(...targets);\n    }\n`
+          : `    if (${read}) {\n      const target = ${how.helper}(${JSON.stringify(how.collection)}, ${read}${argument});\n      if (target) b.${bind}(target);\n    }\n`,
+      );
+    }
+  }
+  const declared = spec.chain(t).some((l) => l.open)
+    ? JSON.stringify(spec.chain(t).flatMap((l) => [...(l.properties ?? []), ...(l.navigationProperties ?? [])].map((p) => p.name)))
+    : "null";
+  const converters = nested.length ? `, { ${nested.join(", ")} }` : "";
+  // Without bindings it's one call, which the caller can write as an expression
+  if (!bindings.length) {
+    const plain = `b.copy(read, ${JSON.stringify(copied)}, ${declared}${converters})`;
+    return { statements: `    ${plain};\n`, plain };
+  }
+  let statements = `    b.copy(read, ${JSON.stringify(copied)}, null${converters});\n${bindings.join("")}`;
+  if (declared !== "null") statements += `    b.copy(read, [], ${declared});\n`;
+  return { statements, plain: undefined };
 }
 
-/** Whether a type gets a create: the probe has writes for it, or a subtype it's the root of does. */
-export function creatable(spec: Spec, t: SpecType): boolean {
-  return t.kind === "entity" && (!!t.write || spec.derived(t).some((d) => !!d.write));
+/** A builder's setters, in the order they're written: each one's method, the JSON name it writes
+ * and its code but for `override`. A subtype's builder has its base's too, as the Java generator's:
+ * those of them the subtype is offered, written again. */
+function setters(spec: Spec, t: SpecType, create: boolean): { method: string; json: string; doc: string; code: string }[] {
+  const offered = spec.offered(t.name + (create ? "Create" : "Patch"))!;
+  const taken = new Set(["build", "property", "set", "bind", "bindAll", "copy", "has", "constructor"]);
+  const out: { method: string; json: string; doc: string; code: string }[] = [];
+  for (const level of spec.chain(t)) {
+    for (const p of level.properties ?? []) {
+      const type = p.departure ? "unknown" : patchType(spec, p.type, !!p.collection);
+      if (type === undefined || !(p.name in offered)) continue;
+      const method = Names.unique(Names.method(p.name), taken);
+      out.push({ method, json: p.name, doc: "", code: `${method}(value: ${type}): this {\n    return this.set(${JSON.stringify(p.name)}, value);\n  }\n` });
+    }
+    for (const n of level.navigationProperties ?? []) {
+      const type = patchType(spec, n.type, !!n.collection);
+      if (type !== undefined && n.name in offered) {
+        const method = Names.unique(Names.method(n.name), taken);
+        out.push({
+          method,
+          json: n.name,
+          doc: `  /** Sets \`${n.name}\` (nested, for a deep insert). */\n`,
+          code: `${method}(value: ${type}): this {\n    return this.set(${JSON.stringify(n.name)}, value);\n  }\n`,
+        });
+      }
+      // Set and bind are offered apart: a binding where TM1 binds, a nested setter where it inserts
+      if (spec.isEntity(n.type) && n.name + BIND in offered) {
+        const method = Names.unique("bind" + Names.member(n.name), taken);
+        out.push(
+          n.collection
+            ? {
+                method,
+                json: n.name + BIND,
+                doc: `  /** Binds \`${n.name}\` to existing entities (\`${n.name}@odata.bind\`). */\n`,
+                code: `${method}(...targets: ODataPath[]): this {\n    return this.bindAll(${JSON.stringify(n.name)}, targets);\n  }\n`,
+              }
+            : {
+                method,
+                json: n.name + BIND,
+                doc: `  /** Binds \`${n.name}\` to an existing entity (\`${n.name}@odata.bind\`). */\n`,
+                code: `${method}(target: ODataPath): this {\n    return this.bind(${JSON.stringify(n.name)}, target);\n  }\n`,
+              },
+        );
+      }
+    }
+  }
+  return out;
 }
 
 function emitPatch(spec: Spec, t: SpecType, create = false): string {
@@ -103,72 +274,90 @@ function emitPatch(spec: Spec, t: SpecType, create = false): string {
   const patch = name + suffix;
   const builder = patch + "Builder";
   const base = spec.base(t);
+  if (base && !spec.offered(base.name + suffix)) throw new Error(`${patch} extends ${base.name + suffix}, which the offers don't list`);
   const typeId = base ? JSON.stringify("#" + t.qualifiedName) : "null";
   const ticks = "`@odata.type`";
+  const subtypes = spec.derived(t);
   let out = create
-    ? `\n/** A create of {@link model.${name}}, for a POST: only the properties set are sent, and only those TM1 applies in a create are offered${t.write ? ", as the probe found" : ""}. Its build() checks what a create needs. */\n`
-    : `\n/** A write of {@link model.${name}}: only the properties set are sent. */\n`;
+    ? `\n/** A create of {@link model.${name}}, for a POST: only the properties set are sent, and only those TM1 was found to apply in a create are offered. Its build() checks what a create needs. */\n`
+    : `\n/** A write of {@link model.${name}}: only the properties set are sent, and only those TM1 was found to apply are offered. */\n`;
   out += `export class ${patch} extends ${base ? base.name + suffix : "Tm1Patch"} {\n`;
-  if (spec.derived(t).length) {
+  // Nothing at run time: it makes the type nominal. Without it every write type has the same
+  // shape, so a CubeCreate would pass for a ProcessPatch; a subtype's stays its base's, which it
+  // extends
+  out += `  /** @internal What makes a value of another write type not one of this. */\n  declare private readonly _${patch}: never;\n\n`;
+  if (subtypes.length && create) {
+    // A hierarchy's root: its create starts from a read of any of its types, with that type's
+    const cases = subtypes
+      .filter((d) => creatable(spec, d))
+      .map((d) => `    if (type === ${JSON.stringify(d.name)}) return ${d.name}Create.builder(read as model.${d.name});\n`)
+      .join("");
+    out += `  /** A builder with nothing set; or, given an entity read from TM1, a create of what it holds that a POST applies, to recreate it, by its type: that type's builder(read), which extends this one's. @throws RangeError if TM1 makes none of its type */\n`;
+    out += `  static builder(read?: model.${name}): ${builder} {\n    if (!read) return new ${builder}();\n`;
+    out += `    const type = typeOf(model.${name}, read);\n${cases}`;
+    out += "    throw new RangeError(`A ${type} has no create: TM1 makes none of its type`);\n  }\n}\n\n";
+  } else if (subtypes.length) {
     out += `  /** A builder with nothing set${base ? " but " + ticks : ""}. */\n`;
     out += `  static ${base ? "override " : ""}builder(): ${builder} {\n    return new ${builder}();\n  }\n}\n\n`;
+    // A hierarchy's root: a nested value of any of its types is written by its type, as the Java
+    // patch's of(); one of a type this client doesn't know as the root's own, without the
+    // @odata.type a builder of the root doesn't send
+    const cases = subtypes
+      .filter((d) => patchable(spec, d))
+      .map((d) => `  if (type === ${JSON.stringify(d.name)}) return ${d.name}Patch.builder(read as model.${d.name}).build();\n`)
+      .join("");
+    out += `/** A patch of what \`read\`, a value read from TM1, holds that a write takes, by its type: for nested values. */\n`;
+    out += `function of${patch}(read: model.${name}): ${patch} {\n  const type = typeOf(model.${name}, read);\n${cases}`;
+    out += `  const b = new ${builder}();\n${fromRead(spec, t, false).statements.replace(/^ {2}/gm, "")}  return b.build();\n}\n\n`;
   } else {
-    const copied: string[] = [];
-    for (const level of spec.chain(t))
-      for (const p of level.properties ?? [])
-        if (p.type !== "Edm.Stream" && !copied.includes(p.name) && (create ? creates(t, p.name, spec) : patches(t, p.name) && offersInPatch(spec, t, p.name)))
-          copied.push(p.name);
-    const declared = spec.chain(t).some((l) => l.open)
-      ? JSON.stringify(spec.chain(t).flatMap((l) => [...(l.properties ?? []), ...(l.navigationProperties ?? [])].map((p) => p.name)))
-      : "null";
+    const from = fromRead(spec, t, create);
     const what = create ? "a POST applies, to recreate it" : "a PATCH applies, leaving out collections a PATCH appends to";
-    out += `  /** A builder with nothing set${base ? " but " + ticks : ""}; or, given an entity read from TM1, one holding what it holds that ${what}. Navigation properties aren't copied, nor nulls. */\n`;
-    out += `  static ${base ? "override " : ""}builder(read?: model.${name}): ${builder} {\n`;
-    out += `    const b = new ${builder}();\n    return read ? b.copy(read, ${JSON.stringify(copied)}, ${declared}) : b;\n  }\n}\n\n`;
+    const never = create ? "" : ", nor a collection, which a PATCH would replace or append to";
+    out += `  /** A builder with nothing set${base ? " but " + ticks : ""}; or, given an entity read from TM1, one holding what it holds that ${what}. A navigation the read holds expanded is bound, where its targets' paths follow from it: an entity set's by key, an element's or member's by its \`UniqueName\`; one it doesn't hold, or holds empty, or a subset or a view (whose path the read can't tell), isn't, nor are nested ones or nulls${never}. */\n`;
+    out += `  static ${base ? "override " : ""}builder(read?: model.${name}): ${builder} {\n    const b = new ${builder}();\n`;
+    out += from.plain ? `    return read ? ${from.plain} : b;\n  }\n}\n\n` : `    if (!read) return b;\n${from.statements}    return b;\n  }\n}\n\n`;
   }
+  // A subtype's builder extends its base's, as the Java model's: a root's builder(read) returns
+  // one, typed as the root's
+  const baseBuilder = base ? base.name + suffix + "Builder" : undefined;
+  const inherited = new Map((base ? setters(spec, base, create) : []).map((s) => [s.method, s.json]));
+  const made = "(values: ReadonlyMap<string, unknown>) => " + patch;
   out += `/** Builds a {@link ${patch}}; each setter replaces what an earlier call set. */\n`;
-  out += `export class ${builder} extends Tm1PatchBuilder<${patch}> {\n`;
-  out += `  constructor() {\n    super((values) => new ${patch}(values), ${typeId});\n  }\n`;
-  const taken = new Set(["build", "property", "set", "bind", "bindAll", "constructor"]);
+  out += `export class ${builder} extends ${baseBuilder ?? `Tm1PatchBuilder<${patch}>`} {\n`;
+  if (subtypes.length) {
+    // What a subtype's builder makes, and the @odata.type it sends, are its own
+    out += `  /** A builder with nothing set. @internal The arguments are a subtype's builder's. */\n`;
+    out += `  constructor(make: ${made} = (values) => new ${patch}(values), odataType: string | null = ${typeId}) {\n    super(make, odataType);\n  }\n`;
+  } else {
+    out += `  constructor() {\n    super((values) => new ${patch}(values), ${typeId});\n  }\n`;
+  }
   const required = create ? (t.write?.create.required ?? []) : [];
-  if (required.length) {
-    out += `\n  /** The create, with what's been set so far. @throws Error if it lacks what a create needs. */\n`;
+  // A subtype's build() checks what its own create needs, as Java's, so its base's mustn't need more
+  const baseRequired = base && create ? (base.write?.create.required ?? []) : [];
+  const more = baseRequired.filter((r) => !required.includes(r));
+  if (more.length) throw new Error(`${base!.name}Create needs ${more.join(", ")}, which ${patch} doesn't`);
+  if (required.length || base) {
+    out += required.length
+      ? `\n  /** The create, with what's been set so far. @throws Error if it lacks what a create needs. */\n`
+      : `\n  /** The ${create ? "create" : "patch"}, with what's been set so far. */\n`;
     out += `  override build(): ${patch} {\n`;
     for (const r of required) {
-      const bare = r.replace("@odata.bind", "");
+      const bare = r.replace(BIND, "");
       out += `    if (!this.has(${JSON.stringify(bare)})) throw new Error(${JSON.stringify(`A ${name} create needs ${bare}: TM1 refuses one without it`)});\n`;
     }
-    out += "    return super.build();\n  }\n";
+    // The constructor gave the base's builder what makes this type's
+    out += base ? `    return super.build() as ${patch};\n  }\n` : "    return super.build();\n  }\n";
   }
-  for (const level of spec.chain(t)) {
-    for (const p of level.properties ?? []) {
-      const type = p.departure ? "unknown" : patchType(spec, p.type, !!p.collection);
-      if (type === undefined || (create ? !creates(t, p.name, spec) : !offersInPatch(spec, t, p.name))) continue;
-      const method = Names.unique(Names.method(p.name), taken);
-      out += `\n  ${method}(value: ${type}): this {\n    return this.set(${JSON.stringify(p.name)}, value);\n  }\n`;
-    }
-    for (const n of level.navigationProperties ?? []) {
-      const type = patchType(spec, n.type, !!n.collection);
-      // A navigation a PATCH ignores or rejects (a cube's Dimensions) isn't offered either
-      if (type === undefined || (!create && !offersInPatch(spec, t, n.name))) continue;
-      const method = Names.unique(Names.method(n.name), taken);
-      out += `\n  /** Sets \`${n.name}\` (nested, for a deep insert). */\n`;
-      out += `  ${method}(value: ${type}): this {\n    return this.set(${JSON.stringify(n.name)}, value);\n  }\n`;
-      if (spec.isEntity(n.type)) {
-        const bind = Names.unique("bind" + Names.member(n.name), taken);
-        if (n.collection) {
-          out += `\n  /** Binds \`${n.name}\` to existing entities (\`${n.name}@odata.bind\`). */\n`;
-          out += `  ${bind}(...targets: ODataPath[]): this {\n    return this.bindAll(${JSON.stringify(n.name)}, targets);\n  }\n`;
-        } else {
-          out += `\n  /** Binds \`${n.name}\` to an existing entity (\`${n.name}@odata.bind\`). */\n`;
-          out += `  ${bind}(target: ODataPath): this {\n    return this.bind(${JSON.stringify(n.name)}, target);\n  }\n`;
-        }
-      }
-    }
+  for (const s of setters(spec, t, create)) {
+    const overrides = inherited.has(s.method);
+    if (overrides && inherited.get(s.method) !== s.json)
+      throw new Error(`${builder}.${s.method} writes ${s.json}, but ${baseBuilder}'s writes ${inherited.get(s.method)}`);
+    out += `\n${s.doc}  ${overrides ? "override " : ""}${s.code}`;
   }
   if (spec.chain(t).some((l) => l.open)) {
+    const overrides = base !== undefined && spec.chain(base).some((l) => l.open);
     out += "\n  /** Sets a property `$metadata` doesn't declare, which this open type can have, such as an attribute's value. */\n";
-    out += "  property(name: string, value: unknown): this {\n    return this.set(name, value);\n  }\n";
+    out += `  ${overrides ? "override " : ""}property(name: string, value: unknown): this {\n    return this.set(name, value);\n  }\n`;
   }
   out += "}\n";
   return out;

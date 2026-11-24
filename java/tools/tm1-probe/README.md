@@ -101,7 +101,7 @@ A structured value a type carries (a complex property, `Parameters` or `DataSour
 
 ### Coverage
 
-Every setter the clients' create and patch types offer must be verified by the probe or listed in [`spec/conformance/probe-coverage.json`](../../../spec/conformance/probe-coverage.json), with why (`ProbeCoverageTest`). For a new TM1 version, a failure there names each writable property or type the cases don't reach yet: add a case, or list it with a reason.
+The clients' create and patch types offer only what the probe verifies, or what the overlay's `writes` keeps with why ([`spec/tm1-overlay.json`](../../../spec/tm1-overlay.json)): `tm1-codegen` works that out as the spec's `offers`, and `ProbeCoverageTest` checks the builder manifest against it, re-reading the probe file. For a new TM1 version, a write the cases don't reach yet isn't offered: add a case, or keep it in the overlay with a reason.
 
 ### Write cases
 
@@ -125,7 +125,6 @@ A case in [`write-cases.json`](src/main/resources/io/skipcheck/tm1/probe/write-c
 | `freeSource` | the source is the case's own (made by `prepare`): it's deleted before the read is posted back, where TM1 takes one object in a place (a breakpoint per line, variable or lock) |
 | `selectType` | the type whose properties are selected, where the one posted reads as another (a document reads as a `DocumentReference`); a property outside it is recorded `unread` |
 | `notRequired` | what only the case's own fixture needs, left out of what a create requires (a native view's titles, on a cube with a third dimension) |
-| `generate` | `false` while the generators don't use the case yet ([#338](https://github.com/ajmyers/skipcheck-tm1/issues/338)): its writes are recorded, and `tm1-codegen` skips them |
 
 ## The file
 

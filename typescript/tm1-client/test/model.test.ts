@@ -6,7 +6,6 @@ import {
   AttributesPatch,
   Cube,
   CubeCreate,
-  CubePatch,
   DimensionCreate,
   Element,
   ElementCreate,
@@ -98,11 +97,10 @@ describe("the generated model", () => {
   });
 
   it("sends only what a patch sets, in order, with explicit nulls and bindings", () => {
-    const view = ODataPath.of("Cubes").key("Sales").nav("Views").key("Default");
-    const patch = (): CubePatch => CubePatch.builder().rules(null).bindViews(view).build();
-    expect(JSON.stringify(patch())).toBe('{"Rules":null,"Views@odata.bind":["Cubes(\'Sales\')/Views(\'Default\')"]}');
-    expect(patch().equals(patch())).toBe(true);
-    expect(patch().equals(CubePatch.builder().rules(null).build())).toBe(false);
+    const dimension = (name: string): CubeCreate => CubeCreate.builder().rules(null).bindDimensions(ODataPath.of("Dimensions").key(name)).build();
+    expect(JSON.stringify(dimension("Region"))).toBe('{"Rules":null,"Dimensions@odata.bind":["Dimensions(\'Region\')"]}');
+    expect(dimension("Region").equals(dimension("Region"))).toBe(true);
+    expect(dimension("Region").equals(dimension("Product"))).toBe(false);
   });
 
   it("nests patches for deep inserts, and writes enums as TM1 does", () => {

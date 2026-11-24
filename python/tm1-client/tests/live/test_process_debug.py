@@ -21,6 +21,7 @@ from skipcheck_tm1 import (
 from skipcheck_tm1.model import (
     ProcessCreate,
     ProcessDebugContextLineBreakpoint,
+    ProcessDebugContextLineBreakpointCreate,
     ProcessDebugContextLineBreakpointPatch,
     ProcessDebugContextStatus,
     ProcessExecuteStatusCode,
@@ -41,7 +42,7 @@ def three_lines(tm1: Tm1Client, name: str) -> Iterator[str]:
 
 def line(process: str, id: int, number: int) -> Any:
     return (
-        ProcessDebugContextLineBreakpointPatch.builder()
+        ProcessDebugContextLineBreakpointCreate.builder()
         .id(id)
         .process_name(process)
         .procedure(ProcessProcedure.PROLOG)
@@ -109,7 +110,7 @@ def test_needs_a_chosen_breakpoint_id_and_updates_and_removes_by_it(tm1: Tm1Clie
     def work(context: Any) -> list[Any]:
         id = context.id
         with pytest.raises(ValueError):
-            debug.add_breakpoint(id, ProcessDebugContextLineBreakpointPatch.builder().process_name(three_lines).line_number(2).build())
+            debug.add_breakpoint(id, ProcessDebugContextLineBreakpointCreate.builder().process_name(three_lines).line_number(2).build())
         debug.add_breakpoint(id, line(three_lines, 1, 2))
         debug.add_breakpoint(id, line(three_lines, 2, 3))
         debug.remove_breakpoint(id, 1)

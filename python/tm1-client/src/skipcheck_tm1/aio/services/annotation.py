@@ -16,7 +16,7 @@ from ..._generated.model import (
     Member,
 )
 from ..._generated.operations import Tm1Operations
-from ..._generated.patches import AnnotationPatch, ApplicationContextFacetValuePatch
+from ..._generated.patches import AnnotationCreate, ApplicationContextFacetValueCreate
 from ...base import Tm1Model, Tm1Patch
 from ...odata import ODataPath, ODataQuery
 from ...request import Tm1Request
@@ -86,7 +86,7 @@ class AnnotationService(Service):
         ``}Cubes`` facet names the cube, and the dimensional context binds the cell's members,
         ``elements`` mapping each dimension, in the cube's order, to the cell's element in its
         same-named hierarchy), or posts an annotation built by hand (``create(annotation)``, an
-        ``AnnotationPatch``). Returns the annotation, with its ID."""
+        ``AnnotationCreate``). Returns the annotation, with its ID."""
         if annotation is None and isinstance(cube, (Tm1Patch, Tm1Model, Mapping)):
             cube, annotation = None, cube
         if annotation is None:
@@ -173,9 +173,9 @@ def _annotation(id: str) -> ODataPath:
 
 def _cell_annotation(cube: str, elements: Mapping[str, str], text: str) -> Any:
     members = [ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Members").key(e) for d, e in elements.items()]
-    facet = ApplicationContextFacetValuePatch.builder().bind_facet(_FACETS.key("}Cubes")).value(cube).build()
+    facet = ApplicationContextFacetValueCreate.builder().bind_facet(_FACETS.key("}Cubes")).value(cube).build()
     return (
-        AnnotationPatch.builder()
+        AnnotationCreate.builder()
         .text(text)
         .application_context([facet])
         .bind_dimensional_context(*members)

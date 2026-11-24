@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { DimensionCreate, DimensionPatch, ODataPath, ODataQuery, Tm1PreconditionFailedException } from "../../src/index.js";
+import { DimensionCreate, DimensionPatch, HierarchyCreate, ODataQuery, Tm1PreconditionFailedException } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 /** DimensionService against a fake TM1: each method sends what the Java client's does, and reads
@@ -33,21 +33,10 @@ describe("DimensionService", () => {
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Dimensions", '{"Name":"Region"}']);
 
     tm1.respond = () => null;
-    await client.dimensions.update(
-      "Region",
-      DimensionPatch.builder().bindDefaultHierarchy(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region")).build(),
-    );
-    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual([
-      "PATCH",
-      "Dimensions('Region')",
-      "{\"DefaultHierarchy@odata.bind\":\"Dimensions('Region')/Hierarchies('Region')\"}",
-    ]);
+    await client.dimensions.update("Region", DimensionPatch.builder().defaultHierarchy(HierarchyCreate.builder().name("Region").build()).build());
+    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["PATCH", "Dimensions('Region')", '{"DefaultHierarchy":{"Name":"Region"}}']);
     expect(tm1.last.headers["if-match"]).toBeUndefined();
-    await client.dimensions.update(
-      "Region",
-      DimensionPatch.builder().bindDefaultHierarchy(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region")).build(),
-      'W/"1"',
-    );
+    await client.dimensions.update("Region", DimensionPatch.builder().defaultHierarchy(HierarchyCreate.builder().name("Region").build()).build(), 'W/"1"');
     expect(tm1.last.headers["if-match"]).toBe('W/"1"');
     await client.dimensions.delete("O'Brien");
     expect([tm1.last.method, tm1.last.target]).toEqual(["DELETE", "Dimensions('O''Brien')"]);
@@ -57,13 +46,7 @@ describe("DimensionService", () => {
     const tm1 = new FakeTm1();
     tm1.respond = () => FakeTm1.reply(412, { error: { code: "278", message: "stale" } });
     await expect(
-      tm1
-        .client()
-        .dimensions.update(
-          "Region",
-          DimensionPatch.builder().bindDefaultHierarchy(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region")).build(),
-          'W/"0"',
-        ),
+      tm1.client().dimensions.update("Region", DimensionPatch.builder().defaultHierarchy(HierarchyCreate.builder().name("Region").build()).build(), 'W/"0"'),
     ).rejects.toBeInstanceOf(Tm1PreconditionFailedException);
   });
 

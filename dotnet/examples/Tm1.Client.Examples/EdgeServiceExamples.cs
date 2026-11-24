@@ -31,7 +31,7 @@ public static class EdgeServiceExamples
     {
         // @start region = move
         // Move North from Total to Total Sales: add the new edge, then delete the old
-        var edge = await tm1.Edges.CreateAsync("Region", "Region", EdgePatch.Builder().ParentName("Total Sales").ComponentName("North").Weight(1.0).Build());
+        var edge = await tm1.Edges.CreateAsync("Region", "Region", EdgeCreate.Builder().ParentName("Total Sales").ComponentName("North").Weight(1.0).Build());
         await tm1.Edges.DeleteAsync("Region", "Region", "Total", "North");
         return edge;
         // @end

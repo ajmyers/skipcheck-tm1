@@ -45,8 +45,13 @@ public class AnnotationServiceTests
         Assert.Equal("ANNOTATION", body.GetProperty("commentType").GetString());
         Assert.Equal("Admin,ADMIN", body.GetProperty("commentLocation").GetString());
 
-        await tm1.Annotations.CreateAsync(AnnotationPatch.Builder().Text("by hand").Build());
-        Assert.Equal(("POST Annotations", """{"Text":"by hand"}"""), (Sent, _tm1.Last.Text));
+        await tm1.Annotations.CreateAsync(
+            AnnotationCreate.Builder().Text("by hand").ApplicationContext([]).BindDimensionalContext(ODataPath.Of("Dimensions").Key("d")).Build()
+        );
+        Assert.Equal(
+            ("POST Annotations", """{"Text":"by hand","ApplicationContext":[],"DimensionalContext@odata.bind":["Dimensions('d')"]}"""),
+            (Sent, _tm1.Last.Text)
+        );
     }
 
     [Fact]

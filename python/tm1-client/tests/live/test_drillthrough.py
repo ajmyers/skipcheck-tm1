@@ -17,7 +17,6 @@ from skipcheck_tm1.model import (
     NativeViewCreate,
     ProcessCreate,
     ProcessParameterPatch,
-    ProcessVariableType,
     ViewAxisSelectionPatch,
 )
 
@@ -46,7 +45,7 @@ def drill(tm1: Tm1Client, name: str) -> Iterator[Any]:
     tm1.views.create(name, ViewScope.PUBLIC, NativeViewCreate.builder().name("Detail").columns([axis(b)]).rows([axis(a)]).build())
 
     def parameter(p: str) -> Any:
-        return ProcessParameterPatch.builder().name(p).value("").type(ProcessVariableType.STRING).build()
+        return ProcessParameterPatch.builder().name(p).value("").build()
 
     patch = (
         ProcessCreate.builder()

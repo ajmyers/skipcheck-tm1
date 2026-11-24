@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from skipcheck_tm1 import ODataPath, Tm1BadRequestError, Tm1Client, Tm1Request
-from skipcheck_tm1.model import LogLevel, ServerSettingsPatch
+from skipcheck_tm1.model import AdministrationSettingsPatch, LogLevel, ServerSettingsPatch
 
 from .conftest import CONFIGURED, REASON
 
@@ -24,10 +24,20 @@ def test_reads_the_server_and_its_configurations(tm1: Tm1Client) -> None:
     assert active.server_name == read.name
     assert tm1.server.configuration().server_name == read.name
 
-    tm1.server.update_static_configuration(ServerSettingsPatch.builder().server_name(fixed.server_name).build())
+    assert fixed.administration is not None and active.administration is not None
+    tm1.server.update_static_configuration(
+        ServerSettingsPatch.builder().administration(AdministrationSettingsPatch.builder().server_name(fixed.administration.server_name).build()).build()
+    )
     with pytest.raises(Tm1BadRequestError):
         # The active configuration is read only
-        tm1.session.execute(Tm1Request.patch(ODataPath.of("ActiveConfiguration"), ServerSettingsPatch.builder().server_name(active.server_name).build()))
+        tm1.session.execute(
+            Tm1Request.patch(
+                ODataPath.of("ActiveConfiguration"),
+                ServerSettingsPatch.builder()
+                .administration(AdministrationSettingsPatch.builder().server_name(active.administration.server_name).build())
+                .build(),
+            )
+        )
     # A duration here, though declared Int32
     assert isinstance(active.access.cam.client_ping_cam_passport, str)
 

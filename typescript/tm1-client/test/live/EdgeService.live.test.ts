@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
-import { DimensionCreate, EdgePatch, ElementCreate, ElementType, HierarchyCreate, type Tm1Client } from "../../src/index.js";
+import { DimensionCreate, EdgeCreate, EdgePatch, ElementCreate, ElementType, HierarchyCreate, type Tm1Client } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 /** EdgeService against a real TM1, on Total = North + South, with East and Label besides: the Java
@@ -10,7 +10,7 @@ describe("EdgeService on TM1" + liveReason, () => {
   let tm1: Tm1Client;
   let d: string;
 
-  const edge = (parent: string, component: string): EdgePatch => EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
+  const edge = (parent: string, component: string): EdgeCreate => EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
 
   beforeAll(async () => {
     if (!Live.configured) return;

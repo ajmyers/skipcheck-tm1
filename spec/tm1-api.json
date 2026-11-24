@@ -1040,6 +1040,38 @@
 					"description" : "The date and time value of the last update of this annotation, with a time zone offset."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"ApplicationContext",
+						"DimensionalContext@odata.bind"
+					],
+					"properties" : {
+						"Created" : "ignored",
+						"Creator" : "ignored",
+						"LastUpdated" : "ignored",
+						"LastUpdatedBy" : "ignored",
+						"Text" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Created" : "ignored",
+						"Creator" : "ignored",
+						"ID" : "ignored",
+						"LastUpdated" : "transformed",
+						"LastUpdatedBy" : "transformed",
+						"Text" : "applied"
+					},
+					"nullRefused" : [
+						"Text"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "ApplicationContext",
@@ -2163,6 +2195,30 @@
 			"description" : "A reference to a chore.",
 			"since" : "10.2.2.1",
 			"properties" : [ ],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"Chore@odata.bind"
+					],
+					"properties" : {
+						"Attributes" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"ID" : "rejected",
+						"Name" : "rejected"
+					},
+					"nullRefused" : [
+						"Attributes"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Chore",
@@ -2205,6 +2261,29 @@
 					"description" : "A collection of parameters for the task."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"Process@odata.bind"
+					],
+					"properties" : {
+						"Parameters" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Parameters" : "applied",
+						"Step" : "rejected"
+					},
+					"nullRefused" : [
+						"Parameters"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Process",
@@ -2744,6 +2823,30 @@
 			"description" : "A reference to a cube.",
 			"since" : "10.2.2.1",
 			"properties" : [ ],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"Cube@odata.bind"
+					],
+					"properties" : {
+						"Attributes" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"ID" : "rejected",
+						"Name" : "rejected"
+					},
+					"nullRefused" : [
+						"Attributes"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Cube",
@@ -2952,6 +3055,30 @@
 			"description" : "A reference to a dimension.",
 			"since" : "10.2.2.1",
 			"properties" : [ ],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"Dimension@odata.bind"
+					],
+					"properties" : {
+						"Attributes" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"ID" : "rejected",
+						"Name" : "rejected"
+					},
+					"nullRefused" : [
+						"Attributes"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Dimension",
@@ -3002,6 +3129,37 @@
 					"description" : "The contents of the document."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"Attributes" : "ignored",
+						"Content" : "untested",
+						"LastUpdated" : "unread",
+						"Size" : "unread"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"Content" : "untested",
+						"ID" : "rejected",
+						"LastUpdated" : "unread",
+						"Name" : "rejected",
+						"Size" : "unread"
+					},
+					"nullRefused" : [
+						"Attributes",
+						"Content",
+						"LastUpdated",
+						"Size"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -3108,6 +3266,29 @@
 					"description" : "The weight of the component in the edge."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"ComponentName",
+						"ParentName"
+					],
+					"properties" : {
+						"Weight" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"ComponentName" : "ignored",
+						"ParentName" : "ignored",
+						"Weight" : "applied"
+					},
+					"nullRefused" : [ ]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Hierarchy",
@@ -3669,6 +3850,30 @@
 			"description" : "A container for related TM1 objects.",
 			"since" : "10.2.2.1",
 			"properties" : [ ],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"Attributes" : "ignored",
+						"ID" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"ID" : "rejected"
+					},
+					"nullRefused" : [
+						"Attributes",
+						"ID"
+					],
+					"rename" : "rejected"
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Contents",
@@ -4632,6 +4837,33 @@
 					"description" : "The URL of the link."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"URL"
+					],
+					"properties" : {
+						"Attributes" : "ignored",
+						"URL" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"ID" : "rejected",
+						"Name" : "rejected",
+						"URL" : "rejected"
+					},
+					"nullRefused" : [
+						"Attributes",
+						"URL"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -4677,6 +4909,30 @@
 					"description" : "A set of attributes for the locale."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"Attributes",
+						"LocaleID"
+					],
+					"properties" : {
+						"Attributes" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"LocaleID" : "rejected"
+					},
+					"nullRefused" : [
+						"Attributes"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -4740,6 +4996,22 @@
 					"description" : "The level of the logger, that is, Fatal, Error, Warning, Info, Debug, Unknown, or Off."
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : { }
+				},
+				"patch" : {
+					"properties" : {
+						"Level" : "applied"
+					},
+					"nullRefused" : [ ]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -5871,6 +6143,39 @@
 					"nullable" : false
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"Enabled" : "applied",
+						"Expression" : "applied",
+						"HitCount" : "applied",
+						"HitMode" : "applied",
+						"VariableName" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Enabled" : "applied",
+						"Expression" : "applied",
+						"HitCount" : "applied",
+						"HitMode" : "applied",
+						"ID" : "ignored",
+						"VariableName" : "applied"
+					},
+					"nullRefused" : [
+						"Enabled",
+						"Expression",
+						"HitCount",
+						"HitMode",
+						"VariableName"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -5907,6 +6212,45 @@
 					"nullable" : false
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"Enabled" : "applied",
+						"Expression" : "applied",
+						"HitCount" : "applied",
+						"HitMode" : "applied",
+						"LineNumber" : "applied",
+						"Procedure" : "applied",
+						"ProcessName" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Enabled" : "applied",
+						"Expression" : "applied",
+						"HitCount" : "applied",
+						"HitMode" : "applied",
+						"ID" : "ignored",
+						"LineNumber" : "applied",
+						"Procedure" : "applied",
+						"ProcessName" : "applied"
+					},
+					"nullRefused" : [
+						"Enabled",
+						"Expression",
+						"HitCount",
+						"HitMode",
+						"LineNumber",
+						"Procedure",
+						"ProcessName"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -5943,6 +6287,45 @@
 					"nullable" : false
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : {
+						"Enabled" : "applied",
+						"Expression" : "applied",
+						"HitCount" : "applied",
+						"HitMode" : "applied",
+						"LockMode" : "applied",
+						"ObjectName" : "applied",
+						"ObjectType" : "applied"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Enabled" : "applied",
+						"Expression" : "applied",
+						"HitCount" : "applied",
+						"HitMode" : "applied",
+						"ID" : "ignored",
+						"LockMode" : "applied",
+						"ObjectName" : "applied",
+						"ObjectType" : "applied"
+					},
+					"nullRefused" : [
+						"Enabled",
+						"Expression",
+						"HitCount",
+						"HitMode",
+						"LockMode",
+						"ObjectName",
+						"ObjectType"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -6187,6 +6570,30 @@
 			"description" : "A reference to a process.",
 			"since" : "10.2.2.1",
 			"properties" : [ ],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"Process@odata.bind"
+					],
+					"properties" : {
+						"Attributes" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"ID" : "rejected",
+						"Name" : "rejected"
+					},
+					"nullRefused" : [
+						"Attributes"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Process",
@@ -6822,6 +7229,23 @@
 					"since" : "11.8.35"
 				}
 			],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [ ],
+					"properties" : { }
+				},
+				"patch" : {
+					"properties" : {
+						"EncryptionAtRest" : "untested",
+						"ServerName" : "ignored"
+					},
+					"nullRefused" : [ ]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [ ]
 		},
 		{
@@ -7126,6 +7550,30 @@
 			"description" : "A reference to a subset.",
 			"since" : "10.2.2.1",
 			"properties" : [ ],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"Subset@odata.bind"
+					],
+					"properties" : {
+						"Attributes" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"ID" : "rejected",
+						"Name" : "rejected"
+					},
+					"nullRefused" : [
+						"Attributes"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "Subset",
@@ -7800,6 +8248,30 @@
 			"description" : "A reference to a view.",
 			"since" : "10.2.2.1",
 			"properties" : [ ],
+			"write" : {
+				"observedIn" : [
+					"11.8.35"
+				],
+				"create" : {
+					"required" : [
+						"View@odata.bind"
+					],
+					"properties" : {
+						"Attributes" : "ignored"
+					}
+				},
+				"patch" : {
+					"properties" : {
+						"Attributes" : "rejected",
+						"ID" : "rejected",
+						"Name" : "rejected"
+					},
+					"nullRefused" : [
+						"Attributes"
+					]
+				},
+				"collections" : { }
+			},
 			"navigationProperties" : [
 				{
 					"name" : "View",
@@ -13083,7 +13555,11 @@
 				"verified" : "applied"
 			}
 		},
-		"AttributesPatch" : { },
+		"AttributesPatch" : {
+			"Caption" : {
+				"kept" : "the live attribute tests translate a caption and read it back; the probe's nested try in a translation is refused (278) for a reason it doesn't log yet"
+			}
+		},
 		"AuditLogSettingsPatch" : {
 			"Enable" : {
 				"verified" : "applied"
@@ -13544,6 +14020,9 @@
 			"ComponentsSortType" : {
 				"verified" : "applied"
 			},
+			"Edges" : {
+				"kept" : "a create's edges join elements in the same body, which the probe's nested edge has none of, so TM1 refuses it there; the live tests (edges, elements, hierarchies, levels, members) create hierarchies with their edges and read them back"
+			},
 			"Elements" : {
 				"verified" : "applied"
 			},
@@ -13960,6 +14439,9 @@
 			},
 			"HitMode" : {
 				"verified" : "applied"
+			},
+			"ID" : {
+				"verified" : "minimal create"
 			}
 		},
 		"ProcessDebugContextBreakpointPatch" : {
@@ -13988,6 +14470,9 @@
 			},
 			"HitMode" : {
 				"verified" : "applied"
+			},
+			"ID" : {
+				"verified" : "minimal create"
 			},
 			"VariableName" : {
 				"verified" : "applied"
@@ -14022,6 +14507,9 @@
 			},
 			"HitMode" : {
 				"verified" : "applied"
+			},
+			"ID" : {
+				"verified" : "minimal create"
 			},
 			"LineNumber" : {
 				"verified" : "applied"
@@ -14068,6 +14556,9 @@
 			},
 			"HitMode" : {
 				"verified" : "applied"
+			},
+			"ID" : {
+				"verified" : "minimal create"
 			},
 			"LockMode" : {
 				"verified" : "applied"
@@ -14318,9 +14809,6 @@
 		},
 		"SubsetPatch" : {
 			"Alias" : {
-				"verified" : "applied"
-			},
-			"Elements@odata.bind" : {
 				"verified" : "applied"
 			},
 			"ExpandAbove" : {

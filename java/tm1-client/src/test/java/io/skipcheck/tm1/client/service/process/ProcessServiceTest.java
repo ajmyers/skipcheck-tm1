@@ -24,7 +24,6 @@ import io.skipcheck.tm1.client.model.ProcessExecuteStatusCode;
 import io.skipcheck.tm1.client.model.ProcessParameterPatch;
 import io.skipcheck.tm1.client.model.ProcessPatch;
 import io.skipcheck.tm1.client.model.ProcessSyntaxError;
-import io.skipcheck.tm1.client.model.ProcessVariableType;
 import io.skipcheck.tm1.client.odata.Filter;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 
@@ -54,8 +53,7 @@ class ProcessServiceTest {
 	private static ProcessCreate adhoc() {
 		return ProcessCreate.builder()
 			.name("adhoc")
-			.parameters(List
-				.of(ProcessParameterPatch.builder().name("p").value("v").type(ProcessVariableType.STRING).build()))
+			.parameters(List.of(ProcessParameterPatch.builder().name("p").value("v").build()))
 			.prologProcedure("LogOutput('INFO', p);\n")
 			.build();
 	}
@@ -122,8 +120,8 @@ class ProcessServiceTest {
 		assertThat(created.name()).isEqualTo("adhoc");
 		ConformanceTm1.Recorded post = tm1().last();
 		assertThat(post.key()).isEqualTo("POST Processes");
-		assertThat(post.text()).isEqualTo("{\"Name\":\"adhoc\",\"Parameters\":[{\"Name\":\"p\",\"Value\":\"v\","
-				+ "\"Type\":\"String\"}],\"PrologProcedure\":\"LogOutput('INFO', p);\\n\"}");
+		assertThat(post.text()).isEqualTo("{\"Name\":\"adhoc\",\"Parameters\":[{\"Name\":\"p\",\"Value\":\"v\"}],"
+				+ "\"PrologProcedure\":\"LogOutput('INFO', p);\\n\"}");
 	}
 
 	@Test

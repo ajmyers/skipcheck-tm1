@@ -29,7 +29,6 @@ import io.skipcheck.tm1.client.model.ProcessParameterPatch;
 import io.skipcheck.tm1.client.model.ProcessPatch;
 import io.skipcheck.tm1.client.model.ProcessProcedure;
 import io.skipcheck.tm1.client.model.ProcessSyntaxError;
-import io.skipcheck.tm1.client.model.ProcessVariableType;
 import io.skipcheck.tm1.client.odata.Filter;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
@@ -168,9 +167,8 @@ class ProcessServiceTm1Test {
 	private static ProcessCreate definition(String name, String prolog) {
 		return ProcessCreate.builder()
 			.name(name)
-			.parameters(List.of(
-					ProcessParameterPatch.builder().name("pName").value("").type(ProcessVariableType.STRING).build(),
-					ProcessParameterPatch.builder().name("pCount").value(0).type(ProcessVariableType.NUMERIC).build()))
+			.parameters(List.of(ProcessParameterPatch.builder().name("pName").value("").build(),
+					ProcessParameterPatch.builder().name("pCount").value(0).build()))
 			.prologProcedure(prolog)
 			.build();
 	}

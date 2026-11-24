@@ -21,7 +21,7 @@ import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.DimensionCreate;
-import io.skipcheck.tm1.client.model.EdgePatch;
+import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.Element;
 import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
@@ -95,16 +95,6 @@ class HierarchyServiceTm1Test {
 		assertThatIllegalArgumentException().isThrownBy(
 				() -> hierarchies.update(dimension, dimension, HierarchyPatch.builder().elements(List.of()).build()))
 			.withMessageContaining("replaceStructure");
-		assertThatIllegalArgumentException().as("binding the collection changes the structure too")
-			.isThrownBy(() -> hierarchies.update(dimension, dimension,
-					HierarchyPatch.builder()
-						.bindElements(ODataPath.of("Dimensions")
-							.key(dimension)
-							.nav("Hierarchies")
-							.key(dimension)
-							.nav("Elements")
-							.key("North"))
-						.build()));
 		assertThatIllegalArgumentException().isThrownBy(() -> hierarchies.update(dimension, dimension,
 				HierarchyPatch.builder().edges(List.of(edge("Total", "East"))).build(), "W/\"x\""));
 	}
@@ -202,8 +192,8 @@ class HierarchyServiceTm1Test {
 		return ElementCreate.builder().name(name).type(ElementType.CONSOLIDATED).build();
 	}
 
-	private static EdgePatch edge(String parent, String component) {
-		return EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
+	private static EdgeCreate edge(String parent, String component) {
+		return EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
 	}
 
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { AttributeOwner, AttributesPatch, LocalizedAttributesPatch, type LocalizedAttributes, type Tm1Client } from "@skipcheck/tm1-client";
+import { AttributeOwner, AttributesPatch, LocalizedAttributesCreate, type LocalizedAttributes, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for LocalizedAttributeService, quoted in its documentation.
 
@@ -8,7 +8,7 @@ export function translate(tm1: Tm1Client): Promise<LocalizedAttributes> {
   // @start region = translate
   // The French for an element's Long Name, an attribute its hierarchy has. A locale's
   // translations are created once: TM1 can't change them here.
-  const french = LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property("Long Name", "Région Nord").build()).build();
+  const french = LocalizedAttributesCreate.builder().localeID("fr").attributes(AttributesPatch.builder().property("Long Name", "Région Nord").build()).build();
   return tm1.localizedAttributes.create(AttributeOwner.element("Region", "Region", "North"), french);
   // @end
 }

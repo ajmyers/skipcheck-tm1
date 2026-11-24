@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Chore, type ChoreCreate, type ChorePatch, ChoreTask, type ChoreTaskPatch, Process, Tm1Operations } from "../../generated/index.js";
+import {
+  Chore,
+  type ChoreCreate,
+  type ChorePatch,
+  ChoreTask,
+  type ChoreTaskCreate,
+  type ChoreTaskPatch,
+  Process,
+  Tm1Operations,
+} from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";
 import { Tm1Request } from "../../request.js";
@@ -15,17 +24,17 @@ const CHORES = ODataPath.of("Chores");
 /** Chores: scheduled runs of processes, as ordered tasks. `/Chores`, their tasks, and running them
  * now.
  *
- * A task binds a process (`ChoreTaskPatch.builder().bindProcess(…)`) and gives each of its
+ * A task binds a process (`ChoreTaskCreate.builder().bindProcess(…)`) and gives each of its
  * parameters a value; its `Step`, its place in the chore, is TM1's to number.
  *
  * Create a daily chore with one task:
  * ```ts
- * const task = ChoreTaskPatch.builder().bindProcess(ODataPath.of("Processes").key("Load")).build();
+ * const task = ChoreTaskCreate.builder().bindProcess(ODataPath.of("Processes").key("Load")).build();
  * await tm1.chores.create(ChoreCreate.builder().name("Nightly").startTime("2026-01-01T02:00:00Z").frequency("P1DT00H00M00S").executionMode("SingleCommit").tasks([task]).build());
  * ```
  * Add a task at the end, and get the step TM1 gave it:
  * ```ts
- * const { Step } = await tm1.chores.addTask("Nightly", ChoreTaskPatch.builder().bindProcess(ODataPath.of("Processes").key("Report")).build());
+ * const { Step } = await tm1.chores.addTask("Nightly", ChoreTaskCreate.builder().bindProcess(ODataPath.of("Processes").key("Report")).build());
  * ```
  * Schedule the chore, by patching `Active`:
  * ```ts
@@ -91,7 +100,7 @@ export class ChoreService extends Tm1Service {
 
   /** `POST Chores('name')/Tasks`: adds a task at the end (its bound process and a value for each of
    * the process's parameters); returns it as created, with the `Step` TM1 gave it. */
-  addTask(name: string, task: ChoreTaskPatch, options?: Tm1CallOptions): Promise<ChoreTask> {
+  addTask(name: string, task: ChoreTaskCreate, options?: Tm1CallOptions): Promise<ChoreTask> {
     return this.session.execute(Tm1Request.post(chorePath(name).nav("Tasks"), required(task, "task"), ChoreTask), options);
   }
 

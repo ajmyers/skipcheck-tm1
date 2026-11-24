@@ -38,7 +38,7 @@ public static class ProcessWalkthrough
         var process = ProcessCreate
             .Builder()
             .Name("Budget From Actual")
-            .Parameters([ProcessParameterPatch.Builder().Name("pMonth").Value("Jan").Type(ProcessVariableType.String).Build()])
+            .Parameters([ProcessParameterPatch.Builder().Name("pMonth").Value("Jan").Build()])
             .PrologProcedure(
                 """
                 nActual = CellGetN('SalesCube', 'Actual', 'France', 'S Series 1.8 L Sedan', 'Units', pMonth);

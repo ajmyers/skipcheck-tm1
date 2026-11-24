@@ -7,10 +7,10 @@ import {
   AttributeSet,
   AttributesPatch,
   AttributeType,
-  ChoreExecutionMode,
   ChoreCreate,
-  ChoreTaskPatch,
-  LocalizedAttributesPatch,
+  ChoreExecutionMode,
+  ChoreTaskCreate,
+  LocalizedAttributesCreate,
   ODataPath,
   ProcessCreate,
   Tm1Duration,
@@ -37,7 +37,7 @@ describe("Process and chore attributes on TM1" + liveReason, () => {
       .active(false)
       .executionMode(ChoreExecutionMode.SingleCommit)
       .frequency(Tm1Duration.ofMillis(24 * 60 * 60 * 1000))
-      .tasks([ChoreTaskPatch.builder().bindProcess(processes.key(process)).build()])
+      .tasks([ChoreTaskCreate.builder().bindProcess(processes.key(process)).build()])
       .build();
     await tm1.chores.create(definition);
   });
@@ -58,7 +58,7 @@ describe("Process and chore attributes on TM1" + liveReason, () => {
       expect((await tm1.attributes.list(set).toArray()).map((a) => a.Name)).toContain(label);
       await tm1.localizedAttributes.create(
         owner,
-        LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Charger").build()).build(),
+        LocalizedAttributesCreate.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Charger").build()).build(),
       );
       expect((await tm1.localizedAttributes.get(owner, "fr")).Attributes?.[label]).toBe("Charger");
     } finally {

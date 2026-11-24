@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { EdgePatch, ElementCreate, ElementType, HierarchyCreate, Member, ODataQuery, type Hierarchy, type Tm1Client } from "@skipcheck/tm1-client";
+import { EdgeCreate, ElementCreate, ElementType, HierarchyCreate, Member, ODataQuery, type Hierarchy, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for HierarchyService, quoted in its documentation.
 
@@ -15,8 +15,8 @@ export function create(tm1: Tm1Client): Promise<Hierarchy> {
       ElementCreate.builder().name("South").type(ElementType.Numeric).build(),
     ])
     .edges([
-      EdgePatch.builder().parentName("Smith").componentName("North").weight(1).build(),
-      EdgePatch.builder().parentName("Smith").componentName("South").weight(1).build(),
+      EdgeCreate.builder().parentName("Smith").componentName("North").weight(1).build(),
+      EdgeCreate.builder().parentName("Smith").componentName("South").weight(1).build(),
     ])
     .build();
   return tm1.hierarchies.create("Region", byManager);
@@ -35,8 +35,8 @@ export function replaceStructure(tm1: Tm1Client): Promise<void> {
     "Version",
     [all, actual, budget],
     [
-      EdgePatch.builder().parentName("All Versions").componentName("Actual").weight(1).build(),
-      EdgePatch.builder().parentName("All Versions").componentName("Budget").weight(1).build(),
+      EdgeCreate.builder().parentName("All Versions").componentName("Actual").weight(1).build(),
+      EdgeCreate.builder().parentName("All Versions").componentName("Budget").weight(1).build(),
     ],
   );
   // @end

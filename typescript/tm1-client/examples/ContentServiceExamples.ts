@@ -7,11 +7,11 @@ import {
   ContentPath,
   ContentScope,
   CubeReference,
-  CubeReferencePatch,
-  DocumentPatch,
+  CubeReferenceCreate,
+  DocumentCreate,
   Entry,
-  FolderPatch,
-  LinkPatch,
+  FolderCreate,
+  LinkCreate,
   ODataPath,
   ODataQuery,
   typeOf,
@@ -33,9 +33,9 @@ export async function application(tm1: Tm1Client): Promise<Entry> {
   // @start region = application
   // An application: a folder with a link and a reference to a cube
   const planning = ContentPath.applications().child("Planning");
-  await tm1.contents.create(ContentPath.applications(), ContentScope.Public, FolderPatch.builder().name("Planning").build());
-  await tm1.contents.create(planning, ContentScope.Public, LinkPatch.builder().name("Guide").url("https://example.com/planning-guide").build());
-  const sales = CubeReferencePatch.builder().name("Sales").bindCube(ODataPath.of("Cubes").key("Sales")).build();
+  await tm1.contents.create(ContentPath.applications(), ContentScope.Public, FolderCreate.builder().name("Planning").build());
+  await tm1.contents.create(planning, ContentScope.Public, LinkCreate.builder().name("Guide").url("https://example.com/planning-guide").build());
+  const sales = CubeReferenceCreate.builder().name("Sales").bindCube(ODataPath.of("Cubes").key("Sales")).build();
   return tm1.contents.create(planning, ContentScope.Public, sales);
   // @end
 }
@@ -45,7 +45,7 @@ export async function upload(tm1: Tm1Client, file: string): Promise<void> {
   // A document made in an application is a reference to one TM1 keeps in Blobs; the
   // reference, as create returns it, is where its content goes
   const planning = ContentPath.applications().child("Planning");
-  const reference = await tm1.contents.create(planning, ContentScope.Public, DocumentPatch.builder().name("notes.txt").build());
+  const reference = await tm1.contents.create(planning, ContentScope.Public, DocumentCreate.builder().name("notes.txt").build());
   // TM1 refuses a chunked upload, so the content is sent whole
   await tm1.contents.upload(planning.child(reference), await readFile(file));
   // @end

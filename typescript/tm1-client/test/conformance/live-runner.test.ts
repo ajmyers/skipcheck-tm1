@@ -157,13 +157,47 @@ describe("the live conformance runner", () => {
     return !error || error.category === "api";
   }
 
-  /** Answers each step's one request with what the step expects, and a finally step's with 204. */
+  /** The expectation with the fields the step saves, as `saved_<name>`, if it lacks them. */
+  function saving(step: live.Step, expect: Record<string, any>): Record<string, any> {
+    if (!step.save) return expect;
+    const fields: Record<string, unknown> = { ...(expect.fields ?? {}) };
+    for (const [name, field] of Object.entries(step.save)) if (!(field in fields)) fields[field] = "saved_" + name;
+    return { ...expect, fields };
+  }
+
+  /** Answers each step's one request with what the step expects (with what it saves too, when it
+   * doesn't expect it), and a finally step's with 204. */
   function answeringAsExpected(s: live.Scenario, names: Record<string, string>): FakeTm1 {
-    const answers = [...s.steps.filter(sends).map((step) => expected(live.substitute(step.expect, names))), ...(s.finally ?? []).map(() => null)];
+    const answers = [...s.steps.filter(sends).map((step) => expected(saving(step, live.substitute(step.expect, names)))), ...(s.finally ?? []).map(() => null)];
     const tm1 = new FakeTm1();
     tm1.respond = () => (answers.length ? answers.shift() : FakeTm1.reply(599, "unscripted"));
     return tm1;
   }
+
+  it("saves a field of a result for the steps after it", async () => {
+    const s = live.scenarios().find((x) => x.name === "annotations")!;
+    const names = live.namesFor(s);
+    const tm1 = answeringAsExpected(s, names);
+    const traffic = new live.Traffic(tm1, FakeTm1.BASE);
+    expect(
+      await live.run(
+        tm1.client((b) => b.transport(traffic)),
+        traffic,
+        s,
+        names,
+      ),
+    ).toEqual([]);
+    expect(names).toMatchObject({ note: "saved_note", built: "saved_built" });
+    const sent = traffic.exchanges.map((e) => {
+      const request = e["request"] as { method: string; target: string };
+      return `${request.method} ${request.target}`;
+    });
+    expect(sent).toEqual(expect.arrayContaining(["PATCH Annotations('saved_built')", "DELETE Annotations('saved_note')"]));
+
+    expect(live.save({ service: "", method: "", params: [], args: [], save: { note: "ID" } }, { result: { Text: "no ID" } }, names)).toMatch(
+      /^no ID to save as note/,
+    );
+  });
 
   it.each([
     "subsets",

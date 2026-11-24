@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { LogLevel, ODataQuery, Server, ServerSettingsPatch } from "../../src/index.js";
+import { AdministrationSettingsPatch, LogLevel, ODataQuery, Server, ServerSettingsPatch } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 /** ServerService against a fake TM1: each method sends what the Java client's does (the .NET
@@ -24,8 +24,10 @@ describe("ServerService", () => {
     expect(`${tm1.last.method} ${tm1.last.target}`).toBe("GET Configuration?$select=ServerName");
 
     tm1.respond = () => null;
-    await client.server.updateStaticConfiguration(ServerSettingsPatch.builder().serverName("Planning").build());
-    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["PATCH", "StaticConfiguration", '{"ServerName":"Planning"}']);
+    await client.server.updateStaticConfiguration(
+      ServerSettingsPatch.builder().administration(AdministrationSettingsPatch.builder().serverName("Planning").build()).build(),
+    );
+    expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["PATCH", "StaticConfiguration", '{"Administration":{"ServerName":"Planning"}}']);
   });
 
   it("reads and sets loggers", async () => {

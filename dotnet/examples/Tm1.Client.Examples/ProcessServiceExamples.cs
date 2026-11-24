@@ -21,8 +21,8 @@ public static class ProcessServiceExamples
             .Builder()
             .Name("Load Sales")
             .Parameters([
-                ProcessParameterPatch.Builder().Name("pVersion").Value("Actual").Type(ProcessVariableType.String).Build(),
-                ProcessParameterPatch.Builder().Name("pYear").Value(2026).Type(ProcessVariableType.Numeric).Build(),
+                ProcessParameterPatch.Builder().Name("pVersion").Value("Actual").Build(),
+                ProcessParameterPatch.Builder().Name("pYear").Value(2026).Build(),
             ])
             .PrologProcedure("LogOutput('INFO', 'Loading ' | pVersion | ' for ' | NumberToString(pYear));\n")
             .Build();

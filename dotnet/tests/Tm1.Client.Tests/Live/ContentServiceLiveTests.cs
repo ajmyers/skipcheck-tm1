@@ -35,10 +35,10 @@ public class ContentServiceLiveTests
         await using var tm1 = Live.Client();
         var name = Live.Name();
         var folder = ContentPath.Applications().Child(name);
-        await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderPatch.Builder().Name(name).Build());
+        await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderCreate.Builder().Name(name).Build());
         try
         {
-            var made = await tm1.Contents.CreateAsync(folder, ContentScope.Public, DocumentPatch.Builder().Name("notes.txt").Build());
+            var made = await tm1.Contents.CreateAsync(folder, ContentScope.Public, DocumentCreate.Builder().Name("notes.txt").Build());
             Assert.IsType<DocumentReference>(made); // a document made in an application is a reference
             Assert.Equal("notes.txt.blob", made.Id); // found by ID, the name plus a suffix
             var notes = folder.Child(made);
@@ -72,16 +72,16 @@ public class ContentServiceLiveTests
         var name = Live.Name();
         var folder = ContentPath.Applications().Child(name);
         var other = ContentPath.Applications().Child(name + "-2");
-        await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderPatch.Builder().Name(name).Build());
-        await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderPatch.Builder().Name(name + "-2").Build());
+        await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderCreate.Builder().Name(name).Build());
+        await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderCreate.Builder().Name(name + "-2").Build());
         try
         {
-            var link = await tm1.Contents.CreateAsync(folder, ContentScope.Public, LinkPatch.Builder().Name("ibm").Url("https://www.ibm.com").Build());
+            var link = await tm1.Contents.CreateAsync(folder, ContentScope.Public, LinkCreate.Builder().Name("ibm").Url("https://www.ibm.com").Build());
             Assert.Equal("ibm.extr", link.Id);
             var reference = await tm1.Contents.CreateAsync(
                 folder,
                 ContentScope.Public,
-                CubeReferencePatch.Builder().Name("}ClientGroups").BindCube(ODataPath.Of("Cubes").Key("}ClientGroups")).Build()
+                CubeReferenceCreate.Builder().Name("}ClientGroups").BindCube(ODataPath.Of("Cubes").Key("}ClientGroups")).Build()
             );
             Assert.Equal("}ClientGroups.cube", reference.Id);
             var listed = await tm1
@@ -97,7 +97,7 @@ public class ContentServiceLiveTests
             var moved = await tm1.Contents.MoveAsync(folder.Child(link.Id!), other, ContentScope.Public, null);
             Assert.Equal("ibm.extr", moved.Id);
             Assert.Equal(["ibm.extr"], await tm1.Contents.ContentsAsync(other, ContentScope.Public).Select(e => e.Id).ToListAsync());
-            await tm1.Contents.CreateAsync(folder, ContentScope.Private, FolderPatch.Builder().Name("mine").Build());
+            await tm1.Contents.CreateAsync(folder, ContentScope.Private, FolderCreate.Builder().Name("mine").Build());
             Assert.Equal(["mine"], await tm1.Contents.ContentsAsync(folder, ContentScope.Private).Select(e => e.Id).ToListAsync());
             Assert.IsType<Folder>(await tm1.Contents.GetAsync(folder.Child("mine", ContentScope.Private)));
             Assert.Empty(await tm1.Contents.LocalizedAttributesAsync(folder).ToListAsync());
@@ -114,10 +114,10 @@ public class ContentServiceLiveTests
         await using var tm1 = Live.Client();
         var name = Live.Name();
         var folder = ContentPath.Applications().Child(name);
-        await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderPatch.Builder().Name(name).Build());
+        await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderCreate.Builder().Name(name).Build());
         try
         {
-            var made = await tm1.Contents.CreateAsync(folder, ContentScope.Public, DocumentPatch.Builder().Name("notes.txt").Build());
+            var made = await tm1.Contents.CreateAsync(folder, ContentScope.Public, DocumentCreate.Builder().Name("notes.txt").Build());
             var (url, user, password) = Live.Target();
             using var http = new HttpClient();
             using var chunked = new HttpRequestMessage(HttpMethod.Put, url + folder.Child(made.Id!).Path() + "/tm1.DocumentReference/Document/Content")

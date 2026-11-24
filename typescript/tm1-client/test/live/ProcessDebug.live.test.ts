@@ -4,9 +4,10 @@ import { afterAll, beforeAll, describe, expect } from "vitest";
 import {
   ODataPath,
   ODataQuery,
-  ProcessDebugContextBreakpoint,
-  ProcessDebugContextLineBreakpointPatch,
   ProcessCreate,
+  ProcessDebugContextBreakpoint,
+  ProcessDebugContextLineBreakpointCreate,
+  ProcessDebugContextLineBreakpointPatch,
   Tm1BadRequestException,
   Tm1Request,
   typeOf,
@@ -22,8 +23,8 @@ describe("ProcessDebugService on TM1" + liveReason, () => {
   let tm1: Tm1Client;
   const process = Live.name();
 
-  const line = (id: number, lineNumber: number): ProcessDebugContextLineBreakpointPatch =>
-    ProcessDebugContextLineBreakpointPatch.builder().id(id).processName(process).procedure("Prolog").lineNumber(lineNumber).enabled(true).build();
+  const line = (id: number, lineNumber: number): ProcessDebugContextLineBreakpointCreate =>
+    ProcessDebugContextLineBreakpointCreate.builder().id(id).processName(process).procedure("Prolog").lineNumber(lineNumber).enabled(true).build();
 
   beforeAll(async () => {
     if (!Live.configured) return;
@@ -102,7 +103,7 @@ describe("ProcessDebugService on TM1" + liveReason, () => {
     await debug
       .debugging(process, {}, async (context) => {
         const id = context.ID!;
-        expect(() => debug.addBreakpoint(id, ProcessDebugContextLineBreakpointPatch.builder().processName(process).lineNumber(2).build())).toThrow(RangeError);
+        expect(() => debug.addBreakpoint(id, ProcessDebugContextLineBreakpointCreate.builder().processName(process).lineNumber(2).build())).toThrow(RangeError);
         await debug.addBreakpoint(id, line(1, 2));
         await debug.addBreakpoint(id, line(2, 3));
         await debug.removeBreakpoint(id, 1);

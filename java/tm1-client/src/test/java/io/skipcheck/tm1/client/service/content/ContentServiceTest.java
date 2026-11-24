@@ -21,15 +21,15 @@ import io.skipcheck.tm1.client.conformance.ConformanceTm1;
 import io.skipcheck.tm1.client.error.Tm1ConflictException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.CubeReference;
-import io.skipcheck.tm1.client.model.CubeReferencePatch;
+import io.skipcheck.tm1.client.model.CubeReferenceCreate;
 import io.skipcheck.tm1.client.model.Document;
-import io.skipcheck.tm1.client.model.DocumentPatch;
+import io.skipcheck.tm1.client.model.DocumentCreate;
 import io.skipcheck.tm1.client.model.DocumentReference;
 import io.skipcheck.tm1.client.model.Entry;
 import io.skipcheck.tm1.client.model.Folder;
-import io.skipcheck.tm1.client.model.FolderPatch;
+import io.skipcheck.tm1.client.model.FolderCreate;
 import io.skipcheck.tm1.client.model.Link;
-import io.skipcheck.tm1.client.model.LinkPatch;
+import io.skipcheck.tm1.client.model.LinkCreate;
 import io.skipcheck.tm1.client.model.LocalizedAttributes;
 import io.skipcheck.tm1.client.odata.Filter;
 import io.skipcheck.tm1.client.odata.ODataPath;
@@ -248,7 +248,7 @@ class ContentServiceTest {
 	void createsFoldersDocumentsLinksAndReferences() {
 		tm1().json(201, "{\"@odata.type\":\"#ibm.tm1.api.v1.Folder\",\"ID\":\"Planning\",\"Name\":\"Planning\"}");
 		Entry folder = conformance.call("contents", "create", ContentPath.applications(), ContentScope.PUBLIC,
-				FolderPatch.builder().name("Planning").build());
+				FolderCreate.builder().name("Planning").build());
 		assertThat(folder).isInstanceOf(Folder.class);
 		ConformanceTm1.Recorded post = tm1().last();
 		assertThat(post.key()).isEqualTo("POST Contents('Applications')/Contents");
@@ -257,7 +257,7 @@ class ContentServiceTest {
 		tm1().json(201,
 				"{\"@odata.type\":\"#ibm.tm1.api.v1.DocumentReference\",\"ID\":\"notes.txt.blob\",\"Name\":\"notes.txt\"}");
 		Entry document = conformance.call("contents", "create", PLANNING, ContentScope.PUBLIC,
-				DocumentPatch.builder().name("notes.txt").build());
+				DocumentCreate.builder().name("notes.txt").build());
 		assertThat(document).as("a document made in an application is a reference")
 			.isInstanceOf(DocumentReference.class);
 		assertThat(document.id()).isEqualTo("notes.txt.blob");
@@ -266,12 +266,12 @@ class ContentServiceTest {
 		tm1().json(201,
 				"{\"@odata.type\":\"#ibm.tm1.api.v1.Link\",\"ID\":\"ibm.extr\",\"Name\":\"ibm\",\"URL\":\"https://www.ibm.com\"}");
 		conformance.call("contents", "create", PLANNING, ContentScope.PUBLIC,
-				LinkPatch.builder().name("ibm").url("https://www.ibm.com").build());
+				LinkCreate.builder().name("ibm").url("https://www.ibm.com").build());
 
 		tm1().json(201,
 				"{\"@odata.type\":\"#ibm.tm1.api.v1.CubeReference\",\"ID\":\"}ClientGroups.cube\",\"Name\":\"}ClientGroups\"}");
 		conformance.call("contents", "create", PLANNING, ContentScope.PUBLIC,
-				CubeReferencePatch.builder()
+				CubeReferenceCreate.builder()
 					.name("}ClientGroups")
 					.bindCube(ODataPath.of("Cubes").key("}ClientGroups"))
 					.build());
@@ -279,7 +279,7 @@ class ContentServiceTest {
 
 		tm1().json(201, "{\"@odata.type\":\"#ibm.tm1.api.v1.Folder\",\"ID\":\"mine\",\"Name\":\"mine\"}");
 		conformance.call("contents", "create", PLANNING, ContentScope.PRIVATE,
-				FolderPatch.builder().name("mine").build());
+				FolderCreate.builder().name("mine").build());
 		assertThat(tm1().last().key()).isEqualTo("POST Contents('Applications')/Contents('Planning')/PrivateContents");
 	}
 
@@ -287,7 +287,7 @@ class ContentServiceTest {
 	void aNameTakenIsAConflict() {
 		tm1().error(409, "1", "An entry named 'Planning' already exists.");
 		Throwable error = conformance.fail("contents", "create", ContentPath.applications(), ContentScope.PUBLIC,
-				FolderPatch.builder().name("Planning").build());
+				FolderCreate.builder().name("Planning").build());
 		assertThat(error).isInstanceOf(Tm1ConflictException.class);
 	}
 

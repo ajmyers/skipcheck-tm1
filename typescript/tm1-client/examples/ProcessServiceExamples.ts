@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  ODataQuery,
-  ProcessExecuteResult,
-  ProcessParameterPatch,
-  ProcessCreate,
-  ProcessVariableType,
-  type Process,
-  type Tm1Client,
-} from "@skipcheck/tm1-client";
+import { ODataQuery, ProcessCreate, ProcessExecuteResult, ProcessParameterPatch, type Process, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for ProcessService, quoted in its documentation.
 
@@ -17,10 +9,7 @@ export async function create(tm1: Tm1Client): Promise<Process> {
   // TM1 saves code that doesn't compile, so compile the definition first
   const process = ProcessCreate.builder()
     .name("Load Sales")
-    .parameters([
-      ProcessParameterPatch.builder().name("pVersion").value("Actual").type(ProcessVariableType.String).build(),
-      ProcessParameterPatch.builder().name("pYear").value(2026).type(ProcessVariableType.Numeric).build(),
-    ])
+    .parameters([ProcessParameterPatch.builder().name("pVersion").value("Actual").build(), ProcessParameterPatch.builder().name("pYear").value(2026).build()])
     .prologProcedure("LogOutput('INFO', 'Loading ' | pVersion | ' for ' | NumberToString(pYear));\n")
     .build();
   const errors = await tm1.processes.compile(process).toArray();

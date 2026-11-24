@@ -225,17 +225,34 @@ public class ConformanceLiveRunnerTests
         return new System.Net.Http.HttpResponseMessage(HttpStatusCode.NoContent);
     }
 
-    /// <summary>Answers each step's one request with what the step expects, and a finally step's with 204.</summary>
     /// <summary>Whether a step sends a request: all but those refused before one (an argument error).</summary>
     private static bool Sends(JsonNode? step) => step!["expect"]?["error"] is not JsonObject error || error["category"]?.GetValue<string>() == "api";
 
+    /// <summary>The expectation with the fields the step saves, as <c>saved_&lt;name&gt;</c>, if it lacks them.</summary>
+    private static JsonObject Saving(JsonNode step, JsonObject expect)
+    {
+        if (step["save"] is not JsonObject save)
+        {
+            return expect;
+        }
+        var fields = expect["fields"] as JsonObject ?? [];
+        expect["fields"] = fields;
+        foreach (var (name, field) in save)
+        {
+            fields.TryAdd(field!.GetValue<string>(), "saved_" + name);
+        }
+        return expect;
+    }
+
+    /// <summary>Answers each step's one request with what the step expects (with what it saves, as
+    /// <c>saved_&lt;name&gt;</c>, when it doesn't expect it), and a finally step's with 204.</summary>
     private static FakeTm1 AnsweringAsExpected(JsonObject scenario, System.Collections.Generic.IReadOnlyDictionary<string, string> names)
     {
         var answers = new System.Collections.Generic.Queue<System.Net.Http.HttpResponseMessage>(
             scenario["steps"]!
                 .AsArray()
                 .Where(Sends)
-                .Select(s => Expected(ConformanceLive.Substitute(s!["expect"], names)!.AsObject()))
+                .Select(s => Expected(Saving(s!, ConformanceLive.Substitute(s!["expect"], names)!.AsObject())))
                 .Concat((scenario["finally"]?.AsArray() ?? []).Select(_ => new System.Net.Http.HttpResponseMessage(HttpStatusCode.NoContent)))
         );
         return new FakeTm1 { Respond = _ => answers.Count > 0 ? answers.Dequeue() : new System.Net.Http.HttpResponseMessage((HttpStatusCode)599) };
@@ -263,5 +280,23 @@ public class ConformanceLiveRunnerTests
         var traffic = new ConformanceLive.Traffic(fake, FakeTm1.Base);
         Assert.Empty(await ConformanceLive.Run(fake.Client(b => b.HttpHandler(traffic)), traffic, scenario, names));
         Assert.Equal(scenario["steps"]!.AsArray().Count(Sends) + (scenario["finally"]?.AsArray().Count ?? 0), traffic.Exchanges.Count);
+    }
+
+    [Fact]
+    public async Task SavesAFieldOfAResultForTheStepsAfterIt()
+    {
+        var scenario = ConformanceLive.Load("annotations");
+        var names = ConformanceLive.NamesFor(scenario);
+        var fake = AnsweringAsExpected(scenario, names);
+        var traffic = new ConformanceLive.Traffic(fake, FakeTm1.Base);
+        Assert.Empty(await ConformanceLive.Run(fake.Client(b => b.HttpHandler(traffic)), traffic, scenario, names));
+        Assert.Equal(("saved_note", "saved_built"), (names["note"], names["built"]));
+        var sent = traffic.Exchanges.Select(e => e["request"]!["method"]!.GetValue<string>() + " " + e["request"]!["target"]!.GetValue<string>()).ToList();
+        Assert.Contains("PATCH Annotations('saved_built')", sent);
+        Assert.Contains("DELETE Annotations('saved_note')", sent);
+
+        var step = new JsonObject { ["save"] = new JsonObject { ["note"] = "ID" } };
+        var outcome = new JsonObject { ["result"] = new JsonObject { ["Text"] = "no ID" } };
+        Assert.StartsWith("no ID to save as note", ConformanceLive.Save(step, outcome, names));
     }
 }

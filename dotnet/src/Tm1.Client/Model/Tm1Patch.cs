@@ -39,11 +39,26 @@ public abstract class Tm1Patch : IEquatable<Tm1Patch>
     /// <inheritdoc/>
     public override string ToString() => GetType().Name + "{" + string.Join(", ", Values.Select(v => v.Key + "=" + Text(v.Value))) + "}";
 
+    /// <summary>What <paramref name="read"/>, an entity read from TM1, holds, as TM1 wrote it: what a
+    /// generated <c>Builder(read)</c> copies primitives from.</summary>
+    internal static JsonElement ReadJson(object read) => JsonSerializer.SerializeToElement(read, read.GetType(), Tm1Json.Options);
+
     private static string Text(object? v) =>
         v is System.Collections.IEnumerable e and not string ? "[" + string.Join(",", e.Cast<object?>().Select(Text)) + "]" : v?.ToString() ?? "null";
 
+    /// <summary>What builds a write of <typeparamref name="TPatch"/>, or of a type derived from it: what a
+    /// root's create's <c>Builder(read)</c> returns, the builder of the read's own type.</summary>
+    /// <typeparam name="TPatch">The write it builds.</typeparam>
+    public interface IBuilder<out TPatch>
+        where TPatch : Tm1Patch
+    {
+        /// <summary>The write, with what's been set so far.</summary>
+        /// <exception cref="InvalidOperationException">A create lacks what it needs.</exception>
+        TPatch Build();
+    }
+
     /// <summary>What every generated builder is made of.</summary>
-    public abstract class BuilderBase<TPatch, TSelf>
+    public abstract class BuilderBase<TPatch, TSelf> : IBuilder<TPatch>
         where TPatch : Tm1Patch
         where TSelf : BuilderBase<TPatch, TSelf>
     {
@@ -87,27 +102,31 @@ public abstract class Tm1Patch : IEquatable<Tm1Patch>
             return (TSelf)this;
         }
 
-        /// <summary>Sets what <paramref name="read"/>, an entity read from TM1, holds of
-        /// <paramref name="names"/>, nulls left out; and, for an open type (<paramref name="declared"/>
-        /// given), its undeclared properties. The generated <c>Builder(read)</c> calls it.</summary>
-        internal TSelf Copy(object read, IEnumerable<string> names, IReadOnlyCollection<string>? declared)
+        /// <summary>Sets what <paramref name="read"/>, an entity read from TM1 as
+        /// <see cref="ReadJson"/> gives it, holds of <paramref name="names"/>, nulls left out. The
+        /// generated <c>Builder(read)</c> calls it.</summary>
+        internal TSelf Copy(JsonElement read, IEnumerable<string> names)
         {
-            var json = JsonSerializer.SerializeToElement(read, read.GetType(), Tm1Json.Options);
             foreach (var name in names)
             {
-                if (json.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null)
+                if (read.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null)
                 {
                     _values[name] = value.Clone();
                 }
             }
-            if (declared is not null)
+            return (TSelf)this;
+        }
+
+        /// <summary>Sets the properties of <paramref name="read"/>, a read of an open type as
+        /// <see cref="ReadJson"/> gives it, that aren't <paramref name="declared"/>, nulls left
+        /// out. The generated <c>Builder(read)</c> calls it.</summary>
+        internal TSelf CopyUndeclared(JsonElement read, IReadOnlyCollection<string> declared)
+        {
+            foreach (var p in read.EnumerateObject())
             {
-                foreach (var p in json.EnumerateObject())
+                if (!declared.Contains(p.Name) && !p.Name.StartsWith('@') && p.Value.ValueKind != JsonValueKind.Null)
                 {
-                    if (!declared.Contains(p.Name) && !p.Name.StartsWith('@') && p.Value.ValueKind != JsonValueKind.Null)
-                    {
-                        _values[p.Name] = p.Value.Clone();
-                    }
+                    _values[p.Name] = p.Value.Clone();
                 }
             }
             return (TSelf)this;
@@ -117,6 +136,6 @@ public abstract class Tm1Patch : IEquatable<Tm1Patch>
         protected bool Has(string name) => _values.ContainsKey(name) || _values.ContainsKey(name + ODataJson.BindSuffix);
 
         /// <summary>The patch, with what's been set so far.</summary>
-        public TPatch Build() => _build(_values);
+        public virtual TPatch Build() => _build(_values);
     }
 }

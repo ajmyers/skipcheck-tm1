@@ -101,18 +101,17 @@ class GeneratedModelTest {
 
 	@Test
 	void sendsOnlyWhatAPatchSetsInOrderWithExplicitNullsAndBindings() {
-		CubePatch patch = CubePatch.builder()
+		CubeCreate patch = CubeCreate.builder()
 			.rules(null)
-			.bindViews(ODataPath.of("Cubes").key("Sales").nav("Views").key("Default"))
+			.bindDimensions(ODataPath.of("Dimensions").key("Region"))
 			.build();
 		assertThat(JSON.writeValueAsString(patch))
-			.isEqualTo("{\"Rules\":null,\"Views@odata.bind\":[\"Cubes('Sales')/Views('Default')\"]}");
+			.isEqualTo("{\"Rules\":null,\"Dimensions@odata.bind\":[\"Dimensions('Region')\"]}");
 		assertThat(patch)
-			.isEqualTo(CubePatch.builder()
-				.rules(null)
-				.bindViews(ODataPath.of("Cubes").key("Sales").nav("Views").key("Default"))
-				.build())
-			.isNotEqualTo(CubePatch.builder().rules(null).build());
+			.isEqualTo(
+					CubeCreate.builder().rules(null).bindDimensions(ODataPath.of("Dimensions").key("Region")).build())
+			.isNotEqualTo(
+					CubeCreate.builder().rules(null).bindDimensions(ODataPath.of("Dimensions").key("Product")).build());
 	}
 
 	@Test

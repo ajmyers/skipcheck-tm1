@@ -15,11 +15,11 @@ import io.skipcheck.tm1.client.error.Tm1ApiException;
 import io.skipcheck.tm1.client.error.Tm1ErrorKind;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.Edge;
+import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.EdgePatch;
 import io.skipcheck.tm1.client.model.Element;
 import io.skipcheck.tm1.client.model.Hierarchy;
 import io.skipcheck.tm1.client.odata.Filter;
-import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 
 /**
@@ -105,31 +105,19 @@ class EdgeServiceTest {
 	void createsAnEdge() {
 		tm1().json(201, "{\"ParentName\":\"Total\",\"ComponentName\":\"West\",\"Weight\":1.0}");
 		Edge created = conformance.call("edges", "create", "Region", "Region",
-				EdgePatch.builder().parentName("Total").componentName("West").weight(1.0).build());
+				EdgeCreate.builder().parentName("Total").componentName("West").weight(1.0).build());
 		assertThat(created.componentName()).isEqualTo("West");
 		ConformanceTm1.Recorded post = tm1().last();
 		assertThat(post.key()).isEqualTo("POST " + EDGES);
 		assertThat(post.header("Content-Type")).isEqualTo("application/json");
 		assertThat(post.text()).isEqualTo("{\"ParentName\":\"Total\",\"ComponentName\":\"West\",\"Weight\":1.0}");
-
-		ODataPath elements = ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements");
-		tm1().json(201, "{\"ParentName\":\"Total\",\"ComponentName\":\"East\",\"Weight\":-0.5}");
-		conformance.call("edges", "create", "Region", "Region",
-				EdgePatch.builder()
-					.bindParent(elements.key("Total"))
-					.bindComponent(elements.key("East"))
-					.weight(-0.5)
-					.build());
-		assertThat(tm1().last().text()).isEqualTo("{\"Parent@odata.bind\":\"Dimensions('Region')/Hierarchies('Region')"
-				+ "/Elements('Total')\",\"Component@odata.bind\":\"Dimensions('Region')/Hierarchies('Region')"
-				+ "/Elements('East')\",\"Weight\":-0.5}");
 	}
 
 	@Test
 	void anEdgeThatWouldMakeACycleIsRefused() {
 		tm1().error(400, "278", "Circular reference: 'Total' is a descendant of 'West'.");
 		Throwable error = conformance.fail("edges", "create", "Region", "Region",
-				EdgePatch.builder().parentName("West").componentName("Total").build());
+				EdgeCreate.builder().parentName("West").componentName("Total").build());
 		assertThat(error).isInstanceOfSatisfying(Tm1ApiException.class, e -> {
 			assertThat(e.kind()).isEqualTo(Tm1ErrorKind.OTHER);
 			assertThat(e.status()).isEqualTo(400);

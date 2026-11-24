@@ -109,6 +109,19 @@ def check(expect: dict[str, Any], outcome: dict[str, Any]) -> str | None:
     return None
 
 
+def save(step: dict[str, Any], outcome: dict[str, Any], names: dict[str, str]) -> str | None:
+    """Keeps what a step's ``"save"`` names from its result, ``{"note": "ID"}``: the result's ``ID`` as the
+    name ``note``, for the steps after it, such as an ID TM1 made up. Why it can't, or None."""
+    for name, field in step.get("save", {}).items():
+        result = outcome.get("result")
+        json_ = result.get("json") if isinstance(result, dict) and "$model" in result else result
+        value = json_.get(field) if isinstance(json_, dict) else None
+        if value is None or isinstance(value, (dict, list)):
+            return f"no {field} to save as {name} in {result!r}"
+        names[name] = ("true" if value else "false") if isinstance(value, bool) else str(value)
+    return None
+
+
 def _outcome(call: Callable[[], Any]) -> Any:
     try:
         value = call()
@@ -143,12 +156,15 @@ def _invoke(client: Any, step: dict[str, Any], names: dict[str, str]) -> Callabl
 
 
 def run(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str, str]) -> list[str]:
-    """Runs the scenario with a sync client; the steps whose expectation failed."""
+    """Runs the scenario with a sync client; the steps whose expectation failed. Its ``finally`` steps
+    always run. What a step saves joins ``names``, so the traffic written after it has TM1's made-up
+    values as their placeholders too."""
     failures = []
     try:
         for i, step in enumerate(scenario["steps"]):
             traffic.step = f"steps[{i}]"
-            why = check(substitute(step["expect"], names), _outcome(_invoke(client, step, names)))
+            outcome = _outcome(_invoke(client, step, names))
+            why = check(substitute(step["expect"], names), outcome) or save(step, outcome, names)
             if why:
                 failures.append(f"step {i} {step['service']}.{step['method']}: {why}")
                 break
@@ -160,12 +176,13 @@ def run(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str
 
 
 async def arun(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str, str]) -> list[str]:
-    """Runs the scenario with an asyncio client; the steps whose expectation failed."""
+    """Runs the scenario with an asyncio client; the steps whose expectation failed, as :func:`run`."""
     failures = []
     try:
         for i, step in enumerate(scenario["steps"]):
             traffic.step = f"steps[{i}]"
-            why = check(substitute(step["expect"], names), await _aoutcome(_invoke(client, step, names)))
+            outcome = await _aoutcome(_invoke(client, step, names))
+            why = check(substitute(step["expect"], names), outcome) or save(step, outcome, names)
             if why:
                 failures.append(f"step {i} {step['service']}.{step['method']}: {why}")
                 break

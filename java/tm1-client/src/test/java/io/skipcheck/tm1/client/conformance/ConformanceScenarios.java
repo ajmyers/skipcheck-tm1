@@ -184,7 +184,8 @@ public final class ConformanceScenarios {
 
 	/**
 	 * Runs the scenario; the steps whose expectation failed. Its {@code finally} steps
-	 * always run.
+	 * always run. What a step saves joins {@code names}, so the traffic written after it
+	 * has TM1's made-up values as their placeholders too.
 	 */
 	public static List<String> run(Tm1Client client, Traffic traffic, JsonNode scenario, Map<String, String> names) {
 		List<String> failures = new ArrayList<>();
@@ -192,7 +193,11 @@ public final class ConformanceScenarios {
 			int i = 0;
 			for (JsonNode step : scenario.get("steps")) {
 				traffic.step("steps[" + i + "]");
-				String why = check(substitute(step.get("expect"), names), outcome(client, step, names));
+				ObjectNode outcome = outcome(client, step, names);
+				String why = check(substitute(step.get("expect"), names), outcome);
+				if (why == null) {
+					why = save(step, outcome, names);
+				}
 				if (why != null) {
 					failures.add("step " + i + " " + step.get("service").asString() + "."
 							+ step.get("method").asString() + ": " + why);
@@ -209,6 +214,23 @@ public final class ConformanceScenarios {
 			}
 		}
 		return failures;
+	}
+
+	/**
+	 * Keeps what a step's {@code "save"} names from its result, {@code {"note": "ID"}}:
+	 * the result's {@code ID} as the name {@code note}, for the steps after it, such as
+	 * an ID TM1 made up. Why it can't, or null.
+	 */
+	static @Nullable String save(JsonNode step, JsonNode outcome, Map<String, String> names) {
+		for (var s : step.path("save").properties()) {
+			JsonNode result = outcome.path("result");
+			JsonNode value = (result.has("$model") ? result.get("json") : result).path(s.getValue().asString());
+			if (!value.isValueNode() || value.isNull()) {
+				return "no " + s.getValue().asString() + " to save as " + s.getKey() + " in " + result;
+			}
+			names.put(s.getKey(), value.asString());
+		}
+		return null;
 	}
 
 	private static ObjectNode outcome(Tm1Client client, JsonNode step, Map<String, String> names) {

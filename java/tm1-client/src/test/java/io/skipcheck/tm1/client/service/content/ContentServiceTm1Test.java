@@ -28,14 +28,14 @@ import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.CubeReference;
-import io.skipcheck.tm1.client.model.CubeReferencePatch;
-import io.skipcheck.tm1.client.model.DocumentPatch;
+import io.skipcheck.tm1.client.model.CubeReferenceCreate;
+import io.skipcheck.tm1.client.model.DocumentCreate;
 import io.skipcheck.tm1.client.model.DocumentReference;
 import io.skipcheck.tm1.client.model.Entry;
 import io.skipcheck.tm1.client.model.Folder;
-import io.skipcheck.tm1.client.model.FolderPatch;
+import io.skipcheck.tm1.client.model.FolderCreate;
 import io.skipcheck.tm1.client.model.Link;
-import io.skipcheck.tm1.client.model.LinkPatch;
+import io.skipcheck.tm1.client.model.LinkCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
@@ -97,11 +97,11 @@ class ContentServiceTm1Test {
 		String name = unique();
 		ContentPath folder = ContentPath.applications().child(name);
 		tm1.contents()
-			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name).build())
+			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name).build())
 			.block(WAIT);
 		try {
 			Entry made = tm1.contents()
-				.create(folder, ContentScope.PUBLIC, DocumentPatch.builder().name("notes.txt").build())
+				.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name("notes.txt").build())
 				.block(WAIT);
 			assertThat(made).as("a document made in an application is a reference")
 				.isInstanceOf(DocumentReference.class);
@@ -139,19 +139,20 @@ class ContentServiceTm1Test {
 		ContentPath folder = ContentPath.applications().child(name);
 		ContentPath other = ContentPath.applications().child(name + "-2");
 		tm1.contents()
-			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name).build())
+			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name).build())
 			.block(WAIT);
 		tm1.contents()
-			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name + "-2").build())
+			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name + "-2").build())
 			.block(WAIT);
 		try {
 			Entry link = tm1.contents()
-				.create(folder, ContentScope.PUBLIC, LinkPatch.builder().name("ibm").url("https://www.ibm.com").build())
+				.create(folder, ContentScope.PUBLIC,
+						LinkCreate.builder().name("ibm").url("https://www.ibm.com").build())
 				.block(WAIT);
 			assertThat(link.id()).isEqualTo("ibm.extr");
 			Entry reference = tm1.contents()
 				.create(folder, ContentScope.PUBLIC,
-						CubeReferencePatch.builder()
+						CubeReferenceCreate.builder()
 							.name("}ClientGroups")
 							.bindCube(ODataPath.of("Cubes").key("}ClientGroups"))
 							.build())
@@ -183,7 +184,9 @@ class ContentServiceTm1Test {
 				.collectList()
 				.block(WAIT)).containsExactly("ibm.extr");
 
-			tm1.contents().create(folder, ContentScope.PRIVATE, FolderPatch.builder().name("mine").build()).block(WAIT);
+			tm1.contents()
+				.create(folder, ContentScope.PRIVATE, FolderCreate.builder().name("mine").build())
+				.block(WAIT);
 			assertThat(tm1.contents()
 				.contents(folder, ContentScope.PRIVATE, ODataQuery.none())
 				.map(Entry::id)
@@ -204,11 +207,11 @@ class ContentServiceTm1Test {
 		String name = unique();
 		ContentPath folder = ContentPath.applications().child(name);
 		tm1.contents()
-			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name(name).build())
+			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name).build())
 			.block(WAIT);
 		try {
 			Entry made = tm1.contents()
-				.create(folder, ContentScope.PUBLIC, DocumentPatch.builder().name("notes.txt").build())
+				.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name("notes.txt").build())
 				.block(WAIT);
 			String auth = Base64.getEncoder()
 				.encodeToString((server.getUsername() + ":" + server.getPassword()).getBytes(StandardCharsets.UTF_8));

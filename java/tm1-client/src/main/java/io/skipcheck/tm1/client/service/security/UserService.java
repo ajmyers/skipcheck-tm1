@@ -89,8 +89,8 @@ public final class UserService {
 	}
 
 	/**
-	 * {@code POST Users}: creates a user, in the groups the patch binds
-	 * ({@code UserPatch.Builder#bindGroups}).
+	 * {@code POST Users}: creates a user, in the groups the create binds
+	 * ({@code UserCreate.Builder#bindGroups}).
 	 * @param user the new user; it needs a name, and a password for Basic security
 	 * @return the user as created
 	 */

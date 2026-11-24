@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { DimensionCreate, EdgePatch, ElementCreate, ElementType, HierarchyCreate, Member, ODataQuery, type Tm1Client } from "../../src/index.js";
+import { DimensionCreate, EdgeCreate, ElementCreate, ElementType, HierarchyCreate, Member, ODataQuery, type Tm1Client } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 const numeric = (name: string): ElementCreate => ElementCreate.builder().name(name).type(ElementType.Numeric).build();
 const consolidated = (name: string): ElementCreate => ElementCreate.builder().name(name).type(ElementType.Consolidated).build();
-const edge = (parent: string, component: string): EdgePatch => EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
+const edge = (parent: string, component: string): EdgeCreate => EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
 
 /** LevelService against a real TM1, on World > Europe (France, Spain), Asia (Japan): the Java
  * client's `LevelAndMemberServiceTm1Test`. */

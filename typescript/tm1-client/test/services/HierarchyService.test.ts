@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { EdgePatch, ElementCreate, ElementType, HierarchyCreate, HierarchyPatch, ODataPath, ODataQuery } from "../../src/index.js";
+import { EdgeCreate, ElementCreate, ElementType, HierarchyCreate, HierarchyPatch, ODataQuery } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 const HIERARCHY = "Dimensions('Region')/Hierarchies('Region')";
@@ -36,12 +36,11 @@ describe("HierarchyService", () => {
   it("refuses an update with structure", () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    const withElements = HierarchyCreate.builder()
+    const withElements = HierarchyPatch.builder()
       .elements([ElementCreate.builder().name("x").build()])
       .build();
-    const withBinding = HierarchyCreate.builder().bindElements(ODataPath.of("Dimensions").key("d")).build();
-    const withEdges = HierarchyCreate.builder().edges([]).build();
-    for (const patch of [withElements, withBinding, withEdges]) {
+    const withEdges = HierarchyPatch.builder().edges([]).build();
+    for (const patch of [withElements, withEdges]) {
       expect(() => client.hierarchies.update("Region", "Region", patch)).toThrow(/replaceStructure/);
       expect(() => client.hierarchies.update("Region", "Region", patch)).toThrow(RangeError);
       expect(() => client.hierarchies.update("Region", "Region", patch, 'W/"1"')).toThrow(RangeError);
@@ -58,7 +57,7 @@ describe("HierarchyService", () => {
         "Region",
         "Region",
         [ElementCreate.builder().name("All").type(ElementType.Consolidated).build()],
-        [EdgePatch.builder().parentName("All").componentName("North").weight(1).build()],
+        [EdgeCreate.builder().parentName("All").componentName("North").weight(1).build()],
       );
     expect([tm1.last.method, tm1.last.target]).toEqual(["PATCH", HIERARCHY]);
     expect(tm1.last.json).toEqual({ Elements: [{ Name: "All", Type: "Consolidated" }], Edges: [{ ParentName: "All", ComponentName: "North", Weight: 1 }] });

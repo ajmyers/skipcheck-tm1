@@ -20,7 +20,7 @@ from skipcheck_tm1.model import (
     ElementCreate,
     ElementType,
     HierarchyCreate,
-    LocalizedAttributesPatch,
+    LocalizedAttributesCreate,
     SubsetCreate,
 )
 
@@ -121,8 +121,8 @@ def test_translates_attribute_values(tm1: Tm1Client, d: str, kind: str) -> None:
 
 
 def test_needs_the_attribute_defined_and_refuses_writes_through_a_member(tm1: Tm1Client, d: str) -> None:
-    caption = LocalizedAttributesPatch.builder().locale_id("fr").attributes(AttributesPatch.builder().caption("Nord").build()).build()
+    caption = LocalizedAttributesCreate.builder().locale_id("fr").attributes(AttributesPatch.builder().caption("Nord").build()).build()
     with pytest.raises(Tm1BadRequestError):  # Caption isn't an attribute until it's defined
         tm1.localized_attributes.create(AttributeOwner.element(d, d, "North"), caption)
     with pytest.raises(Tm1BadRequestError):  # POST not supported on a member's
-        tm1.localized_attributes.create(AttributeOwner.member(d, d, "North"), LocalizedAttributesPatch.builder().locale_id("fr").build())
+        tm1.localized_attributes.create(AttributeOwner.member(d, d, "North"), caption)

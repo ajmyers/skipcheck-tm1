@@ -19,16 +19,16 @@ namespace Skipcheck.Tm1.Client.Services;
 /// <para>Create a dimension with its hierarchy, elements and edges in one request (Region, with one
 /// hierarchy of the same name: Total = North + South):</para>
 /// <code>
-/// var total = ElementPatch.Builder().Name("Total").Type(ElementType.Consolidated).Build();
-/// var north = ElementPatch.Builder().Name("North").Type(ElementType.Numeric).Build();
-/// var south = ElementPatch.Builder().Name("South").Type(ElementType.Numeric).Build();
-/// await tm1.Dimensions.CreateAsync(DimensionPatch.Builder()
+/// var total = ElementCreate.Builder().Name("Total").Type(ElementType.Consolidated).Build();
+/// var north = ElementCreate.Builder().Name("North").Type(ElementType.Numeric).Build();
+/// var south = ElementCreate.Builder().Name("South").Type(ElementType.Numeric).Build();
+/// await tm1.Dimensions.CreateAsync(DimensionCreate.Builder()
 ///     .Name("Region")
-///     .Hierarchies([HierarchyPatch.Builder()
+///     .Hierarchies([HierarchyCreate.Builder()
 ///         .Name("Region")
 ///         .Elements([total, north, south])
-///         .Edges([EdgePatch.Builder().ParentName("Total").ComponentName("North").Weight(1.0).Build(),
-///             EdgePatch.Builder().ParentName("Total").ComponentName("South").Weight(1.0).Build()])
+///         .Edges([EdgeCreate.Builder().ParentName("Total").ComponentName("North").Weight(1.0).Build(),
+///             EdgeCreate.Builder().ParentName("Total").ComponentName("South").Weight(1.0).Build()])
 ///         .Build()])
 ///     .Build());
 /// </code>

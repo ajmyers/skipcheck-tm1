@@ -103,7 +103,7 @@ public final class CubeService {
 
 	/**
 	 * {@code POST Cubes}: creates a cube over existing dimensions, bound in order with
-	 * {@code CubePatch.Builder#bindDimensions}, and optionally its rules.
+	 * {@code CubeCreate.Builder#bindDimensions}, and optionally its rules.
 	 * @param cube the new cube; it needs a name and at least two dimensions
 	 * @return the cube as created
 	 */

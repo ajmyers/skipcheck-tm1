@@ -61,6 +61,23 @@ def test_sorts_only_the_requests_a_step_calls_unordered() -> None:
     assert traffic.reorder(log, {}) == log
 
 
+def test_keeps_one_of_a_run_of_the_requests_a_step_repeats() -> None:
+    patterns = traffic.repeating({"steps": [{}, {"repeats": "tm1\\.Continue$"}], "finally": [{"repeats": "tm1\\.Continue$"}]})
+    assert list(patterns) == ["steps[1]", "finally[0]"]
+    log = [
+        exchange("GET", "Cubes('a')", "steps[0]"),
+        exchange("GET", "Cubes('a')", "steps[0]"),
+        exchange("POST", "C/tm1.Continue", "steps[1]"),
+        exchange("POST", "C/tm1.Continue", "steps[1]"),
+        exchange("POST", "C/tm1.Continue", "finally[0]"),
+        exchange("POST", "C/tm1.Continue", "finally[0]"),
+        exchange("POST", "C/tm1.Continue", "finally[0]"),
+    ]
+    steps = [x["step"] for x in traffic.collapse(log, patterns)]
+    assert steps == ["steps[0]", "steps[0]", "steps[1]", "finally[0]"]
+    assert traffic.collapse(log, {}) == log
+
+
 def test_logs_that_agree_have_no_differences() -> None:
     log = [exchange("GET", "Cubes"), exchange("DELETE", "Cubes('a')")]
     assert traffic.compare({"java": log, "python": list(log), "dotnet": list(log)}) == []

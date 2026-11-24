@@ -24,7 +24,7 @@ import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.LocalizedAttributes;
-import io.skipcheck.tm1.client.model.LocalizedAttributesPatch;
+import io.skipcheck.tm1.client.model.LocalizedAttributesCreate;
 import io.skipcheck.tm1.client.model.MDXViewCreate;
 import io.skipcheck.tm1.client.model.NativeViewCreate;
 import io.skipcheck.tm1.client.model.SubsetCreate;
@@ -126,7 +126,7 @@ class CubeAttributeTm1Test {
 				.block(WAIT)).contains(label);
 			tm1.localizedAttributes()
 				.create(owner,
-						LocalizedAttributesPatch.builder()
+						LocalizedAttributesCreate.builder()
 							.localeID("fr")
 							.attributes(AttributesPatch.builder().property(label, "Ventes").build())
 							.build())

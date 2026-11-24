@@ -7,7 +7,7 @@ import {
   AttributeSet,
   AttributesPatch,
   AttributeType,
-  LocalizedAttributesPatch,
+  LocalizedAttributesCreate,
   SubsetCreate,
   SubsetScope,
   Tm1BadRequestException,
@@ -85,12 +85,12 @@ describe("AttributeService and LocalizedAttributeService on TM1" + liveReason, (
     try {
       await localized.create(
         owner,
-        LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Nord").build()).build(),
+        LocalizedAttributesCreate.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Nord").build()).build(),
       );
       expect((await localized.list(reader).toArray()).map((t) => t.LocaleID)).toContain("fr");
       expect(await value(reader)).toBe("Nord");
 
-      const changed = LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Le Nord").build()).build();
+      const changed = LocalizedAttributesCreate.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Le Nord").build()).build();
       const fr = owner.path().nav("LocalizedAttributes").key("fr");
       await expect(localized.create(owner, changed), "a locale can't be created twice").rejects.toBeInstanceOf(Tm1BadRequestException);
       await expect(tm1.session.execute(Tm1Request.patch(fr, changed)), "nor patched").rejects.toBeInstanceOf(Tm1BadRequestException);
@@ -105,12 +105,15 @@ describe("AttributeService and LocalizedAttributeService on TM1" + liveReason, (
     await expect(
       tm1.localizedAttributes.create(
         AttributeOwner.element(d, d, "North"),
-        LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().caption("Nord").build()).build(),
+        LocalizedAttributesCreate.builder().localeID("fr").attributes(AttributesPatch.builder().caption("Nord").build()).build(),
       ),
       "Caption isn't an attribute until it's defined",
     ).rejects.toBeInstanceOf(Tm1BadRequestException);
     await expect(
-      tm1.localizedAttributes.create(AttributeOwner.member(d, d, "North"), LocalizedAttributesPatch.builder().localeID("fr").build()),
+      tm1.localizedAttributes.create(
+        AttributeOwner.member(d, d, "North"),
+        LocalizedAttributesCreate.builder().localeID("fr").attributes(AttributesPatch.builder().caption("Nord").build()).build(),
+      ),
       "POST not supported on a member's",
     ).rejects.toBeInstanceOf(Tm1BadRequestException);
   });

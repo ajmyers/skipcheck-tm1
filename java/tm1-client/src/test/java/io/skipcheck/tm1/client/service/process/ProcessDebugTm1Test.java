@@ -22,6 +22,7 @@ import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessDebugContext;
 import io.skipcheck.tm1.client.model.ProcessDebugContextLineBreakpoint;
+import io.skipcheck.tm1.client.model.ProcessDebugContextLineBreakpointCreate;
 import io.skipcheck.tm1.client.model.ProcessDebugContextLineBreakpointPatch;
 import io.skipcheck.tm1.client.model.ProcessDebugContextStackFrame;
 import io.skipcheck.tm1.client.model.ProcessDebugContextStatus;
@@ -95,7 +96,7 @@ class ProcessDebugTm1Test {
 		assertThat(settled(id).status()).as("paused before the first line").isEqualTo(ProcessDebugContextStatus.PAUSED);
 		debug
 			.addBreakpoint(id,
-					ProcessDebugContextLineBreakpointPatch.builder()
+					ProcessDebugContextLineBreakpointCreate.builder()
 						.id(1)
 						.processName(process)
 						.procedure(ProcessProcedure.PROLOG)
@@ -148,7 +149,7 @@ class ProcessDebugTm1Test {
 		debug.debugging(process, Map.of(), context -> {
 			String id = context.id();
 			assertThatIllegalArgumentException().isThrownBy(() -> debug.addBreakpoint(id,
-					ProcessDebugContextLineBreakpointPatch.builder().processName(process).lineNumber(2).build()));
+					ProcessDebugContextLineBreakpointCreate.builder().processName(process).lineNumber(2).build()));
 			return debug.addBreakpoint(id, line(1, 2))
 				.then(debug.addBreakpoint(id, line(2, 3)))
 				.then(debug.removeBreakpoint(id, 1))
@@ -162,8 +163,8 @@ class ProcessDebugTm1Test {
 		}).blockLast(WAIT);
 	}
 
-	private static ProcessDebugContextLineBreakpointPatch line(int id, int line) {
-		return ProcessDebugContextLineBreakpointPatch.builder()
+	private static ProcessDebugContextLineBreakpointCreate line(int id, int line) {
+		return ProcessDebugContextLineBreakpointCreate.builder()
 			.id(id)
 			.processName(process)
 			.procedure(ProcessProcedure.PROLOG)
@@ -179,7 +180,7 @@ class ProcessDebugTm1Test {
 			id.set(context.id());
 			return debug
 				.addBreakpoint(context.id(),
-						ProcessDebugContextLineBreakpointPatch.builder()
+						ProcessDebugContextLineBreakpointCreate.builder()
 							.id(1)
 							.processName(process)
 							.procedure(ProcessProcedure.PROLOG)

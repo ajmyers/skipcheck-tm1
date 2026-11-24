@@ -16,11 +16,11 @@ namespace Skipcheck.Tm1.Client.Services;
 /// their own.
 /// <para>Add a hierarchy to an existing dimension, with its elements and edges:</para>
 /// <code>
-/// await tm1.Hierarchies.CreateAsync("Region", HierarchyPatch.Builder()
+/// await tm1.Hierarchies.CreateAsync("Region", HierarchyCreate.Builder()
 ///     .Name("By Manager")
-///     .Elements([ElementPatch.Builder().Name("All").Type(ElementType.Consolidated).Build(),
-///         ElementPatch.Builder().Name("North").Type(ElementType.Numeric).Build()])
-///     .Edges([EdgePatch.Builder().ParentName("All").ComponentName("North").Weight(1.0).Build()])
+///     .Elements([ElementCreate.Builder().Name("All").Type(ElementType.Consolidated).Build(),
+///         ElementCreate.Builder().Name("North").Type(ElementType.Numeric).Build()])
+///     .Edges([EdgeCreate.Builder().ParentName("All").ComponentName("North").Weight(1.0).Build()])
 ///     .Build());
 /// </code>
 /// <para>Replace a hierarchy's structure: TM1 deletes the elements the new structure doesn't list:</para>
@@ -76,7 +76,7 @@ public sealed class HierarchyService : Tm1Service
         string dimension,
         string hierarchy,
         IReadOnlyList<ElementCreate> elements,
-        IReadOnlyList<EdgePatch> edges,
+        IReadOnlyList<EdgeCreate> edges,
         CancellationToken cancellationToken = default
     )
     {

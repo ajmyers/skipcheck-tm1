@@ -71,7 +71,7 @@
 				"Region",
 				"Region",
 				{
-					"$patch" : "EdgePatch",
+					"$patch" : "EdgeCreate",
 					"json" : {
 						"ParentName" : "West",
 						"ComponentName" : "Total"
@@ -129,7 +129,7 @@
 				"Region",
 				"Region",
 				{
-					"$patch" : "EdgePatch",
+					"$patch" : "EdgeCreate",
 					"json" : {
 						"ParentName" : "Total",
 						"ComponentName" : "West",
@@ -173,66 +173,6 @@
 					"ParentName" : "Total",
 					"ComponentName" : "West",
 					"Weight" : 1.0
-				}
-			}
-		},
-		{
-			"id" : "EdgeServiceTest#createsAnEdge#2",
-			"service" : "edges",
-			"method" : "create",
-			"params" : [
-				"dimension",
-				"hierarchy",
-				"edge"
-			],
-			"args" : [
-				"Region",
-				"Region",
-				{
-					"$patch" : "EdgePatch",
-					"json" : {
-						"Parent@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')",
-						"Component@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('East')",
-						"Weight" : -0.5
-					}
-				}
-			],
-			"exchanges" : [
-				{
-					"request" : {
-						"method" : "POST",
-						"target" : "Dimensions('Region')/Hierarchies('Region')/Edges",
-						"headers" : {
-							"accept" : "application/json",
-							"content-type" : "application/json",
-							"odata-maxversion" : "4.0",
-							"odata-version" : "4.0"
-						},
-						"json" : {
-							"Parent@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('Total')",
-							"Component@odata.bind" : "Dimensions('Region')/Hierarchies('Region')/Elements('East')",
-							"Weight" : -0.5
-						}
-					},
-					"response" : {
-						"status" : 201,
-						"headers" : {
-							"content-type" : "application/json"
-						},
-						"json" : {
-							"ParentName" : "Total",
-							"ComponentName" : "East",
-							"Weight" : -0.5
-						}
-					}
-				}
-			],
-			"result" : {
-				"$model" : "Edge",
-				"json" : {
-					"ParentName" : "Total",
-					"ComponentName" : "East",
-					"Weight" : -0.5
 				}
 			}
 		},

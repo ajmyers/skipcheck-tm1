@@ -24,6 +24,18 @@ describe("codegen", () => {
     expect(() => generate({ ...spec, specVersion: 2 })).toThrow(/spec version 2/);
   });
 
+  it("copies a value of an unknown subtype as its root's offered properties", () => {
+    // No write nests a breakpoint, so nothing reaches this through the client: the code is checked.
+    // The open root (EncryptionAtRestProviderSettings) is spec/conformance/writes.json's case
+    const patches = generate(spec)["patches.ts"]!;
+    const start = patches.indexOf("function ofProcessDebugContextBreakpointPatch(");
+    expect(start).toBeGreaterThan(0);
+    const fallback = patches.slice(start, patches.indexOf("\n}\n", start));
+    expect(fallback).toContain(
+      'const b = new ProcessDebugContextBreakpointPatchBuilder();\n  b.copy(read, ["Enabled","HitMode","HitCount","Expression"], null);\n  return b.build();',
+    );
+  });
+
   it("names operations as the Java client does", () => {
     expect(Tm1Operations.ChoreActivate.endpoint()).toBe("Action Chore/Activate");
     expect(Tm1Operations.ExecuteMdx.endpoint()).toBe("ActionImport ExecuteMDX");

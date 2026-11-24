@@ -22,20 +22,19 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Every setter of every create and patch type is verified by the write probe, or listed,
- * with why, in {@code spec/conformance/probe-coverage.json}: {@code excluded} for what
- * isn't probed for a reason, {@code pending} for what isn't probed yet. A setter the
- * clients offer (the builder manifest, {@code builders.json}) that neither verifies nor
- * lists fails, so a new TM1 version's writable property or type can't go unprobed
- * unnoticed; so does a listing the probe now verifies, so the pending list only shrinks.
+ * Every setter of every create and patch type is one the write probe verifies, or one the
+ * overlay keeps with why (#338): the builder manifest ({@code builders.json}) is exactly
+ * the spec's {@code offers}, and each offer the spec calls verified is, by this test's
+ * own reading of the probe file. So a client can't offer a write TM1 wasn't seen to make,
+ * and a new TM1 version's probe, or a change to the rule, shows up here.
  *
  * <p>
- * Verified means a probed outcome, of any kind but {@code untested}, for the setter's
- * property (or navigation, bound or nested) in a create or a PATCH of its type or a type
- * derived from it; a singleton's settings, probed by path
- * ({@code Administration/Language}), verify each part's type along the way; {@code Name}
- * and what a create requires are verified by the probe's least create, and a patch's
- * {@code Name} by its rename.
+ * Verified means the probe found TM1 to act on it: an outcome of {@code applied},
+ * {@code replaces}, {@code appends} or {@code mixed} for the setter's property (or
+ * navigation, bound or nested), or its collection, in a create or a PATCH of its type or
+ * a type derived from it; a nested field, by path ({@code Administration/Language}),
+ * verifies each part's type along the way; the keys a least create sent, and what it
+ * requires, verify a create's; an applied rename, a patch's {@code Name}.
  */
 class ProbeCoverageTest {
 
@@ -45,8 +44,10 @@ class ProbeCoverageTest {
 
 	private static final String BIND = "@odata.bind";
 
+	private static final Set<String> DOES = Set.of("applied", "replaces", "appends", "mixed");
+
 	@Test
-	void everySetterIsProbedOrListedWithWhy() throws IOException {
+	void everySetterIsVerifiedOrKeptWithWhy() throws IOException {
 		JsonNode spec = JSON.readTree(REPO.resolve("spec/tm1-api.json").toFile());
 		Map<String, JsonNode> types = new HashMap<>();
 		spec.path("types").forEach(t -> types.put(t.path("name").asString(), t));
@@ -57,62 +58,55 @@ class ProbeCoverageTest {
 		}
 		assertThat(probes).isNotEmpty();
 		for (Path probe : probes) {
-			JsonNode writes = JSON.readTree(probe.toFile()).path("writes");
+			JsonNode root = JSON.readTree(probe.toFile());
+			JsonNode writes = root.path("writes");
 			for (String id : writes.propertyNames()) {
 				collect(writes.path(id), id, types, verified);
 			}
+			for (String id : root.path("collections").propertyNames()) {
+				String[] parts = id.split("/", 2);
+				if (parts.length == 2 && DOES.contains(root.path("collections").path(id).path("outcome").asString())) {
+					verified.add(parts[0] + "|patch|" + parts[1]);
+				}
+			}
 		}
-		JsonNode coverage = JSON.readTree(REPO.resolve("spec/conformance/probe-coverage.json").toFile());
-		Set<String> listed = new TreeSet<>();
-		coverage.path("excluded").propertyNames().forEach(listed::add);
-		coverage.path("pending").propertyNames().forEach(listed::add);
-
+		JsonNode offers = spec.path("offers");
 		JsonNode builders = JSON.readTree(REPO.resolve("spec/conformance/builders.json").toFile()).path("builders");
-		Set<String> unlisted = new TreeSet<>();
-		Set<String> stale = new TreeSet<>();
-		for (String builder : builders.propertyNames()) {
+		assertThat(new TreeSet<>(builders.propertyNames())).as("the write types the clients generate")
+			.isEqualTo(new TreeSet<>(offers.propertyNames()));
+		Set<String> unverified = new TreeSet<>();
+		for (String builder : offers.propertyNames()) {
+			Set<String> offered = new TreeSet<>(offers.path(builder).propertyNames());
+			Set<String> built = new TreeSet<>();
+			builders.path(builder).path("setters").forEach(s -> built.add(s.asString()));
+			assertThat(built).as(builder + "'s setters, as the spec offers them").isEqualTo(offered);
 			String type = builder.replaceAll("(Patch|Create)$", "");
-			String write = builder.endsWith("Create") ? "post" : "patch";
-			boolean wholeListed = listed.contains(builder);
-			boolean anyUnverified = false;
-			for (JsonNode s : builders.path(builder).path("setters")) {
-				String setter = s.asString();
-				boolean ok = isVerified(type, write, setter, verified, types);
-				anyUnverified |= !ok;
-				String key = builder + "." + setter;
-				if (ok && listed.contains(key)) {
-					stale.add(key);
+			boolean complex = !types.containsKey(type) || !types.get(type).path("kind").asString().equals("entity");
+			for (String setter : offered) {
+				JsonNode why = offers.path(builder).path(setter);
+				if (why.has("kept") || why.has("unverified")) {
+					// The overlay's, with its reason: the export refuses one the probe
+					// verifies
+					assertThat(why.path(why.has("kept") ? "kept" : "unverified").asString()).as(builder + "." + setter)
+						.isNotBlank();
+					continue;
 				}
-				if (!ok && !wholeListed && !listed.contains(key)) {
-					unlisted.add(key);
+				String write = builder.endsWith("Create") ? "post" : "patch";
+				boolean ok = isVerified(type, write, setter, verified, types) || (complex
+						&& isVerified(type, write.equals("post") ? "patch" : "post", setter, verified, types));
+				if (!ok) {
+					unverified.add(builder + "." + setter);
 				}
-			}
-			if (wholeListed && !anyUnverified && builders.path(builder).path("setters").size() > 0) {
-				stale.add(builder);
-			}
-		}
-		assertThat(unlisted).as("setters the probe doesn't verify, not listed in probe-coverage.json").isEmpty();
-		assertThat(stale).as("listed in probe-coverage.json, but the probe verifies them now: take them out").isEmpty();
-		for (String entry : listed) {
-			String builder = entry.contains(".") ? entry.substring(0, entry.indexOf('.')) : entry;
-			assertThat(builders.has(builder)).as("probe-coverage.json names " + entry + ", which no client has")
-				.isTrue();
-			if (entry.contains(".")) {
-				String setter = entry.substring(entry.indexOf('.') + 1);
-				boolean offered = false;
-				for (JsonNode s : builders.path(builder).path("setters")) {
-					offered |= s.asString().equals(setter);
-				}
-				assertThat(offered).as("probe-coverage.json names " + entry + ", a setter no client offers").isTrue();
 			}
 		}
+		assertThat(unverified).as("offered as verified, but the probe file doesn't verify them").isEmpty();
 	}
 
 	private static void collect(JsonNode w, String id, Map<String, JsonNode> types, Set<String> verified) {
 		String type = w.path("type").asString(id.split("/", 2)[0]);
 		for (String write : List.of("post", "patch")) {
 			for (String property : w.path(write).propertyNames()) {
-				if (w.path(write).path(property).path("outcome").asString().equals("untested")) {
+				if (!DOES.contains(w.path(write).path(property).path("outcome").asString())) {
 					continue;
 				}
 				// A setting or a nested value's field, by path: each part's type is
@@ -135,19 +129,24 @@ class ProbeCoverageTest {
 			}
 			for (String nav : w.path("navigations").propertyNames()) {
 				JsonNode n = w.path("navigations").path(nav).path(write);
-				if (!n.path("bind").path("outcome").asString().equals("untested")) {
+				if (DOES.contains(n.path("bind").path("outcome").asString())) {
 					verified.add(type + "|" + write + "|" + nav + BIND);
 				}
-				if (!n.path("nested").path("outcome").asString().equals("untested")) {
+				if (DOES.contains(n.path("nested").path("outcome").asString())) {
 					verified.add(type + "|" + write + "|" + nav);
 				}
 			}
 		}
 		if (w.path("minimal").path("outcome").asString().equals("accepted")) {
-			verified.add(type + "|post|Name");
+			if (w.has("keys")) {
+				w.path("keys").forEach(k -> verified.add(type + "|post|" + k.asString()));
+			}
+			else {
+				verified.add(type + "|post|Name");
+			}
 			w.path("required").forEach(r -> verified.add(type + "|post|" + r.asString()));
 		}
-		if (w.has("rename")) {
+		if (w.path("rename").path("outcome").asString().equals("applied")) {
 			verified.add(type + "|patch|Name");
 		}
 	}

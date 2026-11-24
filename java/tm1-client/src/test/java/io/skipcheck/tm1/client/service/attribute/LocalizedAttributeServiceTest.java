@@ -18,7 +18,7 @@ import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.AttributesPatch;
 import io.skipcheck.tm1.client.model.LocalizedAttributes;
-import io.skipcheck.tm1.client.model.LocalizedAttributesPatch;
+import io.skipcheck.tm1.client.model.LocalizedAttributesCreate;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.cube.ViewScope;
 import io.skipcheck.tm1.client.service.dimension.SubsetScope;
@@ -104,7 +104,7 @@ class LocalizedAttributeServiceTest {
 		owners().forEach((path, owner) -> {
 			tm1().json(201, "{\"LocaleID\":\"fr\",\"Attributes\":{\"Caption\":\"Nord\",\"Code\":\"N\"}}");
 			LocalizedAttributes fr = conformance.call("localizedAttributes", "create", owner,
-					LocalizedAttributesPatch.builder()
+					LocalizedAttributesCreate.builder()
 						.localeID("fr")
 						.attributes(AttributesPatch.builder().caption("Nord").property("Code", "N").build())
 						.build());
@@ -117,7 +117,7 @@ class LocalizedAttributeServiceTest {
 
 		tm1().json(201, "{\"LocaleID\":\"de\",\"Attributes\":{\"Weight\":2.5}}");
 		conformance.call("localizedAttributes", "create", owner("process", "Load"),
-				LocalizedAttributesPatch.builder()
+				LocalizedAttributesCreate.builder()
 					.localeID("de")
 					.attributes(AttributesPatch.builder().property("Weight", 2.5).property("Note", null).build())
 					.build());
@@ -130,13 +130,19 @@ class LocalizedAttributeServiceTest {
 		tm1().error(400, "278", "Localized attributes for locale 'fr' exist.");
 		Throwable twice = conformance.fail("localizedAttributes", "create",
 				owner("element", "Region", "Region", "North"),
-				LocalizedAttributesPatch.builder().localeID("fr").build());
+				LocalizedAttributesCreate.builder()
+					.localeID("fr")
+					.attributes(AttributesPatch.builder().caption("Nord").build())
+					.build());
 		assertThat(twice).isInstanceOf(Tm1BadRequestException.class);
 
 		tm1().error(400, "278", "POST not supported.");
 		Throwable member = conformance.fail("localizedAttributes", "create",
 				owner("member", "Region", "Region", "North"),
-				LocalizedAttributesPatch.builder().localeID("fr").build());
+				LocalizedAttributesCreate.builder()
+					.localeID("fr")
+					.attributes(AttributesPatch.builder().caption("Nord").build())
+					.build());
 		assertThat(member).isInstanceOf(Tm1BadRequestException.class);
 	}
 

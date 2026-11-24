@@ -9,11 +9,11 @@ import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.CubeReference;
-import io.skipcheck.tm1.client.model.CubeReferencePatch;
-import io.skipcheck.tm1.client.model.DocumentPatch;
+import io.skipcheck.tm1.client.model.CubeReferenceCreate;
+import io.skipcheck.tm1.client.model.DocumentCreate;
 import io.skipcheck.tm1.client.model.Entry;
-import io.skipcheck.tm1.client.model.FolderPatch;
-import io.skipcheck.tm1.client.model.LinkPatch;
+import io.skipcheck.tm1.client.model.FolderCreate;
+import io.skipcheck.tm1.client.model.LinkCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.content.ContentPath;
@@ -41,13 +41,13 @@ final class ContentServiceExamples {
 		// An application: a folder with a link and a reference to a cube
 		ContentPath planning = ContentPath.applications().child("Planning");
 		return tm1.contents()
-			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderPatch.builder().name("Planning").build())
+			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name("Planning").build())
 			.then(tm1.contents()
 				.create(planning, ContentScope.PUBLIC,
-						LinkPatch.builder().name("Guide").url("https://example.com/planning-guide").build()))
+						LinkCreate.builder().name("Guide").url("https://example.com/planning-guide").build()))
 			.then(tm1.contents()
 				.create(planning, ContentScope.PUBLIC,
-						CubeReferencePatch.builder()
+						CubeReferenceCreate.builder()
 							.name("Sales")
 							.bindCube(ODataPath.of("Cubes").key("Sales"))
 							.build()));
@@ -60,7 +60,7 @@ final class ContentServiceExamples {
 		// reference, as create returns it, is where its content goes
 		ContentPath planning = ContentPath.applications().child("Planning");
 		return tm1.contents()
-			.create(planning, ContentScope.PUBLIC, DocumentPatch.builder().name("notes.txt").build())
+			.create(planning, ContentScope.PUBLIC, DocumentCreate.builder().name("notes.txt").build())
 			.flatMap(reference -> tm1.contents()
 				.upload(planning.child(reference),
 						// read again if the session has to log in again

@@ -15,17 +15,18 @@ class WritesTest {
 			{"probeVersion": 2, "server": {"schemaVersion": "11.8.35"},
 			 "writes": {
 			  "Cube": {"type": "Cube", "post": {"Rules": {"outcome": "applied"}}, "patch": {"Rules": {"outcome": "applied"}}},
-			  "Edge": {"type": "Edge", "generate": false, "post": {"Weight": {"outcome": "applied"}},
+			  "Edge": {"type": "Edge", "required": ["ParentName"], "post": {"Weight": {"outcome": "applied"}},
 			   "patch": {"Weight": {"outcome": "applied"}}}},
 			 "collections": {}}""";
 
 	@Test
-	void leavesOutAProbedTypeNotYetGeneratedFrom() {
+	void readsEveryProbedType() {
 		Overlay overlay = Overlay.read(new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8)));
 		Writes writes = Writes.read(PROBE, overlay);
 		assertThat(writes.get("Cube")).isNotNull();
-		// Recorded by the probe, but the generators don't act on it yet (#338)
-		assertThat(writes.get("Edge")).isNull();
+		// Its create's needs too, which build() checks
+		assertThat(writes.get("Edge")).isNotNull();
+		assertThat(writes.get("Edge").required()).containsExactly("ParentName");
 	}
 
 }

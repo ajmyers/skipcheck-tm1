@@ -61,11 +61,6 @@ public class HierarchyServiceLiveTests
             _ = tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().Elements([]).Build());
         });
         Assert.Contains("ReplaceStructureAsync", e.Message);
-        var north = ODataPath.Of("Dimensions").Key(d).Nav("Hierarchies").Key(d).Nav("Elements").Key("North");
-        Assert.Throws<ArgumentException>(() =>
-        {
-            _ = tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().BindElements(north).Build());
-        });
         Assert.Throws<ArgumentException>(() =>
         {
             _ = tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().Edges([LiveDimension.Edge("Total", "East")]).Build(), "W/\"x\"");

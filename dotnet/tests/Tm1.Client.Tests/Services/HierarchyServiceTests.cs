@@ -46,9 +46,8 @@ public class HierarchyServiceTests
     {
         var tm1 = _tm1.Client();
         var withElements = HierarchyPatch.Builder().Elements([ElementCreate.Builder().Name("x").Build()]).Build();
-        var withBinding = HierarchyPatch.Builder().BindElements(ODataPath.Of("Dimensions").Key("d")).Build();
         var withEdges = HierarchyPatch.Builder().Edges([]).Build();
-        foreach (var patch in new[] { withElements, withBinding, withEdges })
+        foreach (var patch in new[] { withElements, withEdges })
         {
             var e = Assert.Throws<ArgumentException>(() =>
             {
@@ -72,7 +71,7 @@ public class HierarchyServiceTests
                 "Region",
                 "Region",
                 [ElementCreate.Builder().Name("All").Type(ElementType.Consolidated).Build()],
-                [EdgePatch.Builder().ParentName("All").ComponentName("North").Weight(1.0).Build()]
+                [EdgeCreate.Builder().ParentName("All").ComponentName("North").Weight(1.0).Build()]
             );
         Assert.Equal(("PATCH", "Dimensions('Region')/Hierarchies('Region')"), (_tm1.Last.Method, _tm1.Last.Target));
         var body = _tm1.Last.Json;

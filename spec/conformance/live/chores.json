@@ -36,7 +36,7 @@
 			"service" : "chores",
 			"method" : "addTask",
 			"params" : [ "name", "task" ],
-			"args" : [ "${chore}", { "$patch" : "ChoreTaskPatch", "json" : { "Process@odata.bind" : "Processes('${process}')", "Parameters" : [ { "Name" : "pName", "Value" : "second" } ] } } ],
+			"args" : [ "${chore}", { "$patch" : "ChoreTaskCreate", "json" : { "Process@odata.bind" : "Processes('${process}')", "Parameters" : [ { "Name" : "pName", "Value" : "second" } ] } } ],
 			"expect" : { "fields" : { "Step" : 1 } }
 		},
 		{

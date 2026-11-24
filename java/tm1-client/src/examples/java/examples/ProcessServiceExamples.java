@@ -12,7 +12,6 @@ import io.skipcheck.tm1.client.model.Process;
 import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessExecuteResult;
 import io.skipcheck.tm1.client.model.ProcessParameterPatch;
-import io.skipcheck.tm1.client.model.ProcessVariableType;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Mono;
 
@@ -27,17 +26,8 @@ final class ProcessServiceExamples {
 		// TM1 saves code that doesn't compile, so compile the definition first
 		ProcessCreate process = ProcessCreate.builder()
 			.name("Load Sales")
-			.parameters(List.of(
-					ProcessParameterPatch.builder()
-						.name("pVersion")
-						.value("Actual")
-						.type(ProcessVariableType.STRING)
-						.build(),
-					ProcessParameterPatch.builder()
-						.name("pYear")
-						.value(2026)
-						.type(ProcessVariableType.NUMERIC)
-						.build()))
+			.parameters(List.of(ProcessParameterPatch.builder().name("pVersion").value("Actual").build(),
+					ProcessParameterPatch.builder().name("pYear").value(2026).build()))
 			.prologProcedure("LogOutput('INFO', 'Loading ' | pVersion | ' for ' | NumberToString(pYear));\n")
 			.build();
 		return tm1.processes()

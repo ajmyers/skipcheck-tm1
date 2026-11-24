@@ -120,6 +120,5 @@ public sealed class DrillthroughLiveTests : IAsyncLifetime
         await _tm1.Drillthrough.DeleteRowsetAsync(rowset);
     }
 
-    private static ProcessParameterPatch Parameter(string name) =>
-        ProcessParameterPatch.Builder().Name(name).Value("").Type(ProcessVariableType.String).Build();
+    private static ProcessParameterPatch Parameter(string name) => ProcessParameterPatch.Builder().Name(name).Value("").Build();
 }

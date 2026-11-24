@@ -65,6 +65,9 @@
 		"ApplicationContextFacetValueCreate": {
 			"kept": "an annotation's application context: the minimal create sends it and TM1 takes it; its Value changes only with the annotation's dimensional context"
 		},
+		"AttributesPatch.Caption": {
+			"kept": "the live attribute tests translate a caption and read it back; the probe's nested try in a translation is refused (278) for a reason it doesn't log yet"
+		},
 		"AuthenticationSettingsPatch.IntegratedSecurityMode": {
 			"kept": "reads back as Mixed on a server without Windows integrated security"
 		},
@@ -85,6 +88,9 @@
 		},
 		"GitConfigurationPatch": {
 			"kept": "an operation's parameters (tm1.GitInit, tm1.GitDeploy), not an entity write"
+		},
+		"HierarchyCreate.Edges": {
+			"kept": "a create's edges join elements in the same body, which the probe's nested edge has none of, so TM1 refuses it there; the live tests (edges, elements, hierarchies, levels, members) create hierarchies with their edges and read them back"
 		},
 		"KeyProtectSettingsPatch": {
 			"unverified": "an encryption key provider: probing it needs a key store"

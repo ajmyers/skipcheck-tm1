@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { DimensionCreate, EdgePatch, ElementCreate, ElementType, HierarchyCreate, Member, typeOf, type Tm1Client } from "../../src/index.js";
+import { DimensionCreate, EdgeCreate, ElementCreate, ElementType, HierarchyCreate, Member, typeOf, type Tm1Client } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 /** MemberService against a real TM1, on World = Europe (France, Spain) + Asia (Japan): the Java
@@ -14,7 +14,7 @@ describe("MemberService on TM1" + liveReason, () => {
     if (!Live.configured) return;
     tm1 = await Live.client();
     const element = (name: string, type: ElementType): ElementCreate => ElementCreate.builder().name(name).type(type).build();
-    const edge = (parent: string, component: string): EdgePatch => EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
+    const edge = (parent: string, component: string): EdgeCreate => EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
     await tm1.dimensions.create(
       DimensionCreate.builder()
         .name(d)

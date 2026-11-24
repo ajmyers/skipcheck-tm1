@@ -207,7 +207,7 @@
 			],
 			"args" : [
 				{
-					"$patch" : "AnnotationPatch",
+					"$patch" : "AnnotationCreate",
 					"json" : {
 						"Text" : "by hand",
 						"ApplicationContext" : [
@@ -1170,48 +1170,6 @@
 						"json" : {
 							"Text" : "second note",
 							"commentValue" : "second note"
-						}
-					},
-					"response" : {
-						"status" : 204,
-						"headers" : { }
-					}
-				}
-			],
-			"result" : null
-		},
-		{
-			"id" : "AnnotationServiceTest#updatesAnAnnotation#2",
-			"service" : "annotations",
-			"method" : "update",
-			"params" : [
-				"id",
-				"patch"
-			],
-			"args" : [
-				"C}ClientGroups~B.B~7uA_4TxLwG",
-				{
-					"$patch" : "AnnotationPatch",
-					"json" : {
-						"LastUpdated" : "2026-01-02T03:04:00.12+05:30",
-						"Created" : "2026-01-02T03:04:05Z"
-					}
-				}
-			],
-			"exchanges" : [
-				{
-					"request" : {
-						"method" : "PATCH",
-						"target" : "Annotations('C%7DClientGroups~B.B~7uA_4TxLwG')",
-						"headers" : {
-							"accept" : "application/json",
-							"content-type" : "application/json",
-							"odata-maxversion" : "4.0",
-							"odata-version" : "4.0"
-						},
-						"json" : {
-							"LastUpdated" : "2026-01-02T03:04:00.12+05:30",
-							"Created" : "2026-01-02T03:04:05Z"
 						}
 					},
 					"response" : {

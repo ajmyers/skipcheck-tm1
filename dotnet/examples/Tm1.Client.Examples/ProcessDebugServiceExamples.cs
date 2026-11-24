@@ -21,7 +21,7 @@ public static class ProcessDebugServiceExamples
 
         async IAsyncEnumerable<string> Stack(string id)
         {
-            var line3 = ProcessDebugContextLineBreakpointPatch
+            var line3 = ProcessDebugContextLineBreakpointCreate
                 .Builder()
                 .Id(1) // TM1 needs an ID chosen by the caller
                 .ProcessName("Load Sales")

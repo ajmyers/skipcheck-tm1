@@ -80,10 +80,10 @@ public sealed class AnnotationService : Tm1Service
             .Select(e => ODataPath.Of("Dimensions").Key(e.Key).Nav("Hierarchies").Key(e.Key).Nav("Members").Key(e.Value))
             .ToArray();
         return CreateAsync(
-            AnnotationPatch
+            AnnotationCreate
                 .Builder()
                 .Text(text)
-                .ApplicationContext([ApplicationContextFacetValuePatch.Builder().BindFacet(Facets.Key("}Cubes")).Value(cube).Build()])
+                .ApplicationContext([ApplicationContextFacetValueCreate.Builder().BindFacet(Facets.Key("}Cubes")).Value(cube).Build()])
                 .BindDimensionalContext(members)
                 .Property("objectName", cube)
                 .Property("commentValue", text)
@@ -97,7 +97,7 @@ public sealed class AnnotationService : Tm1Service
     /// <summary><c>POST Annotations</c>, for an annotation built by hand. Returns the annotation as
     /// made, with its ID.</summary>
     [Tm1Endpoint("EntitySet Annotations")]
-    public Task<Annotation> CreateAsync(AnnotationPatch annotation, CancellationToken cancellationToken = default) =>
+    public Task<Annotation> CreateAsync(AnnotationCreate annotation, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<Annotation>(Annotations, Require(annotation, nameof(annotation))), cancellationToken);
 
     /// <summary><c>PATCH Annotations('id')</c>. To change what it says, set both <c>Text</c> and the

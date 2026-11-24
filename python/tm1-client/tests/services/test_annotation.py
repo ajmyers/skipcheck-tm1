@@ -8,7 +8,8 @@ import json
 
 import httpx2
 
-from skipcheck_tm1.model import AnnotationPatch
+from skipcheck_tm1 import ODataPath
+from skipcheck_tm1.model import AnnotationCreate, AnnotationPatch, ApplicationContextFacetValueCreate
 
 from ..conftest import Api, FakeTm1, target
 
@@ -41,12 +42,25 @@ def test_annotates_a_cell_as_paw_does(api: Api, fake: FakeTm1) -> None:
     }
 
 
+def by_hand(text: str) -> AnnotationCreate:
+    """An annotation with what a create needs: its application and dimensional context."""
+    facet = ApplicationContextFacetValueCreate.builder().bind_facet(ODataPath.of("ApplicationContextFacets").key("}Cubes")).value("Sales").build()
+    north = ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Members").key("North")
+    return AnnotationCreate.builder().text(text).application_context([facet]).bind_dimensional_context(north).build()
+
+
+CONTEXT = {
+    "ApplicationContext": [{"Facet@odata.bind": "ApplicationContextFacets('%7DCubes')", "Value": "Sales"}],
+    "DimensionalContext@odata.bind": ["Dimensions('Region')/Hierarchies('Region')/Members('North')"],
+}
+
+
 def test_crud_by_id(api: Api, fake: FakeTm1) -> None:
     fake.respond = lambda r: {"ID": "a"}
-    api.run(api.client.annotations.create(AnnotationPatch.builder().text("t").build()))
-    assert body(fake.last) == {"Text": "t"}
-    api.run(api.client.annotations.create(annotation=AnnotationPatch.builder().text("u").build()))
-    assert body(fake.last) == {"Text": "u"}
+    api.run(api.client.annotations.create(by_hand("t")))
+    assert body(fake.last) == {"Text": "t", **CONTEXT}
+    api.run(api.client.annotations.create(annotation=by_hand("u")))
+    assert body(fake.last) == {"Text": "u", **CONTEXT}
     api.run(api.client.annotations.get("C}Sales~1", select="Text"))
     assert target(fake.last) == "GET Annotations('C%7DSales~1')?$select=Text"
     fake.respond = lambda r: None

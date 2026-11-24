@@ -247,7 +247,9 @@
 				{
 					"$patch" : "DimensionPatch",
 					"json" : {
-						"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Region')"
+						"DefaultHierarchy" : {
+							"Name" : "Region"
+						}
 					}
 				},
 				"W/\"0\""
@@ -265,7 +267,9 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Region')"
+							"DefaultHierarchy" : {
+								"Name" : "Region"
+							}
 						}
 					},
 					"response" : {
@@ -1601,7 +1605,9 @@
 				{
 					"$patch" : "DimensionPatch",
 					"json" : {
-						"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Alternate')"
+						"DefaultHierarchy" : {
+							"Name" : "Alternate"
+						}
 					}
 				}
 			],
@@ -1617,7 +1623,9 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Alternate')"
+							"DefaultHierarchy" : {
+								"Name" : "Alternate"
+							}
 						}
 					},
 					"response" : {
@@ -1642,7 +1650,9 @@
 				{
 					"$patch" : "DimensionPatch",
 					"json" : {
-						"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Alternate')"
+						"DefaultHierarchy" : {
+							"Name" : "Alternate"
+						}
 					}
 				},
 				"W/\"1\""
@@ -1660,7 +1670,9 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"DefaultHierarchy@odata.bind" : "Dimensions('Region')/Hierarchies('Alternate')"
+							"DefaultHierarchy" : {
+								"Name" : "Alternate"
+							}
 						}
 					},
 					"response" : {

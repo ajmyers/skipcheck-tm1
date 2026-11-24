@@ -18,6 +18,7 @@ from skipcheck_tm1.model import (
     Dimension,
     DimensionCreate,
     DimensionPatch,
+    EdgeCreate,
     EdgePatch,
     Element,
     ElementCreate,
@@ -65,7 +66,7 @@ def test_dimensions_list_get_create_update_delete(api: Api, fake: FakeTm1) -> No
 
     total = ElementCreate.builder().name("Total").type(ElementType.CONSOLIDATED).build()
     north = ElementCreate.builder().name("North").type(ElementType.NUMERIC).build()
-    edge = EdgePatch.builder().parent_name("Total").component_name("North").weight(1.0).build()
+    edge = EdgeCreate.builder().parent_name("Total").component_name("North").weight(1.0).build()
     api.run(
         dims.create(
             DimensionCreate.builder()
@@ -89,9 +90,8 @@ def test_dimensions_list_get_create_update_delete(api: Api, fake: FakeTm1) -> No
     )
 
     fake.respond = lambda r: None
-    alternate = ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Alt")
-    api.run(dims.update("Region", DimensionPatch.builder().bind_default_hierarchy(alternate).build()))
-    assert sent(fake) == ("PATCH Dimensions('Region')", {"DefaultHierarchy@odata.bind": "Dimensions('Region')/Hierarchies('Alt')"})
+    api.run(dims.update("Region", DimensionPatch.builder().default_hierarchy(HierarchyCreate.builder().name("Alt").build()).build()))
+    assert sent(fake) == ("PATCH Dimensions('Region')", {"DefaultHierarchy": {"Name": "Alt"}})
     assert "if-match" not in fake.last.headers
     api.run(dims.update("Region", {"Name": "Region"}, 'W/"1"'))
     assert fake.last.headers["if-match"] == 'W/"1"'
@@ -153,7 +153,7 @@ def test_a_hierarchy_update_refuses_structure(api: Api, fake: FakeTm1) -> None:
     for patch in (
         HierarchyCreate.builder().elements([ElementCreate.builder().name("a").build()]).build(),
         HierarchyCreate.builder().edges([]).build(),
-        HierarchyCreate.builder().bind_elements(elements.key("a")).build(),
+        {"Elements@odata.bind": [str(elements.key("a"))]},
         {"Edges@odata.bind": []},
     ):
         with pytest.raises(ValueError, match="replace_structure"):
@@ -165,7 +165,7 @@ def test_replace_structure(api: Api, fake: FakeTm1) -> None:
     fake.respond = lambda r: None
     all_ = ElementCreate.builder().name("All Versions").type(ElementType.CONSOLIDATED).build()
     actual = ElementCreate.builder().name("Actual").type(ElementType.NUMERIC).build()
-    edge = EdgePatch.builder().parent_name("All Versions").component_name("Actual").weight(1.0).build()
+    edge = EdgeCreate.builder().parent_name("All Versions").component_name("Actual").weight(1.0).build()
     api.run(api.client.hierarchies.replace_structure("Version", "Version", [all_, actual], [edge]))
     assert sent(fake) == (
         "PATCH Dimensions('Version')/Hierarchies('Version')",
@@ -273,7 +273,7 @@ def test_edges(api: Api, fake: FakeTm1) -> None:
     for method, nav in (("parent", "Parent"), ("component", "Component"), ("hierarchy", "Hierarchy")):
         api.run(getattr(es, method)("Region", "Region", "Total", "North"))
         assert target(fake.last) == f"GET {key}/{nav}"
-    api.run(es.create("Region", "Region", EdgePatch.builder().parent_name("Total Sales").component_name("North").weight(1.0).build()))
+    api.run(es.create("Region", "Region", EdgeCreate.builder().parent_name("Total Sales").component_name("North").weight(1.0).build()))
     assert sent(fake) == (f"POST {H}/Edges", {"ParentName": "Total Sales", "ComponentName": "North", "Weight": 1.0})
     fake.respond = lambda r: None
     api.run(es.update("Region", "Region", "Total", "North", EdgePatch.builder().weight(-1.0).build()))
@@ -360,7 +360,7 @@ def test_subsets_by_scope(api: Api, fake: FakeTm1, scope: SubsetScope) -> None:
 def test_a_subset_update_refuses_elements(api: Api, fake: FakeTm1) -> None:
     # SubsetPatch offers no Elements: TM1 refuses them in a PATCH, and appends a binding
     assert not hasattr(SubsetPatch.Builder, "elements") and not hasattr(SubsetPatch.Builder, "bind_elements")
-    for patch in (SubsetCreate.builder().elements([]).build(), {"Elements@odata.bind": []}):
+    for patch in ({"Elements": []}, {"Elements@odata.bind": []}):
         with pytest.raises(ValueError, match="add_elements"):
             api.run(api.client.subsets.update("Region", "Region", SubsetScope.PUBLIC, "s", patch))
     assert fake.requests == []

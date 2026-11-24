@@ -27,7 +27,6 @@ import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.NativeViewCreate;
 import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessParameterPatch;
-import io.skipcheck.tm1.client.model.ProcessVariableType;
 import io.skipcheck.tm1.client.model.SubsetCreate;
 import io.skipcheck.tm1.client.model.ViewAxisSelectionPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
@@ -181,7 +180,7 @@ class DrillthroughTm1Test {
 	}
 
 	private static ProcessParameterPatch parameter(String name) {
-		return ProcessParameterPatch.builder().name(name).value("").type(ProcessVariableType.STRING).build();
+		return ProcessParameterPatch.builder().name(name).value("").build();
 	}
 
 	private static ViewAxisSelectionPatch axis(String dimension) {

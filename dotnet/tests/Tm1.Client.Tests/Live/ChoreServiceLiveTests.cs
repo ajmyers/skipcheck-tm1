@@ -36,10 +36,7 @@ public sealed class ChoreServiceLiveTests : IAsyncLifetime
             ProcessCreate
                 .Builder()
                 .Name(Process)
-                .Parameters([
-                    ProcessParameterPatch.Builder().Name("pName").Value("").Type(ProcessVariableType.String).Build(),
-                    ProcessParameterPatch.Builder().Name("pCount").Value(0).Type(ProcessVariableType.Numeric).Build(),
-                ])
+                .Parameters([ProcessParameterPatch.Builder().Name("pName").Value("").Build(), ProcessParameterPatch.Builder().Name("pCount").Value(0).Build()])
                 .PrologProcedure("If(DimensionExists(pName) = 0);\n  DimensionCreate(pName);\nEndIf;\n")
                 .Build()
         );
@@ -102,7 +99,7 @@ public sealed class ChoreServiceLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task NeedsEveryProcessParameterInATask()
     {
-        var task = ChoreTaskPatch.Builder().BindProcess(ODataPath.Of("Processes").Key(Process)).Parameters([Parameter("pName", "x")]).Build();
+        var task = ChoreTaskCreate.Builder().BindProcess(ODataPath.Of("Processes").Key(Process)).Parameters([Parameter("pName", "x")]).Build();
         await Assert.ThrowsAnyAsync<Tm1Exception>(() => Chores.AddTaskAsync(Chore, task));
     }
 
@@ -134,8 +131,8 @@ public sealed class ChoreServiceLiveTests : IAsyncLifetime
 
     private async Task<bool> Active() => (await Chores.GetAsync(Chore)).Active == true;
 
-    private ChoreTaskPatch TaskFor(string marker) =>
-        ChoreTaskPatch.Builder().BindProcess(ODataPath.Of("Processes").Key(Process)).Parameters([Parameter("pName", marker), Parameter("pCount", 1)]).Build();
+    private ChoreTaskCreate TaskFor(string marker) =>
+        ChoreTaskCreate.Builder().BindProcess(ODataPath.Of("Processes").Key(Process)).Parameters([Parameter("pName", marker), Parameter("pCount", 1)]).Build();
 
     private static ChoreTaskParameterPatch Parameter(string name, object value) => ChoreTaskParameterPatch.Builder().Name(name).Value(value).Build();
 

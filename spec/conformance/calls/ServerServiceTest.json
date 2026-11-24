@@ -63,7 +63,9 @@
 				{
 					"$patch" : "ServerSettingsPatch",
 					"json" : {
-						"ServerName" : "renamed"
+						"Administration" : {
+							"ServerName" : "renamed"
+						}
 					}
 				}
 			],
@@ -79,7 +81,9 @@
 							"odata-version" : "4.0"
 						},
 						"json" : {
-							"ServerName" : "renamed"
+							"Administration" : {
+								"ServerName" : "renamed"
+							}
 						}
 					},
 					"response" : {
@@ -568,6 +572,46 @@
 				"exception" : "NullPointerException",
 				"category" : "argument"
 			}
+		},
+		{
+			"id" : "ServerServiceTest#updatesALoggerWithAPatch#1",
+			"service" : "server",
+			"method" : "updateLogger",
+			"params" : [
+				"name",
+				"patch"
+			],
+			"args" : [
+				"TM1.Process",
+				{
+					"$patch" : "LoggerPatch",
+					"json" : {
+						"Level" : "Debug"
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PATCH",
+						"target" : "Loggers('TM1.Process')",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"json" : {
+							"Level" : "Debug"
+						}
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
 		},
 		{
 			"id" : "ServerServiceTest#updatesTheStaticConfiguration#1",

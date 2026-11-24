@@ -4,6 +4,7 @@ package examples;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Edge;
+import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.EdgePatch;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
@@ -36,7 +37,7 @@ final class EdgeServiceExamples {
 		// Move North from Total to Total Sales: add the new edge, then delete the old
 		return tm1.edges()
 			.create("Region", "Region",
-					EdgePatch.builder().parentName("Total Sales").componentName("North").weight(1.0).build())
+					EdgeCreate.builder().parentName("Total Sales").componentName("North").weight(1.0).build())
 			.flatMap(edge -> tm1.edges().delete("Region", "Region", "Total", "North").thenReturn(edge));
 		// @end
 	}

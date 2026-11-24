@@ -16,14 +16,13 @@ from skipcheck_tm1.model import (
     AttributesPatch,
     AttributeType,
     DimensionCreate,
-    EdgePatch,
+    EdgeCreate,
     ElementCreate,
     ElementType,
     HierarchyCreate,
-    LocalizedAttributesPatch,
+    LocalizedAttributesCreate,
     ProcessCreate,
     ProcessParameterPatch,
-    ProcessVariableType,
     SubsetCreate,
 )
 
@@ -39,7 +38,7 @@ def element(name: str, type: ElementType = ElementType.NUMERIC) -> Any:
 
 
 def edge(parent: str, component: str) -> Any:
-    return EdgePatch.builder().parent_name(parent).component_name(component).weight(1.0).build()
+    return EdgeCreate.builder().parent_name(parent).component_name(component).weight(1.0).build()
 
 
 def dimension(tm1: Tm1Client, name: str, elements: list[Any], edges: list[Any] | None = None, subset: bool = False) -> str:
@@ -90,7 +89,7 @@ def string(name: str) -> ElementCreate:
     return ElementCreate.builder().name(name).type(ElementType.STRING).build()
 
 
-def dimension_of(name: str, elements: list[ElementCreate], edges: list[EdgePatch] | None = None) -> DimensionCreate:
+def dimension_of(name: str, elements: list[ElementCreate], edges: list[EdgeCreate] | None = None) -> DimensionCreate:
     hierarchy = HierarchyCreate.builder().name(name).elements(elements)
     if edges:
         hierarchy = hierarchy.edges(edges)
@@ -121,8 +120,8 @@ def string_attribute(name: str) -> AttributeDefinitionCreate:
     return AttributeDefinitionCreate.builder().name(name).type(AttributeType.STRING).build()
 
 
-def french(attribute: str, value: str) -> LocalizedAttributesPatch:
-    return LocalizedAttributesPatch.builder().locale_id("fr").attributes(AttributesPatch.builder().property(attribute, value).build()).build()
+def french(attribute: str, value: str) -> LocalizedAttributesCreate:
+    return LocalizedAttributesCreate.builder().locale_id("fr").attributes(AttributesPatch.builder().property(attribute, value).build()).build()
 
 
 def french_value(tm1: Tm1Client, owner: AttributeOwner, attribute: str) -> object:
@@ -138,8 +137,8 @@ def process_definition(name: str, prolog: str) -> Any:
         .name(name)
         .parameters(
             [
-                ProcessParameterPatch.builder().name("pName").value("").type(ProcessVariableType.STRING).build(),
-                ProcessParameterPatch.builder().name("pCount").value(0).type(ProcessVariableType.NUMERIC).build(),
+                ProcessParameterPatch.builder().name("pName").value("").build(),
+                ProcessParameterPatch.builder().name("pCount").value(0).build(),
             ]
         )
         .prolog_procedure(prolog)

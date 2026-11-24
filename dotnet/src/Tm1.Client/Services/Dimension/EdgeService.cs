@@ -13,7 +13,7 @@ namespace Skipcheck.Tm1.Client.Services;
 /// hierarchy, each keyed by its parent's and its component's names.
 /// <para>Add an element under a consolidation, with its weight:</para>
 /// <code>
-/// await tm1.Edges.CreateAsync("Region", "Region", EdgePatch.Builder().ParentName("Total").ComponentName("West").Weight(1.0).Build());
+/// await tm1.Edges.CreateAsync("Region", "Region", EdgeCreate.Builder().ParentName("Total").ComponentName("West").Weight(1.0).Build());
 /// </code>
 /// </summary>
 public sealed class EdgeService : Tm1Service
@@ -40,7 +40,7 @@ public sealed class EdgeService : Tm1Service
 
     /// <summary><c>POST …/Edges</c>: links a component under a parent, with a weight; returns the edge.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Edges")]
-    public Task<Edge> CreateAsync(string dimension, string hierarchy, EdgePatch edge, CancellationToken cancellationToken = default) =>
+    public Task<Edge> CreateAsync(string dimension, string hierarchy, EdgeCreate edge, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<Edge>(EdgesPath(dimension, hierarchy), Require(edge, nameof(edge))), cancellationToken);
 
     /// <summary><c>PATCH …/Edges(ParentName='p',ComponentName='c')</c>: changes the edge, typically its weight.</summary>

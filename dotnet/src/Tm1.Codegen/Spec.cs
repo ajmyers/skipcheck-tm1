@@ -22,6 +22,13 @@ public sealed class Spec
         Endpoints = root.GetProperty("endpoints").EnumerateArray().ToList();
         TypeByName = Types.ToDictionary(t => Str(t, "qualifiedName")!);
         EnumByName = Enums.ToDictionary(e => Str(e, "qualifiedName")!);
+        if (root.TryGetProperty("offers", out var offers))
+        {
+            foreach (var b in offers.EnumerateObject())
+            {
+                Offers[b.Name] = b.Value.EnumerateObject().Select(s => s.Name).ToHashSet();
+            }
+        }
         foreach (var s in root.GetProperty("schemas").EnumerateArray())
         {
             if (Str(s, "alias") is { } alias)
@@ -50,6 +57,36 @@ public sealed class Spec
     public Dictionary<string, JsonElement> EnumByName { get; }
 
     public Dictionary<string, string> Aliases { get; } = new();
+
+    /// <summary>The write types to generate (<c>CubeCreate</c>), each with the setters it offers by the JSON
+    /// names they write (<c>Dimensions@odata.bind</c> for a binding): what the TM1 probe verified, or the
+    /// overlay keeps. Empty in a spec from before them, when every type gets a patch.</summary>
+    public Dictionary<string, HashSet<string>> Offers { get; } = new();
+
+    /// <summary>Whether the spec says which write types and setters to generate (#338).</summary>
+    public bool VerifiedOnly => Offers.Count > 0;
+
+    /// <summary>The entity set whose members are of <paramref name="t"/>'s type, or failing that of the
+    /// nearest type it derives from; or null. As the Java, Python and TypeScript generators.</summary>
+    public string? EntitySet(JsonElement t)
+    {
+        foreach (var level in Enumerable.Reverse(Chain(t)))
+        {
+            foreach (var s in Array(Container, "entitySets"))
+            {
+                if (Str(s, "entityType") == Str(level, "qualifiedName"))
+                {
+                    return Str(s, "name");
+                }
+            }
+        }
+        return null;
+    }
+
+    /// <summary>The key of <paramref name="t"/>'s type, declared on it or failing that on the nearest type it
+    /// derives from.</summary>
+    public List<string> Key(JsonElement t) =>
+        Enumerable.Reverse(Chain(t)).Select(l => Array(l, "key").Select(k => k.GetString()!).ToList()).FirstOrDefault(k => k.Count > 0) ?? [];
 
     public static string? Str(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 

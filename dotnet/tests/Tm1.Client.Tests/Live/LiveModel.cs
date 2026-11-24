@@ -23,13 +23,13 @@ internal static class LiveModel
 
     public static ElementCreate Element(string name, ElementType type) => ElementCreate.Builder().Name(name).Type(type).Build();
 
-    public static EdgePatch Edge(string parent, string component) => EdgePatch.Builder().ParentName(parent).ComponentName(component).Weight(1.0).Build();
+    public static EdgeCreate Edge(string parent, string component) => EdgeCreate.Builder().ParentName(parent).ComponentName(component).Weight(1.0).Build();
 
     /// <summary>A dimension of numeric elements.</summary>
     public static Task DimensionAsync(Tm1Client tm1, string name, params string[] elements) =>
         DimensionAsync(tm1, name, elements.Select(e => Element(e, ElementType.Numeric)).ToList(), []);
 
-    public static Task DimensionAsync(Tm1Client tm1, string name, IReadOnlyList<ElementCreate> elements, IReadOnlyList<EdgePatch> edges)
+    public static Task DimensionAsync(Tm1Client tm1, string name, IReadOnlyList<ElementCreate> elements, IReadOnlyList<EdgeCreate> edges)
     {
         var hierarchy = HierarchyCreate.Builder().Name(name).Elements(elements);
         if (edges.Count > 0)

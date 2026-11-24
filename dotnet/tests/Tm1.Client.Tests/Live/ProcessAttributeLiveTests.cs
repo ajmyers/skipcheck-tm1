@@ -19,8 +19,8 @@ public class ProcessAttributeLiveTests
 
     private static AttributeDefinitionCreate StringAttribute(string name) => AttributeDefinitionCreate.Builder().Name(name).Type(AttributeType.String).Build();
 
-    private static LocalizedAttributesPatch French(string attribute, string value) =>
-        LocalizedAttributesPatch.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Property(attribute, value).Build()).Build();
+    private static LocalizedAttributesCreate French(string attribute, string value) =>
+        LocalizedAttributesCreate.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Property(attribute, value).Build()).Build();
 
     private static async Task<string?> Value(Tm1Client tm1, AttributeOwner owner, string attribute)
     {
@@ -49,7 +49,7 @@ public class ProcessAttributeLiveTests
                     .Active(false)
                     .ExecutionMode(ChoreExecutionMode.SingleCommit)
                     .Frequency(TimeSpan.FromDays(1))
-                    .Tasks([ChoreTaskPatch.Builder().BindProcess(ODataPath.Of("Processes").Key(process)).Build()])
+                    .Tasks([ChoreTaskCreate.Builder().BindProcess(ODataPath.Of("Processes").Key(process)).Build()])
                     .Build()
             );
             try

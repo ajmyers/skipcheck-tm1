@@ -7,7 +7,6 @@ The Java client is the definition of how a call behaves. Its unit tests record e
 | `odata-encoding.json` | Paths and literals every client must encode identically | Hand |
 | `writes.json` | Writes made from what was read (`builder(read)` on the create and patch types) that every client must produce identically | Hand |
 | `builders.json` | What every generated create and patch builder offers: each `XPatch` and `XCreate`, its `@odata.type`, the JSON names its setters write, what its `build()` requires, and whether it takes undeclared properties (`property`). Every client's `BuilderManifestTest` drives its own builders to find these, and must match | `./gradlew :tm1-client:test -PrecordConformance` (the Java builders) |
-| `probe-coverage.json` | What the write probe doesn't verify, and why: each create or patch type's setter (`builders.json`) the probe file has no outcome for is listed as `excluded` (not probed, for a reason) or `pending` (not probed yet, until the #338 step named). The Java client's `ProbeCoverageTest` fails on a setter that's neither verified nor listed, such as a writable property a new TM1 version adds, and on a listing the probe now verifies, so `pending` only shrinks | Hand |
 | `calls/<JavaTestClass>.json` | The service calls one Java unit-test class records | `./gradlew :tm1-client:test -PrecordConformance` |
 | `live/<scenario>.json` | Steps every client runs against a real TM1 | Hand |
 
@@ -136,7 +135,9 @@ A scenario is steps every client runs against a real TM1, with names made fresh 
 ```
 
 - Arguments use the same encoding as the fixtures. `${name}` placeholders are replaced in every string.
+- A step can save fields of its result for the steps after it, `"save": {"note": "ID"}`: the result's `ID` (a field of its JSON, a value, not null) becomes the name `note`, for an ID TM1 makes up, such as an annotation's or a debug context's. A step whose result lacks one fails. Saved names join the run's names, so the traffic has them as placeholders too; give each a fallback in `names`, so a `finally` step that uses it still runs when its step didn't.
 - A step whose requests may go out in any order (a cellset stream's pages) names them with `"unordered"`, a regular expression matching `METHOD target` (after names become placeholders): each run of the step's consecutive requests that match it is compared as a set. The step's other requests, and every other step's, are compared in order.
+- A step that polls TM1 until it's done (finishing a debug run resumes it until it's complete) names the requests it repeats with `"repeats"`, a regular expression on `METHOD target`: each run of equal consecutive ones compares as one, since how many TM1 takes varies. A `finally` step can too.
 - Each step has one expectation:
   - `{"none": true}`: the call returns nothing.
   - `{"count": n}`: a list of `n` items.
@@ -145,11 +146,11 @@ A scenario is steps every client runs against a real TM1, with names made fresh 
   - `{"error": {"category": "api", "kind": "NOT_FOUND"}}`: the call fails this way.
 - The run stops at the first step that misses its expectation. The `finally` steps always run, ignoring failures.
 
-All 22 scenarios pass in every client against TM1 11.8.03500.6 (Planning Analytics 2.1.19), and the clients' traffic compares equal. Three leftovers are known: the annotations scenario can't delete the annotation it makes (a scenario can't carry an ID between steps), the views scenario leaves a cellset until its session ends, and the git scenario assumes Git isn't initialised on the server.
+All 23 scenarios pass in every client against TM1 11.8.03500.6 (Planning Analytics 2.1.19), and the clients' traffic compares equal. Two leftovers are known: the views scenario leaves a cellset until its session ends, and the git scenario assumes Git isn't initialised on the server.
 
 The runners are Java's `ConformanceScenarioTm1Test`, Python's `tests/live/test_conformance_scenario.py` (sync and async), .NET's `Live/ConformanceScenarioLiveTests.cs` and TypeScript's `test/live/ConformanceScenario.live.test.ts`. Each runs with its client's live harness (testcontainers, or `TM1_URL`) and records what it sends to `build/conformance-live/<language>/<scenario>.jsonl`. The session's own requests are left out of the record.
 
-[`scripts/compare-live-traffic.py`](../../scripts/compare-live-traffic.py) normalizes the logs: names go back to placeholders, entity tags are dropped, and a cellset's ID, which TM1 makes up for each run, becomes `<id>`. It then requires every language to have sent the same requests, with the same statuses, in the same order, but for a step's `unordered` runs. [`scripts/live-tests.sh`](../../scripts/live-tests.sh) runs it after the suites. Each runner also has offline tests: the cubes scenario against a fake TM1; the data scenarios (cellsets, views, sandboxes) against a fake that answers as TM1 would; and other scenarios (subsets, members, edges, member-sets, content, encryption, git and more) against a fake answering each step's one request with what the step expects. A byte stream's result is checked as `{"fields": {"$bytes": …}}`.
+[`scripts/compare-live-traffic.py`](../../scripts/compare-live-traffic.py) normalizes the logs: names go back to placeholders, entity tags are dropped, and a cellset's ID, which TM1 makes up for each run, becomes `<id>`. It then requires every language to have sent the same requests, with the same statuses, in the same order, but for a step's `unordered` runs. [`scripts/live-tests.sh`](../../scripts/live-tests.sh) runs it after the suites. Each runner also has offline tests: the cubes scenario against a fake TM1; the data scenarios (cellsets, views, sandboxes) against a fake that answers as TM1 would; and other scenarios (subsets, members, edges, member-sets, content, encryption, git and more) against a fake answering each step's one request with what the step expects (and what it saves, as `saved_<name>`, if it doesn't expect it). A byte stream's result is checked as `{"fields": {"$bytes": …}}`.
 
 ### Adding a scenario
 

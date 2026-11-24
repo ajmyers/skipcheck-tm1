@@ -108,13 +108,13 @@
   "writes" : {
     "Annotation" : {
       "type" : "Annotation",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ ],
       "required" : [ "ApplicationContext", "DimensionalContext@odata.bind" ],
       "post" : {
         "Created" : {
@@ -135,7 +135,8 @@
         "ApplicationContext/Value" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "248"
+          "code" : "248",
+          "message" : "No element specified for at least one of the dimensions in the cube!"
         },
         "ApplicationContext/Facet" : {
           "outcome" : "untested"
@@ -189,7 +190,8 @@
         "Text" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Annotation\". Expecting type \"String\" but was \"Null\"."
         }
       },
       "navigations" : {
@@ -234,7 +236,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "248"
+              "code" : "248",
+              "message" : "Can't specify more than one element for the same dimension. Dimensional context invalid!"
             },
             "nested" : {
               "outcome" : "ignored"
@@ -259,6 +262,7 @@
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ "Type" ],
       "post" : {
         "Type" : {
@@ -269,21 +273,24 @@
         "Type" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "patchNull" : {
         "Type" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "navigations" : { },
       "rename" : {
         "outcome" : "rejected",
         "status" : 400,
-        "code" : "278"
+        "code" : "278",
+        "message" : "PATCH not supported on this resource!"
       }
     },
     "Chore" : {
@@ -294,6 +301,7 @@
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "Active" : {
@@ -325,7 +333,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Chore PATCH."
         },
         "DSTSensitive" : {
           "outcome" : "applied"
@@ -342,39 +351,46 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Chore PATCH."
         }
       },
       "patchNull" : {
         "Active" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Chore\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Chore PATCH."
         },
         "DSTSensitive" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Chore\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "ExecutionMode" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Chore\". Expecting either type \"Numeric\" or \"String\" but was \"Null\"."
         },
         "Frequency" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Chore\". Expecting type \"String\" but was \"Null\"."
         },
         "StartTime" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Chore\". Expecting either type \"String\" or \"DateTimeOffset\" but was \"Null\"."
         }
       },
       "navigations" : {
@@ -401,7 +417,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"ChoreTask\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "applied"
@@ -411,7 +428,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"ChoreTask\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "applied"
@@ -422,18 +440,19 @@
       "rename" : {
         "outcome" : "rejected",
         "status" : 400,
-        "code" : "278"
+        "code" : "278",
+        "message" : "Mismatched Chore names."
       }
     },
     "ChoreReference" : {
       "type" : "ChoreReference",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ "Chore@odata.bind" ],
       "post" : {
         "Attributes" : {
@@ -447,29 +466,34 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "ID" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Name" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "navigations" : {
@@ -481,19 +505,22 @@
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           },
           "patch" : {
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -510,12 +537,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -532,12 +561,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         }
@@ -545,14 +576,14 @@
     },
     "ChoreTask" : {
       "type" : "ChoreTask",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
-      "required" : [ "Parameters", "Process@odata.bind" ],
+      "keys" : [ ],
+      "required" : [ "Process@odata.bind" ],
       "post" : {
         "Parameters" : {
           "outcome" : "applied"
@@ -560,7 +591,8 @@
         "Parameters/Name" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "248"
+          "code" : "248",
+          "message" : "Mismatch between task parameters and process parameters"
         },
         "Parameters/Value" : {
           "outcome" : "applied"
@@ -573,7 +605,8 @@
         "Parameters/Name" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "248"
+          "code" : "248",
+          "message" : "Mismatch between task parameters and process parameters"
         },
         "Parameters/Value" : {
           "outcome" : "applied"
@@ -581,14 +614,16 @@
         "Step" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "248"
+          "code" : "248",
+          "message" : "Mismatch between task parameter count and process parameter count"
         }
       },
       "patchNull" : {
         "Parameters" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Chore\". Expecting type \"Array\" but was \"Null\"."
         }
       },
       "navigations" : {
@@ -605,12 +640,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "248"
+              "code" : "248",
+              "message" : "Mismatch between task parameter count and process parameter count"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "248"
+              "code" : "248",
+              "message" : "Mismatch between task parameter count and process parameter count"
             }
           }
         },
@@ -619,12 +656,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "248"
+              "code" : "248",
+              "message" : "Mismatch between task parameter count and process parameter count"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           },
           "patch" : {
@@ -634,7 +673,8 @@
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           }
         }
@@ -645,11 +685,13 @@
       "postRead" : {
         "outcome" : "rejected",
         "status" : 400,
-        "code" : "278"
+        "code" : "278",
+        "message" : "Unexpected value type encountered in the payload while processing \"Cube\". Expecting type \"String\" but was \"Null\"."
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ "Dimensions@odata.bind" ],
       "post" : {
         "AllowPersistentHolds" : {
@@ -664,7 +706,8 @@
         "CellSecurityDefaultValue" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Invalid enum value encountered in payload."
         },
         "CellSecurityMostRestrictive" : {
           "outcome" : "applied"
@@ -698,7 +741,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Cube PATCH."
         },
         "CalculationThresholdForStorage" : {
           "outcome" : "applied"
@@ -706,7 +750,8 @@
         "CellSecurityDefaultValue" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Invalid enum value encountered in payload."
         },
         "CellSecurityMostRestrictive" : {
           "outcome" : "applied"
@@ -732,19 +777,22 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Cube PATCH."
         }
       },
       "patchNull" : {
         "AllowPersistentHolds" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Cube\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Cube PATCH."
         },
         "CalculationThresholdForStorage" : {
           "outcome" : "accepted"
@@ -755,7 +803,8 @@
         "CellSecurityMostRestrictive" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Cube\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "DrillthroughRules" : {
           "outcome" : "accepted"
@@ -836,7 +885,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"View\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "applied"
@@ -874,7 +924,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"View\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "applied"
@@ -896,13 +947,13 @@
     },
     "CubeReference" : {
       "type" : "CubeReference",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ "Cube@odata.bind" ],
       "post" : {
         "Attributes" : {
@@ -916,29 +967,34 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "ID" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Name" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "navigations" : {
@@ -955,12 +1011,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -972,19 +1030,22 @@
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           },
           "patch" : {
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -1001,12 +1062,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         }
@@ -1020,6 +1083,7 @@
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "AllLeavesHierarchyName" : {
@@ -1042,7 +1106,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Dimension PATCH."
         },
         "UniqueName" : {
           "outcome" : "ignored"
@@ -1050,7 +1115,8 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Dimension PATCH."
         }
       },
       "patchNull" : {
@@ -1060,7 +1126,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Dimension PATCH."
         },
         "UniqueName" : {
           "outcome" : "accepted"
@@ -1090,7 +1157,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"Hierarchy\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "applied"
@@ -1110,12 +1178,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Specifying HierarchyAttributes as part of a dimension definition is not supported."
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Specifying HierarchyAttributes as part of a dimension definition is not supported."
             }
           },
           "patch" : {
@@ -1152,13 +1222,13 @@
     },
     "DimensionReference" : {
       "type" : "DimensionReference",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ "Dimension@odata.bind" ],
       "post" : {
         "Attributes" : {
@@ -1172,29 +1242,34 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "ID" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Name" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "navigations" : {
@@ -1211,12 +1286,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -1228,19 +1305,22 @@
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           },
           "patch" : {
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -1257,12 +1337,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         }
@@ -1270,13 +1352,13 @@
     },
     "Document" : {
       "type" : "Document",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "Attributes" : {
@@ -1299,7 +1381,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Content" : {
           "outcome" : "untested"
@@ -1313,39 +1396,46 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "ID" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Name" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Content" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "LastUpdated" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Size" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "navigations" : {
@@ -1362,12 +1452,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -1384,12 +1476,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         }
@@ -1397,15 +1491,16 @@
     },
     "Edge" : {
       "type" : "Edge",
-      "generate" : false,
       "postRead" : {
         "outcome" : "rejected",
         "status" : 400,
-        "code" : "24"
+        "code" : "24",
+        "message" : "Element {p}A already exists as a component of parent element {p}Total"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "ComponentName", "ParentName" ],
       "required" : [ "ComponentName", "ParentName" ],
       "post" : {
         "Weight" : {
@@ -1434,12 +1529,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Component specified by ComponentName property and Component reference did not match. Edge creation failed."
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           },
           "patch" : {
@@ -1474,12 +1571,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Parent specified by ParentName property and Parent reference did not match. Edge creation failed."
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           },
           "patch" : {
@@ -1501,6 +1600,7 @@
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "Attributes" : {
@@ -1532,7 +1632,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Element PATCH."
         },
         "DisplayString" : {
           "outcome" : "ignored"
@@ -1552,19 +1653,22 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Element PATCH."
         },
         "Attributes/SkipcheckProbeAlias" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Element PATCH."
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Element PATCH."
         },
         "DisplayString" : {
           "outcome" : "accepted"
@@ -1606,12 +1710,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"Edge\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Parent specified by ParentName property and Parent reference did not match. Edge creation failed."
             }
           },
           "patch" : {
@@ -1684,13 +1790,13 @@
     },
     "Folder" : {
       "type" : "Folder",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "Attributes" : {
@@ -1707,29 +1813,34 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "ID" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "ID" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "navigations" : {
@@ -1746,12 +1857,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -1760,7 +1873,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"Folder\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "applied"
@@ -1770,12 +1884,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -1792,12 +1908,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -1806,7 +1924,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"Folder\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "applied"
@@ -1816,12 +1935,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         }
@@ -1829,7 +1950,8 @@
       "rename" : {
         "outcome" : "rejected",
         "status" : 400,
-        "code" : "278"
+        "code" : "278",
+        "message" : "PATCH not supported on this resource!"
       }
     },
     "Group" : {
@@ -1840,6 +1962,7 @@
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : { },
       "patch" : { },
@@ -1876,6 +1999,7 @@
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "Attributes" : {
@@ -1916,7 +2040,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Hierarchy PATCH"
         },
         "Cardinality" : {
           "outcome" : "ignored"
@@ -1948,14 +2073,16 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Hierarchy PATCH"
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Hierarchy PATCH"
         },
         "Cardinality" : {
           "outcome" : "accepted"
@@ -1963,22 +2090,26 @@
         "ComponentsSortSense" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Hierarchy\". Expecting either type \"String\" or \"Numeric\" but was \"Null\"."
         },
         "ComponentsSortType" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Hierarchy\". Expecting either type \"String\" or \"Numeric\" but was \"Null\"."
         },
         "ElementsSortSense" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Hierarchy\". Expecting either type \"String\" or \"Numeric\" but was \"Null\"."
         },
         "ElementsSortType" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Hierarchy\". Expecting either type \"String\" or \"Numeric\" but was \"Null\"."
         },
         "Structure" : {
           "outcome" : "accepted"
@@ -2053,24 +2184,28 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"Edge\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find element \"{p}Total\". Edge creation failed."
             }
           },
           "patch" : {
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"Edge\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find element \"{p}Total\". Edge creation failed."
             }
           }
         },
@@ -2079,12 +2214,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Specifying ElementAttributes as part of a hierarchy definition is not supported."
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Specifying ElementAttributes as part of a hierarchy definition is not supported."
             }
           },
           "patch" : {
@@ -2101,7 +2238,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"Element\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "applied"
@@ -2111,7 +2249,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"Element\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "applied"
@@ -2177,7 +2316,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"Subset\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "applied"
@@ -2233,7 +2373,8 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Unexpected value type encountered in the payload while processing \"Subset\". Expecting type \"Object\" but was \"EntityBind\"."
             },
             "nested" : {
               "outcome" : "applied"
@@ -2255,13 +2396,13 @@
     },
     "Link" : {
       "type" : "Link",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ "URL" ],
       "post" : {
         "Attributes" : {
@@ -2278,39 +2419,46 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "URL" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "ID" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Name" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "URL" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "navigations" : {
@@ -2327,12 +2475,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -2349,12 +2499,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         }
@@ -2362,15 +2514,16 @@
     },
     "LocalizedAttributes" : {
       "type" : "LocalizedAttributes",
-      "generate" : false,
       "postRead" : {
         "outcome" : "rejected",
         "status" : 400,
-        "code" : "278"
+        "code" : "278",
+        "message" : "\"fr\" is already set up for cube \"{p}Cube\"."
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "LocaleID" ],
       "required" : [ "Attributes", "LocaleID" ],
       "post" : {
         "Attributes" : {
@@ -2379,48 +2532,54 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "No cube attribute named \"Caption\". Failed to created LocalizedAttributes."
         },
         "Attributes/SkipcheckProbeCubeAttribute" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "\"es\" is already set up for cube \"{p}Cube\"."
         }
       },
       "patch" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Attributes/SkipcheckProbeCubeAttribute" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "LocaleID" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "navigations" : { }
     },
     "Logger" : {
       "type" : "Logger",
-      "generate" : false,
       "patch" : {
         "Level" : {
           "outcome" : "applied"
@@ -2435,6 +2594,7 @@
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ "MDX" ],
       "post" : {
         "Attributes" : {
@@ -2451,7 +2611,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during View PATCH."
         },
         "MDX" : {
           "outcome" : "applied"
@@ -2459,19 +2620,22 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during View PATCH."
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during View PATCH."
         },
         "MDX" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"View\". Expecting type \"String\" but was \"Null\"."
         }
       },
       "navigations" : {
@@ -2521,11 +2685,13 @@
       "postRead" : {
         "outcome" : "rejected",
         "status" : 400,
-        "code" : "278"
+        "code" : "278",
+        "message" : "Empty ViewAxisSelection definition in payload. Failed to create ViewAxisSelected."
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ "Columns", "Rows" ],
       "post" : {
         "Attributes" : {
@@ -2573,7 +2739,8 @@
         "Titles/Selected" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Could not find entity reference in payload."
         },
         "Titles/Selected@odata.bind" : {
           "outcome" : "applied"
@@ -2583,7 +2750,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during View PATCH."
         },
         "Columns" : {
           "outcome" : "applied"
@@ -2606,7 +2774,8 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during View PATCH."
         },
         "Columns/Subset" : {
           "outcome" : "applied"
@@ -2629,7 +2798,8 @@
         "Titles/Selected" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Could not find entity reference in payload."
         },
         "Titles/Selected@odata.bind" : {
           "outcome" : "applied"
@@ -2639,22 +2809,26 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during View PATCH."
         },
         "Columns" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"View\". Expecting type \"Array\" but was \"Null\"."
         },
         "FormatString" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"View\". Expecting type \"String\" but was \"Null\"."
         },
         "Rows" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"View\". Expecting type \"Array\" but was \"Null\"."
         },
         "SuppressEmptyColumns" : {
           "outcome" : "accepted"
@@ -2665,7 +2839,8 @@
         "Titles" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"View\". Expecting type \"Array\" but was \"Null\"."
         }
       },
       "navigations" : {
@@ -2718,6 +2893,7 @@
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "Attributes" : {
@@ -2818,7 +2994,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Process PATCH."
         },
         "Code" : {
           "outcome" : "transformed"
@@ -2856,7 +3033,8 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Process PATCH."
         },
         "DataSource/Type" : {
           "outcome" : "applied"
@@ -2917,17 +3095,20 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Process PATCH."
         },
         "Code" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "DataProcedure" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "DataSource" : {
           "outcome" : "accepted"
@@ -2935,42 +3116,50 @@
         "EpilogProcedure" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "HasSecurityAccess" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "MetadataProcedure" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "Parameters" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"Array\" but was \"Null\"."
         },
         "PrologProcedure" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "UIData" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "Variables" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"Array\" but was \"Null\"."
         },
         "VariablesUIData" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"Array\" but was \"Null\"."
         }
       },
       "navigations" : {
@@ -3014,7 +3203,8 @@
       "rename" : {
         "outcome" : "rejected",
         "status" : 400,
-        "code" : "278"
+        "code" : "278",
+        "message" : "A Process' Name property cannot be modified."
       }
     },
     "Process/view source" : {
@@ -3025,6 +3215,7 @@
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "Attributes" : {
@@ -3110,7 +3301,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Process PATCH."
         },
         "Code" : {
           "outcome" : "transformed"
@@ -3148,7 +3340,8 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Process PATCH."
         },
         "DataSource/Type" : {
           "outcome" : "applied"
@@ -3194,17 +3387,20 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Process PATCH."
         },
         "Code" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "DataProcedure" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "DataSource" : {
           "outcome" : "accepted"
@@ -3212,42 +3408,50 @@
         "EpilogProcedure" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "HasSecurityAccess" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "MetadataProcedure" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "Parameters" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"Array\" but was \"Null\"."
         },
         "PrologProcedure" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "UIData" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"String\" but was \"Null\"."
         },
         "Variables" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"Array\" but was \"Null\"."
         },
         "VariablesUIData" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Process\". Expecting type \"Array\" but was \"Null\"."
         }
       },
       "navigations" : {
@@ -3291,18 +3495,19 @@
       "rename" : {
         "outcome" : "rejected",
         "status" : 400,
-        "code" : "278"
+        "code" : "278",
+        "message" : "A Process' Name property cannot be modified."
       }
     },
     "ProcessDebugContextDataBreakpoint" : {
       "type" : "ProcessDebugContextDataBreakpoint",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "ID" ],
       "required" : [ ],
       "post" : {
         "Enabled" : {
@@ -3345,40 +3550,45 @@
         "Enabled" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextBreakpoint\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "Expression" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextBreakpoint\". Expecting type \"String\" but was \"Null\"."
         },
         "HitCount" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextBreakpoint\". Expecting type \"Numeric\" but was \"Null\"."
         },
         "HitMode" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in payload for ProcessDebugContextBreakpoint HitMode property."
         },
         "VariableName" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextBreakpoint\". Expecting type \"String\" but was \"Null\"."
         }
       },
       "navigations" : { }
     },
     "ProcessDebugContextLineBreakpoint" : {
       "type" : "ProcessDebugContextLineBreakpoint",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "ID" ],
       "required" : [ ],
       "post" : {
         "Enabled" : {
@@ -3433,50 +3643,57 @@
         "Enabled" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextLineBreakpoint\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "Expression" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextBreakpoint\". Expecting type \"String\" but was \"Null\"."
         },
         "HitCount" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextLineBreakpoint\". Expecting type \"Numeric\" but was \"Null\"."
         },
         "HitMode" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in payload for ProcessDebugContextLineBreakpoint Type property."
         },
         "LineNumber" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextLineBreakpoint\". Expecting type \"Numeric\" but was \"Null\"."
         },
         "Procedure" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in payload for ProcessDebugContextLineBreakpoint Type property."
         },
         "ProcessName" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextLineBreakpoint\". Expecting type \"String\" but was \"Null\"."
         }
       },
       "navigations" : { }
     },
     "ProcessDebugContextLockBreakpoint" : {
       "type" : "ProcessDebugContextLockBreakpoint",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "ID" ],
       "required" : [ ],
       "post" : {
         "Enabled" : {
@@ -3531,50 +3748,57 @@
         "Enabled" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextBreakpoint\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "Expression" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextBreakpoint\". Expecting type \"String\" but was \"Null\"."
         },
         "HitCount" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextBreakpoint\". Expecting type \"Numeric\" but was \"Null\"."
         },
         "HitMode" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in payload for ProcessDebugContextBreakpoint HitMode property."
         },
         "LockMode" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextBreakpoint\". Expecting either type \"Numeric\" or \"String\" but was \"Null\"."
         },
         "ObjectName" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextBreakpoint\". Expecting type \"String\" but was \"Null\"."
         },
         "ObjectType" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"ProcessDebugContextBreakpoint\". Expecting type \"String\" but was \"Null\"."
         }
       },
       "navigations" : { }
     },
     "ProcessReference" : {
       "type" : "ProcessReference",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ "Process@odata.bind" ],
       "post" : {
         "Attributes" : {
@@ -3588,29 +3812,34 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "ID" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Name" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "navigations" : {
@@ -3627,12 +3856,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -3649,12 +3880,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -3666,19 +3899,22 @@
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           },
           "patch" : {
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         }
@@ -3692,6 +3928,7 @@
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "IncludeInSandboxDimension" : {
@@ -3725,7 +3962,8 @@
         "IncludeInSandboxDimension" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Sandbox\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "IsActive" : {
           "outcome" : "accepted"
@@ -3744,7 +3982,6 @@
     },
     "ServerSettings" : {
       "type" : "ServerSettings",
-      "generate" : false,
       "patch" : {
         "Access/Authentication/IntegratedSecurityMode" : {
           "outcome" : "transformed"
@@ -3948,12 +4185,14 @@
         "Administration/Clients/RetainNonCAMGroupMembership" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Invalid value for ClientSettings property \"RetainNonCAMGroupMembership\" encountered in payload."
         },
         "Administration/DataBaseDirectory" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Invalid value for AdministrationSettings property \"DataBaseDirectory\" encountered in payload."
         },
         "Administration/DebugLog/LoggingDirectory" : {
           "outcome" : "applied"
@@ -4253,6 +4492,7 @@
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "Alias" : {
@@ -4281,7 +4521,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Subset PATCH."
         },
         "ExpandAbove" : {
           "outcome" : "applied"
@@ -4295,24 +4536,28 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Subset PATCH."
         }
       },
       "patchNull" : {
         "Alias" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Subset\". Expecting type \"String\" but was \"Null\"."
         },
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Subset PATCH."
         },
         "ExpandAbove" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Subset\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "Expression" : {
           "outcome" : "accepted"
@@ -4330,7 +4575,8 @@
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           },
           "patch" : {
@@ -4340,7 +4586,8 @@
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           }
         },
@@ -4390,11 +4637,13 @@
       "postRead" : {
         "outcome" : "rejected",
         "status" : 400,
-        "code" : "278"
+        "code" : "278",
+        "message" : "Unexpected value type encountered in the payload while processing \"Subset\". Expecting type \"String\" but was \"Null\"."
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "Alias" : {
@@ -4423,7 +4672,8 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Subset PATCH."
         },
         "ExpandAbove" : {
           "outcome" : "applied"
@@ -4437,24 +4687,28 @@
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Subset PATCH."
         }
       },
       "patchNull" : {
         "Alias" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Subset\". Expecting type \"String\" but was \"Null\"."
         },
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Cannot modify Attributes property during Subset PATCH."
         },
         "ExpandAbove" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"Subset\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "Expression" : {
           "outcome" : "accepted"
@@ -4472,7 +4726,8 @@
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           },
           "patch" : {
@@ -4482,7 +4737,8 @@
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           }
         },
@@ -4529,13 +4785,13 @@
     },
     "SubsetReference" : {
       "type" : "SubsetReference",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ "Subset@odata.bind" ],
       "post" : {
         "Attributes" : {
@@ -4549,29 +4805,34 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "ID" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Name" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "navigations" : {
@@ -4588,12 +4849,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -4610,12 +4873,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -4627,19 +4892,22 @@
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           },
           "patch" : {
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         }
@@ -4650,11 +4918,13 @@
       "postRead" : {
         "outcome" : "rejected",
         "status" : 400,
-        "code" : "140"
+        "code" : "140",
+        "message" : "ObjectAttributeSetFailed"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ ],
       "post" : {
         "Enabled" : {
@@ -4696,12 +4966,14 @@
         "Enabled" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"User\". Expecting type \"Boolean\" but was \"Null\"."
         },
         "FriendlyName" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"User\". Expecting type \"String\" but was \"Null\"."
         },
         "IsActive" : {
           "outcome" : "accepted"
@@ -4709,7 +4981,8 @@
         "Password" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "Unexpected value type encountered in the payload while processing \"User\". Expecting type \"String\" but was \"Null\"."
         },
         "Type" : {
           "outcome" : "accepted"
@@ -4759,13 +5032,13 @@
     },
     "ViewReference" : {
       "type" : "ViewReference",
-      "generate" : false,
       "postRead" : {
         "outcome" : "accepted"
       },
       "minimal" : {
         "outcome" : "accepted"
       },
+      "keys" : [ "Name" ],
       "required" : [ "View@odata.bind" ],
       "post" : {
         "Attributes" : {
@@ -4779,29 +5052,34 @@
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Attributes/Caption" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "ID" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         },
         "Name" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "patchNull" : {
         "Attributes" : {
           "outcome" : "rejected",
           "status" : 400,
-          "code" : "278"
+          "code" : "278",
+          "message" : "PATCH not supported on this resource!"
         }
       },
       "navigations" : {
@@ -4818,12 +5096,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -4840,12 +5120,14 @@
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         },
@@ -4857,19 +5139,22 @@
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "Could not find entity reference in payload."
             }
           },
           "patch" : {
             "bind" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             },
             "nested" : {
               "outcome" : "rejected",
               "status" : 400,
-              "code" : "278"
+              "code" : "278",
+              "message" : "PATCH not supported on this resource!"
             }
           }
         }
@@ -4901,7 +5186,8 @@
     "Subset/Elements" : {
       "outcome" : "rejected",
       "status" : 400,
-      "code" : "278"
+      "code" : "278",
+      "message" : "Could not find entity reference in payload."
     },
     "Subset/Elements@odata.bind" : {
       "outcome" : "appends"

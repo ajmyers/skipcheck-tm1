@@ -21,8 +21,8 @@ import io.skipcheck.tm1.client.model.AttributeType;
 import io.skipcheck.tm1.client.model.AttributesPatch;
 import io.skipcheck.tm1.client.model.ChoreCreate;
 import io.skipcheck.tm1.client.model.ChoreExecutionMode;
-import io.skipcheck.tm1.client.model.ChoreTaskPatch;
-import io.skipcheck.tm1.client.model.LocalizedAttributesPatch;
+import io.skipcheck.tm1.client.model.ChoreTaskCreate;
+import io.skipcheck.tm1.client.model.LocalizedAttributesCreate;
 import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -59,7 +59,7 @@ class ProcessAttributeTm1Test {
 				.active(false)
 				.executionMode(ChoreExecutionMode.SINGLE_COMMIT)
 				.frequency(Duration.ofDays(1))
-				.tasks(List.of(ChoreTaskPatch.builder().bindProcess(ODataPath.of("Processes").key(process)).build()))
+				.tasks(List.of(ChoreTaskCreate.builder().bindProcess(ODataPath.of("Processes").key(process)).build()))
 				.build())
 			.block(WAIT);
 	}
@@ -88,7 +88,7 @@ class ProcessAttributeTm1Test {
 				.block(WAIT)).contains(label);
 			tm1.localizedAttributes()
 				.create(owner,
-						LocalizedAttributesPatch.builder()
+						LocalizedAttributesCreate.builder()
 							.localeID("fr")
 							.attributes(AttributesPatch.builder().property(label, "Charger").build())
 							.build())

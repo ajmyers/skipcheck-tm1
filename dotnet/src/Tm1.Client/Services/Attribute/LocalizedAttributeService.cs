@@ -63,7 +63,7 @@ public sealed class LocalizedAttributeService : Tm1Service
     [Tm1Endpoint("Navigation View/LocalizedAttributes")]
     [Tm1Endpoint("Navigation Process/LocalizedAttributes")]
     [Tm1Endpoint("Navigation Chore/LocalizedAttributes")]
-    public Task<LocalizedAttributes> CreateAsync(AttributeOwner owner, LocalizedAttributesPatch translations, CancellationToken cancellationToken = default) =>
+    public Task<LocalizedAttributes> CreateAsync(AttributeOwner owner, LocalizedAttributesCreate translations, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<LocalizedAttributes>(Localized(owner), Require(translations, nameof(translations))), cancellationToken);
 
     private static ODataPath Localized(AttributeOwner owner) => Require(owner, nameof(owner)).Path.Nav("LocalizedAttributes");

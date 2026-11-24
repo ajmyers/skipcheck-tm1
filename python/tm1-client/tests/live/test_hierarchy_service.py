@@ -82,7 +82,7 @@ def test_refuses_to_replace_elements_through_a_plain_update(tm1: Tm1Client, regi
         tm1.hierarchies.update(d, d, HierarchyPatch.builder().elements([]).build())
     north = ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Elements").key("North")
     with pytest.raises(ValueError):
-        tm1.hierarchies.update(d, d, HierarchyPatch.builder().bind_elements(north).build())
+        tm1.hierarchies.update(d, d, {"Elements@odata.bind": [str(north)]})
     with pytest.raises(ValueError):
         tm1.hierarchies.update(d, d, HierarchyPatch.builder().edges([edge("Total", "East")]).build(), 'W/"x"')
 

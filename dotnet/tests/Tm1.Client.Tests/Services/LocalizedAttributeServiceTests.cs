@@ -53,7 +53,11 @@ public class LocalizedAttributeServiceTests
         Assert.Equal(("GET", localized + "('de-CH')"), (_tm1.Last.Method, _tm1.Last.Target));
         await tm1.LocalizedAttributes.CreateAsync(
             owner,
-            LocalizedAttributesPatch.Builder().LocaleID("fr").Attributes(AttributesPatch.Builder().Caption("Ouest").Property("Manager", "Jean").Build()).Build()
+            LocalizedAttributesCreate
+                .Builder()
+                .LocaleID("fr")
+                .Attributes(AttributesPatch.Builder().Caption("Ouest").Property("Manager", "Jean").Build())
+                .Build()
         );
         Assert.Equal(
             ("POST", localized, """{"LocaleID":"fr","Attributes":{"Caption":"Ouest","Manager":"Jean"}}"""),

@@ -8,7 +8,7 @@ import {
   AttributesPatch,
   AttributeType,
   CubeCreate,
-  LocalizedAttributesPatch,
+  LocalizedAttributesCreate,
   MDXViewCreate,
   NativeViewCreate,
   SubsetCreate,
@@ -68,7 +68,7 @@ describe("Cube and view attributes on TM1" + liveReason, () => {
       expect((await tm1.attributes.list(set).toArray()).map((a) => a.Name)).toContain(label);
       await tm1.localizedAttributes.create(
         owner,
-        LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Ventes").build()).build(),
+        LocalizedAttributesCreate.builder().localeID("fr").attributes(AttributesPatch.builder().property(label, "Ventes").build()).build(),
       );
       const fr = await tm1.localizedAttributes.get(owner, "fr");
       expect(fr.Attributes?.[label]).toBe("Ventes");

@@ -26,7 +26,7 @@ import io.skipcheck.tm1.client.model.CellsetUpdatePatch;
 import io.skipcheck.tm1.client.model.CubeCreate;
 import io.skipcheck.tm1.client.model.CubeUpdatePatch;
 import io.skipcheck.tm1.client.model.DimensionCreate;
-import io.skipcheck.tm1.client.model.EdgePatch;
+import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
@@ -241,8 +241,8 @@ class CellServiceTm1Test {
 		return ElementCreate.builder().name(name).type(type).build();
 	}
 
-	private static EdgePatch edge(String parent, String component) {
-		return EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
+	private static EdgeCreate edge(String parent, String component) {
+		return EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
 	}
 
 }

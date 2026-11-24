@@ -27,16 +27,16 @@ namespace Skipcheck.Tm1.Client.Services;
 /// <code>
 /// // An application: a folder with a link and a reference to a cube
 /// var planning = ContentPath.Applications().Child("Planning");
-/// await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderPatch.Builder().Name("Planning").Build());
-/// await tm1.Contents.CreateAsync(planning, ContentScope.Public, LinkPatch.Builder().Name("Guide").Url("https://example.com/planning-guide").Build());
-/// await tm1.Contents.CreateAsync(planning, ContentScope.Public, CubeReferencePatch.Builder().Name("Sales").BindCube(ODataPath.Of("Cubes").Key("Sales")).Build());
+/// await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderCreate.Builder().Name("Planning").Build());
+/// await tm1.Contents.CreateAsync(planning, ContentScope.Public, LinkCreate.Builder().Name("Guide").Url("https://example.com/planning-guide").Build());
+/// await tm1.Contents.CreateAsync(planning, ContentScope.Public, CubeReferenceCreate.Builder().Name("Sales").BindCube(ODataPath.Of("Cubes").Key("Sales")).Build());
 /// </code>
 /// <para>Upload a document from a file:</para>
 /// <code>
 /// // A document made in an application is a reference to one TM1 keeps in Blobs; the
 /// // reference, as create returns it, is where its content goes
 /// var planning = ContentPath.Applications().Child("Planning");
-/// var reference = await tm1.Contents.CreateAsync(planning, ContentScope.Public, DocumentPatch.Builder().Name("notes.txt").Build());
+/// var reference = await tm1.Contents.CreateAsync(planning, ContentScope.Public, DocumentCreate.Builder().Name("notes.txt").Build());
 /// await tm1.Contents.UploadAsync(planning.Child(reference), await File.ReadAllBytesAsync(file));
 /// </code>
 /// <para>Download a document's content to a file:</para>
@@ -90,14 +90,14 @@ public sealed class ContentService : Tm1Service
         CancellationToken cancellationToken = default
     ) => Session.StreamAsync(Tm1Request.List<Entry>(Require(folder, nameof(folder)).Path().Nav(scope.Navigation()), query), cancellationToken);
 
-    /// <summary>Makes an entry in a folder: a <c>FolderPatch</c>, <c>DocumentPatch</c>, <c>LinkPatch</c>
-    /// or a reference, such as a <c>CubeReferencePatch</c> with
+    /// <summary>Makes an entry in a folder: a <c>FolderCreate</c>, <c>DocumentCreate</c>, <c>LinkCreate</c>
+    /// or a reference, such as a <c>CubeReferenceCreate</c> with
     /// <c>BindCube(ODataPath.Of("Cubes").Key("Sales"))</c>. A document made outside <c>Blobs</c> comes
     /// back as a <c>DocumentReference</c>, with an empty document behind it; <see cref="UploadAsync"/>
     /// gives it content. Returns the entry as made, with the <c>ID</c> to find it by.</summary>
     [Tm1Endpoint("Navigation Folder/Contents")]
     [Tm1Endpoint("Navigation Folder/PrivateContents")]
-    public Task<Entry> CreateAsync(ContentPath folder, ContentScope scope, EntryPatch entry, CancellationToken cancellationToken = default) =>
+    public Task<Entry> CreateAsync(ContentPath folder, ContentScope scope, EntryCreate entry, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(
             Tm1Request.Post<Entry>(Require(folder, nameof(folder)).Path().Nav(scope.Navigation()), Require(entry, nameof(entry))),
             cancellationToken

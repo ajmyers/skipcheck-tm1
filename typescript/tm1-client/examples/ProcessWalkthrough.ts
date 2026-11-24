@@ -1,15 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  Cellset,
-  CellsetCell,
-  ODataQuery,
-  ProcessExecuteResult,
-  ProcessParameterPatch,
-  ProcessCreate,
-  ProcessVariableType,
-  type Tm1Client,
-} from "@skipcheck/tm1-client";
+import { Cellset, CellsetCell, ODataQuery, ProcessCreate, ProcessExecuteResult, ProcessParameterPatch, type Tm1Client } from "@skipcheck/tm1-client";
 import { connect } from "./ConnectWalkthrough.js";
 
 // The walkthrough "Run a process and read its result" (api-site/content/walkthroughs/tm1-client), on
@@ -34,7 +25,7 @@ export async function create(tm1: Tm1Client): Promise<void> {
   // A process that sets a month's budget to its actual units plus 10%
   const process = ProcessCreate.builder()
     .name("Budget From Actual")
-    .parameters([ProcessParameterPatch.builder().name("pMonth").value("Jan").type(ProcessVariableType.String).build()])
+    .parameters([ProcessParameterPatch.builder().name("pMonth").value("Jan").build()])
     .prologProcedure(
       "nActual = CellGetN('SalesCube', 'Actual', 'France', 'S Series 1.8 L Sedan', 'Units', pMonth);\n" +
         "CellPutN(Round(nActual * 1.1), 'SalesCube', 'Budget', 'France', 'S Series 1.8 L Sedan', 'Units', pMonth);\n",
