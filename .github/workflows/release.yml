@@ -29,6 +29,7 @@
 #   MAVEN_CENTRAL_USERNAME / MAVEN_CENTRAL_PASSWORD  - Central Portal user token
 #   SIGNING_KEY / SIGNING_KEY_PASSWORD               - ASCII-armored GPG private key
 #   CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID     - the API docs (api-docs.yml)
+#   CLOUDFLARE_PROJECTS_TOKEN                        - the project store, which api-docs.yml publishes to
 # PyPI, NuGet and npm need none: each trusts this workflow by name (PyPI: each project's Publishing
 # settings; NuGet: the account's Trusted Publishing policy for Skipcheck.*; npm: each package's
 # Trusted Publisher setting), so renaming this file, or moving a publish step out of it, breaks

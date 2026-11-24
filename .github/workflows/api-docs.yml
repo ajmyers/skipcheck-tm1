@@ -8,9 +8,16 @@
 #                 directly, or docs would ship for a release that didn't.
 #   Manual run:   deploys the chosen branch (e.g. master, before the first release).
 #
+# It also checks each project's entry for the project store, which skipcheck.io and ajmyers.net draw
+# the projects' cards from (scripts/projects.mjs), and publishes them when it deploys. The store's
+# rules and publish script are skipcheck.io's, downloaded from it (see its README, "The project
+# store"). The store keeps a release until the next one: a deploy of master before then doesn't
+# replace it.
+#
 # Repo secrets needed to deploy:
-#   CLOUDFLARE_API_TOKEN   - Workers Scripts: Edit (account) and Workers Routes: Edit (skipcheck.io, skipcheck.dev)
-#   CLOUDFLARE_ACCOUNT_ID  - the Cloudflare account
+#   CLOUDFLARE_API_TOKEN       - Workers Scripts: Edit (account) and Workers Routes: Edit (skipcheck.io, skipcheck.dev)
+#   CLOUDFLARE_ACCOUNT_ID      - the Cloudflare account
+#   CLOUDFLARE_PROJECTS_TOKEN  - Workers KV read and write: the project store
 name: API Docs
 
 on:
@@ -76,6 +83,15 @@ jobs:
           fi
           npm run assemble
 
+      - name: Check the project entries
+        working-directory: api-site
+        run: |
+          mkdir -p "$RUNNER_TEMP/project-store"
+          for tool in publish-project.mjs project-entry.mjs; do
+            curl -fsSL --retry 3 -o "$RUNNER_TEMP/project-store/$tool" "https://skipcheck.io/tools/$tool"
+          done
+          node "$RUNNER_TEMP/project-store/publish-project.mjs" --check .generated/project-entries.json
+
       - name: Bundle the Worker (no deploy)
         if: ${{ !inputs.deploy }}
         working-directory: api-site
@@ -87,4 +103,12 @@ jobs:
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Publish the project entries
+        if: ${{ inputs.deploy }}
+        working-directory: api-site
+        run: node "$RUNNER_TEMP/project-store/publish-project.mjs" .generated/project-entries.json
+        env:
+          CLOUDFLARE_PROJECTS_TOKEN: ${{ secrets.CLOUDFLARE_PROJECTS_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

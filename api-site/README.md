@@ -12,6 +12,7 @@ Builds and serves each project's pages on skipcheck.io (and on skipcheck.dev, wh
 | `/pa-docker/` | Planning Analytics in Docker: a landing page, and a page per image and for `pa-setup` (`/pa-docker/tm1-server/`...), with a search box over their titles and headings. The setup page, `/pa-docker/setup/`, is the site's: the Worker passes it through. | `scripts/docker.mjs`, from `content/pa-docker.md` and the READMEs under `docker/` |
 | `/llms.txt`, `/llms-full.txt` | The docs for coding agents, as the [llms.txt convention](https://llmstxt.org) has them: a list of the pages, each with a line saying what's there, and the full text of the landing pages, the walkthroughs and every type's overview in Markdown. | `scripts/llms.mjs`, from the same sources as the pages |
 | `/<project>/release.json` | The version the pages describe, and whether it's a release: the site's home page reads it for each project's badge. | `scripts/pages.mjs` |
+| (the project store) | Each project's entry, which skipcheck.io and ajmyers.net draw the projects' cards from: name, summary, links, release, and a visual of its page's first example. Not served here: `api-docs.yml` publishes them when it deploys (see ajmyers/skipcheck.io's README, "The project store"). | `scripts/projects.mjs`, into `.generated/project-entries.json` |
 | `/<project>/api/java/` | The Javadoc, themed, linked from each Java page. | `./gradlew apiSiteJavadoc`, collected by `scripts/assemble.mjs` |
 
 The projects are listed in `scripts/site.mjs`. The home page, the setup page and everything else on
@@ -88,6 +89,7 @@ has one, and isn't required.
 | `scripts/doc-code.mjs` | The gate that no doc comment the reference reads has code typed into it: a Javadoc `<pre>` or inline `{@snippet}`, a .NET `<code>`, a TypeScript fence or `@example`, a Python `::` block or doctest. |
 | `scripts/search.mjs` | The search index of each docs language, `search.json` beside its pages: every type and member, the walkthroughs and the TM1 types the pages link to, a short summary, and where it is. `reference.mjs` writes it from the data it renders the pages with. And `/pa-docker/search.json`, the Docker pages' titles and headings, which `docker.mjs` writes. |
 | `scripts/pages.mjs` | The landing pages and the walkthroughs. |
+| `scripts/projects.mjs` | Each project's entry for the project store, from its landing page's front matter (`card`, `description`) and first example. |
 | `scripts/sitemap.mjs` | `/docs/sitemap.xml`: every generated page but the Javadoc, for search engines. skipcheck.io's `robots.txt` names it. |
 | `scripts/walkthroughs.mjs` | Each project's walkthroughs, from `content/walkthroughs/`. |
 | `scripts/output.mjs` | What the examples printed (`example-output/`), and the checks on it. |
