@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Document, Entry, Folder, LocalizedAttributes, Tm1Operations, type EntryPatch } from "../../generated/index.js";
+import { Document, Entry, Folder, LocalizedAttributes, Tm1Operations, type EntryCreate } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import type { Tm1Operation } from "../../operation.js";
 import { Tm1Request } from "../../request.js";
@@ -32,13 +32,13 @@ export type ContentSource = Uint8Array | ArrayBuffer | Blob | ReadableStream<Uin
  * Build an application: a folder, a link and a cube reference:
  * ```ts
  * const app = ContentPath.applications().child("Planning");
- * await tm1.contents.create(ContentPath.applications(), ContentScope.Public, FolderPatch.builder().name("Planning").build());
- * await tm1.contents.create(app, ContentScope.Public, LinkPatch.builder().name("ibm").url("https://www.ibm.com").build());
- * await tm1.contents.create(app, ContentScope.Public, CubeReferencePatch.builder().name("Sales").bindCube(ODataPath.of("Cubes").key("Sales")).build());
+ * await tm1.contents.create(ContentPath.applications(), ContentScope.Public, FolderCreate.builder().name("Planning").build());
+ * await tm1.contents.create(app, ContentScope.Public, LinkCreate.builder().name("ibm").url("https://www.ibm.com").build());
+ * await tm1.contents.create(app, ContentScope.Public, CubeReferenceCreate.builder().name("Sales").bindCube(ODataPath.of("Cubes").key("Sales")).build());
  * ```
  * Upload a document, and download it:
  * ```ts
- * const made = await tm1.contents.create(app, ContentScope.Public, DocumentPatch.builder().name("notes.txt").build());
+ * const made = await tm1.contents.create(app, ContentScope.Public, DocumentCreate.builder().name("notes.txt").build());
  * await tm1.contents.upload(app.child(made), new TextEncoder().encode("hello there"));
  * for await (const chunk of tm1.contents.content(app.child(made))) process.stdout.write(chunk);
  * ```
@@ -88,11 +88,11 @@ export class ContentService extends Tm1Service {
     return this.session.stream(Tm1Request.list(pathOf(folder, "folder").nav(ContentScope.navigation(scope)), query, Entry), options);
   }
 
-  /** Makes an entry in a folder, public or private: a `FolderPatch`, `DocumentPatch`, `LinkPatch`
-   * or a reference, such as a `CubeReferencePatch` with `bindCube(ODataPath.of("Cubes").key("Sales"))`.
+  /** Makes an entry in a folder, public or private: a `FolderCreate`, `DocumentCreate`, `LinkCreate`
+   * or a reference, such as a `CubeReferenceCreate` with `bindCube(ODataPath.of("Cubes").key("Sales"))`.
    * A document made outside `Blobs` comes back as a `DocumentReference`, with an empty document
    * behind it; {@link upload} gives it content. Returns the entry as made, with the `ID` to find it by. */
-  create(folder: ContentPath, scope: ContentScope, entry: EntryPatch, options?: Tm1CallOptions): Promise<Entry> {
+  create(folder: ContentPath, scope: ContentScope, entry: EntryCreate, options?: Tm1CallOptions): Promise<Entry> {
     return this.session.execute(Tm1Request.post(pathOf(folder, "folder").nav(ContentScope.navigation(scope)), required(entry, "entry"), Entry), options);
   }
 

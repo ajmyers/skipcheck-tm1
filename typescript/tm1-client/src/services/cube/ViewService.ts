@@ -24,7 +24,7 @@ const VIEWS = ["Navigation Cube/Views", "Navigation Cube/PrivateViews"] as const
  * Create a native view: each axis binds a subset, and every dimension of the cube has to be on one:
  * ```ts
  * const subset = (d: string) => ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Subsets").key("All");
- * await tm1.views.create("Sales", ViewScope.Public, NativeViewPatch.builder()
+ * await tm1.views.create("Sales", ViewScope.Public, NativeViewCreate.builder()
  *     .name("Default")
  *     .columns([ViewAxisSelectionPatch.builder().bindSubset(subset("Month")).build()])
  *     .rows([ViewAxisSelectionPatch.builder().bindSubset(subset("Region")).build()])

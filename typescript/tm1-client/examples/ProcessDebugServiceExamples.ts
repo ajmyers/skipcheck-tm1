@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { ProcessDebugContextLineBreakpointPatch, ProcessProcedure, type ProcessDebugContext, type Tm1Client } from "@skipcheck/tm1-client";
+import { ProcessDebugContextLineBreakpointCreate, ProcessProcedure, type ProcessDebugContext, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for ProcessDebugService, quoted in its documentation.
 
@@ -12,7 +12,7 @@ export function breakpoint(tm1: Tm1Client): Promise<string[]> {
   return debug
     .debugging("Load Sales", { pVersion: "Forecast" }, async function* (context) {
       const id = context.ID!;
-      const line3 = ProcessDebugContextLineBreakpointPatch.builder()
+      const line3 = ProcessDebugContextLineBreakpointCreate.builder()
         .id(1) // TM1 needs an ID chosen by the caller
         .processName("Load Sales")
         .procedure(ProcessProcedure.Prolog)

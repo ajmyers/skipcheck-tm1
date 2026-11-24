@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  type Chore,
   ChoreCreate,
   ChoreExecutionMode,
   ChorePatch,
+  ChoreTaskCreate,
   ChoreTaskParameterPatch,
-  ChoreTaskPatch,
   ODataPath,
-  type Tm1Client,
   Tm1Duration,
+  type Chore,
+  type Tm1Client,
 } from "@skipcheck/tm1-client";
 
 // Examples for ChoreService, quoted in its documentation.
@@ -18,7 +18,7 @@ export function create(tm1: Tm1Client): Promise<Chore> {
   // @start region = create
   // A daily chore at 02:00 UTC, inactive until it's switched on. A task gives every
   // parameter of its process a value.
-  const loadActuals = ChoreTaskPatch.builder()
+  const loadActuals = ChoreTaskCreate.builder()
     .bindProcess(ODataPath.of("Processes").key("Load Sales"))
     .parameters([
       ChoreTaskParameterPatch.builder().name("pVersion").value("Actual").build(),
@@ -41,7 +41,7 @@ export function create(tm1: Tm1Client): Promise<Chore> {
 export async function addTask(tm1: Tm1Client): Promise<number | undefined> {
   // @start region = add-task
   // A task goes at the end; TM1 numbers the steps from 0
-  const loadForecast = ChoreTaskPatch.builder()
+  const loadForecast = ChoreTaskCreate.builder()
     .bindProcess(ODataPath.of("Processes").key("Load Sales"))
     .parameters([
       ChoreTaskParameterPatch.builder().name("pVersion").value("Forecast").build(),

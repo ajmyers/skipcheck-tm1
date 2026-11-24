@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Configuration, Logger, Server, ServerSettings, type LogLevel, type ServerSettingsPatch } from "../../generated/index.js";
+import { Configuration, Logger, Server, ServerSettings, type LoggerPatch, type LogLevel, type ServerSettingsPatch } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import { Tm1Request } from "../../request.js";
 import type { Tm1CallOptions } from "../../session/session.js";
@@ -40,6 +40,7 @@ export class ServerService extends Tm1Service {
     loggers: ["EntitySet Loggers"],
     logger: ["EntitySet Loggers"],
     setLoggerLevel: ["EntitySet Loggers"],
+    updateLogger: ["EntitySet Loggers"],
   } as const satisfies Tm1Endpoints<ServerService>;
 
   /** `GET Server`: the server's name, version and ports. TM1 (11.8) sends no ETag for it. */
@@ -86,5 +87,11 @@ export class ServerService extends Tm1Service {
     const path = LOGGERS.key(required(name, "name"));
     if (required(level, "level") === "Unrecognized") throw new RangeError("LogLevel.Unrecognized stands for a level this client doesn't know, and isn't sent");
     return this.session.execute(Tm1Request.patch(path, { Level: level }), options);
+  }
+
+  /** `PATCH Loggers('name')`: changes a logger, at once. TM1 (11.8) changes only its `Level`, which
+   * {@link setLoggerLevel} sets as well. */
+  updateLogger(name: string, patch: LoggerPatch, options?: Tm1CallOptions): Promise<void> {
+    return this.session.execute(Tm1Request.patch(LOGGERS.key(required(name, "name")), required(patch, "patch")), options);
   }
 }

@@ -3,10 +3,11 @@
 import { describe, expect, it } from "vitest";
 import {
   ODataQuery,
-  ProcessDebugContextBreakpointPatch,
-  ProcessDebugContextLineBreakpointPatch,
-  typeOf,
   ProcessDebugContextBreakpoint,
+  ProcessDebugContextBreakpointCreate,
+  ProcessDebugContextBreakpointPatch,
+  ProcessDebugContextLineBreakpointCreate,
+  typeOf,
 } from "../../src/index.js";
 import { FakeTm1, type Recorded } from "../support/fake-tm1.js";
 
@@ -66,11 +67,11 @@ describe("ProcessDebugService", () => {
     expect(sent(tm1.last)).toBe("GET ProcessDebugContexts('d1')/Breakpoints");
 
     tm1.respond = () => ({ ID: 1 });
-    const line = ProcessDebugContextLineBreakpointPatch.builder().id(1).enabled(true).processName("Load").lineNumber(3).build();
+    const line = ProcessDebugContextLineBreakpointCreate.builder().id(1).enabled(true).processName("Load").lineNumber(3).build();
     expect((await client.processDebugging.addBreakpoint("d1", line)).ID).toBe(1);
     expect(sent(tm1.last)).toBe("POST ProcessDebugContexts('d1')/Breakpoints");
     expect(tm1.last.text).toBe('{"@odata.type":"#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint","ID":1,"Enabled":true,"ProcessName":"Load","LineNumber":3}');
-    await client.processDebugging.addBreakpoint("d1", ProcessDebugContextBreakpointPatch.builder().id(0).build());
+    await client.processDebugging.addBreakpoint("d1", ProcessDebugContextBreakpointCreate.builder().id(0).build());
     expect(tm1.last.text).toBe('{"ID":0}');
 
     tm1.respond = () => null;
@@ -83,9 +84,9 @@ describe("ProcessDebugService", () => {
   it("refuses a breakpoint without an ID of 0 or more", () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    expect(() => client.processDebugging.addBreakpoint("d1", ProcessDebugContextLineBreakpointPatch.builder().lineNumber(3).build())).toThrow(RangeError);
-    expect(() => client.processDebugging.addBreakpoint("d1", ProcessDebugContextBreakpointPatch.builder().id(-1).build())).toThrow(RangeError);
-    expect(() => client.processDebugging.addBreakpoint("d1", ProcessDebugContextBreakpointPatch.builder().id(null).build())).toThrow(RangeError);
+    expect(() => client.processDebugging.addBreakpoint("d1", ProcessDebugContextLineBreakpointCreate.builder().lineNumber(3).build())).toThrow(RangeError);
+    expect(() => client.processDebugging.addBreakpoint("d1", ProcessDebugContextBreakpointCreate.builder().id(-1).build())).toThrow(RangeError);
+    expect(() => client.processDebugging.addBreakpoint("d1", ProcessDebugContextBreakpointCreate.builder().id(null).build())).toThrow(RangeError);
     expect(tm1.requests.filter((r) => r.target.includes("Breakpoints"))).toEqual([]);
   });
 

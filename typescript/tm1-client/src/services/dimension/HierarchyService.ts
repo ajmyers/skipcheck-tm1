@@ -3,7 +3,7 @@
 import type { Tm1Model } from "../../model.js";
 import {
   Dimension,
-  type EdgePatch,
+  type EdgeCreate,
   type ElementCreate,
   Hierarchy,
   type HierarchyCreate,
@@ -29,7 +29,7 @@ import { Tm1Service, type Tm1Endpoints } from "../service.js";
  * ```ts
  * await tm1.hierarchies.create("Region", HierarchyCreate.builder().name("ByManager")
  *   .elements([ElementCreate.builder().name("All").type(ElementType.Consolidated).build(), ElementCreate.builder().name("North").build()])
- *   .edges([EdgePatch.builder().parentName("All").componentName("North").weight(1).build()])
+ *   .edges([EdgeCreate.builder().parentName("All").componentName("North").weight(1).build()])
  *   .build());
  * ```
  * Replace a hierarchy's structure, knowing that TM1 deletes what isn't listed:
@@ -93,7 +93,7 @@ export class HierarchyService extends Tm1Service {
     dimension: string,
     hierarchy: string,
     elements: readonly ElementCreate[],
-    edges: readonly EdgePatch[],
+    edges: readonly EdgeCreate[],
     options?: Tm1CallOptions,
   ): Promise<void> {
     const patch = HierarchyPatch.builder().elements(required(elements, "elements")).edges(required(edges, "edges")).build();

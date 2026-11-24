@@ -2,10 +2,11 @@
 
 import {
   Annotation,
-  AnnotationPatch,
+  AnnotationCreate,
+  type AnnotationPatch,
   ApplicationContextFacet,
   ApplicationContextFacetValue,
-  ApplicationContextFacetValuePatch,
+  ApplicationContextFacetValueCreate,
   Attachment,
   Member,
   Tm1Operations,
@@ -84,8 +85,8 @@ export class AnnotationService extends Tm1Service {
    * annotation, with its ID. */
   create(cube: string, elements: Tm1Map<string>, text: string, options?: Tm1CallOptions): Promise<Annotation>;
   /** `POST Annotations`, for an annotation built by hand; returns it as made, with its ID. */
-  create(annotation: AnnotationPatch, options?: Tm1CallOptions): Promise<Annotation>;
-  create(first: string | AnnotationPatch, second?: Tm1Map<string> | Tm1CallOptions, text?: string, options?: Tm1CallOptions): Promise<Annotation> {
+  create(annotation: AnnotationCreate, options?: Tm1CallOptions): Promise<Annotation>;
+  create(first: string | AnnotationCreate, second?: Tm1Map<string> | Tm1CallOptions, text?: string, options?: Tm1CallOptions): Promise<Annotation> {
     if (typeof first !== "string") {
       return this.session.execute(Tm1Request.post(ANNOTATIONS, required(first, "annotation"), Annotation), second as Tm1CallOptions | undefined);
     }
@@ -94,9 +95,9 @@ export class AnnotationService extends Tm1Service {
     const cell = entriesOf(required(second as Tm1Map<string>, "elements"));
     const dimensions = ODataPath.of("Dimensions");
     const members = cell.map(([dimension, element]) => dimensions.key(dimension).nav("Hierarchies").key(dimension).nav("Members").key(element));
-    const annotation = AnnotationPatch.builder()
+    const annotation = AnnotationCreate.builder()
       .text(text!)
-      .applicationContext([ApplicationContextFacetValuePatch.builder().bindFacet(FACETS.key("}Cubes")).value(cube).build()])
+      .applicationContext([ApplicationContextFacetValueCreate.builder().bindFacet(FACETS.key("}Cubes")).value(cube).build()])
       .bindDimensionalContext(...members)
       .property("objectName", cube)
       .property("commentValue", text)

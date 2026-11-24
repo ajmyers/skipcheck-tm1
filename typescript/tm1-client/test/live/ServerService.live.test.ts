@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterAll, beforeAll, describe, expect } from "vitest";
-import { LogLevel, ODataPath, ODataQuery, ServerSettingsPatch, Tm1BadRequestException, Tm1Request, type Tm1Client } from "../../src/index.js";
+import {
+  AdministrationSettingsPatch,
+  LogLevel,
+  ODataPath,
+  ODataQuery,
+  ServerSettingsPatch,
+  Tm1BadRequestException,
+  Tm1Request,
+  type Tm1Client,
+} from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 /** ServerService against a real TM1: the server, its configurations and loggers. The Java client's
@@ -31,7 +40,11 @@ describe("ServerService on TM1" + liveReason, () => {
 
     await tm1.server.updateStaticConfiguration(
       ServerSettingsPatch.builder()
-        .serverName(fixed.ServerName ?? null)
+        .administration(
+          AdministrationSettingsPatch.builder()
+            .serverName(fixed.Administration?.ServerName ?? null)
+            .build(),
+        )
         .build(),
     );
     await expect(
@@ -39,7 +52,11 @@ describe("ServerService on TM1" + liveReason, () => {
         Tm1Request.patch(
           ODataPath.of("ActiveConfiguration"),
           ServerSettingsPatch.builder()
-            .serverName(active.ServerName ?? null)
+            .administration(
+              AdministrationSettingsPatch.builder()
+                .serverName(active.Administration?.ServerName ?? null)
+                .build(),
+            )
             .build(),
         ),
       ),

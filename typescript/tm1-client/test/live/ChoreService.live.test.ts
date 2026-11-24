@@ -6,16 +6,16 @@ import {
   ChoreCreate,
   ChorePatch,
   ChoreTask,
+  ChoreTaskCreate,
   ChoreTaskParameterPatch,
-  ChoreTaskPatch,
   ODataPath,
   ODataQuery,
   ProcessCreate,
   ProcessParameterPatch,
-  type Tm1Client,
   Tm1Duration,
   Tm1Exception,
   Tm1PreconditionFailedException,
+  type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
@@ -28,8 +28,8 @@ describe("ChoreService on TM1" + liveReason, () => {
   let chore: string;
 
   const parameter = (name: string, value: unknown): ChoreTaskParameterPatch => ChoreTaskParameterPatch.builder().name(name).value(value).build();
-  const task = (marker: string): ChoreTaskPatch =>
-    ChoreTaskPatch.builder()
+  const task = (marker: string): ChoreTaskCreate =>
+    ChoreTaskCreate.builder()
       .bindProcess(ODataPath.of("Processes").key(process))
       .parameters([parameter("pName", marker), parameter("pCount", 1)])
       .build();
@@ -44,10 +44,7 @@ describe("ChoreService on TM1" + liveReason, () => {
     await tm1.processes.create(
       ProcessCreate.builder()
         .name(process)
-        .parameters([
-          ProcessParameterPatch.builder().name("pName").value("").type("String").build(),
-          ProcessParameterPatch.builder().name("pCount").value(0).type("Numeric").build(),
-        ])
+        .parameters([ProcessParameterPatch.builder().name("pName").value("").build(), ProcessParameterPatch.builder().name("pCount").value(0).build()])
         .prologProcedure("If(DimensionExists(pName) = 0);\n  DimensionCreate(pName);\nEndIf;\n")
         .build(),
     );
@@ -89,7 +86,7 @@ describe("ChoreService on TM1" + liveReason, () => {
     await tm1.chores.updateTask(
       chore,
       1,
-      ChoreTaskPatch.builder()
+      ChoreTaskCreate.builder()
         .parameters([parameter("pName", "third-" + id), parameter("pCount", 2)])
         .build(),
     );
@@ -109,7 +106,7 @@ describe("ChoreService on TM1" + liveReason, () => {
   });
 
   tm1Test("needs every process parameter in a task", async () => {
-    const partial = ChoreTaskPatch.builder()
+    const partial = ChoreTaskCreate.builder()
       .bindProcess(ODataPath.of("Processes").key(process))
       .parameters([parameter("pName", "x")])
       .build();

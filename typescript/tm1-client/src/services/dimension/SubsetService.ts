@@ -38,7 +38,7 @@ const SUBSETS = ["Navigation Hierarchy/Subsets", "Navigation Hierarchy/PrivateSu
  * ```
  * Create a session subset and read its elements by the name TM1 gave it:
  * ```ts
- * const subset = await tm1.subsets.createSessionSubset("Region", "Region", SubsetPatch.builder().expression("{[Region].[Region].[West]}").build());
+ * const subset = await tm1.subsets.createSessionSubset("Region", "Region", SubsetCreate.builder().expression("{[Region].[Region].[West]}").build());
  * const elements = await tm1.subsets.elements("Region", "Region", SubsetScope.Session, subset.Name!).toArray();
  * ```
  */
@@ -75,7 +75,7 @@ export class SubsetService extends Tm1Service {
   }
 
   /** `POST …/Subsets`: creates a subset: static with `Elements@odata.bind`
-   * (`SubsetPatch.builder().bindElements(…)`), dynamic with an `Expression`. It needs a name; returns
+   * (`SubsetCreate.builder().bindElements(…)`), dynamic with an `Expression`. It needs a name; returns
    * the subset as created. */
   create(dimension: string, hierarchy: string, scope: SubsetScope, subset: SubsetCreate, options?: Tm1CallOptions): Promise<Subset> {
     return this.session.execute(Tm1Request.post(subsetsPath(dimension, hierarchy, scope), required(subset, "subset"), Subset), options);

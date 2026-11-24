@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { AttributeOwner, AttributesPatch, LocalizedAttributesPatch, ODataQuery, SubsetScope, ViewScope } from "../../src/index.js";
+import { AttributeOwner, AttributesPatch, LocalizedAttributesCreate, ODataQuery, SubsetScope, ViewScope } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 /** LocalizedAttributeService and AttributeOwner against a fake TM1: each sends what the Java
@@ -34,7 +34,7 @@ describe("LocalizedAttributeService", () => {
     expect([tm1.last.method, tm1.last.target]).toEqual(["GET", `${localized}('de-CH')`]);
     await client.localizedAttributes.create(
       owner,
-      LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().caption("Ouest").property("Manager", "Jean").build()).build(),
+      LocalizedAttributesCreate.builder().localeID("fr").attributes(AttributesPatch.builder().caption("Ouest").property("Manager", "Jean").build()).build(),
     );
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual([
       "POST",

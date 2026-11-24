@@ -25,6 +25,9 @@ export interface Step {
   params: string[];
   args: any[];
   expect?: Record<string, any>;
+  /** Fields of the result to keep for the steps after it, by the name they're kept as:
+   * `{"note": "ID"}` makes the result's `ID` `${note}`. */
+  save?: Record<string, string>;
 }
 
 export interface Scenario {
@@ -96,7 +99,7 @@ export function substitute(value: any, names: Record<string, string>): any {
   return value;
 }
 
-type Outcome = { result: any } | { error: codec.EncodedError };
+export type Outcome = { result: any } | { error: codec.EncodedError };
 
 /** Why the outcome doesn't meet the expectation, or undefined if it does. */
 export function check(expect: Record<string, any>, outcome: Outcome): string | undefined {
@@ -139,13 +142,29 @@ async function outcome(client: any, step: Step, names: Record<string, string>): 
   }
 }
 
-/** Runs the scenario; the steps whose expectation failed. Its `finally` steps always run. */
+/** Keeps what a step's `save` names from its result, `{"note": "ID"}`: the result's `ID` as the
+ * name `note`, for the steps after it, such as an ID TM1 made up. Why it can't, or undefined. */
+export function save(step: Step, outcome: Outcome, names: Record<string, string>): string | undefined {
+  for (const [name, field] of Object.entries(step.save ?? {})) {
+    const result = "result" in outcome ? outcome.result : undefined;
+    const json = result !== null && typeof result === "object" && "$model" in result ? result.json : result;
+    const value = json !== null && typeof json === "object" && !Array.isArray(json) ? json[field] : undefined;
+    if (value === undefined || value === null || typeof value === "object") return `no ${field} to save as ${name} in ${JSON.stringify(result)}`;
+    names[name] = String(value);
+  }
+  return undefined;
+}
+
+/** Runs the scenario; the steps whose expectation failed. Its `finally` steps always run. What a
+ * step saves joins `names`, so the traffic written after it has TM1's made-up values as their
+ * placeholders too. */
 export async function run(client: unknown, traffic: Traffic, scenario: Scenario, names: Record<string, string>): Promise<string[]> {
   const failures: string[] = [];
   try {
     for (const [i, step] of scenario.steps.entries()) {
       traffic.step = `steps[${i}]`;
-      const why = check(substitute(step.expect ?? {}, names), await outcome(client, step, names));
+      const got = await outcome(client, step, names);
+      const why = check(substitute(step.expect ?? {}, names), got) ?? save(step, got, names);
       if (why) {
         failures.push(`step ${i} ${step.service}.${step.method}: ${why}`);
         break;

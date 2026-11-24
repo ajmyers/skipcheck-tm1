@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vi
 import {
   DimensionCreate,
   Edge,
-  EdgePatch,
+  EdgeCreate,
   Element,
   ElementCreate,
   ElementPatch,
@@ -14,15 +14,15 @@ import {
   ODataPath,
   ODataQuery,
   Tm1BadRequestException,
-  type Tm1Client,
   Tm1NotFoundException,
   Tm1PreconditionFailedException,
   Tm1Request,
+  type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 const element = (name: string, type: ElementType): ElementCreate => ElementCreate.builder().name(name).type(type).build();
-const edge = (parent: string, component: string): EdgePatch => EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
+const edge = (parent: string, component: string): EdgeCreate => EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
 
 /** ElementService (and edges) against a real TM1, on a dimension with Total = North + South, and
  * East and Label alone: the Java client's `ElementServiceTm1Test`. */

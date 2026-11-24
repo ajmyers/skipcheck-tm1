@@ -23,6 +23,7 @@ export interface SpecType {
   kind: "entity" | "complex";
   baseType: string | null;
   abstract?: boolean;
+  key?: string[];
   open?: boolean;
   derivedTypes?: string[];
   description?: string;
@@ -70,10 +71,15 @@ export interface SpecDocument {
   types: SpecType[];
   operations: SpecOperation[];
   container: {
+    entitySets?: { name: string; entityType: string }[];
     actionImports?: { name: string; operation: string }[];
     functionImports?: { name: string; operation: string }[];
   };
   endpoints: { id: string }[];
+  /** The write types to generate (`CubeCreate`), each with the setters it offers, by the JSON
+   * name each writes (`Dimensions@odata.bind` for a binding), and why: what the probe verified or
+   * an exception kept. A type absent gets no write type. */
+  offers?: Record<string, Record<string, Record<string, string>>>;
 }
 
 export class Spec {
@@ -114,6 +120,12 @@ export class Spec {
 
   derived(t: SpecType): SpecType[] {
     return (t.derivedTypes ?? []).map((d) => this.typeByName.get(d)!);
+  }
+
+  /** The setters a write type offers (`CubeCreate`), by the JSON name each writes; undefined for
+   * one that isn't generated. */
+  offered(builder: string): Record<string, unknown> | undefined {
+    return this.doc.offers?.[builder];
   }
 
   isEntity(typeName: string): boolean {

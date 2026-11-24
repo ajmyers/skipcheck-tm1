@@ -8,6 +8,7 @@ import {
   ProcessDebugContextVariable,
   Thread,
   Tm1Operations,
+  type ProcessDebugContextBreakpointCreate,
   type ProcessDebugContextBreakpointPatch,
 } from "../../generated/index.js";
 import { ODataPath, ODataQuery } from "../../odata/index.js";
@@ -45,7 +46,7 @@ export type ProcessDebugWork<R> = AsyncIterable<R> | PromiseLike<R | void> | R |
  * ```ts
  * const frames = await tm1.processDebugging.debugging("Load", {}, async (context) => {
  *   const id = context.ID!;
- *   await tm1.processDebugging.addBreakpoint(id, ProcessDebugContextLineBreakpointPatch.builder().id(0).enabled(true).processName("Load").procedure("Prolog").lineNumber(3).build());
+ *   await tm1.processDebugging.addBreakpoint(id, ProcessDebugContextLineBreakpointCreate.builder().id(0).enabled(true).processName("Load").procedure("Prolog").lineNumber(3).build());
  *   await tm1.processDebugging.resume(id);
  *   return tm1.processDebugging.callStack(id).toArray();
  * }).first();
@@ -184,13 +185,13 @@ export class ProcessDebugService extends Tm1Service {
   }
 
   /** `POST …/Breakpoints`: adds a breakpoint, its kind given by the patch
-   * (`ProcessDebugContextLineBreakpointPatch`, …Data…, …Lock…); returns it as created.
+   * (`ProcessDebugContextLineBreakpointCreate`, …Data…, …Lock…); returns it as created.
    *
    * The caller chooses the breakpoint's `ID`, 0 or more and unique in the context: TM1 (11.8) stores
    * one sent without an ID as -1, which it then refuses in a path, so it can't be changed or
    * removed, and a second one without an ID conflicts (409).
    * @throws RangeError if the patch has no `ID` of 0 or more */
-  addBreakpoint(id: string, breakpoint: ProcessDebugContextBreakpointPatch, options?: Tm1CallOptions): Promise<ProcessDebugContextBreakpoint> {
+  addBreakpoint(id: string, breakpoint: ProcessDebugContextBreakpointCreate, options?: Tm1CallOptions): Promise<ProcessDebugContextBreakpoint> {
     const value = required(breakpoint, "breakpoint")
       .values()
       .find(([k]) => k === "ID")?.[1];

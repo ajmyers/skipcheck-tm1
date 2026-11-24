@@ -65,11 +65,18 @@ export abstract class Tm1PatchBuilder<P extends Tm1Patch> {
     return this;
   }
 
-  /** @internal What `read`, an entity read from TM1, holds of `names`, nulls left out; and, for an
-   * open type (`declared` given), its undeclared properties. The generated `builder(read)` calls it. */
-  copy(read: object, names: readonly string[], declared: readonly string[] | null): this {
+  /** @internal What `read`, an entity read from TM1, holds of `names`, nulls left out, a structured
+   * value (each member of a collection of them) through its converter in `nested`; and, for an open
+   * type (`declared` given), its undeclared properties. The generated `builder(read)` calls it. */
+  copy(read: object, names: readonly string[], declared: readonly string[] | null, nested: Readonly<Record<string, (value: never) => unknown>> = {}): this {
     const data = read as Record<string, unknown>;
-    for (const name of names) if (data[name] !== undefined && data[name] !== null) this.set(name, data[name]);
+    for (const name of names) {
+      const value = data[name];
+      if (value === undefined || value === null) continue;
+      const convert = nested[name];
+      if (!convert) this.set(name, value);
+      else this.set(name, Array.isArray(value) ? value.map((v) => convert(v as never)) : convert(value as never));
+    }
     if (declared) {
       for (const [name, value] of Object.entries(data)) {
         if (!declared.includes(name) && !name.startsWith("@") && value !== undefined && value !== null) this.set(name, value);

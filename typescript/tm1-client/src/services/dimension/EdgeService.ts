@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Edge, Element, Hierarchy, type EdgePatch } from "../../generated/index.js";
+import { Edge, Element, Hierarchy, type EdgeCreate, type EdgePatch } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import { Tm1Request } from "../../request.js";
 import type { Tm1CallOptions } from "../../session/session.js";
@@ -22,7 +22,7 @@ import { Tm1Service, type Tm1Endpoints } from "../service.js";
  * Move an element to another parent:
  * ```ts
  * await tm1.edges.delete("Region", "Region", "North", "Ohio");
- * await tm1.edges.create("Region", "Region", EdgePatch.builder().parentName("Midwest").componentName("Ohio").weight(1).build());
+ * await tm1.edges.create("Region", "Region", EdgeCreate.builder().parentName("Midwest").componentName("Ohio").weight(1).build());
  * ```
  */
 export class EdgeService extends Tm1Service {
@@ -51,7 +51,7 @@ export class EdgeService extends Tm1Service {
 
   /** `POST …/Edges`: makes an element a child of a consolidation (parent, component and, optionally,
    * weight); returns the edge as created. */
-  create(dimension: string, hierarchy: string, edge: EdgePatch, options?: Tm1CallOptions): Promise<Edge> {
+  create(dimension: string, hierarchy: string, edge: EdgeCreate, options?: Tm1CallOptions): Promise<Edge> {
     return this.session.execute(Tm1Request.post(edgesPath(dimension, hierarchy), required(edge, "edge"), Edge), options);
   }
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { EdgePatch, type Edge, type Tm1Client } from "@skipcheck/tm1-client";
+import { EdgeCreate, EdgePatch, type Edge, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for EdgeService, quoted in its documentation.
 
@@ -22,7 +22,7 @@ export function reweight(tm1: Tm1Client): Promise<void> {
 export async function move(tm1: Tm1Client): Promise<Edge> {
   // @start region = move
   // Move North from Total to Total Sales: add the new edge, then delete the old
-  const edge = await tm1.edges.create("Region", "Region", EdgePatch.builder().parentName("Total Sales").componentName("North").weight(1).build());
+  const edge = await tm1.edges.create("Region", "Region", EdgeCreate.builder().parentName("Total Sales").componentName("North").weight(1).build());
   await tm1.edges.delete("Region", "Region", "Total", "North");
   return edge;
   // @end

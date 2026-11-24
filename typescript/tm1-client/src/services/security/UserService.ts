@@ -65,7 +65,7 @@ export class UserService extends Tm1Service {
     return this.session.execute(Tm1Request.get(ODataPath.of("ActiveUser"), query, User), options);
   }
 
-  /** `POST Users`: creates a user, in the groups the patch binds (`UserPatch.builder().bindGroups(…)`).
+  /** `POST Users`: creates a user, in the groups the create binds (`UserCreate.builder().bindGroups(…)`).
    * It needs a name, and a password for Basic security; returns the user as created. */
   create(user: UserCreate, options?: Tm1CallOptions): Promise<User> {
     return this.session.execute(Tm1Request.post(USERS, required(user, "user"), User), options);

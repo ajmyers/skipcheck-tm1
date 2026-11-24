@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { ChoreCreate, ChorePatch, ChoreTaskParameterPatch, ChoreTaskPatch, ODataPath, ODataQuery, Tm1PreconditionFailedException } from "../../src/index.js";
+import {
+  ChoreCreate,
+  ChorePatch,
+  ChoreTaskCreate,
+  ChoreTaskParameterPatch,
+  ChoreTaskPatch,
+  ODataPath,
+  ODataQuery,
+  Tm1PreconditionFailedException,
+} from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 /** ChoreService against a fake TM1: each method sends what the Java client's does (the .NET
@@ -18,7 +27,7 @@ describe("ChoreService", () => {
     expect((await client.chores.get("Nightly Load", ODataQuery.none().expand("Tasks")))["@odata.etag"]).toBe('W/"3"');
     expect(`${tm1.last.method} ${tm1.last.target}`).toBe("GET Chores('Nightly%20Load')?$expand=Tasks");
 
-    const task = ChoreTaskPatch.builder()
+    const task = ChoreTaskCreate.builder()
       .bindProcess(ODataPath.of("Processes").key("Load Sales"))
       .parameters([ChoreTaskParameterPatch.builder().name("pYear").value(2026).build()])
       .build();
@@ -49,7 +58,7 @@ describe("ChoreService", () => {
     expect(`${tm1.last.method} ${tm1.last.target}`).toBe("GET Chores('c')/Tasks?$expand=Process");
 
     tm1.respond = () => ({ Step: 2 });
-    const added = await client.chores.addTask("c", ChoreTaskPatch.builder().bindProcess(ODataPath.of("Processes").key("p")).build());
+    const added = await client.chores.addTask("c", ChoreTaskCreate.builder().bindProcess(ODataPath.of("Processes").key("p")).build());
     expect(added.Step).toBe(2);
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Chores('c')/Tasks", '{"Process@odata.bind":"Processes(\'p\')"}']);
 

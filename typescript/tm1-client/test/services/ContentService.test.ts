@@ -2,7 +2,7 @@
 
 import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
-import { ContentPath, ContentScope, DocumentPatch, DocumentReference, Entry, Folder, FolderPatch, Link, ODataQuery, typeOf } from "../../src/index.js";
+import { ContentPath, ContentScope, DocumentCreate, DocumentReference, Entry, Folder, FolderCreate, Link, ODataQuery, typeOf } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 const utf8 = new TextEncoder();
@@ -92,12 +92,12 @@ describe("ContentService", () => {
     const client = tm1.client();
     const planning = ContentPath.applications().child("Planning");
     tm1.respond = () => ({ "@odata.type": "#ibm.tm1.api.v1.DocumentReference", ID: "notes.txt.blob" });
-    const made = await client.contents.create(planning, ContentScope.Public, DocumentPatch.builder().name("notes.txt").build());
+    const made = await client.contents.create(planning, ContentScope.Public, DocumentCreate.builder().name("notes.txt").build());
     expect(typeOf(Entry, made)).toBe("DocumentReference");
     expect(typeOf(DocumentReference, made as DocumentReference)).toBe("DocumentReference");
     expect([sent(tm1), tm1.last.json.Name]).toEqual(["POST Contents('Applications')/Contents('Planning')/Contents", "notes.txt"]);
     expect(tm1.last.json["@odata.type"]).toBe("#ibm.tm1.api.v1.Document");
-    await client.contents.create(planning, ContentScope.Private, FolderPatch.builder().name("mine").build());
+    await client.contents.create(planning, ContentScope.Private, FolderCreate.builder().name("mine").build());
     expect(sent(tm1)).toBe("POST Contents('Applications')/Contents('Planning')/PrivateContents");
 
     const other = ContentPath.applications().child("Other");

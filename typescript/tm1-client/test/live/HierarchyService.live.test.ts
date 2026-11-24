@@ -3,7 +3,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
 import {
   DimensionCreate,
-  EdgePatch,
+  EdgeCreate,
   ElementCreate,
   ElementType,
   Hierarchy,
@@ -12,15 +12,15 @@ import {
   Member,
   ODataPath,
   ODataQuery,
-  type Tm1Client,
   Tm1PreconditionFailedException,
   Tm1Request,
+  type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 const numeric = (name: string): ElementCreate => ElementCreate.builder().name(name).type(ElementType.Numeric).build();
 const consolidated = (name: string): ElementCreate => ElementCreate.builder().name(name).type(ElementType.Consolidated).build();
-const edge = (parent: string, component: string): EdgePatch => EdgePatch.builder().parentName(parent).componentName(component).weight(1.0).build();
+const edge = (parent: string, component: string): EdgeCreate => EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
 
 /** Total = North + South, and East alone. */
 const structure = (name: string): HierarchyCreate =>
@@ -79,9 +79,6 @@ describe("HierarchyService on TM1" + liveReason, () => {
 
   tm1Test("refuses to replace elements through a plain update", () => {
     expect(() => tm1.hierarchies.update(dimension, dimension, HierarchyPatch.builder().elements([]).build())).toThrow(/replaceStructure/);
-    // Binding the collection changes the structure too
-    const north = ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements").key("North");
-    expect(() => tm1.hierarchies.update(dimension, dimension, HierarchyPatch.builder().bindElements(north).build())).toThrow(RangeError);
     expect(() =>
       tm1.hierarchies.update(
         dimension,

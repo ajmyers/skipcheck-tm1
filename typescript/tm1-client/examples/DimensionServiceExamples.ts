@@ -3,7 +3,7 @@
 import {
   Dimension,
   DimensionCreate,
-  EdgePatch,
+  EdgeCreate,
   ElementCreate,
   ElementType,
   Hierarchy,
@@ -32,8 +32,8 @@ export function create(tm1: Tm1Client): Promise<Dimension> {
     .name("Region")
     .elements([total, north, south])
     .edges([
-      EdgePatch.builder().parentName("Total").componentName("North").weight(1).build(),
-      EdgePatch.builder().parentName("Total").componentName("South").weight(1).build(),
+      EdgeCreate.builder().parentName("Total").componentName("North").weight(1).build(),
+      EdgeCreate.builder().parentName("Total").componentName("South").weight(1).build(),
     ])
     .build();
   return tm1.dimensions.create(DimensionCreate.builder().name("Region").hierarchies([region]).build());

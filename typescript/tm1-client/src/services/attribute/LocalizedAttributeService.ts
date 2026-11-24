@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { LocalizedAttributes, type LocalizedAttributesPatch } from "../../generated/index.js";
+import { LocalizedAttributes, type LocalizedAttributesCreate } from "../../generated/index.js";
 import type { ODataPath, ODataQuery } from "../../odata/index.js";
 import { Tm1Request } from "../../request.js";
 import type { Tm1CallOptions } from "../../session/session.js";
@@ -36,7 +36,7 @@ const OWNERS = [
  * Translate an element's attribute into French:
  * ```ts
  * await tm1.localizedAttributes.create(AttributeOwner.element("Region", "Region", "North"),
- *   LocalizedAttributesPatch.builder().localeID("fr").attributes(AttributesPatch.builder().property("Label", "Nord").build()).build());
+ *   LocalizedAttributesCreate.builder().localeID("fr").attributes(AttributesPatch.builder().property("Label", "Nord").build()).build());
  * ```
  * Read the translation back:
  * ```ts
@@ -66,7 +66,7 @@ export class LocalizedAttributeService extends Tm1Service {
 
   /** `POST …/LocalizedAttributes`: adds translations for a locale, its `LocaleID` and the translated
    * `Attributes`; returns them as created. */
-  create(owner: AttributeOwner, translations: LocalizedAttributesPatch, options?: Tm1CallOptions): Promise<LocalizedAttributes> {
+  create(owner: AttributeOwner, translations: LocalizedAttributesCreate, options?: Tm1CallOptions): Promise<LocalizedAttributes> {
     return this.session.execute(Tm1Request.post(localized(owner), required(translations, "translations"), LocalizedAttributes), options);
   }
 }

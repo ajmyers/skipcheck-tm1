@@ -93,7 +93,7 @@ export class CubeService extends Tm1Service {
   }
 
   /** `POST Cubes`: creates a cube over existing dimensions, bound in order with
-   * `CubePatch.builder().bindDimensions(…)`, and optionally its rules. It needs a name and at least
+   * `CubeCreate.builder().bindDimensions(…)`, and optionally its rules. It needs a name and at least
    * two dimensions; returns the cube as created. */
   create(cube: CubeCreate, options?: Tm1CallOptions): Promise<Cube> {
     return this.session.execute(Tm1Request.post(CUBES, required(cube, "cube"), Cube), options);
