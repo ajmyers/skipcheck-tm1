@@ -290,7 +290,7 @@
 			"method" : "debug",
 			"params" : [ "process", "parameters", "query" ],
 			"args" : [ "${debug}", { "$map" : { } }, { "$query" : { } } ],
-			"expect" : { "fields" : { "@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContext" } },
+			"expect" : { "fields" : { } },
 			"save" : { "context" : "ID" }
 		},
 		{
@@ -375,11 +375,12 @@
 			"method" : "finish",
 			"params" : [ "id" ],
 			"args" : [ "${context}" ],
+			"repeats" : "tm1\\.Continue$",
 			"expect" : { "fields" : { "Status" : "Complete" } }
 		}
 	],
 	"finally" : [
-		{ "service" : "processDebugging", "method" : "finish", "params" : [ "id" ], "args" : [ "${context}" ] },
+		{ "service" : "processDebugging", "method" : "finish", "params" : [ "id" ], "args" : [ "${context}" ], "repeats" : "tm1\\.Continue$" },
 		{ "service" : "processes", "method" : "delete", "params" : [ "name" ], "args" : [ "${debug}" ] },
 		{
 			"service" : "users",

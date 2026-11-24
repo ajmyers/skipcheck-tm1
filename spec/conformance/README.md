@@ -137,6 +137,7 @@ A scenario is steps every client runs against a real TM1, with names made fresh 
 - Arguments use the same encoding as the fixtures. `${name}` placeholders are replaced in every string.
 - A step can save fields of its result for the steps after it, `"save": {"note": "ID"}`: the result's `ID` (a field of its JSON, a value, not null) becomes the name `note`, for an ID TM1 makes up, such as an annotation's or a debug context's. A step whose result lacks one fails. Saved names join the run's names, so the traffic has them as placeholders too; give each a fallback in `names`, so a `finally` step that uses it still runs when its step didn't.
 - A step whose requests may go out in any order (a cellset stream's pages) names them with `"unordered"`, a regular expression matching `METHOD target` (after names become placeholders): each run of the step's consecutive requests that match it is compared as a set. The step's other requests, and every other step's, are compared in order.
+- A step that polls TM1 until it's done (finishing a debug run resumes it until it's complete) names the requests it repeats with `"repeats"`, a regular expression on `METHOD target`: each run of equal consecutive ones compares as one, since how many TM1 takes varies. A `finally` step can too.
 - Each step has one expectation:
   - `{"none": true}`: the call returns nothing.
   - `{"count": n}`: a list of `n` items.

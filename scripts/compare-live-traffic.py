@@ -13,7 +13,8 @@ left out by the runners.
 This script normalizes every log the same way: the run's names back to their placeholders
 (${cube}), entity tags left out, the ID TM1 made up for a cellset as <id>, and each run of requests a scenario's step marks "unordered" (a
 regular expression on "METHOD target", for requests a client has in flight at once, such as a
-cellset stream's pages) put in one order; then requires every language's log of a scenario to be
+cellset stream's pages) put in one order, and each run of equal requests a step marks "repeats" (the
+same, for a poll that sends as many as TM1 takes) kept once; then requires every language's log of a scenario to be
 equal, request for request, and prints the first difference. With fewer than two logs of a scenario,
 there's nothing to compare: it says so and passes.
 
@@ -108,6 +109,29 @@ def reorder(exchanges: list[dict[str, Any]], patterns: dict[str, re.Pattern[str]
     return out
 
 
+def repeating(scenario: dict[str, Any]) -> dict[str, re.Pattern[str]]:
+    """The steps, finally ones too, whose matching requests may repeat: step label to pattern. A call
+    that polls TM1 until it's done, such as finishing a debug run, sends as many as TM1 takes."""
+    return {
+        f"{part}[{i}]": re.compile(step["repeats"])
+        for part in ("steps", "finally")
+        for i, step in enumerate(scenario.get(part, []))
+        if "repeats" in step
+    }
+
+
+def collapse(exchanges: list[dict[str, Any]], patterns: dict[str, re.Pattern[str]]) -> list[dict[str, Any]]:
+    """A normalized log with each run of a step's equal consecutive requests that match its pattern
+    kept once, so polls that took TM1 more or fewer answers compare equal. Everything else stays."""
+    out: list[dict[str, Any]] = []
+    for x in exchanges:
+        pattern = patterns.get(x.get("step") or "")
+        if pattern and out and _ordered(out[-1]) == _ordered(x) and pattern.search(f"{x['request']['method']} {x['request']['target']}"):
+            continue
+        out.append(x)
+    return out
+
+
 def _ordered(value: Any) -> Any:
     """For comparing: JSON with its members' order kept."""
     if isinstance(value, dict):
@@ -146,8 +170,9 @@ def main(argv: list[str]) -> int:
     for log in sorted(root.glob("*/*.jsonl")):
         header, exchanges = load(log)
         spec = SCENARIOS / f"{log.stem}.json"
-        patterns = unordered(json.loads(spec.read_text(encoding="utf-8"))) if spec.is_file() else {}
-        scenarios.setdefault(log.stem, {})[log.parent.name] = reorder(normalize(header, exchanges), patterns)
+        definition = json.loads(spec.read_text(encoding="utf-8")) if spec.is_file() else {}
+        normalized = collapse(normalize(header, exchanges), repeating(definition))
+        scenarios.setdefault(log.stem, {})[log.parent.name] = reorder(normalized, unordered(definition))
     failed = False
     for scenario, logs in sorted(scenarios.items()):
         problems = compare(logs)
