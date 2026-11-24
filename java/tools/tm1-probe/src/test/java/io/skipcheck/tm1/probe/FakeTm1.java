@@ -11,6 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
+import org.jspecify.annotations.Nullable;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import tools.jackson.databind.JsonNode;
@@ -25,7 +27,7 @@ import tools.jackson.databind.node.ObjectNode;
 final class FakeTm1 implements AutoCloseable {
 
 	/** An answer: a status and a JSON body, or null for none. */
-	record Reply(int status, JsonNode body) {
+	record Reply(int status, @Nullable JsonNode body) {
 
 		static Reply ok(String json) {
 			return new Reply(200, ProbeClient.JSON.readTree(json));
@@ -41,7 +43,22 @@ final class FakeTm1 implements AutoCloseable {
 
 	final AtomicInteger batches = new AtomicInteger();
 
+	/**
+	 * Answers any request: its method, its target (path and decoded query), and its body
+	 * or null.
+	 */
+	interface Handler {
+
+		Reply handle(String method, String target, @Nullable JsonNode body);
+
+	}
+
 	FakeTm1(Function<String, Reply> gets) throws IOException {
+		this((method, target, body) -> method.equals("GET") ? gets.apply(target) : new Reply(204, null));
+	}
+
+	FakeTm1(Handler handler) throws IOException {
+		Function<String, Reply> gets = target -> handler.handle("GET", target, null);
 		server = HttpServer.create(new InetSocketAddress(InetAddress.getByAddress(new byte[] { 127, 0, 0, 1 }), 0), 0);
 		server.createContext("/api/v1/", exchange -> {
 			String target = URLDecoder.decode(exchange.getRequestURI().getRawPath().substring("/api/v1/".length())
@@ -59,11 +76,10 @@ final class FakeTm1 implements AutoCloseable {
 				}
 				send(exchange, new Reply(200, out));
 			}
-			else if (exchange.getRequestMethod().equals("GET")) {
-				send(exchange, gets.apply(target));
-			}
 			else {
-				send(exchange, new Reply(204, null));
+				byte[] raw = exchange.getRequestBody().readAllBytes();
+				JsonNode body = raw.length == 0 ? null : ProbeClient.JSON.readTree(raw);
+				send(exchange, handler.handle(exchange.getRequestMethod(), target, body));
 			}
 		});
 		server.start();

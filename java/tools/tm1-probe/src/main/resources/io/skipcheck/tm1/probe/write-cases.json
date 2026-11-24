@@ -1,0 +1,423 @@
+{
+	"$comment": "What the write probe tries, for each type (WriteProbe): where to create it, the least a create needs (base, plus Name), a fixture to read a full set of properties from, and values for properties no value can be made up for. {p} is the fixtures' prefix, {name} the name of the object a test creates. Hand-written; extend it as new types or properties need probing.",
+	"cases": [
+		{
+			"id": "AttributeDefinition",
+			"type": "AttributeDefinition",
+			"collection": "CubeAttributes",
+			"source": "CubeAttributes('{p}CubeAttribute')",
+			"base": {
+				"Type": "String"
+			}
+		},
+		{
+			"id": "Chore",
+			"type": "Chore",
+			"collection": "Chores",
+			"source": "Chores('{p}Chore')",
+			"base": {}
+		},
+		{
+			"id": "Cube",
+			"type": "Cube",
+			"collection": "Cubes",
+			"source": "Cubes('{p}Cube')",
+			"base": {
+				"Dimensions@odata.bind": [
+					"Dimensions('{p}Dim')",
+					"Dimensions('{p}Measures')"
+				]
+			},
+			"values": {
+				"DrillthroughRules": "['{p}A'] = S: 'x';",
+				"CalculationThresholdForStorage": 50,
+				"ViewStorageMaxMemory": 1000,
+				"ViewStorageMinTime": 5,
+				"CellSecurityDefaultValue": "READ"
+			}
+		},
+		{
+			"id": "Dimension",
+			"type": "Dimension",
+			"collection": "Dimensions",
+			"source": "Dimensions('{p}Dim')",
+			"base": {}
+		},
+		{
+			"id": "Element",
+			"type": "Element",
+			"collection": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Elements",
+			"source": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Elements('{p}Total')",
+			"base": {},
+			"values": {
+				"DisplayString": "Shown"
+			}
+		},
+		{
+			"id": "Group",
+			"type": "Group",
+			"collection": "Groups",
+			"source": "Groups('{p}Group')",
+			"base": {}
+		},
+		{
+			"id": "Hierarchy",
+			"type": "Hierarchy",
+			"collection": "Dimensions('{p}Dim')/Hierarchies",
+			"source": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')",
+			"base": {},
+			"values": {
+				"ElementsSortType": "ByName",
+				"ElementsSortSense": "Descending",
+				"ComponentsSortType": "ByName",
+				"ComponentsSortSense": "Descending"
+			}
+		},
+		{
+			"id": "MDXView",
+			"type": "MDXView",
+			"collection": "Cubes('{p}Cube')/Views",
+			"source": "Cubes('{p}Cube')/Views('{p}Mdx')",
+			"base": {
+				"@odata.type": "ibm.tm1.api.v1.MDXView",
+				"MDX": "SELECT {[{p}Dim].[{p}B]} ON 0 FROM [{p}Cube]"
+			}
+		},
+		{
+			"id": "NativeView",
+			"type": "NativeView",
+			"collection": "Cubes('{p}Cube')/Views",
+			"source": "Cubes('{p}Cube')/Views('{p}Native')",
+			"base": {
+				"@odata.type": "ibm.tm1.api.v1.NativeView",
+				"Columns": [
+					{
+						"Subset@odata.bind": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets('{p}Static')"
+					}
+				],
+				"Rows": [
+					{
+						"Subset": {
+							"Hierarchy@odata.bind": "Dimensions('{p}Measures')/Hierarchies('{p}Measures')",
+							"Expression": "{TM1SUBSETALL([{p}Measures])}"
+						}
+					}
+				],
+				"Titles": []
+			}
+		},
+		{
+			"id": "Process",
+			"type": "Process",
+			"collection": "Processes",
+			"source": "Processes('{p}Ascii')",
+			"base": {},
+			"values": {
+				"Code": "#region Prolog\nx = 2;\n#endregion",
+				"VariablesUIData": [
+					"VarType=32\fColType=827\f"
+				],
+				"UIData": "CubeAction=1511\fDataAction=1503\fCubeLogChanges=0\f"
+			}
+		},
+		{
+			"id": "Process/view source",
+			"type": "Process",
+			"collection": "Processes",
+			"source": "Processes('{p}View')",
+			"base": {},
+			"values": {
+				"Code": "#region Prolog\nx = 2;\n#endregion",
+				"Parameters": [
+					{
+						"Name": "pValue",
+						"Prompt": "A value",
+						"Value": "1",
+						"Type": "String"
+					}
+				]
+			}
+		},
+		{
+			"id": "Sandbox",
+			"type": "Sandbox",
+			"collection": "Sandboxes",
+			"source": "Sandboxes('{p}Sandbox')",
+			"base": {}
+		},
+		{
+			"id": "Subset/dynamic",
+			"type": "Subset",
+			"collection": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets",
+			"source": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets('{p}Dynamic')",
+			"base": {},
+			"values": {
+				"Alias": "{p}Alias"
+			}
+		},
+		{
+			"id": "Subset/static",
+			"type": "Subset",
+			"collection": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets",
+			"source": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets('{p}Static')",
+			"base": {},
+			"values": {
+				"Alias": "{p}Alias",
+				"Expression": "{TM1SUBSETALL([{p}Dim])}"
+			}
+		},
+		{
+			"id": "User",
+			"type": "User",
+			"collection": "Users",
+			"source": "Users('{p}User')",
+			"base": {}
+		}
+	],
+	"collections": [
+		{
+			"id": "Hierarchy/Elements",
+			"collection": "Dimensions('{p}Dim')/Hierarchies",
+			"create": {
+				"Name": "{name}",
+				"Elements": [
+					{
+						"Name": "{p}One",
+						"Type": "Numeric"
+					},
+					{
+						"Name": "{p}Two",
+						"Type": "Numeric"
+					}
+				]
+			},
+			"patch": {
+				"Elements": [
+					{
+						"Name": "{p}Three",
+						"Type": "Numeric"
+					}
+				]
+			},
+			"read": "Elements",
+			"key": "Name"
+		},
+		{
+			"id": "Hierarchy/Edges",
+			"collection": "Dimensions('{p}Dim')/Hierarchies",
+			"create": {
+				"Name": "{name}",
+				"Elements": [
+					{
+						"Name": "{p}One",
+						"Type": "Numeric"
+					},
+					{
+						"Name": "{p}Two",
+						"Type": "Numeric"
+					},
+					{
+						"Name": "{p}Top",
+						"Type": "Consolidated"
+					}
+				],
+				"Edges": [
+					{
+						"ParentName": "{p}Top",
+						"ComponentName": "{p}One",
+						"Weight": 1
+					}
+				]
+			},
+			"patch": {
+				"Edges": [
+					{
+						"ParentName": "{p}Top",
+						"ComponentName": "{p}Two",
+						"Weight": 1
+					}
+				]
+			},
+			"read": "Edges",
+			"key": "ComponentName"
+		},
+		{
+			"id": "Subset/Elements@odata.bind",
+			"collection": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets",
+			"create": {
+				"Name": "{name}",
+				"Elements@odata.bind": [
+					"Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Elements('{p}A')"
+				]
+			},
+			"patch": {
+				"Elements@odata.bind": [
+					"Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Elements('{p}B')"
+				]
+			},
+			"read": "Elements",
+			"key": "Name"
+		},
+		{
+			"id": "Subset/Elements",
+			"collection": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets",
+			"create": {
+				"Name": "{name}",
+				"Elements@odata.bind": [
+					"Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Elements('{p}A')"
+				]
+			},
+			"patch": {
+				"Elements": [
+					{
+						"Name": "{p}B"
+					}
+				]
+			},
+			"read": "Elements",
+			"key": "Name"
+		},
+		{
+			"id": "Process/Parameters",
+			"collection": "Processes",
+			"create": {
+				"Name": "{name}",
+				"Parameters": [
+					{
+						"Name": "pOne",
+						"Value": "1",
+						"Type": "String"
+					}
+				]
+			},
+			"patch": {
+				"Parameters": [
+					{
+						"Name": "pTwo",
+						"Value": "2",
+						"Type": "String"
+					}
+				]
+			},
+			"read": "Parameters",
+			"key": "Name"
+		},
+		{
+			"id": "Process/Variables",
+			"collection": "Processes",
+			"create": {
+				"Name": "{name}",
+				"Variables": [
+					{
+						"Name": "vOne",
+						"Type": "String",
+						"Position": 1,
+						"StartByte": 0,
+						"EndByte": 0
+					}
+				]
+			},
+			"patch": {
+				"Variables": [
+					{
+						"Name": "vTwo",
+						"Type": "String",
+						"Position": 1,
+						"StartByte": 0,
+						"EndByte": 0
+					}
+				]
+			},
+			"read": "Variables",
+			"key": "Name"
+		},
+		{
+			"id": "Chore/Tasks",
+			"collection": "Chores",
+			"create": {
+				"Name": "{name}",
+				"StartTime": "2026-01-01T00:00:00Z",
+				"Frequency": "P1DT00H00M00S",
+				"Active": false,
+				"Tasks": [
+					{
+						"Process@odata.bind": "Processes('{p}Ascii')",
+						"Parameters": [
+							{
+								"Name": "pValue",
+								"Value": "1"
+							}
+						]
+					}
+				]
+			},
+			"patch": {
+				"Tasks": [
+					{
+						"Process@odata.bind": "Processes('{p}Ascii')",
+						"Parameters": [
+							{
+								"Name": "pValue",
+								"Value": "2"
+							}
+						]
+					}
+				]
+			},
+			"read": "Tasks",
+			"key": "Step"
+		},
+		{
+			"id": "User/Groups@odata.bind",
+			"collection": "Users",
+			"create": {
+				"Name": "{name}",
+				"Groups@odata.bind": [
+					"Groups('{p}Group')"
+				]
+			},
+			"patch": {
+				"Groups@odata.bind": [
+					"Groups('ADMIN')"
+				]
+			},
+			"read": "Groups",
+			"key": "Name"
+		},
+		{
+			"id": "Cube/Dimensions@odata.bind",
+			"collection": "Cubes",
+			"create": {
+				"Name": "{name}",
+				"Dimensions@odata.bind": [
+					"Dimensions('{p}Dim')",
+					"Dimensions('{p}Measures')"
+				]
+			},
+			"patch": {
+				"Dimensions@odata.bind": [
+					"Dimensions('{p}Measures')",
+					"Dimensions('{p}Dim')"
+				]
+			},
+			"read": "Dimensions",
+			"key": "Name"
+		},
+		{
+			"id": "Dimension/Hierarchies",
+			"collection": "Dimensions",
+			"create": {
+				"Name": "{name}"
+			},
+			"patch": {
+				"Hierarchies": [
+					{
+						"Name": "{p}Other"
+					}
+				]
+			},
+			"read": "Hierarchies",
+			"key": "Name"
+		}
+	]
+}

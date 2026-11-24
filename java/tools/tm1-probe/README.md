@@ -8,9 +8,9 @@ java/tm1-client/src/model/metadata/tm1-schema-<v>.xml   TM1's $metadata, as capt
 java/tm1-client/src/model/metadata/tm1-probe-<v>.json   what the probe found (this tool)
 ```
 
-A build tool: not published, and nothing at run time depends on it. It's still growing ([#312]):
-today it finds **undeclared properties**. What each type accepts in a POST and a PATCH comes next,
-in the same file. Until the generators read the file, it's a record and a diff, not an input.
+A build tool: not published, and nothing at run time depends on it. It's still growing ([#312]).
+It finds **undeclared properties**, and **what each type does with each property in a POST and a
+PATCH**. Until the generators read the file, it's a record and a diff, not an input.
 
 [#312]: https://github.com/ajmyers/skipcheck-tm1/issues/312
 
@@ -61,6 +61,20 @@ two to start the containers. Then review and commit the file it wrote.
    counts only if TM1 accepts a declared name there and refuses one no type has.
 5. **Values.** Each undeclared property is read from an entity, for the kind of JSON value it
    holds.
+6. **Writes**, on the first server, as [`write-cases.json`](src/main/resources/io/skipcheck/tm1/probe/write-cases.json)
+   describes them: per case, where to create the type, the least a create needs (`base`), a
+   fixture to read every property from (declared and undeclared, selected by name), and values for
+   properties none can be made up for. For each case:
+   - `postRead`: the fixture's read body POSTed back as a create;
+   - `minimal` and `required`: the base alone, then without each of its properties;
+   - `post` and `patch`: per property, the base plus that property in a create, and that
+     property in a PATCH of a fresh object, each read back;
+   - `patchNull`: per property, a PATCH setting it to `null`;
+   - `rename`: a PATCH of `Name`.
+
+   The value sent is the case's, else the fixture's where it differs from the default, else one
+   made up from the property's type (another enum member, a flipped boolean, a number plus one).
+   Collection cases create an object with some members, PATCH the collection, and read it back.
 
 With several servers, each one creates the same fixtures and finds its own paths, then takes
 every Nth type in name order. Identical servers give identical answers, so the file doesn't
@@ -75,12 +89,20 @@ depend on how many there were.
 | `undeclared` | per entity type, the properties TM1 accepts that `$metadata` doesn't declare, each with the kind of value read (`string`, `number`, `boolean`, `array`, `object`, `null`, `navigation`, or `unread`). `null` says only that the fixture's value was null. |
 | `declaredRefused` | per entity type, declared properties TM1 refused: `$metadata` declares more than the server has |
 | `unverifiable` | types TM1 doesn't check names for, such as `View` (any type with subtypes, in any form, casts included) and `Annotation`: undeclared properties there are invisible to this probe |
+| `writes` | per case: `postRead`, `minimal`, `required`, and per property `post`, `patch` and `patchNull`, then `rename`. An outcome is `applied` (read back as sent), `ignored` (2xx, read back as the default), `transformed` (2xx, read back as neither: `UniqueName` follows the name, line ends are normalised), `rejected` (with `status` and TM1's error `code`), `accepted` (2xx, nothing to read back), or `untested` (no value to send) |
+| `collections` | per collection case, what a PATCH of it does: `replaces`, `appends`, `reorders`, `ignored`, `rejected` or `mixed` |
 | `unreached` | types the walk found no path to. It follows declared navigation types, so a subtype (`NativeView`, `ProcessReference`) is reached only as its base type and is listed here. So are types nothing on the server holds (`GitPlan` without Git). |
 
 Everything is sorted and nothing depends on when or where it ran: probing the same server twice
-writes the same file.
+writes the same file. The writes keep outcomes, statuses and error codes only, never TM1's
+messages or the values read, which can hold the names of objects the run made.
 
 ## What it can't see
+
+- **Writes of types without a case**, such as `ChoreTask` and `Edge` (keys the server assigns,
+  or two-part keys): add a case to `write-cases.json`.
+- **What depends on other properties**, beyond the fixture each case reads: a process's
+  data source fields for another `Type`, say.
 
 - **Properties inside complex values.** `$select=DataSource/x` isn't checked; TM1 answers 200
   for any name.
