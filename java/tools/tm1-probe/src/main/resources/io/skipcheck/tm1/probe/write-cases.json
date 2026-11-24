@@ -1,21 +1,79 @@
 {
 	"$comment": "What the write probe tries, for each type (WriteProbe): where to create it, the least a create needs (base, plus Name), a fixture to read a full set of properties from, and values for properties no value can be made up for. {p} is the fixtures' prefix, {name} the name of the object a test creates. Hand-written; extend it as new types or properties need probing.",
 	"targets": {
-		"$comment": "Per entity type, a fixture a navigation of that type is bound to: what a binding in a create or a PATCH of each probed type's navigations points at. A type with none gets its bindings untested.",
+		"$comment": "Per entity type, a fixture a navigation of that type is bound to: a path, or {\"from\", \"key\", \"path\"} for a key TM1 assigns, found at run time (without \"key\", the first member's @odata.id). A type with none gets its bindings untested.",
+		"Annotation": {
+			"from": "Cubes('{p}Cube')/Annotations?$top=1",
+			"key": "ID",
+			"path": "Annotations('{key}')"
+		},
+		"ApplicationContextFacetValue": "ApplicationContextFacets('}Cubes')/Values('{p}Cube')",
 		"AttributeDefinition": "CubeAttributes('{p}CubeAttribute')",
 		"Chore": "Chores('{p}Chore')",
+		"ChoreTask": "Chores('{p}Chore')/Tasks(0)",
 		"Cube": "Cubes('{p}Cube')",
 		"Dimension": "Dimensions('{p}Other')",
+		"Edge": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Edges(ParentName='{p}Total',ComponentName='{p}A')",
 		"Element": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Elements('{p}B')",
+		"Entry": "Contents('Applications')/Contents('{p}Folder')",
+		"Folder": "Contents('Applications')/Contents('{p}Folder')",
 		"Group": "Groups('{p}Group')",
 		"Hierarchy": "Dimensions('{p}Dim')/Hierarchies('{p}Alternate')",
+		"Level": {
+			"from": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Levels?$top=1"
+		},
+		"LocalizedAttributes": "Cubes('{p}Cube')/LocalizedAttributes('fr')",
+		"Member": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Members('{p}A')",
 		"Process": "Processes('{p}Ascii')",
+		"ProcessErrorLog": {
+			"from": "Processes('{p}Fail')/ErrorLogs?$top=1",
+			"key": "Timestamp",
+			"path": "Processes('{p}Fail')/ErrorLogs({key})"
+		},
+		"Session": {
+			"from": "ActiveSession",
+			"key": "ID",
+			"path": "Sessions({key})"
+		},
 		"Subset": "Dimensions('{p}Dim')/Hierarchies('{p}Dim')/Subsets('{p}Static')",
 		"User": "Users('{p}User')",
 		"View": "Cubes('{p}Cube')/Views('{p}Mdx')"
 	},
 	"nest": {
-		"$comment": "Per entity type, the case a nested entity of it is made from, where the first case by id won't do: an MDX view's query names the fixture cube, so a view nested in a new cube is a native one.",
+		"$comment": "Per entity type, how a nested entity of it is made, where the first case by id won't do: a case's id, or a body (with {name}) for a type without a case to make one from, or one not addressed by a name. An MDX view's query names the fixture cube, so a view nested in a new cube is a native one.",
+		"ApplicationContextFacetValue": {
+			"Facet@odata.bind": "ApplicationContextFacets('}Cubes')",
+			"Value": "{p}Cube"
+		},
+		"Attachment": {
+			"Name": "{name}"
+		},
+		"ChoreTask": {
+			"Process@odata.bind": "Processes('{p}Ascii')",
+			"Parameters": [
+				{
+					"Name": "pValue",
+					"Value": "1"
+				}
+			]
+		},
+		"Edge": {
+			"ParentName": "{p}Total",
+			"ComponentName": "{p}B",
+			"Weight": 1
+		},
+		"Level": {
+			"Name": "{name}"
+		},
+		"LocalizedAttributes": {
+			"LocaleID": "de",
+			"Attributes": {}
+		},
+		"Member": {
+			"Name": "{name}"
+		},
+		"ProcessErrorLog": {},
+		"Session": {},
 		"View": "NativeView"
 	},
 	"cases": [

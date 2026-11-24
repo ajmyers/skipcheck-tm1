@@ -111,9 +111,10 @@ A case in [`write-cases.json`](src/main/resources/io/skipcheck/tm1/probe/write-c
 | `assigned` | the key TM1 assigns, read from the create's answer: a task's `Step`, an annotation's or a link's `ID` (a link's is its name and `.extr`) |
 | `setup`, `teardown` | requests before each create and after each delete, with `{name}` (an edge's component element) |
 | `names` | the names to use in turn, where TM1 takes only some (locales, for translations) |
-| `targets` | the case's own binding targets, over the cases' `targets` |
+| `targets` | the case's own binding targets, over the cases' `targets`. A target is a path, or `{"from", "key", "path"}` for a key TM1 assigns, found at run time (a session's `ID`; with no `key`, the first member's `@odata.id`, a level's) |
 | `secrets` | properties TM1 never reads back, checked by signing in |
 | `singleton`, `skip` | one object, patched setting by setting (nested ones by path, `Administration/Language`), read back and set back; `skip` leaves paths alone, such as what the probe's own connection depends on |
+| (cases') `nest` | per entity type, how a nested entity of it is made: a case's id, or a body with `{name}` for a type without a case, or one not found by a name (a member, a task, an edge, a translation) |
 | `generate` | `false` while the generators don't use the case yet ([#338](https://github.com/ajmyers/skipcheck-tm1/issues/338)): its writes are recorded, and `tm1-codegen` skips them |
 
 ## The file

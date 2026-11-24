@@ -87,6 +87,10 @@ public final class ProbeFixtures {
 							 "Variables": [{"Name": "vDim", "Type": "String", "Position": 1, "StartByte": 0, "EndByte": 0},
 							               {"Name": "vMeasure", "Type": "String", "Position": 2, "StartByte": 0, "EndByte": 0},
 							               {"Name": "Value", "Type": "Numeric", "Position": 3, "StartByte": 0, "EndByte": 0}]}"""),
+			// A process that fails, run once, for an error log to bind to
+			step("POST", "Processes", """
+					{"Name": "%1$sFail", "PrologProcedure": "ProcessError;\\r\\n"}"""),
+			step("POST", "Processes('%1$sFail')/tm1.ExecuteWithReturn", "{}"),
 			step("POST", "Processes('%1$sAscii')/tm1.ExecuteWithReturn", """
 					{"Parameters": [{"Name": "pValue", "Value": "1"}]}"""),
 			step("POST", "Chores",
@@ -118,8 +122,8 @@ public final class ProbeFixtures {
 							 "objectName": "%1$sCube"}"""));
 
 	private static final List<String> DELETES = List.of("Chores('%1$sChore')", "Processes('%1$sAscii')",
-			"Processes('%1$sView')", "Cubes('%1$sCube')", "Dimensions('%1$sDim')", "Dimensions('%1$sMeasures')",
-			"Dimensions('%1$sOther')", "Users('%1$sUser')", "Groups('%1$sGroup')",
+			"Processes('%1$sView')", "Processes('%1$sFail')", "Cubes('%1$sCube')", "Dimensions('%1$sDim')",
+			"Dimensions('%1$sMeasures')", "Dimensions('%1$sOther')", "Users('%1$sUser')", "Groups('%1$sGroup')",
 			"CubeAttributes('%1$sCubeAttribute')", "ProcessAttributes('%1$sProcessAttribute')",
 			"Sandboxes('%1$sSandbox')", // TM1 gives a link the ID of its name and .extr
 			"Contents('Applications')/Contents('%1$sFolder')/Contents('%1$sLink.extr')",
