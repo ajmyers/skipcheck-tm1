@@ -10,10 +10,12 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.model.AnnotationCreate;
 import io.skipcheck.tm1.client.model.ChoreCreate;
 import io.skipcheck.tm1.client.model.CubeCreate;
 import io.skipcheck.tm1.client.model.EncryptionAtRestProviderSettingsPatch;
 import io.skipcheck.tm1.client.model.NativeViewPatch;
+import io.skipcheck.tm1.client.model.NetworkSettingsPatch;
 import io.skipcheck.tm1.client.model.ServerSettingsPatch;
 import io.skipcheck.tm1.client.model.VaultSettingsPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
@@ -89,12 +91,21 @@ class PatchBuildersTest {
 			.isThrownBy(() -> PatchBuilders.build(NativeViewPatch.class,
 					json("{\"@odata.type\": \"#ibm.tm1.api.v1.NativeView\", \"Name\": \"renamed\"}")))
 			.withMessage("NativeViewPatch has no setter for Name");
+		// Nor a declared navigation's binding
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> PatchBuilders.build(NativeViewPatch.class,
+					json("{\"@odata.type\": \"#ibm.tm1.api.v1.NativeView\", \"Cube@odata.bind\": \"Cubes('x')\"}")))
+			.withMessage("NativeViewPatch has no setter for Cube@odata.bind");
 	}
 
 	@Test
 	void refusesAValueThatDoesntReadBackAsWritten() {
 		assertThatIllegalArgumentException().isThrownBy(
 				() -> PatchBuilders.build(ChoreCreate.class, json("{\"Name\": \"c\", \"ExecutionMode\": \"Nope\"}")))
+			.withMessageContaining("doesn't read back as written");
+		// A flags enum's setter takes text, so its members are checked by the spec
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> PatchBuilders.build(NetworkSettingsPatch.class, json("{\"IPVersion\": \"Nope\"}")))
 			.withMessageContaining("doesn't read back as written");
 		assertThatIllegalArgumentException()
 			.isThrownBy(() -> PatchBuilders.build(CubeCreate.class,
@@ -108,6 +119,33 @@ class PatchBuildersTest {
 				json("{\"Name\": \"c\", \"StartTime\": \"2026-03-04T05:06:07.5+02:00\"}"));
 		assertThat(built).isEqualTo(
 				ChoreCreate.builder().name("c").startTime(OffsetDateTime.parse("2026-03-04T05:06:07.5+02:00")).build());
+	}
+
+	@Test
+	void refusesABindingPathThatIsntEncoded() {
+		// As written, it goes out as it is: so it must be as TM1 gets it, as a caller's
+		// path is
+		for (String path : List.of("Dimensions('a b')", "Dimensions('100%')", "ApplicationContextFacets('}Cubes')")) {
+			assertThatIllegalArgumentException()
+				.isThrownBy(() -> PatchBuilders.build(CubeCreate.class,
+						JSON.createObjectNode()
+							.put("Name", "c")
+							.set("Dimensions@odata.bind", JSON.createArrayNode().add(path))))
+				.withMessageContaining("isn't encoded as TM1 gets it");
+		}
+	}
+
+	@Test
+	void refusesAValueOfTheWrongShape() {
+		// One value where the setter takes a list, and a list where it takes one
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> PatchBuilders.build(AnnotationCreate.class,
+					json("{\"Text\": \"t\", \"ApplicationContext\": {\"Value\": \"x\"}}")))
+			.withMessageContaining("takes a list");
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> PatchBuilders.build(ChoreCreate.class,
+					json("{\"Name\": \"c\", \"ExecutionMode\": [\"SingleCommit\"]}")))
+			.withMessageContaining("takes one value");
 	}
 
 }

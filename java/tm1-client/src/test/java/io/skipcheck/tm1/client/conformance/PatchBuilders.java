@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import org.jspecify.annotations.Nullable;
 
@@ -49,7 +50,20 @@ final class PatchBuilders {
 	private static final JsonNode SPEC = ConformanceCodec.json()
 		.readTree(new File(Objects.requireNonNull(System.getProperty("tm1.spec"), "tm1.spec")));
 
-	private static final Map<Class<?>, Set<String>> DECLARED = new ConcurrentHashMap<>();
+	private static final Map<Class<?>, Map<String, JsonNode>> DECLARED = new ConcurrentHashMap<>();
+
+	private static final Map<String, JsonNode> ENUMS = new LinkedHashMap<>();
+
+	static {
+		SPEC.path("enums").forEach(e -> ENUMS.put(e.path("qualifiedName").asString(), e));
+	}
+
+	private static final String BIND = "@odata.bind";
+
+	/**
+	 * A path segment encoded as a client encodes one: unreserved characters, or a %XX.
+	 */
+	private static final Pattern ENCODED = Pattern.compile("([A-Za-z0-9\\-._~'()=,@$!]|%[0-9A-F]{2})*");
 
 	/** Per builder class, the setter that writes each JSON name. */
 	private static final Map<Class<?>, Map<String, Method>> SETTERS = new ConcurrentHashMap<>();
@@ -76,7 +90,8 @@ final class PatchBuilders {
 				String key = e.getKey();
 				if (key.equals("@odata.type")) {
 					// The builder sends its own, which must be this one
-					if (!e.getValue().asString().equals(values(builder).get("@odata.type"))) {
+					if (!e.getValue().isString()
+							|| !e.getValue().asString().equals(values(builder).get("@odata.type"))) {
 						throw new IllegalArgumentException(
 								type.getSimpleName() + " doesn't send @odata.type " + e.getValue());
 					}
@@ -84,9 +99,13 @@ final class PatchBuilders {
 				}
 				Method setter = setters.get(key);
 				if (setter != null) {
+					if (!key.endsWith(BIND)) {
+						check(type, key, e.getValue());
+					}
 					setter.invoke(builder, argument(setter, e.getValue()));
 				}
-				else if (!key.startsWith("@") && open(builder.getClass()) && !declared(type).contains(key)) {
+				else if (!key.startsWith("@") && open(builder.getClass())
+						&& !declared(type).containsKey(key.replace(BIND, ""))) {
 					builder.getClass()
 						.getMethod("property", String.class, Object.class)
 						.invoke(builder, key, ConformanceCodec.json().treeToValue(e.getValue(), Object.class));
@@ -150,6 +169,11 @@ final class PatchBuilders {
 		if (!value.isString()) {
 			throw new IllegalArgumentException(setter.getName() + " binds a path, not " + value);
 		}
+		for (String segment : value.asString().split("/", -1)) {
+			if (!ENCODED.matcher(segment).matches()) {
+				throw new IllegalArgumentException(value + " isn't encoded as TM1 gets it: " + segment);
+			}
+		}
 		try {
 			Constructor<ODataPath> make = ODataPath.class.getDeclaredConstructor(List.class);
 			make.setAccessible(true);
@@ -171,6 +195,10 @@ final class PatchBuilders {
 		if (type instanceof ParameterizedType p && p.getRawType() == List.class) {
 			Class<?> element = write(p.getActualTypeArguments()[0]);
 			if (element != null) {
+				if (!value.isArray()) {
+					throw new IllegalArgumentException(
+							"A list of " + element.getSimpleName() + " is a list, not " + value);
+				}
 				List<Object> out = new ArrayList<>();
 				value.forEach(v -> out.add(build(element, v)));
 				return out;
@@ -197,18 +225,57 @@ final class PatchBuilders {
 		return out;
 	}
 
-	/** The names a write's type declares, its base's too, from the spec. */
-	private static Set<String> declared(Class<?> write) {
+	/**
+	 * A value's shape and, for an enum, its members, by the spec, as every runner checks
+	 * them: one value or a list, as the plan's setter takes; an enum's value one TM1 has
+	 * (a flags enum's, each of its comma-separated members), which the typed setters of a
+	 * flags enum, taking text, wouldn't check.
+	 */
+	private static void check(Class<?> write, String key, JsonNode value) {
+		if (value.isNull()) {
+			return;
+		}
+		JsonNode setter = null;
+		for (JsonNode s : SPEC.path("builders").path(write.getSimpleName()).path("setters")) {
+			if (s.path("json").asString().equals(key)) {
+				setter = s;
+			}
+		}
+		if (setter != null && setter.path("collection").asBoolean() != value.isArray()) {
+			throw new IllegalArgumentException(write.getSimpleName() + "." + key + " takes "
+					+ (setter.path("collection").asBoolean() ? "a list" : "one value") + ", not " + value);
+		}
+		JsonNode property = declared(write).get(key);
+		JsonNode enumType = property == null ? null : ENUMS.get(property.path("type").asString());
+		if (enumType == null) {
+			return;
+		}
+		Set<String> members = new HashSet<>();
+		enumType.path("members").forEach(m -> members.add(m.path("name").asString()));
+		for (JsonNode v : value.isArray() ? value : List.of(value)) {
+			List<String> parts = !v.isString() ? List.of() : enumType.path("flags").asBoolean()
+					? Arrays.stream(v.asString().split(",")).map(String::trim).toList() : List.of(v.asString());
+			if (parts.isEmpty() || !members.containsAll(parts)) {
+				throw new IllegalArgumentException(v + " doesn't read back as written: "
+						+ enumType.path("name").asString() + " has no such member");
+			}
+		}
+	}
+
+	/**
+	 * The properties and navigations a write's type declares, its base's too, by name.
+	 */
+	private static Map<String, JsonNode> declared(Class<?> write) {
 		return DECLARED.computeIfAbsent(write, w -> {
 			String name = w.getSimpleName().replaceAll("(Create|Patch)$", "");
 			Map<String, JsonNode> byName = new LinkedHashMap<>();
 			SPEC.path("types").forEach(t -> byName.put(t.path("qualifiedName").asString(), t));
-			Set<String> out = new HashSet<>();
+			Map<String, JsonNode> out = new LinkedHashMap<>();
 			for (JsonNode t : byName.values()) {
 				if (t.path("name").asString().equals(name)) {
 					for (JsonNode level = t; level != null; level = byName.get(level.path("baseType").asString(""))) {
-						level.path("properties").forEach(p -> out.add(p.path("name").asString()));
-						level.path("navigationProperties").forEach(p -> out.add(p.path("name").asString()));
+						level.path("properties").forEach(p -> out.putIfAbsent(p.path("name").asString(), p));
+						level.path("navigationProperties").forEach(p -> out.putIfAbsent(p.path("name").asString(), p));
 					}
 				}
 			}
