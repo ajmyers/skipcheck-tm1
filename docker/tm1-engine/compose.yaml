@@ -1,0 +1,65 @@
+# tm1-engine: a local IBM TM1 v12 engine (Planning Analytics 3.x) for development and tests.
+#
+# This file works on its own: download it into an empty folder and run it. It uses the
+# published image (ghcr.io/ajmyers/tm1-engine). To use an image you built from the repo,
+# set TM1_ENGINE_IMAGE=tm1-engine:local in .env.
+#
+#   docker compose up -d                                  # TM1 + MongoDB -> http://localhost:4444
+#   docker compose exec tm1-engine tm1-engine credentials # every address and credential
+#   docker compose exec tm1-engine tm1-engine session     # log in as admin: a cookie for curl -b
+#
+# Where TM1 comes from (set in .env; see .env.example):
+#   - nothing set: put IBM's tm1-v<version>-standalone-linux.tgz in ./bundles. It's
+#     installed once, on first start, into the Docker volume "tm1-engine-install".
+#   - TM1_ENGINE_BUNDLE_URL: download the package instead (e.g. a pre-signed S3 link)
+#   - TM1_ENGINE_IMAGE: a private image with TM1 built in (or your own build)
+#
+# TM1's files are in ./tm1-engine-files (or TM1_ENGINE_FILES_DIR): deployment/ holds the
+# configuration, databases and logs; credentials/ the root and application credentials.
+
+services:
+  tm1-engine:
+    image: ${TM1_ENGINE_IMAGE:-ghcr.io/ajmyers/tm1-engine:latest}
+    platform: linux/amd64
+    container_name: tm1-engine
+    depends_on:
+      mongo:
+        condition: service_healthy
+    stop_grace_period: 2m     # each database is stopped cleanly first
+    restart: unless-stopped
+    environment:
+      TM1_DATASTORE_URL: mongodb://tm1:${TM1_DATASTORE_PASSWORD:-tm1-datastore}@mongo:27017
+      TM1_DATABASES: ${TM1_DATABASES:-tm1}
+      TM1_USERS: ${TM1_USERS:-}
+      TM1_ENGINE_BUNDLE_URL: ${TM1_ENGINE_BUNDLE_URL:-}
+      TM1_ENGINE_BUNDLE: ${TM1_ENGINE_BUNDLE:-}
+      TM1_ENGINE_BUNDLE_SHA256: ${TM1_ENGINE_BUNDLE_SHA256:-}
+    ports:
+      - "${TM1_ENGINE_PORT:-4444}:4444"   # REST API, logins and the management API
+    volumes:
+      - tm1-engine-install:/opt/ibm/tm1-engine
+      - ${TM1_ENGINE_BUNDLE_DIR:-./bundles}:/ibm:ro
+      - ${TM1_ENGINE_FILES_DIR:-./tm1-engine-files}/deployment:/tm1/deployment
+      - ${TM1_ENGINE_FILES_DIR:-./tm1-engine-files}/credentials:/tm1/credentials
+
+  # TM1's datastore. Not IBM software: the official MongoDB image, which runs natively
+  # on Apple Silicon too. Only TM1 talks to it, so it has no published port.
+  mongo:
+    image: mongo:8.0
+    container_name: tm1-engine-mongo
+    command: ["--wiredTigerCacheSizeGB", "0.5"]
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: tm1
+      MONGO_INITDB_ROOT_PASSWORD: ${TM1_DATASTORE_PASSWORD:-tm1-datastore}
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - tm1-engine-datastore:/data/db
+
+volumes:
+  tm1-engine-install:
+  tm1-engine-datastore:

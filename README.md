@@ -20,6 +20,7 @@ Java is the reference: the other clients have its API, and their tests replay wh
 | [`java/tools`](java/tools) | Applications built on the libraries (not published). |
 | [`spec`](spec) | The language-neutral API spec every client is generated from and counts its coverage against, exported from TM1's `$metadata` by `tm1-codegen`. |
 | [`docker/tm1-server`](docker/tm1-server) | Docker image for TM1 Server, for local development and tests. You supply your own licensed TM1; no IBM software is included. **[Getting started](docker/tm1-server/GETTING-STARTED.md)** |
+| [`docker/tm1-engine`](docker/tm1-engine) | Docker image for TM1 v12, the TM1 engine of Planning Analytics 3.x: one engine holding instances and databases, set up from environment variables. You supply your own licensed TM1 v12; no IBM software is included. |
 | [`docker/tm1-web`](docker/tm1-web) | Docker image for TM1 Web (Planning Analytics Spreadsheet Services), to run alongside `tm1-server`. You supply your own licensed TM1 Web; no IBM software is included. |
 | [`docker/paw`](docker/paw) | Runs IBM's Planning Analytics Workspace Local images from your own PAW zip, next to `tm1-server`. No IBM software is included. |
 | [`docker/cognos-server`](docker/cognos-server) | Docker image for Cognos Analytics, for testing TM1's Cognos (CAM) security with test users through LDAP and OIDC. You supply your own licensed Cognos; no IBM software is included. |

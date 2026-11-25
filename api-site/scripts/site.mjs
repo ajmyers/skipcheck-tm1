@@ -120,6 +120,7 @@ export const PA_DOCKER = {
 		{ path: 'pa-setup', source: 'docker/pa-setup/README.md' },
 		{ path: 'tm1-server', source: 'docker/tm1-server/README.md' },
 		{ path: 'tm1-server/getting-started', source: 'docker/tm1-server/GETTING-STARTED.md', label: 'Getting started' },
+		{ path: 'tm1-engine', source: 'docker/tm1-engine/README.md' },
 		{ path: 'tm1-web', source: 'docker/tm1-web/README.md' },
 		{ path: 'paw', source: 'docker/paw/README.md' },
 		{ path: 'cognos-server', source: 'docker/cognos-server/README.md' },
