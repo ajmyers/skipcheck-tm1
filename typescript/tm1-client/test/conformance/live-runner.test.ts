@@ -237,6 +237,7 @@ describe("the live conformance runner", () => {
     "annotations",
     "processes",
     "chores",
+    "round-trips",
   ])("runs a scenario sending one request per step: %s", async (name) => {
     const s = live.scenarios().find((x) => x.name === name)!;
     const names = live.namesFor(s);

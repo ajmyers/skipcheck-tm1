@@ -1,0 +1,346 @@
+{
+	"specVersion" : 1,
+	"name" : "round-trips",
+	"description" : "Writes built from what was read: each object is read (and kept), its write type's builder(read) is changed by one setter ($fromRead) and sent through its service's update, then read back. So what builder(read) copies and binds is sent to TM1 as a caller would, in every client. The server's static configuration isn't sent back here: TM1 rereads tm1s.cfg as it changes, and the settings scenario writes it.",
+	"names" : [ "dim", "month", "cube", "mdx", "subset", "process", "chore", "user", "sandbox" ],
+	"steps" : [
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${dim}", "Hierarchies" : [ { "Name" : "${dim}", "Elements" : [ { "Name" : "A", "Type" : "Numeric" }, { "Name" : "B", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${dim}" } }
+		},
+		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${month}", "Hierarchies" : [ { "Name" : "${month}", "Elements" : [ { "Name" : "Jan", "Type" : "Numeric" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${month}" } }
+		},
+		{
+			"service" : "hierarchies",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$query" : {  } } ],
+			"expect" : { "fields" : { "Name" : "${dim}" } },
+			"keep" : "hierarchy"
+		},
+		{
+			"service" : "hierarchies",
+			"method" : "update",
+			"params" : [ "dimension", "hierarchy", "patch" ],
+			"args" : [ "${dim}", "${dim}", { "$fromRead" : "HierarchyPatch", "read" : "hierarchy", "json" : { "ElementsSortType" : "ByName" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "hierarchies",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$query" : { "select" : [ "ElementsSortType" ] } } ],
+			"expect" : { "fields" : { "ElementsSortType" : "ByName" } }
+		},
+		{
+			"service" : "elements",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "element", "query" ],
+			"args" : [ "${dim}", "${dim}", "A", { "$query" : {  } } ],
+			"expect" : { "fields" : { "Name" : "A" } },
+			"keep" : "element"
+		},
+		{
+			"service" : "elements",
+			"method" : "update",
+			"params" : [ "dimension", "hierarchy", "element", "patch" ],
+			"args" : [ "${dim}", "${dim}", "A", { "$fromRead" : "ElementPatch", "read" : "element", "json" : {  } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "cubes",
+			"method" : "create",
+			"params" : [ "cube" ],
+			"args" : [ { "$patch" : "CubeCreate", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${dim}')", "Dimensions('${month}')" ] } } ],
+			"expect" : { "fields" : { "Name" : "${cube}" } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${cube}", { "$query" : {  } } ],
+			"expect" : { "fields" : { "Name" : "${cube}" } },
+			"keep" : "cube"
+		},
+		{
+			"service" : "cubes",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${cube}", { "$fromRead" : "CubePatch", "read" : "cube", "json" : { "Rules" : "SKIPCHECK;" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "cubes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${cube}", { "$query" : { "select" : [ "Rules" ] } } ],
+			"expect" : { "fields" : { "Rules" : "SKIPCHECK;" } }
+		},
+		{
+			"service" : "views",
+			"method" : "create",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "MDXViewCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.MDXView", "Name" : "${mdx}", "MDX" : "SELECT {[${dim}].[${dim}].[A]} ON 0 FROM [${cube}]" } } ],
+			"expect" : { "fields" : { "Name" : "${mdx}" } }
+		},
+		{
+			"service" : "views",
+			"method" : "get",
+			"params" : [ "cube", "scope", "view", "query" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${mdx}", { "$query" : {  } } ],
+			"expect" : { "fields" : { "@odata.type" : "#ibm.tm1.api.v1.MDXView", "Name" : "${mdx}" } },
+			"keep" : "mdx"
+		},
+		{
+			"service" : "views",
+			"method" : "update",
+			"params" : [ "cube", "scope", "view", "patch" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${mdx}", { "$fromRead" : "MDXViewPatch", "read" : "mdx", "json" : { "MDX" : "SELECT {[${dim}].[${dim}].[B]} ON 0 FROM [${cube}]" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "views",
+			"method" : "get",
+			"params" : [ "cube", "scope", "view", "query" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${mdx}", { "$query" : {  } } ],
+			"expect" : { "fields" : { "MDX" : "SELECT {[${dim}].[${dim}].[B]} ON 0 FROM [${cube}]" } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "SubsetCreate", "json" : { "Name" : "${subset}", "Expression" : "{TM1SUBSETALL([${dim}].[${dim}])}" } } ],
+			"expect" : { "fields" : { "Name" : "${subset}" } }
+		},
+		{
+			"service" : "subsets",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}", { "$query" : {  } } ],
+			"expect" : { "fields" : { "Name" : "${subset}" } },
+			"keep" : "subset"
+		},
+		{
+			"service" : "subsets",
+			"method" : "update",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "patch" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}", { "$fromRead" : "SubsetPatch", "read" : "subset", "json" : { "ExpandAbove" : true } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "subsets",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "scope", "subset", "query" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}", { "$query" : { "select" : [ "ExpandAbove" ] } } ],
+			"expect" : { "fields" : { "ExpandAbove" : true } }
+		},
+		{
+			"service" : "processes",
+			"method" : "create",
+			"params" : [ "process" ],
+			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${process}", "PrologProcedure" : "x = 1;\r\n" } } ],
+			"expect" : { "fields" : { "Name" : "${process}" } }
+		},
+		{
+			"service" : "processes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${process}", { "$query" : {  } } ],
+			"expect" : { "fields" : { "Name" : "${process}" } },
+			"keep" : "process"
+		},
+		{
+			"service" : "processes",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${process}", { "$fromRead" : "ProcessPatch", "read" : "process", "json" : { "EpilogProcedure" : "y = 2;\r\n" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "processes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${process}", { "$query" : { "select" : [ "PrologProcedure", "EpilogProcedure" ] } } ],
+			"expect" : { "fields" : { "PrologProcedure" : "x = 1;\r\n", "EpilogProcedure" : "y = 2;\r\n" } }
+		},
+		{
+			"service" : "chores",
+			"method" : "create",
+			"params" : [ "chore" ],
+			"args" : [ { "$patch" : "ChoreCreate", "json" : { "Name" : "${chore}", "StartTime" : "2026-01-01T02:00:00Z", "Frequency" : "PT24H", "Active" : false, "Tasks" : [ { "Process@odata.bind" : "Processes('${process}')" } ] } } ],
+			"expect" : { "fields" : { "Name" : "${chore}" } }
+		},
+		{
+			"service" : "chores",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${chore}", { "$query" : {  } } ],
+			"expect" : { "fields" : { "Name" : "${chore}" } },
+			"keep" : "chore"
+		},
+		{
+			"service" : "chores",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${chore}", { "$fromRead" : "ChorePatch", "read" : "chore", "json" : { "DSTSensitive" : true } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "chores",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${chore}", { "$query" : { "select" : [ "DSTSensitive", "Active" ] } } ],
+			"expect" : { "fields" : { "DSTSensitive" : true, "Active" : false } }
+		},
+		{
+			"service" : "users",
+			"method" : "create",
+			"params" : [ "user" ],
+			"args" : [ { "$patch" : "UserCreate", "json" : { "Name" : "${user}", "Password" : "pw" } } ],
+			"expect" : { "fields" : { "Name" : "${user}" } }
+		},
+		{
+			"service" : "users",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${user}", { "$query" : {  } } ],
+			"expect" : { "fields" : { "Name" : "${user}" } },
+			"keep" : "user"
+		},
+		{
+			"service" : "users",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${user}", { "$fromRead" : "UserPatch", "read" : "user", "json" : { "FriendlyName" : "Round trip" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "users",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${user}", { "$query" : { "select" : [ "FriendlyName" ] } } ],
+			"expect" : { "fields" : { "FriendlyName" : "Round trip" } }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "create",
+			"params" : [ "sandbox" ],
+			"args" : [ { "$patch" : "SandboxCreate", "json" : { "Name" : "${sandbox}" } } ],
+			"expect" : { "fields" : { "Name" : "${sandbox}" } }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${sandbox}", { "$query" : {  } } ],
+			"expect" : { "fields" : { "Name" : "${sandbox}" } },
+			"keep" : "sandbox"
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${sandbox}", { "$fromRead" : "SandboxPatch", "read" : "sandbox", "json" : { "IncludeInSandboxDimension" : false } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "get",
+			"params" : [ "name", "query" ],
+			"args" : [ "${sandbox}", { "$query" : { "select" : [ "IncludeInSandboxDimension" ] } } ],
+			"expect" : { "fields" : { "IncludeInSandboxDimension" : false } }
+		},
+		{
+			"service" : "server",
+			"method" : "logger",
+			"params" : [ "name", "query" ],
+			"args" : [ "TM1.Server", { "$query" : { "select" : [ "Name", "Level" ] } } ],
+			"expect" : { "fields" : { "Name" : "TM1.Server" } },
+			"keep" : "logger"
+		},
+		{
+			"service" : "server",
+			"method" : "updateLogger",
+			"params" : [ "name", "patch" ],
+			"args" : [ "TM1.Server", { "$fromRead" : "LoggerPatch", "read" : "logger", "json" : { "Level" : "Debug" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "server",
+			"method" : "logger",
+			"params" : [ "name", "query" ],
+			"args" : [ "TM1.Server", { "$query" : { "select" : [ "Level" ] } } ],
+			"expect" : { "fields" : { "Level" : "Debug" } }
+		}
+	],
+	"finally" : [
+		{
+			"service" : "server",
+			"method" : "updateLogger",
+			"params" : [ "name", "patch" ],
+			"args" : [ "TM1.Server", { "$fromRead" : "LoggerPatch", "read" : "logger", "json" : {  } } ]
+		},
+		{
+			"service" : "sandboxes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${sandbox}" ]
+		},
+		{
+			"service" : "users",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${user}" ]
+		},
+		{
+			"service" : "chores",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${chore}" ]
+		},
+		{
+			"service" : "processes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${process}" ]
+		},
+		{
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${dim}", "${dim}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}" ]
+		},
+		{
+			"service" : "views",
+			"method" : "delete",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${mdx}" ]
+		},
+		{
+			"service" : "cubes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${cube}" ]
+		},
+		{
+			"service" : "dimensions",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${dim}" ]
+		},
+		{
+			"service" : "dimensions",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${month}" ]
+		}
+	]
+}

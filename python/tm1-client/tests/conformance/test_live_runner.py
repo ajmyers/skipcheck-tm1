@@ -148,7 +148,22 @@ def _answering_as_expected(scenario: dict[str, Any], names: dict[str, str]) -> F
 
 @pytest.mark.parametrize(
     "name",
-    ["subsets", "members", "edges", "member-sets", "content", "encryption", "git", "users", "sessions", "attributes", "annotations", "processes", "chores"],
+    [
+        "subsets",
+        "members",
+        "edges",
+        "member-sets",
+        "content",
+        "encryption",
+        "git",
+        "users",
+        "sessions",
+        "attributes",
+        "annotations",
+        "processes",
+        "chores",
+        "round-trips",
+    ],
 )
 def test_runs_a_scenario_sending_one_request_per_step(traffic_dir: Path, name: str) -> None:
     # In both flavors

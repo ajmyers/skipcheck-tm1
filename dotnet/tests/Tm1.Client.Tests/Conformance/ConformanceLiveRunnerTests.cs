@@ -315,6 +315,7 @@ public class ConformanceLiveRunnerTests
     [InlineData("annotations")]
     [InlineData("processes")]
     [InlineData("chores")]
+    [InlineData("round-trips")]
     public async Task RunsAScenarioSendingOneRequestPerStep(string name)
     {
         var scenario = ConformanceLive.Load(name);

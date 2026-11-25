@@ -199,7 +199,7 @@ class ConformanceScenariosTest {
 
 	@ParameterizedTest(name = "{0}")
 	@ValueSource(strings = { "subsets", "members", "edges", "member-sets", "content", "encryption", "git", "users",
-			"sessions", "attributes", "annotations", "processes", "chores" })
+			"sessions", "attributes", "annotations", "processes", "chores", "round-trips" })
 	void runsAScenarioSendingOneRequestPerStep(String name) {
 		JsonNode scenario = ConformanceScenarios.load(ConformanceScenarios.directory().resolve(name + ".json"));
 		Map<String, String> names = ConformanceScenarios.names(scenario);
