@@ -120,14 +120,8 @@ public final class ConformanceDecoder {
 	}
 
 	private static Object patch(Class<?> patch, JsonNode json) {
-		try {
-			Constructor<?> ctor = patch.getDeclaredConstructor(Map.class);
-			ctor.setAccessible(true);
-			return ctor.newInstance(ConformanceCodec.json().treeToValue(json, LinkedHashMap.class));
-		}
-		catch (ReflectiveOperationException e) {
-			throw new IllegalStateException("Can't make a " + patch.getSimpleName(), e);
-		}
+		// Through the generated setters, as a caller makes one (#354)
+		return PatchBuilders.build(patch, json);
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
