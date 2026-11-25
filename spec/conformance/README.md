@@ -67,7 +67,7 @@ A JSON value stands for itself. Anything else is an object with one `$` tag:
 | Tag | Java value | Example |
 |---|---|---|
 | `$query` | `ODataQuery`, as its parts | `{"$query": {"select": ["Name"], "expand": {"Hierarchies": {"select": ["Name"]}}, "filter": "startswith(Name,'S')", "orderBy": ["Name desc"], "top": 5, "skip": 1, "count": true, "options": {"!sandbox": "s"}, "aliases": {"@p": "{}"}}}` |
-| `$patch` | a generated patch | `{"$patch": "CubePatch", "json": {"Rules": null}}` |
+| `$patch` | a generated patch, built with its builder's setters: each key by the setter that writes it, a nested write type's value by its own builder (a root's by the subtype its `@odata.type` names), a binding by the bind setter, an open type's undeclared key by `property`. A key no setter writes fails the step, so a scenario can send only what a caller can build (#354) | `{"$patch": "CubePatch", "json": {"Rules": null}}` |
 | `$model` | a generated model | `{"$model": "Cube", "json": {...}}` |
 | `$enum` | an enum | `{"$enum": "CheckFeedersSelection", "name": "UNFED", "json": "Unfed"}` |
 | `$map` | a `Map` | `{"$map": {"Region": "North"}}` |
