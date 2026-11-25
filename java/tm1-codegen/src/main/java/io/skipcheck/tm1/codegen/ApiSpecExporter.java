@@ -145,6 +145,8 @@ public final class ApiSpecExporter {
 	 * @return the text
 	 * @throws IllegalArgumentException if the overlay names a property or endpoint the
 	 * snapshot doesn't have
+	 * @throws IllegalStateException if the write plan can't be made (see
+	 * {@link Builders#of})
 	 */
 	public String export() {
 		ObjectNode root = JSON.objectNode();

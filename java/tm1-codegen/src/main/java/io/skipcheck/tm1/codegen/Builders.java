@@ -45,10 +45,9 @@ import io.skipcheck.tm1.csdl.CsdlTypeRef;
  * takes its value as read.</li>
  * <li>{@code builder(read)} copies the properties set (not navigations), as read, or
  * through the value's own write type: its {@code builder(read)}, or a root's
- * {@code of(read)}. A value whose type is a root and is written as a create isn't copied:
- * which subtype to make the read doesn't say. A patch leaves out what a PATCH doesn't
- * apply, and a collection it appends to (copying one would add its members again),
- * ignores or rejects.</li>
+ * {@code of(read)}, which picks its subtype's by the read's type. A patch leaves out what
+ * a PATCH doesn't apply, and a collection it appends to (copying one would add its
+ * members again), ignores or rejects.</li>
  * <li>It binds a navigation it holds expanded where its targets' paths follow from the
  * read: an entity set's by its single key, an element's or member's by its
  * {@code UniqueName}. A patch binds no collection: sent back, it would replace or append
@@ -97,14 +96,6 @@ public record Builders(Map<String, Builder> builders) {
 		}
 
 		/**
-		 * Whether it creates.
-		 * @return whether it's a {@code Create}
-		 */
-		public boolean create() {
-			return write.equals("create");
-		}
-
-		/**
 		 * A setter, by the JSON name of its property or navigation.
 		 * @param json the name, such as {@code Dimensions}
 		 * @return the setter, if it has one
@@ -127,8 +118,8 @@ public record Builders(Map<String, Builder> builders) {
 	 * for a deep insert)
 	 * @param bind whether it has an {@code @odata.bind} setter (a navigation to existing
 	 * entities)
-	 * @param value the write type its value setter takes, or null for anything else (a
-	 * primitive, an enum, a departure)
+	 * @param value the write type its value setter takes, always one the plan has; null
+	 * for anything else (a primitive, an enum, a departure, a setter that only binds)
 	 */
 	public record Setter(String json, String declaredOn, boolean navigation, boolean collection, boolean set,
 			boolean bind, @Nullable String value) {
@@ -214,8 +205,9 @@ public record Builders(Map<String, Builder> builders) {
 	 * @return the plan
 	 * @throws IllegalArgumentException if a type derives from a derived type
 	 * @throws IllegalStateException if a root has a patch and a subtype that isn't
-	 * abstract has none (its {@code of(read)} couldn't write a read of it), or a
-	 * subtype's create needs less than its root's
+	 * abstract has none (its {@code of(read)} couldn't write a read of it), a subtype's
+	 * create needs less than its root's, a subtype's write type has no root's to extend,
+	 * or a setter takes a write type that isn't planned
 	 */
 	public static Builders of(CsdlDocument metadata, Overlay overlay, Writes writes, Offers offers) {
 		return new Planner(metadata, overlay, writes, offers).plan();
@@ -265,7 +257,27 @@ public record Builders(Map<String, Builder> builders) {
 					out.put(t.name() + "Create", builder(t, true));
 				}
 			});
+			check(out);
 			return new Builders(out);
+		}
+
+		/**
+		 * Refuses a plan a generator couldn't write out: a subtype's write type whose
+		 * root has none to extend, or a setter whose value's write type isn't planned.
+		 */
+		private static void check(Map<String, Builder> out) {
+			for (Builder b : out.values()) {
+				if (b.base() != null && !out.containsKey(b.base())) {
+					throw new IllegalStateException(b.name() + " extends " + b.base()
+							+ ", which isn't generated: offer it, or none of the hierarchy's");
+				}
+				for (Setter s : b.setters()) {
+					if (s.value() != null && !out.containsKey(s.value())) {
+						throw new IllegalStateException(b.name() + "." + s.json() + " takes " + s.value()
+								+ ", which isn't generated: offer it, or not the setter");
+					}
+				}
+			}
 		}
 
 		private Builder builder(CsdlStructuredType type, boolean create) {
@@ -354,7 +366,7 @@ public record Builders(Map<String, Builder> builders) {
 				}
 				if (set || bind) {
 					out.add(new Setter(n.name(), qualified(level), true, n.type().collection(), set, bind,
-							valueType(n.type()).orElse(null)));
+							set ? valueType(n.type()).orElse(null) : null));
 				}
 			}
 			return out;
@@ -383,13 +395,9 @@ public record Builders(Map<String, Builder> builders) {
 					copy.add(new Copy(s.json(), null, null));
 					continue;
 				}
-				boolean rootValue = root(s.value());
-				if (rootValue && s.value().endsWith("Create")) {
-					// A root's create starts from a read only by its type, which a nested
-					// value's read doesn't settle
-					continue;
-				}
-				copy.add(new Copy(s.json(), rootValue ? "of" : "builder", s.value()));
+				// A property's structured value is complex, so its write type is a patch:
+				// a root's, through its of(read), which picks the subtype's
+				copy.add(new Copy(s.json(), root(s.value()) ? "of" : "builder", s.value()));
 			}
 			List<Binding> bindings = new ArrayList<>();
 			for (Setter s : setters) {

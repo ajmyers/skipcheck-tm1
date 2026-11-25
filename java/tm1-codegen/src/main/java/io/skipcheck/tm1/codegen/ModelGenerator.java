@@ -666,7 +666,7 @@ public final class ModelGenerator {
 			this(method, type, json, doc, navigation, collection, revisions, true, navigation);
 		}
 
-		PatchProperty offering(boolean set, boolean bind) {
+		PatchProperty offering(boolean set, boolean bind, TypeName type) {
 			return new PatchProperty(method, type, json, doc, navigation, collection, revisions, set, bind);
 		}
 
@@ -692,8 +692,8 @@ public final class ModelGenerator {
 	}
 
 	/**
-	 * What a patch takes for a property: patches for structured values, so nested ones
-	 * are partial too.
+	 * What a write takes for a property: the property's own type, with JSON as any value;
+	 * for a structured value, a placeholder the write plan's type replaces.
 	 */
 	private Optional<TypeName> patchType(CsdlTypeRef ref) {
 		String qualified = metadata.qualify(ref.name());
@@ -710,15 +710,9 @@ public final class ModelGenerator {
 				return t;
 			});
 		}
-		// A nested entity is new, in a deep insert or a collection a PATCH replaces: it's
-		// a
-		// create, where its type has one
-		ClassName patch = creatable(structured.get()) ? createName(structured.get()) : patchName(structured.get());
-		if (!ref.collection()) {
-			return Optional.of(patch);
-		}
-		TypeName element = hierarchies.containsKey(qualified) ? WildcardTypeName.subtypeOf(patch) : patch;
-		return Optional.of(ParameterizedTypeName.get(ClassName.get(List.class), element));
+		// A structured value's setter takes the write type the plan gives it (valueType):
+		// this stands in until a setter is offered
+		return Optional.of(ClassName.get(Object.class));
 	}
 
 	private static ClassName patchName(CsdlStructuredType type) {
@@ -750,6 +744,7 @@ public final class ModelGenerator {
 					name.simpleName() + " is a CSDL type, so its write type needs another name");
 		}
 		CsdlStructuredType root = roots.get(qualified(type));
+		Builders.Builder plan = plan(name);
 		boolean extensible = hierarchies.containsKey(qualified(type));
 		ClassName builder = name.nestedClass("Builder");
 		TypeName valuesType = ParameterizedTypeName.get(ClassName.get(Map.class), ClassName.get(String.class),
@@ -768,7 +763,7 @@ public final class ModelGenerator {
 					: "") + "A write of {@link " + record
 					+ "}: for a {@code PATCH}, only the properties set are sent, an explicit {@code null} included; for a {@code POST}, the new entity's properties, nested patches for deep inserts and {@code @odata.bind} references to existing entities.\n\n<p>\n"
 					+ (root != null ? "Extends {@link " + (create ? createName(root) : patchName(root)).simpleName()
-							+ "} and sends {@code @odata.type} {@code " + typeId(type) + "}. " : "")
+							+ "} and sends {@code @odata.type} {@code " + plan.odataType() + "}. " : "")
 					+ (extensible ? "Each subtype's patch extends this one. " : "")
 					+ "Generated from {@code $metadata}.\n");
 		if (root != null) {
@@ -831,7 +826,7 @@ public final class ModelGenerator {
 		MethodSpec.Builder ctor = MethodSpec.constructorBuilder();
 		if (root != null) {
 			b.superclass((create ? createName(root) : patchName(root)).nestedClass("Builder"));
-			ctor.addStatement("this.values.put($S, $S)", "@odata.type", typeId(type));
+			ctor.addStatement("this.values.put($S, $S)", "@odata.type", plan.odataType());
 			for (PatchProperty inherited : writable(root, type, create)) {
 				addPatchMethods(b, builder, inherited, true);
 			}
@@ -851,7 +846,7 @@ public final class ModelGenerator {
 		for (PatchProperty own : writable(type, type, create)) {
 			addPatchMethods(b, builder, own, false);
 		}
-		if (open(type)) {
+		if (plan.open()) {
 			MethodSpec.Builder dynamic = MethodSpec.methodBuilder("property")
 				.addModifiers(Modifier.PUBLIC)
 				.addParameter(String.class, "name")
@@ -859,7 +854,7 @@ public final class ModelGenerator {
 				.returns(builder)
 				.addJavadoc(
 						"Sets a property {@code $$metadata} doesn't declare, which this open type can have, such as an attribute's value.\n@param name the property's name, as TM1 writes it\n@param value the value; {@code null} sends an explicit {@code null}\n@return this builder\n");
-			if (root != null && open(root)) {
+			if (plan.base() != null && plan(ClassName.get(PACKAGE, plan.base())).open()) {
 				dynamic.addAnnotation(Override.class).addStatement("super.property(name, value)");
 			}
 			else {
@@ -985,9 +980,25 @@ public final class ModelGenerator {
 				.stream()
 				.filter(s -> s.json().equals(p.json()) && s.declaredOn().equals(declaredOn))
 				.findFirst()
-				.ifPresent(s -> out.add(p.offering(s.set(), s.bind())));
+				.ifPresent(s -> out.add(p.offering(s.set(), s.bind(), valueType(s, p))));
 		}
 		return out;
+	}
+
+	/**
+	 * The type a setter takes: for a structured value, the write type the plan gives it
+	 * (any subtype's welcome in a collection of a root's), else the property's own.
+	 */
+	private TypeName valueType(Builders.Setter s, PatchProperty p) {
+		if (s.value() == null) {
+			return p.type();
+		}
+		ClassName value = ClassName.get(PACKAGE, s.value());
+		if (!s.collection()) {
+			return value;
+		}
+		boolean root = Objects.requireNonNull(plan().get(s.value())).dispatch() != null;
+		return ParameterizedTypeName.get(ClassName.get(List.class), root ? WildcardTypeName.subtypeOf(value) : value);
 	}
 
 	/** What a create of {@code type} needs, by the write plan. */
@@ -1060,7 +1071,11 @@ public final class ModelGenerator {
 	 * made.
 	 */
 	private CodeBlock readBinding(Builders.Binding binding, PatchProperty p, String accessor) {
-		boolean byKey = binding.by().equals("key");
+		boolean byKey = switch (binding.by()) {
+			case "key" -> true;
+			case "uniqueName" -> false;
+			default -> throw new IllegalStateException("A binding by " + binding.by() + ": by key or uniqueName");
+		};
 		String helper = byKey ? (binding.collection() ? "byKeys" : "byKey")
 				: (binding.collection() ? "allInHierarchy" : "inHierarchy");
 		String argument = componentName(binding.key());

@@ -54,6 +54,35 @@ class ApiSpecTest {
 		assertThat(property(spec, "Cube", "MeasuresDimension").isMissingNode()).isTrue();
 	}
 
+	@Test
+	void exportsTheWritePlan() throws IOException {
+		JsonNode builders = JsonMapper.builder().build().readTree(exportWithProbe()).path("builders");
+		JsonNode cube = builders.path("CubeCreate");
+		assertThat(cube.path("type").asString()).isEqualTo("ibm.tm1.api.v1.Cube");
+		assertThat(cube.path("write").asString()).isEqualTo("create");
+		assertThat(cube.path("required").get(0).asString()).isEqualTo("Dimensions");
+		JsonNode dimensions = cube.path("fromRead").path("bindings").get(0);
+		assertThat(dimensions.path("json").asString()).isEqualTo("Dimensions");
+		assertThat(dimensions.path("by").asString()).isEqualTo("key");
+		assertThat(dimensions.path("set").asString()).isEqualTo("Dimensions");
+		assertThat(dimensions.path("key").asString()).isEqualTo("Name");
+		assertThat(cube.path("dispatch").isNull()).isTrue();
+		JsonNode encryption = null;
+		for (JsonNode c : builders.path("ServerSettingsPatch").path("fromRead").path("copy")) {
+			if (c.path("json").asString().equals("EncryptionAtRest")) {
+				encryption = c;
+			}
+		}
+		assertThat(encryption).as("a root's value goes through its of()").isNotNull();
+		assertThat(encryption.path("via").asString()).isEqualTo("of");
+		assertThat(encryption.path("value").asString()).isEqualTo("EncryptionAtRestProviderSettingsPatch");
+		JsonNode view = builders.path("MDXViewPatch");
+		assertThat(view.path("base").asString()).isEqualTo("ViewPatch");
+		assertThat(view.path("odataType").asString()).isEqualTo("#ibm.tm1.api.v1.MDXView");
+		assertThat(view.path("open").asBoolean()).isTrue();
+		assertThat(builders.path("ViewPatch").path("dispatch").size()).isEqualTo(2);
+	}
+
 	private static JsonNode property(JsonNode spec, String type, String name) {
 		for (JsonNode t : spec.path("types")) {
 			if (t.path("name").asString().equals(type)) {
