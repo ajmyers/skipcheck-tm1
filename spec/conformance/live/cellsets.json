@@ -76,7 +76,7 @@
 			"service" : "cellsets",
 			"method" : "updateCells",
 			"params" : [ "id", "updates" ],
-			"args" : [ "${cellset}", [ { "$patch" : "CellsetUpdatePatch", "json" : { "Ordinal" : 0, "Value" : 10 } }, { "$patch" : "CellsetUpdatePatch", "json" : { "Ordinal" : 1, "Value" : 11 } }, { "$patch" : "CellsetUpdatePatch", "json" : { "Ordinal" : 2, "Value" : 12 } }, { "$patch" : "CellsetUpdatePatch", "json" : { "Ordinal" : 4, "Value" : 6, "ReferenceCube@odata.bind" : "Cubes('${cube}')", "ReferenceCell@odata.bind" : [ "Dimensions('${region}')/Hierarchies('${region}')/Elements('South')", "Dimensions('${month}')/Hierarchies('${month}')/Elements('Feb')" ] } } ] ],
+			"args" : [ "${cellset}", [ { "$patch" : "CellsetUpdatePatch", "json" : { "Ordinal" : 0, "Value" : 10 } }, { "$patch" : "CellsetUpdatePatch", "json" : { "Ordinal" : 1, "Value" : 11 } }, { "$patch" : "CellsetUpdatePatch", "json" : { "Ordinal" : 2, "Value" : 12 } }, { "$patch" : "CellsetUpdatePatch", "json" : { "Ordinal" : 4, "Value" : 6, "ReferenceCube@odata.bind" : "Cubes('${cube}')", "ReferenceCell@odata.bind" : [ "Dimensions('${region}')/Hierarchies('${region}')/Elements('South')", "Dimensions('${month}')/Hierarchies('${month}')/Elements('Jan')" ] } } ] ],
 			"expect" : { "none" : true }
 		},
 		{
@@ -117,6 +117,12 @@
 		}
 	],
 	"finally" : [
+		{
+			"service" : "cellsets",
+			"method" : "delete",
+			"params" : [ "id" ],
+			"args" : [ "${cellset}" ]
+		},
 		{ "service" : "cubes", "method" : "delete", "params" : [ "name" ], "args" : [ "${cube}" ] },
 		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${region}" ] },
 		{ "service" : "dimensions", "method" : "delete", "params" : [ "name" ], "args" : [ "${month}" ] }

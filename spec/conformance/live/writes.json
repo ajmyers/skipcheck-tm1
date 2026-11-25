@@ -531,6 +531,24 @@
 			"service" : "contents",
 			"method" : "delete",
 			"params" : [ "entry" ],
+			"args" : [ { "$type" : "ContentPath", "factory" : "child", "args" : [ { "$type" : "ContentPath", "factory" : "child", "args" : [ { "$type" : "ContentPath", "factory" : "applications", "args" : [  ] }, "${app}", { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" } ] }, "mine", { "$enum" : "ContentScope", "name" : "PRIVATE", "json" : "PRIVATE" } ] } ]
+		},
+		{
+			"service" : "views",
+			"method" : "delete",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${views}", { "$enum" : "ViewScope", "name" : "PRIVATE", "json" : "PRIVATE" }, "mine" ]
+		},
+		{
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${dim}", "Sub", { "$enum" : "SubsetScope", "name" : "PRIVATE", "json" : "PRIVATE" }, "mine" ]
+		},
+		{
+			"service" : "contents",
+			"method" : "delete",
+			"params" : [ "entry" ],
 			"args" : [ { "$type" : "ContentPath", "factory" : "child", "args" : [ { "$type" : "ContentPath", "factory" : "applications", "args" : [  ] }, "${app}", { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" } ] } ]
 		},
 		{
