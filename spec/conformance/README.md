@@ -20,7 +20,11 @@ The manifest doesn't hold the types a setter takes (Python's setters take `Any`,
 
 ## What `builder(read)` copies (`writes.json`)
 
-A create's `builder(read)` copies the properties its setters write; a patch's leaves out what a PATCH ignores or rejects and the collections it appends to (copying one would add its members again). Navigations aren't copied but bound, where the read says the targets' paths. A setter the overlay keeps though the probe couldn't try its PATCH (outcome `untested`) is copied like any other. Today that's `ServerSettingsPatch`'s `EncryptionAtRest`, which needs a key store to probe. It is also the only copy through a root type's `of(read)`, so its two cases (a known subtype, and one a client doesn't know) are what holds every client's root dispatch to the same writes (#358).
+A create's `builder(read)` copies the properties its setters write. A patch's leaves out what the probe found a PATCH of that type ignores or rejects, and the collections a PATCH appends to (copying one would add its members again). That holds for a type with probe writes of its own. A nested value's write type has none yet, since the probe's nested outcomes aren't read per field, so its `builder(read)` copies every setter it offers (#360).
+
+Navigations aren't copied. A create's `builder(read)` binds them, and a patch's binds only single-valued ones, where the read says the targets' paths. An open type's undeclared properties are copied too, but not nulls or annotations.
+
+A setter the overlay keeps, though the probe couldn't try its PATCH (outcome `untested`), is copied like any other. The only such top-level property today is `ServerSettingsPatch`'s `EncryptionAtRest`, which needs a key store to probe. It is also the only copy through a root patch's `of(read)`. So its two cases, a known subtype and one a client doesn't know, are what holds every client's root-patch dispatch to the same writes (#358).
 
 ## Recorded calls (`calls/`)
 
