@@ -436,8 +436,8 @@ def _setters(spec: Spec, t: dict[str, Any], create: bool) -> list[str]:
 
 def emit_patches(spec: Spec) -> str:
     """Patch builders, as the Java model's ``CubeCreate.builder().name("Sales").build()``: only
-    what's set is sent, explicit ``None`` included, with ``bind_…`` for ``@odata.bind``. With offers
-    in the spec, only the write types and setters they list."""
+    what's set is sent, explicit ``None`` included, with ``bind_…`` for ``@odata.bind``. The write
+    types and their setters are the spec's write plan (``builders``)."""
     out = [
         '"""Patch builders for writes, generated from spec/tm1-api.json by tm1_pygen: don\'t edit.',
         "",
@@ -468,11 +468,12 @@ def emit_patches(spec: Spec) -> str:
             continue
         name = t["name"] + "Patch"
         names_all.append(name)
-        base = spec.type_by_name[t["baseType"]]["name"] + "Patch" if t.get("baseType") else "Tm1Patch"
+        plan = _plan(spec, t, False)
+        base = plan["base"] or "Tm1Patch"
         out += ["", "", f"class {name}({base}):"]
         out.append(f'    """A write of ``{t["name"]}``: only the properties set are sent."""')
         out.append("")
-        out.append(f"    odata_type = {('#' + t['qualifiedName'])!r}" if t.get("baseType") else "    odata_type = None")
+        out.append(f"    odata_type = {plan['odataType']!r}")
         out += _builder_method(spec, t, name, False)
         out.append("")
         out.append(f"    class Builder({base}.Builder):")
@@ -480,32 +481,33 @@ def emit_patches(spec: Spec) -> str:
         setters = _setters(spec, t, False)
         out += setters
         # As the other clients: only an open type's builder takes properties $metadata doesn't declare
-        if t["open"]:
+        if plan["open"]:
             out += _property()
-        if not setters and not t["open"]:
+        if not setters and not plan["open"]:
             out.append("        pass")
     for t in ordered:
         if not has_create(spec, t):
             continue
         name = t["name"] + "Create"
         names_all.append(name)
-        base = spec.type_by_name[t["baseType"]]["name"] + "Create" if t.get("baseType") else "Tm1Patch"
-        has = "as the probe verified"
+        plan = _plan(spec, t, True)
+        base = plan["base"] or "Tm1Patch"
+        has = "as the probe verified" if spec.offers else "all, as the spec has no probe's offers"
         out += ["", "", f"class {name}({base}):"]
         out.append(f'    """A create of ``{t["name"]}``, for a POST: only the properties set are sent, and only those TM1')
         out.append(f"    applies in a create are offered ({has}). ``build()`` checks what a create needs. As the Java")
         out.append(f'    model\'s ``{name}``."""')
         out.append("")
-        out.append(f"    odata_type = {('#' + t['qualifiedName'])!r}" if t.get("baseType") else "    odata_type = None")
+        out.append(f"    odata_type = {plan['odataType']!r}")
         out += _builder_method(spec, t, name, True)
         out.append("")
         out.append(f"    class Builder({base}.Builder):")
         out.append(f'        """Builds a ``{name}``; each setter replaces what an earlier call set."""')
         setters = _setters(spec, t, True)
         out += setters
-        if t["open"]:
+        if plan["open"]:
             out += _property()
-        required = _plan(spec, t, True)["required"]
+        required = plan["required"]
         if required:
             out.append("")
             out.append("        def build(self) -> Any:")
@@ -513,7 +515,7 @@ def emit_patches(spec: Spec) -> str:
             out.append('                if needed not in self._values and needed + "@odata.bind" not in self._values:')
             out.append(f'                    raise ValueError(f"A {t["name"]} create needs {{needed}}: TM1 refuses one without it")')
             out.append("            return super().build()")
-        elif not setters and not t["open"]:
+        elif not setters and not plan["open"]:
             out.append("        pass")
     out.append("")
     out.append("__all__ = [" + ", ".join(repr(n) for n in names_all) + "]")
