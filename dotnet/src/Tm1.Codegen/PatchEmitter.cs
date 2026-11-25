@@ -154,7 +154,7 @@ public sealed class PatchEmitter
         if (create)
         {
             _out.Append(
-                $"\n/// <summary>A create of <see cref=\"{name}\"/>, for a POST: only the properties set are sent, and only those TM1 applies in a create are offered{(t.TryGetProperty("write", out _) ? ", as the probe found" : "")}. <c>Build()</c> checks what a create needs.</summary>\n"
+                $"\n/// <summary>A create of <see cref=\"{name}\"/>, for a POST: only the properties set are sent, and only those TM1 applies in a create are offered: what the probe verified, or the overlay keeps. <c>Build()</c> checks what a create needs.</summary>\n"
             );
         }
         else

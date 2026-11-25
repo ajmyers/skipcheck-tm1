@@ -10,7 +10,7 @@ java/tm1-client/src/model/metadata/tm1-probe-<v>.json   what the probe found (th
 
 A build tool: not published, and nothing at run time depends on it. It's still growing ([#312]).
 It finds **undeclared properties**, and **what each type does with each property in a POST and a
-PATCH**. `tm1-codegen` adds the undeclared properties to every client's model from it, each tagged as a departure from `$metadata` (`@Tm1Departure` in Java). The writes give each probed type a create type (`ProcessCreate`) with only what a POST applies, and every write type a `builder(read)` copying what TM1 applies from a read entity (#311).
+PATCH**. `tm1-codegen` adds the undeclared properties to every client's model from it, each tagged as a departure from `$metadata` (`@Tm1Departure` in Java). From the writes, the clients' create and patch types offer only what the probe verified, and their `builder(read)` copies what TM1 applies from a read entity (#311, #338; see below).
 
 [#312]: https://github.com/ajmyers/skipcheck-tm1/issues/312
 

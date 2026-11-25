@@ -54,12 +54,6 @@ class Spec:
         return self.doc["endpoints"]
 
     @property
-    def offers(self) -> dict[str, dict[str, Any]]:
-        """Per write type (``CubeCreate``), the setters it offers, each with why (verified, kept); none
-        in a spec from before the probe verified them."""
-        return self.doc.get("offers", {})
-
-    @property
     def builders(self) -> dict[str, dict[str, Any]]:
         """The write plan: per write type (``CubeCreate``), its setters, what ``build()`` requires, what
         ``builder(read)`` copies and binds, and a root's dispatch to its subtypes. Worked out once, by

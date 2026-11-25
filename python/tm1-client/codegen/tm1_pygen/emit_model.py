@@ -492,7 +492,7 @@ def emit_patches(spec: Spec) -> str:
         names_all.append(name)
         plan = _plan(spec, t, True)
         base = plan["base"] or "Tm1Patch"
-        has = "as the probe verified" if spec.offers else "all, as the spec has no probe's offers"
+        has = "as the probe verified"
         out += ["", "", f"class {name}({base}):"]
         out.append(f'    """A create of ``{t["name"]}``, for a POST: only the properties set are sent, and only those TM1')
         out.append(f"    applies in a create are offered ({has}). ``build()`` checks what a create needs. As the Java")

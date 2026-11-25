@@ -32,9 +32,7 @@ import io.skipcheck.tm1.csdl.CsdlTypeRef;
  *
  * <p>
  * What a write type offers comes from {@link Offers}: only what the probe verified, or
- * the overlay keeps. Without offers (no probe file), every type gets a patch offering
- * what the writes don't refuse, and the types the writes cover a create: the Java
- * generator's tests generate that way.
+ * the overlay keeps. Without offers (no probe file) there are no write types.
  *
  * <p>
  * The rules:
@@ -201,7 +199,7 @@ public record Builders(Map<String, Builder> builders) {
 	 * added
 	 * @param overlay the overlay, for its departures
 	 * @param writes what the probe found writes do
-	 * @param offers the write types and their setters; with none, every type gets a patch
+	 * @param offers the write types and their setters; with none, there are none
 	 * @return the plan
 	 * @throws IllegalArgumentException if a type derives from a derived type
 	 * @throws IllegalStateException if a root has a patch and a subtype that isn't
@@ -336,7 +334,7 @@ public record Builders(Map<String, Builder> builders) {
 		 * declares ({@code type}'s own, or its root's).
 		 */
 		private List<Setter> setters(CsdlStructuredType level, CsdlStructuredType type, boolean create) {
-			Map<String, Offers.Offer> offered = offers.builders().isEmpty() ? null : Objects.requireNonNullElse(
+			Map<String, Offers.Offer> offered = Objects.requireNonNullElse(
 					offers.get(type.name() + (create ? "Create" : "Patch")), Map.<String, Offers.Offer>of());
 			List<Setter> out = new ArrayList<>();
 			for (CsdlProperty p : level.properties()) {
@@ -344,9 +342,7 @@ public record Builders(Map<String, Builder> builders) {
 					// Media content, read through $value, never part of the JSON
 					continue;
 				}
-				boolean set = offered != null ? offered.containsKey(p.name())
-						: create ? creates(type, p.name()) : offersInPatch(type, p.name());
-				if (set) {
+				if (offered.containsKey(p.name())) {
 					boolean departs = overlay.departures().containsKey(level.name() + "/" + p.name());
 					out.add(new Setter(p.name(), qualified(level), false, p.type().collection(), true, false,
 							departs ? null : valueType(p.type()).orElse(null)));
@@ -354,16 +350,8 @@ public record Builders(Map<String, Builder> builders) {
 			}
 			for (CsdlNavigationProperty n : level.navigationProperties()) {
 				boolean entity = metadata.entityType(metadata.qualify(n.type().name())).isPresent();
-				boolean set;
-				boolean bind;
-				if (offered != null) {
-					set = offered.containsKey(n.name());
-					bind = entity && offered.containsKey(n.name() + BIND);
-				}
-				else {
-					set = create || offersInPatch(type, n.name());
-					bind = entity && set;
-				}
+				boolean set = offered.containsKey(n.name());
+				boolean bind = entity && offered.containsKey(n.name() + BIND);
 				if (set || bind) {
 					out.add(new Setter(n.name(), qualified(level), true, n.type().collection(), set, bind,
 							set ? valueType(n.type()).orElse(null) : null));
@@ -477,63 +465,14 @@ public record Builders(Map<String, Builder> builders) {
 				.orElse(false);
 		}
 
-		/**
-		 * Whether a type gets a create: an entity type the offers list one for; without
-		 * offers, one the probe has writes for, or the root of a hierarchy whose subtype
-		 * does.
-		 */
+		/** Whether a type gets a create: an entity type the offers list one for. */
 		private boolean creatable(CsdlStructuredType type) {
-			if (!(type instanceof CsdlEntityType)) {
-				return false;
-			}
-			if (!offers.builders().isEmpty()) {
-				return offers.get(type.name() + "Create") != null;
-			}
-			if (writes.get(type.name()) != null) {
-				return true;
-			}
-			List<CsdlStructuredType> subtypes = hierarchies.get(qualified(type));
-			return subtypes != null && subtypes.stream().anyMatch(s -> writes.get(s.name()) != null);
+			return type instanceof CsdlEntityType && offers.get(type.name() + "Create") != null;
 		}
 
-		/** Whether a type gets a patch: every type does, unless the offers say which. */
+		/** Whether a type gets a patch: the offers list one. */
 		private boolean patchable(CsdlStructuredType type) {
-			return offers.builders().isEmpty() || offers.get(type.name() + "Patch") != null;
-		}
-
-		/**
-		 * Without offers, whether a patch of {@code type} offers a property: not if a
-		 * PATCH rejects or ignores it; for the root of a hierarchy without writes of its
-		 * own, if every probed subtype's patch offers it.
-		 */
-		private boolean offersInPatch(CsdlStructuredType type, String property) {
-			Writes.TypeWrites w = writes.get(type.name());
-			if (w != null) {
-				return w.offersInPatch(property);
-			}
-			List<Writes.TypeWrites> probed = hierarchies.getOrDefault(qualified(type), List.of())
-				.stream()
-				.map(s -> writes.get(s.name()))
-				.filter(Objects::nonNull)
-				.toList();
-			return probed.isEmpty() || probed.stream().allMatch(s -> s.offersInPatch(property));
-		}
-
-		/**
-		 * Without offers, whether a POST of {@code type} takes a property: for the root
-		 * of a hierarchy without writes of its own, if every subtype that has writes
-		 * takes it.
-		 */
-		private boolean creates(CsdlStructuredType type, String property) {
-			Writes.TypeWrites w = writes.get(type.name());
-			if (w != null) {
-				return w.creates(property);
-			}
-			return hierarchies.getOrDefault(qualified(type), List.of())
-				.stream()
-				.map(s -> writes.get(s.name()))
-				.filter(Objects::nonNull)
-				.allMatch(s -> s.creates(property));
+			return offers.get(type.name() + "Patch") != null;
 		}
 
 		/** What a create of {@code type} needs, by name without {@code @odata.bind}. */

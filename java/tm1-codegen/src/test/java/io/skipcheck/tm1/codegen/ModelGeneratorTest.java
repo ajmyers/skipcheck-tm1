@@ -5,13 +5,13 @@ package io.skipcheck.tm1.codegen;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Stream;
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -25,7 +25,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.palantir.javapoet.JavaFile;
 import io.skipcheck.tm1.csdl.CsdlDocument;
+import io.skipcheck.tm1.csdl.CsdlNavigationProperty;
 import io.skipcheck.tm1.csdl.CsdlParser;
+import io.skipcheck.tm1.csdl.CsdlStructuredType;
 
 class ModelGeneratorTest {
 
@@ -160,19 +162,18 @@ class ModelGeneratorTest {
 
 	@Test
 	void generatesTheSnapshotsModelAndItCompiles(@TempDir Path out) throws Exception {
-		CsdlDocument snapshot;
-		try (InputStream in = Files.newInputStream(Path.of(System.getProperty("tm1.snapshot")))) {
-			snapshot = CsdlParser.parse(in);
-		}
-		new ModelGenerator(snapshot).writeTo(out);
+		// As the build generates it: with the probe file beside the snapshot
+		Tm1Codegen.Model model = Tm1Codegen.Model.of(Path.of(System.getProperty("tm1.snapshot")));
+		new ModelGenerator(model.metadata(), model.overlay(), model.undeclared(), model.writes(), model.offers())
+			.writeTo(out);
 
 		List<Path> sources;
 		try (Stream<Path> walk = Files.walk(out)) {
 			sources = walk.filter(p -> p.toString().endsWith(".java")).toList();
 		}
 		assertThat(sources)
-			.as("31 enums, 122 records, 7 hierarchies, 129 patches, the catalog, the read bindings, package-info")
-			.hasSize(292);
+			.as("31 enums, 122 records, 7 hierarchies, 103 write types, the catalog, the read bindings, package-info")
+			.hasSize(266);
 
 		JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
 		DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
@@ -271,7 +272,7 @@ class ModelGeneratorTest {
 				  </edmx:DataServices>
 				</edmx:Edmx>
 				""";
-		ModelGenerator generator = new ModelGenerator(CsdlParser.parse(sample));
+		ModelGenerator generator = everyPatch(CsdlParser.parse(sample));
 		assertThat(source(generator, "CAMSettings")).contains("@Nullable JsonNode clientPingCAMPassport")
 			.contains("ISO 8601 duration");
 		assertThat(source(generator, "CAMSettingsPatch"))
@@ -299,7 +300,31 @@ class ModelGeneratorTest {
 	}
 
 	private static ModelGenerator sample() {
-		return new ModelGenerator(CsdlParser.parse(SAMPLE));
+		return everyPatch(CsdlParser.parse(SAMPLE));
+	}
+
+	/**
+	 * A generator with the bundled overlay, offering a patch of every type with a setter
+	 * for each of its properties (a stream's too, which the generator leaves out) and
+	 * navigations (a binding, too, for one to an entity): what the patches' generated
+	 * code looks like, without a probe.
+	 */
+	private static ModelGenerator everyPatch(CsdlDocument metadata) {
+		Map<String, Map<String, Offers.Offer>> offers = new TreeMap<>();
+		Offers.Offer offer = new Offers.Offer("kept", "the generator's test");
+		metadata.structuredTypes().forEach(t -> {
+			Map<String, Offers.Offer> setters = new TreeMap<>();
+			for (CsdlStructuredType level = t; level != null; level = level.baseType() == null ? null
+					: metadata.structuredType(metadata.qualify(level.baseType())).orElseThrow()) {
+				level.properties().forEach(p -> setters.put(p.name(), offer));
+				for (CsdlNavigationProperty n : level.navigationProperties()) {
+					setters.put(n.name(), offer);
+					setters.put(n.name() + "@odata.bind", offer);
+				}
+			}
+			offers.put(t.name() + "Patch", setters);
+		});
+		return new ModelGenerator(metadata, Overlay.bundled(), Undeclared.NONE, Writes.NONE, new Offers(offers));
 	}
 
 	private static String source(ModelGenerator generator, String type) {

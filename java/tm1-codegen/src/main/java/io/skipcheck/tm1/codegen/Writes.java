@@ -57,38 +57,11 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 		}
 
 		/**
-		 * Whether a POST sets a property: it applies or transforms it, or it wasn't
-		 * probed. One with no outcome isn't known to the probe, and is kept.
-		 * @param property the property's name
-		 * @return whether a create offers it
-		 */
-		public boolean creates(String property) {
-			return writes(create.get(property));
-		}
-
-		/**
-		 * Whether a patch offers a property or navigation: everything but what a PATCH
-		 * rejects or ignores, a collection included, and {@code Name} where a PATCH
-		 * doesn't rename. A collection a PATCH replaces or appends to stays: its docs
-		 * say.
-		 * @param property the property's name
-		 * @return whether a patch offers it
-		 */
-		public boolean offersInPatch(String property) {
-			if (property.equals("Name")) {
-				return rename == null || rename.equals("applied");
-			}
-			String outcome = patch.get(property);
-			String collection = collections.get(property);
-			return !refused(outcome) && !refused(collection);
-			// writeOnly counts as offered
-		}
-
-		/**
-		 * Whether {@code builder(read)} copies a property into a patch: a PATCH sets it,
-		 * as {@link #creates} says for a POST, and isn't a collection a PATCH appends to
-		 * (copying one would add its members again). A collection a PATCH replaces is
-		 * copied: the read holds all of it.
+		 * Whether {@code builder(read)} copies a property into a patch: a PATCH sets it
+		 * (it applies or transforms it, it's write-only, its outcome is untested, or it
+		 * wasn't probed), and isn't a collection a PATCH appends to (copying one would
+		 * add its members again). A collection a PATCH replaces is copied: the read holds
+		 * all of it.
 		 * @param property the property's name
 		 * @return whether a patch made from a read copies it
 		 */
