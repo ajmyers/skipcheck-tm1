@@ -41,10 +41,11 @@ const enums = new Map(spec.enums.map((e) => [e.qualifiedName, e]));
  * TM1 gets it), an open type's undeclared key by `property`. Refused, as a caller couldn't send
  * them: a key no setter writes (a declared one included, on an open type too), an enum value TM1
  * doesn't have, a binding of the wrong shape, an `@odata.type` the write type doesn't send. */
-export function build(type: any, values: Json): unknown {
+export function build(type: any, values: Json, read?: unknown): unknown {
   if (values === null || typeof values !== "object" || Array.isArray(values)) throw new Error(`A ${type.name} is an object, not ${JSON.stringify(values)}`);
-  const write = subtype(type, values);
-  const b = write.builder() as Builder;
+  // With what was read, from builder(read), as a caller changes it ($fromRead)
+  const write = read === undefined ? subtype(type, values) : type;
+  const b = (read === undefined ? write.builder() : write.builder(read)) as Builder;
   const setters = settersFor(write);
   const plan = spec.builders[write.name]!;
   const byJson = new Map(plan.setters.map((s) => [s.json, s]));
@@ -169,6 +170,15 @@ const pascal = (javaConstant: string): string =>
     .join("");
 
 /** An argument, as this client takes it. */
+/** A `$fromRead` argument, `{"$fromRead": "CubePatch", "read": "cube", "json": {...}}`: `CubePatch.builder(read)`
+ * with the changes `json` names, through the setters a `$patch` uses, from what a step before kept. */
+export function fromRead(v: Record<string, any>, kept: Map<string, unknown>): unknown {
+  const type = (Patches as Record<string, any>)[v.$fromRead];
+  if (typeof type !== "function") throw new Unknown("no patch " + v.$fromRead);
+  if (!kept.has(v.read)) throw new Error(`No read kept as ${JSON.stringify(v.read)} for ${JSON.stringify(v)}`);
+  return build(type, v.json ?? {}, kept.get(v.read));
+}
+
 export function decode(value: Json): unknown {
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) return value.map(decode);

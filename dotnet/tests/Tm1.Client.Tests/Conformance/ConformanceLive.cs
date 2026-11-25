@@ -181,18 +181,53 @@ public static class ConformanceLive
         return JsonNode.DeepEquals(expected, got);
     }
 
-    private static async Task<JsonObject> Outcome(Tm1Client client, JsonNode step, IReadOnlyDictionary<string, string> names)
+    private static async Task<JsonObject> Outcome(Tm1Client client, JsonNode step, IReadOnlyDictionary<string, string> names, Dictionary<string, object> kept)
     {
         var service = typeof(Tm1Client).GetProperty(ConformanceCodec.Pascal(step["service"]!.GetValue<string>()))!.GetValue(client)!;
         var parameters = step["params"]!.AsArray().Select(p => p!.GetValue<string>()).ToList();
+        var args = Substitute(step["args"], names)!.AsArray();
+        // A $fromRead argument, {"$fromRead": "CubePatch", "read": "cube", "json": {...}}: CubePatch.Builder(read)
+        // with the changes json names, through the setters a $patch uses, from what a step before kept
+        var built = new Dictionary<string, object>();
+        for (var i = 0; i < args.Count; i++)
+        {
+            if (args[i] is JsonObject a && a.ContainsKey("$fromRead"))
+            {
+                var name = a["$fromRead"]!.GetValue<string>();
+                var type = typeof(Tm1Client).Assembly.GetType("Skipcheck.Tm1.Client.Model." + name)
+                    ?? throw new UnknownConformanceValueException("no patch " + name);
+                var read = a["read"]?.GetValue<string>() ?? "";
+                if (!kept.TryGetValue(read, out var from))
+                {
+                    throw new ArgumentException($"No read kept as {read} for {a.ToJsonString()}");
+                }
+                built[parameters[i]] = PatchBuilders.Build(type, a["json"]?.AsObject() ?? [], from);
+                args[i] = null;
+            }
+        }
         var (method, values) = ConformanceCodec.Bind(
             service.GetType(),
             ConformanceCodec.Pascal(step["method"]!.GetValue<string>()) + "Async",
             parameters,
-            Substitute(step["args"], names)!.AsArray()
+            args
         );
+        var declared = method.GetParameters();
+        foreach (var (param, value) in built)
+        {
+            values[System.Array.FindIndex(declared, p => p.Name == param)] = value;
+        }
         try
         {
+            if (step["keep"] is JsonValue keep)
+            {
+                // The result, as read, kept for a $fromRead after it
+                var returned = await ConformanceCodec.Await(Invoked(service, method, values), method.ReturnType);
+                if (returned is not null)
+                {
+                    kept[keep.GetValue<string>()] = returned;
+                }
+                return new JsonObject { ["result"] = ConformanceCodec.Result(returned) };
+            }
             return new JsonObject { ["result"] = await ConformanceCodec.Call(service, method, values) };
         }
         catch (UnknownConformanceValueException)
@@ -227,15 +262,30 @@ public static class ConformanceLive
     /// <summary>Runs the scenario; the steps whose expectation failed. Its <c>finally</c> steps always run.
     /// What a step saves joins <paramref name="names"/>, so the traffic written after it has TM1's made-up
     /// values as their placeholders too.</summary>
+    private static object? Invoked(object service, System.Reflection.MethodInfo method, object?[] values)
+    {
+        try
+        {
+            return method.Invoke(service, values);
+        }
+        catch (System.Reflection.TargetInvocationException e) when (e.InnerException is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(e.InnerException).Throw();
+            throw;
+        }
+    }
+
     public static async Task<List<string>> Run(Tm1Client client, Traffic traffic, JsonObject scenario, Dictionary<string, string> names)
     {
         var failures = new List<string>();
+        // What steps keep of their results, as read, for a $fromRead after them
+        var kept = new Dictionary<string, object>();
         try
         {
             foreach (var (step, i) in scenario["steps"]!.AsArray().Select((s, i) => (s!, i)))
             {
                 traffic.Step = $"steps[{i}]";
-                var outcome = await Outcome(client, step, names);
+                var outcome = await Outcome(client, step, names, kept);
                 var why = Check(Substitute(step["expect"], names)!.AsObject(), outcome) ?? Save(step, outcome, names);
                 if (why is not null)
                 {
@@ -249,7 +299,12 @@ public static class ConformanceLive
             foreach (var (step, i) in (scenario["finally"]?.AsArray() ?? []).Select((s, i) => (s!, i)))
             {
                 traffic.Step = $"finally[{i}]";
-                await Outcome(client, step, names);
+                // A step setting back what a step that didn't run would have read has nothing to send
+                if (step["args"]!.AsArray().Any(a => a is JsonObject o && o.ContainsKey("$fromRead") && !kept.ContainsKey(o["read"]?.GetValue<string>() ?? "")))
+                {
+                    continue;
+                }
+                await Outcome(client, step, names, kept);
             }
         }
         return failures;

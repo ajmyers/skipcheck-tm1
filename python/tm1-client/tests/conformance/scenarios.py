@@ -138,11 +138,12 @@ def save(step: dict[str, Any], outcome: dict[str, Any], names: dict[str, str]) -
     return None
 
 
-def _outcome(call: Callable[[], Any]) -> Any:
+def _outcome(call: Callable[[], Any], step: dict[str, Any] | None = None, kept: dict[str, Any] | None = None) -> Any:
     try:
         value = call()
         if inspect.isgenerator(value):
             value = list(value)
+        _keep(step, kept, value)
         return {"result": codec.result(value)}
     except codec.Unknown:
         raise
@@ -150,13 +151,14 @@ def _outcome(call: Callable[[], Any]) -> Any:
         return {"error": codec.error(exc)}
 
 
-async def _aoutcome(call: Callable[[], Awaitable[Any]]) -> Any:
+async def _aoutcome(call: Callable[[], Awaitable[Any]], step: dict[str, Any] | None = None, kept: dict[str, Any] | None = None) -> Any:
     try:
         value = call()
         if inspect.isawaitable(value):
             value = await value
         if hasattr(value, "__aiter__"):
             value = [v async for v in value]
+        _keep(step, kept, value)
         return {"result": codec.result(value)}
     except codec.Unknown:
         raise
@@ -164,10 +166,36 @@ async def _aoutcome(call: Callable[[], Awaitable[Any]]) -> Any:
         return {"error": codec.error(exc)}
 
 
-def _invoke(client: Any, step: dict[str, Any], names: dict[str, str]) -> Callable[[], Any]:
+def _unkept(step: dict[str, Any], kept: dict[str, Any]) -> bool:
+    """Whether a step builds a ``$fromRead`` from a read no step kept: a ``finally`` step setting back
+    what a step that didn't run would have read, which is skipped."""
+    return any(isinstance(a, dict) and "$fromRead" in a and a.get("read") not in kept for a in step["args"])
+
+
+def _keep(step: dict[str, Any] | None, kept: dict[str, Any] | None, value: Any) -> None:
+    """Keeps a step's result, as read, under its ``"keep"`` name, for a ``$fromRead`` after it."""
+    if step is not None and kept is not None and "keep" in step and value is not None:
+        kept[step["keep"]] = value
+
+
+def _arg(value: Any, kept: dict[str, Any]) -> Any:
+    """A step's argument: a ``$fromRead`` one, ``{"$fromRead": "CubePatch", "read": "cube", "json": {...}}``,
+    is ``CubePatch.builder(read)`` with the changes ``json`` names, through the setters a ``$patch``
+    uses, from what a step before kept; any other is decoded."""
+    if isinstance(value, dict) and "$fromRead" in value:
+        if value.get("read") not in kept:
+            raise ValueError(f"No read kept as {value.get('read')!r} for {value!r}")
+        cls = getattr(codec.p, value["$fromRead"], None)
+        if cls is None:
+            raise codec.Unknown(f"no patch {value['$fromRead']}")
+        return codec.build(cls, value.get("json", {}), kept[value["read"]])
+    return codec.decode(value)
+
+
+def _invoke(client: Any, step: dict[str, Any], names: dict[str, str], kept: dict[str, Any] | None = None) -> Callable[[], Any]:
     service = getattr(client, snake(step["service"]))
     method = getattr(service, snake(step["method"]))
-    kwargs = {snake(p): codec.decode(substitute(a, names)) for p, a in zip(step["params"], step["args"])}
+    kwargs = {snake(p): _arg(substitute(a, names), kept or {}) for p, a in zip(step["params"], step["args"])}
     return lambda: method(**kwargs)
 
 
@@ -176,10 +204,11 @@ def run(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str
     always run. What a step saves joins ``names``, so the traffic written after it has TM1's made-up
     values as their placeholders too."""
     failures = []
+    kept: dict[str, Any] = {}
     try:
         for i, step in enumerate(scenario["steps"]):
             traffic.step = f"steps[{i}]"
-            outcome = _outcome(_invoke(client, step, names))
+            outcome = _outcome(_invoke(client, step, names, kept), step, kept)
             why = check(substitute(step["expect"], names), outcome) or save(step, outcome, names)
             if why:
                 failures.append(f"step {i} {step['service']}.{step['method']}: {why}")
@@ -187,17 +216,19 @@ def run(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str
     finally:
         for i, step in enumerate(scenario.get("finally", [])):
             traffic.step = f"finally[{i}]"
-            _outcome(_invoke(client, step, names))
+            if not _unkept(step, kept):
+                _outcome(_invoke(client, step, names, kept), step, kept)
     return failures
 
 
 async def arun(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str, str]) -> list[str]:
     """Runs the scenario with an asyncio client; the steps whose expectation failed, as :func:`run`."""
     failures = []
+    kept: dict[str, Any] = {}
     try:
         for i, step in enumerate(scenario["steps"]):
             traffic.step = f"steps[{i}]"
-            outcome = await _aoutcome(_invoke(client, step, names))
+            outcome = await _aoutcome(_invoke(client, step, names, kept), step, kept)
             why = check(substitute(step["expect"], names), outcome) or save(step, outcome, names)
             if why:
                 failures.append(f"step {i} {step['service']}.{step['method']}: {why}")
@@ -205,5 +236,6 @@ async def arun(client: Any, traffic: Traffic, scenario: dict[str, Any], names: d
     finally:
         for i, step in enumerate(scenario.get("finally", [])):
             traffic.step = f"finally[{i}]"
-            await _aoutcome(_invoke(client, step, names))
+            if not _unkept(step, kept):
+                await _aoutcome(_invoke(client, step, names, kept), step, kept)
     return failures

@@ -46,10 +46,15 @@ internal static class PatchBuilders
     /// <summary>A path segment encoded as a client encodes one: unreserved characters, or a %XX.</summary>
     private static readonly Regex Encoded = new("^([A-Za-z0-9\\-._~'()=,@$!]|%[0-9A-F]{2})*$");
 
-    internal static object Build(Type patch, JsonObject json)
+    internal static object Build(Type patch, JsonObject json) => Build(patch, json, null);
+
+    /// <summary>A write built from what was read, as a caller changes it (<c>$fromRead</c>):
+    /// <c>Builder(read)</c>, then the setters <paramref name="json"/> names, as for a fresh one; with no
+    /// read, from <c>Builder()</c>.</summary>
+    internal static object Build(Type patch, JsonObject json, object? read)
     {
-        var type = Subtype(patch, json);
-        var builder = Fresh(type);
+        var type = read is null ? Subtype(patch, json) : patch;
+        var builder = read is null ? Fresh(type) : FromRead(type, read);
         var setters = Setters(type);
         foreach (var (key, value) in json)
         {
@@ -272,6 +277,13 @@ internal static class PatchBuilders
         type.Namespace == typeof(Cube).Namespace
         && typeof(Tm1Patch).IsAssignableFrom(type)
         && (type.Name.EndsWith("Patch", StringComparison.Ordinal) || type.Name.EndsWith("Create", StringComparison.Ordinal));
+
+    private static object FromRead(Type type, object read) =>
+        (
+            type.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .FirstOrDefault(m => m.Name == "Builder" && m.GetParameters() is [var p] && p.ParameterType.IsInstanceOfType(read))
+            ?? throw new ArgumentException($"{type.Name} has no Builder({read.GetType().Name} read)")
+        ).Invoke(null, [read])!;
 
     private static object Fresh(Type type) => type.GetMethod("Builder", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
 

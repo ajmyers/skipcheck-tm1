@@ -28,6 +28,8 @@ export interface Step {
   /** Fields of the result to keep for the steps after it, by the name they're kept as:
    * `{"note": "ID"}` makes the result's `ID` `${note}`. */
   save?: Record<string, string>;
+  /** A name to keep the result by, as read, for a `$fromRead` argument after it. */
+  keep?: string;
 }
 
 export interface Scenario {
@@ -141,15 +143,20 @@ export function check(expect: Record<string, any>, outcome: Outcome): string | u
   return undefined;
 }
 
-async function outcome(client: any, step: Step, names: Record<string, string>): Promise<Outcome> {
+async function outcome(client: any, step: Step, names: Record<string, string>, kept: Map<string, unknown>): Promise<Outcome> {
   const service = client[step.service];
   if (!service || typeof service[step.method] !== "function") throw new codec.Unknown(`no ${step.service}.${step.method}`);
-  const args = step.args.map((a) => codec.decode(substitute(a, names)));
+  const args = step.args.map((a) => {
+    const v = substitute(a, names);
+    return v !== null && typeof v === "object" && !Array.isArray(v) && "$fromRead" in v ? codec.fromRead(v, kept) : codec.decode(v);
+  });
   try {
     let value: any = service[step.method](...args);
     value = value && typeof value.toArray === "function" ? await value.toArray() : await value;
     // A stream of bytes, such as a document's content, as its bytes however they're split
     if (Array.isArray(value) && value.length > 0 && value.every((v) => v instanceof Uint8Array)) value = Buffer.concat(value);
+    // A step's result, as read, kept for a $fromRead after it
+    if (step.keep !== undefined && value !== undefined && value !== null) kept.set(step.keep, value);
     return { result: codec.result(value) };
   } catch (e) {
     if (e instanceof codec.Unknown) throw e;
@@ -175,10 +182,11 @@ export function save(step: Step, outcome: Outcome, names: Record<string, string>
  * placeholders too. */
 export async function run(client: unknown, traffic: Traffic, scenario: Scenario, names: Record<string, string>): Promise<string[]> {
   const failures: string[] = [];
+  const kept = new Map<string, unknown>();
   try {
     for (const [i, step] of scenario.steps.entries()) {
       traffic.step = `steps[${i}]`;
-      const got = await outcome(client, step, names);
+      const got = await outcome(client, step, names, kept);
       const why = check(substitute(step.expect ?? {}, names), got) ?? save(step, got, names);
       if (why) {
         failures.push(`step ${i} ${step.service}.${step.method}: ${why}`);
@@ -188,7 +196,9 @@ export async function run(client: unknown, traffic: Traffic, scenario: Scenario,
   } finally {
     for (const [i, step] of (scenario.finally ?? []).entries()) {
       traffic.step = `finally[${i}]`;
-      await outcome(client, step, names).catch(() => undefined);
+      // A step setting back what a step that didn't run would have read has nothing to send
+      if (step.args.some((a) => a !== null && typeof a === "object" && !Array.isArray(a) && "$fromRead" in a && !kept.has(a.read))) continue;
+      await outcome(client, step, names, kept).catch(() => undefined);
     }
   }
   return failures;
