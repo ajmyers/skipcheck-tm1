@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -143,10 +144,12 @@ public sealed class PatchEmitter
         var suffix = create ? "Create" : "Patch";
         var patch = name + suffix;
         var builderName = create ? "CreateBuilder" : "PatchBuilder";
-        var baseType = _spec.Base(t);
-        var hasDerived = _spec.Derived(t).Any();
-        var basePatch = baseType is { } b ? Spec.Str(b, "name") + suffix : "Tm1Patch";
-        var typeId = baseType is null ? "null" : $"\"#{Spec.Str(t, "qualifiedName")}\"";
+        var plan = Plan(t, create);
+        // A subtype's base: its root's write type
+        var baseType = Spec.Str(plan, "base");
+        var hasDerived = plan.GetProperty("dispatch").ValueKind == JsonValueKind.Array;
+        var basePatch = baseType ?? "Tm1Patch";
+        var typeId = Spec.Str(plan, "odataType") is { } id ? $"\"{id}\"" : "null";
         var properties = Writable(t, create);
         if (create)
         {
@@ -179,10 +182,10 @@ public sealed class PatchEmitter
             _out.Append("    /// <param name=\"read\">An entity read from TM1.</param>\n");
             _out.Append("    /// <exception cref=\"ArgumentException\">TM1 makes none of its type.</exception>\n");
             _out.Append($"    public static IBuilder<{patch}> Builder({name} read) =>\n        read switch\n        {{\n");
-            foreach (var c in Spec.Array(Plan(t, true), "dispatch"))
+            foreach (var c in Spec.Array(plan, "dispatch"))
             {
                 var subName = Spec.Str(_spec.TypeByName[Spec.Str(c, "type")!], "name")!;
-                _out.Append($"            {subName} v => {subName}Create.Builder(v),\n");
+                _out.Append($"            {subName} v => {Spec.Str(c, "builder")}.Builder(v),\n");
             }
             _out.Append(
                 "            _ => throw new ArgumentException(\"A \" + read.GetType().Name + \" has no create: TM1 makes none of its type\", nameof(read)),\n        };\n\n"
@@ -194,10 +197,10 @@ public sealed class PatchEmitter
             _out.Append($"    /// <summary>A patch of what <paramref name=\"read\"/> holds that a write takes, by its type: for nested values.</summary>\n");
             _out.Append("    /// <param name=\"read\">A value read from TM1.</param>\n");
             _out.Append($"    internal static {patch} Of({name} read) =>\n        read switch\n        {{\n");
-            foreach (var c in Spec.Array(Plan(t, false), "dispatch"))
+            foreach (var c in Spec.Array(plan, "dispatch"))
             {
                 var subName = Spec.Str(_spec.TypeByName[Spec.Str(c, "type")!], "name")!;
-                _out.Append($"            {subName} v => {subName}Patch.Builder(v).Build(),\n");
+                _out.Append($"            {subName} v => {Spec.Str(c, "builder")}.Builder(v).Build(),\n");
             }
             _out.Append($"            _ => Unknown(read).Build(),\n        }};\n\n");
             EmitFrom(t, create, builderName, properties, "Unknown");
@@ -241,7 +244,7 @@ public sealed class PatchEmitter
                 _out.Append($"        public {builderName} {p.BindMethod}(ODataPath target) => Bind(\"{p.Json}\", target);\n");
             }
         }
-        if (_spec.Chain(t).Any(l => Spec.Bool(l, "open")))
+        if (Spec.Bool(plan, "open"))
         {
             _out.Append(
                 "\n        /// <summary>Sets a property <c>$metadata</c> doesn't declare, which this open type can have, such as an attribute's value.</summary>\n"
@@ -346,7 +349,12 @@ public sealed class PatchEmitter
     private string ReadBinding(JsonElement binding, WriteProperty p, string member)
     {
         var target = _spec.TypeByName[Spec.Str(p.Property, "type")!];
-        var byKey = Spec.Str(binding, "by") == "key";
+        var byKey = Spec.Str(binding, "by") switch
+        {
+            "key" => true,
+            "uniqueName" => false,
+            var by => throw new InvalidOperationException($"A binding by {by}: by key or uniqueName"),
+        };
         var helper = byKey ? (p.Collection ? "ByKeys" : "ByKey") : (p.Collection ? "AllInHierarchy" : "InHierarchy");
         var argument = ModelEmitter.MemberNames(_spec, target)[Spec.Str(binding, "key")!];
         var collectionName = Spec.Str(binding, "set")!;

@@ -91,8 +91,6 @@ public sealed class Spec
 
     public IEnumerable<JsonElement> Derived(JsonElement t) => Array(t, "derivedTypes").Select(d => TypeByName[d.GetString()!]);
 
-    public bool IsEntity(string typeName) => TypeByName.TryGetValue(typeName, out var t) && Str(t, "kind") == "entity";
-
     public bool IsStructured(string typeName) => TypeByName.ContainsKey(typeName);
 
     public string AliasName(string qualified)

@@ -24,12 +24,14 @@ public static class Program
             return 2;
         }
         using var doc = JsonDocument.Parse(File.ReadAllBytes(args[0]));
-        var spec = new Spec(doc.RootElement);
-        if (spec.Version != SupportedSpecVersion)
+        // Before reading it: a spec of another version may lack what this one reads (builders)
+        var version = doc.RootElement.TryGetProperty("specVersion", out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : 0;
+        if (version != SupportedSpecVersion)
         {
-            Console.Error.WriteLine($"{args[0]}: spec version {spec.Version}; this generator reads {SupportedSpecVersion}");
+            Console.Error.WriteLine($"{args[0]}: spec version {version}; this generator reads {SupportedSpecVersion}");
             return 1;
         }
+        var spec = new Spec(doc.RootElement);
         Directory.CreateDirectory(args[1]);
         foreach (var old in Directory.GetFiles(args[1], "*.g.cs"))
         {
