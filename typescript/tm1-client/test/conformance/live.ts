@@ -101,7 +101,6 @@ export function substitute(value: any, names: Record<string, string>): any {
 
 export type Outcome = { result: any } | { error: codec.EncodedError };
 
-/** Why the outcome doesn't meet the expectation, or undefined if it does. */
 /** Equal JSON at any depth: numbers by their value, and a null as a property left out, as clients
  * differ in whether a model's JSON keeps a null. */
 export function same(expected: unknown, got: unknown): boolean {
@@ -117,6 +116,7 @@ export function same(expected: unknown, got: unknown): boolean {
   return expected === got;
 }
 
+/** Why the outcome doesn't meet the expectation, or undefined if it does. */
 export function check(expect: Record<string, any>, outcome: Outcome): string | undefined {
   if (expect.error) {
     const got = "error" in outcome ? (outcome.error as unknown as Record<string, unknown>) : undefined;

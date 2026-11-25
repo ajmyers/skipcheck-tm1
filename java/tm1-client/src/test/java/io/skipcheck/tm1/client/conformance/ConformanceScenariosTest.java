@@ -361,6 +361,9 @@ class ConformanceScenariosTest {
 			.isFalse();
 		assertThat(ConformanceScenarios.same(expected, ConformanceCodec.json().readTree("{\"A\":{\"B\":1,\"C\":[1]}}")))
 			.isFalse();
+		assertThat(ConformanceScenarios.same(ConformanceCodec.json().readTree("true"),
+				ConformanceCodec.json().readTree("1")))
+			.isFalse();
 	}
 
 	@Test

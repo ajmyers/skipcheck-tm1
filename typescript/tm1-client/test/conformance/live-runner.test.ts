@@ -85,6 +85,7 @@ describe("the live conformance runner's comparison", () => {
     expect(live.same(expected, { A: { B: 1, C: [1, { D: 2 }] } })).toBe(false);
     expect(live.same(expected, { A: { C: [1, {}] } })).toBe(false);
     expect(live.same(expected, { A: { B: 1, C: [1] } })).toBe(false);
+    expect(live.same(true, 1)).toBe(false);
   });
 });
 

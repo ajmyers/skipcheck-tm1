@@ -259,6 +259,7 @@ def test_treats_a_null_as_missing_at_any_depth() -> None:
     assert not live.same(expected, {"A": {"B": 1, "C": [1, {"D": 2}]}})
     assert not live.same(expected, {"A": {"C": [1, {}]}})
     assert not live.same(expected, {"A": {"B": 1, "C": [1]}})
+    assert not live.same(True, 1)
 
 
 @pytest.mark.parametrize("name", ["cellsets", "views", "sandboxes"])
