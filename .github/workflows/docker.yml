@@ -70,6 +70,11 @@ jobs:
             platforms: linux/amd64   # TM1 Web's bundled Java is x86-64 only
             gradle-task: ''
             publish-var: PUBLISH_DOCKER_TM1_WEB
+          - image: tm1-engine
+            context: docker/tm1-engine
+            platforms: linux/amd64   # TM1 v12 is x86-64 only
+            gradle-task: ''
+            publish-var: PUBLISH_DOCKER_TM1_ENGINE
           - image: cognos-server
             context: docker/cognos-server
             platforms: linux/amd64   # Cognos Analytics for Linux is x86-64 only

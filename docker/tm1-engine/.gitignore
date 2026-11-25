@@ -1,0 +1,11 @@
+# Your TM1 files (configuration, databases, logs, credentials)
+tm1-engine-files/
+# Your IBM downloads: never commit IBM software
+bundles/*
+!bundles/README.md
+*.tgz
+*.tar.gz
+*.zip
+*.run
+# Machine-specific settings
+.env

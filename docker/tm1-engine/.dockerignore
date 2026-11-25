@@ -1,0 +1,10 @@
+# Only the image's own files belong in the build context. Keep IBM software,
+# databases and local settings out (they'd be sent to Docker on every build).
+tm1-engine-files/
+bundles/
+examples/
+.env
+*.tgz
+*.tar.gz
+*.zip
+*.run
