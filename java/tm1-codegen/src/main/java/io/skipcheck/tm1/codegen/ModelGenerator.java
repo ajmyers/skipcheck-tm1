@@ -187,54 +187,14 @@ public final class ModelGenerator {
 	private @Nullable Builders plan;
 
 	/**
-	 * A generator for {@code metadata}, with the bundled overlay.
+	 * A generator for {@code metadata}'s read model, with the bundled overlay: without a
+	 * probe's offers, no write types.
 	 * @param metadata the {@code $metadata} document
 	 * @throws IllegalArgumentException if a type derives from a derived type, which TM1
 	 * doesn't do and the generator doesn't support yet
 	 */
 	public ModelGenerator(CsdlDocument metadata) {
-		this(metadata, Overlay.bundled());
-	}
-
-	/**
-	 * A generator for {@code metadata}.
-	 * @param metadata the {@code $metadata} document
-	 * @param overlay what TM1 does differently from {@code metadata}
-	 * @throws IllegalArgumentException if a type derives from a derived type, which TM1
-	 * doesn't do and the generator doesn't support yet
-	 */
-	public ModelGenerator(CsdlDocument metadata, Overlay overlay) {
-		this(metadata, overlay, Undeclared.NONE);
-	}
-
-	/**
-	 * A generator for {@code metadata}, with properties a probe found that it doesn't
-	 * declare.
-	 * @param metadata the {@code $metadata} document, with the undeclared properties
-	 * {@linkplain Undeclared#applyTo(CsdlDocument) added}
-	 * @param overlay what TM1 does differently from {@code metadata}, with the undeclared
-	 * properties' {@linkplain Undeclared#applyTo(Overlay) departures}
-	 * @param undeclared the undeclared properties, to tag
-	 * @throws IllegalArgumentException if a type derives from a derived type, which TM1
-	 * doesn't do and the generator doesn't support yet
-	 */
-	public ModelGenerator(CsdlDocument metadata, Overlay overlay, Undeclared undeclared) {
-		this(metadata, overlay, undeclared, Writes.NONE);
-	}
-
-	/**
-	 * A generator for {@code metadata}, with what a probe found: the undeclared
-	 * properties, and what a POST and a PATCH do with each property.
-	 * @param metadata the {@code $metadata} document, with the undeclared properties
-	 * added
-	 * @param overlay what TM1 does differently from {@code metadata}, with the undeclared
-	 * properties' departures
-	 * @param undeclared the undeclared properties, to tag
-	 * @param writes what writes do, for the create types and {@code from}
-	 * @throws IllegalArgumentException if a type derives from a derived type
-	 */
-	public ModelGenerator(CsdlDocument metadata, Overlay overlay, Undeclared undeclared, Writes writes) {
-		this(metadata, overlay, undeclared, writes, Offers.NONE);
+		this(metadata, Overlay.bundled(), Undeclared.NONE, Writes.NONE, Offers.NONE);
 	}
 
 	/**
@@ -246,8 +206,7 @@ public final class ModelGenerator {
 	 * properties' departures
 	 * @param undeclared the undeclared properties, to tag
 	 * @param writes what writes do, for what a create needs and {@code from}
-	 * @param offers the write types and their setters; with none, every type gets a
-	 * patch, offering what the writes don't refuse
+	 * @param offers the write types and their setters; with none, there are none
 	 * @throws IllegalArgumentException if a type derives from a derived type
 	 */
 	public ModelGenerator(CsdlDocument metadata, Overlay overlay, Undeclared undeclared, Writes writes, Offers offers) {

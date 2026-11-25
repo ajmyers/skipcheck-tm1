@@ -210,27 +210,8 @@ class BuildersTest {
 	}
 
 	@Test
-	void withoutOffersPlansAPatchForEveryTypeAndACreateForWhatTheWritesCover() {
-		Builders plan = Builders.of(METADATA, Overlay.NONE, WRITES, Offers.NONE);
-		assertThat(plan.builders()).containsOnlyKeys("CubePatch", "CubeCreate", "DimensionPatch", "ElementPatch",
-				"BoxPatch", "DrillPatch", "CubeDrillPatch", "ViewPatch", "MDXViewPatch", "NativeViewPatch");
-		assertThat(setters(plan.get("CubeCreate")))
-			.as("what a POST takes (a property the probe didn't try, too), and every navigation")
-			.containsExactly("Name", "Rules", "Tags", "Box", "Drill", "Views", "Dimensions", "Measure", "DefaultView");
-		assertThat(plan.get("CubeCreate").setter("Dimensions").orElseThrow().bind()).isTrue();
-		assertThat(setters(plan.get("ViewPatch"))).as("a root without writes of its own offers what its subtypes do")
-			.containsExactly("Name");
-	}
-
-	@Test
-	void withoutOffersARootOffersOnlyWhatEveryProbedSubtypeTakes() {
-		Writes writes = Writes.read("""
-				{"writes": {"MDXView": {"type": "MDXView", "post": {"Name": {"outcome": "applied"}},
-				   "patch": {}, "rename": {"outcome": "ignored"}}}}""");
-		Builders plan = Builders.of(METADATA, Overlay.NONE, writes, Offers.NONE);
-		assertThat(plan.get("ViewCreate")).as("its subtype has writes").isNotNull();
-		assertThat(setters(plan.get("ViewCreate"))).containsExactly("Name");
-		assertThat(setters(plan.get("ViewPatch"))).as("a PATCH of its probed subtype doesn't rename").isEmpty();
+	void withoutOffersPlansNoWriteTypes() {
+		assertThat(Builders.of(METADATA, Overlay.NONE, WRITES, Offers.NONE).builders()).isEmpty();
 	}
 
 }
