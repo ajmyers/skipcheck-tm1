@@ -14,7 +14,8 @@ This script normalizes every log the same way: the run's names back to their pla
 (${cube}), entity tags left out, the ID TM1 made up for a cellset as <id>, and each run of requests a scenario's step marks "unordered" (a
 regular expression on "METHOD target", for requests a client has in flight at once, such as a
 cellset stream's pages) put in one order, and each run of equal requests a step marks "repeats" (the
-same, for a poll that sends as many as TM1 takes) kept once; then requires every language's log of a scenario to be
+same, for a poll that sends as many as TM1 takes) kept once, as long as no run is longer than the
+step's "maxRepeats" (30 if it gives none); then requires every language's log of a scenario to be
 equal, request for request, and prints the first difference. With fewer than two logs of a scenario,
 there's nothing to compare: it says so and passes.
 
@@ -32,6 +33,10 @@ from pathlib import Path
 from typing import Any
 
 ETAG_HEADERS = ("if-match", "if-none-match")
+
+# How many equal requests a step that "repeats" may send in a row: past it, a client polling far more
+# than another would still compare equal, as each run is kept once
+REPEAT_LIMIT = 30
 
 # A cellset's ID is TM1's, new for every run, and a scenario can't name it. One a scenario does
 # name (a missing cellset) is a placeholder by now, and stays.
@@ -120,6 +125,35 @@ def repeating(scenario: dict[str, Any]) -> dict[str, re.Pattern[str]]:
     }
 
 
+def repeat_limits(scenario: dict[str, Any]) -> dict[str, int]:
+    """Per step that repeats, how many equal requests it may send in a row: its "maxRepeats", else
+    REPEAT_LIMIT."""
+    return {
+        f"{part}[{i}]": int(step.get("maxRepeats", REPEAT_LIMIT))
+        for part in ("steps", "finally")
+        for i, step in enumerate(scenario.get(part, []))
+        if "repeats" in step
+    }
+
+
+def overlong(exchanges: list[dict[str, Any]], patterns: dict[str, re.Pattern[str]], limits: dict[str, int]) -> list[str]:
+    """Each run of a step's equal consecutive requests matching its pattern that's longer than the
+    step's limit, which collapsing them would hide."""
+    problems: list[str] = []
+    runs: list[tuple[dict[str, Any], int]] = []
+    for x in exchanges:
+        pattern = patterns.get(x.get("step") or "")
+        if pattern and runs and _ordered(runs[-1][0]) == _ordered(x) and pattern.search(f"{x['request']['method']} {x['request']['target']}"):
+            runs[-1] = (runs[-1][0], runs[-1][1] + 1)
+        else:
+            runs.append((x, 1))
+    for x, count in runs:
+        limit = limits.get(x.get("step") or "", REPEAT_LIMIT)
+        if x.get("step") in patterns and count > limit:
+            problems.append(f"{x['step']} sent {x['request']['method']} {x['request']['target']} {count} times in a row, more than its {limit}")
+    return problems
+
+
 def collapse(exchanges: list[dict[str, Any]], patterns: dict[str, re.Pattern[str]]) -> list[dict[str, Any]]:
     """A normalized log with each run of a step's equal consecutive requests that match its pattern
     kept once, so polls that took TM1 more or fewer answers compare equal. Everything else stays."""
@@ -167,13 +201,17 @@ def main(argv: list[str]) -> int:
         print(f"No live conformance traffic in {root}: nothing to compare")
         return 0
     scenarios: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    failed = False
     for log in sorted(root.glob("*/*.jsonl")):
         header, exchanges = load(log)
         spec = SCENARIOS / f"{log.stem}.json"
         definition = json.loads(spec.read_text(encoding="utf-8")) if spec.is_file() else {}
-        normalized = collapse(normalize(header, exchanges), repeating(definition))
+        patterns = repeating(definition)
+        for problem in overlong(normalize(header, exchanges), patterns, repeat_limits(definition)):
+            failed = True
+            print(f"{log.stem}: {log.parent.name} {problem}")
+        normalized = collapse(normalize(header, exchanges), patterns)
         scenarios.setdefault(log.stem, {})[log.parent.name] = reorder(normalized, unordered(definition))
-    failed = False
     for scenario, logs in sorted(scenarios.items()):
         problems = compare(logs)
         if len(logs) < 2:

@@ -2,7 +2,7 @@
 	"specVersion" : 1,
 	"name" : "writes",
 	"description" : "What the probe found TM1 applies, written through every client's create and patch types: each property a create or a patch applies, by tm1-probe-<schema>.json, that no other scenario writes, read back after its create and after its patch. ProbedWritesCoverageTest holds the scenarios to the probe. It also writes, through each client's builders, what LiveBuildersCoverageTest holds every builder and setter to that no other scenario writes: a dimension's default hierarchy, a hierarchy's subsets, an element's parents and components, a cube's views with bound axis and title subsets, a process's code and variables, a chore's tasks, a user's new group, and an application folder with contents and a reference to each kind of object.",
-	"names" : [ "dim", "month", "third", "cube", "native", "process", "chore", "sandbox", "subset", "user", "level", "debug", "context", "fourth", "views", "coded", "member", "group", "app" ],
+	"names" : [ "dim", "month", "third", "cube", "native", "process", "chore", "sandbox", "subset", "user", "level", "debug", "context", "fourth", "views", "coded", "member", "group", "app", "bound", "ascii", "viewed" ],
 	"steps" : [
 		{
 			"service" : "dimensions",
@@ -426,6 +426,55 @@
 			"expect" : { "fields" : { "Name" : "${native}" } }
 		},
 		{
+			"service" : "subsets",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${month}", "${month}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "SubsetCreate", "json" : { "Name" : "${subset}", "Expression" : "{TM1SUBSETALL([${month}].[${month}])}" } } ],
+			"expect" : { "fields" : { "Name" : "${subset}" } }
+		},
+		{
+			"service" : "views",
+			"method" : "create",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "NativeViewCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "Name" : "${bound}", "Columns" : [ { "Subset@odata.bind" : "Dimensions('${month}')/Hierarchies('${month}')/Subsets('${subset}')" } ], "Rows" : [ { "Subset@odata.bind" : "Dimensions('${dim}')/Hierarchies('${dim}')/Subsets('${subset}')" } ], "Titles" : [ { "Subset@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')/Subsets('${subset}')", "Selected@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')/Elements('T1')" } ] } } ],
+			"expect" : { "fields" : { "Name" : "${bound}" } }
+		},
+		{
+			"service" : "views",
+			"method" : "update",
+			"params" : [ "cube", "scope", "view", "patch" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${bound}", { "$patch" : "NativeViewPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "Columns" : [ { "Subset@odata.bind" : "Dimensions('${dim}')/Hierarchies('${dim}')/Subsets('${subset}')" } ], "Rows" : [ { "Subset@odata.bind" : "Dimensions('${month}')/Hierarchies('${month}')/Subsets('${subset}')" } ], "Titles" : [ { "Subset@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')/Subsets('${subset}')", "Selected@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')/Elements('T2')" } ] } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "processes",
+			"method" : "create",
+			"params" : [ "process" ],
+			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${ascii}", "DataSource" : { "Type" : "ASCII", "asciiDelimiterType" : "Character", "asciiDelimiterChar" : ",", "asciiDecimalSeparator" : ".", "asciiQuoteCharacter" : "\"", "asciiThousandSeparator" : ",", "asciiHeaderRecords" : 1, "dataSourceNameForServer" : "probe.csv", "dataSourceNameForClient" : "probe.csv" } } } ],
+			"expect" : { "fields" : { "Name" : "${ascii}" } }
+		},
+		{
+			"service" : "processes",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${ascii}", { "$patch" : "ProcessPatch", "json" : { "DataSource" : { "Type" : "ASCII", "asciiDelimiterType" : "Character", "asciiDelimiterChar" : ";", "asciiDecimalSeparator" : ",", "asciiQuoteCharacter" : "'", "asciiThousandSeparator" : ".", "asciiHeaderRecords" : 0, "dataSourceNameForServer" : "other.csv", "dataSourceNameForClient" : "other.csv" } } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "processes",
+			"method" : "create",
+			"params" : [ "process" ],
+			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${viewed}", "DataSource" : { "Type" : "TM1CubeView", "dataSourceNameForServer" : "${cube}", "dataSourceNameForClient" : "${cube}", "view" : "${native}" } } } ],
+			"expect" : { "fields" : { "Name" : "${viewed}" } }
+		},
+		{
+			"service" : "processes",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${viewed}", { "$patch" : "ProcessPatch", "json" : { "DataSource" : { "Type" : "TM1CubeView", "dataSourceNameForServer" : "${cube}", "dataSourceNameForClient" : "${cube}", "view" : "${bound}" } } } ],
+			"expect" : { "none" : true }
+		},
+		{
 			"service" : "processes",
 			"method" : "create",
 			"params" : [ "process" ],
@@ -527,6 +576,30 @@
 		}
 	],
 	"finally" : [
+		{
+			"service" : "processes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${ascii}" ]
+		},
+		{
+			"service" : "processes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${viewed}" ]
+		},
+		{
+			"service" : "views",
+			"method" : "delete",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${cube}", { "$enum" : "ViewScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${bound}" ]
+		},
+		{
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${month}", "${month}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}" ]
+		},
 		{
 			"service" : "contents",
 			"method" : "delete",
