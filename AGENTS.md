@@ -47,7 +47,7 @@ Run the Gradle task for what you changed before you push. They're what CI runs.
 - A write the probe finds TM1 applies needs a step in a live scenario (`spec/conformance/live`):
   `ProbedWritesCoverageTest` fails until it has one, and `ProbeCoverageTest` fails when the
   builders and the probe disagree. Every builder and setter is written by some live scenario, or
-  listed in `spec/conformance/live-builders-pending.txt` (which only shrinks) or
+  listed in `spec/conformance/live-builders-pending.txt` (what's still to write) or
   `live-builders-excluded.txt` with why: `LiveBuildersCoverageTest` holds it.
 - Every commit builds on its own: the pre-push hook runs `./gradlew build` on each (and the lint of
   a client the commit touches, not its tests). Java can go in a commit before the other clients,

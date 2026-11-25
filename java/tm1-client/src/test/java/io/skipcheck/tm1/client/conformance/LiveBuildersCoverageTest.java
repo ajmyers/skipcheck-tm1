@@ -25,16 +25,21 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Every generated create and patch builder, and each of its setters, is validated against
- * a real TM1: written by some live scenario ({@code spec/conformance/live}), which every
- * client runs through its builders' setters ({@code $patch}) and
- * {@code compareLiveTraffic} compares (#354). A setter is written when a scenario's write
- * of its builder has its key ({@code Name}, or {@code Dimensions@odata.bind} for a
- * binding), nested values counted for their own write types, a root's subtype's write for
- * the root's setters too. What none writes yet is listed in
- * {@code conformance/live-builders-pending.txt}, which only shrinks; what can't be
- * written in a TM1 container, in {@code live-builders-excluded.txt}, each with why. A
- * newly generated builder or setter fails here until a scenario writes it, or it's
- * listed; a listed one a scenario now writes fails too, to be taken off the list.
+ * a real TM1: written by a step of some live scenario ({@code spec/conformance/live})
+ * that TM1 is expected to accept, which every client runs through its builders' setters
+ * ({@code $patch}) and {@code compareLiveTraffic} compares (#354). A setter is written
+ * when such a step's write of its builder has its key ({@code Name}, or
+ * {@code Dimensions@odata.bind} for a binding), nested values counted for their own write
+ * types, a root's subtype's write for the root's setters too. A step expecting an error,
+ * or a {@code finally} step, doesn't count: a refusal TM1 is expected to give can be
+ * checked, and the builder still listed as excluded. Each counted write is built here as
+ * the runners build it, so CI checks it offline.
+ *
+ * <p>
+ * What no step writes yet is in {@code conformance/live-builders-pending.txt}; what can't
+ * be written in a TM1 container, in {@code live-builders-excluded.txt}, each with why. A
+ * newly generated builder or setter fails here until a step writes it, or it's listed; a
+ * listed one a step now writes fails too, to be taken off the list.
  */
 class LiveBuildersCoverageTest {
 
@@ -44,14 +49,34 @@ class LiveBuildersCoverageTest {
 
 	private static final String BIND = "@odata.bind";
 
+	/** A scenario's name placeholder, ${name}. */
+	private static final String NAME = "\\$\\{([A-Za-z0-9_]+)\\}";
+
 	@Test
 	void everyBuilderAndSetterIsWrittenLiveOrListed() throws IOException {
 		JsonNode plan = JSON.readTree(REPO.resolve("spec/tm1-api.json").toFile()).path("builders");
 		Set<String> built = new HashSet<>();
 		Map<String, Set<String>> written = new HashMap<>();
+		List<Path> scenarios;
 		try (Stream<Path> files = Files.list(REPO.resolve("spec/conformance/live"))) {
-			for (Path file : files.filter(f -> f.toString().endsWith(".json")).sorted().toList()) {
-				collect(JSON.readTree(file.toFile()), plan, built, written);
+			scenarios = files.filter(f -> f.toString().endsWith(".json")).sorted().toList();
+		}
+		assertThat(scenarios).as("the live scenarios").isNotEmpty();
+		assertThat(plan.size()).as("the spec's write plan").isPositive();
+		for (Path file : scenarios) {
+			// Only a step that succeeds validates a write: not one TM1 is expected to
+			// refuse,
+			// nor a finally step, whose failures are ignored
+			// A name a step saves from TM1's answer (an ID, a logger's level) has no
+			// value to
+			// make up: a write holding one is counted, not built here
+			Set<String> saved = new HashSet<>();
+			JsonNode scenario = JSON.readTree(file.toFile());
+			scenario.path("steps").forEach(step -> saved.addAll(step.path("save").propertyNames()));
+			for (JsonNode step : scenario.path("steps")) {
+				if (!step.path("expect").has("error")) {
+					collect(step.path("args"), plan, built, written, file.getFileName().toString(), saved);
+				}
 			}
 		}
 		// What each builder offers, its own level's setters: a subtype's inherited ones
@@ -85,6 +110,9 @@ class LiveBuildersCoverageTest {
 		}
 		Map<String, String> pending = list("live-builders-pending.txt");
 		Map<String, String> excluded = list("live-builders-excluded.txt");
+		Set<String> both = new TreeSet<>(pending.keySet());
+		both.retainAll(excluded.keySet());
+		assertThat(both).as("in both lists").isEmpty();
 		assertThat(excluded.entrySet()).as("live-builders-excluded.txt: each entry says why")
 			.allMatch(e -> !e.getValue().isBlank());
 		Set<String> listed = new TreeSet<>(pending.keySet());
@@ -99,18 +127,37 @@ class LiveBuildersCoverageTest {
 	}
 
 	/**
-	 * Every {@code $patch} in a scenario, nested values through their own write types.
+	 * Every {@code $patch} in a step's arguments, nested values through their own write
+	 * types. Each is built first, as every runner builds it (its names made up), so
+	 * what's counted is a write a caller could make: CI checks that offline, live or not.
 	 */
-	private static void collect(JsonNode node, JsonNode plan, Set<String> built, Map<String, Set<String>> written) {
+	private static void collect(JsonNode node, JsonNode plan, Set<String> built, Map<String, Set<String>> written,
+			String scenario, Set<String> saved) {
 		if (node.isArray()) {
-			node.forEach(n -> collect(n, plan, built, written));
+			node.forEach(n -> collect(n, plan, built, written, scenario, saved));
 		}
 		else if (node.isObject()) {
 			if (node.path("$patch").isString() && node.path("json").isObject()) {
-				write(node.path("$patch").asString(), node.path("json"), plan, built, written);
+				String patch = node.path("$patch").asString();
+				String text = node.path("json").toString();
+				boolean fromTm1 = saved.stream().anyMatch(name -> text.contains("${" + name + "}"));
+				try {
+					if (fromTm1) {
+						throw new SkipBuild();
+					}
+					JsonNode json = JSON.readTree(text.replaceAll(NAME, "tm1conf_$1"));
+					PatchBuilders.build(Class.forName("io.skipcheck.tm1.client.model." + patch), json);
+				}
+				catch (SkipBuild e) {
+					// Counted, as the runners build it with TM1's value
+				}
+				catch (ClassNotFoundException | RuntimeException e) {
+					throw new AssertionError(scenario + ": " + patch + " doesn't build: " + e.getMessage(), e);
+				}
+				write(patch, node.path("json"), plan, built, written);
 			}
 			else {
-				node.forEach(n -> collect(n, plan, built, written));
+				node.forEach(n -> collect(n, plan, built, written, scenario, saved));
 			}
 		}
 	}
@@ -159,16 +206,27 @@ class LiveBuildersCoverageTest {
 	 */
 	private static Map<String, String> list(String name) throws IOException {
 		Map<String, String> out = new LinkedHashMap<>();
+		Set<String> twice = new TreeSet<>();
 		for (String line : Files.readAllLines(REPO.resolve("spec/conformance").resolve(name), StandardCharsets.UTF_8)) {
 			String entry = line.strip();
 			if (entry.isEmpty() || entry.startsWith("#")) {
 				continue;
 			}
 			int colon = entry.indexOf(':');
-			out.put((colon < 0 ? entry : entry.substring(0, colon)).strip(),
-					colon < 0 ? "" : entry.substring(colon + 1).strip());
+			String key = (colon < 0 ? entry : entry.substring(0, colon)).strip();
+			if (out.put(key, colon < 0 ? "" : entry.substring(colon + 1).strip()) != null) {
+				twice.add(key);
+			}
 		}
+		assertThat(twice).as(name + ": listed twice").isEmpty();
 		return out;
+	}
+
+	/** A write that holds a name saved from TM1's answer: not built here. */
+	private static final class SkipBuild extends Exception {
+
+		private static final long serialVersionUID = 1L;
+
 	}
 
 }

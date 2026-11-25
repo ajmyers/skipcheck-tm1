@@ -9,6 +9,7 @@ The Java client is the definition of how a call behaves. Its unit tests record e
 | `builders.json` | What every generated create and patch builder offers: each `XPatch` and `XCreate`, its `@odata.type`, the JSON names its setters write, what its `build()` requires, and whether it takes undeclared properties (`property`). Every client's `BuilderManifestTest` drives its own builders to find these, and must match | `./gradlew :tm1-client:test -PrecordConformance` (the Java builders) |
 | `calls/<JavaTestClass>.json` | The service calls one Java unit-test class records | `./gradlew :tm1-client:test -PrecordConformance` |
 | `live/<scenario>.json` | Steps every client runs against a real TM1 | Hand |
+| `live-builders-pending.txt`, `live-builders-excluded.txt` | The builders and setters no live scenario writes yet, and those a TM1 container can't be written with, each with why (`LiveBuildersCoverageTest`) | Hand |
 
 ## The builder manifest (`builders.json`)
 
@@ -164,8 +165,9 @@ The runners are Java's `ConformanceScenarioTm1Test`, Python's `tests/live/test_c
 
 Every generated create and patch builder, and each of its setters, is to be written by some live scenario, which every client builds through its setters and `compareLiveTraffic` compares (#354). The Java client's `LiveBuildersCoverageTest` holds that, from the spec's write plan (`builders`):
 
-- A setter counts when a scenario's write of its builder has its key (`Name`, or `Dimensions@odata.bind` for a binding). A nested value counts for its own write type. A subtype's write counts for the setters its root declares.
-- What no scenario writes yet is in `live-builders-pending.txt`, a whole builder as one line. The list only shrinks: a newly generated builder or setter is added until a scenario writes it, and an entry a scenario comes to write fails the test until it's taken off.
+- A setter counts when a step's write of its builder has its key (`Name`, or `Dimensions@odata.bind` for a binding). A nested value counts for its own write type. A subtype's write counts for the setters its root declares.
+- Only a step TM1 is expected to accept counts: not one expecting an error, nor a `finally` step. So a builder whose refusal a step checks can still be listed as excluded. Each counted write is built as the runners build it, so CI checks it offline.
+- What no step writes yet is in `live-builders-pending.txt`, a whole builder as one line. A newly generated builder or setter is added until a step writes it, and an entry a step comes to write fails the test until it's taken off. Once a step writes a builder in part, its line gives way to the setters no step writes yet.
 - What a TM1 container can't be written with goes in `live-builders-excluded.txt`, each entry with why.
 
 ### Adding a scenario

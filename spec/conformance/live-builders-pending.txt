@@ -1,6 +1,7 @@
-# Builders and setters no live scenario writes yet (#354). LiveBuildersCoverageTest holds this
-# list: what a scenario comes to write is taken off it, and nothing is added but a newly generated
-# builder or setter, until a scenario writes it. A whole builder no scenario writes is one line.
+# Builders and setters no step of a live scenario writes yet (#354), a step TM1 is expected to
+# accept. LiveBuildersCoverageTest holds this list: what a step comes to write is taken off it, and
+# a newly generated builder or setter goes on it until one does. A whole builder no step writes is
+# one line, which gives way to the setters no step writes yet once one writes it in part.
 
 # Server settings: no scenario writes them yet; one that writes each and restores it is to come (#354)
 AccessSettingsPatch
@@ -39,11 +40,13 @@ TM1WebSettingsPatch
 TopLogSettingsPatch
 ViewCalculationSettingsPatch
 
-# Encryption at rest providers: need a key store; to try with a local key file, else to exclude (#354)
+# The IBM Key Protect and HashiCorp Vault encryption providers: no step writes them yet. A validate
+# step, which TM1 answers without the service, is to come, as the local key file's (#354)
 KeyProtectSettingsPatch
 VaultSettingsPatch
 
-# Groups: no service takes them yet; GroupService.create is to take a GroupCreate (#354)
+# Groups: no service takes a GroupPatch, and no step writes a GroupCreate yet (a UserCreate's Groups
+# takes one, as GroupService.create is to) (#354)
 GroupCreate
 GroupPatch
 
