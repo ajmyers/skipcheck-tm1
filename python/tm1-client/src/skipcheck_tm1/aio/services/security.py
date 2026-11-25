@@ -130,7 +130,7 @@ class GroupService(Service):
 
     Create a group and add a user to it, from the user's side::
 
-        await tm1.groups.create("Planners")
+        await tm1.groups.create(GroupCreate.builder().name("Planners").build())
         groups = [g.name for g in await tm1.users.groups("alice", ODataQuery.none().select(Group.NAME))]
         await tm1.users.set_groups("alice", [*groups, "Planners"])
     """
@@ -146,9 +146,12 @@ class GroupService(Service):
         return await self._session.execute(Tm1Request.get(_group(name), ODataQuery.of(query, **options), Group))
 
     @endpoint("EntitySet Groups")
-    async def create(self, name: str) -> Group:
-        """``POST Groups``: creates an empty group."""
-        return await self._session.execute(Tm1Request.post(_GROUPS, {"Name": _require(name, "name")}, Group))
+    async def create(self, group: Any) -> Group:
+        """``POST Groups``: creates a group, with the users the create binds
+        (``GroupCreate.Builder.bind_users``) or nests (new users, created with it). It needs a name.
+        Afterwards, a user's membership is set from the user's side, ``UserService.set_groups``: a
+        group PATCH would replace its users."""
+        return await self._session.execute(Tm1Request.post(_GROUPS, _require(group, "group"), Group))
 
     @endpoint("EntitySet Groups")
     async def delete(self, name: str) -> None:

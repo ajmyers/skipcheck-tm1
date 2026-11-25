@@ -13973,14 +13973,6 @@
 				"verified" : "applied"
 			}
 		},
-		"GroupPatch" : {
-			"Users" : {
-				"verified" : "applied"
-			},
-			"Users@odata.bind" : {
-				"verified" : "applied"
-			}
-		},
 		"HTTPSettingsPatch" : {
 			"OriginAllowList" : {
 				"verified" : "applied"
@@ -17774,31 +17766,6 @@
 						"key" : "Name"
 					}
 				],
-				"undeclared" : null
-			},
-			"dispatch" : null
-		},
-		"GroupPatch" : {
-			"type" : "ibm.tm1.api.v1.Group",
-			"write" : "patch",
-			"base" : null,
-			"odataType" : null,
-			"open" : false,
-			"required" : [ ],
-			"setters" : [
-				{
-					"json" : "Users",
-					"declaredOn" : "ibm.tm1.api.v1.Group",
-					"navigation" : true,
-					"collection" : true,
-					"set" : true,
-					"bind" : true,
-					"value" : "UserCreate"
-				}
-			],
-			"fromRead" : {
-				"copy" : [ ],
-				"bindings" : [ ],
 				"undeclared" : null
 			},
 			"dispatch" : null

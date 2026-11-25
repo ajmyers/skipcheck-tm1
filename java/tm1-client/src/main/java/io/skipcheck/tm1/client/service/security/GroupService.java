@@ -2,11 +2,11 @@
 
 package io.skipcheck.tm1.client.service.security;
 
-import java.util.Map;
 import java.util.Objects;
 
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Group;
+import io.skipcheck.tm1.client.model.GroupCreate;
 import io.skipcheck.tm1.client.model.User;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -63,14 +63,16 @@ public final class GroupService {
 	}
 
 	/**
-	 * {@code POST Groups}: creates an empty group.
-	 * @param name the group's name
+	 * {@code POST Groups}: creates a group, with the users the create binds
+	 * ({@code GroupCreate.Builder#bindUsers}) or nests (new users, created with it).
+	 * Afterwards, a user's membership is set from the user's side,
+	 * {@link UserService#setGroups}: a group PATCH would replace its users.
+	 * @param group the new group; it needs a name
 	 * @return the group as created
 	 */
 	@Tm1Endpoint("EntitySet Groups")
-	public Mono<Group> create(String name) {
-		return session
-			.execute(Tm1Request.post(GROUPS, Map.of("Name", Objects.requireNonNull(name, "name")), Group.class));
+	public Mono<Group> create(GroupCreate group) {
+		return session.execute(Tm1Request.post(GROUPS, Objects.requireNonNull(group, "group"), Group.class));
 	}
 
 	/**

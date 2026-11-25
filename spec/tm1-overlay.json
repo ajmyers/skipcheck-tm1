@@ -104,6 +104,12 @@
 		"GitConfigurationPatch": {
 			"kept": "an operation's parameters (tm1.GitInit, tm1.GitDeploy), not an entity write"
 		},
+		"GroupPatch.Users": {
+			"withheld": "a group PATCH with `Users` replaces them, removing the users it doesn't list: a user's groups are set from the user's side, `UserService.setGroups`"
+		},
+		"GroupPatch.Users@odata.bind": {
+			"withheld": "a group PATCH binding `Users` replaces them, removing the users it doesn't list: a user's groups are set from the user's side, `UserService.setGroups`"
+		},
 		"HierarchyCreate.Edges": {
 			"kept": "a create's edges join elements in the same body, which the probe's nested edge has none of, so TM1 refuses it there; the live tests (edges, elements, hierarchies, levels, members) create hierarchies with their edges and read them back"
 		},

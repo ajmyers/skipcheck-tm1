@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Group, ODataQuery, User, type Tm1Client } from "@skipcheck/tm1-client";
+import { Group, GroupCreate, ODataQuery, User, type Tm1Client } from "@skipcheck/tm1-client";
 
 // Examples for GroupService, quoted in its documentation.
 
@@ -14,7 +14,7 @@ export async function members(tm1: Tm1Client): Promise<string[]> {
 export async function createAndAdd(tm1: Tm1Client): Promise<void> {
   // @start region = create
   // A new group, then alice added to it, from her side: her groups plus this one
-  await tm1.groups.create("Planners");
+  await tm1.groups.create(GroupCreate.builder().name("Planners").build());
   const groups = await tm1.users.groups("alice", ODataQuery.none().select(Group.Fields.Name)).toArray();
   await tm1.users.setGroups("alice", [...groups.map((group) => group.Name!), "Planners"]);
   // @end

@@ -23,7 +23,7 @@ public static class GroupServiceExamples
     {
         // @start region = create
         // A new group, then alice added to it, from her side: her groups plus this one
-        await tm1.Groups.CreateAsync("Planners");
+        await tm1.Groups.CreateAsync(GroupCreate.Builder().Name("Planners").Build());
         var groups = await tm1.Users.GroupsAsync("alice", ODataQuery.None().Select(Group.Fields.Name)).Select(group => group.Name!).ToListAsync();
         await tm1.Users.SetGroupsAsync("alice", [.. groups, "Planners"]);
         // @end

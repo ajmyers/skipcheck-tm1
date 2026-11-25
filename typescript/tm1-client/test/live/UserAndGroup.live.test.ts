@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, beforeEach, describe, expect } from "vitest";
-import { ODataPath, type Tm1Client, type Tm1ClientBuilder, Tm1NotFoundException, Tm1Request, UserCreate, UserPatch, UserType } from "../../src/index.js";
+import {
+  GroupCreate,
+  ODataPath,
+  type Tm1Client,
+  type Tm1ClientBuilder,
+  Tm1NotFoundException,
+  Tm1Request,
+  UserCreate,
+  UserPatch,
+  UserType,
+} from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 
 /** A client beside `Live.client()`, of the same TM1 with the same settings: as another session, or
@@ -25,8 +35,8 @@ describe("UserService and GroupService on TM1" + liveReason, () => {
     user = Live.name();
     g1 = Live.name();
     g2 = Live.name();
-    await tm1.groups.create(g1);
-    await tm1.groups.create(g2);
+    await tm1.groups.create(GroupCreate.builder().name(g1).build());
+    await tm1.groups.create(GroupCreate.builder().name(g2).build());
     await tm1.users.create(UserCreate.builder().name(user).password("pw").bindGroups(ODataPath.of("Groups").key(g1)).build());
   });
 

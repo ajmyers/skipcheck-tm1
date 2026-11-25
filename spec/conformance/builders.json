@@ -328,15 +328,6 @@
         "Users" : "UserCreate[]"
       }
     },
-    "GroupPatch" : {
-      "odataType" : null,
-      "open" : false,
-      "required" : [ ],
-      "setters" : [ "Users", "Users@odata.bind" ],
-      "values" : {
-        "Users" : "UserCreate[]"
-      }
-    },
     "HTTPSettingsPatch" : {
       "odataType" : null,
       "open" : false,

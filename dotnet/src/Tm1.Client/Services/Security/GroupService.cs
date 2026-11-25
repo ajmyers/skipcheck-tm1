@@ -15,7 +15,7 @@ namespace Skipcheck.Tm1.Client.Services;
 /// <code>await foreach (var user in tm1.Groups.UsersAsync("Finance")) { Console.WriteLine(user.Name); }</code>
 /// <para>Create a group and add a user to it, from the user's side:</para>
 /// <code>
-/// await tm1.Groups.CreateAsync("Planners");
+/// await tm1.Groups.CreateAsync(GroupCreate.Builder().Name("Planners").Build());
 /// var groups = await tm1.Users.GroupsAsync("jsmith").Select(g => g.Name!).ToListAsync();
 /// await tm1.Users.SetGroupsAsync("jsmith", [.. groups, "Planners"]);
 /// </code>
@@ -38,10 +38,13 @@ public sealed class GroupService : Tm1Service
     public Task<Group> GetAsync(string name, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Get<Group>(GroupPath(name), query), cancellationToken);
 
-    /// <summary><c>POST Groups</c>: creates an empty group.</summary>
+    /// <summary><c>POST Groups</c>: creates a group, with the users the create binds
+    /// (<c>GroupCreate.CreateBuilder.BindUsers</c>) or nests (new users, created with it). It needs a name.
+    /// Afterwards, a user's membership is set from the user's side, <see cref="UserService.SetGroupsAsync"/>:
+    /// a group PATCH would replace its users.</summary>
     [Tm1Endpoint("EntitySet Groups")]
-    public Task<Group> CreateAsync(string name, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Post<Group>(Groups, new Dictionary<string, object?> { ["Name"] = Require(name, nameof(name)) }), cancellationToken);
+    public Task<Group> CreateAsync(GroupCreate group, CancellationToken cancellationToken = default) =>
+        Session.ExecuteAsync(Tm1Request.Post<Group>(Groups, Require(group, nameof(group))), cancellationToken);
 
     /// <summary><c>DELETE Groups('name')</c>: deletes the group; its users stay, without it.</summary>
     [Tm1Endpoint("EntitySet Groups")]
