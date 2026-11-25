@@ -78,6 +78,34 @@ def test_keeps_one_of_a_run_of_the_requests_a_step_repeats() -> None:
     assert traffic.collapse(log, {}) == log
 
 
+def test_refuses_a_run_of_repeats_longer_than_its_limit() -> None:
+    scenario = {"steps": [{"repeats": "tm1\\.Continue$"}, {"repeats": "tm1\\.Continue$", "maxRepeats": 2}]}
+    patterns, limits = traffic.repeating(scenario), traffic.repeat_limits(scenario)
+    assert limits == {"steps[0]": traffic.REPEAT_LIMIT, "steps[1]": 2}
+    polls = [exchange("POST", "C/tm1.Continue", "steps[1]") for _ in range(3)]
+    assert traffic.overlong(polls, patterns, limits) == ["steps[1] sent POST C/tm1.Continue 3 times in a row, more than its 2"]
+    assert traffic.overlong(polls[:2], patterns, limits) == []
+    many = [exchange("POST", "C/tm1.Continue", "steps[0]") for _ in range(traffic.REPEAT_LIMIT + 1)]
+    assert len(traffic.overlong(many, patterns, limits)) == 1
+    # Only a step that repeats is held to it: other equal requests aren't a run
+    assert traffic.overlong([exchange("GET", "Cubes('a')", "steps[2]")] * 40, patterns, limits) == []
+
+
+def test_fails_a_client_that_repeats_past_the_limit(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    # main reads each log's steps from its scenario's definition
+    definitions = tmp_path / "live"
+    definitions.mkdir()
+    (definitions / "poll.json").write_text(json.dumps({"steps": [{"repeats": "tm1\\.Continue$"}]}), encoding="utf-8")
+    monkeypatch.setattr(traffic, "SCENARIOS", definitions)
+    log = [exchange("POST", "C/tm1.Continue") for _ in range(traffic.REPEAT_LIMIT + 1)]
+    write_log(tmp_path / "traffic", "java", "poll", log, {})
+    write_log(tmp_path / "traffic", "python", "poll", log[:1], {})
+    assert traffic.main(["compare", str(tmp_path / "traffic")]) == 1
+    assert "java steps[0] sent POST C/tm1.Continue 31 times in a row" in capsys.readouterr().out
+    write_log(tmp_path / "traffic", "java", "poll", log[:-1], {})
+    assert traffic.main(["compare", str(tmp_path / "traffic")]) == 0
+
+
 def test_logs_that_agree_have_no_differences() -> None:
     log = [exchange("GET", "Cubes"), exchange("DELETE", "Cubes('a')")]
     assert traffic.compare({"java": log, "python": list(log), "dotnet": list(log)}) == []

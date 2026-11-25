@@ -10,6 +10,7 @@ The Java client is the definition of how a call behaves. Its unit tests record e
 | `calls/<JavaTestClass>.json` | The service calls one Java unit-test class records | `./gradlew :tm1-client:test -PrecordConformance` |
 | `live/<scenario>.json` | Steps every client runs against a real TM1 | Hand |
 | `live-builders-pending.txt`, `live-builders-excluded.txt` | The builders and setters no live scenario writes yet, and those a TM1 container can't be written with, each with why (`LiveBuildersCoverageTest`) | Hand |
+| `probed-writes-unsent.txt` | The writes the probe found TM1 applies that no client's builders can send, each with why (`ProbedWritesCoverageTest`) | Hand |
 
 ## The builder manifest (`builders.json`)
 
@@ -148,7 +149,7 @@ A scenario is steps every client runs against a real TM1, with names made fresh 
 - A step can save fields of its result for the steps after it, `"save": {"note": "ID"}`: the result's `ID` (a field of its JSON, a value, not null) becomes the name `note`, for an ID TM1 makes up, such as an annotation's or a debug context's. A step whose result lacks one fails. Saved names join the run's names, so the traffic has them as placeholders too; give each a fallback in `names`, so a `finally` step that uses it still runs when its step didn't.
 - A step can keep its whole result, as read, for a `$fromRead` after it: `"keep": "cube"`. Unlike `save`, what it keeps doesn't join the names, and the traffic is unchanged. The round-trips scenario reads each object, selecting what `builder(read)` copies, builds its write with `builder(read)` and a change to another property, sends it through its service's update, and reads it back. `LiveBuildersCoverageTest` counts `$patch` writes only: what a `$fromRead` sends depends on what TM1 answered.
 - A step whose requests may go out in any order (a cellset stream's pages) names them with `"unordered"`, a regular expression matching `METHOD target` (after names become placeholders): each run of the step's consecutive requests that match it is compared as a set. The step's other requests, and every other step's, are compared in order.
-- A step that polls TM1 until it's done (finishing a debug run resumes it until it's complete) names the requests it repeats with `"repeats"`, a regular expression on `METHOD target`: each run of equal consecutive ones compares as one, since how many TM1 takes varies. A `finally` step can too.
+- A step that polls TM1 until it's done (finishing a debug run resumes it until it's complete) names the requests it repeats with `"repeats"`, a regular expression on `METHOD target`: each run of equal consecutive ones compares as one, since how many TM1 takes varies. A run longer than the step's `"maxRepeats"` (30 if it gives none) fails the comparison, so a client polling far more than another can't compare equal. A `finally` step can too.
 - Each step has one expectation:
   - `{"none": true}`: the call returns nothing.
   - `{"count": n}`: a list of `n` items.
