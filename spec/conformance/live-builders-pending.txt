@@ -45,9 +45,10 @@ ViewCalculationSettingsPatch
 KeyProtectSettingsPatch
 VaultSettingsPatch
 
-# Groups: no service takes a GroupPatch, and no step writes a GroupCreate yet (a UserCreate's Groups
-# takes one, as GroupService.create is to) (#354)
-GroupCreate
+# Groups: no service takes a GroupPatch, and GroupCreate is written only nested in a UserCreate's
+# Groups, which leaves out its Users. GroupService.create is to take a GroupCreate (#354)
+GroupCreate.Users
+GroupCreate.Users@odata.bind
 GroupPatch
 
 # Git: needs a repository TM1 can reach; to try with a local one, else to exclude (#354)
@@ -56,35 +57,8 @@ GitConfigurationPatch
 # Others: to write in the scenarios of their services (#354)
 AttributesPatch.Caption
 CellsetUpdatePatch
-ChorePatch.Tasks
-ChoreReferenceCreate
-ChoreTaskPatch.Process@odata.bind
-CubeCreate.PrivateViews
-CubeCreate.Views
 CubeUpdatePatch.ReferenceCell
 CubeUpdatePatch.ReferenceCell@odata.bind
 CubeUpdatePatch.ReferenceCube
 CubeUpdatePatch.ReferenceCube@odata.bind
 CubeUpdatePatch.Tuple
-DimensionCreate.DefaultHierarchy
-DimensionPatch.DefaultHierarchy
-DimensionReferenceCreate
-ElementCreate.Components
-ElementCreate.Components@odata.bind
-ElementCreate.Parents
-ElementCreate.Parents@odata.bind
-ElementPatch.Components
-ElementPatch.Components@odata.bind
-FolderCreate.Contents
-FolderCreate.PrivateContents
-HierarchyCreate.PrivateSubsets
-HierarchyCreate.Subsets
-ProcessCreate.Code
-ProcessPatch.Code
-ProcessReferenceCreate
-ProcessVariablePatch
-SubsetReferenceCreate
-UserCreate.Groups
-ViewAxisSelectionPatch.Subset@odata.bind
-ViewReferenceCreate
-ViewTitlePatch.Subset@odata.bind
