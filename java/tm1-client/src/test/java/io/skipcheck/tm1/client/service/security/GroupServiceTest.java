@@ -15,7 +15,9 @@ import io.skipcheck.tm1.client.error.Tm1ApiException;
 import io.skipcheck.tm1.client.error.Tm1ErrorKind;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.Group;
+import io.skipcheck.tm1.client.model.GroupCreate;
 import io.skipcheck.tm1.client.model.User;
+import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 
 /**
@@ -69,7 +71,7 @@ class GroupServiceTest {
 	@Test
 	void createsAGroup() {
 		tm1().json(201, "{\"Name\":\"Planners\"}");
-		Group created = conformance.call("groups", "create", "Planners");
+		Group created = conformance.call("groups", "create", GroupCreate.builder().name("Planners").build());
 		assertThat(created.name()).isEqualTo("Planners");
 		ConformanceTm1.Recorded post = tm1().last();
 		assertThat(post.key()).isEqualTo("POST Groups");
@@ -78,9 +80,22 @@ class GroupServiceTest {
 	}
 
 	@Test
+	void createsAGroupWithItsUsers() {
+		ODataPath users = ODataPath.of("Users");
+		tm1().json(201, "{\"Name\":\"Planners\"}");
+		Group created = conformance.call("groups", "create",
+				GroupCreate.builder().name("Planners").bindUsers(users.key("alice"), users.key("O'Neil")).build());
+		assertThat(created.name()).isEqualTo("Planners");
+		ConformanceTm1.Recorded post = tm1().last();
+		assertThat(post.key()).isEqualTo("POST Groups");
+		assertThat(post.text())
+			.isEqualTo("{\"Name\":\"Planners\",\"Users@odata.bind\":[\"Users('alice')\",\"Users('O''Neil')\"]}");
+	}
+
+	@Test
 	void anExistingGroupIsRefused() {
 		tm1().error(400, "278", "Group 'Planners' already exists.");
-		Throwable error = conformance.fail("groups", "create", "Planners");
+		Throwable error = conformance.fail("groups", "create", GroupCreate.builder().name("Planners").build());
 		assertThat(error).isInstanceOfSatisfying(Tm1ApiException.class,
 				e -> assertThat(e.kind()).isEqualTo(Tm1ErrorKind.ALREADY_EXISTS));
 	}

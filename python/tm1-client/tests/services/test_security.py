@@ -14,6 +14,7 @@ import pytest
 from skipcheck_tm1 import Filter, ODataPath, ODataQuery, Tm1NotFoundError
 from skipcheck_tm1.model import (
     Group,
+    GroupCreate,
     Session,
     Thread,
     User,
@@ -101,7 +102,7 @@ def test_groups(api: Api, fake: FakeTm1) -> None:
     fake.respond = lambda r: {"Name": "Planners"}
     api.run(groups.get("Planners"))
     assert target(fake.last) == "GET Groups('Planners')"
-    assert api.run(groups.create("Planners")).name == "Planners"
+    assert api.run(groups.create(GroupCreate.builder().name("Planners").build())).name == "Planners"
     assert (target(fake.last), body(fake.last)) == ("POST Groups", {"Name": "Planners"})
     fake.respond = lambda r: {"value": [{"Name": "alice"}]}
     assert [u.name for u in api.run(groups.users("Planners", ODataQuery.none().select(User.NAME)))] == ["alice"]

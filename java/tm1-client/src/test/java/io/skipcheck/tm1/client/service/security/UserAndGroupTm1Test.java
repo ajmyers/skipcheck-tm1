@@ -20,6 +20,7 @@ import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.Group;
+import io.skipcheck.tm1.client.model.GroupCreate;
 import io.skipcheck.tm1.client.model.User;
 import io.skipcheck.tm1.client.model.UserCreate;
 import io.skipcheck.tm1.client.model.UserPatch;
@@ -56,7 +57,10 @@ class UserAndGroupTm1Test {
 		user = "tm1-client-" + id;
 		g1 = "tm1-client-g1-" + id;
 		g2 = "tm1-client-g2-" + id;
-		tm1.groups().create(g1).then(tm1.groups().create(g2)).block(WAIT);
+		tm1.groups()
+			.create(GroupCreate.builder().name(g1).build())
+			.then(tm1.groups().create(GroupCreate.builder().name(g2).build()))
+			.block(WAIT);
 		tm1.users()
 			.create(UserCreate.builder().name(user).password("pw").bindGroups(ODataPath.of("Groups").key(g1)).build())
 			.block(WAIT);

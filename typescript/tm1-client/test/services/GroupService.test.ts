@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { ODataQuery } from "../../src/index.js";
+import { GroupCreate, ODataQuery } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 
 /** GroupService against a fake TM1 (the .NET client's GroupServiceTests; the Java client tests
@@ -17,7 +17,7 @@ describe("GroupService", () => {
     tm1.respond = () => ({ Name: "Finance" });
     expect((await client.groups.get("Finance")).Name).toBe("Finance");
     expect(`${tm1.last.method} ${tm1.last.target}`).toBe("GET Groups('Finance')");
-    expect((await client.groups.create("Finance")).Name).toBe("Finance");
+    expect((await client.groups.create(GroupCreate.builder().name("Finance").build())).Name).toBe("Finance");
     expect([tm1.last.method, tm1.last.target, tm1.last.text]).toEqual(["POST", "Groups", '{"Name":"Finance"}']);
 
     tm1.respond = () => null;

@@ -33,8 +33,8 @@ public sealed class UserAndGroupLiveTests : IAsyncLifetime
             return;
         }
         _tm1 = Live.Client();
-        await _tm1.Groups.CreateAsync(_g1);
-        await _tm1.Groups.CreateAsync(_g2);
+        await _tm1.Groups.CreateAsync(GroupCreate.Builder().Name(_g1).Build());
+        await _tm1.Groups.CreateAsync(GroupCreate.Builder().Name(_g2).Build());
         await _tm1.Users.CreateAsync(UserCreate.Builder().Name(_user).Password("pw").BindGroups(ODataPath.Of("Groups").Key(_g1)).Build());
     }
 

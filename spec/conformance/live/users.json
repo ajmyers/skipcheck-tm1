@@ -1,21 +1,21 @@
 {
 	"specVersion" : 1,
 	"name" : "users",
-	"description" : "A user in two fresh groups: create, read, update, set the groups whole, list members from both sides, a missing user, delete.",
-	"names" : [ "user", "g1", "g2", "missing" ],
+	"description" : "A user in two fresh groups: create, read, update, set the groups whole, list members from both sides, a missing user, delete. A group is created with a user it binds, and one with a user it nests, a new user created with it.",
+	"names" : [ "user", "member", "g1", "g2", "g3", "g4", "missing" ],
 	"steps" : [
 		{
 			"service" : "groups",
 			"method" : "create",
-			"params" : [ "name" ],
-			"args" : [ "${g1}" ],
+			"params" : [ "group" ],
+			"args" : [ { "$patch" : "GroupCreate", "json" : { "Name" : "${g1}" } } ],
 			"expect" : { "fields" : { "Name" : "${g1}" } }
 		},
 		{
 			"service" : "groups",
 			"method" : "create",
-			"params" : [ "name" ],
-			"args" : [ "${g2}" ],
+			"params" : [ "group" ],
+			"args" : [ { "$patch" : "GroupCreate", "json" : { "Name" : "${g2}" } } ],
 			"expect" : { "fields" : { "Name" : "${g2}" } }
 		},
 		{
@@ -83,6 +83,34 @@
 		},
 		{
 			"service" : "groups",
+			"method" : "create",
+			"params" : [ "group" ],
+			"args" : [ { "$patch" : "GroupCreate", "json" : { "Name" : "${g3}", "Users@odata.bind" : [ "Users('${user}')" ] } } ],
+			"expect" : { "fields" : { "Name" : "${g3}" } }
+		},
+		{
+			"service" : "groups",
+			"method" : "users",
+			"params" : [ "name", "query" ],
+			"args" : [ "${g3}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "${user}" ] } }
+		},
+		{
+			"service" : "groups",
+			"method" : "create",
+			"params" : [ "group" ],
+			"args" : [ { "$patch" : "GroupCreate", "json" : { "Name" : "${g4}", "Users" : [ { "Name" : "${member}", "Password" : "pw" } ] } } ],
+			"expect" : { "fields" : { "Name" : "${g4}" } }
+		},
+		{
+			"service" : "groups",
+			"method" : "users",
+			"params" : [ "name", "query" ],
+			"args" : [ "${g4}", { "$query" : { "select" : [ "Name" ] } } ],
+			"expect" : { "items" : { "Name" : [ "${member}" ] } }
+		},
+		{
+			"service" : "groups",
 			"method" : "get",
 			"params" : [ "name", "query" ],
 			"args" : [ "${g1}", { "$query" : { "select" : [ "Name" ] } } ],
@@ -92,14 +120,14 @@
 			"service" : "users",
 			"method" : "sessions",
 			"params" : [ "name", "query" ],
-			"args" : [ "${user}", { "$query" : { } } ],
+			"args" : [ "${user}", { "$query" : {  } } ],
 			"expect" : { "count" : 0 }
 		},
 		{
 			"service" : "users",
 			"method" : "get",
 			"params" : [ "name", "query" ],
-			"args" : [ "${missing}", { "$query" : { } } ],
+			"args" : [ "${missing}", { "$query" : {  } } ],
 			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
 		},
 		{
@@ -113,7 +141,7 @@
 			"service" : "users",
 			"method" : "get",
 			"params" : [ "name", "query" ],
-			"args" : [ "${user}", { "$query" : { } } ],
+			"args" : [ "${user}", { "$query" : {  } } ],
 			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
 		},
 		{
@@ -125,8 +153,41 @@
 		}
 	],
 	"finally" : [
-		{ "service" : "users", "method" : "delete", "params" : [ "name" ], "args" : [ "${user}" ] },
-		{ "service" : "groups", "method" : "delete", "params" : [ "name" ], "args" : [ "${g1}" ] },
-		{ "service" : "groups", "method" : "delete", "params" : [ "name" ], "args" : [ "${g2}" ] }
+		{
+			"service" : "users",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${user}" ]
+		},
+		{
+			"service" : "groups",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${g1}" ]
+		},
+		{
+			"service" : "groups",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${g2}" ]
+		},
+		{
+			"service" : "users",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${member}" ]
+		},
+		{
+			"service" : "groups",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${g3}" ]
+		},
+		{
+			"service" : "groups",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${g4}" ]
+		}
 	]
 }

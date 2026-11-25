@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Group, User } from "../../generated/index.js";
+import { Group, type GroupCreate, User } from "../../generated/index.js";
 import { ODataPath, type ODataQuery } from "../../odata/index.js";
 import { Tm1Request } from "../../request.js";
 import type { Tm1CallOptions } from "../../session/session.js";
@@ -19,7 +19,7 @@ const GROUPS = ODataPath.of("Groups");
  * ```
  * Create a group and add a user to it, from the user's side:
  * ```ts
- * await tm1.groups.create("Planners");
+ * await tm1.groups.create(GroupCreate.builder().name("Planners").build());
  * const groups = (await tm1.users.groups("jsmith").toArray()).map((g) => g.Name!);
  * await tm1.users.setGroups("jsmith", [...groups, "Planners"]);
  * ```
@@ -45,9 +45,12 @@ export class GroupService extends Tm1Service {
     return this.session.execute(Tm1Request.get(groupPath(name), query, Group), options);
   }
 
-  /** `POST Groups`: creates an empty group; returns it as created. */
-  create(name: string, options?: Tm1CallOptions): Promise<Group> {
-    return this.session.execute(Tm1Request.post(GROUPS, { Name: required(name, "name") }, Group), options);
+  /** `POST Groups`: creates a group, with the users the create binds (`GroupCreate.builder().bindUsers(…)`)
+   * or nests (new users, created with it). It needs a name; returns the group as created. Afterwards, a
+   * user's membership is set from the user's side, `UserService.setGroups`: a group PATCH would replace
+   * its users. */
+  create(group: GroupCreate, options?: Tm1CallOptions): Promise<Group> {
+    return this.session.execute(Tm1Request.post(GROUPS, required(group, "group"), Group), options);
   }
 
   /** `DELETE Groups('name')`: deletes the group; its users stay, without it. */

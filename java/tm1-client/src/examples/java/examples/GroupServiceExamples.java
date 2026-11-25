@@ -6,6 +6,7 @@ import java.util.stream.Stream;
 
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.Group;
+import io.skipcheck.tm1.client.model.GroupCreate;
 import io.skipcheck.tm1.client.model.User;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Flux;
@@ -27,7 +28,7 @@ final class GroupServiceExamples {
 		// @start region = create
 		// A new group, then alice added to it, from her side: her groups plus this one
 		return tm1.groups()
-			.create("Planners")
+			.create(GroupCreate.builder().name("Planners").build())
 			.then(tm1.users().groups("alice", ODataQuery.none().select(Group.NAME)).map(Group::name).collectList())
 			.flatMap(groups -> tm1.users()
 				.setGroups("alice", Stream.concat(groups.stream(), Stream.of("Planners")).toList()));
