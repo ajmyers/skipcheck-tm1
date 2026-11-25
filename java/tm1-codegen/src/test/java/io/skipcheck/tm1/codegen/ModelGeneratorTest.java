@@ -172,8 +172,8 @@ class ModelGeneratorTest {
 			sources = walk.filter(p -> p.toString().endsWith(".java")).toList();
 		}
 		assertThat(sources)
-			.as("31 enums, 122 records, 7 hierarchies, 103 write types, the catalog, the read bindings, package-info")
-			.hasSize(266);
+			.as("31 enums, 122 records, 7 hierarchies, 102 write types, the catalog, the read bindings, package-info")
+			.hasSize(265);
 
 		JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
 		DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();

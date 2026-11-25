@@ -8,11 +8,10 @@
 KeyProtectSettingsPatch
 VaultSettingsPatch
 
-# Groups: no service takes a GroupPatch, and GroupCreate is written only nested in a UserCreate's
-# Groups, which leaves out its Users. GroupService.create is to take a GroupCreate (#354)
+# Groups: GroupCreate is written only nested in a UserCreate's Groups, which leaves out its Users.
+# GroupService.create is to take a GroupCreate (#354)
 GroupCreate.Users
 GroupCreate.Users@odata.bind
-GroupPatch
 
 # Git: needs a repository TM1 can reach; to try with a local one, else to exclude (#354)
 GitConfigurationPatch
