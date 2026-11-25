@@ -3,43 +3,6 @@
 # a newly generated builder or setter goes on it until one does. A whole builder no step writes is
 # one line, which gives way to the setters no step writes yet once one writes it in part.
 
-# Server settings: no scenario writes them yet; one that writes each and restores it is to come (#354)
-AccessSettingsPatch
-AdministrationSettingsPatch
-AuditLogSettingsPatch
-AuthenticationSettingsPatch
-CAMSettingsPatch
-CAPISettingsPatch
-ClientSettingsPatch
-DebugLogSettingsPatch
-EventLogSettingsPatch
-ExternalDatabaseSettingsPatch
-FileRetrySettingsPatch
-HTTPSettingsPatch
-JavaSettingsPatch
-JobQueuingSettingsPatch
-LDAPSettingsPatch
-LockingSettingsPatch
-MTCubeLoadSettingsPatch
-MTFeedersSettingsPatch
-MTQSettingsPatch
-MemorySettingsPatch
-ModellingSettingsPatch
-NetworkSettingsPatch
-PerformanceSettingsPatch
-RulesSettingsPatch
-SSLSettingsPatch
-ServerLogSettingsPatch
-ServerSettingsPatch
-SpreadingSettingsPatch
-StargateSettingsPatch
-StartupSettingsPatch
-SynchronizationSettingsPatch
-TISettingsPatch
-TM1WebSettingsPatch
-TopLogSettingsPatch
-ViewCalculationSettingsPatch
-
 # The IBM Key Protect and HashiCorp Vault encryption providers: no step writes them yet. A validate
 # step, which TM1 answers without the service, is to come, as the local key file's (#354)
 KeyProtectSettingsPatch

@@ -152,10 +152,11 @@ A scenario is steps every client runs against a real TM1, with names made fresh 
   - `{"count": n}`: a list of `n` items.
   - `{"fields": {...}}`: these fields of the result. An `@odata.type` field is the result's type (its `$model`, as `#ibm.tm1.api.v1.<model>`), since a result's JSON leaves the type out.
   - `{"items": {"Name": [...]}}`: a field of each item, in order.
+  - A field or an item's value compares as JSON at any depth: numbers by value, arrays in order, and a null the same as a property left out, since clients differ in whether a model's JSON keeps one. At the top level `fields` names only the fields it checks; below it an object must match whole, every property on either side.
   - `{"error": {"category": "api", "kind": "NOT_FOUND"}}`: the call fails this way.
 - The run stops at the first step that misses its expectation. The `finally` steps always run, ignoring failures.
 
-All 23 scenarios pass in every client against TM1 11.8.03500.6 (Planning Analytics 2.1.19), and the clients' traffic compares equal. Two leftovers are known: the views scenario leaves a cellset until its session ends, and the git scenario assumes Git isn't initialised on the server.
+All 24 scenarios pass in every client against TM1 11.8.03500.6 (Planning Analytics 2.1.19), and the clients' traffic compares equal. Two leftovers are known: the views scenario leaves a cellset until its session ends, and the git scenario assumes Git isn't initialised on the server. The settings scenario rewrites the server's `tm1s.cfg` and sets it back as a fresh container has it: run it only against a container the suite starts, not against a server of your own (`TM1_URL`).
 
 The runners are Java's `ConformanceScenarioTm1Test`, Python's `tests/live/test_conformance_scenario.py` (sync and async), .NET's `Live/ConformanceScenarioLiveTests.cs` and TypeScript's `test/live/ConformanceScenario.live.test.ts`. Each runs with its client's live harness (testcontainers, or `TM1_URL`) and records what it sends to `build/conformance-live/<language>/<scenario>.jsonl`. The session's own requests are left out of the record.
 

@@ -164,6 +164,17 @@ public class ConformanceLiveRunnerTests
         };
     }
 
+    [Fact]
+    public void TreatsANullAsMissingAtAnyDepth()
+    {
+        var expected = JsonNode.Parse("""{"A":{"B":1,"C":[1.0,{"D":null}]}}""");
+        Assert.True(ConformanceLive.Same(expected, JsonNode.Parse("""{"A":{"B":1.0,"C":[1,{}],"E":null}}""")));
+        Assert.False(ConformanceLive.Same(expected, JsonNode.Parse("""{"A":{"B":1,"C":[1,{"D":2}]}}""")));
+        Assert.False(ConformanceLive.Same(expected, JsonNode.Parse("""{"A":{"C":[1,{}]}}""")));
+        Assert.False(ConformanceLive.Same(expected, JsonNode.Parse("""{"A":{"B":1,"C":[1]}}""")));
+        Assert.False(ConformanceLive.Same(JsonNode.Parse("true"), JsonNode.Parse("1")));
+    }
+
     [Theory]
     [InlineData("cellsets")]
     [InlineData("views")]

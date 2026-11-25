@@ -78,6 +78,17 @@ function dataFake(names: Record<string, string>): FakeTm1 {
   return tm1;
 }
 
+describe("the live conformance runner's comparison", () => {
+  it("treats a null as missing at any depth", () => {
+    const expected = { A: { B: 1, C: [1.0, { D: null }] } };
+    expect(live.same(expected, { A: { B: 1.0, C: [1, {}], E: null } })).toBe(true);
+    expect(live.same(expected, { A: { B: 1, C: [1, { D: 2 }] } })).toBe(false);
+    expect(live.same(expected, { A: { C: [1, {}] } })).toBe(false);
+    expect(live.same(expected, { A: { B: 1, C: [1] } })).toBe(false);
+    expect(live.same(true, 1)).toBe(false);
+  });
+});
+
 describe("the live conformance runner, on the data scenarios", () => {
   for (const name of ["cellsets", "views", "sandboxes"]) {
     it(`runs the data scenarios: ${name}`, async () => {

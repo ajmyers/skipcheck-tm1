@@ -101,6 +101,21 @@ export function substitute(value: any, names: Record<string, string>): any {
 
 export type Outcome = { result: any } | { error: codec.EncodedError };
 
+/** Equal JSON at any depth: numbers by their value, and a null as a property left out, as clients
+ * differ in whether a model's JSON keeps a null. */
+export function same(expected: unknown, got: unknown): boolean {
+  if (expected === null || expected === undefined || got === null || got === undefined)
+    return (expected === null || expected === undefined) && (got === null || got === undefined);
+  if (Array.isArray(expected) || Array.isArray(got))
+    return Array.isArray(expected) && Array.isArray(got) && expected.length === got.length && expected.every((e, i) => same(e, got[i]));
+  if (typeof expected === "object" && typeof got === "object") {
+    const e = expected as Record<string, unknown>;
+    const g = got as Record<string, unknown>;
+    return [...new Set([...Object.keys(e), ...Object.keys(g)])].every((k) => same(e[k], g[k]));
+  }
+  return expected === got;
+}
+
 /** Why the outcome doesn't meet the expectation, or undefined if it does. */
 export function check(expect: Record<string, any>, outcome: Outcome): string | undefined {
   if (expect.error) {
@@ -114,13 +129,13 @@ export function check(expect: Record<string, any>, outcome: Outcome): string | u
   if (expect.none && result !== null) return "expected nothing, got " + JSON.stringify(result);
   if (expect.count !== undefined && (!Array.isArray(result) || result.length !== expect.count))
     return `expected ${expect.count} items, got ${JSON.stringify(result)}`;
-  if (expect.fields && (result === null || typeof result !== "object" || Object.entries(expect.fields).some(([k, v]) => result[k] !== v))) {
+  if (expect.fields && (result === null || typeof result !== "object" || Object.entries(expect.fields).some(([k, v]) => !same(v, result[k])))) {
     return `expected the fields ${JSON.stringify(expect.fields)}, got ${JSON.stringify(result)}`;
   }
   if (expect.items) {
     for (const [field, values] of Object.entries(expect.items as Record<string, unknown[]>)) {
       const got = (Array.isArray(result) ? result : []).map((i: any) => i?.[field] ?? null);
-      if (JSON.stringify(got) !== JSON.stringify(values)) return `expected the items' ${field} ${JSON.stringify(values)}, got ${JSON.stringify(got)}`;
+      if (!same(values, got)) return `expected the items' ${field} ${JSON.stringify(values)}, got ${JSON.stringify(got)}`;
     }
   }
   return undefined;

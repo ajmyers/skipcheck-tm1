@@ -1,2 +1,8 @@
 # Builders and setters a TM1 container can't be written live with, each with why after a colon
 # (#354): Builder, or Builder.Setter, then ": why". LiveBuildersCoverageTest holds this list.
+ClientSettingsPatch.RetainNonCAMGroupMembership: applies only with CAM security, which a TM1 container lacks: TM1 refuses it otherwise ("Invalid value for ClientSettings property")
+SSLSettingsPatch.CertificateFile: TM1 never sends it back, so a live write could be neither checked nor set back (the probe leaves it untested for the same reason)
+SSLSettingsPatch.ClientExportServerCertificate: TM1 never sends it back, so a live write could be neither checked nor set back (the probe leaves it untested for the same reason)
+SSLSettingsPatch.PrivateKeyPwdFile: TM1 never sends it back, so a live write could be neither checked nor set back (the probe leaves it untested for the same reason)
+SSLSettingsPatch.PwdKeyFile: TM1 never sends it back, so a live write could be neither checked nor set back (the probe leaves it untested for the same reason)
+ServerSettingsPatch.EncryptionAtRest: TM1 takes it in the static configuration but sends it back as null, so a live write could be neither checked nor set back; encryption.json validates a local key file provider instead
