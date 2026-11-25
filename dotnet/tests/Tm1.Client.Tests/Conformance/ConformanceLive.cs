@@ -134,7 +134,7 @@ public static class ConformanceLive
         {
             return $"expected {count} items, got {result?.ToJsonString()}";
         }
-        if (expect["fields"] is JsonObject fields && (json is not JsonObject o || fields.Any(f => !JsonNode.DeepEquals(f.Value, o[f.Key]))))
+        if (expect["fields"] is JsonObject fields && (json is not JsonObject o || fields.Any(f => !Same(f.Value, o[f.Key]))))
         {
             return $"expected the fields {fields.ToJsonString()}, got {result?.ToJsonString()}";
         }
@@ -144,13 +144,41 @@ public static class ConformanceLive
             foreach (var (field, want) in items)
             {
                 var got = new JsonArray(values.Select(v => v?[field]?.DeepClone()).ToArray());
-                if (!JsonNode.DeepEquals(want, got))
+                if (!Same(want, got))
                 {
                     return $"expected the items' {field} {want!.ToJsonString()}, got {got.ToJsonString()}";
                 }
             }
         }
         return null;
+    }
+
+    /// <summary>Equal JSON at any depth: numbers by their value (11 as an int or a double), and a
+    /// null as a property left out, as clients differ in whether a model's JSON keeps a null.</summary>
+    public static bool Same(JsonNode? expected, JsonNode? got)
+    {
+        if (expected is null || got is null)
+        {
+            return expected is null && got is null;
+        }
+        if (expected is JsonObject e && got is JsonObject g)
+        {
+            return e.Select(p => p.Key).Union(g.Select(p => p.Key)).All(k => Same(e[k], g[k]));
+        }
+        if (expected is JsonArray ea && got is JsonArray ga)
+        {
+            return ea.Count == ga.Count && ea.Zip(ga).All(p => Same(p.First, p.Second));
+        }
+        if (
+            expected is JsonValue ev
+            && got is JsonValue gv
+            && ev.GetValueKind() == System.Text.Json.JsonValueKind.Number
+            && gv.GetValueKind() == System.Text.Json.JsonValueKind.Number
+        )
+        {
+            return ev.GetValue<decimal>() == gv.GetValue<decimal>();
+        }
+        return JsonNode.DeepEquals(expected, got);
     }
 
     private static async Task<JsonObject> Outcome(Tm1Client client, JsonNode step, IReadOnlyDictionary<string, string> names)

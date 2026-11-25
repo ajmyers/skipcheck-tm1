@@ -349,6 +349,21 @@ class ConformanceScenariosTest {
 	}
 
 	@Test
+	void treatsANullAsMissingAtAnyDepth() {
+		JsonNode expected = ConformanceCodec.json().readTree("{\"A\":{\"B\":1,\"C\":[1.0,{\"D\":null}]}}");
+		assertThat(ConformanceScenarios.same(expected,
+				ConformanceCodec.json().readTree("{\"A\":{\"B\":1.0,\"C\":[1,{}],\"E\":null}}")))
+			.isTrue();
+		assertThat(ConformanceScenarios.same(expected,
+				ConformanceCodec.json().readTree("{\"A\":{\"B\":1,\"C\":[1,{\"D\":2}]}}")))
+			.isFalse();
+		assertThat(ConformanceScenarios.same(expected, ConformanceCodec.json().readTree("{\"A\":{\"C\":[1,{}]}}")))
+			.isFalse();
+		assertThat(ConformanceScenarios.same(expected, ConformanceCodec.json().readTree("{\"A\":{\"B\":1,\"C\":[1]}}")))
+			.isFalse();
+	}
+
+	@Test
 	void savesAFieldOfAResultForTheStepsAfterIt() {
 		JsonNode scenario = ConformanceScenarios.load(ConformanceScenarios.directory().resolve("annotations.json"));
 		Map<String, String> names = ConformanceScenarios.names(scenario);

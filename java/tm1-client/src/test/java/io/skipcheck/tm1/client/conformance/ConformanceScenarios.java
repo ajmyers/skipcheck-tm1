@@ -14,7 +14,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -267,17 +269,36 @@ public final class ConformanceScenarios {
 	}
 
 	/**
-	 * Equal JSON, numbers by their value ({@code 11} as an int or a long), at any depth.
+	 * Equal JSON at any depth: numbers by their value ({@code 11} as an int or a long),
+	 * and a null as a property left out, as clients differ in whether a model's JSON
+	 * keeps a null (a raw JSON departure keeps it; a generated property is left out).
 	 */
 	static boolean same(@Nullable JsonNode expected, @Nullable JsonNode got) {
-		if (expected == null || got == null) {
-			JsonNode given = expected != null ? expected : got;
-			return given == null || given.isNull();
+		boolean noExpected = expected == null || expected.isNull();
+		boolean noGot = got == null || got.isNull();
+		if (noExpected || noGot) {
+			return noExpected && noGot;
 		}
-		return expected.equals(
-				(a, b) -> a.equals(b)
-						|| (a.isNumber() && b.isNumber() && a.decimalValue().compareTo(b.decimalValue()) == 0) ? 0 : 1,
-				got);
+		if (expected.isNumber() && got.isNumber()) {
+			return expected.decimalValue().compareTo(got.decimalValue()) == 0;
+		}
+		if (expected.isObject() && got.isObject()) {
+			Set<String> keys = new TreeSet<>(expected.propertyNames());
+			keys.addAll(got.propertyNames());
+			return keys.stream().allMatch(k -> same(expected.get(k), got.get(k)));
+		}
+		if (expected.isArray() && got.isArray()) {
+			if (expected.size() != got.size()) {
+				return false;
+			}
+			for (int i = 0; i < expected.size(); i++) {
+				if (!same(expected.get(i), got.get(i))) {
+					return false;
+				}
+			}
+			return true;
+		}
+		return expected.equals(got);
 	}
 
 	/**

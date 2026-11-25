@@ -253,6 +253,14 @@ def _data_tm1(names: dict[str, str]) -> FakeTm1:
     return fake
 
 
+def test_treats_a_null_as_missing_at_any_depth() -> None:
+    expected = {"A": {"B": 1, "C": [1.0, {"D": None}]}}
+    assert live.same(expected, {"A": {"B": 1.0, "C": [1, {}], "E": None}})
+    assert not live.same(expected, {"A": {"B": 1, "C": [1, {"D": 2}]}})
+    assert not live.same(expected, {"A": {"C": [1, {}]}})
+    assert not live.same(expected, {"A": {"B": 1, "C": [1]}})
+
+
 @pytest.mark.parametrize("name", ["cellsets", "views", "sandboxes"])
 def test_runs_the_data_scenarios(traffic_dir: Path, name: str) -> None:
     # In both flavors, and the traffic they record compares equal

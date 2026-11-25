@@ -80,6 +80,22 @@ def substitute(value: Any, names: dict[str, str]) -> Any:
     return value
 
 
+def same(expected: Any, got: Any) -> bool:
+    """Equal JSON at any depth: numbers by their value (11 as an int or a float), and a null as a
+    property left out, as clients differ in whether a model's JSON keeps a null."""
+    if expected is None or got is None:
+        return expected is None and got is None
+    if isinstance(expected, bool) or isinstance(got, bool):
+        return expected is got
+    if isinstance(expected, (int, float)) and isinstance(got, (int, float)):
+        return expected == got
+    if isinstance(expected, dict) and isinstance(got, dict):
+        return all(same(expected.get(k), got.get(k)) for k in expected.keys() | got.keys())
+    if isinstance(expected, list) and isinstance(got, list):
+        return len(expected) == len(got) and all(same(e, g) for e, g in zip(expected, got))
+    return expected == got
+
+
 def check(expect: dict[str, Any], outcome: dict[str, Any]) -> str | None:
     """Why the outcome doesn't meet the expectation, or None if it does."""
     if "error" in expect:
@@ -99,12 +115,12 @@ def check(expect: dict[str, Any], outcome: dict[str, Any]) -> str | None:
         if isinstance(json_, dict) and "$model" in result:
             # A model's JSON leaves out its type, which its $model gives
             json_ = {"@odata.type": f"#ibm.tm1.api.v1.{result['$model']}", **json_}
-        if not isinstance(json_, dict) or any(json_.get(k) != v for k, v in expect["fields"].items()):
+        if not isinstance(json_, dict) or any(not same(v, json_.get(k)) for k, v in expect["fields"].items()):
             return f"expected the fields {expect['fields']}, got {result!r}"
     if "items" in expect:
         items = [i.get("json") if isinstance(i, dict) and "$model" in i else i for i in (result or [])]
         for field, values in expect["items"].items():
-            if [i.get(field) if isinstance(i, dict) else None for i in items] != values:
+            if not same(values, [i.get(field) if isinstance(i, dict) else None for i in items]):
                 return f"expected the items' {field} {values}, got {items!r}"
     return None
 
