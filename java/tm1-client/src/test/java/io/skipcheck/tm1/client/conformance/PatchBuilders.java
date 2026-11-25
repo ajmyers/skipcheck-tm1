@@ -2,7 +2,8 @@
 
 package io.skipcheck.tm1.client.conformance;
 
-import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -10,12 +11,16 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
-import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.jspecify.annotations.Nullable;
@@ -29,13 +34,22 @@ import tools.jackson.databind.JsonNode;
  * {...}}} through {@code CubeCreate.builder()}, each key by the setter that writes it, so
  * a scenario's write goes through the setters a caller uses (#354). A nested write type's
  * value is built by its own builder, a root's by the subtype its {@code @odata.type}
- * names; a binding ({@code Dimensions@odata.bind}) by the bind setter, from the paths; an
- * open type's undeclared property by {@code property}. A key no setter writes is refused:
- * the builders don't offer it, so neither may a scenario.
+ * names; a binding ({@code Dimensions@odata.bind}) by the bind setter, from the paths as
+ * written, already encoded, as TM1 gets them; an open type's undeclared property by
+ * {@code property}. Refused, as a caller couldn't send them: a key no setter writes (a
+ * declared one included, on an open type too); a value that doesn't read back as written
+ * (an enum TM1 doesn't have, a duration not written as the client writes it, a fraction
+ * for a whole number); a binding of the wrong shape; an {@code @odata.type} the write
+ * type doesn't send.
  */
 final class PatchBuilders {
 
 	private static final String PACKAGE = "io.skipcheck.tm1.client.model";
+
+	private static final JsonNode SPEC = ConformanceCodec.json()
+		.readTree(new File(Objects.requireNonNull(System.getProperty("tm1.spec"), "tm1.spec")));
+
+	private static final Map<Class<?>, Set<String>> DECLARED = new ConcurrentHashMap<>();
 
 	/** Per builder class, the setter that writes each JSON name. */
 	private static final Map<Class<?>, Map<String, Method>> SETTERS = new ConcurrentHashMap<>();
@@ -51,6 +65,9 @@ final class PatchBuilders {
 	 * @throws IllegalArgumentException if a key has no setter, or a value doesn't fit it
 	 */
 	static Object build(Class<?> patch, JsonNode json) {
+		if (!json.isObject()) {
+			throw new IllegalArgumentException("A " + patch.getSimpleName() + " is an object, not " + json);
+		}
 		Class<?> type = subtype(patch, json);
 		try {
 			Object builder = type.getMethod("builder").invoke(null);
@@ -58,14 +75,18 @@ final class PatchBuilders {
 			for (var e : json.properties()) {
 				String key = e.getKey();
 				if (key.equals("@odata.type")) {
-					// The builder sends its own; the subtype was picked by it
+					// The builder sends its own, which must be this one
+					if (!e.getValue().asString().equals(values(builder).get("@odata.type"))) {
+						throw new IllegalArgumentException(
+								type.getSimpleName() + " doesn't send @odata.type " + e.getValue());
+					}
 					continue;
 				}
 				Method setter = setters.get(key);
 				if (setter != null) {
 					setter.invoke(builder, argument(setter, e.getValue()));
 				}
-				else if (!key.startsWith("@") && open(builder.getClass())) {
+				else if (!key.startsWith("@") && open(builder.getClass()) && !declared(type).contains(key)) {
 					builder.getClass()
 						.getMethod("property", String.class, Object.class)
 						.invoke(builder, key, ConformanceCodec.json().treeToValue(e.getValue(), Object.class));
@@ -107,33 +128,36 @@ final class PatchBuilders {
 	private static @Nullable Object[] argument(Method setter, JsonNode value) {
 		Class<?> raw = setter.getParameterTypes()[0];
 		if (raw == ODataPath[].class) {
+			if (!value.isArray()) {
+				throw new IllegalArgumentException(setter.getName() + " binds a list of paths, not " + value);
+			}
 			List<ODataPath> paths = new ArrayList<>();
-			value.forEach(p -> paths.add(path(p.asString())));
+			value.forEach(p -> paths.add(path(setter, p)));
 			return new Object[] { paths.toArray(ODataPath[]::new) };
 		}
 		if (raw == ODataPath.class) {
-			return new Object[] { path(value.asString()) };
+			return new Object[] { path(setter, value) };
 		}
 		return new Object[] { value(setter.getGenericParameterTypes()[0], value) };
 	}
 
 	/**
-	 * A binding's path, which the JSON holds as sent, percent-encoded: decoded, so the
-	 * bind setter encodes it once, as a caller's {@code ODataPath} would be.
+	 * A binding's path as written, already encoded, as TM1 gets it: its segments taken as
+	 * they are, so a key's {@code %2F} stays one, and the bind setter writes it back the
+	 * same.
 	 */
-	private static ODataPath path(String encoded) {
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		for (int i = 0; i < encoded.length(); i++) {
-			char c = encoded.charAt(i);
-			if (c == '%' && i + 2 < encoded.length()) {
-				out.write(Integer.parseInt(encoded.substring(i + 1, i + 3), 16));
-				i += 2;
-			}
-			else {
-				out.writeBytes(String.valueOf(c).getBytes(StandardCharsets.UTF_8));
-			}
+	private static ODataPath path(Method setter, JsonNode value) {
+		if (!value.isString()) {
+			throw new IllegalArgumentException(setter.getName() + " binds a path, not " + value);
 		}
-		return ODataPath.link(out.toString(StandardCharsets.UTF_8));
+		try {
+			Constructor<ODataPath> make = ODataPath.class.getDeclaredConstructor(List.class);
+			make.setAccessible(true);
+			return make.newInstance(List.of(value.asString().split("/", -1)));
+		}
+		catch (ReflectiveOperationException e) {
+			throw new IllegalStateException("Can't make a path", e);
+		}
 	}
 
 	private static @Nullable Object value(Type type, JsonNode value) {
@@ -152,8 +176,44 @@ final class PatchBuilders {
 				return out;
 			}
 		}
+		Class<?> raw = type instanceof ParameterizedType p ? (Class<?>) p.getRawType() : (Class<?>) type;
+		if (raw == OffsetDateTime.class) {
+			// As a caller gives it, its offset kept
+			return OffsetDateTime.parse(value.asString());
+		}
+		if ((raw == Integer.class || raw == Long.class) && !value.canConvertToExactIntegral()) {
+			throw new IllegalArgumentException(value + " isn't a whole number");
+		}
 		JavaType javaType = ConformanceCodec.json().getTypeFactory().constructType(type);
-		return ConformanceCodec.json().treeToValue(value, javaType);
+		Object out = ConformanceCodec.json().treeToValue(value, javaType);
+		if (raw.isEnum() || raw == Duration.class) {
+			// What the client sends for it: an enum TM1 doesn't have reads as UNKNOWN, a
+			// duration as the client writes durations
+			JsonNode back = ConformanceCodec.json().valueToTree(out);
+			if (!back.equals(value)) {
+				throw new IllegalArgumentException(value + " doesn't read back as written, but as " + back);
+			}
+		}
+		return out;
+	}
+
+	/** The names a write's type declares, its base's too, from the spec. */
+	private static Set<String> declared(Class<?> write) {
+		return DECLARED.computeIfAbsent(write, w -> {
+			String name = w.getSimpleName().replaceAll("(Create|Patch)$", "");
+			Map<String, JsonNode> byName = new LinkedHashMap<>();
+			SPEC.path("types").forEach(t -> byName.put(t.path("qualifiedName").asString(), t));
+			Set<String> out = new HashSet<>();
+			for (JsonNode t : byName.values()) {
+				if (t.path("name").asString().equals(name)) {
+					for (JsonNode level = t; level != null; level = byName.get(level.path("baseType").asString(""))) {
+						level.path("properties").forEach(p -> out.add(p.path("name").asString()));
+						level.path("navigationProperties").forEach(p -> out.add(p.path("name").asString()));
+					}
+				}
+			}
+			return out;
+		});
 	}
 
 	/** The write type a type is, or a list's element is, or null. */

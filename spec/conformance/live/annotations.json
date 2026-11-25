@@ -44,7 +44,7 @@
 			"service" : "annotations",
 			"method" : "create",
 			"params" : [ "annotation" ],
-			"args" : [ { "$patch" : "AnnotationCreate", "json" : { "Text" : "built note", "ApplicationContext" : [ { "Facet@odata.bind" : "ApplicationContextFacets('}Cubes')", "Value" : "${cube}" } ], "DimensionalContext@odata.bind" : [ "Dimensions('${region}')/Hierarchies('${region}')/Members('South')", "Dimensions('${month}')/Hierarchies('${month}')/Members('Feb')" ] } } ],
+			"args" : [ { "$patch" : "AnnotationCreate", "json" : { "Text" : "built note", "ApplicationContext" : [ { "Facet@odata.bind" : "ApplicationContextFacets('%7DCubes')", "Value" : "${cube}" } ], "DimensionalContext@odata.bind" : [ "Dimensions('${region}')/Hierarchies('${region}')/Members('South')", "Dimensions('${month}')/Hierarchies('${month}')/Members('Feb')" ] } } ],
 			"expect" : { "fields" : { "Text" : "built note" } },
 			"save" : { "built" : "ID" }
 		},
