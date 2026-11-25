@@ -39,7 +39,8 @@ import tools.jackson.databind.json.JsonMapper;
  * {@link Writes} counts them as written
  * @param writes setters a write type offers though the probe doesn't verify them, by
  * {@code Builder.Setter}, or a whole write type by {@code Builder}, and setters it leaves
- * out though the probe verifies them: why ({@link Offers})
+ * out though the probe verifies them, or the overlay keeps their whole write type: why
+ * ({@link Offers})
  */
 public record Overlay(Map<String, String> departures, Map<String, String> lenientDates,
 		Map<String, EndpointNote> endpoints, Map<String, UndeclaredType> undeclared, Map<String, String> writeOnly,

@@ -43,8 +43,10 @@ import tools.jackson.databind.json.JsonMapper;
  * </ul>
  * A patch doesn't offer a binding a PATCH appends with (a subset's {@code Elements}):
  * binding reads as "set to", so a service's own add does that. Nor does one offer a
- * setter the overlay withholds, which the write's only service would refuse: a user
- * patch's {@code Groups}, which {@code setGroups} sets (#361). A setter a subtype
+ * setter the overlay withholds, which the write's only service, or TM1, would refuse: a
+ * user patch's {@code Groups}, which {@code setGroups} sets (#361), or a cell update's
+ * nested {@code Tuple}, which only a bind writes (#354). One can be withheld when the
+ * probe verifies it, or the overlay keeps its whole write type. A setter a subtype
  * verifies counts for its root. A write type with nothing to offer isn't generated,
  * unless a subtype's or an offered setter's value needs it (an open type, a root). An
  * offered nested setter whose value type offers nothing is dropped.
