@@ -199,12 +199,22 @@ def test_saves_a_field_of_a_result_for_the_steps_after_it() -> None:
 
 def _data_tm1(names: dict[str, str]) -> FakeTm1:
     """Answers as TM1 would for the cellsets, views and sandboxes scenarios: a cellset of 3 × 2
-    cells (and the slicer), names that exist but ``missing``."""
+    cells (and the slicer), each worth its ordinal until an update writes it, names that exist but
+    ``missing``."""
     fake = FakeTm1()
     missing = names["missing"]
+    # The cells' values, by ordinal, as the scenario's updates write them
+    values: dict[int, Any] = {}
 
     def cells(begin: int, end: int) -> list[dict[str, Any]]:
-        return [{"Ordinal": n, "Value": n} for n in range(begin, end + 1)]
+        return [{"Ordinal": n, "Value": values.get(n, n)} for n in range(begin, end + 1)]
+
+    def ordinal(update: dict[str, Any]) -> int:
+        # By the update's ordinal, or its tuple's elements (a region, then a month)
+        if "Ordinal" in update:
+            return int(update["Ordinal"])
+        region, month = (re.search(r"Elements\('([^']*)'\)$", path)[1] for path in update["Tuple@odata.bind"])
+        return ["North", "South"].index(region) * 3 + ["Jan", "Feb", "Mar"].index(month)
 
     def respond(request: httpx2.Request) -> Any:
         target = request.url.raw_path.decode().removeprefix("/api/v1/")
@@ -217,9 +227,13 @@ def _data_tm1(names: dict[str, str]) -> FakeTm1:
         if method == "POST" and target.split("?")[0] == "ExecuteMDX":
             if "SELEKT" in body["MDX"]:
                 return httpx2.Response(400, json={"error": {"code": "501", "message": "syntax"}})
-            top = int(re.search(r"\$top%3D(\d+)", target)[1])
+            top = int(m[1]) if (m := re.search(r"\$top%3D(\d+)", target)) else 0
             axes = [{"Ordinal": 0, "Cardinality": 3}, {"Ordinal": 1, "Cardinality": 2}, {"Ordinal": 2, "Cardinality": 1}]
             return {"ID": "cs1", "Axes": axes, "Cells": cells(0, top - 1)}
+        if method == "POST" and re.fullmatch(r"(Cellsets\('cs1'\)|Cubes\('[^']*'\))/tm1\.UpdateCells", target):
+            for update in body["Updates"]:
+                values[ordinal(update)] = update["Value"]
+            return httpx2.Response(204)
         if method == "POST" and target.endswith("/tm1.Execute?$select=ID"):
             return {"ID": "cs2"}
         if method == "GET" and (m := re.match(r"Cellsets\('cs1'\)/tm1\.GetPartition\(Begin=(\d+),End=(\d+)\)", target)):

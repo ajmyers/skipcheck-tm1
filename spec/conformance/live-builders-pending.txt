@@ -54,11 +54,13 @@ GroupPatch
 # Git: needs a repository TM1 can reach; to try with a local one, else to exclude (#354)
 GitConfigurationPatch
 
+# The nested forms of a cell update's tuple and reference: TM1 refuses them ("Could not find entity
+# reference in payload"), and takes only the bound forms (@odata.bind). To withhold (#354)
+CellsetUpdatePatch.ReferenceCell
+CellsetUpdatePatch.ReferenceCube
+CubeUpdatePatch.ReferenceCell
+CubeUpdatePatch.ReferenceCube
+CubeUpdatePatch.Tuple
+
 # Others: to write in the scenarios of their services (#354)
 AttributesPatch.Caption
-CellsetUpdatePatch
-CubeUpdatePatch.ReferenceCell
-CubeUpdatePatch.ReferenceCell@odata.bind
-CubeUpdatePatch.ReferenceCube
-CubeUpdatePatch.ReferenceCube@odata.bind
-CubeUpdatePatch.Tuple
