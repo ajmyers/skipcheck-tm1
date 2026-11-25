@@ -113,7 +113,7 @@
 			"service" : "processes",
 			"method" : "create",
 			"params" : [ "process" ],
-			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${process}", "HasSecurityAccess" : true, "PrologProcedure" : "nA = 1;\r\n", "MetadataProcedure" : "nB = 2;\r\n", "DataProcedure" : "nC = 3;\r\n", "EpilogProcedure" : "nD = 4;\r\n", "DataSource" : { "Type" : "None" }, "Parameters" : [ { "Name" : "pName", "Prompt" : "", "Value" : "", "Type" : "String" } ], "Variables" : [  ], "UIData" : "CubeAction=1511\f", "VariablesUIData" : [  ] } } ],
+			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${process}", "HasSecurityAccess" : true, "PrologProcedure" : "nA = 1;\r\n", "MetadataProcedure" : "nB = 2;\r\n", "DataProcedure" : "nC = 3;\r\n", "EpilogProcedure" : "nD = 4;\r\n", "DataSource" : { "Type" : "None" }, "Parameters" : [ { "Name" : "pName", "Prompt" : "", "Value" : "" } ], "Variables" : [  ], "UIData" : "CubeAction=1511\f", "VariablesUIData" : [  ] } } ],
 			"expect" : { "fields" : { "Name" : "${process}" } }
 		},
 		{
@@ -127,7 +127,7 @@
 			"service" : "processes",
 			"method" : "update",
 			"params" : [ "name", "patch" ],
-			"args" : [ "${process}", { "$patch" : "ProcessPatch", "json" : { "HasSecurityAccess" : false, "PrologProcedure" : "nA = 10;\r\n", "MetadataProcedure" : "nB = 20;\r\n", "DataProcedure" : "nC = 30;\r\n", "DataSource" : { "Type" : "None" }, "Parameters" : [ { "Name" : "pOther", "Prompt" : "", "Value" : "", "Type" : "String" } ], "Variables" : [  ], "UIData" : "CubeAction=1512\f", "VariablesUIData" : [  ] } } ],
+			"args" : [ "${process}", { "$patch" : "ProcessPatch", "json" : { "HasSecurityAccess" : false, "PrologProcedure" : "nA = 10;\r\n", "MetadataProcedure" : "nB = 20;\r\n", "DataProcedure" : "nC = 30;\r\n", "DataSource" : { "Type" : "None" }, "Parameters" : [ { "Name" : "pOther", "Prompt" : "", "Value" : "" } ], "Variables" : [  ], "UIData" : "CubeAction=1512\f", "VariablesUIData" : [  ] } } ],
 			"expect" : { "none" : true }
 		},
 		{

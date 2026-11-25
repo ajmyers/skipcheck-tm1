@@ -125,6 +125,9 @@
 		"SSLSettingsPatch.PwdKeyFile": {
 			"unverified": "TM1 never returns it, so the probe can't set it back after a try"
 		},
+		"SubsetCreate.Hierarchy@odata.bind": {
+			"kept": "an ad-hoc subset in a view's axis or title names its hierarchy so; the probe tried it on a subset made under its hierarchy, where TM1 ignores it as implied. The live views scenario makes a native view with one"
+		},
 		"UserPatch.Groups": {
 			"withheld": "a user PATCH with `Groups` replaces them: `UserService.setGroups` binds them"
 		},

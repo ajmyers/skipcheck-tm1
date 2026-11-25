@@ -9,7 +9,7 @@
 		{"service": "dimensions", "method": "list", "params": ["query"], "args": [{"$query": {"select": ["Name"], "filter": "Name eq '${dimension}'"}}], "expect": {"items": {"Name": ["${dimension}"]}}},
 		{"service": "dimensions", "method": "modelDimensions", "params": ["query"], "args": [{"$query": {"select": ["Name"], "filter": "startswith(Name,'${dimension}')"}}], "expect": {"items": {"Name": ["${dimension}"]}}},
 		{"service": "dimensions", "method": "controlDimensions", "params": ["query"], "args": [{"$query": {"select": ["Name"], "filter": "Name eq '${dimension}'"}}], "expect": {"count": 0}},
-		{"service": "dimensions", "method": "update", "params": ["name", "patch"], "args": ["${dimension}", {"$patch": "DimensionPatch", "json": {"Name": "${dimension}"}}], "expect": {"none": true}},
+		{"service": "dimensions", "method": "update", "params": ["name", "patch"], "args": ["${dimension}", {"$patch": "DimensionPatch", "json": {}}], "expect": {"none": true}},
 		{"service": "dimensions", "method": "saveAs", "params": ["name", "newName"], "args": ["${dimension}", "${copy}"], "expect": {"fields": {"Name": "${copy}"}}},
 		{"service": "dimensions", "method": "saveAs", "params": ["name", "newName", "overwrite", "keepExistingAttributes"], "args": ["${dimension}", "${copy}", true, false], "expect": {"fields": {"Name": "${copy}"}}},
 		{"service": "dimensions", "method": "delete", "params": ["name"], "args": ["${copy}"], "expect": {"none": true}},

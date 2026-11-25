@@ -14797,6 +14797,9 @@
 			"Expression" : {
 				"verified" : "applied"
 			},
+			"Hierarchy@odata.bind" : {
+				"kept" : "an ad-hoc subset in a view's axis or title names its hierarchy so; the probe tried it on a subset made under its hierarchy, where TM1 ignores it as implied. The live views scenario makes a native view with one"
+			},
 			"Name" : {
 				"verified" : "minimal create"
 			}
@@ -21922,6 +21925,15 @@
 					"collection" : false,
 					"set" : true,
 					"bind" : false,
+					"value" : null
+				},
+				{
+					"json" : "Hierarchy",
+					"declaredOn" : "ibm.tm1.api.v1.Subset",
+					"navigation" : true,
+					"collection" : false,
+					"set" : false,
+					"bind" : true,
 					"value" : null
 				},
 				{

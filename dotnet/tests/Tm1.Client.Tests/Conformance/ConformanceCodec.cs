@@ -111,14 +111,8 @@ public static class ConformanceCodec
             {
                 var type = Client.GetType("Skipcheck.Tm1.Client.Model." + body!.GetValue<string>())
                     ?? throw new UnknownConformanceValueException("no patch " + body);
-                var values = new Dictionary<string, object?>();
-                foreach (var (key, value) in node["json"]!.AsObject())
-                {
-                    values[key] = Plain(value);
-                }
-                var ctor = type.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                    .Single(c => c.GetParameters() is [var p] && p.ParameterType.IsAssignableFrom(typeof(Dictionary<string, object?>)));
-                return ctor.Invoke([values]);
+                // Through the generated setters, as a caller makes one (#354)
+                return PatchBuilders.Build(type, node["json"]!.AsObject());
             }
             case "$model":
             {
@@ -214,7 +208,7 @@ public static class ConformanceCodec
         };
 
     /// <summary>JSON as plain values, as a patch holds them.</summary>
-    private static object? Plain(JsonNode? node) =>
+    internal static object? Plain(JsonNode? node) =>
         node switch
         {
             null => null,
