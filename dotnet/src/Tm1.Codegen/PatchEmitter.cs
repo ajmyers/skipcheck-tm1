@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -44,15 +45,15 @@ public sealed class PatchEmitter
         return _out.ToString();
     }
 
-    private string? PatchType(string typeName, bool collection)
+    /// <summary>A write type's plan (the spec's <c>builders</c>), which the Java generator works out once.</summary>
+    private JsonElement Plan(JsonElement t, bool create) => _spec.Builders[Spec.Str(t, "name") + (create ? "Create" : "Patch")];
+
+    /// <summary>The type a setter takes: the write type the plan gives a structured value, else the model's.</summary>
+    private string? PatchType(string typeName, bool collection, string? value)
     {
-        string element;
-        if (_spec.TypeByName.TryGetValue(typeName, out var t))
+        if (value is not null)
         {
-            // A nested entity is sent as its create where it has one: a deep insert creates it, as does a
-            // collection a PATCH replaces or appends to
-            element = Spec.Str(t, "name") + (Spec.Str(t, "kind") == "entity" && Creatable(t) ? "Create" : "Patch");
-            return collection ? $"IEnumerable<{element}>?" : element + "?";
+            return collection ? $"IEnumerable<{value}>?" : value + "?";
         }
         if (ModelEmitter.Element(_spec, typeName) is not { } el)
         {
@@ -65,64 +66,11 @@ public sealed class PatchEmitter
         return collection ? $"IEnumerable<{el.Type}>?" : el.Type + "?";
     }
 
-    private static readonly HashSet<string> Writing = ["applied", "writeOnly", "transformed", "untested"];
+    /// <summary>Whether a type gets a create: the write plan has one.</summary>
+    private bool Creatable(JsonElement t) => _spec.Builders.ContainsKey(Spec.Str(t, "name") + "Create");
 
-    private static bool Writes(string? outcome) => outcome is null || Writing.Contains(outcome);
-
-    private static string? Outcome(JsonElement t, string method, string prop) =>
-        t.TryGetProperty("write", out var w) && w.GetProperty(method).GetProperty("properties").TryGetProperty(prop, out var o) ? o.GetString() : null;
-
-    /// <summary>Whether a POST of <paramref name="t"/> takes a property, by the probe's writes.</summary>
-    private bool Creates(JsonElement t, string prop) =>
-        t.TryGetProperty("write", out _)
-            ? Writes(Outcome(t, "create", prop))
-            : _spec.Derived(t).Where(d => d.TryGetProperty("write", out _)).All(d => Writes(Outcome(d, "create", prop)));
-
-    /// <summary>
-    /// Whether <c>Builder(read)</c> copies a property into a patch: a PATCH applies it, and it isn't a
-    /// collection a PATCH appends to (copying one would add its members again), ignores or rejects. A
-    /// collection a PATCH replaces is copied: the read holds all of it. As the Java generator.
-    /// </summary>
-    private static bool Patches(JsonElement t, string prop) =>
-        Writes(Outcome(t, "patch", prop)) && Collection(t.TryGetProperty("write", out var w) ? w : default, prop) is not ("appends" or "ignored" or "rejected");
-
-    /// <summary>What the probe found a PATCH does with a collection or navigation: <c>replaces</c>, <c>appends</c>, <c>ignored</c>, <c>rejected</c>; or null.</summary>
-    private static string? Collection(JsonElement w, string prop) =>
-        w.ValueKind == JsonValueKind.Object && w.TryGetProperty("collections", out var c) && c.TryGetProperty(prop, out var o) ? o.GetString() : null;
-
-    private static bool WriteOffersInPatch(JsonElement w, string prop)
-    {
-        var patch = w.GetProperty("patch");
-        if (prop == "Name")
-        {
-            return !patch.TryGetProperty("rename", out var rename) || rename.ValueKind == JsonValueKind.Null || rename.GetString() == "applied";
-        }
-        var outcome = patch.GetProperty("properties").TryGetProperty(prop, out var o) ? o.GetString() : null;
-        return outcome is not ("rejected" or "ignored") && Collection(w, prop) is not ("rejected" or "ignored");
-    }
-
-    /// <summary>
-    /// Whether a patch of <paramref name="t"/> offers a property: not if a PATCH rejects or ignores it, by the
-    /// probe, nor <c>Name</c> where a PATCH doesn't rename; for the root of a hierarchy without writes of its
-    /// own, if every probed subtype's patch offers it. As the Java generator.
-    /// </summary>
-    private bool OffersInPatch(JsonElement t, string prop) =>
-        t.TryGetProperty("write", out var w)
-            ? WriteOffersInPatch(w, prop)
-            : _spec.Derived(t).Where(d => d.TryGetProperty("write", out _)).All(d => WriteOffersInPatch(d.GetProperty("write"), prop));
-
-    /// <summary>Whether a type gets a create: the spec's offers list one; without offers, the probe has writes
-    /// for it, or for a subtype it's the root of.</summary>
-    private bool Creatable(JsonElement t) =>
-        Spec.Str(t, "kind") == "entity"
-        && (
-            _spec.VerifiedOnly
-                ? _spec.Offers.ContainsKey(Spec.Str(t, "name") + "Create")
-                : t.TryGetProperty("write", out _) || _spec.Derived(t).Any(d => d.TryGetProperty("write", out _))
-        );
-
-    /// <summary>Whether a type gets a patch: every type does, unless the offers say which (#338).</summary>
-    private bool Patchable(JsonElement t) => !_spec.VerifiedOnly || _spec.Offers.ContainsKey(Spec.Str(t, "name") + "Patch");
+    /// <summary>Whether a type gets a patch: the write plan has one.</summary>
+    private bool Patchable(JsonElement t) => _spec.Builders.ContainsKey(Spec.Str(t, "name") + "Patch");
 
     /// <summary>A write type's property, for its setter and bind methods: <c>Set</c> whether it has its
     /// setter (for a navigation, the nested one), <c>Bind</c> whether a navigation to an entity has its
@@ -135,29 +83,29 @@ public sealed class PatchEmitter
     }
 
     /// <summary>
-    /// What a write type of <paramref name="t"/> offers, in the order its setters are declared: what the spec's
-    /// offers list for it; without offers, what a POST takes for a create, and for a patch what a PATCH doesn't
-    /// reject or ignore, navigations included (a cube's <c>Dimensions</c> isn't).
+    /// What a write type of <paramref name="t"/> offers, in the order its setters are declared: the setters the
+    /// write plan lists for it.
     /// </summary>
     private List<WriteProperty> Writable(JsonElement t, bool create)
     {
-        var offered = _spec.Offers.GetValueOrDefault(Spec.Str(t, "name") + (create ? "Create" : "Patch")) ?? [];
+        var plan = Spec.Array(Plan(t, create), "setters").ToList();
         var result = new List<WriteProperty>();
         var taken = new HashSet<string> { "Build", "Property", "Set", "Bind", "BindAll" };
         foreach (var level in _spec.Chain(t))
         {
+            JsonElement? Setter(string name) =>
+                plan.Where(s => Spec.Str(s, "json") == name && Spec.Str(s, "declaredOn") == Spec.Str(level, "qualifiedName"))
+                    .Cast<JsonElement?>()
+                    .FirstOrDefault();
             foreach (var p in Spec.Array(level, "properties"))
             {
                 var prop = Spec.Str(p, "name")!;
-                var type = p.TryGetProperty("departure", out _) ? "object?" : PatchType(Spec.Str(p, "type")!, Spec.Bool(p, "collection"));
-                if (
-                    type is null
-                    || !(
-                        _spec.VerifiedOnly ? offered.Contains(prop)
-                        : create ? Creates(t, prop)
-                        : OffersInPatch(t, prop)
-                    )
-                )
+                if (Setter(prop) is not { } s || !Spec.Bool(s, "set"))
+                {
+                    continue;
+                }
+                var type = p.TryGetProperty("departure", out _) ? "object?" : PatchType(Spec.Str(p, "type")!, Spec.Bool(p, "collection"), Spec.Str(s, "value"));
+                if (type is null)
                 {
                     continue;
                 }
@@ -169,18 +117,12 @@ public sealed class PatchEmitter
             {
                 var nav = Spec.Str(n, "name")!;
                 var collection = Spec.Bool(n, "collection");
-                var type = PatchType(Spec.Str(n, "type")!, collection);
-                if (type is null)
+                if (Setter(nav) is not { } s || PatchType(Spec.Str(n, "type")!, collection, Spec.Str(s, "value")) is not { } type)
                 {
                     continue;
                 }
-                var entity = _spec.IsEntity(Spec.Str(n, "type")!);
-                var set = _spec.VerifiedOnly ? offered.Contains(nav) : create || OffersInPatch(t, nav);
-                var bind = entity && (_spec.VerifiedOnly ? offered.Contains(nav + "@odata.bind") : set);
-                if (!set && !bind)
-                {
-                    continue;
-                }
+                var set = Spec.Bool(s, "set");
+                var bind = Spec.Bool(s, "bind");
                 var w = new WriteProperty(n, nav, type, true, collection, set, bind);
                 if (set)
                 {
@@ -202,10 +144,12 @@ public sealed class PatchEmitter
         var suffix = create ? "Create" : "Patch";
         var patch = name + suffix;
         var builderName = create ? "CreateBuilder" : "PatchBuilder";
-        var baseType = _spec.Base(t);
-        var hasDerived = _spec.Derived(t).Any();
-        var basePatch = baseType is { } b ? Spec.Str(b, "name") + suffix : "Tm1Patch";
-        var typeId = baseType is null ? "null" : $"\"#{Spec.Str(t, "qualifiedName")}\"";
+        var plan = Plan(t, create);
+        // A subtype's base: its root's write type
+        var baseType = Spec.Str(plan, "base");
+        var hasDerived = plan.GetProperty("dispatch").ValueKind == JsonValueKind.Array;
+        var basePatch = baseType ?? "Tm1Patch";
+        var typeId = Spec.Str(plan, "odataType") is { } id ? $"\"{id}\"" : "null";
         var properties = Writable(t, create);
         if (create)
         {
@@ -238,10 +182,10 @@ public sealed class PatchEmitter
             _out.Append("    /// <param name=\"read\">An entity read from TM1.</param>\n");
             _out.Append("    /// <exception cref=\"ArgumentException\">TM1 makes none of its type.</exception>\n");
             _out.Append($"    public static IBuilder<{patch}> Builder({name} read) =>\n        read switch\n        {{\n");
-            foreach (var sub in _spec.Derived(t).Where(Creatable))
+            foreach (var c in Spec.Array(plan, "dispatch"))
             {
-                var subName = Spec.Str(sub, "name")!;
-                _out.Append($"            {subName} v => {subName}Create.Builder(v),\n");
+                var subName = Spec.Str(_spec.TypeByName[Spec.Str(c, "type")!], "name")!;
+                _out.Append($"            {subName} v => {Spec.Str(c, "builder")}.Builder(v),\n");
             }
             _out.Append(
                 "            _ => throw new ArgumentException(\"A \" + read.GetType().Name + \" has no create: TM1 makes none of its type\", nameof(read)),\n        };\n\n"
@@ -253,10 +197,10 @@ public sealed class PatchEmitter
             _out.Append($"    /// <summary>A patch of what <paramref name=\"read\"/> holds that a write takes, by its type: for nested values.</summary>\n");
             _out.Append("    /// <param name=\"read\">A value read from TM1.</param>\n");
             _out.Append($"    internal static {patch} Of({name} read) =>\n        read switch\n        {{\n");
-            foreach (var sub in _spec.Derived(t).Where(Patchable))
+            foreach (var c in Spec.Array(plan, "dispatch"))
             {
-                var subName = Spec.Str(sub, "name")!;
-                _out.Append($"            {subName} v => {subName}Patch.Builder(v).Build(),\n");
+                var subName = Spec.Str(_spec.TypeByName[Spec.Str(c, "type")!], "name")!;
+                _out.Append($"            {subName} v => {Spec.Str(c, "builder")}.Builder(v).Build(),\n");
             }
             _out.Append($"            _ => Unknown(read).Build(),\n        }};\n\n");
             EmitFrom(t, create, builderName, properties, "Unknown");
@@ -264,17 +208,13 @@ public sealed class PatchEmitter
         _out.Append($"    /// <summary>Builds a <see cref=\"{patch}\"/>; each setter replaces what an earlier call set.</summary>\n");
         _out.Append($"    public {hide}sealed class {builderName} : BuilderBase<{patch}, {builderName}>\n    {{\n");
         _out.Append($"        public {builderName}()\n            : base(v => new {patch}(v), {typeId})\n        {{\n        }}\n");
-        if (
-            create
-            && t.TryGetProperty("write", out var write)
-            && write.GetProperty("create").TryGetProperty("required", out var required)
-            && required.GetArrayLength() > 0
-        )
+        var required = create ? Spec.Array(Plan(t, true), "required").Select(r => r.GetString()!).ToList() : [];
+        if (required.Count > 0)
         {
             _out.Append($"\n        /// <summary>The create, with what's been set so far.</summary>\n");
             _out.Append($"        /// <exception cref=\"InvalidOperationException\">It lacks what a create needs.</exception>\n");
             _out.Append($"        public override {patch} Build()\n        {{\n");
-            foreach (var r in required.EnumerateArray().Select(r => r.GetString()!.Replace("@odata.bind", "")))
+            foreach (var r in required)
             {
                 _out.Append(
                     $"            if (!Has(\"{r}\"))\n            {{\n                throw new InvalidOperationException(\"A {name} create needs {r}: TM1 refuses one without it\");\n            }}\n"
@@ -304,7 +244,7 @@ public sealed class PatchEmitter
                 _out.Append($"        public {builderName} {p.BindMethod}(ODataPath target) => Bind(\"{p.Json}\", target);\n");
             }
         }
-        if (_spec.Chain(t).Any(l => Spec.Bool(l, "open")))
+        if (Spec.Bool(plan, "open"))
         {
             _out.Append(
                 "\n        /// <summary>Sets a property <c>$metadata</c> doesn't declare, which this open type can have, such as an attribute's value.</summary>\n"
@@ -327,7 +267,6 @@ public sealed class PatchEmitter
     {
         var name = Spec.Str(t, "name")!;
         var members = ModelEmitter.MemberNames(_spec, t);
-        var open = _spec.Chain(t).Any(l => Spec.Bool(l, "open"));
         var what = create ? "a POST applies, to recreate it" : "a PATCH applies, leaving out collections a PATCH appends to";
         if (method == "Builder")
         {
@@ -344,6 +283,7 @@ public sealed class PatchEmitter
             );
             _out.Append($"    private static {builderName} {method}({name} read)\n    {{\n");
         }
+        var from = Plan(t, create).GetProperty("fromRead");
         var statements = new List<string>();
         var run = new List<string>();
         var json = false;
@@ -356,29 +296,19 @@ public sealed class PatchEmitter
                 json = true;
             }
         }
-        foreach (var p in properties.Where(p => p.Set && !p.Navigation))
+        foreach (var c in Spec.Array(from, "copy"))
         {
-            var prop = p.Json;
-            if (Spec.Str(p.Property, "type") == "Edm.Stream" || (!create && !Patches(t, prop)))
-            {
-                continue;
-            }
-            if (p.Property.TryGetProperty("departure", out _) || !_spec.TypeByName.TryGetValue(Spec.Str(p.Property, "type")!, out var structured))
+            var prop = Spec.Str(c, "json")!;
+            if (Spec.Str(c, "via") is not { } via)
             {
                 // A primitive, an enum or a departure: as the read wrote it
                 run.Add(prop);
                 continue;
             }
             Flush();
-            var valueName = Spec.Str(structured, "name")!;
-            var root = _spec.Derived(structured).Any();
-            if (root && p.Type.Contains("Create"))
-            {
-                // A root's create has no Builder(read) to take a nested value with
-                continue;
-            }
-            var write = root ? valueName + "Patch" : p.Type.TrimEnd('?').Replace("IEnumerable<", "").TrimEnd('>');
-            string Convert(string v) => root ? $"{write}.Of({v})" : $"{write}.Builder({v}).Build()";
+            var p = properties.First(p => p.Set && !p.Navigation && p.Json == prop);
+            var write = Spec.Str(c, "value")!;
+            string Convert(string v) => via == "of" ? $"{write}.Of({v})" : $"{write}.Builder({v}).Build()";
             var member = members[prop];
             var local = Local(member);
             statements.Add(
@@ -388,21 +318,14 @@ public sealed class PatchEmitter
             );
         }
         Flush();
-        // A patch from a read binds no collection: sent back, it would replace or append to what's there,
-        // whichever TM1 does for it, on an unrelated change
-        foreach (var p in properties.Where(p => p.Navigation && p.Bind && (create || !p.Collection)))
+        foreach (var binding in Spec.Array(from, "bindings"))
         {
-            if (ReadBinding(p, members[p.Json]) is { } binding)
-            {
-                statements.Add(binding);
-            }
+            var p = properties.First(p => p.Navigation && p.Json == Spec.Str(binding, "json"));
+            statements.Add(ReadBinding(binding, p, members[p.Json]));
         }
-        if (open)
+        if (from.TryGetProperty("undeclared", out var undeclared) && undeclared.ValueKind == JsonValueKind.Array)
         {
-            var declared = _spec
-                .Chain(t)
-                .SelectMany(l => Spec.Array(l, "properties").Concat(Spec.Array(l, "navigationProperties")))
-                .Select(p => $"\"{Spec.Str(p, "name")}\"");
+            var declared = undeclared.EnumerateArray().Select(n => $"\"{n.GetString()}\"");
             statements.Add($"b.CopyUndeclared(json, [{string.Join(", ", declared)}]);");
             json = true;
         }
@@ -419,38 +342,22 @@ public sealed class PatchEmitter
     }
 
     /// <summary>
-    /// The code binding a navigation a read holds: by key for a target in an entity set, by <c>UniqueName</c>
-    /// for an element or a member; null for any other (a subset, public or private, or a view, whose cube the
-    /// read doesn't say). A collection is bound only when it has members and every member's path can be made.
+    /// The code binding a navigation a read holds, as the write plan says: by key for a target in an entity set,
+    /// by <c>UniqueName</c> for an element or a member. A collection is bound only when it has members and every
+    /// member's path can be made.
     /// </summary>
-    private string? ReadBinding(WriteProperty p, string member)
+    private string ReadBinding(JsonElement binding, WriteProperty p, string member)
     {
-        if (!_spec.TypeByName.TryGetValue(Spec.Str(p.Property, "type")!, out var target) || Spec.Str(target, "kind") != "entity")
+        var target = _spec.TypeByName[Spec.Str(p.Property, "type")!];
+        var byKey = Spec.Str(binding, "by") switch
         {
-            return null;
-        }
-        var set = _spec.EntitySet(target);
-        var key = _spec.Key(target);
-        var targetName = Spec.Str(target, "name")!;
-        string helper;
-        string argument;
-        string collectionName;
-        if (set is not null && key.Count == 1)
-        {
-            helper = p.Collection ? "ByKeys" : "ByKey";
-            argument = ModelEmitter.MemberNames(_spec, target)[key[0]];
-            collectionName = set;
-        }
-        else if (targetName is "Element" or "Member")
-        {
-            helper = p.Collection ? "AllInHierarchy" : "InHierarchy";
-            argument = ModelEmitter.MemberNames(_spec, target)["UniqueName"];
-            collectionName = targetName + "s";
-        }
-        else
-        {
-            return null;
-        }
+            "key" => true,
+            "uniqueName" => false,
+            var by => throw new InvalidOperationException($"A binding by {by}: by key or uniqueName"),
+        };
+        var helper = byKey ? (p.Collection ? "ByKeys" : "ByKey") : (p.Collection ? "AllInHierarchy" : "InHierarchy");
+        var argument = ModelEmitter.MemberNames(_spec, target)[Spec.Str(binding, "key")!];
+        var collectionName = Spec.Str(binding, "set")!;
         var local = Local(member);
         var value = p.Collection ? $"{local}.Select(v => (object?)v.{argument}).ToList()" : $"{local}.{argument}";
         return $"if (read.{member} is {{ }} {local} && ReadBindings.{helper}(\"{collectionName}\", {value}) is {{ }} {local}Targets)\n{{\n    b.{p.BindMethod}({local}Targets);\n}}";

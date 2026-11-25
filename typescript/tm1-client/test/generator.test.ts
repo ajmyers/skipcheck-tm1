@@ -21,7 +21,7 @@ describe("codegen", () => {
   });
 
   it("refuses a spec version it doesn't read", () => {
-    expect(() => generate({ ...spec, specVersion: 2 })).toThrow(/spec version 2/);
+    expect(() => generate({ ...spec, specVersion: 3 })).toThrow(/spec version 3/);
   });
 
   it("copies a value of an unknown subtype as its root's offered properties", () => {

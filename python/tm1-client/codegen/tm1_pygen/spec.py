@@ -12,7 +12,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
-SUPPORTED_SPEC_VERSION = 1
+SUPPORTED_SPEC_VERSION = 2
 
 
 @dataclass
@@ -58,6 +58,13 @@ class Spec:
         """Per write type (``CubeCreate``), the setters it offers, each with why (verified, kept); none
         in a spec from before the probe verified them."""
         return self.doc.get("offers", {})
+
+    @property
+    def builders(self) -> dict[str, dict[str, Any]]:
+        """The write plan: per write type (``CubeCreate``), its setters, what ``build()`` requires, what
+        ``builder(read)`` copies and binds, and a root's dispatch to its subtypes. Worked out once, by
+        tm1-codegen: a generator writes it out rather than working it out again."""
+        return self.doc["builders"]
 
     # Lookups
 

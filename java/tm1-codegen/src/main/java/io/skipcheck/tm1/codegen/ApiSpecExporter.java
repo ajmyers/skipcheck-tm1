@@ -57,7 +57,7 @@ import tools.jackson.databind.node.ObjectNode;
 public final class ApiSpecExporter {
 
 	/** The version of the spec's format. */
-	public static final int SPEC_VERSION = 1;
+	public static final int SPEC_VERSION = 2;
 
 	private static final JsonNodeFactory JSON = JsonNodeFactory.instance;
 
@@ -145,6 +145,8 @@ public final class ApiSpecExporter {
 	 * @return the text
 	 * @throws IllegalArgumentException if the overlay names a property or endpoint the
 	 * snapshot doesn't have
+	 * @throws IllegalStateException if the write plan can't be made (see
+	 * {@link Builders#of})
 	 */
 	public String export() {
 		ObjectNode root = JSON.objectNode();
@@ -174,9 +176,69 @@ public final class ApiSpecExporter {
 				setters.forEach((setter, offer) -> b.putObject(setter).put(offer.kind(), offer.why()));
 			});
 		}
+		root.set("builders", builders(Builders.of(metadata, overlay, writes, offers)));
 		DefaultPrettyPrinter printer = new DefaultPrettyPrinter().withObjectIndenter(new DefaultIndenter("\t", "\n"))
 			.withArrayIndenter(new DefaultIndenter("\t", "\n"));
 		return JsonMapper.builder().build().writer().with(printer).writeValueAsString(root) + "\n";
+	}
+
+	/** The write plan: per write type, what each client's generator writes out. */
+	private static ObjectNode builders(Builders plan) {
+		ObjectNode out = JSON.objectNode();
+		plan.builders().forEach((name, b) -> {
+			ObjectNode node = out.putObject(name);
+			node.put("type", b.type());
+			node.put("write", b.write());
+			node.put("base", b.base());
+			node.put("odataType", b.odataType());
+			node.put("open", b.open());
+			b.required().forEach(node.putArray("required")::add);
+			ArrayNode setters = node.putArray("setters");
+			for (Builders.Setter s : b.setters()) {
+				setters.addObject()
+					.put("json", s.json())
+					.put("declaredOn", s.declaredOn())
+					.put("navigation", s.navigation())
+					.put("collection", s.collection())
+					.put("set", s.set())
+					.put("bind", s.bind())
+					.put("value", s.value());
+			}
+			Builders.FromRead from = b.fromRead();
+			if (from == null) {
+				node.putNull("fromRead");
+			}
+			else {
+				ObjectNode f = node.putObject("fromRead");
+				ArrayNode copy = f.putArray("copy");
+				for (Builders.Copy c : from.copy()) {
+					copy.addObject().put("json", c.json()).put("via", c.via()).put("value", c.value());
+				}
+				ArrayNode bindings = f.putArray("bindings");
+				for (Builders.Binding x : from.bindings()) {
+					bindings.addObject()
+						.put("json", x.json())
+						.put("collection", x.collection())
+						.put("by", x.by())
+						.put("set", x.set())
+						.put("key", x.key());
+				}
+				if (from.undeclared() == null) {
+					f.putNull("undeclared");
+				}
+				else {
+					from.undeclared().forEach(f.putArray("undeclared")::add);
+				}
+			}
+			if (b.dispatch() == null) {
+				node.putNull("dispatch");
+			}
+			else {
+				ArrayNode dispatch = node.putArray("dispatch");
+				b.dispatch().forEach(c -> dispatch.addObject().put("type", c.type()).put("builder", c.builder()));
+			}
+		});
+		return out;
 	}
 
 	private ArrayNode enums() {

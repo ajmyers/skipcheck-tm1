@@ -40,7 +40,6 @@ import com.palantir.javapoet.TypeSpec;
 import com.palantir.javapoet.WildcardTypeName;
 import io.skipcheck.tm1.csdl.CsdlAnnotation;
 import io.skipcheck.tm1.csdl.CsdlDocument;
-import io.skipcheck.tm1.csdl.CsdlEntityContainer;
 import io.skipcheck.tm1.csdl.CsdlEntityType;
 import io.skipcheck.tm1.csdl.CsdlEnumType;
 import io.skipcheck.tm1.csdl.CsdlNavigationProperty;
@@ -182,6 +181,11 @@ public final class ModelGenerator {
 
 	private final Offers offers;
 
+	private final Overlay overlay;
+
+	/** The write plan, once worked out: see {@link #plan()}. */
+	private @Nullable Builders plan;
+
 	/**
 	 * A generator for {@code metadata}, with the bundled overlay.
 	 * @param metadata the {@code $metadata} document
@@ -250,6 +254,7 @@ public final class ModelGenerator {
 		this.metadata = metadata;
 		this.writes = writes;
 		this.offers = offers;
+		this.overlay = overlay;
 		overlay.departures().forEach((key, note) -> this.tags.put(key, new Departure("TYPE", List.of(), plain(note))));
 		overlay.lenientDates()
 			.forEach((key, note) -> this.tags.put(key, new Departure("LENIENT_DATE", List.of(), plain(note))));
@@ -661,7 +666,7 @@ public final class ModelGenerator {
 			this(method, type, json, doc, navigation, collection, revisions, true, navigation);
 		}
 
-		PatchProperty offering(boolean set, boolean bind) {
+		PatchProperty offering(boolean set, boolean bind, TypeName type) {
 			return new PatchProperty(method, type, json, doc, navigation, collection, revisions, set, bind);
 		}
 
@@ -687,8 +692,8 @@ public final class ModelGenerator {
 	}
 
 	/**
-	 * What a patch takes for a property: patches for structured values, so nested ones
-	 * are partial too.
+	 * What a write takes for a property: the property's own type, with JSON as any value;
+	 * for a structured value, a placeholder the write plan's type replaces.
 	 */
 	private Optional<TypeName> patchType(CsdlTypeRef ref) {
 		String qualified = metadata.qualify(ref.name());
@@ -705,15 +710,9 @@ public final class ModelGenerator {
 				return t;
 			});
 		}
-		// A nested entity is new, in a deep insert or a collection a PATCH replaces: it's
-		// a
-		// create, where its type has one
-		ClassName patch = creatable(structured.get()) ? createName(structured.get()) : patchName(structured.get());
-		if (!ref.collection()) {
-			return Optional.of(patch);
-		}
-		TypeName element = hierarchies.containsKey(qualified) ? WildcardTypeName.subtypeOf(patch) : patch;
-		return Optional.of(ParameterizedTypeName.get(ClassName.get(List.class), element));
+		// A structured value's setter takes the write type the plan gives it (valueType):
+		// this stands in until a setter is offered
+		return Optional.of(ClassName.get(Object.class));
 	}
 
 	private static ClassName patchName(CsdlStructuredType type) {
@@ -745,6 +744,7 @@ public final class ModelGenerator {
 					name.simpleName() + " is a CSDL type, so its write type needs another name");
 		}
 		CsdlStructuredType root = roots.get(qualified(type));
+		Builders.Builder plan = plan(name);
 		boolean extensible = hierarchies.containsKey(qualified(type));
 		ClassName builder = name.nestedClass("Builder");
 		TypeName valuesType = ParameterizedTypeName.get(ClassName.get(Map.class), ClassName.get(String.class),
@@ -763,7 +763,7 @@ public final class ModelGenerator {
 					: "") + "A write of {@link " + record
 					+ "}: for a {@code PATCH}, only the properties set are sent, an explicit {@code null} included; for a {@code POST}, the new entity's properties, nested patches for deep inserts and {@code @odata.bind} references to existing entities.\n\n<p>\n"
 					+ (root != null ? "Extends {@link " + (create ? createName(root) : patchName(root)).simpleName()
-							+ "} and sends {@code @odata.type} {@code " + typeId(type) + "}. " : "")
+							+ "} and sends {@code @odata.type} {@code " + plan.odataType() + "}. " : "")
 					+ (extensible ? "Each subtype's patch extends this one. " : "")
 					+ "Generated from {@code $metadata}.\n");
 		if (root != null) {
@@ -826,7 +826,7 @@ public final class ModelGenerator {
 		MethodSpec.Builder ctor = MethodSpec.constructorBuilder();
 		if (root != null) {
 			b.superclass((create ? createName(root) : patchName(root)).nestedClass("Builder"));
-			ctor.addStatement("this.values.put($S, $S)", "@odata.type", typeId(type));
+			ctor.addStatement("this.values.put($S, $S)", "@odata.type", plan.odataType());
 			for (PatchProperty inherited : writable(root, type, create)) {
 				addPatchMethods(b, builder, inherited, true);
 			}
@@ -846,7 +846,7 @@ public final class ModelGenerator {
 		for (PatchProperty own : writable(type, type, create)) {
 			addPatchMethods(b, builder, own, false);
 		}
-		if (open(type)) {
+		if (plan.open()) {
 			MethodSpec.Builder dynamic = MethodSpec.methodBuilder("property")
 				.addModifiers(Modifier.PUBLIC)
 				.addParameter(String.class, "name")
@@ -854,7 +854,7 @@ public final class ModelGenerator {
 				.returns(builder)
 				.addJavadoc(
 						"Sets a property {@code $$metadata} doesn't declare, which this open type can have, such as an attribute's value.\n@param name the property's name, as TM1 writes it\n@param value the value; {@code null} sends an explicit {@code null}\n@return this builder\n");
-			if (root != null && open(root)) {
+			if (plan.base() != null && plan(ClassName.get(PACKAGE, plan.base())).open()) {
 				dynamic.addAnnotation(Override.class).addStatement("super.property(name, value)");
 			}
 			else {
@@ -894,9 +894,9 @@ public final class ModelGenerator {
 			// that type's builder, which extends this one's
 			ClassName rootRecord = ClassName.get(PACKAGE, javaTypeName(type.name()));
 			CodeBlock.Builder cases = CodeBlock.builder();
-			for (CsdlStructuredType sub : subtypes.stream().filter(this::creatable).toList()) {
-				cases.beginControlFlow("if (read instanceof $T v)", ClassName.get(PACKAGE, javaTypeName(sub.name())))
-					.addStatement("return $T.builder(v)", createName(sub))
+			for (Builders.Case c : Objects.requireNonNull(plan(name).dispatch())) {
+				cases.beginControlFlow("if (read instanceof $T v)", ClassName.get(PACKAGE, simple(c.type())))
+					.addStatement("return $T.builder(v)", ClassName.get(PACKAGE, c.builder()))
 					.endControlFlow();
 			}
 			cases.addStatement("throw new $T($S + read.getClass().getSimpleName() + $S)",
@@ -916,20 +916,13 @@ public final class ModelGenerator {
 			ClassName rootRecord = ClassName.get(PACKAGE, javaTypeName(type.name()));
 			ClassName fallback = rootRecord.nestedClass(type.isAbstract() ? "Unknown" : "Plain");
 			spec.addMethod(from(type, null, builder, false, fallback));
-			// A subtype without a patch would reach the cast to the fallback below and
-			// fail at run time: refuse it here instead
-			for (CsdlStructuredType sub : subtypes) {
-				if (!sub.isAbstract() && !patchable(sub)) {
-					throw new IllegalStateException(name.simpleName() + " has a subtype without a patch, " + sub.name()
-							+ ", which its of() can't write: offer " + sub.name()
-							+ "Patch, or none of the hierarchy's");
-				}
-			}
-			// instanceof, not a switch on the type: the client is built for Java 17
+			// instanceof, not a switch on the type: the client is built for Java 17. The
+			// plan refuses a subtype without a patch, which would reach the cast to the
+			// fallback below and fail at run time
 			CodeBlock.Builder cases = CodeBlock.builder();
-			for (CsdlStructuredType sub : subtypes.stream().filter(this::patchable).toList()) {
-				cases.beginControlFlow("if (read instanceof $T v)", ClassName.get(PACKAGE, javaTypeName(sub.name())))
-					.addStatement("return $T.builder(v).build()", patchName(sub))
+			for (Builders.Case c : Objects.requireNonNull(plan(name).dispatch())) {
+				cases.beginControlFlow("if (read instanceof $T v)", ClassName.get(PACKAGE, simple(c.type())))
+					.addStatement("return $T.builder(v).build()", ClassName.get(PACKAGE, c.builder()))
 					.endControlFlow();
 			}
 			cases.addStatement("return builder(($T) read).build()", fallback);
@@ -945,33 +938,29 @@ public final class ModelGenerator {
 		return spec;
 	}
 
-	/**
-	 * Whether a type gets a create: the probe has writes for it, or it's the root of a
-	 * hierarchy whose subtype does.
-	 */
+	/** Whether a type gets a create: the write plan has one. */
 	private boolean creatable(CsdlStructuredType type) {
-		if (!(type instanceof CsdlEntityType)) {
-			return false;
-		}
-		if (verifiedOnly()) {
-			return offers.get(type.name() + "Create") != null;
-		}
-		if (writes.get(type.name()) != null) {
-			return true;
-		}
-		List<CsdlStructuredType> subtypes = hierarchies.get(qualified(type));
-		return subtypes != null && subtypes.stream().anyMatch(s -> writes.get(s.name()) != null);
+		return plan().get(createName(type).simpleName()) != null;
+	}
+
+	/** Whether a type gets a patch: the write plan has one. */
+	private boolean patchable(CsdlStructuredType type) {
+		return plan().get(patchName(type).simpleName()) != null;
 	}
 
 	/**
-	 * Whether a type gets a patch: every type does, unless the offers say which (#338).
+	 * The write plan, worked out on first use: what the spec exports as {@code builders},
+	 * from the same inputs.
 	 */
-	private boolean patchable(CsdlStructuredType type) {
-		return !verifiedOnly() || offers.get(type.name() + "Patch") != null;
+	private Builders plan() {
+		if (plan == null) {
+			plan = Builders.of(metadata, overlay, writes, offers);
+		}
+		return plan;
 	}
 
-	private boolean verifiedOnly() {
-		return !offers.builders().isEmpty();
+	private Builders.Builder plan(ClassName write) {
+		return Objects.requireNonNull(plan().get(write.simpleName()), write.simpleName());
 	}
 
 	private static ClassName createName(CsdlStructuredType type) {
@@ -979,68 +968,42 @@ public final class ModelGenerator {
 	}
 
 	/**
-	 * The properties a write type offers: for a create, those a POST of {@code type}
-	 * takes, by the probe's writes (all, for a type with none), and every navigation; for
-	 * a patch, what a PATCH doesn't reject or ignore, navigations included.
+	 * The properties a write of {@code type} offers that {@code level} ({@code type} or
+	 * its root) declares, with the setters the write plan gives each.
 	 */
 	private List<PatchProperty> writable(CsdlStructuredType level, CsdlStructuredType type, boolean create) {
-		if (verifiedOnly()) {
-			Map<String, Offers.Offer> offered = Objects.requireNonNullElse(
-					offers.get(type.name() + (create ? "Create" : "Patch")), Map.<String, Offers.Offer>of());
-			List<PatchProperty> out = new ArrayList<>();
-			for (PatchProperty p : patchProperties(level)) {
-				boolean set = offered.containsKey(p.json());
-				boolean bind = p.navigation() && offered.containsKey(p.json() + "@odata.bind");
-				if (set || bind) {
-					out.add(p.offering(set, bind));
-				}
-			}
-			return out;
+		Builders.Builder write = plan(create ? createName(type) : patchName(type));
+		String declaredOn = qualified(level);
+		List<PatchProperty> out = new ArrayList<>();
+		for (PatchProperty p : patchProperties(level)) {
+			write.setters()
+				.stream()
+				.filter(s -> s.json().equals(p.json()) && s.declaredOn().equals(declaredOn))
+				.findFirst()
+				.ifPresent(s -> out.add(p.offering(s.set(), s.bind(), valueType(s, p))));
 		}
-		return patchProperties(level).stream()
-			.filter(p -> create ? p.navigation() || creates(type, p.json()) : offersInPatch(type, p.json()))
-			.toList();
+		return out;
 	}
 
 	/**
-	 * Whether a patch of {@code type} offers a property: not if a PATCH rejects or
-	 * ignores it, by the probe; for the root of a hierarchy without writes of its own, if
-	 * any probed subtype's patch offers it.
+	 * The type a setter takes: for a structured value, the write type the plan gives it
+	 * (any subtype's welcome in a collection of a root's), else the property's own.
 	 */
-	private boolean offersInPatch(CsdlStructuredType type, String property) {
-		Writes.TypeWrites w = writes.get(type.name());
-		if (w != null) {
-			return w.offersInPatch(property);
+	private TypeName valueType(Builders.Setter s, PatchProperty p) {
+		if (s.value() == null) {
+			return p.type();
 		}
-		List<Writes.TypeWrites> probed = hierarchies.getOrDefault(qualified(type), List.of())
-			.stream()
-			.map(s -> writes.get(s.name()))
-			.filter(Objects::nonNull)
-			.toList();
-		return probed.isEmpty() || probed.stream().allMatch(s -> s.offersInPatch(property));
+		ClassName value = ClassName.get(PACKAGE, s.value());
+		if (!s.collection()) {
+			return value;
+		}
+		boolean root = Objects.requireNonNull(plan().get(s.value())).dispatch() != null;
+		return ParameterizedTypeName.get(ClassName.get(List.class), root ? WildcardTypeName.subtypeOf(value) : value);
 	}
 
-	/**
-	 * Whether a POST of {@code type} takes a property: by its writes; for the root of a
-	 * hierarchy without its own, if every subtype that has writes takes it, so each
-	 * subtype's create offers at least what its root's does.
-	 */
-	private boolean creates(CsdlStructuredType type, String property) {
-		Writes.TypeWrites w = writes.get(type.name());
-		if (w != null) {
-			return w.creates(property);
-		}
-		List<CsdlStructuredType> subtypes = hierarchies.getOrDefault(qualified(type), List.of());
-		return subtypes.stream()
-			.map(s -> writes.get(s.name()))
-			.filter(Objects::nonNull)
-			.allMatch(s -> s.creates(property));
-	}
-
-	/** What a create of {@code type} needs besides its name, by the probe. */
+	/** What a create of {@code type} needs, by the write plan. */
 	private List<String> required(CsdlStructuredType type) {
-		Writes.TypeWrites w = writes.get(type.name());
-		return w == null ? List.of() : w.required();
+		return plan(createName(type)).required();
 	}
 
 	/**
@@ -1056,14 +1019,14 @@ public final class ModelGenerator {
 
 	private MethodSpec from(CsdlStructuredType type, @Nullable CsdlStructuredType root, ClassName builder,
 			boolean create, ClassName record) {
-		Writes.TypeWrites w = writes.get(type.name());
+		Builders.FromRead plan = Objects.requireNonNull(plan(create ? createName(type) : patchName(type)).fromRead());
 		Map<String, String> accessors = new HashMap<>();
 		components(type).forEach(c -> accessors.put(c.json(), c.name()));
-		List<PatchProperty> properties = new ArrayList<>();
+		Map<String, PatchProperty> properties = new HashMap<>();
 		if (root != null) {
-			properties.addAll(writable(root, type, create));
+			writable(root, type, create).forEach(p -> properties.putIfAbsent(p.json(), p));
 		}
-		properties.addAll(writable(type, type, create));
+		writable(type, type, create).forEach(p -> properties.putIfAbsent(p.json(), p));
 		MethodSpec.Builder from = MethodSpec.methodBuilder("builder")
 			.addModifiers(Modifier.PUBLIC, Modifier.STATIC)
 			.addParameter(record, "read")
@@ -1076,28 +1039,19 @@ public final class ModelGenerator {
 							+ (create ? "" : ", nor a collection, which a {@code PATCH} would replace or append to")
 							+ ".\n@param read an entity read from TM1\n@return a builder\n")
 			.addStatement("$T b = new $T()", builder, builder);
-		for (PatchProperty p : properties) {
-			String accessor = accessors.get(p.json());
-			if (p.navigation() || !p.set() || accessor == null || (!create && w != null && !w.patches(p.json()))) {
-				continue;
-			}
-			CodeBlock value = convert(p, "read." + accessor + "()");
-			if (value == null) {
-				continue;
-			}
+		for (Builders.Copy c : plan.copy()) {
+			PatchProperty p = Objects.requireNonNull(properties.get(c.json()), c.json());
+			String accessor = Objects.requireNonNull(accessors.get(c.json()), c.json());
 			from.beginControlFlow("if (read.$L() != null)", accessor)
-				.addStatement("b.$L($L)", p.method(), value)
+				.addStatement("b.$L($L)", p.method(), convert(p, c, "read." + accessor + "()"))
 				.endControlFlow();
 		}
-		for (PatchProperty p : properties) {
-			String accessor = accessors.get(p.json());
-			// A patch from a read binds no collection: sent back, it would replace or
-			// append to what's there, whichever TM1 does for it, on an unrelated change
-			if (p.navigation() && p.bind() && accessor != null && (create || !p.collection())) {
-				readBinding(type, p, accessor).ifPresent(from::addCode);
-			}
+		for (Builders.Binding binding : plan.bindings()) {
+			PatchProperty p = Objects.requireNonNull(properties.get(binding.json()), binding.json());
+			from.addCode(
+					readBinding(binding, p, Objects.requireNonNull(accessors.get(binding.json()), binding.json())));
 		}
-		if (open(type) && accessors.containsKey(DYNAMIC)) {
+		if (plan.undeclared() != null && accessors.containsKey(DYNAMIC)) {
 			// Not nulls, as for declared properties, nor annotations (@odata.etag)
 			from.beginControlFlow("if (read.$L() != null)", accessors.get(DYNAMIC))
 				.beginControlFlow("for (var e : read.$L().entrySet())", accessors.get(DYNAMIC))
@@ -1112,73 +1066,31 @@ public final class ModelGenerator {
 	}
 
 	/**
-	 * The code binding a navigation a read holds: by key for a target in an entity set,
-	 * by {@code UniqueName} for an element or a member; empty for any other (a subset,
-	 * public or private, or a view, whose cube the read doesn't say). A collection is
-	 * bound only when every member's path can be made.
+	 * The code binding a navigation a read holds, as the write plan says: by key, or by
+	 * {@code UniqueName}. A collection is bound only when every member's path can be
+	 * made.
 	 */
-	private Optional<CodeBlock> readBinding(CsdlStructuredType type, PatchProperty p, String accessor) {
-		CsdlNavigationProperty nav = null;
-		for (CsdlStructuredType level : metadata.typeHierarchy(qualified(type))) {
-			for (CsdlNavigationProperty n : level.navigationProperties()) {
-				if (n.name().equals(p.json())) {
-					nav = n;
-				}
-			}
-		}
-		if (nav == null) {
-			return Optional.empty();
-		}
-		Optional<CsdlStructuredType> target = metadata.structuredType(metadata.qualify(nav.type().name()));
-		if (target.isEmpty() || !(target.get() instanceof CsdlEntityType)) {
-			return Optional.empty();
-		}
-		String set = null;
-		List<String> key = List.of();
-		for (CsdlStructuredType level : metadata.typeHierarchy(qualified(target.get()))) {
-			if (level instanceof CsdlEntityType e && !e.key().isEmpty() && key.isEmpty()) {
-				key = e.key();
-			}
-			if (set == null) {
-				String q = qualified(level);
-				set = metadata.entityContainer()
-					.flatMap(c -> c.entitySets()
-						.stream()
-						.filter(s -> metadata.qualify(s.entityType()).equals(q))
-						.map(CsdlEntityContainer.EntitySet::name)
-						.findFirst())
-					.orElse(null);
-			}
-		}
-		String helper;
-		String argument;
-		String collectionName;
-		if (set != null && key.size() == 1) {
-			helper = nav.type().collection() ? "byKeys" : "byKey";
-			argument = componentName(key.get(0));
-			collectionName = set;
-		}
-		else if (target.get().name().equals("Element") || target.get().name().equals("Member")) {
-			helper = nav.type().collection() ? "allInHierarchy" : "inHierarchy";
-			argument = "uniqueName";
-			collectionName = target.get().name() + "s";
-		}
-		else {
-			return Optional.empty();
-		}
-		ClassName path = ODATA_PATH;
+	private CodeBlock readBinding(Builders.Binding binding, PatchProperty p, String accessor) {
+		boolean byKey = switch (binding.by()) {
+			case "key" -> true;
+			case "uniqueName" -> false;
+			default -> throw new IllegalStateException("A binding by " + binding.by() + ": by key or uniqueName");
+		};
+		String helper = byKey ? (binding.collection() ? "byKeys" : "byKey")
+				: (binding.collection() ? "allInHierarchy" : "inHierarchy");
+		String argument = componentName(binding.key());
 		String bind = "bind" + capitalize(p.method());
 		CodeBlock.Builder code = CodeBlock.builder().beginControlFlow("if (read.$L() != null)", accessor);
-		if (nav.type().collection()) {
-			code.addStatement("$T[] targets = ReadBindings.$L($S, read.$L().stream().map(v -> v.$L()).toList())", path,
-					helper, collectionName, accessor, argument);
+		if (binding.collection()) {
+			code.addStatement("$T[] targets = ReadBindings.$L($S, read.$L().stream().map(v -> v.$L()).toList())",
+					ODATA_PATH, helper, binding.set(), accessor, argument);
 		}
 		else {
-			code.addStatement("$T targets = ReadBindings.$L($S, read.$L().$L())", path, helper, collectionName,
+			code.addStatement("$T targets = ReadBindings.$L($S, read.$L().$L())", ODATA_PATH, helper, binding.set(),
 					accessor, argument);
 		}
 		code.beginControlFlow("if (targets != null)").addStatement("b.$L(targets)", bind).endControlFlow();
-		return Optional.of(code.endControlFlow().build());
+		return code.endControlFlow().build();
 	}
 
 	/**
@@ -1305,53 +1217,25 @@ public final class ModelGenerator {
 	}
 
 	/**
-	 * A read value as a write setter takes it, or null when it can't be: structured
-	 * values through their patch's {@code from}, unless their type has subtypes.
+	 * A read value as a write setter takes it, as the write plan says: as read, or
+	 * through the value's write type's {@code builder(read)}, or a root's
+	 * {@code of(read)}.
 	 */
-	private @Nullable CodeBlock convert(PatchProperty p, String value) {
-		TypeName t = p.type();
-		if (t instanceof ParameterizedTypeName list) {
-			TypeName element = list.typeArguments().get(0);
-			if (element instanceof WildcardTypeName w) {
-				element = w.upperBounds().get(0);
-			}
-			if (element.equals(ClassName.get(Object.class))) {
+	private static CodeBlock convert(PatchProperty p, Builders.Copy copy, String value) {
+		if (copy.via() == null) {
+			if (p.type() instanceof ParameterizedTypeName list
+					&& list.typeArguments().get(0).equals(ClassName.get(Object.class))) {
 				return CodeBlock.of("$T.<Object>copyOf($L)", List.class, value);
-			}
-			if (element instanceof ClassName c && isPatch(c)) {
-				if (root(c) && c.simpleName().endsWith("Create")) {
-					return null;
-				}
-				return root(c) ? CodeBlock.of("$L.stream().map(v -> $T.of(v)).toList()", value, c)
-						: CodeBlock.of("$L.stream().map(v -> $T.builder(v).build()).toList()", value, c);
 			}
 			return CodeBlock.of("$L", value);
 		}
-		if (t instanceof ClassName c && isPatch(c)) {
-			if (root(c) && c.simpleName().endsWith("Create")) {
-				return null;
-			}
-			return root(c) ? CodeBlock.of("$T.of($L)", c, value) : CodeBlock.of("$T.builder($L).build()", c, value);
+		ClassName c = ClassName.get(PACKAGE, Objects.requireNonNull(copy.value()));
+		boolean of = copy.via().equals("of");
+		if (p.collection()) {
+			return of ? CodeBlock.of("$L.stream().map(v -> $T.of(v)).toList()", value, c)
+					: CodeBlock.of("$L.stream().map(v -> $T.builder(v).build()).toList()", value, c);
 		}
-		return CodeBlock.of("$L", value);
-	}
-
-	private static boolean isPatch(ClassName c) {
-		return c.packageName().equals(PACKAGE)
-				&& (c.simpleName().endsWith("Patch") || c.simpleName().endsWith("Create"));
-	}
-
-	/**
-	 * Whether a patch has {@code builder(read)}: its type isn't the root of a hierarchy.
-	 */
-	private boolean root(ClassName patch) {
-		String suffix = patch.simpleName().endsWith("Create") ? "Create" : "Patch";
-		String csdl = patch.simpleName().substring(0, patch.simpleName().length() - suffix.length());
-		return metadata.structuredTypes()
-			.filter(t -> javaTypeName(t.name()).equals(csdl))
-			.findFirst()
-			.map(t -> hierarchies.containsKey(qualified(t)))
-			.orElse(false);
+		return of ? CodeBlock.of("$T.of($L)", c, value) : CodeBlock.of("$T.builder($L).build()", c, value);
 	}
 
 	private static void addPatchMethods(TypeSpec.Builder builder, ClassName builderName, PatchProperty property,
@@ -1637,6 +1521,11 @@ public final class ModelGenerator {
 			.filter(s -> s.alias() != null && qualified.equals(s.namespace() + "." + type.name()))
 			.findFirst()
 			.map(s -> "#" + s.alias() + "." + type.name());
+	}
+
+	/** {@code ibm.tm1.api.v1.Cube} → {@code Cube}. */
+	private static String simple(String qualified) {
+		return qualified.substring(qualified.lastIndexOf('.') + 1);
 	}
 
 	private static String capitalize(String text) {

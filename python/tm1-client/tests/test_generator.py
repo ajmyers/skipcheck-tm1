@@ -9,6 +9,8 @@ import re
 import sys
 from pathlib import Path
 
+import pytest
+
 from skipcheck_tm1._generated import aio_api, api
 
 from .conftest import SPEC
@@ -30,6 +32,18 @@ def test_generates_the_same_code_every_time(tmp_path: Path) -> None:
     built = ROOT / "src" / "skipcheck_tm1" / "_generated"
     for name, text in first.items():
         assert (built / name).read_text() == text, f"{name} is stale: reinstall or run tm1_pygen"
+
+
+def test_refuses_a_spec_version_it_doesnt_read(tmp_path: Path) -> None:
+    sys.path.insert(0, str(ROOT / "codegen"))
+    try:
+        from tm1_pygen.spec import Spec
+    finally:
+        sys.path.pop(0)
+    spec = tmp_path / "spec.json"
+    spec.write_text('{"specVersion": 1}', encoding="utf-8")
+    with pytest.raises(ValueError, match="spec version 1; this generator reads 2"):
+        Spec.load(spec)
 
 
 def test_generated_code_starts_with_its_license() -> None:
