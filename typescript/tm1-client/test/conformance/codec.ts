@@ -18,32 +18,79 @@ export const SPEC_VERSION = 1;
 const HEADERS = new Set(["accept", "content-type", "if-match", "if-none-match", "odata-version", "odata-maxversion", "prefer"]);
 
 const BIND = "@odata.bind";
-const plan = (JSON.parse(readFileSync(Repo.spec, "utf8")) as { builders: Record<string, { setters: { json: string; value: string | null }[] }> }).builders;
 type Builder = Record<string, (...args: unknown[]) => unknown> & { build(): unknown };
 const settersOf = new Map<unknown, Map<string, string>>();
 
+const spec = JSON.parse(readFileSync(Repo.spec, "utf8")) as {
+  builders: Record<string, { odataType: string | null; setters: { json: string; collection: boolean; value: string | null }[] }>;
+  types: {
+    name: string;
+    qualifiedName: string;
+    baseType: string | null;
+    properties?: { name: string; type: string }[];
+    navigationProperties?: { name: string; type: string }[];
+  }[];
+  enums: { qualifiedName: string; name: string; flags: boolean; members: { name: string }[] }[];
+};
+const types = new Map(spec.types.map((t) => [t.qualifiedName, t]));
+const enums = new Map(spec.enums.map((e) => [e.qualifiedName, e]));
+
 /** A write as the generated builder makes it, as the Java runner's PatchBuilders: each key by the
  * setter that writes it, a nested write type's value by its own builder (a root's by the subtype its
- * `@odata.type` names), a binding by the bind setter (its path decoded, so the setter encodes it
- * once), an open type's undeclared key by `property`. A key no setter writes is refused: a caller
- * can't send it, so neither can a scenario. */
-export function build(type: any, values: Record<string, Json>): unknown {
+ * `@odata.type` names), a binding by the bind setter from the path as written (already encoded, as
+ * TM1 gets it), an open type's undeclared key by `property`. Refused, as a caller couldn't send
+ * them: a key no setter writes (a declared one included, on an open type too), an enum value TM1
+ * doesn't have, a binding of the wrong shape, an `@odata.type` the write type doesn't send. */
+export function build(type: any, values: Json): unknown {
+  if (values === null || typeof values !== "object" || Array.isArray(values)) throw new Error(`A ${type.name} is an object, not ${JSON.stringify(values)}`);
   const write = subtype(type, values);
   const b = write.builder() as Builder;
   const setters = settersFor(write);
-  const values_ = new Map(plan[write.name]!.setters.map((s) => [s.json, s.value]));
+  const plan = spec.builders[write.name]!;
+  const byJson = new Map(plan.setters.map((s) => [s.json, s]));
+  const declared = declaredOf(write.name);
   for (const [key, value] of Object.entries(values)) {
-    if (key === "@odata.type") continue; // the builder sends its own; the subtype was picked by it
+    if (key === "@odata.type") {
+      // The builder sends its own, which must be this one
+      if (plan.odataType !== value) throw new Error(`${write.name} doesn't send @odata.type ${String(value)}`);
+      continue;
+    }
     const setter = setters.get(key);
     if (setter !== undefined) {
       if (key.endsWith(BIND)) {
-        if (Array.isArray(value)) b[setter]!(...value.map((p) => path(p as string)));
-        else b[setter]!(path(value as string));
-      } else b[setter]!(nested(values_.get(key) ?? null, value));
-    } else if (!key.startsWith("@") && typeof b["property"] === "function") b["property"](key, value);
+        if (byJson.get(key.slice(0, -BIND.length))!.collection) {
+          if (!Array.isArray(value)) throw new Error(`${setter} binds a list of paths, not ${JSON.stringify(value)}`);
+          b[setter]!(...value.map((p) => path(setter, p)));
+        } else b[setter]!(path(setter, value));
+      } else {
+        check(declared.get(key), value);
+        b[setter]!(nested(byJson.get(key)?.value ?? null, value));
+      }
+    } else if (!key.startsWith("@") && typeof b["property"] === "function" && !declared.has(key)) b["property"](key, value);
     else throw new Error(`${write.name} has no setter for ${key}`);
   }
   return b.build();
+}
+
+/** The properties and navigations a write's type declares, its base's too, by name. */
+function declaredOf(write: string): Map<string, { name: string; type: string }> {
+  const name = write.replace(/(Create|Patch)$/, "");
+  const out = new Map<string, { name: string; type: string }>();
+  for (let level = spec.types.find((t) => t.name === name); level; level = level.baseType ? types.get(level.baseType) : undefined)
+    for (const p of [...(level.properties ?? []), ...(level.navigationProperties ?? [])]) if (!out.has(p.name)) out.set(p.name, p);
+  return out;
+}
+
+/** An enum's value must be one TM1 has, as the typed clients refuse what doesn't read back. */
+function check(prop: { type: string } | undefined, value: Json): void {
+  const e = prop && enums.get(prop.type);
+  if (!e || value === null) return;
+  const members = new Set(e.members.map((m) => m.name));
+  for (const v of Array.isArray(value) ? value : [value]) {
+    const parts = e.flags && typeof v === "string" ? v.split(",").map((s) => s.trim()) : [v];
+    if (parts.some((part) => typeof part !== "string" || !members.has(part)))
+      throw new Error(`${JSON.stringify(v)} doesn't read back as written: ${e.name} has no such member`);
+  }
 }
 
 function subtype(type: any, values: Record<string, Json>): any {
@@ -58,11 +105,16 @@ function subtype(type: any, values: Record<string, Json>): any {
 function nested(write: string | null, value: Json): unknown {
   if (value === null || write === null) return value;
   const type = (Patches as Record<string, any>)[write];
-  return Array.isArray(value) ? value.map((v) => build(type, v as Record<string, Json>)) : build(type, value as Record<string, Json>);
+  return Array.isArray(value) ? value.map((v) => build(type, v)) : build(type, value);
 }
 
-/** A binding's path, which the JSON holds as sent, percent-encoded. */
-const path = (encoded: string): ODataPath => ODataPath.link(decodeURIComponent(encoded));
+/** A binding's path as written, already encoded, as TM1 gets it: its segments taken as they are, so a
+ * key's `%2F` stays one, and the bind setter writes it back the same. */
+function path(setter: string, encoded: Json): ODataPath {
+  if (typeof encoded !== "string") throw new Error(`${setter} binds a path, not ${JSON.stringify(encoded)}`);
+  const make = ODataPath as unknown as new (segments: readonly string[]) => ODataPath;
+  return new make(encoded.split("/"));
+}
 
 /** The builder's setters, by the JSON name each writes: each called once on a fresh builder, with its
  * `set`, `bind` and `bindAll` watched, as the builder manifest finds them. */
