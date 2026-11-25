@@ -1,0 +1,13 @@
+# Writes the probe found TM1 applies that no client's builders can send, each with why after ': '
+# (#354): Builder Path. ProbedWritesCoverageTest holds every other applied write to a live scenario,
+# and fails until a write listed here can be sent (then it must be), or one no builder can send is
+# listed.
+
+AnnotationCreate Attachments: no write type for an attachment: the probe has no write case for one, so nothing verifies what a nested attachment applies, and the create offers no setter for it
+GroupPatch Users: a group PATCH with Users replaces them, removing the users it doesn't list; the overlay withholds it, and a user's groups are set from the user's side (UserService.setGroups)
+GroupPatch Users@odata.bind: as GroupPatch Users, bound
+HierarchyPatch Edges: a hierarchy PATCH with Edges replaces them; the overlay withholds it, and HierarchyService.replaceStructure sends them with the elements
+HierarchyPatch Elements: a hierarchy PATCH with Elements replaces them; the overlay withholds it, and HierarchyService.replaceStructure sends them with the edges
+SubsetPatch Elements@odata.bind: a subset PATCH binding Elements appends to them, and binding reads as "set to", so the patch doesn't offer it (Offers); SubsetService.addElements sends it
+UserPatch Groups: a user PATCH with Groups replaces them; the overlay withholds it, and UserService.setGroups binds them
+UserPatch Groups@odata.bind: as UserPatch Groups, bound
