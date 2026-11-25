@@ -9,8 +9,10 @@ from __future__ import annotations
 import base64
 import datetime as dt
 import enum
+import inspect
 import json
 import re
+from pathlib import Path
 from typing import Any
 
 import pydantic
@@ -26,6 +28,80 @@ SPEC_VERSION = 1
 
 # The request headers fixtures record: as ConformanceTm1.HEADERS, plus TM1-* but the session's own
 HEADERS = {"accept", "content-type", "if-match", "if-none-match", "odata-version", "odata-maxversion", "prefer"}
+
+
+_PLAN: dict[str, Any] = json.loads((Path(__file__).resolve().parents[4] / "spec" / "tm1-api.json").read_text(encoding="utf-8"))["builders"]
+_SETTERS: dict[type, dict[str, Any]] = {}
+
+
+def build(cls: Any, values: dict[str, Any]) -> Any:
+    """A write as the generated builder makes it, as the Java runner's PatchBuilders: each key by the
+    setter that writes it, a nested write type's value by its own builder (a root's by the subtype its
+    ``@odata.type`` names), a binding by the bind setter, an open type's undeclared key by
+    ``property``. A key no setter writes is refused: a caller can't send it, so neither can a scenario."""
+    cls = _subtype(cls, values)
+    builder = cls.builder()
+    setters = _setters(cls)
+    plan = {s["json"]: s for s in _PLAN[cls.__name__]["setters"]}
+    for key, v in values.items():
+        if key == "@odata.type":
+            continue  # the builder sends its own; the subtype was picked by it
+        setter = setters.get(key)
+        if setter is not None:
+            if key.endswith("@odata.bind"):
+                # As sent, already encoded: Python's bind setters take a path's text as it is
+                getattr(builder, setter)(*v) if isinstance(v, list) else getattr(builder, setter)(v)
+            else:
+                getattr(builder, setter)(_value(plan[key]["value"], v))
+        elif not key.startswith("@") and hasattr(builder, "property"):
+            builder.property(key, v)
+        else:
+            raise ValueError(f"{cls.__name__} has no setter for {key}")
+    return builder.build()
+
+
+def _subtype(cls: Any, values: dict[str, Any]) -> Any:
+    odata_type = values.get("@odata.type")
+    if not isinstance(odata_type, str):
+        return cls
+    suffix = "Create" if cls.__name__.endswith("Create") else "Patch"
+    sub = getattr(p, odata_type.rsplit(".", 1)[-1] + suffix, None)
+    if sub is None or not issubclass(sub, cls):
+        raise ValueError(f"no write type for {odata_type} that is a {cls.__name__}")
+    return sub
+
+
+def _value(write: str | None, v: Any) -> Any:
+    if v is None or write is None:
+        return v
+    if isinstance(v, list):
+        return [build(getattr(p, write), item) for item in v]
+    return build(getattr(p, write), v)
+
+
+def _setters(cls: Any) -> dict[str, str]:
+    """The builder's setters, by the JSON name each writes: each called once on a fresh builder."""
+    if cls not in _SETTERS:
+        base = dict(cls.builder()._values)
+        out: dict[str, str] = {}
+        for name in dir(cls.builder()):
+            if name.startswith("_") or name in ("build", "property"):
+                continue
+            fresh = cls.builder()
+            method = getattr(fresh, name)
+            if not callable(method):
+                continue
+            params = list(inspect.signature(method).parameters.values())
+            if params and params[0].kind is inspect.Parameter.VAR_POSITIONAL:
+                method()
+            else:
+                method("x" if name.startswith("bind_") else None)
+            wrote = [k for k in fresh._values if k not in base]
+            if len(wrote) != 1:
+                raise ValueError(f"{cls.__name__}.Builder.{name} writes {wrote}")
+            out[wrote[0]] = name
+        _SETTERS[cls] = out
+    return _SETTERS[cls]
 
 
 class Unknown(Exception):
@@ -65,7 +141,8 @@ def decode(value: Any) -> Any:
         cls = getattr(p, value["$patch"], None)
         if cls is None:
             raise Unknown(f"no patch {value['$patch']}")
-        return cls(dict(value["json"]))
+        # Through the generated setters, as a caller makes one (#354)
+        return build(cls, value["json"])
     if tag == "$model":
         cls = getattr(m, value["$model"], None)
         if cls is None:
