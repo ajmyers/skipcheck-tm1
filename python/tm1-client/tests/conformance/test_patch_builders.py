@@ -50,11 +50,17 @@ def test_refuses_a_declared_key_no_setter_writes_on_an_open_type() -> None:
     # NativeView is open, but declares Name, which its patch doesn't offer
     with pytest.raises(ValueError, match="NativeViewPatch has no setter for Name"):
         build(p.NativeViewPatch, {"@odata.type": "#ibm.tm1.api.v1.NativeView", "Name": "renamed"})
+    # Nor a declared navigation's binding
+    with pytest.raises(ValueError, match="NativeViewPatch has no setter for Cube@odata.bind"):
+        build(p.NativeViewPatch, {"@odata.type": "#ibm.tm1.api.v1.NativeView", "Cube@odata.bind": "Cubes('x')"})
 
 
 def test_refuses_a_value_that_doesnt_read_back_as_written() -> None:
     with pytest.raises(ValueError, match="doesn't read back as written"):
         build(p.ChoreCreate, {"Name": "c", "ExecutionMode": "Nope"})
+    # A flags enum's members are checked by the spec
+    with pytest.raises(ValueError, match="doesn't read back as written"):
+        build(p.NetworkSettingsPatch, {"IPVersion": "Nope"})
     with pytest.raises(ValueError, match="doesn't send @odata.type"):
         build(p.CubeCreate, {"@odata.type": "#ibm.tm1.api.v1.Cube", "Name": "c"})
 
@@ -62,3 +68,18 @@ def test_refuses_a_value_that_doesnt_read_back_as_written() -> None:
 def test_keeps_a_date_times_offset() -> None:
     built = build(p.ChoreCreate, {"Name": "c", "StartTime": "2026-03-04T05:06:07.5+02:00"})
     assert built.json()["StartTime"] == "2026-03-04T05:06:07.5+02:00"
+
+
+def test_refuses_a_binding_path_that_isnt_encoded() -> None:
+    # As written, it goes out as it is: so it must be as TM1 gets it, as a caller's path is
+    for path in ("Dimensions('a b')", "Dimensions('100%')", "ApplicationContextFacets('}Cubes')"):
+        with pytest.raises(ValueError, match="isn't encoded as TM1 gets it"):
+            build(p.CubeCreate, {"Name": "c", "Dimensions@odata.bind": [path]})
+
+
+def test_refuses_a_value_of_the_wrong_shape() -> None:
+    # One value where the setter takes a list, and a list where it takes one
+    with pytest.raises(ValueError, match="takes a list"):
+        build(p.AnnotationCreate, {"Text": "t", "ApplicationContext": {"Value": "x"}})
+    with pytest.raises(ValueError, match="takes one value"):
+        build(p.ChoreCreate, {"Name": "c", "ExecutionMode": ["SingleCommit"]})

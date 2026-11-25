@@ -54,7 +54,7 @@ def build(cls: Any, values: Any) -> Any:
     for key, v in values.items():
         if key == "@odata.type":
             # The builder sends its own, which must be this one
-            if builder._values.get("@odata.type") != v:
+            if not isinstance(v, str) or builder._values.get("@odata.type") != v:
                 raise ValueError(f"{cls.__name__} doesn't send @odata.type {v}")
             continue
         setter = setters.get(key)
@@ -68,18 +68,28 @@ def build(cls: Any, values: Any) -> Any:
                 else:
                     getattr(builder, setter)(_path(setter, v))
             else:
+                if v is not None and plan[key]["collection"] != isinstance(v, list):
+                    takes = "a list" if plan[key]["collection"] else "one value"
+                    raise ValueError(f"{cls.__name__}.{key} takes {takes}, not {v!r}")
                 _check(declared.get(key), v)
                 getattr(builder, setter)(_value(plan[key]["value"], v))
-        elif not key.startswith("@") and hasattr(builder, "property") and key not in declared:
+        elif not key.startswith("@") and hasattr(builder, "property") and key.removesuffix("@odata.bind") not in declared:
             builder.property(key, v)
         else:
             raise ValueError(f"{cls.__name__} has no setter for {key}")
     return builder.build()
 
 
+# A path segment encoded as a client encodes one: unreserved characters, or a %XX
+_ENCODED = re.compile(r"([A-Za-z0-9\-._~'()=,@$!]|%[0-9A-F]{2})*")
+
+
 def _path(setter: str, path: Any) -> str:
     if not isinstance(path, str):
         raise ValueError(f"{setter} binds a path, not {path!r}")
+    for segment in path.split("/"):
+        if not _ENCODED.fullmatch(segment):
+            raise ValueError(f"{path!r} isn't encoded as TM1 gets it: {segment}")
     return path
 
 
@@ -102,8 +112,8 @@ def _check(prop: Any, v: Any) -> None:
     enum = _ENUMS[prop["type"]]
     members = {m["name"] for m in enum["members"]}
     for value in v if isinstance(v, list) else [v]:
-        parts = value.split(",") if enum["flags"] and isinstance(value, str) else [value]
-        if any(part.strip() not in members for part in parts):
+        parts = [] if not isinstance(value, str) else [s.strip() for s in value.split(",")] if enum["flags"] else [value]
+        if not parts or any(part not in members for part in parts):
             raise ValueError(f"{value!r} doesn't read back as written: {enum['name']} has no such member")
 
 
