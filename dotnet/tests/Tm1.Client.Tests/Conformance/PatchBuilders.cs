@@ -31,7 +31,20 @@ internal static class PatchBuilders
 {
     private static readonly ConcurrentDictionary<Type, Dictionary<string, MethodInfo>> SettersOf = new();
 
-    private static readonly JsonArray Types = JsonNode.Parse(File.ReadAllText(Repo.Spec))!["types"]!.AsArray();
+    private const string BindSuffix = "@odata.bind";
+
+    private static readonly JsonNode Spec = JsonNode.Parse(File.ReadAllText(Repo.Spec))!;
+
+    private static readonly Dictionary<string, JsonNode> Types = Spec["types"]!.AsArray().ToDictionary(t => t!["qualifiedName"]!.GetValue<string>(), t => t!);
+
+    private static readonly Dictionary<string, JsonNode> Enums = Spec["enums"]!.AsArray().ToDictionary(e => e!["qualifiedName"]!.GetValue<string>(), e => e!);
+
+    private static readonly JsonObject Builders = Spec["builders"]!.AsObject();
+
+    private static readonly ConcurrentDictionary<Type, Dictionary<string, JsonNode>> DeclaredOf = new();
+
+    /// <summary>A path segment encoded as a client encodes one: unreserved characters, or a %XX.</summary>
+    private static readonly Regex Encoded = new("^([A-Za-z0-9\\-._~'()=,@$!]|%[0-9A-F]{2})*$");
 
     internal static object Build(Type patch, JsonObject json)
     {
@@ -43,7 +56,12 @@ internal static class PatchBuilders
             if (key == "@odata.type")
             {
                 // The builder sends its own, which must be this one
-                if (!Values(builder).TryGetValue("@odata.type", out var own) || own?.ToString() != value?.ToString())
+                if (
+                    value is not JsonValue id
+                    || id.GetValueKind() != JsonValueKind.String
+                    || !Values(builder).TryGetValue("@odata.type", out var own)
+                    || own?.ToString() != id.GetValue<string>()
+                )
                 {
                     throw new ArgumentException($"{type.Name} doesn't send @odata.type {value}");
                 }
@@ -51,11 +69,15 @@ internal static class PatchBuilders
             }
             if (setters.TryGetValue(key, out var setter))
             {
+                if (!key.EndsWith(BindSuffix, StringComparison.Ordinal))
+                {
+                    Check(type, key, value);
+                }
                 Invoke(setter, builder, Argument(setter, value));
             }
             else if (
                 !key.StartsWith('@')
-                && !Declared(type).Contains(key)
+                && !Declared(type).ContainsKey(key.EndsWith(BindSuffix, StringComparison.Ordinal) ? key[..^BindSuffix.Length] : key)
                 && builder.GetType().GetMethod("Property", [typeof(string), typeof(object)]) is { } property
             )
             {
@@ -111,26 +133,68 @@ internal static class PatchBuilders
         {
             throw new ArgumentException($"{setter.Name} binds a path, not {value?.ToJsonString() ?? "null"}");
         }
+        foreach (var segment in v.GetValue<string>().Split('/'))
+        {
+            if (!Encoded.IsMatch(segment))
+            {
+                throw new ArgumentException($"{v.GetValue<string>()} isn't encoded as TM1 gets it: {segment}");
+            }
+        }
         var make = typeof(ODataPath).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, [typeof(IReadOnlyList<string>)])!;
         return (ODataPath)make.Invoke([v.GetValue<string>().Split('/').ToList()]);
     }
 
-    /// <summary>The names a write's type declares, its base's too, from the spec.</summary>
-    private static HashSet<string> Declared(Type write)
+    /// <summary>
+    /// A value's shape and, for an enum, its members, by the spec, as every runner checks them: one value
+    /// or a list, as the plan's setter takes; an enum's value one TM1 has (a flags enum's, each of its
+    /// comma-separated members), which the setter of a flags enum, taking text, wouldn't check.
+    /// </summary>
+    private static void Check(Type write, string key, JsonNode? value)
     {
-        var name = write.Name.EndsWith("Create", StringComparison.Ordinal) ? write.Name[..^"Create".Length] : write.Name[..^"Patch".Length];
-        var byName = Types.ToDictionary(t => t!["qualifiedName"]!.GetValue<string>(), t => t!);
-        var found = new HashSet<string>();
-        for (var level = Types.FirstOrDefault(t => t!["name"]!.GetValue<string>() == name); level is not null; )
+        if (value is null)
         {
-            foreach (var p in level["properties"]!.AsArray().Concat(level["navigationProperties"]!.AsArray()))
-            {
-                found.Add(p!["name"]!.GetValue<string>());
-            }
-            level = level["baseType"] is JsonValue b && b.GetValueKind() == JsonValueKind.String ? byName[b.GetValue<string>()] : null;
+            return;
         }
-        return found;
+        var setter = Builders[write.Name]!["setters"]!.AsArray().FirstOrDefault(s => s!["json"]!.GetValue<string>() == key);
+        if (setter is not null && setter["collection"]!.GetValue<bool>() != value is JsonArray)
+        {
+            var takes = setter["collection"]!.GetValue<bool>() ? "a list" : "one value";
+            throw new ArgumentException($"{write.Name}.{key} takes {takes}, not {value.ToJsonString()}");
+        }
+        if (!Declared(write).TryGetValue(key, out var property) || !Enums.TryGetValue(property["type"]!.GetValue<string>(), out var enumType))
+        {
+            return;
+        }
+        var members = enumType["members"]!.AsArray().Select(m => m!["name"]!.GetValue<string>()).ToHashSet();
+        foreach (var v in value is JsonArray a ? a.ToList() : [value])
+        {
+            var text = v is JsonValue s && s.GetValueKind() == JsonValueKind.String ? s.GetValue<string>() : null;
+            var parts =
+                text is null ? []
+                : enumType["flags"]!.GetValue<bool>() ? text.Split(',').Select(p => p.Trim()).ToList()
+                : [text];
+            if (parts.Count == 0 || !parts.All(members.Contains))
+            {
+                throw new ArgumentException($"{v?.ToJsonString()} doesn't read back as written: {enumType["name"]} has no such member");
+            }
+        }
     }
+
+    /// <summary>The properties and navigations a write's type declares, its base's too, by name, from the spec.</summary>
+    private static Dictionary<string, JsonNode> Declared(Type write) => DeclaredOf.GetOrAdd(write, w =>
+        {
+            var name = w.Name.EndsWith("Create", StringComparison.Ordinal) ? w.Name[..^"Create".Length] : w.Name[..^"Patch".Length];
+            var found = new Dictionary<string, JsonNode>();
+            for (var level = Types.Values.FirstOrDefault(t => t["name"]!.GetValue<string>() == name); level is not null; )
+            {
+                foreach (var p in level["properties"]!.AsArray().Concat(level["navigationProperties"]!.AsArray()))
+                {
+                    found.TryAdd(p!["name"]!.GetValue<string>(), p);
+                }
+                level = level["baseType"] is JsonValue b && b.GetValueKind() == JsonValueKind.String ? Types[b.GetValue<string>()] : null;
+            }
+            return found;
+        });
 
     private static object? Value(Type type, JsonNode? value)
     {
@@ -146,7 +210,11 @@ internal static class PatchBuilders
         {
             var element = type.GetGenericArguments()[0];
             var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(element))!;
-            foreach (var item in value.AsArray())
+            if (value is not JsonArray items)
+            {
+                throw new ArgumentException($"A list of {element.Name} is a list, not {value.ToJsonString()}");
+            }
+            foreach (var item in items)
             {
                 list.Add(Build(element, Object(element, item)));
             }

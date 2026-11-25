@@ -72,6 +72,11 @@ public class PatchBuildersTests
             PatchBuilders.Build(typeof(NativeViewPatch), Json("""{"@odata.type": "#ibm.tm1.api.v1.NativeView", "Name": "renamed"}"""))
         );
         Assert.Equal("NativeViewPatch has no setter for Name", e.Message);
+        // Nor a declared navigation's binding
+        var bound = Assert.Throws<ArgumentException>(() =>
+            PatchBuilders.Build(typeof(NativeViewPatch), Json("""{"@odata.type": "#ibm.tm1.api.v1.NativeView", "Cube@odata.bind": "Cubes('x')"}"""))
+        );
+        Assert.Equal("NativeViewPatch has no setter for Cube@odata.bind", bound.Message);
     }
 
     [Fact]
@@ -79,6 +84,9 @@ public class PatchBuildersTests
     {
         var mode = Assert.Throws<ArgumentException>(() => PatchBuilders.Build(typeof(ChoreCreate), Json("""{"Name": "c", "ExecutionMode": "Nope"}""")));
         Assert.Contains("doesn't read back as written", mode.Message, StringComparison.Ordinal);
+        // A flags enum's setter takes text, so its members are checked by the spec
+        var flags = Assert.Throws<ArgumentException>(() => PatchBuilders.Build(typeof(NetworkSettingsPatch), Json("""{"IPVersion": "Nope"}""")));
+        Assert.Contains("doesn't read back as written", flags.Message, StringComparison.Ordinal);
         var type = Assert.Throws<ArgumentException>(() =>
             PatchBuilders.Build(typeof(CubeCreate), Json("""{"@odata.type": "#ibm.tm1.api.v1.Cube", "Name": "c"}"""))
         );
@@ -90,5 +98,31 @@ public class PatchBuildersTests
     {
         var built = PatchBuilders.Build(typeof(ChoreCreate), Json("""{"Name": "c", "StartTime": "2026-03-04T05:06:07.5+02:00"}"""));
         Assert.Equal("2026-03-04T05:06:07.5+02:00", Sent(built)["StartTime"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void RefusesABindingPathThatIsntEncoded()
+    {
+        // As written, it goes out as it is: so it must be as TM1 gets it, as a caller's path is
+        foreach (var path in new[] { "Dimensions('a b')", "Dimensions('100%')", "ApplicationContextFacets('}Cubes')" })
+        {
+            var json = new JsonObject { ["Name"] = "c", ["Dimensions@odata.bind"] = new JsonArray(path) };
+            var e = Assert.Throws<ArgumentException>(() => PatchBuilders.Build(typeof(CubeCreate), json));
+            Assert.Contains("isn't encoded as TM1 gets it", e.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void RefusesAValueOfTheWrongShape()
+    {
+        // One value where the setter takes a list, and a list where it takes one
+        var list = Assert.Throws<ArgumentException>(() =>
+            PatchBuilders.Build(typeof(AnnotationCreate), Json("""{"Text": "t", "ApplicationContext": {"Value": "x"}}"""))
+        );
+        Assert.Contains("takes a list", list.Message, StringComparison.Ordinal);
+        var one = Assert.Throws<ArgumentException>(() =>
+            PatchBuilders.Build(typeof(ChoreCreate), Json("""{"Name": "c", "ExecutionMode": ["SingleCommit"]}"""))
+        );
+        Assert.Contains("takes one value", one.Message, StringComparison.Ordinal);
     }
 }
