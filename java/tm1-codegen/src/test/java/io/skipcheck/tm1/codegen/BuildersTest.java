@@ -210,6 +210,22 @@ class BuildersTest {
 	}
 
 	@Test
+	void aPatchCopiesASetterTheOverlayKeepsThoughThePatchIsUntested() {
+		Writes writes = Writes.read("""
+				{"writes": {"Cube": {"type": "Cube", "post": {}, "patch": {"Rules": {"outcome": "untested"}}}}}""");
+		Map<String, Map<String, Offers.Offer>> offers = new HashMap<>(OFFERS);
+		offers.put("CubePatch", Map.of("Rules", new Offers.Offer("unverified", "the probe can't try it")));
+		Builders plan = Builders.of(METADATA, Overlay.NONE, writes, new Offers(offers));
+		assertThat(plan.get("CubePatch").fromRead().copy()).as("as ServerSettingsPatch's EncryptionAtRest (#358)")
+			.containsExactly(new Builders.Copy("Rules", null, null));
+		// What a PATCH ignores isn't
+		Writes ignored = Writes.read("""
+				{"writes": {"Cube": {"type": "Cube", "post": {}, "patch": {"Rules": {"outcome": "ignored"}}}}}""");
+		assertThat(Builders.of(METADATA, Overlay.NONE, ignored, new Offers(offers)).get("CubePatch").fromRead().copy())
+			.isEmpty();
+	}
+
+	@Test
 	void withoutOffersPlansNoWriteTypes() {
 		assertThat(Builders.of(METADATA, Overlay.NONE, WRITES, Offers.NONE).builders()).isEmpty();
 	}

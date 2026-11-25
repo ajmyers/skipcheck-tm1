@@ -62,6 +62,13 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 		 * wasn't probed), and isn't a collection a PATCH appends to (copying one would
 		 * add its members again). A collection a PATCH replaces is copied: the read holds
 		 * all of it.
+		 * <p>
+		 * An {@code untested} outcome counts, so a setter offered only because the
+		 * overlay keeps it is copied too: {@code ServerSettingsPatch}'s
+		 * {@code EncryptionAtRest}, which the probe can't PATCH without a key store. It's
+		 * the only copy through a root's {@code of(read)}, the dispatch
+		 * {@code writes.json} checks every client against; leaving it out would leave
+		 * that untested (#358). Revisit when the probe can verify it.
 		 * @param property the property's name
 		 * @return whether a patch made from a read copies it
 		 */
