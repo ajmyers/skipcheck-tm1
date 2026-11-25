@@ -80,8 +80,9 @@ export class HierarchyService extends Tm1Service {
    * ignores `Visible`. With `etag` (`hierarchy["@odata.etag"]`, from a read), sent as `If-Match`:
    * only if the hierarchy hasn't changed since, else a `Tm1PreconditionFailedException`.
    *
-   * Throws a `RangeError` at once if the patch sets `Elements` or `Edges` (or binds them), which
-   * would replace them: use {@link replaceStructure}. */
+   * Its elements and edges are {@link replaceStructure}'s: a PATCH with them replaces them, so
+   * `HierarchyPatch` has no setter for them. A JavaScript caller's patch with them (no compiler to
+   * refuse it) throws a `RangeError` at once. */
   update(dimension: string, hierarchy: string, patch: HierarchyPatch, etag?: string | null, options?: Tm1CallOptions): Promise<void> {
     const request = Tm1Request.patch(hierarchyPath(dimension, hierarchy), withoutStructure(required(patch, "patch")));
     return this.session.execute(etag == null ? request : request.ifMatch(etag), options);
@@ -96,8 +97,9 @@ export class HierarchyService extends Tm1Service {
     edges: readonly EdgeCreate[],
     options?: Tm1CallOptions,
   ): Promise<void> {
-    const patch = HierarchyPatch.builder().elements(required(elements, "elements")).edges(required(edges, "edges")).build();
-    return this.session.execute(Tm1Request.patch(hierarchyPath(dimension, hierarchy), patch), options);
+    // Not a HierarchyPatch, which offers neither, so update can't do this by accident
+    const body = { Elements: [...required(elements, "elements")], Edges: [...required(edges, "edges")] };
+    return this.session.execute(Tm1Request.patch(hierarchyPath(dimension, hierarchy), body), options);
   }
 
   /** `DELETE Dimensions('d')/Hierarchies('h')`. */

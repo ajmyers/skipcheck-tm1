@@ -63,7 +63,10 @@ describe("UserService and GroupService on TM1" + liveReason, () => {
     expect((await tm1.groups.users(g2).toArray()).map((u) => u.Name)).toEqual([user]);
     expect((await tm1.groups.get(g1)).Name, "left, not deleted").toBe(g1);
 
-    expect(() => tm1.users.update(user, UserPatch.builder().bindGroups(ODataPath.of("Groups").key(g1)).build())).toThrow(/setGroups/);
+    // UserPatch offers no Groups; a JavaScript caller's patch with them is refused, sending nothing
+    expect("bindGroups" in UserPatch.builder()).toBe(false);
+    const bound = UserCreate.builder().bindGroups(ODataPath.of("Groups").key(g1)).build() as unknown as UserPatch;
+    expect(() => tm1.users.update(user, bound)).toThrow(/setGroups/);
   });
 
   tm1Test("deletes the group itself on a reference delete", async () => {

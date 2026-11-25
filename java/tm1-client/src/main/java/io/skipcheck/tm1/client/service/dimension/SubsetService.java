@@ -31,9 +31,9 @@ import reactor.core.publisher.Mono;
  *
  * <p>
  * A static subset lists its elements; a dynamic one has an MDX {@code Expression}.
- * Binding {@code Elements} in a subset PATCH <em>appends</em> to them, so {@link #update}
- * refuses it: {@link #addElements} appends by name and {@link #clearElements} empties the
- * list.
+ * Binding {@code Elements} in a subset PATCH <em>appends</em> to them, so a subset's
+ * patch has no setter for them: {@link #addElements} appends by name and
+ * {@link #clearElements} empties the list.
  *
  * <p>
  * Create a static subset, binding its elements:
@@ -120,16 +120,16 @@ public final class SubsetService {
 	 * @param hierarchy the hierarchy's name
 	 * @param scope where the subset is
 	 * @param subset the subset's name
-	 * @param patch the changes, without {@code Elements}
+	 * @param patch the changes; its elements are {@link #addElements}' and
+	 * {@link #clearElements}'
 	 * @return completes when the subset is changed
-	 * @throws IllegalArgumentException if the patch sets or binds {@code Elements}, which
-	 * TM1 appends: use {@link #addElements} or {@link #clearElements}
 	 */
 	@Tm1Endpoint("Navigation Hierarchy/Subsets")
 	@Tm1Endpoint("Navigation Hierarchy/PrivateSubsets")
 	@Tm1Endpoint("Navigation Hierarchy/SessionSubsets")
 	public Mono<Void> update(String dimension, String hierarchy, SubsetScope scope, String subset, SubsetPatch patch) {
-		return session.execute(Tm1Request.patch(subset(dimension, hierarchy, scope, subset), withoutElements(patch)));
+		return session.execute(
+				Tm1Request.patch(subset(dimension, hierarchy, scope, subset), Objects.requireNonNull(patch, "patch")));
 	}
 
 	/**
@@ -138,11 +138,11 @@ public final class SubsetService {
 	 * @param hierarchy the hierarchy's name
 	 * @param scope where the subset is
 	 * @param subset the subset's name
-	 * @param patch the changes, without {@code Elements}
+	 * @param patch the changes; its elements are {@link #addElements}' and
+	 * {@link #clearElements}'
 	 * @param etag the ETag the subset was read with ({@link Subset#etag()})
 	 * @return completes when the subset is changed, or a
 	 * {@code Tm1PreconditionFailedException} if it had changed
-	 * @throws IllegalArgumentException if the patch sets or binds {@code Elements}
 	 */
 	@Tm1Endpoint("Navigation Hierarchy/Subsets")
 	@Tm1Endpoint("Navigation Hierarchy/PrivateSubsets")
@@ -150,7 +150,8 @@ public final class SubsetService {
 	public Mono<Void> update(String dimension, String hierarchy, SubsetScope scope, String subset, SubsetPatch patch,
 			String etag) {
 		return session.execute(
-				Tm1Request.patch(subset(dimension, hierarchy, scope, subset), withoutElements(patch)).ifMatch(etag));
+				Tm1Request.patch(subset(dimension, hierarchy, scope, subset), Objects.requireNonNull(patch, "patch"))
+					.ifMatch(etag));
 	}
 
 	/**
@@ -367,14 +368,6 @@ public final class SubsetService {
 		}
 		return session.execute(action(Tm1Operations.SUBSET_SET_ELEMENT, subset(dimension, hierarchy, scope, subset),
 				body, Void.class));
-	}
-
-	private static SubsetPatch withoutElements(SubsetPatch patch) {
-		if (patch.json().keySet().stream().anyMatch(key -> key.equals("Elements") || key.startsWith("Elements@"))) {
-			throw new IllegalArgumentException(
-					"A subset PATCH with Elements appends to them: use addElements, or clearElements first");
-		}
-		return patch;
 	}
 
 	private static ODataPath hierarchy(String dimension, String hierarchy) {

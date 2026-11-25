@@ -78,13 +78,15 @@ def test_creates_lists_reads_and_deletes_a_hierarchy(tm1: Tm1Client, region: str
 
 def test_refuses_to_replace_elements_through_a_plain_update(tm1: Tm1Client, region: str) -> None:
     d = region
+    # HierarchyPatch offers neither (#361); a mapping with them is refused, sending nothing
+    assert not hasattr(HierarchyPatch.builder(), "elements")
     with pytest.raises(ValueError, match="replace_structure"):
-        tm1.hierarchies.update(d, d, HierarchyPatch.builder().elements([]).build())
+        tm1.hierarchies.update(d, d, {"Elements": []})
     north = ODataPath.of("Dimensions").key(d).nav("Hierarchies").key(d).nav("Elements").key("North")
     with pytest.raises(ValueError):
         tm1.hierarchies.update(d, d, {"Elements@odata.bind": [str(north)]})
     with pytest.raises(ValueError):
-        tm1.hierarchies.update(d, d, HierarchyPatch.builder().edges([edge("Total", "East")]).build(), 'W/"x"')
+        tm1.hierarchies.update(d, d, {"Edges": [edge("Total", "East")]}, 'W/"x"')
 
 
 def test_replaces_the_structure_deleting_what_it_doesnt_list(tm1: Tm1Client, region: str) -> None:

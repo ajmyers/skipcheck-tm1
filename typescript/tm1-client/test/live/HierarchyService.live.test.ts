@@ -78,17 +78,14 @@ describe("HierarchyService on TM1" + liveReason, () => {
   });
 
   tm1Test("refuses to replace elements through a plain update", () => {
-    expect(() => tm1.hierarchies.update(dimension, dimension, HierarchyPatch.builder().elements([]).build())).toThrow(/replaceStructure/);
-    expect(() =>
-      tm1.hierarchies.update(
-        dimension,
-        dimension,
-        HierarchyPatch.builder()
-          .edges([edge("Total", "East")])
-          .build(),
-        'W/"x"',
-      ),
-    ).toThrow(RangeError);
+    // HierarchyPatch offers neither; a JavaScript caller's patch with them is refused, sending nothing
+    expect("elements" in HierarchyPatch.builder()).toBe(false);
+    const elements = HierarchyCreate.builder().elements([]).build() as unknown as HierarchyPatch;
+    expect(() => tm1.hierarchies.update(dimension, dimension, elements)).toThrow(/replaceStructure/);
+    const edges = HierarchyCreate.builder()
+      .edges([edge("Total", "East")])
+      .build() as unknown as HierarchyPatch;
+    expect(() => tm1.hierarchies.update(dimension, dimension, edges, 'W/"x"')).toThrow(RangeError);
   });
 
   tm1Test("replaces the structure, deleting what it doesn't list", async () => {

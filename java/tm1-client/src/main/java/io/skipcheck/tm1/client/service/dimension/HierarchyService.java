@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Dimension;
@@ -31,8 +33,8 @@ import reactor.core.publisher.Mono;
  *
  * <p>
  * A hierarchy PATCH that sets {@code Elements} or {@code Edges} <em>replaces</em> them:
- * TM1 deletes the elements it doesn't list. So {@link #update} refuses such a patch, and
- * {@link #replaceStructure} does it by name.
+ * TM1 deletes the elements it doesn't list. So a hierarchy's patch has no setter for
+ * them, and {@link #replaceStructure} does it by name.
  *
  * <p>
  * Add a hierarchy to a dimension, with its elements and edges:
@@ -98,14 +100,13 @@ public final class HierarchyService {
 	 * sets. TM1 (11.8) ignores {@code Visible}.
 	 * @param dimension the dimension's name
 	 * @param hierarchy the hierarchy's name
-	 * @param patch the changes, without {@code Elements} or {@code Edges}
+	 * @param patch the changes; its elements and edges are {@link #replaceStructure}'s
 	 * @return completes when the hierarchy is changed
-	 * @throws IllegalArgumentException if the patch sets {@code Elements} or
-	 * {@code Edges}, which would replace them: use {@link #replaceStructure}
 	 */
 	@Tm1Endpoint("Navigation Dimension/Hierarchies")
 	public Mono<Void> update(String dimension, String hierarchy, HierarchyPatch patch) {
-		return session.execute(Tm1Request.patch(hierarchy(dimension, hierarchy), withoutStructure(patch)));
+		return session
+			.execute(Tm1Request.patch(hierarchy(dimension, hierarchy), Objects.requireNonNull(patch, "patch")));
 	}
 
 	/**
@@ -113,17 +114,15 @@ public final class HierarchyService {
 	 * properties the patch sets, unless the hierarchy changed since it was read.
 	 * @param dimension the dimension's name
 	 * @param hierarchy the hierarchy's name
-	 * @param patch the changes, without {@code Elements} or {@code Edges}
+	 * @param patch the changes; its elements and edges are {@link #replaceStructure}'s
 	 * @param etag the ETag the hierarchy was read with ({@link Hierarchy#etag()})
 	 * @return completes when the hierarchy is changed, or a
 	 * {@code Tm1PreconditionFailedException} if it had changed
-	 * @throws IllegalArgumentException if the patch sets {@code Elements} or
-	 * {@code Edges}: use {@link #replaceStructure}
 	 */
 	@Tm1Endpoint("Navigation Dimension/Hierarchies")
 	public Mono<Void> update(String dimension, String hierarchy, HierarchyPatch patch, String etag) {
-		return session
-			.execute(Tm1Request.patch(hierarchy(dimension, hierarchy), withoutStructure(patch)).ifMatch(etag));
+		return session.execute(Tm1Request.patch(hierarchy(dimension, hierarchy), Objects.requireNonNull(patch, "patch"))
+			.ifMatch(etag));
 	}
 
 	/**
@@ -139,8 +138,11 @@ public final class HierarchyService {
 	@Tm1Endpoint("Navigation Dimension/Hierarchies")
 	public Mono<Void> replaceStructure(String dimension, String hierarchy, List<ElementCreate> elements,
 			List<EdgeCreate> edges) {
-		HierarchyPatch patch = HierarchyPatch.builder().elements(elements).edges(edges).build();
-		return session.execute(Tm1Request.patch(hierarchy(dimension, hierarchy), patch));
+		// Not a HierarchyPatch, which offers neither, so update can't do this by accident
+		Map<String, @Nullable Object> body = new LinkedHashMap<>();
+		body.put("Elements", elements == null ? null : List.copyOf(elements));
+		body.put("Edges", edges == null ? null : List.copyOf(edges));
+		return session.execute(Tm1Request.patch(hierarchy(dimension, hierarchy), body));
 	}
 
 	/**
@@ -286,19 +288,6 @@ public final class HierarchyService {
 		body.put("Element@odata.bind", element(dimension, hierarchy, element).toString());
 		body.put("Before@odata.bind", element(dimension, hierarchy, before).toString());
 		return session.execute(action(Tm1Operations.HIERARCHY_SET_ELEMENT, dimension, hierarchy, body, Void.class));
-	}
-
-	private static HierarchyPatch withoutStructure(HierarchyPatch patch) {
-		// Bindings to the collections (Elements@odata.bind) are structure changes too
-		if (patch.json()
-			.keySet()
-			.stream()
-			.anyMatch(key -> key.equals("Elements") || key.equals("Edges") || key.startsWith("Elements@")
-					|| key.startsWith("Edges@"))) {
-			throw new IllegalArgumentException(
-					"A hierarchy PATCH with Elements or Edges replaces them, deleting what it doesn't list: use replaceStructure");
-		}
-		return patch;
 	}
 
 	private static ODataPath dimension(String dimension) {

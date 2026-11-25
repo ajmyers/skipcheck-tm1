@@ -14,13 +14,13 @@ namespace Skipcheck.Tm1.Client.Services;
 
 /// <summary>Users: <c>/Users</c>, the session's own user, their groups, and disconnecting them.
 /// <para>Group membership is set whole, with <see cref="SetGroupsAsync"/>: binding <c>Groups</c> in a
-/// user PATCH replaces them. TM1 (11.8) has no safe way to leave one group: a
+/// user PATCH replaces them, so <c>UserPatch</c> has no setter for them. TM1 (11.8) has no safe way to leave one group: a
 /// <c>DELETE Users('u')/Groups('g')/$ref</c>, which OData means as "remove the link", <em>deletes the
 /// group</em>, for everyone. This service never sends it.</para>
 /// <para>Create a user in some groups, binding them by path:</para>
 /// <code>
 /// var groups = ODataPath.Of("Groups");
-/// await tm1.Users.CreateAsync(UserPatch.Builder().Name("jsmith").Password("changeme")
+/// await tm1.Users.CreateAsync(UserCreate.Builder().Name("jsmith").Password("changeme")
 ///     .BindGroups(groups.Key("Finance"), groups.Key("Planners")).Build());
 /// </code>
 /// <para>Take a user out of one group by setting the rest:</para>
@@ -59,18 +59,17 @@ public sealed class UserService : Tm1Service
         Session.ExecuteAsync(Tm1Request.Get<User>(ODataPath.Of("ActiveUser"), query), cancellationToken);
 
     /// <summary><c>POST Users</c>: creates a user, in the groups the patch binds
-    /// (<c>UserPatch.PatchBuilder.BindGroups</c>). It needs a name, and a password for Basic security.</summary>
+    /// (<c>UserCreate.CreateBuilder.BindGroups</c>). It needs a name, and a password for Basic security.</summary>
     [Tm1Endpoint("EntitySet Users")]
     public Task<User> CreateAsync(UserCreate user, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Post<User>(Users, Require(user, nameof(user))), cancellationToken);
 
     /// <summary><c>PATCH Users('name')</c>: changes the properties the patch sets, such as
     /// <c>Password</c> or <c>Enabled</c>. TM1 (11.8) sends no ETag for a user, so there's no
-    /// <c>If-Match</c> form. A patch that sets or binds <c>Groups</c>, which replaces them, is refused
-    /// with an <see cref="ArgumentException"/>: use <see cref="SetGroupsAsync"/>.</summary>
+    /// <c>If-Match</c> form. Its groups are <see cref="SetGroupsAsync"/>'s.</summary>
     [Tm1Endpoint("EntitySet Users")]
     public Task UpdateAsync(string name, UserPatch patch, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Patch(UserPath(name), WithoutGroups(Require(patch, nameof(patch)))), cancellationToken);
+        Session.ExecuteAsync(Tm1Request.Patch(UserPath(name), Require(patch, nameof(patch))), cancellationToken);
 
     /// <summary><c>PATCH Users('name')</c> binding <c>Groups</c>: makes the user's groups exactly
     /// <paramref name="groups"/>, leaving any not listed.</summary>
@@ -107,15 +106,6 @@ public sealed class UserService : Tm1Service
             Tm1Request.Post(UserPath(name).Action(operation.Name), new Dictionary<string, object?>()).Requires(operation.Capability()),
             cancellationToken
         );
-    }
-
-    private static UserPatch WithoutGroups(UserPatch patch)
-    {
-        if (patch.Values.Any(v => v.Key == "Groups" || v.Key.StartsWith("Groups@", StringComparison.Ordinal)))
-        {
-            throw new ArgumentException("A user PATCH with Groups replaces them: use SetGroupsAsync", nameof(patch));
-        }
-        return patch;
     }
 
     private static ODataPath UserPath(string name) => Users.Key(Require(name, nameof(name)));

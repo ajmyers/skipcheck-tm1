@@ -42,10 +42,15 @@ describe("UserService", () => {
   });
 
   it("refuses an update with groups, at once", () => {
+    // UserPatch offers no Groups: a PATCH with them replaces them, and setGroups sets them (#361)
+    expect("groups" in UserPatch.builder()).toBe(false);
+    expect("bindGroups" in UserPatch.builder()).toBe(false);
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    expect(() => client.users.update("jsmith", UserPatch.builder().bindGroups(ODataPath.of("Groups").key("Finance")).build())).toThrow(RangeError);
-    expect(() => client.users.update("jsmith", UserPatch.builder().groups([]).build())).toThrow(/setGroups/);
+    // The compiler refuses a UserCreate as a UserPatch; a caller without it (JavaScript) is refused here
+    const bound = UserCreate.builder().bindGroups(ODataPath.of("Groups").key("Finance")).build() as unknown as UserPatch;
+    expect(() => client.users.update("jsmith", bound)).toThrow(RangeError);
+    expect(() => client.users.update("jsmith", UserCreate.builder().groups([]).build() as unknown as UserPatch)).toThrow(/setGroups/);
     expect(tm1.requests.filter((r) => r.method === "PATCH")).toEqual([]);
   });
 

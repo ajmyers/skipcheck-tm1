@@ -5,6 +5,8 @@ package io.skipcheck.tm1.client.service.dimension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -139,17 +141,10 @@ class HierarchyServiceTest {
 
 	@Test
 	void anUpdateWithStructureIsRefused() {
-		List<HierarchyPatch> patches = List.of(
-				HierarchyPatch.builder().elements(List.of(ElementCreate.builder().name("a").build())).build(),
-				HierarchyPatch.builder().edges(List.of()).build());
-		for (HierarchyPatch patch : patches) {
-			assertThat(conformance.fail("hierarchies", "update", "Region", "Region", patch))
-				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("replaceStructure");
-		}
-		assertThat(conformance.fail("hierarchies", "update", "Region", "Region",
-				HierarchyPatch.builder().edges(List.of()).build(), "W/\"1\""))
-			.isInstanceOf(IllegalArgumentException.class);
+		// Refused at compile time: HierarchyPatch offers neither Elements nor Edges, as a
+		// PATCH with them replaces them; replaceStructure does that (#361)
+		assertThat(Arrays.stream(HierarchyPatch.Builder.class.getMethods()).map(Method::getName))
+			.doesNotContain("elements", "edges", "bindElements", "bindEdges");
 		assertThat(tm1().requests()).isEmpty();
 	}
 

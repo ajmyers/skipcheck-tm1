@@ -52,19 +52,11 @@ public class HierarchyServiceLiveTests
     }
 
     [Tm1Fact]
-    public async Task RefusesToReplaceElementsThroughAPlainUpdate()
+    public void RefusesToReplaceElementsThroughAPlainUpdate()
     {
-        await using var made = await Region();
-        var (tm1, d) = (made.Tm1, made.Name);
-        var e = Assert.Throws<ArgumentException>(() =>
-        {
-            _ = tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().Elements([]).Build());
-        });
-        Assert.Contains("ReplaceStructureAsync", e.Message);
-        Assert.Throws<ArgumentException>(() =>
-        {
-            _ = tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().Edges([LiveDimension.Edge("Total", "East")]).Build(), "W/\"x\"");
-        });
+        // HierarchyPatch offers neither Elements nor Edges: a PATCH with them replaces them, as
+        // ReplaceStructureAsync does
+        Assert.DoesNotContain(typeof(HierarchyPatch.PatchBuilder).GetMethods(), m => m.Name is "Elements" or "Edges" or "BindElements" or "BindEdges");
     }
 
     [Tm1Fact]

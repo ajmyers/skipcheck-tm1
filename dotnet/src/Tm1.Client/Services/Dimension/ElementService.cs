@@ -15,7 +15,7 @@ namespace Skipcheck.Tm1.Client.Services;
 /// <c>}ElementAttributes_&lt;dimension&gt;</c>, not properties of the element.
 /// <para>Add an element, and put it under a consolidation:</para>
 /// <code>
-/// await tm1.Elements.CreateAsync("Region", "Region", ElementPatch.Builder().Name("West").Type(ElementType.Numeric).Build());
+/// await tm1.Elements.CreateAsync("Region", "Region", ElementCreate.Builder().Name("West").Type(ElementType.Numeric).Build());
 /// await tm1.Elements.SetComponentAsync("Region", "Region", "Total", "West", 1.0);
 /// </code>
 /// </summary>
@@ -47,11 +47,11 @@ public sealed class ElementService : Tm1Service
         Session.ExecuteAsync(Tm1Request.Post<Element>(ElementsPath(dimension, hierarchy), Require(element, nameof(element))), cancellationToken);
 
     /// <summary><c>PATCH …/Elements('e')</c>: changes the properties the patch sets, typically <c>Type</c>.
-    /// A patch with <c>Name</c> (TM1 ignores it: elements can't be renamed) or <c>Attributes</c> (TM1
-    /// rejects it) is refused with an <see cref="ArgumentException"/>.</summary>
+    /// <c>ElementPatch</c> has no <c>Name</c> (TM1 ignores it: elements can't be renamed) or
+    /// <c>Attributes</c> (TM1 rejects it).</summary>
     [Tm1Endpoint("Navigation Hierarchy/Elements")]
     public Task UpdateAsync(string dimension, string hierarchy, string element, ElementPatch patch, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Patch(ElementPath(dimension, hierarchy, element), Checked(patch)), cancellationToken);
+        Session.ExecuteAsync(Tm1Request.Patch(ElementPath(dimension, hierarchy, element), Require(patch, nameof(patch))), cancellationToken);
 
     /// <summary><c>PATCH …/Elements('e')</c> with <c>If-Match</c>: as <see cref="UpdateAsync(string, string, string, ElementPatch, CancellationToken)"/>,
     /// unless the element changed since it was read with <paramref name="etag"/>; a
@@ -66,7 +66,7 @@ public sealed class ElementService : Tm1Service
         CancellationToken cancellationToken = default
     ) =>
         Session.ExecuteAsync(
-            Tm1Request.Patch(ElementPath(dimension, hierarchy, element), Checked(patch)).IfMatch(Require(etag, nameof(etag))),
+            Tm1Request.Patch(ElementPath(dimension, hierarchy, element), Require(patch, nameof(patch))).IfMatch(Require(etag, nameof(etag))),
             cancellationToken
         );
 
@@ -185,22 +185,6 @@ public sealed class ElementService : Tm1Service
             body["Weight"] = weight.Value;
         }
         return Session.ExecuteAsync(Action(Tm1Operations.ElementSetComponent, dimension, hierarchy, parent, body), cancellationToken);
-    }
-
-    private static ElementPatch Checked(ElementPatch patch)
-    {
-        foreach (var v in Require(patch, nameof(patch)).Values)
-        {
-            if (v.Key == "Name")
-            {
-                throw new ArgumentException("TM1 ignores Name in an element PATCH: elements can't be renamed");
-            }
-            if (v.Key == "Attributes")
-            {
-                throw new ArgumentException("TM1 rejects Attributes in an element PATCH: attribute values are cells of }ElementAttributes_<dimension>");
-            }
-        }
-        return patch;
     }
 
     private static ODataPath ElementsPath(string dimension, string hierarchy) => HierarchyService.HierarchyPath(dimension, hierarchy).Nav("Elements");

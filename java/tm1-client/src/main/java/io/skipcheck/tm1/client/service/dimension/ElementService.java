@@ -30,8 +30,8 @@ import reactor.core.publisher.Mono;
  * <p>
  * TM1 (11.8) ignores {@code Name} in an element PATCH, so elements can't be renamed, and
  * rejects {@code Attributes}, whose values are cells of the
- * <code>&#125;ElementAttributes_&lt;dimension&gt;</code> cube. {@link #update} refuses
- * both, saying why.
+ * <code>&#125;ElementAttributes_&lt;dimension&gt;</code> cube. So an element's patch has
+ * a setter for neither.
  *
  * <p>
  * List elements with a query: here, the consolidations.
@@ -100,14 +100,13 @@ public final class ElementService {
 	 * @param dimension the dimension's name
 	 * @param hierarchy the hierarchy's name
 	 * @param element the element's name
-	 * @param patch the changes, without {@code Name} or {@code Attributes}
+	 * @param patch the changes
 	 * @return completes when the element is changed
-	 * @throws IllegalArgumentException if the patch sets {@code Name}, which TM1 ignores,
-	 * or {@code Attributes}, which it rejects
 	 */
 	@Tm1Endpoint("Navigation Hierarchy/Elements")
 	public Mono<Void> update(String dimension, String hierarchy, String element, ElementPatch patch) {
-		return session.execute(Tm1Request.patch(element(dimension, hierarchy, element), checked(patch)));
+		return session
+			.execute(Tm1Request.patch(element(dimension, hierarchy, element), Objects.requireNonNull(patch, "patch")));
 	}
 
 	/**
@@ -115,16 +114,16 @@ public final class ElementService {
 	 * @param dimension the dimension's name
 	 * @param hierarchy the hierarchy's name
 	 * @param element the element's name
-	 * @param patch the changes, without {@code Name} or {@code Attributes}
+	 * @param patch the changes
 	 * @param etag the ETag the element was read with ({@link Element#etag()})
 	 * @return completes when the element is changed, or a
 	 * {@code Tm1PreconditionFailedException} if it had changed
-	 * @throws IllegalArgumentException if the patch sets {@code Name} or
-	 * {@code Attributes}
 	 */
 	@Tm1Endpoint("Navigation Hierarchy/Elements")
 	public Mono<Void> update(String dimension, String hierarchy, String element, ElementPatch patch, String etag) {
-		return session.execute(Tm1Request.patch(element(dimension, hierarchy, element), checked(patch)).ifMatch(etag));
+		return session
+			.execute(Tm1Request.patch(element(dimension, hierarchy, element), Objects.requireNonNull(patch, "patch"))
+				.ifMatch(etag));
 	}
 
 	/**
@@ -303,17 +302,6 @@ public final class ElementService {
 			body.put("Weight", weight);
 		}
 		return session.execute(action(Tm1Operations.ELEMENT_SET_COMPONENT, dimension, hierarchy, parent, body));
-	}
-
-	private static ElementPatch checked(ElementPatch patch) {
-		if (patch.json().containsKey("Name")) {
-			throw new IllegalArgumentException("TM1 ignores Name in an element PATCH: elements can't be renamed");
-		}
-		if (patch.json().containsKey("Attributes")) {
-			throw new IllegalArgumentException(
-					"TM1 rejects Attributes in an element PATCH: attribute values are cells of }ElementAttributes_<dimension>");
-		}
-		return patch;
 	}
 
 	private static ODataPath elements(String dimension, String hierarchy) {

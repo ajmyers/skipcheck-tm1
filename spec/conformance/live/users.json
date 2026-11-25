@@ -1,7 +1,7 @@
 {
 	"specVersion" : 1,
 	"name" : "users",
-	"description" : "A user in two fresh groups: create, read, update, set the groups whole, list members from both sides, a refused groups update, a missing user, delete.",
+	"description" : "A user in two fresh groups: create, read, update, set the groups whole, list members from both sides, a missing user, delete.",
 	"names" : [ "user", "g1", "g2", "missing" ],
 	"steps" : [
 		{
@@ -87,13 +87,6 @@
 			"params" : [ "name", "query" ],
 			"args" : [ "${g1}", { "$query" : { "select" : [ "Name" ] } } ],
 			"expect" : { "fields" : { "Name" : "${g1}" } }
-		},
-		{
-			"service" : "users",
-			"method" : "update",
-			"params" : [ "name", "patch" ],
-			"args" : [ "${user}", { "$patch" : "UserPatch", "json" : { "Groups@odata.bind" : [ "Groups('${g1}')" ] } } ],
-			"expect" : { "error" : { "category" : "argument" } }
 		},
 		{
 			"service" : "users",

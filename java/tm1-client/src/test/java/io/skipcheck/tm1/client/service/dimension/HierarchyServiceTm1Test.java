@@ -3,10 +3,11 @@
 package io.skipcheck.tm1.client.service.dimension;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.reflect.Method;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -92,11 +93,10 @@ class HierarchyServiceTm1Test {
 
 	@Test
 	void refusesToReplaceElementsThroughAPlainUpdate() {
-		assertThatIllegalArgumentException().isThrownBy(
-				() -> hierarchies.update(dimension, dimension, HierarchyPatch.builder().elements(List.of()).build()))
-			.withMessageContaining("replaceStructure");
-		assertThatIllegalArgumentException().isThrownBy(() -> hierarchies.update(dimension, dimension,
-				HierarchyPatch.builder().edges(List.of(edge("Total", "East"))).build(), "W/\"x\""));
+		// HierarchyPatch offers neither Elements nor Edges: a PATCH with them replaces
+		// them, as replaceStructure does
+		assertThat(Arrays.stream(HierarchyPatch.Builder.class.getMethods()).map(Method::getName))
+			.doesNotContain("elements", "edges", "bindElements", "bindEdges");
 	}
 
 	@Test

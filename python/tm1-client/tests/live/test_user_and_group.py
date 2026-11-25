@@ -73,8 +73,10 @@ def test_sets_groups_whole_and_lists_members_from_both_sides(tm1: Tm1Client, peo
     assert groups() == [people.g2], "replaced"
     assert [u.name for u in tm1.groups.users(people.g2)] == [people.user]
     assert tm1.groups.get(people.g1).name == people.g1, "left, not deleted"
+    # UserPatch offers no Groups (#361); a mapping with them is refused, sending nothing
+    assert not hasattr(UserPatch.builder(), "bind_groups")
     with pytest.raises(ValueError, match="set_groups"):
-        tm1.users.update(people.user, UserPatch.builder().bind_groups(ODataPath.of("Groups").key(people.g1)).build())
+        tm1.users.update(people.user, {"Groups@odata.bind": [str(ODataPath.of("Groups").key(people.g1))]})
 
 
 def test_deletes_the_group_itself_on_a_reference_delete(tm1: Tm1Client, people: People) -> None:

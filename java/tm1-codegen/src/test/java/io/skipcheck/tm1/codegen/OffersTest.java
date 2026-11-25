@@ -164,4 +164,24 @@ class OffersTest {
 			.isInstanceOf(IllegalArgumentException.class);
 	}
 
+	@Test
+	void leavesOutASetterTheOverlayWithholds() {
+		// Hierarchy/Elements: a PATCH replaces them, so the patch would offer it
+		Offers offers = Offers.of(PROBE, METADATA,
+				overlay("{\"HierarchyPatch.Elements\": {\"withheld\": \"replaceStructure does it\"}}"));
+		assertThat(offers.get("HierarchyPatch")).as("with nothing else to offer, it has no patch").isNull();
+		assertThat(Offers.of(PROBE, METADATA, NONE).get("HierarchyPatch")).containsKey("Elements");
+	}
+
+	@Test
+	void refusesToWithholdWhatTheProbeDoesntVerifyOrAWholeWriteType() {
+		assertThatThrownBy(
+				() -> Offers.of(PROBE, METADATA, overlay("{\"CubePatch.LastDataUpdate\": {\"withheld\": \"x\"}}")))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("withholds CubePatch.LastDataUpdate, which the probe doesn't verify");
+		assertThatThrownBy(() -> Offers.of(PROBE, METADATA, overlay("{\"CubePatch\": {\"withheld\": \"x\"}}")))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("withhold a setter");
+	}
+
 }

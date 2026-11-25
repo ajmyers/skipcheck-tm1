@@ -42,7 +42,9 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code Name} in a patch, when a rename applied.</li>
  * </ul>
  * A patch doesn't offer a binding a PATCH appends with (a subset's {@code Elements}):
- * binding reads as "set to", so a service's own add does that. A setter a subtype
+ * binding reads as "set to", so a service's own add does that. Nor does one offer a
+ * setter the overlay withholds, which the write's only service would refuse: a user
+ * patch's {@code Groups}, which {@code setGroups} sets (#361). A setter a subtype
  * verifies counts for its root. A write type with nothing to offer isn't generated,
  * unless a subtype's or an offered setter's value needs it (an open type, a root). An
  * offered nested setter whose value type offers nothing is dropped.
@@ -209,6 +211,15 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 								: Optional.ofNullable(verifiedFor(t.name(), "post", setter))
 									.orElse(verifiedFor(t.name(), "patch", setter));
 						Overlay.WriteException one = exceptions.get(builder + "." + setter);
+						if (one != null && one.kind().equals("withheld")) {
+							// Verified, but left out: the write's only service refuses it
+							if (why == null) {
+								throw new IllegalArgumentException("The overlay's writes withholds " + builder + "."
+										+ setter + ", which the probe doesn't verify: take it out");
+							}
+							exceptionsUsed.add(builder + "." + setter);
+							continue;
+						}
 						if (why != null && one != null) {
 							throw new IllegalArgumentException("The overlay's writes keeps " + builder + "." + setter
 									+ ", which the probe verifies (" + why.why() + "): take it out");
@@ -232,6 +243,12 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 					}
 				}
 			}
+			exceptions.forEach((key, e) -> {
+				if (e.kind().equals("withheld") && !key.contains(".")) {
+					throw new IllegalArgumentException(
+							"The overlay's writes withholds " + key + ": withhold a setter, Builder.Setter");
+				}
+			});
 			Set<String> unused = new TreeSet<>(exceptions.keySet());
 			unused.removeAll(exceptionsUsed);
 			if (!unused.isEmpty()) {

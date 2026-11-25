@@ -4,6 +4,7 @@ package io.skipcheck.tm1.client.service.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 
@@ -16,7 +17,6 @@ import io.skipcheck.tm1.client.error.Tm1ConflictException;
 import io.skipcheck.tm1.client.error.Tm1ErrorKind;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.Group;
-import io.skipcheck.tm1.client.model.GroupCreate;
 import io.skipcheck.tm1.client.model.Session;
 import io.skipcheck.tm1.client.model.User;
 import io.skipcheck.tm1.client.model.UserCreate;
@@ -152,13 +152,10 @@ class UserServiceTest {
 
 	@Test
 	void refusesAnUpdateThatSetsGroups() {
-		Throwable bound = conformance.fail("users", "update", "alice",
-				UserPatch.builder().bindGroups(ODataPath.of("Groups").key("Planners")).build());
-		assertThat(bound).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("setGroups");
-
-		Throwable set = conformance.fail("users", "update", "alice",
-				UserPatch.builder().groups(List.of(GroupCreate.builder().name("Planners").build())).build());
-		assertThat(set).isInstanceOf(IllegalArgumentException.class);
+		// Refused at compile time: UserPatch offers no Groups, as a PATCH with them
+		// replaces them; setGroups sets them (#361)
+		assertThat(Arrays.stream(UserPatch.Builder.class.getMethods()).map(Method::getName)).doesNotContain("groups",
+				"bindGroups");
 		assertThat(tm1().requests()).isEmpty();
 	}
 

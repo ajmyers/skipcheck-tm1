@@ -77,8 +77,8 @@ class UserService(Service):
         """``PATCH Users('name')``: changes the properties the patch sets, such as ``Password``
         or ``Enabled``. TM1 (11.8) sends no ETag for a user, so there's no ``If-Match`` form.
 
-        Raises ``ValueError`` if the patch sets or binds ``Groups``, which replaces them: use
-        :meth:`set_groups`."""
+        Its groups are :meth:`set_groups`': a PATCH with them replaces them, so ``UserPatch`` has no
+        setter for them. A mapping that sets or binds ``Groups`` raises ``ValueError``, sending nothing."""
         body = body_of(_require(patch, "patch"))
         if isinstance(body, dict) and any(k == "Groups" or k.startswith("Groups@") for k in body):
             raise ValueError("A user PATCH with Groups replaces them: use set_groups")

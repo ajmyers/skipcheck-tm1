@@ -27,9 +27,10 @@ import reactor.core.publisher.Mono;
  *
  * <p>
  * Group membership is set whole, with {@link #setGroups}: binding {@code Groups} in a
- * user PATCH replaces them. TM1 (11.8) has no safe way to leave one group: a
- * {@code DELETE Users('u')/Groups('g')/$ref}, which OData means as "remove the link",
- * <em>deletes the group</em>, for everyone. This service never sends it.
+ * user PATCH replaces them, so a user's patch has no setter for them. TM1 (11.8) has no
+ * safe way to leave one group: a {@code DELETE Users('u')/Groups('g')/$ref}, which OData
+ * means as "remove the link", <em>deletes the group</em>, for everyone. This service
+ * never sends it.
  *
  * <p>
  * Create a user in some groups, binding them by path:
@@ -104,14 +105,12 @@ public final class UserService {
 	 * {@code Password} or {@code Enabled}. TM1 (11.8) sends no ETag for a user, so
 	 * there's no {@code If-Match} form.
 	 * @param name the user's name
-	 * @param patch the changes, without {@code Groups}
+	 * @param patch the changes; its groups are {@link #setGroups}'s
 	 * @return completes when the user is changed
-	 * @throws IllegalArgumentException if the patch sets or binds {@code Groups}, which
-	 * replaces them: use {@link #setGroups}
 	 */
 	@Tm1Endpoint("EntitySet Users")
 	public Mono<Void> update(String name, UserPatch patch) {
-		return session.execute(Tm1Request.patch(user(name), withoutGroups(patch)));
+		return session.execute(Tm1Request.patch(user(name), Objects.requireNonNull(patch, "patch")));
 	}
 
 	/**
@@ -173,13 +172,6 @@ public final class UserService {
 		Tm1Operation operation = Tm1Operations.USER_DISCONNECT;
 		return session.execute(Tm1Request.post(user(name).action(operation.name()), Map.of(), Void.class)
 			.requires(operation.capability()));
-	}
-
-	private static UserPatch withoutGroups(UserPatch patch) {
-		if (patch.json().keySet().stream().anyMatch(key -> key.equals("Groups") || key.startsWith("Groups@"))) {
-			throw new IllegalArgumentException("A user PATCH with Groups replaces them: use setGroups");
-		}
-		return patch;
 	}
 
 	private static ODataPath user(String name) {

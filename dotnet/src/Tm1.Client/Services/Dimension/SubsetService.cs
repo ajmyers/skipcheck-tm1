@@ -69,8 +69,8 @@ public sealed class SubsetService : Tm1Service
     ) => Session.ExecuteAsync(Tm1Request.Post<Subset>(SubsetsPath(dimension, hierarchy, scope), Require(subset, nameof(subset))), cancellationToken);
 
     /// <summary><c>PATCH …/Subsets('s')</c>: changes the properties the patch sets, such as
-    /// <c>Expression</c>. A patch with <c>Elements</c> is refused (<see cref="ArgumentException"/>): TM1
-    /// appends them, so use <see cref="AddElementsAsync"/>, or <see cref="ClearElementsAsync"/> first.</summary>
+    /// <c>Expression</c>. Its elements are <see cref="AddElementsAsync"/>'s and <see cref="ClearElementsAsync"/>'s:
+    /// TM1 appends a PATCH's, so <c>SubsetPatch</c> has no setter for them.</summary>
     [Tm1Endpoint("Navigation Hierarchy/Subsets")]
     [Tm1Endpoint("Navigation Hierarchy/PrivateSubsets")]
     [Tm1Endpoint("Navigation Hierarchy/SessionSubsets")]
@@ -81,7 +81,7 @@ public sealed class SubsetService : Tm1Service
         string subset,
         SubsetPatch patch,
         CancellationToken cancellationToken = default
-    ) => Session.ExecuteAsync(Tm1Request.Patch(SubsetPath(dimension, hierarchy, scope, subset), WithoutElements(patch)), cancellationToken);
+    ) => Session.ExecuteAsync(Tm1Request.Patch(SubsetPath(dimension, hierarchy, scope, subset), Require(patch, nameof(patch))), cancellationToken);
 
     /// <summary><c>PATCH …/Subsets('s')</c> with <c>If-Match</c>: only if the subset hasn't changed since it
     /// was read with <paramref name="etag"/>; a <c>Tm1PreconditionFailedException</c> if it had.</summary>
@@ -98,7 +98,7 @@ public sealed class SubsetService : Tm1Service
         CancellationToken cancellationToken = default
     ) =>
         Session.ExecuteAsync(
-            Tm1Request.Patch(SubsetPath(dimension, hierarchy, scope, subset), WithoutElements(patch)).IfMatch(Require(etag, nameof(etag))),
+            Tm1Request.Patch(SubsetPath(dimension, hierarchy, scope, subset), Require(patch, nameof(patch))).IfMatch(Require(etag, nameof(etag))),
             cancellationToken
         );
 
@@ -284,15 +284,6 @@ public sealed class SubsetService : Tm1Service
             Tm1Request.Post(SubsetPath(dimension, hierarchy, scope, subset).Action(operation.Name), body).Requires(operation.Capability()),
             cancellationToken
         );
-    }
-
-    private static SubsetPatch WithoutElements(SubsetPatch patch)
-    {
-        if (Require(patch, nameof(patch)).Values.Any(v => v.Key == "Elements" || v.Key.StartsWith("Elements@", StringComparison.Ordinal)))
-        {
-            throw new ArgumentException("A subset PATCH with Elements appends to them: use AddElementsAsync, or ClearElementsAsync first");
-        }
-        return patch;
     }
 
     private static ODataPath SubsetsPath(string dimension, string hierarchy, SubsetScope scope) =>

@@ -72,8 +72,9 @@ export class UserService extends Tm1Service {
   }
 
   /** `PATCH Users('name')`: changes the properties the patch sets, such as `Password` or `Enabled`.
-   * TM1 (11.8) sends no ETag for a user, so there's no `If-Match` form. Throws a `RangeError` (at
-   * once) if the patch sets or binds `Groups`, which replaces them: use {@link setGroups}. */
+   * TM1 (11.8) sends no ETag for a user, so there's no `If-Match` form. Its groups are
+   * {@link setGroups}': a PATCH with them replaces them, so `UserPatch` has no setter for them. A
+   * JavaScript caller's patch with them (no compiler to refuse it) throws a `RangeError` at once. */
   update(name: string, patch: UserPatch, options?: Tm1CallOptions): Promise<void> {
     return this.session.execute(Tm1Request.patch(userPath(name), withoutGroups(patch)), options);
   }
