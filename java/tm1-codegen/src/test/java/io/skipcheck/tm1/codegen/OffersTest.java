@@ -40,6 +40,10 @@ class OffersTest {
 			        <Key><PropertyRef Name="Name"/></Key>
 			        <Property Name="Name" Type="Edm.String" Nullable="false"/>
 			      </EntityType>
+			      <ComplexType Name="CubeUpdate">
+			        <Property Name="Value" Type="Edm.String"/>
+			        <NavigationProperty Name="Tuple" Type="Collection(tm1.Element)"/>
+			      </ComplexType>
 			      <ComplexType Name="Settings">
 			        <Property Name="Admin" Type="tm1.AdminSettings"/>
 			        <Property Name="Fixed" Type="Edm.Boolean"/>
@@ -171,6 +175,17 @@ class OffersTest {
 				overlay("{\"HierarchyPatch.Elements\": {\"withheld\": \"replaceStructure does it\"}}"));
 		assertThat(offers.get("HierarchyPatch")).as("with nothing else to offer, it has no patch").isNull();
 		assertThat(Offers.of(PROBE, METADATA, NONE).get("HierarchyPatch")).containsKey("Elements");
+	}
+
+	@Test
+	void leavesOutASetterOfAWriteTypeTheOverlayKeepsWhole() {
+		// CubeUpdate: an operation's parameters, kept whole; TM1 takes its tuple only
+		// bound
+		String kept = "\"CubeUpdatePatch\": {\"kept\": \"an operation's parameters\"}";
+		Offers offers = Offers.of(PROBE, METADATA,
+				overlay("{" + kept + ", \"CubeUpdatePatch.Tuple\": {\"withheld\": \"bind it\"}}"));
+		assertThat(offers.get("CubeUpdatePatch")).doesNotContainKey("Tuple").containsKey("Tuple@odata.bind");
+		assertThat(Offers.of(PROBE, METADATA, overlay("{" + kept + "}")).get("CubeUpdatePatch")).containsKey("Tuple");
 	}
 
 	@Test

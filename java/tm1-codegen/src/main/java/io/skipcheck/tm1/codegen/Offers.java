@@ -212,10 +212,16 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 									.orElse(verifiedFor(t.name(), "patch", setter));
 						Overlay.WriteException one = exceptions.get(builder + "." + setter);
 						if (one != null && one.kind().equals("withheld")) {
-							// Verified, but left out: the write's only service refuses it
-							if (why == null) {
+							// Offered, but left out: the write's only service, or TM1,
+							// refuses it.
+							// Offered means the probe verifies it, or the overlay keeps
+							// its whole
+							// write type (an operation's parameters, which the probe
+							// doesn't try)
+							if (why == null && !exceptions.containsKey(builder)) {
 								throw new IllegalArgumentException("The overlay's writes withholds " + builder + "."
-										+ setter + ", which the probe doesn't verify: take it out");
+										+ setter + ", which the probe doesn't verify and the overlay doesn't keep"
+										+ " with its write type: take it out");
 							}
 							exceptionsUsed.add(builder + "." + setter);
 							continue;

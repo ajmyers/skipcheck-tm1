@@ -64,8 +64,9 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 	 * @param kind {@code kept}: the probe tried it, and what it found is accounted for
 	 * (TM1 transforms it as it should, or it needs a configuration the probe server
 	 * lacks); {@code unverified}: the probe can't try it; {@code withheld}: the probe
-	 * verifies it, but the write type doesn't offer it, since the only service that takes
-	 * the write would refuse it (another method does that write)
+	 * verifies it, or the overlay keeps its whole write type, but the write type doesn't
+	 * offer it, since the only service that takes the write, or TM1, would refuse it
+	 * (another setter or method does that write)
 	 * @param note why, in Markdown
 	 */
 	public record WriteException(String kind, String note) {
