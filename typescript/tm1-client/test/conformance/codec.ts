@@ -52,7 +52,7 @@ export function build(type: any, values: Json): unknown {
   for (const [key, value] of Object.entries(values)) {
     if (key === "@odata.type") {
       // The builder sends its own, which must be this one
-      if (plan.odataType !== value) throw new Error(`${write.name} doesn't send @odata.type ${String(value)}`);
+      if (typeof value !== "string" || plan.odataType !== value) throw new Error(`${write.name} doesn't send @odata.type ${String(value)}`);
       continue;
     }
     const setter = setters.get(key);
@@ -63,10 +63,14 @@ export function build(type: any, values: Json): unknown {
           b[setter]!(...value.map((p) => path(setter, p)));
         } else b[setter]!(path(setter, value));
       } else {
+        const collection = byJson.get(key)!.collection;
+        if (value !== null && collection !== Array.isArray(value))
+          throw new Error(`${write.name}.${key} takes ${collection ? "a list" : "one value"}, not ${JSON.stringify(value)}`);
         check(declared.get(key), value);
         b[setter]!(nested(byJson.get(key)?.value ?? null, value));
       }
-    } else if (!key.startsWith("@") && typeof b["property"] === "function" && !declared.has(key)) b["property"](key, value);
+    } else if (!key.startsWith("@") && typeof b["property"] === "function" && !declared.has(key.endsWith(BIND) ? key.slice(0, -BIND.length) : key))
+      b["property"](key, value);
     else throw new Error(`${write.name} has no setter for ${key}`);
   }
   return b.build();
@@ -112,6 +116,9 @@ function nested(write: string | null, value: Json): unknown {
  * key's `%2F` stays one, and the bind setter writes it back the same. */
 function path(setter: string, encoded: Json): ODataPath {
   if (typeof encoded !== "string") throw new Error(`${setter} binds a path, not ${JSON.stringify(encoded)}`);
+  // Encoded as a client encodes a segment: unreserved characters, or a %XX
+  for (const segment of encoded.split("/"))
+    if (!/^([A-Za-z0-9\-._~'()=,@$!]|%[0-9A-F]{2})*$/.test(segment)) throw new Error(`${encoded} isn't encoded as TM1 gets it: ${segment}`);
   const make = ODataPath as unknown as new (segments: readonly string[]) => ODataPath;
   return new make(encoded.split("/"));
 }

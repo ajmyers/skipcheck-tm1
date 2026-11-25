@@ -42,15 +42,33 @@ describe("PatchBuilders", () => {
     expect(() => build(Patches.NativeViewPatch, { "@odata.type": "#ibm.tm1.api.v1.NativeView", Name: "renamed" })).toThrow(
       "NativeViewPatch has no setter for Name",
     );
+    // Nor a declared navigation's binding
+    expect(() => build(Patches.NativeViewPatch, { "@odata.type": "#ibm.tm1.api.v1.NativeView", "Cube@odata.bind": "Cubes('x')" })).toThrow(
+      "NativeViewPatch has no setter for Cube@odata.bind",
+    );
   });
 
   it("refuses a value that doesn't read back as written", () => {
     expect(() => build(ChoreCreate, { Name: "c", ExecutionMode: "Nope" })).toThrow("doesn't read back as written");
+    // A flags enum's members are checked by the spec
+    expect(() => build(Patches.NetworkSettingsPatch, { IPVersion: "Nope" })).toThrow("doesn't read back as written");
     expect(() => build(CubeCreate, { "@odata.type": "#ibm.tm1.api.v1.Cube", Name: "c" })).toThrow("doesn't send @odata.type");
   });
 
   it("keeps a date-time's offset", () => {
     const built = build(ChoreCreate, { Name: "c", StartTime: "2026-03-04T05:06:07.5+02:00" });
     expect(JSON.parse(JSON.stringify(built)).StartTime).toBe("2026-03-04T05:06:07.5+02:00");
+  });
+
+  it("refuses a binding path that isn't encoded", () => {
+    // As written, it goes out as it is: so it must be as TM1 gets it, as a caller's path is
+    for (const path of ["Dimensions('a b')", "Dimensions('100%')", "ApplicationContextFacets('}Cubes')"])
+      expect(() => build(CubeCreate, { Name: "c", "Dimensions@odata.bind": [path] })).toThrow("isn't encoded as TM1 gets it");
+  });
+
+  it("refuses a value of the wrong shape", () => {
+    // One value where the setter takes a list, and a list where it takes one
+    expect(() => build(Patches.AnnotationCreate, { Text: "t", ApplicationContext: { Value: "x" } })).toThrow("takes a list");
+    expect(() => build(ChoreCreate, { Name: "c", ExecutionMode: ["SingleCommit"] })).toThrow("takes one value");
   });
 });
