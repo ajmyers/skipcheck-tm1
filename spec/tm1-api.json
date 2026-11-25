@@ -13638,13 +13638,7 @@
 			"Ordinal" : {
 				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
 			},
-			"ReferenceCell" : {
-				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
-			},
 			"ReferenceCell@odata.bind" : {
-				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
-			},
-			"ReferenceCube" : {
 				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
 			},
 			"ReferenceCube@odata.bind" : {
@@ -13801,19 +13795,10 @@
 			}
 		},
 		"CubeUpdatePatch" : {
-			"ReferenceCell" : {
-				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
-			},
 			"ReferenceCell@odata.bind" : {
 				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
 			},
-			"ReferenceCube" : {
-				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
-			},
 			"ReferenceCube@odata.bind" : {
-				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
-			},
-			"Tuple" : {
 				"kept" : "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
 			},
 			"Tuple@odata.bind" : {
@@ -16052,18 +16037,18 @@
 					"declaredOn" : "ibm.tm1.api.v1.CellsetUpdate",
 					"navigation" : true,
 					"collection" : false,
-					"set" : true,
+					"set" : false,
 					"bind" : true,
-					"value" : "CubeCreate"
+					"value" : null
 				},
 				{
 					"json" : "ReferenceCell",
 					"declaredOn" : "ibm.tm1.api.v1.CellsetUpdate",
 					"navigation" : true,
 					"collection" : true,
-					"set" : true,
+					"set" : false,
 					"bind" : true,
-					"value" : "ElementCreate"
+					"value" : null
 				}
 			],
 			"fromRead" : {
@@ -16875,27 +16860,27 @@
 					"declaredOn" : "ibm.tm1.api.v1.CubeUpdate",
 					"navigation" : true,
 					"collection" : true,
-					"set" : true,
+					"set" : false,
 					"bind" : true,
-					"value" : "ElementCreate"
+					"value" : null
 				},
 				{
 					"json" : "ReferenceCube",
 					"declaredOn" : "ibm.tm1.api.v1.CubeUpdate",
 					"navigation" : true,
 					"collection" : false,
-					"set" : true,
+					"set" : false,
 					"bind" : true,
-					"value" : "CubeCreate"
+					"value" : null
 				},
 				{
 					"json" : "ReferenceCell",
 					"declaredOn" : "ibm.tm1.api.v1.CubeUpdate",
 					"navigation" : true,
 					"collection" : true,
-					"set" : true,
+					"set" : false,
 					"bind" : true,
-					"value" : "ElementCreate"
+					"value" : null
 				}
 			],
 			"fromRead" : {
