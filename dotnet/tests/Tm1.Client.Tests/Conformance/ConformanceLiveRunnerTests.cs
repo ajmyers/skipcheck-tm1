@@ -327,6 +327,24 @@ public class ConformanceLiveRunnerTests
     }
 
     [Fact]
+    public async Task BuildsAWriteFromWhatAStepKept()
+    {
+        // The patch carries what the read held (Rules) with the change; a finally step setting back a
+        // read no step kept sends nothing
+        var scenario = JsonNode
+            .Parse(
+                "{\"names\":[\"cube\"],\"steps\":[{\"service\":\"cubes\",\"method\":\"get\",\"params\":[\"name\",\"query\"],\"args\":[\"${cube}\",{\"$query\":{}}],\"keep\":\"cube\",\"expect\":{\"fields\":{\"Name\":\"${cube}\",\"Rules\":\"SKIPCHECK;\"}}},{\"service\":\"cubes\",\"method\":\"update\",\"params\":[\"name\",\"patch\"],\"args\":[\"${cube}\",{\"$fromRead\":\"CubePatch\",\"read\":\"cube\",\"json\":{\"DrillthroughRules\":\"x\"}}],\"expect\":{\"none\":true}}],\"finally\":[{\"service\":\"cubes\",\"method\":\"update\",\"params\":[\"name\",\"patch\"],\"args\":[\"${cube}\",{\"$fromRead\":\"CubePatch\",\"read\":\"never\",\"json\":{}}]}]}"
+            )!
+            .AsObject();
+        var names = ConformanceLive.NamesFor(scenario);
+        var fake = AnsweringAsExpected(scenario, names);
+        var traffic = new ConformanceLive.Traffic(fake, FakeTm1.Base);
+        Assert.Empty(await ConformanceLive.Run(fake.Client(b => b.HttpHandler(traffic)), traffic, scenario, names));
+        Assert.Equal(2, traffic.Exchanges.Count);
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{"Rules":"SKIPCHECK;","DrillthroughRules":"x"}"""), traffic.Exchanges[1]["request"]!["json"]));
+    }
+
+    [Fact]
     public async Task SavesAFieldOfAResultForTheStepsAfterIt()
     {
         var scenario = ConformanceLive.Load("annotations");

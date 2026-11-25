@@ -53,6 +53,11 @@ internal static class PatchBuilders
     /// read, from <c>Builder()</c>.</summary>
     internal static object Build(Type patch, JsonObject json, object? read)
     {
+        if (read is not null && Builders[patch.Name]?["dispatch"] is JsonArray)
+        {
+            // A root's Builder(read) hands off to its subtype's: name the subtype's write type
+            throw new ArgumentException($"{patch.Name} is a root: build from a read with a subtype's");
+        }
         var type = read is null ? Subtype(patch, json) : patch;
         var builder = read is null ? Fresh(type) : FromRead(type, read);
         var setters = Setters(type);

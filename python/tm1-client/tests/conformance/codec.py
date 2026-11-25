@@ -49,6 +49,9 @@ def build(cls: Any, values: Any, read: Any = None) -> Any:
         raise ValueError(f"A {cls.__name__} is an object, not {values!r}")
     if read is None:
         cls = _subtype(cls, values)
+    elif _PLAN[cls.__name__].get("dispatch") is not None:
+        # A root's builder(read) hands off to its subtype's: name the subtype's write type
+        raise ValueError(f"{cls.__name__} is a root: build from a read with a subtype's")
     builder = cls.builder() if read is None else cls.builder(read)
     setters = _setters(cls)
     plan = {s["json"]: s for s in _PLAN[cls.__name__]["setters"]}

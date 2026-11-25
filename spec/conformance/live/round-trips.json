@@ -1,7 +1,7 @@
 {
 	"specVersion" : 1,
 	"name" : "round-trips",
-	"description" : "Writes built from what was read: each object is read (and kept), its write type's builder(read) is changed by one setter ($fromRead) and sent through its service's update, then read back. So what builder(read) copies and binds is sent to TM1 as a caller would, in every client. The server's static configuration isn't sent back here: TM1 rereads tm1s.cfg as it changes, and the settings scenario writes it.",
+	"description" : "Writes built from what was read: each object is read (and kept), its write type's builder(read) is changed by one setter ($fromRead) and sent through its service's update, then read back. So what builder(read) copies is sent to TM1 as a caller would send it, in every client: the reads select what builder(read) copies, and the change is to another property, so the copied values go out with it. The element's patch is sent as read, unchanged, and none of these write types binds a navigation. The server's static configuration isn't sent back here: TM1 rereads tm1s.cfg as it changes, and the settings scenario writes it.",
 	"names" : [ "dim", "month", "cube", "mdx", "subset", "process", "chore", "user", "sandbox" ],
 	"steps" : [
 		{
@@ -22,7 +22,7 @@
 			"service" : "hierarchies",
 			"method" : "get",
 			"params" : [ "dimension", "hierarchy", "query" ],
-			"args" : [ "${dim}", "${dim}", { "$query" : {  } } ],
+			"args" : [ "${dim}", "${dim}", { "$query" : { "select" : [ "Name", "ElementsSortType", "ElementsSortSense", "ComponentsSortType", "ComponentsSortSense" ] } } ],
 			"expect" : { "fields" : { "Name" : "${dim}" } },
 			"keep" : "hierarchy"
 		},
@@ -30,15 +30,15 @@
 			"service" : "hierarchies",
 			"method" : "update",
 			"params" : [ "dimension", "hierarchy", "patch" ],
-			"args" : [ "${dim}", "${dim}", { "$fromRead" : "HierarchyPatch", "read" : "hierarchy", "json" : { "ElementsSortType" : "ByName" } } ],
+			"args" : [ "${dim}", "${dim}", { "$fromRead" : "HierarchyPatch", "read" : "hierarchy", "json" : { "ComponentsSortType" : "ByName" } } ],
 			"expect" : { "none" : true }
 		},
 		{
 			"service" : "hierarchies",
 			"method" : "get",
 			"params" : [ "dimension", "hierarchy", "query" ],
-			"args" : [ "${dim}", "${dim}", { "$query" : { "select" : [ "ElementsSortType" ] } } ],
-			"expect" : { "fields" : { "ElementsSortType" : "ByName" } }
+			"args" : [ "${dim}", "${dim}", { "$query" : { "select" : [ "ComponentsSortType" ] } } ],
+			"expect" : { "fields" : { "ComponentsSortType" : "ByName" } }
 		},
 		{
 			"service" : "elements",
@@ -56,17 +56,24 @@
 			"expect" : { "none" : true }
 		},
 		{
+			"service" : "elements",
+			"method" : "get",
+			"params" : [ "dimension", "hierarchy", "element", "query" ],
+			"args" : [ "${dim}", "${dim}", "A", { "$query" : { "select" : [ "Type" ] } } ],
+			"expect" : { "fields" : { "Type" : "Numeric" } }
+		},
+		{
 			"service" : "cubes",
 			"method" : "create",
 			"params" : [ "cube" ],
-			"args" : [ { "$patch" : "CubeCreate", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${dim}')", "Dimensions('${month}')" ] } } ],
+			"args" : [ { "$patch" : "CubeCreate", "json" : { "Name" : "${cube}", "Dimensions@odata.bind" : [ "Dimensions('${dim}')", "Dimensions('${month}')" ], "Rules" : "SKIPCHECK;" } } ],
 			"expect" : { "fields" : { "Name" : "${cube}" } }
 		},
 		{
 			"service" : "cubes",
 			"method" : "get",
 			"params" : [ "name", "query" ],
-			"args" : [ "${cube}", { "$query" : {  } } ],
+			"args" : [ "${cube}", { "$query" : { "select" : [ "Name", "Rules", "DrillthroughRules", "AllowPersistentHolds", "CalculationThresholdForStorage", "CellSecurityMostRestrictive", "ViewStorageMaxMemory" ] } } ],
 			"expect" : { "fields" : { "Name" : "${cube}" } },
 			"keep" : "cube"
 		},
@@ -74,15 +81,15 @@
 			"service" : "cubes",
 			"method" : "update",
 			"params" : [ "name", "patch" ],
-			"args" : [ "${cube}", { "$fromRead" : "CubePatch", "read" : "cube", "json" : { "Rules" : "SKIPCHECK;" } } ],
+			"args" : [ "${cube}", { "$fromRead" : "CubePatch", "read" : "cube", "json" : { "DrillthroughRules" : "['A'] = S: 'x';" } } ],
 			"expect" : { "none" : true }
 		},
 		{
 			"service" : "cubes",
 			"method" : "get",
 			"params" : [ "name", "query" ],
-			"args" : [ "${cube}", { "$query" : { "select" : [ "Rules" ] } } ],
-			"expect" : { "fields" : { "Rules" : "SKIPCHECK;" } }
+			"args" : [ "${cube}", { "$query" : { "select" : [ "Rules", "DrillthroughRules" ] } } ],
+			"expect" : { "fields" : { "Rules" : "SKIPCHECK;", "DrillthroughRules" : "['A'] = S: 'x';" } }
 		},
 		{
 			"service" : "views",
@@ -146,7 +153,7 @@
 			"service" : "processes",
 			"method" : "create",
 			"params" : [ "process" ],
-			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${process}", "PrologProcedure" : "x = 1;\r\n" } } ],
+			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${process}", "PrologProcedure" : "x = 1;\r\n", "Parameters" : [ { "Name" : "pA", "Prompt" : "A", "Value" : "1" } ] } } ],
 			"expect" : { "fields" : { "Name" : "${process}" } }
 		},
 		{
@@ -175,7 +182,7 @@
 			"service" : "chores",
 			"method" : "create",
 			"params" : [ "chore" ],
-			"args" : [ { "$patch" : "ChoreCreate", "json" : { "Name" : "${chore}", "StartTime" : "2026-01-01T02:00:00Z", "Frequency" : "PT24H", "Active" : false, "Tasks" : [ { "Process@odata.bind" : "Processes('${process}')" } ] } } ],
+			"args" : [ { "$patch" : "ChoreCreate", "json" : { "Name" : "${chore}", "StartTime" : "2026-01-01T02:00:00Z", "Frequency" : "PT24H", "Active" : false, "Tasks" : [ { "Process@odata.bind" : "Processes('${process}')", "Parameters" : [ { "Name" : "pA", "Value" : "2" } ] } ] } } ],
 			"expect" : { "fields" : { "Name" : "${chore}" } }
 		},
 		{
@@ -283,12 +290,6 @@
 	],
 	"finally" : [
 		{
-			"service" : "server",
-			"method" : "updateLogger",
-			"params" : [ "name", "patch" ],
-			"args" : [ "TM1.Server", { "$fromRead" : "LoggerPatch", "read" : "logger", "json" : {  } } ]
-		},
-		{
 			"service" : "sandboxes",
 			"method" : "delete",
 			"params" : [ "name" ],
@@ -341,6 +342,12 @@
 			"method" : "delete",
 			"params" : [ "name" ],
 			"args" : [ "${month}" ]
+		},
+		{
+			"service" : "server",
+			"method" : "updateLogger",
+			"params" : [ "name", "patch" ],
+			"args" : [ "TM1.Server", { "$fromRead" : "LoggerPatch", "read" : "logger", "json" : {  } } ]
 		}
 	]
 }

@@ -259,9 +259,6 @@ public static class ConformanceLive
         return null;
     }
 
-    /// <summary>Runs the scenario; the steps whose expectation failed. Its <c>finally</c> steps always run.
-    /// What a step saves joins <paramref name="names"/>, so the traffic written after it has TM1's made-up
-    /// values as their placeholders too.</summary>
     private static object? Invoked(object service, System.Reflection.MethodInfo method, object?[] values)
     {
         try
@@ -275,6 +272,9 @@ public static class ConformanceLive
         }
     }
 
+    /// <summary>Runs the scenario; the steps whose expectation failed. Its <c>finally</c> steps always run.
+    /// What a step saves joins <paramref name="names"/>, so the traffic written after it has TM1's made-up
+    /// values as their placeholders too.</summary>
     public static async Task<List<string>> Run(Tm1Client client, Traffic traffic, JsonObject scenario, Dictionary<string, string> names)
     {
         var failures = new List<string>();

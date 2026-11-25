@@ -43,7 +43,10 @@ const enums = new Map(spec.enums.map((e) => [e.qualifiedName, e]));
  * doesn't have, a binding of the wrong shape, an `@odata.type` the write type doesn't send. */
 export function build(type: any, values: Json, read?: unknown): unknown {
   if (values === null || typeof values !== "object" || Array.isArray(values)) throw new Error(`A ${type.name} is an object, not ${JSON.stringify(values)}`);
-  // With what was read, from builder(read), as a caller changes it ($fromRead)
+  // With what was read, from builder(read), as a caller changes it ($fromRead); a root's hands
+  // off to its subtype's, so the subtype's write type is named instead
+  if (read !== undefined && (spec.builders[type.name] as { dispatch?: unknown } | undefined)?.dispatch)
+    throw new Error(`${type.name} is a root: build from a read with a subtype's`);
   const write = read === undefined ? subtype(type, values) : type;
   const b = (read === undefined ? write.builder() : write.builder(read)) as Builder;
   const setters = settersFor(write);
@@ -169,7 +172,6 @@ const pascal = (javaConstant: string): string =>
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join("");
 
-/** An argument, as this client takes it. */
 /** A `$fromRead` argument, `{"$fromRead": "CubePatch", "read": "cube", "json": {...}}`: `CubePatch.builder(read)`
  * with the changes `json` names, through the setters a `$patch` uses, from what a step before kept. */
 export function fromRead(v: Record<string, any>, kept: Map<string, unknown>): unknown {
@@ -179,6 +181,7 @@ export function fromRead(v: Record<string, any>, kept: Map<string, unknown>): un
   return build(type, v.json ?? {}, kept.get(v.read));
 }
 
+/** An argument, as this client takes it. */
 export function decode(value: Json): unknown {
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) return value.map(decode);

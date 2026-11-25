@@ -98,6 +98,13 @@ final class PatchBuilders {
 		if (!json.isObject()) {
 			throw new IllegalArgumentException("A " + patch.getSimpleName() + " is an object, not " + json);
 		}
+		if (read != null && !SPEC.path("builders").path(patch.getSimpleName()).path("dispatch").isNull()
+				&& SPEC.path("builders").path(patch.getSimpleName()).has("dispatch")) {
+			// A root's builder(read) hands off to its subtype's: name the subtype's write
+			// type
+			throw new IllegalArgumentException(
+					patch.getSimpleName() + " is a root: build from a read with a subtype's");
+		}
 		Class<?> type = read == null ? subtype(patch, json) : patch;
 		try {
 			Object builder = read == null ? type.getMethod("builder").invoke(null)
