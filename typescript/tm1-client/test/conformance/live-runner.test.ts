@@ -25,10 +25,19 @@ function fake(names: Record<string, string>): FakeTm1 {
 }
 
 /** Answers as TM1 would for the cellsets, views and sandboxes scenarios: a cellset of 3 × 2 cells
- * (and the slicer), names that exist but `missing`. */
+ * (and the slicer), each worth its ordinal until an update writes it, names that exist but `missing`. */
 function dataFake(names: Record<string, string>): FakeTm1 {
   const tm1 = new FakeTm1();
-  const cells = (begin: number, end: number) => Array.from({ length: end - begin + 1 }, (_, i) => ({ Ordinal: begin + i, Value: begin + i }));
+  // The cells' values, by ordinal, as the scenario's updates write them
+  const values = new Map<number, unknown>();
+  const cells = (begin: number, end: number) =>
+    Array.from({ length: end - begin + 1 }, (_, i) => ({ Ordinal: begin + i, Value: values.has(begin + i) ? values.get(begin + i) : begin + i }));
+  // By the update's ordinal, or its tuple's elements (a region, then a month)
+  const ordinal = (update: Record<string, unknown>): number => {
+    if ("Ordinal" in update) return Number(update.Ordinal);
+    const [region, month] = (update["Tuple@odata.bind"] as string[]).map((path) => /Elements\('([^']*)'\)$/.exec(path)![1]);
+    return ["North", "South"].indexOf(region!) * 3 + ["Jan", "Feb", "Mar"].indexOf(month!);
+  };
   tm1.respond = (r) => {
     const { method, target } = r;
     const body = r.body.length ? r.json : {};
@@ -40,7 +49,7 @@ function dataFake(names: Record<string, string>): FakeTm1 {
       return FakeTm1.reply(201, { Name: body.Name }, { "content-type": "application/json" });
     if (method === "POST" && target.split("?")[0] === "ExecuteMDX") {
       if (String(body.MDX).includes("SELEKT")) return FakeTm1.reply(400, { error: { code: "501", message: "syntax" } }, { "content-type": "application/json" });
-      const top = Number(/\$top%3D(\d+)/.exec(target)![1]);
+      const top = Number(/\$top%3D(\d+)/.exec(target)?.[1] ?? 0);
       return {
         ID: "cs1",
         Axes: [
@@ -50,6 +59,10 @@ function dataFake(names: Record<string, string>): FakeTm1 {
         ],
         Cells: cells(0, top - 1),
       };
+    }
+    if (method === "POST" && /^(Cellsets\('cs1'\)|Cubes\('[^']*'\))\/tm1\.UpdateCells$/.test(target)) {
+      for (const update of body.Updates as Record<string, unknown>[]) values.set(ordinal(update), update.Value);
+      return FakeTm1.reply(204);
     }
     if (method === "POST" && target.endsWith("/tm1.Execute?$select=ID")) return { ID: "cs2" };
     if (method === "GET" && (m = /^Cellsets\('cs1'\)\/tm1\.GetPartition\(Begin=(\d+),End=(\d+)\)/.exec(target)))

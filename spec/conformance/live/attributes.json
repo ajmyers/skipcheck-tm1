@@ -76,6 +76,27 @@
 		},
 		{
 			"service" : "attributes",
+			"method" : "create",
+			"params" : [ "set", "attribute" ],
+			"args" : [ { "$type" : "AttributeSet", "factory" : "elements", "args" : [ "${dimension}", "${dimension}" ] }, { "$patch" : "AttributeDefinitionCreate", "json" : { "Name" : "Caption", "Type" : "String" } } ],
+			"expect" : { "fields" : { "Name" : "Caption", "Type" : "String" } }
+		},
+		{
+			"service" : "localizedAttributes",
+			"method" : "create",
+			"params" : [ "owner", "translations" ],
+			"args" : [ { "$type" : "AttributeOwner", "factory" : "element", "args" : [ "${dimension}", "${dimension}", "South" ] }, { "$patch" : "LocalizedAttributesCreate", "json" : { "LocaleID" : "fr", "Attributes" : { "Caption" : "Sud" } } } ],
+			"expect" : { "fields" : { "LocaleID" : "fr" } }
+		},
+		{
+			"service" : "attributes",
+			"method" : "delete",
+			"params" : [ "set", "name" ],
+			"args" : [ { "$type" : "AttributeSet", "factory" : "elements", "args" : [ "${dimension}", "${dimension}" ] }, "Caption" ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "attributes",
 			"method" : "delete",
 			"params" : [ "set", "name" ],
 			"args" : [ { "$type" : "AttributeSet", "factory" : "hierarchies", "args" : [ "${dimension}" ] }, "${code}" ],

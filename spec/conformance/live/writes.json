@@ -1,8 +1,8 @@
 {
 	"specVersion" : 1,
 	"name" : "writes",
-	"description" : "What the probe found TM1 applies, written through every client's create and patch types: each property a create or a patch applies, by tm1-probe-<schema>.json, that no other scenario writes, read back after its create and after its patch. ProbedWritesCoverageTest holds the scenarios to the probe.",
-	"names" : [ "dim", "month", "third", "cube", "native", "process", "chore", "sandbox", "subset", "user", "level", "debug", "context" ],
+	"description" : "What the probe found TM1 applies, written through every client's create and patch types: each property a create or a patch applies, by tm1-probe-<schema>.json, that no other scenario writes, read back after its create and after its patch. ProbedWritesCoverageTest holds the scenarios to the probe. It also writes, through each client's builders, what LiveBuildersCoverageTest holds every builder and setter to that no other scenario writes: a dimension's default hierarchy, a hierarchy's subsets, an element's parents and components, a cube's views with bound axis and title subsets, a process's code and variables, a chore's tasks, a user's new group, and an application folder with contents and a reference to each kind of object.",
+	"names" : [ "dim", "month", "third", "cube", "native", "process", "chore", "sandbox", "subset", "user", "level", "debug", "context", "fourth", "views", "coded", "member", "group", "app" ],
 	"steps" : [
 		{
 			"service" : "dimensions",
@@ -279,6 +279,153 @@
 			"expect" : { "none" : true }
 		},
 		{
+			"service" : "dimensions",
+			"method" : "create",
+			"params" : [ "dimension" ],
+			"args" : [ { "$patch" : "DimensionCreate", "json" : { "Name" : "${fourth}", "DefaultHierarchy" : { "Name" : "${fourth}", "Elements" : [ { "Name" : "F1", "Type" : "Numeric" } ] } } } ],
+			"expect" : { "fields" : { "Name" : "${fourth}" } }
+		},
+		{
+			"service" : "dimensions",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${dim}", { "$patch" : "DimensionPatch", "json" : { "DefaultHierarchy" : { "Name" : "Def", "Elements" : [ { "Name" : "A", "Type" : "Numeric" } ] } } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "hierarchies",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy" ],
+			"args" : [ "${dim}", { "$patch" : "HierarchyCreate", "json" : { "Name" : "Sub", "Elements" : [ { "Name" : "A", "Type" : "Numeric" } ], "Subsets" : [ { "Name" : "pub", "Expression" : "{TM1SUBSETALL([${dim}].[Sub])}" } ], "PrivateSubsets" : [ { "Name" : "mine", "Expression" : "{TM1SUBSETALL([${dim}].[Sub])}" } ] } } ],
+			"expect" : { "fields" : { "Name" : "Sub" } }
+		},
+		{
+			"service" : "elements",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy", "element" ],
+			"args" : [ "${dim}", "${dim}", { "$patch" : "ElementCreate", "json" : { "Name" : "Top", "Type" : "Consolidated", "Components@odata.bind" : [ "Dimensions('${dim}')/Hierarchies('${dim}')/Elements('A')" ] } } ],
+			"expect" : { "fields" : { "Name" : "Top" } }
+		},
+		{
+			"service" : "elements",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy", "element" ],
+			"args" : [ "${dim}", "${dim}", { "$patch" : "ElementCreate", "json" : { "Name" : "Mid", "Type" : "Consolidated", "Components" : [ { "Name" : "C", "Type" : "Numeric" } ], "Parents@odata.bind" : [ "Dimensions('${dim}')/Hierarchies('${dim}')/Elements('Top')" ] } } ],
+			"expect" : { "fields" : { "Name" : "Mid" } }
+		},
+		{
+			"service" : "elements",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy", "element" ],
+			"args" : [ "${dim}", "${dim}", { "$patch" : "ElementCreate", "json" : { "Name" : "D", "Type" : "Numeric", "Parents" : [ { "Name" : "Up", "Type" : "Consolidated" } ] } } ],
+			"expect" : { "fields" : { "Name" : "D" } }
+		},
+		{
+			"service" : "elements",
+			"method" : "update",
+			"params" : [ "dimension", "hierarchy", "element", "patch" ],
+			"args" : [ "${dim}", "${dim}", "Top", { "$patch" : "ElementPatch", "json" : { "Components@odata.bind" : [ "Dimensions('${dim}')/Hierarchies('${dim}')/Elements('B')" ] } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "elements",
+			"method" : "update",
+			"params" : [ "dimension", "hierarchy", "element", "patch" ],
+			"args" : [ "${dim}", "${dim}", "Up", { "$patch" : "ElementPatch", "json" : { "Components" : [ { "Name" : "E", "Type" : "Numeric" } ] } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "subsets",
+			"method" : "create",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${third}", "${third}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "SubsetCreate", "json" : { "Name" : "${subset}", "Expression" : "{TM1SUBSETALL([${third}].[${third}])}" } } ],
+			"expect" : { "fields" : { "Name" : "${subset}" } }
+		},
+		{
+			"service" : "cubes",
+			"method" : "create",
+			"params" : [ "cube" ],
+			"args" : [ { "$patch" : "CubeCreate", "json" : { "Name" : "${views}", "Dimensions@odata.bind" : [ "Dimensions('${dim}')", "Dimensions('${month}')", "Dimensions('${third}')" ], "Views" : [ { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "Name" : "nested", "Columns" : [ { "Subset@odata.bind" : "Dimensions('${dim}')/Hierarchies('${dim}')/Subsets('${subset}')" } ], "Rows" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${month}')/Hierarchies('${month}')", "Expression" : "{TM1SUBSETALL([${month}].[${month}])}" } } ], "Titles" : [ { "Subset@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')/Subsets('${subset}')", "Selected@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')/Elements('T1')" } ] } ], "PrivateViews" : [ { "@odata.type" : "#ibm.tm1.api.v1.NativeView", "Name" : "mine", "Columns" : [ { "Subset@odata.bind" : "Dimensions('${dim}')/Hierarchies('${dim}')/Subsets('${subset}')" } ], "Rows" : [ { "Subset" : { "Hierarchy@odata.bind" : "Dimensions('${month}')/Hierarchies('${month}')", "Expression" : "{TM1SUBSETALL([${month}].[${month}])}" } } ], "Titles" : [ { "Subset@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')/Subsets('${subset}')", "Selected@odata.bind" : "Dimensions('${third}')/Hierarchies('${third}')/Elements('T1')" } ] } ] } } ],
+			"expect" : { "fields" : { "Name" : "${views}" } }
+		},
+		{
+			"service" : "processes",
+			"method" : "create",
+			"params" : [ "process" ],
+			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${coded}", "Code" : "#region Prolog\nx = 2;\n#endregion", "Variables" : [ { "Name" : "vOne", "Type" : "String", "Position" : 1, "StartByte" : 0, "EndByte" : 0 } ] } } ],
+			"expect" : { "fields" : { "Name" : "${coded}" } }
+		},
+		{
+			"service" : "processes",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${coded}", { "$patch" : "ProcessPatch", "json" : { "Code" : "#region Prolog\nx = 3;\n#endregion", "Variables" : [ { "Name" : "vTwo", "Type" : "String", "Position" : 1, "StartByte" : 0, "EndByte" : 0 } ] } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "chores",
+			"method" : "update",
+			"params" : [ "name", "patch" ],
+			"args" : [ "${chore}", { "$patch" : "ChorePatch", "json" : { "Tasks" : [ { "Process@odata.bind" : "Processes('${process}')", "Parameters" : [ { "Name" : "pOther", "Value" : "y" } ] } ] } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "chores",
+			"method" : "updateTask",
+			"params" : [ "name", "step", "patch" ],
+			"args" : [ "${chore}", 0, { "$patch" : "ChoreTaskPatch", "json" : { "Process@odata.bind" : "Processes('${coded}')" } } ],
+			"expect" : { "none" : true }
+		},
+		{
+			"service" : "users",
+			"method" : "create",
+			"params" : [ "user" ],
+			"args" : [ { "$patch" : "UserCreate", "json" : { "Name" : "${member}", "Password" : "pw", "Groups" : [ { "Name" : "${group}" } ] } } ],
+			"expect" : { "fields" : { "Name" : "${member}" } }
+		},
+		{
+			"service" : "contents",
+			"method" : "create",
+			"params" : [ "folder", "scope", "entry" ],
+			"args" : [ { "$type" : "ContentPath", "factory" : "applications", "args" : [  ] }, { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "FolderCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.Folder", "Name" : "${app}", "Contents" : [ { "@odata.type" : "#ibm.tm1.api.v1.Folder", "Name" : "inner" } ], "PrivateContents" : [ { "@odata.type" : "#ibm.tm1.api.v1.Folder", "Name" : "mine" } ] } } ],
+			"expect" : { "fields" : { "Name" : "${app}" } }
+		},
+		{
+			"service" : "contents",
+			"method" : "create",
+			"params" : [ "folder", "scope", "entry" ],
+			"args" : [ { "$type" : "ContentPath", "factory" : "child", "args" : [ { "$type" : "ContentPath", "factory" : "applications", "args" : [  ] }, "${app}", { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" } ] }, { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "ChoreReferenceCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.ChoreReference", "Name" : "${chore}", "Chore@odata.bind" : "Chores('${chore}')" } } ],
+			"expect" : { "fields" : { "Name" : "${chore}" } }
+		},
+		{
+			"service" : "contents",
+			"method" : "create",
+			"params" : [ "folder", "scope", "entry" ],
+			"args" : [ { "$type" : "ContentPath", "factory" : "child", "args" : [ { "$type" : "ContentPath", "factory" : "applications", "args" : [  ] }, "${app}", { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" } ] }, { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "DimensionReferenceCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.DimensionReference", "Name" : "${dim}", "Dimension@odata.bind" : "Dimensions('${dim}')" } } ],
+			"expect" : { "fields" : { "Name" : "${dim}" } }
+		},
+		{
+			"service" : "contents",
+			"method" : "create",
+			"params" : [ "folder", "scope", "entry" ],
+			"args" : [ { "$type" : "ContentPath", "factory" : "child", "args" : [ { "$type" : "ContentPath", "factory" : "applications", "args" : [  ] }, "${app}", { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" } ] }, { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "ProcessReferenceCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.ProcessReference", "Name" : "${process}", "Process@odata.bind" : "Processes('${process}')" } } ],
+			"expect" : { "fields" : { "Name" : "${process}" } }
+		},
+		{
+			"service" : "contents",
+			"method" : "create",
+			"params" : [ "folder", "scope", "entry" ],
+			"args" : [ { "$type" : "ContentPath", "factory" : "child", "args" : [ { "$type" : "ContentPath", "factory" : "applications", "args" : [  ] }, "${app}", { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" } ] }, { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "SubsetReferenceCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.SubsetReference", "Name" : "${subset}", "Subset@odata.bind" : "Dimensions('${dim}')/Hierarchies('${dim}')/Subsets('${subset}')" } } ],
+			"expect" : { "fields" : { "Name" : "${subset}" } }
+		},
+		{
+			"service" : "contents",
+			"method" : "create",
+			"params" : [ "folder", "scope", "entry" ],
+			"args" : [ { "$type" : "ContentPath", "factory" : "child", "args" : [ { "$type" : "ContentPath", "factory" : "applications", "args" : [  ] }, "${app}", { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" } ] }, { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" }, { "$patch" : "ViewReferenceCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.ViewReference", "Name" : "${native}", "View@odata.bind" : "Cubes('${cube}')/Views('${native}')" } } ],
+			"expect" : { "fields" : { "Name" : "${native}" } }
+		},
+		{
 			"service" : "processes",
 			"method" : "create",
 			"params" : [ "process" ],
@@ -380,6 +527,54 @@
 		}
 	],
 	"finally" : [
+		{
+			"service" : "contents",
+			"method" : "delete",
+			"params" : [ "entry" ],
+			"args" : [ { "$type" : "ContentPath", "factory" : "child", "args" : [ { "$type" : "ContentPath", "factory" : "child", "args" : [ { "$type" : "ContentPath", "factory" : "applications", "args" : [  ] }, "${app}", { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" } ] }, "mine", { "$enum" : "ContentScope", "name" : "PRIVATE", "json" : "PRIVATE" } ] } ]
+		},
+		{
+			"service" : "views",
+			"method" : "delete",
+			"params" : [ "cube", "scope", "view" ],
+			"args" : [ "${views}", { "$enum" : "ViewScope", "name" : "PRIVATE", "json" : "PRIVATE" }, "mine" ]
+		},
+		{
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${dim}", "Sub", { "$enum" : "SubsetScope", "name" : "PRIVATE", "json" : "PRIVATE" }, "mine" ]
+		},
+		{
+			"service" : "contents",
+			"method" : "delete",
+			"params" : [ "entry" ],
+			"args" : [ { "$type" : "ContentPath", "factory" : "child", "args" : [ { "$type" : "ContentPath", "factory" : "applications", "args" : [  ] }, "${app}", { "$enum" : "ContentScope", "name" : "PUBLIC", "json" : "PUBLIC" } ] } ]
+		},
+		{
+			"service" : "users",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${member}" ]
+		},
+		{
+			"service" : "groups",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${group}" ]
+		},
+		{
+			"service" : "cubes",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${views}" ]
+		},
+		{
+			"service" : "subsets",
+			"method" : "delete",
+			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
+			"args" : [ "${third}", "${third}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}" ]
+		},
 		{ "service" : "processDebugging", "method" : "finish", "params" : [ "id" ], "args" : [ "${context}" ], "repeats" : "tm1\\.Continue$" },
 		{ "service" : "processes", "method" : "delete", "params" : [ "name" ], "args" : [ "${debug}" ] },
 		{
@@ -410,6 +605,12 @@
 			"service" : "processes",
 			"method" : "delete",
 			"params" : [ "name" ],
+			"args" : [ "${coded}" ]
+		},
+		{
+			"service" : "processes",
+			"method" : "delete",
+			"params" : [ "name" ],
 			"args" : [ "${process}" ]
 		},
 		{
@@ -423,6 +624,12 @@
 			"method" : "delete",
 			"params" : [ "name" ],
 			"args" : [ "${cube}" ]
+		},
+		{
+			"service" : "dimensions",
+			"method" : "delete",
+			"params" : [ "name" ],
+			"args" : [ "${fourth}" ]
 		},
 		{
 			"service" : "dimensions",

@@ -8,8 +8,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -223,10 +225,13 @@ class ConformanceScenariosTest {
 
 	/**
 	 * Answers as TM1 would for the cellsets, views and sandboxes scenarios: a cellset of
-	 * 3 × 2 cells (and the slicer), names that exist but {@code missing}.
+	 * 3 × 2 cells (and the slicer), each worth its ordinal until an update writes it,
+	 * names that exist but {@code missing}.
 	 */
 	private static ExchangeFunction data(Map<String, String> names) {
 		ConformanceTm1 plumbing = new ConformanceTm1();
+		// The cells' values, by ordinal, as the scenario's updates write them
+		Map<Long, JsonNode> values = new HashMap<>();
 		return request -> {
 			String target = ConformanceTm1.target(request.url());
 			String key = request.method().name() + " " + target;
@@ -234,18 +239,18 @@ class ConformanceScenariosTest {
 					|| key.startsWith("POST ActiveSession")) {
 				return plumbing.exchange(request);
 			}
-			return ConformanceTm1.body(request).map(body -> data(request.method().name(), target, body, names));
+			return ConformanceTm1.body(request).map(body -> data(request.method().name(), target, body, names, values));
 		};
 	}
 
-	private static String cells(long begin, long end) {
+	private static String cells(long begin, long end, Map<Long, JsonNode> values) {
 		StringBuilder out = new StringBuilder("[");
 		for (long n = begin; n <= end; n++) {
 			out.append(n == begin ? "" : ",")
 				.append("{\"Ordinal\":")
 				.append(n)
 				.append(",\"Value\":")
-				.append(n)
+				.append(values.containsKey(n) ? values.get(n).toString() : String.valueOf(n))
 				.append('}');
 		}
 		return out.append(']').toString();
@@ -257,7 +262,25 @@ class ConformanceScenariosTest {
 		return m.matches() ? m : null;
 	}
 
-	private static ClientResponse data(String method, String target, byte[] body, Map<String, String> names) {
+	/**
+	 * A cell's ordinal in the scenario's cellset of 3 × 2 cells, by its update's ordinal
+	 * or its tuple's elements (a region, then a month).
+	 */
+	private static long ordinal(JsonNode update) {
+		if (update.has("Ordinal")) {
+			return update.get("Ordinal").asLong();
+		}
+		List<String> elements = new ArrayList<>();
+		for (JsonNode path : update.get("Tuple@odata.bind")) {
+			Matcher element = Pattern.compile("Elements\\('([^']*)'\\)$").matcher(path.asString());
+			elements.add(element.find() ? element.group(1) : "");
+		}
+		return List.of("North", "South").indexOf(elements.get(0)) * 3L
+				+ List.of("Jan", "Feb", "Mar").indexOf(elements.get(1));
+	}
+
+	private static ClientResponse data(String method, String target, byte[] body, Map<String, String> names,
+			Map<Long, JsonNode> values) {
 		JsonNode json = body.length == 0 ? null : ConformanceCodec.json().readTree(body);
 		boolean get = method.equals("GET");
 		boolean post = method.equals("POST");
@@ -277,7 +300,13 @@ class ConformanceScenariosTest {
 			return json(200,
 					"{\"ID\":\"cs1\",\"Axes\":[{\"Ordinal\":0,\"Cardinality\":3},{\"Ordinal\":1,\"Cardinality\":2},"
 							+ "{\"Ordinal\":2,\"Cardinality\":1}],\"Cells\":"
-							+ cells(0, top == null ? -1 : Long.parseLong(top.group(1)) - 1) + "}");
+							+ cells(0, top == null ? -1 : Long.parseLong(top.group(1)) - 1, values) + "}");
+		}
+		if (post && target.matches("(Cellsets\\('cs1'\\)|Cubes\\('[^']*'\\))/tm1\\.UpdateCells")) {
+			for (JsonNode update : json.get("Updates")) {
+				values.put(ordinal(update), update.get("Value"));
+			}
+			return ClientResponse.create(HttpStatus.NO_CONTENT).build();
 		}
 		if (post && target.endsWith("/tm1.Execute?$select=ID")) {
 			return json(200, "{\"ID\":\"cs2\"}");
@@ -285,7 +314,7 @@ class ConformanceScenariosTest {
 		Matcher partition = match("Cellsets\\('cs1'\\)/tm1\\.GetPartition\\(Begin=(\\d+),End=(\\d+)\\).*", target);
 		if (get && partition != null) {
 			return json(200, "{\"value\":"
-					+ cells(Long.parseLong(partition.group(1)), Long.parseLong(partition.group(2))) + "}");
+					+ cells(Long.parseLong(partition.group(1)), Long.parseLong(partition.group(2)), values) + "}");
 		}
 		Matcher cube = match("Cubes\\('([^']*)'\\)/[A-Za-z]+\\('[^']*'\\)/Cube.*", target);
 		if (get && cube != null) {

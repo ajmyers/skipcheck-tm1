@@ -3,6 +3,7 @@
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -57,14 +58,35 @@ public class ConformanceLiveRunnerTests
     }
 
     /// <summary>Answers as TM1 would for the cellsets, views and sandboxes scenarios: a cellset of
-    /// 3 × 2 cells (and the slicer), names that exist but <c>missing</c>.</summary>
-    private static FakeTm1 DataFake(System.Collections.Generic.IReadOnlyDictionary<string, string> names) =>
-        new()
+    /// 3 × 2 cells (and the slicer), each worth its ordinal until an update writes it, names that
+    /// exist but <c>missing</c>.</summary>
+    private static FakeTm1 DataFake(System.Collections.Generic.IReadOnlyDictionary<string, string> names)
+    {
+        // The cells' values, by ordinal, as the scenario's updates write them
+        var values = new System.Collections.Generic.Dictionary<long, JsonElement>();
+        // By the update's ordinal, or its tuple's elements (a region, then a month)
+        static long Ordinal(JsonElement update)
+        {
+            if (update.TryGetProperty("Ordinal", out var ordinal))
+            {
+                return ordinal.GetInt64();
+            }
+            var elements = update
+                .GetProperty("Tuple@odata.bind")
+                .EnumerateArray()
+                .Select(path => Regex.Match(path.GetString()!, @"Elements\('([^']*)'\)$").Groups[1].Value)
+                .ToArray();
+            return System.Array.IndexOf(new[] { "North", "South" }, elements[0]) * 3L + System.Array.IndexOf(new[] { "Jan", "Feb", "Mar" }, elements[1]);
+        }
+        return new()
         {
             Respond = r =>
             {
-                static object[] Cells(long begin, long end) =>
-                    Enumerable.Range((int)begin, (int)(end - begin + 1)).Select(object (n) => new { Ordinal = n, Value = n }).ToArray();
+                object[] Cells(long begin, long end) =>
+                    Enumerable
+                        .Range((int)begin, (int)(end - begin + 1))
+                        .Select(object (n) => new { Ordinal = n, Value = values.TryGetValue(n, out var value) ? (object)value : n })
+                        .ToArray();
                 var (method, target) = (r.Method, r.Target);
                 if (
                     target.Contains("('" + names["missing"] + "')", System.StringComparison.Ordinal)
@@ -83,13 +105,22 @@ public class ConformanceLiveRunnerTests
                     {
                         return FakeTm1.Json(new { error = new { code = "501", message = "syntax" } }, HttpStatusCode.BadRequest);
                     }
-                    var top = long.Parse(Regex.Match(target, @"\$top%3D(\d+)").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                    var topMatch = Regex.Match(target, @"\$top%3D(\d+)");
+                    var top = topMatch.Success ? long.Parse(topMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : 0;
                     return new
                     {
                         ID = "cs1",
                         Axes = new[] { new { Ordinal = 0, Cardinality = 3 }, new { Ordinal = 1, Cardinality = 2 }, new { Ordinal = 2, Cardinality = 1 } },
                         Cells = Cells(0, top - 1),
                     };
+                }
+                if (method == "POST" && Regex.IsMatch(target, @"^(Cellsets\('cs1'\)|Cubes\('[^']*'\))/tm1\.UpdateCells$"))
+                {
+                    foreach (var update in r.Json.GetProperty("Updates").EnumerateArray())
+                    {
+                        values[Ordinal(update)] = update.GetProperty("Value").Clone();
+                    }
+                    return null;
                 }
                 if (method == "POST" && target.EndsWith("/tm1.Execute?$select=ID", System.StringComparison.Ordinal))
                 {
@@ -131,6 +162,7 @@ public class ConformanceLiveRunnerTests
                 return null;
             },
         };
+    }
 
     [Theory]
     [InlineData("cellsets")]
