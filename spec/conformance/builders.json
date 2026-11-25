@@ -103,11 +103,8 @@
       "odataType" : null,
       "open" : false,
       "required" : [ ],
-      "setters" : [ "Ordinal", "ReferenceCell", "ReferenceCell@odata.bind", "ReferenceCube", "ReferenceCube@odata.bind", "Value" ],
-      "values" : {
-        "ReferenceCell" : "ElementCreate[]",
-        "ReferenceCube" : "CubeCreate"
-      }
+      "setters" : [ "Ordinal", "ReferenceCell@odata.bind", "ReferenceCube@odata.bind", "Value" ],
+      "values" : { }
     },
     "ChoreCreate" : {
       "odataType" : null,
@@ -194,12 +191,8 @@
       "odataType" : null,
       "open" : false,
       "required" : [ ],
-      "setters" : [ "ReferenceCell", "ReferenceCell@odata.bind", "ReferenceCube", "ReferenceCube@odata.bind", "Tuple", "Tuple@odata.bind", "Value" ],
-      "values" : {
-        "ReferenceCell" : "ElementCreate[]",
-        "ReferenceCube" : "CubeCreate",
-        "Tuple" : "ElementCreate[]"
-      }
+      "setters" : [ "ReferenceCell@odata.bind", "ReferenceCube@odata.bind", "Tuple@odata.bind", "Value" ],
+      "values" : { }
     },
     "DebugLogSettingsPatch" : {
       "odataType" : null,

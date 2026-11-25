@@ -1,5 +1,5 @@
 {
-	"$comment": "What TM1 does differently from its own $metadata, shared by every client's code generator. Notes are Markdown; each generator renders them in its own doc format. Keys are Type/Property for properties and coverage-gate endpoint IDs for endpoints. writes: setters a write type offers though the probe doesn't verify them, by Builder.Setter (or a whole write type by Builder), each kept (the probe tried it, and what it found is accounted for) or unverified (the probe can't try it), with why; and setters a write type leaves out though the probe verifies them, each withheld, with why (the only service that takes the write would refuse them, and another method does that write).",
+	"$comment": "What TM1 does differently from its own $metadata, shared by every client's code generator. Notes are Markdown; each generator renders them in its own doc format. Keys are Type/Property for properties and coverage-gate endpoint IDs for endpoints. writes: setters a write type offers though the probe doesn't verify them, by Builder.Setter (or a whole write type by Builder), each kept (the probe tried it, and what it found is accounted for) or unverified (the probe can't try it), with why; and setters a write type leaves out though the probe verifies them, or the overlay keeps their whole write type, each withheld, with why (the only service that takes the write, or TM1, would refuse them, and another setter or method does that write).",
 	"departures": {
 		"CAMSettings/ClientPingCAMPassport": {
 			"read": "json",
@@ -74,6 +74,12 @@
 		"CellsetUpdatePatch": {
 			"kept": "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
 		},
+		"CellsetUpdatePatch.ReferenceCell": {
+			"withheld": "TM1 refuses a nested one (\"Could not find entity reference in payload\"): bind the cell's elements (`bindReferenceCell`)"
+		},
+		"CellsetUpdatePatch.ReferenceCube": {
+			"withheld": "TM1 refuses a nested one (\"Could not find entity reference in payload\"): bind the cube (`bindReferenceCube`)"
+		},
 		"ChoreTaskParameterPatch.Name": {
 			"kept": "names the process parameter: the minimal create sends it and TM1 takes it; a name the process lacks is refused"
 		},
@@ -82,6 +88,15 @@
 		},
 		"CubeUpdatePatch": {
 			"kept": "an operation's parameters (tm1.Update), not an entity write: service and live tests verify what they send"
+		},
+		"CubeUpdatePatch.ReferenceCell": {
+			"withheld": "TM1 refuses a nested one (\"Could not find entity reference in payload\"): bind the cell's elements (`bindReferenceCell`)"
+		},
+		"CubeUpdatePatch.ReferenceCube": {
+			"withheld": "TM1 refuses a nested one (\"Could not find entity reference in payload\"): bind the cube (`bindReferenceCube`)"
+		},
+		"CubeUpdatePatch.Tuple": {
+			"withheld": "TM1 refuses a nested one (\"Could not find entity reference in payload\"): bind the cell's elements (`bindTuple`)"
 		},
 		"EncryptionAtRestProviderSettingsPatch": {
 			"unverified": "an encryption key provider: probing it needs a key store"
