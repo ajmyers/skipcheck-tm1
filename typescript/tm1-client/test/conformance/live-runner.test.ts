@@ -198,6 +198,27 @@ describe("the live conformance runner", () => {
     return tm1;
   }
 
+  it("builds a write from what a step kept", async () => {
+    // The patch carries what the read held (Rules) with the change; a finally step setting back a
+    // read no step kept sends nothing
+    const s = JSON.parse(
+      '{"names":["cube"],"steps":[{"service":"cubes","method":"get","params":["name","query"],"args":["${cube}",{"$query":{}}],"keep":"cube","expect":{"fields":{"Name":"${cube}","Rules":"SKIPCHECK;"}}},{"service":"cubes","method":"update","params":["name","patch"],"args":["${cube}",{"$fromRead":"CubePatch","read":"cube","json":{"DrillthroughRules":"x"}}],"expect":{"none":true}}],"finally":[{"service":"cubes","method":"update","params":["name","patch"],"args":["${cube}",{"$fromRead":"CubePatch","read":"never","json":{}}]}]}',
+    ) as live.Scenario;
+    const names = live.namesFor(s);
+    const tm1 = answeringAsExpected(s, names);
+    const traffic = new live.Traffic(tm1, FakeTm1.BASE);
+    expect(
+      await live.run(
+        tm1.client((b) => b.transport(traffic)),
+        traffic,
+        s,
+        names,
+      ),
+    ).toEqual([]);
+    expect(traffic.exchanges).toHaveLength(2);
+    expect((traffic.exchanges[1]!["request"] as { json: unknown }).json).toEqual({ Rules: "SKIPCHECK;", DrillthroughRules: "x" });
+  });
+
   it("saves a field of a result for the steps after it", async () => {
     const s = live.scenarios().find((x) => x.name === "annotations")!;
     const names = live.namesFor(s);
@@ -237,6 +258,7 @@ describe("the live conformance runner", () => {
     "annotations",
     "processes",
     "chores",
+    "round-trips",
   ])("runs a scenario sending one request per step: %s", async (name) => {
     const s = live.scenarios().find((x) => x.name === name)!;
     const names = live.namesFor(s);

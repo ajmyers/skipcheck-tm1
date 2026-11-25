@@ -199,7 +199,7 @@ class ConformanceScenariosTest {
 
 	@ParameterizedTest(name = "{0}")
 	@ValueSource(strings = { "subsets", "members", "edges", "member-sets", "content", "encryption", "git", "users",
-			"sessions", "attributes", "annotations", "processes", "chores" })
+			"sessions", "attributes", "annotations", "processes", "chores", "round-trips" })
 	void runsAScenarioSendingOneRequestPerStep(String name) {
 		JsonNode scenario = ConformanceScenarios.load(ConformanceScenarios.directory().resolve(name + ".json"));
 		Map<String, String> names = ConformanceScenarios.names(scenario);
@@ -364,6 +364,24 @@ class ConformanceScenariosTest {
 		assertThat(ConformanceScenarios.same(ConformanceCodec.json().readTree("true"),
 				ConformanceCodec.json().readTree("1")))
 			.isFalse();
+	}
+
+	@Test
+	void buildsAWriteFromWhatAStepKept() {
+		// The patch carries what the read held (Rules) with the change; a finally step
+		// setting
+		// back a read no step kept sends nothing
+		JsonNode scenario = ConformanceCodec.json()
+			.readTree(
+					"""
+							{"names":["cube"],"steps":[{"service":"cubes","method":"get","params":["name","query"],"args":["${cube}",{"$query":{}}],"keep":"cube","expect":{"fields":{"Name":"${cube}","Rules":"SKIPCHECK;"}}},{"service":"cubes","method":"update","params":["name","patch"],"args":["${cube}",{"$fromRead":"CubePatch","read":"cube","json":{"DrillthroughRules":"x"}}],"expect":{"none":true}}],"finally":[{"service":"cubes","method":"update","params":["name","patch"],"args":["${cube}",{"$fromRead":"CubePatch","read":"never","json":{}}]}]}""");
+		Map<String, String> names = ConformanceScenarios.names(scenario);
+		ConformanceScenarios.Traffic traffic = new ConformanceScenarios.Traffic(ConformanceTm1.ROOT);
+		assertThat(ConformanceScenarios.run(client(traffic, expected(scenario, names)), traffic, scenario, names))
+			.isEmpty();
+		assertThat(traffic.exchanges()).hasSize(2);
+		assertThat(traffic.exchanges().get(1).get("request").get("json"))
+			.isEqualTo(ConformanceCodec.json().readTree("{\"Rules\":\"SKIPCHECK;\",\"DrillthroughRules\":\"x\"}"));
 	}
 
 	@Test

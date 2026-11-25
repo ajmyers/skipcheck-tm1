@@ -191,11 +191,13 @@ public final class ConformanceScenarios {
 	 */
 	public static List<String> run(Tm1Client client, Traffic traffic, JsonNode scenario, Map<String, String> names) {
 		List<String> failures = new ArrayList<>();
+		// What steps keep of their results, as read, for a $fromRead after them
+		Map<String, Object> kept = new LinkedHashMap<>();
 		try {
 			int i = 0;
 			for (JsonNode step : scenario.get("steps")) {
 				traffic.step("steps[" + i + "]");
-				ObjectNode outcome = outcome(client, step, names);
+				ObjectNode outcome = outcome(client, step, names, kept);
 				String why = check(substitute(step.get("expect"), names), outcome);
 				if (why == null) {
 					why = save(step, outcome, names);
@@ -212,10 +214,59 @@ public final class ConformanceScenarios {
 			int i = 0;
 			for (JsonNode step : scenario.path("finally")) {
 				traffic.step("finally[" + i++ + "]");
-				outcome(client, step, names);
+				if (!unkept(step, kept)) {
+					outcome(client, step, names, kept);
+				}
 			}
 		}
 		return failures;
+	}
+
+	/**
+	 * Whether a step builds a {@code $fromRead} from a read no step kept: a
+	 * {@code finally} step setting back what a step that didn't run would have read,
+	 * which is skipped.
+	 */
+	static boolean unkept(JsonNode step, Map<String, Object> kept) {
+		for (JsonNode arg : step.path("args")) {
+			if (arg.isObject() && arg.has("$fromRead") && !kept.containsKey(arg.path("read").asString())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * A step's arguments, decoded; a {@code $fromRead} one built from what a step before
+	 * kept: {@code {"$fromRead": "CubePatch", "read": "cube", "json": {...}}} is
+	 * {@code CubePatch.builder(read)} with the changes {@code json} names, through the
+	 * setters a {@code $patch} uses.
+	 */
+	static @Nullable Object[] args(Method method, JsonNode args, Map<String, Object> kept) {
+		ArrayNode decodable = (ArrayNode) args.deepCopy();
+		Map<Integer, Object> built = new LinkedHashMap<>();
+		for (int i = 0; i < args.size(); i++) {
+			JsonNode arg = args.get(i);
+			if (arg.isObject() && arg.has("$fromRead")) {
+				Object read = kept.get(arg.path("read").asString());
+				if (read == null) {
+					throw new IllegalArgumentException("No read kept as " + arg.path("read") + " for " + arg);
+				}
+				try {
+					built.put(i,
+							PatchBuilders.build(
+									Class.forName("io.skipcheck.tm1.client.model." + arg.get("$fromRead").asString()),
+									arg.path("json"), read));
+				}
+				catch (ClassNotFoundException e) {
+					throw new IllegalArgumentException("No write type " + arg.get("$fromRead"), e);
+				}
+				decodable.set(i, ConformanceCodec.json().nullNode());
+			}
+		}
+		@Nullable Object[] out = ConformanceDecoder.args(method, decodable);
+		built.forEach((i, value) -> out[i] = value);
+		return out;
 	}
 
 	/**
@@ -235,7 +286,8 @@ public final class ConformanceScenarios {
 		return null;
 	}
 
-	private static ObjectNode outcome(Tm1Client client, JsonNode step, Map<String, String> names) {
+	private static ObjectNode outcome(Tm1Client client, JsonNode step, Map<String, String> names,
+			Map<String, Object> kept) {
 		ObjectNode out = ConformanceCodec.json().createObjectNode();
 		Object service;
 		try {
@@ -247,7 +299,7 @@ public final class ConformanceScenarios {
 		List<String> params = new ArrayList<>();
 		step.get("params").forEach(p -> params.add(p.asString()));
 		Method method = ConformanceDecoder.method(service.getClass(), step.get("method").asString(), params);
-		Object[] args = ConformanceDecoder.args(method, substitute(step.get("args"), names));
+		Object[] args = args(method, substitute(step.get("args"), names), kept);
 		try {
 			Object returned = method.invoke(service, args);
 			Object value = returned instanceof Mono<?> mono ? mono.block()
@@ -255,6 +307,9 @@ public final class ConformanceScenarios {
 					: returned instanceof Flux<?> flux && Conformance.bytes(method) ? ConformanceCodec.bytes(flux)
 							: returned instanceof Flux<?> flux ? flux.collectList().block() : returned;
 			out.set("result", ConformanceCodec.result(value));
+			if (step.has("keep") && value != null) {
+				kept.put(step.get("keep").asString(), value);
+			}
 		}
 		catch (InvocationTargetException e) {
 			out.set("error", ConformanceCodec.error(e.getCause()));

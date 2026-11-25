@@ -148,7 +148,22 @@ def _answering_as_expected(scenario: dict[str, Any], names: dict[str, str]) -> F
 
 @pytest.mark.parametrize(
     "name",
-    ["subsets", "members", "edges", "member-sets", "content", "encryption", "git", "users", "sessions", "attributes", "annotations", "processes", "chores"],
+    [
+        "subsets",
+        "members",
+        "edges",
+        "member-sets",
+        "content",
+        "encryption",
+        "git",
+        "users",
+        "sessions",
+        "attributes",
+        "annotations",
+        "processes",
+        "chores",
+        "round-trips",
+    ],
 )
 def test_runs_a_scenario_sending_one_request_per_step(traffic_dir: Path, name: str) -> None:
     # In both flavors
@@ -180,6 +195,21 @@ def test_runs_a_scenario_sending_one_request_per_step(traffic_dir: Path, name: s
     compare = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(compare)
     assert compare.main(["x", str(traffic_dir)]) == 0
+
+
+def test_builds_a_write_from_what_a_step_kept() -> None:
+    # The patch carries what the read held (Rules) with the change; a finally step setting back a
+    # read no step kept sends nothing
+    scenario = json.loads(
+        '{"names":["cube"],"steps":[{"service":"cubes","method":"get","params":["name","query"],"args":["${cube}",{"$query":{}}],"keep":"cube","expect":{"fields":{"Name":"${cube}","Rules":"SKIPCHECK;"}}},{"service":"cubes","method":"update","params":["name","patch"],"args":["${cube}",{"$fromRead":"CubePatch","read":"cube","json":{"DrillthroughRules":"x"}}],"expect":{"none":true}}],"finally":[{"service":"cubes","method":"update","params":["name","patch"],"args":["${cube}",{"$fromRead":"CubePatch","read":"never","json":{}}]}]}'
+    )
+    names = live.names_for(scenario)
+    traffic = live.Traffic(BASE)
+    fake = _answering_as_expected(scenario, names)
+    http = httpx2.Client(transport=httpx2.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
+    assert live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names) == []
+    assert len(traffic.exchanges) == 2
+    assert traffic.exchanges[1]["request"]["json"] == {"Rules": "SKIPCHECK;", "DrillthroughRules": "x"}
 
 
 def test_saves_a_field_of_a_result_for_the_steps_after_it() -> None:

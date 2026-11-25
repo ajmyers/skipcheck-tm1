@@ -1002,7 +1002,13 @@ public final class ModelGenerator {
 		for (Builders.Copy c : plan.copy()) {
 			PatchProperty p = Objects.requireNonNull(properties.get(c.json()), c.json());
 			String accessor = Objects.requireNonNull(accessors.get(c.json()), c.json());
-			from.beginControlFlow("if (read.$L() != null)", accessor)
+			// A value taken as TM1's JSON (a departure, or a value of any type) reads a
+			// null
+			// as a NullNode, which isn't copied either: no client sends a null a read
+			// holds
+			boolean json = p.type().withoutAnnotations().equals(ClassName.get(Object.class));
+			(json ? from.beginControlFlow("if (read.$L() != null && !read.$L().isNull())", accessor, accessor)
+					: from.beginControlFlow("if (read.$L() != null)", accessor))
 				.addStatement("b.$L($L)", p.method(), convert(p, c, "read." + accessor + "()"))
 				.endControlFlow();
 		}

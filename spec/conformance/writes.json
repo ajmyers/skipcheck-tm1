@@ -390,6 +390,19 @@
 			}
 		},
 		{
+			"id": "a departure's value read as null isn't copied, as no declared property's null is",
+			"type": "CAMSettings",
+			"write": "patch",
+			"read": {
+				"ClientURI": "http://cognos.example:9300/bi",
+				"ClientPingCAMPassport": null,
+				"CAMUseSSL": null
+			},
+			"expect": {
+				"ClientURI": "http://cognos.example:9300/bi"
+			}
+		},
+		{
 			"id": "a root's create refuses a read of a type TM1 makes no create for",
 			"type": "Entry",
 			"write": "create",

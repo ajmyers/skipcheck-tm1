@@ -37,17 +37,22 @@ _ENUMS: dict[str, Any] = {e["qualifiedName"]: e for e in _SPEC["enums"]}
 _SETTERS: dict[type, dict[str, Any]] = {}
 
 
-def build(cls: Any, values: Any) -> Any:
+def build(cls: Any, values: Any, read: Any = None) -> Any:
     """A write as the generated builder makes it, as the Java runner's PatchBuilders: each key by the
     setter that writes it, a nested write type's value by its own builder (a root's by the subtype its
     ``@odata.type`` names), a binding by the bind setter from the path as written (already encoded, as
     TM1 gets it), an open type's undeclared key by ``property``. Refused, as a caller couldn't send
     them: a key no setter writes (a declared one included, on an open type too), an enum value TM1
-    doesn't have, a binding of the wrong shape, an ``@odata.type`` the write type doesn't send."""
+    doesn't have, a binding of the wrong shape, an ``@odata.type`` the write type doesn't send. With
+    ``read``, it starts from ``builder(read)``, as a caller changes what was read (``$fromRead``)."""
     if not isinstance(values, dict):
         raise ValueError(f"A {cls.__name__} is an object, not {values!r}")
-    cls = _subtype(cls, values)
-    builder = cls.builder()
+    if read is None:
+        cls = _subtype(cls, values)
+    elif _PLAN[cls.__name__].get("dispatch") is not None:
+        # A root's builder(read) hands off to its subtype's: name the subtype's write type
+        raise ValueError(f"{cls.__name__} is a root: build from a read with a subtype's")
+    builder = cls.builder() if read is None else cls.builder(read)
     setters = _setters(cls)
     plan = {s["json"]: s for s in _PLAN[cls.__name__]["setters"]}
     declared = _declared(cls)

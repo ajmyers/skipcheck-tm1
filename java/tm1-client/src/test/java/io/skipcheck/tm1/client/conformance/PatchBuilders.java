@@ -79,12 +79,36 @@ final class PatchBuilders {
 	 * @throws IllegalArgumentException if a key has no setter, or a value doesn't fit it
 	 */
 	static Object build(Class<?> patch, JsonNode json) {
+		return build(patch, json, null);
+	}
+
+	/**
+	 * Builds a write from what was read, as a caller changes an object:
+	 * {@code builder(read)}, then the setters {@code json} names, as
+	 * {@link #build(Class, JsonNode)} applies them.
+	 * @param patch the write type, such as {@code CubePatch}
+	 * @param json the changes, by TM1's names
+	 * @param read what was read, which {@code builder(read)} starts from; null for
+	 * {@code builder()}
+	 * @return the write, as its builder made it
+	 * @throws IllegalArgumentException if the write type has no {@code builder(read)} for
+	 * it, a key has no setter, or a value doesn't fit it
+	 */
+	static Object build(Class<?> patch, JsonNode json, @Nullable Object read) {
 		if (!json.isObject()) {
 			throw new IllegalArgumentException("A " + patch.getSimpleName() + " is an object, not " + json);
 		}
-		Class<?> type = subtype(patch, json);
+		if (read != null && !SPEC.path("builders").path(patch.getSimpleName()).path("dispatch").isNull()
+				&& SPEC.path("builders").path(patch.getSimpleName()).has("dispatch")) {
+			// A root's builder(read) hands off to its subtype's: name the subtype's write
+			// type
+			throw new IllegalArgumentException(
+					patch.getSimpleName() + " is a root: build from a read with a subtype's");
+		}
+		Class<?> type = read == null ? subtype(patch, json) : patch;
 		try {
-			Object builder = type.getMethod("builder").invoke(null);
+			Object builder = read == null ? type.getMethod("builder").invoke(null)
+					: fromRead(type, read).invoke(null, read);
 			Map<String, Method> setters = setters(builder.getClass());
 			for (var e : json.properties()) {
 				String key = e.getKey();
@@ -122,6 +146,18 @@ final class PatchBuilders {
 		catch (ReflectiveOperationException e) {
 			throw new IllegalStateException("Can't build a " + type.getSimpleName(), e);
 		}
+	}
+
+	/** A write type's {@code builder(read)}. */
+	private static Method fromRead(Class<?> type, Object read) {
+		for (Method m : type.getMethods()) {
+			if (m.getName().equals("builder") && m.getParameterCount() == 1 && Modifier.isStatic(m.getModifiers())
+					&& m.getParameterTypes()[0].isInstance(read)) {
+				return m;
+			}
+		}
+		throw new IllegalArgumentException(
+				type.getSimpleName() + " has no builder(read) for a " + read.getClass().getSimpleName());
 	}
 
 	/** A root's write type for a value naming its subtype, else the type itself. */
