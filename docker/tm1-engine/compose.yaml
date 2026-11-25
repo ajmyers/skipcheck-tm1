@@ -29,7 +29,8 @@ services:
     restart: unless-stopped
     environment:
       TM1_DATASTORE_URL: mongodb://tm1:${TM1_DATASTORE_PASSWORD:-tm1-datastore}@mongo:27017
-      TM1_DATABASES: ${TM1_DATABASES:-tm1}
+      TM1_DATABASES: ${TM1_DATABASES-tm1}      # set but empty: no databases
+      TM1_APPLICATIONS: ${TM1_APPLICATIONS:-}
       TM1_USERS: ${TM1_USERS:-}
       TM1_ENGINE_BUNDLE_URL: ${TM1_ENGINE_BUNDLE_URL:-}
       TM1_ENGINE_BUNDLE: ${TM1_ENGINE_BUNDLE:-}

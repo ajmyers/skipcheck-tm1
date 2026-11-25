@@ -88,11 +88,11 @@ def plan(env=None):
         name, database = _qualified(item, "database")
         if len(database) < 3:
             raise Failure(f"TM1_DATABASES: {database!r}: TM1 needs database names of at least 3 characters")
-        if database.lower() in (d.lower() for d in instance(name)["databases"]):
+        if database in instance(name)["databases"]:  # TM1's names are case-sensitive: Sales and sales are two
             raise Failure(f"TM1_DATABASES: {item!r} is listed twice")
         instance(name)["databases"].append(database)
-    applications = env.get("TM1_APPLICATIONS")
-    if applications is None:
+    applications = env.get("TM1_APPLICATIONS", "").strip()  # empty is unset: compose passes unset ones empty
+    if not applications:
         if not instances:
             instance(DEFAULT_INSTANCE)
         for entry in instances.values():
@@ -111,6 +111,18 @@ def plan(env=None):
             raise Failure(f"TM1_USERS: {name!r} is listed twice")
         users.append({"name": name, "groups": groups})
     return {"instances": instances, "users": users}
+
+
+def seconds(value, name, default):
+    """A whole number of seconds from a setting; the default, with a warning, when it isn't one."""
+    try:
+        number = int(str(value).strip()) if value not in (None, "") else default
+    except ValueError:
+        number = -1
+    if number < 0:
+        log(f"WARNING: {name}={value!r} isn't a whole number of seconds; using {default}")
+        return default
+    return number
 
 
 # ---- HTTP ---------------------------------------------------------------------------
@@ -192,30 +204,39 @@ def application_file(instance, name):
     return os.path.join(CREDENTIALS, instance, name + ".json")
 
 
-def held_application(instance, name=None):
-    """The saved credentials of an application in the instance (the first, if not named)."""
+def held_applications(instance, name=None):
+    """The saved credentials of the instance's applications (of one, if named)."""
     folder = os.path.join(CREDENTIALS, instance)
     wanted = [name + ".json"] if name else sorted(os.listdir(folder)) if os.path.isdir(folder) else []
+    found = []
     for file_name in wanted:
         try:
             with open(os.path.join(folder, file_name)) as file:
-                return json.load(file)
+                found.append(json.load(file))
         except (OSError, ValueError):
             continue
-    return None
+    return found
+
+
+def held_application(instance, name=None):
+    """The saved credentials of an application in the instance (the first, if not named)."""
+    return next(iter(held_applications(instance, name)), None)
 
 
 def session(instance, user, application=None):
     """Logs user in through the instance's application. Returns the session cookie, name=value."""
-    held = held_application(instance, application)
-    if not held:
+    candidates = held_applications(instance, application)
+    if not candidates:
         raise Failure(f"no saved application credentials for instance {instance!r} in {CREDENTIALS}")
-    status, payload, headers = call("POST", f"/{instance}/auth/v1/session",
-                                    basic=(held["clientId"], held["clientSecret"]), body={"User": user})
-    cookie = (headers.get("Set-Cookie") or "").split(";")[0]
-    if status != 201 or not cookie:
-        raise Failure(f"logging in to instance {instance!r} as {user!r}: {status} {message(payload)}")
-    return cookie
+    refused = ""
+    for held in candidates:  # a saved file can outlive its application: try the next
+        status, payload, headers = call("POST", f"/{instance}/auth/v1/session",
+                                        basic=(held["clientId"], held["clientSecret"]), body={"User": user})
+        cookie = (headers.get("Set-Cookie") or "").split(";")[0]
+        if status == 201 and cookie:
+            return cookie
+        refused = f"{status} {message(payload)}"
+    raise Failure(f"logging in to instance {instance!r} as {user!r}: {refused}")
 
 
 # ---- setup --------------------------------------------------------------------------
@@ -310,7 +331,8 @@ def apply_users(instance, database, users):
         return payload
 
     have_groups = {group["Name"].lower(): group["Name"] for group in request("GET", "Groups?$select=Name")["value"]}
-    have_users = {user["Name"].lower(): user["Name"] for user in request("GET", "Users?$select=Name")["value"]}
+    have_users = {user["Name"].lower(): (user["Name"], sorted(group["Name"].lower() for group in user.get("Groups") or []))
+                  for user in request("GET", "Users?$select=Name&$expand=Groups($select=Name)")["value"]}
     for user in users:
         groups = list(user["groups"])
         if user["name"].lower() == "admin" and groups and "admin" not in (group.lower() for group in groups):
@@ -327,28 +349,22 @@ def apply_users(instance, database, users):
             if bind:
                 body["Groups@odata.bind"] = bind
             request("POST", "Users", body)
-        elif bind:
-            request("PATCH", f"Users({quote(existing)})", {"Groups@odata.bind": bind})
+        elif bind and existing[1] != sorted(group.lower() for group in groups):
+            request("PATCH", f"Users({quote(existing[0])})", {"Groups@odata.bind": bind})
 
 
 def setup():
     wanted = plan()
-    wait_for_gateway(int(os.environ.get("TM1_ENGINE_START_TIMEOUT", "300")))
+    wait_for_gateway(seconds(os.environ.get("TM1_ENGINE_START_TIMEOUT"), "TM1_ENGINE_START_TIMEOUT", 300))
     client_id, client_secret = root()
     _write_secret(os.path.join(CREDENTIALS, "root.json"), {"clientId": client_id, "clientSecret": client_secret})
 
     # Databases the last stop scaled down come back first, whoever made them.
-    try:
-        with open(STOPPED) as file:
-            stopped = [tuple(pair) for pair in json.load(file)]
-    except (OSError, ValueError):
-        stopped = []
+    stopped = stopped_before()
     have_instances = names("Instances")
     for instance, database in stopped:
         if instance in have_instances and database in names(f"Instances({quote(instance)})/Databases"):
             manage("PATCH", f"Instances({quote(instance)})/Databases({quote(database)})", {"Replicas": 1})
-    if os.path.exists(STOPPED):
-        os.remove(STOPPED)
 
     databases = []
     for instance, entry in wanted["instances"].items():
@@ -369,6 +385,8 @@ def setup():
             databases.append((instance, database))
     wait_ready(databases + [pair for pair in stopped if pair not in databases and pair[0] in have_instances
                             and pair[1] in names(f"Instances({quote(pair[0])})/Databases")], 300)
+    if os.path.exists(STOPPED):
+        os.remove(STOPPED)  # only now: a stop before this point must still know what to bring back
     for instance, database in databases:
         if held_application(instance):
             apply_users(instance, database, wanted["users"])
@@ -439,7 +457,11 @@ def command_database(args):
             raise Failure(f"{database!r}: TM1 needs database names of at least 3 characters")
         manage("POST", f"Instances({quote(instance)})/Databases", {"Name": database})
         wait_ready([(instance, database)], 300)
-        apply_users(instance, database, plan()["users"])
+        users = plan()["users"]
+        if users and not held_application(instance):
+            log(f"WARNING: no application in instance {instance}, so TM1_USERS wasn't applied to {database}")
+        else:
+            apply_users(instance, database, users)
         print(f"/{instance}/api/v1/Databases('{database}')/")
     else:
         manage("DELETE", f"Instances({quote(instance)})/Databases({quote(database)})")
@@ -481,10 +503,19 @@ def running_databases():
     return pids
 
 
+def stopped_before():
+    """The databases an earlier stop-databases scaled down, as (instance, database) pairs."""
+    try:
+        with open(STOPPED) as file:
+            return [tuple(pair) for pair in json.load(file)]
+    except (OSError, ValueError):
+        return []
+
+
 def command_stop_databases(args):
     """Scales every running database to no replicas: TM1 commits and shuts each one down. tm1sd
     alone would leave them running when it stops."""
-    seconds = int(args[0]) if args else 60
+    timeout = seconds(args[0] if args else None, "the stop timeout", 60)
     running = []
     try:
         for instance in names("Instances"):
@@ -494,8 +525,10 @@ def command_stop_databases(args):
     except (Failure, OSError):
         log("TM1 isn't answering, so there are no databases to stop through it")
         return 1
+    # Added to what an earlier stop recorded: a stop before setup brought those back mustn't lose them
+    record = sorted(set(stopped_before()) | set(running))
     with open(STOPPED, "w") as file:
-        json.dump(running, file)
+        json.dump(record, file)
     failures = []
 
     def stop(instance, database):
@@ -509,14 +542,14 @@ def command_stop_databases(args):
         thread.start()
     for thread in threads:
         thread.join()
-    deadline = time.monotonic() + seconds
+    deadline = time.monotonic() + timeout
     while running_databases() and time.monotonic() < deadline:
         time.sleep(0.5)
     for failure in failures:
         log("WARNING: " + failure)
     left = running_databases()
     if left:
-        log(f"WARNING: {len(left)} database process(es) still running after {seconds}s")
+        log(f"WARNING: {len(left)} database process(es) still running after {timeout}s")
         return 1
     log(f"Stopped {len(running)} database(s) cleanly")
     return 0
@@ -552,7 +585,10 @@ def configure(config, env=None):
 
     def put(section, key, value, shown=None):
         if section.get(key) != value:
-            changes.append(f"{shown or key}: {section.get(key)!r} -> " + ("(set)" if key == "pass" else repr(value)))
+            if key == "pass":
+                changes.append(f"{shown or key}: (changed)")
+            else:
+                changes.append(f"{shown or key}: {section.get(key)!r} -> {value!r}")
             section[key] = value
 
     gateway = config.setdefault("services", {}).setdefault("tm1-gateway", {})

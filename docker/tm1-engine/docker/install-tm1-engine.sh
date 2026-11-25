@@ -93,11 +93,14 @@ mkdir -p "$TARGET" 2>/dev/null || die "can't create $TARGET"
 exec 9>"$TARGET/.install.lock"
 flock 9
 
-if [ -n "$KEY" ] && [ -f "$MARKER" ] && [ "$(cat "$MARKER")" = "$KEY" ] && [ -x "$TARGET/bin/tm1sd.exe" ]; then
+# An install is whole once its marker is written and INSTALLING, made first and removed
+# last, is gone. One that was cut short is done again.
+INSTALLING="$TARGET/.tm1-engine-installing"
+if [ ! -e "$INSTALLING" ] && [ -n "$KEY" ] && [ -f "$MARKER" ] && [ "$(cat "$MARKER")" = "$KEY" ] && [ -x "$TARGET/bin/tm1sd.exe" ]; then
   log "TM1 already installed in $TARGET from this package ($SHOWN)"
   exit 0
 fi
-if [ -e "$TARGET/bin" ] && [ ! -f "$MARKER" ]; then
+if [ -e "$TARGET/bin" ] && [ ! -f "$MARKER" ] && [ ! -e "$INSTALLING" ]; then
   die "$TARGET already contains a TM1 install not created by tm1-engine-install; refusing to overwrite it"
 fi
 
@@ -129,7 +132,6 @@ if [ -n "${TM1_ENGINE_BUNDLE_SHA256:-}" ]; then
 fi
 
 log "Installing TM1 from $SHOWN into $TARGET (one-time)"
-find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .install.lock -exec rm -rf {} +
 
 # Detect the type from the contents: gzip (1f8b) = IBM's package, "#!" (2321) = the
 # installer inside it.
@@ -158,14 +160,20 @@ python3 /usr/local/lib/tm1-engine/unpack-tm1-engine.py "$run" "$work/inst" >&2 \
 [ -f "$work/inst/bin/tm1sd.exe" ] && [ -d "$work/inst/deployment" ] \
   || die "$SHOWN doesn't look like a TM1 v12 installer (no bin/tm1sd.exe or deployment/ in it)"
 
+# Only now, with a package known to be good, is what was in the target replaced
+: > "$INSTALLING"
+find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .install.lock ! -name .tm1-engine-installing -exec rm -rf {} +
 cp -a "$work/inst/bin" "$TARGET/bin"
 cp -a "$work/inst/deployment" "$TARGET/deployment-template"
 [ -d "$work/inst/copyright" ] && cp -a "$work/inst/copyright" "$TARGET/copyright"
 # What the installer would have told us: TM1's version, and the MongoDB version it downloads.
-sed -n 's/^VERSION="\(.*\)"$/\1/p' "$work/inst/installer.sh" 2>/dev/null | head -1 > "$TARGET/version.txt"
-sed -n 's/^DS_VERSION="\(.*\)"$/\1/p' "$work/inst/scripts/datastore.sh" 2>/dev/null | head -1 > "$TARGET/datastore-version.txt"
+# (Another TM1 version may not have these files: the versions are then unknown, not an error.)
+{ sed -n 's/^VERSION="\(.*\)"$/\1/p' "$work/inst/installer.sh" 2>/dev/null || true; } | head -1 > "$TARGET/version.txt"
+{ sed -n 's/^DS_VERSION="\(.*\)"$/\1/p' "$work/inst/scripts/datastore.sh" 2>/dev/null || true; } | head -1 > "$TARGET/datastore-version.txt"
 
 chmod -R u+rwX,go+rX "$TARGET"
 chmod -R a+x "$TARGET/bin"
 echo "$KEY" > "$MARKER"
-log "Installed: TM1 $(cat "$TARGET/version.txt" 2>/dev/null || echo "(unknown version)")"
+rm -f "$INSTALLING"
+version=$(cat "$TARGET/version.txt" 2>/dev/null || true)
+log "Installed: TM1 ${version:-(unknown version)}"

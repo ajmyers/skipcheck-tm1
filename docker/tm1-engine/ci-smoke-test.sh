@@ -19,7 +19,8 @@ run() { docker run --rm "$@"; }  # image is linux/amd64 (pinned in the Dockerfil
 
 # 1. Shell scripts pass shellcheck
 if command -v shellcheck >/dev/null; then
-  shellcheck -S warning "$here"/docker/*.sh "$here"/ci-smoke-test.sh && pass "shellcheck"
+  shellcheck -S warning "$here"/docker/*.sh "$here"/ci-smoke-test.sh || fail "shellcheck"
+  pass "shellcheck"
 else
   echo "skip - shellcheck not installed"
 fi

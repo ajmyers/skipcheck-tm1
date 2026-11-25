@@ -46,11 +46,17 @@ def test_plan_with_no_databases_still_has_the_instance_and_its_application() -> 
     assert engine.plan({"TM1_DATABASES": ""}) == {"instances": {"tm1": {"applications": ["tm1"], "databases": []}}, "users": []}
 
 
+def test_plan_takes_names_as_tm1_does_and_an_empty_application_list_as_unset() -> None:
+    # TM1's database names are case-sensitive; compose passes a variable that isn't set as empty
+    plan = engine.plan({"TM1_DATABASES": "sales,Sales", "TM1_APPLICATIONS": " "})
+    assert plan["instances"] == {"tm1": {"applications": ["tm1"], "databases": ["sales", "Sales"]}}
+
+
 @pytest.mark.parametrize(
     ("env", "message"),
     [
         ({"TM1_DATABASES": "ab"}, "at least 3 characters"),
-        ({"TM1_DATABASES": "sales,Sales"}, "listed twice"),
+        ({"TM1_DATABASES": "sales,sales"}, "listed twice"),
         ({"TM1_DATABASES": "my db"}, "names are letters"),
         ({"TM1_DATABASES": "a/b/sales"}, "names are letters"),
         ({"TM1_USERS": "analyst:"}, "USER[:GROUP[:GROUP]]"),
@@ -107,6 +113,11 @@ def test_configure_points_tm1_at_a_mongodb_with_a_control_database_of_its_own() 
     before = datastore["controlDatabase"]
     assert engine.configure(config, {"TM1_DATASTORE_URL": "mongodb://root:secret@mongo:27017"}) == []
     assert config["datastore"]["controlDatabase"] == before
+
+    # A changed password is applied, and neither the old nor the new one is logged
+    changes = engine.configure(config, {"TM1_DATASTORE_URL": "mongodb://root:rotated@mongo:27017"})
+    assert config["datastore"]["pass"] == "rotated"
+    assert changes == ["datastore.pass: (changed)"]
 
 
 # ---- setup, against a stand-in for TM1 --------------------------------------------------------
@@ -188,7 +199,7 @@ class FakeTm1:
                 return 201, {"Name": body["Name"]}, {}
             return 200, {"value": [{"Name": group} for group in database["groups"]]}, {}
         if method == "GET":
-            return 200, {"value": [{"Name": user} for user in database["users"]]}, {}
+            return 200, {"value": [{"Name": user, "Groups": [{"Name": group} for group in groups]} for user, groups in database["users"].items()]}, {}
         groups = [re.fullmatch(rf"Groups{key}", bound)[1] for bound in body.get("Groups@odata.bind", [])]
         assert all(group in database["groups"] for group in groups), groups
         if method == "POST":
@@ -268,8 +279,19 @@ def test_setup_again_changes_nothing(tm1: FakeTm1, monkeypatch: pytest.MonkeyPat
     secret = tm1.instances["tm1"]["applications"]["tm1"]["ClientSecret"]
     tm1.requests.clear()
     engine.setup()
-    assert [request for request in tm1.requests if request[0] in ("POST", "DELETE") and "/auth/" not in request[1]] == []
+    assert [request for request in tm1.requests if request[0] != "GET" and "/auth/" not in request[1]] == []
     assert tm1.instances["tm1"]["applications"]["tm1"]["ClientSecret"] == secret
+
+
+def test_setup_puts_a_user_back_in_the_groups_asked_for(tm1: FakeTm1, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TM1_USERS", "analyst:Analysts,viewer")
+    engine.setup()
+    users = tm1.instances["tm1"]["databases"]["tm1"]["users"]
+    users["analyst"] = ["ADMIN"]
+    users["viewer"] = ["ADMIN"]
+    engine.setup()
+    assert users["analyst"] == ["Analysts"]
+    assert users["viewer"] == ["ADMIN"]  # no groups were asked for: left as it is
 
 
 def test_setup_replaces_an_application_whose_secret_is_lost(tm1: FakeTm1) -> None:
@@ -295,9 +317,21 @@ def test_stopping_scales_every_database_down_and_setup_brings_them_back(tm1: Fak
     databases = tm1.instances["tm1"]["databases"]
     assert {name: database["Replicas"] for name, database in databases.items()} == {"tm1": 0, "scratch": 0}
 
+    # A second stop before anything came back (a failed start, say) keeps the first one's list
+    assert engine.command_stop_databases(["5"]) == 0
+    assert sorted(json.loads(Path(engine.STOPPED).read_text())) == [["tm1", "scratch"], ["tm1", "tm1"]]
+
     engine.setup()
     assert {name: database["Replicas"] for name, database in databases.items()} == {"tm1": 1, "scratch": 1}
     assert not Path(engine.STOPPED).exists()
+
+
+def test_timeouts_that_arent_numbers_fall_back_with_a_warning(tm1: FakeTm1, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setenv("TM1_ENGINE_START_TIMEOUT", "5m")
+    engine.setup()
+    assert "TM1_ENGINE_START_TIMEOUT='5m' isn't a whole number of seconds; using 300" in capsys.readouterr().err
+    assert engine.command_stop_databases(["60s"]) == 0  # the databases are still stopped through TM1
+    assert tm1.instances["tm1"]["databases"]["tm1"]["Replicas"] == 0
 
 
 def test_setup_failure_says_what_tm1_logged(tm1: FakeTm1, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -350,6 +384,26 @@ def test_session_logs_in_through_the_saved_application(tm1: FakeTm1, capsys: pyt
     assert capsys.readouterr().out.strip() == "TM1SessionId=tm1:analyst"
     with pytest.raises(engine.Failure, match="no saved application credentials"):
         engine.session("other", "admin")
+
+
+def test_session_skips_a_saved_application_tm1_no_longer_has(tm1: FakeTm1) -> None:
+    engine.setup()
+    (tm1.credentials / "tm1" / "aaa.json").write_text(json.dumps({"instance": "tm1", "name": "aaa", "clientId": "gone", "clientSecret": "gone"}))
+    assert engine.session("tm1", "admin") == "TM1SessionId=tm1:admin"
+    (tm1.credentials / "tm1" / "tm1.json").unlink()
+    with pytest.raises(engine.Failure, match="logging in to instance 'tm1' as 'admin': 401"):
+        engine.session("tm1", "admin")
+
+
+def test_database_create_without_an_application_warns_and_still_creates(tm1: FakeTm1, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setenv("TM1_USERS", "analyst")
+    engine.setup()
+    engine.manage("POST", "Instances", {"Name": "bare"})
+    capsys.readouterr()
+    engine.command_database(["create", "bare/scratch"])
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "/bare/api/v1/Databases('scratch')/"
+    assert "no application in instance bare" in captured.err
 
 
 def test_credentials_lists_everything_and_only_secrets_it_holds(tm1: FakeTm1, capsys: pytest.CaptureFixture[str]) -> None:

@@ -60,7 +60,9 @@ have_bundle() {
   [ -n "${TM1_ENGINE_BUNDLE_URL:-}" ] || [ -n "${TM1_ENGINE_BUNDLE:-}" ] && return 0
   compgen -G "${TM1_ENGINE_BUNDLE_DIR:-/ibm}/tm1-v*-standalone-linux.tgz" >/dev/null
 }
-if [ ! -x "$BIN/tm1sd.exe" ] && have_bundle; then
+# An install is whole once its marker of an unfinished one is gone
+installed() { [ -x "$BIN/tm1sd.exe" ] && [ ! -e "$TM1_ENGINE_HOME/.tm1-engine-installing" ]; }
+if ! installed && have_bundle; then
   if mountpoint -q "$TM1_ENGINE_HOME"; then
     # A volume (or folder) is mounted there without an install: install into it, so
     # it's filled once and reused.
@@ -77,9 +79,9 @@ if [ ! -x "$BIN/tm1sd.exe" ] && have_bundle; then
   fi
 fi
 
-if [ ! -x "$BIN/tm1sd.exe" ]; then
+if ! installed; then
   cat >&2 <<MSG
-[tm1-engine-entrypoint] ERROR: $BIN/tm1sd.exe not found.
+[tm1-engine-entrypoint] ERROR: no TM1 install at $TM1_ENGINE_HOME ($BIN/tm1sd.exe not found, or its install didn't finish).
 
   tm1-engine does not include IBM software. Give it your own licensed TM1 v12
   (tm1-v<version>-standalone-linux.tgz) in one of these ways:
@@ -123,11 +125,12 @@ if [ "$datastore" = embedded ]; then
     [ -w "$TM1_ENGINE_HOME/" ] || die "TM1 needs MongoDB. Set TM1_DATASTORE_URL to one (e.g. a mongo:8.0 container: mongodb://user:password@mongo:27017), or mount $TM1_ENGINE_HOME read-write so MongoDB can be downloaded into it."
     version=$(cat "$TM1_ENGINE_HOME/datastore-version.txt" 2>/dev/null || true); version=${version:-8.0.32}
     url=${TM1_DATASTORE_DOWNLOAD_URL:-https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2404-$version.tgz}
+    # "|| die" on every step: errexit is off inside a subshell that is the left side of ||
     (
-      flock 9
+      flock 9 || die "couldn't lock $TM1_ENGINE_HOME"
       [ -x "$ds/mongod" ] && exit 0   # another container sharing this install got there first
       log "TM1_DATASTORE_URL isn't set, so TM1 runs its own MongoDB: downloading MongoDB $version (one-time)"
-      tmp=$(mktemp -d)
+      tmp=$(mktemp -d) || die "couldn't make a temporary folder"
       curl -fsSL --retry 3 --retry-delay 2 -o "$tmp/mongodb.tgz" "$url" || die "download failed: $url. Set TM1_DATASTORE_URL to a MongoDB instead."
       if sum=$(curl -fsSL --retry 3 "$url.sha256" 2>/dev/null); then
         echo "${sum%% *}  $tmp/mongodb.tgz" | sha256sum -c --quiet - || die "checksum mismatch for $url"
@@ -139,11 +142,12 @@ if [ "$datastore" = embedded ]; then
         || die "couldn't unpack $url"
       real=$(find "$tmp" -type f -name mongod | head -1)
       [ -n "$real" ] || die "no mongod in $url"
-      mkdir -p "$ds"
+      mkdir -p "$ds" || die "couldn't create $ds"
       find "$tmp" -type f \( -name 'LICENSE*' -o -name 'MPL-2' -o -name 'THIRD-PARTY-NOTICES' -o -name README \) -exec mv {} "$ds/" \;
-      mv "$real" "$ds/mongod.bin"
-      # TM1 starts mongod with a 16 GB cache; the wrapper holds it to TM1_DATASTORE_CACHE_GB
-      install -m 755 "$LIB/mongod-wrapper.sh" "$ds/mongod"
+      mv "$real" "$ds/mongod.bin" || die "couldn't put MongoDB in $ds"
+      # TM1 starts mongod with a 16 GB cache; the wrapper holds it to TM1_DATASTORE_CACHE_GB.
+      # Written last: with it there, the download isn't done again.
+      install -m 755 "$LIB/mongod-wrapper.sh" "$ds/mongod" || die "couldn't put MongoDB in $ds"
       rm -rf "$tmp"
     ) 9>"$TM1_ENGINE_HOME/.datastore.lock" || exit $?
   elif [ ! -e "$ds/mongod.bin" ]; then
@@ -164,7 +168,13 @@ TM1_PID=$!
 
 running() { kill -0 "$TM1_PID" 2>/dev/null; }
 
+SETUP_PID=
 stop_tm1() {
+  # Setup may still be creating things: it mustn't start a database while they're stopped
+  if [ -n "$SETUP_PID" ]; then
+    kill "$SETUP_PID" 2>/dev/null || true
+    wait "$SETUP_PID" 2>/dev/null || true
+  fi
   # tm1sd doesn't stop its databases (tm1s.exe): left alone, they'd be killed with the
   # container. So they're stopped through TM1 first, which commits each one.
   if running; then
@@ -189,7 +199,10 @@ trap shutdown INT TERM
 # Create what was asked for once TM1 answers. A failure stops the container: half a
 # setup isn't what was asked for.
 rm -f /tmp/tm1-engine-ready.json /tmp/tm1-engine-setup-failed
-( /usr/local/bin/tm1-engine setup || touch /tmp/tm1-engine-setup-failed ) &
+( trap 'kill "$child" 2>/dev/null; exit 0' TERM
+  /usr/local/bin/tm1-engine setup & child=$!
+  wait "$child" || touch /tmp/tm1-engine-setup-failed ) &
+SETUP_PID=$!
 
 # Sleep in the background + wait, so the trap fires immediately on a signal.
 while running; do

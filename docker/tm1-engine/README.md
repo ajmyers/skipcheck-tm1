@@ -58,8 +58,9 @@ TM1 v12 keeps its metadata (instances, databases, applications) in MongoDB.
   `replicaSet` and `tlsCAFile`, as IBM's installer does.
 - **Without it,** TM1 runs its own: on first start the container downloads the MongoDB
   version IBM's installer would (8.0.32 for TM1 12.6.7) from mongodb.org into the install,
-  checks its SHA-256, and holds its cache to `TM1_DATASTORE_CACHE_GB` (default 0.5; TM1
-  would start it with 16 GB). That needs internet on first start, and a writable install
+  checks it against the SHA-256 published beside it (with a warning if that can't be
+  fetched), and holds its cache to `TM1_DATASTORE_CACHE_GB` (default 0.5; TM1 would start
+  it with 16 GB). That needs internet on first start, and a writable install
   (the cache, or a volume).
 
   ```sh
@@ -68,6 +69,10 @@ TM1 v12 keeps its metadata (instances, databases, applications) in MongoDB.
 
 TM1 creates a control database and one database per instance in MongoDB. Tested with a
 MongoDB administrator (`root`), on MongoDB 8.0.
+
+Keep the password in the URL to letters and digits: whether TM1 decodes `%40` and the like
+hasn't been checked. A deployment that has used a MongoDB of yours keeps using it:
+removing `TM1_DATASTORE_URL` later doesn't move it to a MongoDB of TM1's own.
 
 The MongoDB and `/tm1/deployment` belong together: keep or remove both. With the
 deployment kept and the MongoDB gone (`docker compose down -v`, say), TM1 starts empty and
@@ -81,7 +86,7 @@ On every start the container makes sure these exist, and creates only what's mis
 
 | Variable | Default | |
 |---|---|---|
-| `TM1_DATABASES` | `tm1` | `[instance/]database,...`: databases, in instance `tm1` unless named. Empty for none. Names need at least 3 characters. |
+| `TM1_DATABASES` | `tm1` | `[instance/]database,...`: databases, in instance `tm1` unless named. Empty for none. Names need at least 3 characters, and `Sales` and `sales` are two databases. |
 | `TM1_APPLICATIONS` | `tm1` in each instance | `[instance/]application,...`: applications, whose credentials are saved in `/tm1/credentials` |
 | `TM1_USERS` | | `user[:group[:group]],...`: users for every database, in exactly those groups (created if missing). `admin` always stays in `ADMIN`. |
 
@@ -113,13 +118,13 @@ The image needs IBM's `tm1-v<version>-standalone-linux.tgz`. It looks in this or
 | # | Source | How |
 |---|---|---|
 | 1 | **An install made by this image** | a volume or folder at `/opt/ibm/tm1-engine`, or a private image built on this one |
-| 2 | **IBM's package, mounted** | `-v /path/to/ibm-downloads:/ibm:ro` (optionally `-e TM1_ENGINE_BUNDLE=<file name>`) |
-| 3 | **A download URL** | `-e TM1_ENGINE_BUNDLE_URL=https://...`, e.g. a pre-signed S3, R2 or GCS link; `TM1_ENGINE_BUNDLE_SHA256` verifies it |
+| 2 | **A download URL** | `-e TM1_ENGINE_BUNDLE_URL=https://...`, e.g. a pre-signed S3, R2 or GCS link; `TM1_ENGINE_BUNDLE_SHA256` verifies it |
+| 3 | **IBM's package, mounted** | `-v /path/to/ibm-downloads:/ibm:ro` (optionally `-e TM1_ENGINE_BUNDLE=<file name>`) |
 | 4 | **A package piped in** | `... \| docker run -i --rm -v tm1-engine:/opt/ibm/tm1-engine ghcr.io/ajmyers/tm1-engine install -`, then mount the volume |
 
 With 2 and 3, TM1 is installed into `/tm1/cache/<key>` (one folder per package), or into
 an empty volume mounted at `/opt/ibm/tm1-engine`. Several containers can share one
-cache; installs are locked.
+cache; installs are locked, and one that was cut short is done again.
 
 **IBM's installer isn't run.** It asks questions, registers a systemd service and
 downloads MongoDB. The package's installer is a self-extracting archive, so the container
