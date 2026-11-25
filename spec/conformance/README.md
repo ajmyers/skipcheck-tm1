@@ -18,6 +18,14 @@ When a change to the spec, the overlay, the probe file or the Java generator cha
 
 The manifest doesn't hold the types a setter takes (Python's setters take `Any`, and TypeScript's types are gone at runtime), nor what `builder(read)` copies: `writes.json` covers that.
 
+## What `builder(read)` copies (`writes.json`)
+
+A create's `builder(read)` copies the properties its setters write. A patch's leaves out what the probe found a PATCH of that type ignores or rejects, and the collections a PATCH appends to (copying one would add its members again). That holds for a type with probe writes of its own. A nested value's write type has none yet, since the probe's nested outcomes aren't read per field, so its `builder(read)` copies every setter it offers (#360).
+
+Navigations aren't copied. A create's `builder(read)` binds them, and a patch's binds only single-valued ones, where the read says the targets' paths. An open type's undeclared properties are copied too, but not nulls or annotations.
+
+A setter the overlay keeps, though the probe couldn't try its PATCH (outcome `untested`), is copied like any other. The only such top-level property today is `ServerSettingsPatch`'s `EncryptionAtRest`, which needs a key store to probe. It is also the only copy through a root patch's `of(read)`. So its two cases, a known subtype and one a client doesn't know, are what holds every client's root-patch dispatch to the same writes (#358).
+
 ## Recorded calls (`calls/`)
 
 ### Format
