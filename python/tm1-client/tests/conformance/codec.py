@@ -12,7 +12,6 @@ import enum
 import inspect
 import json
 import re
-import urllib.parse
 from pathlib import Path
 from typing import Any
 
@@ -31,41 +30,81 @@ SPEC_VERSION = 1
 HEADERS = {"accept", "content-type", "if-match", "if-none-match", "odata-version", "odata-maxversion", "prefer"}
 
 
-_PLAN: dict[str, Any] = json.loads((Path(__file__).resolve().parents[4] / "spec" / "tm1-api.json").read_text(encoding="utf-8"))["builders"]
+_SPEC: dict[str, Any] = json.loads((Path(__file__).resolve().parents[4] / "spec" / "tm1-api.json").read_text(encoding="utf-8"))
+_PLAN: dict[str, Any] = _SPEC["builders"]
+_TYPES: dict[str, Any] = {t["qualifiedName"]: t for t in _SPEC["types"]}
+_ENUMS: dict[str, Any] = {e["qualifiedName"]: e for e in _SPEC["enums"]}
 _SETTERS: dict[type, dict[str, Any]] = {}
 
 
-def build(cls: Any, values: dict[str, Any]) -> Any:
+def build(cls: Any, values: Any) -> Any:
     """A write as the generated builder makes it, as the Java runner's PatchBuilders: each key by the
     setter that writes it, a nested write type's value by its own builder (a root's by the subtype its
-    ``@odata.type`` names), a binding by the bind setter, an open type's undeclared key by
-    ``property``. A key no setter writes is refused: a caller can't send it, so neither can a scenario."""
+    ``@odata.type`` names), a binding by the bind setter from the path as written (already encoded, as
+    TM1 gets it), an open type's undeclared key by ``property``. Refused, as a caller couldn't send
+    them: a key no setter writes (a declared one included, on an open type too), an enum value TM1
+    doesn't have, a binding of the wrong shape, an ``@odata.type`` the write type doesn't send."""
+    if not isinstance(values, dict):
+        raise ValueError(f"A {cls.__name__} is an object, not {values!r}")
     cls = _subtype(cls, values)
     builder = cls.builder()
     setters = _setters(cls)
     plan = {s["json"]: s for s in _PLAN[cls.__name__]["setters"]}
+    declared = _declared(cls)
     for key, v in values.items():
         if key == "@odata.type":
-            continue  # the builder sends its own; the subtype was picked by it
+            # The builder sends its own, which must be this one
+            if builder._values.get("@odata.type") != v:
+                raise ValueError(f"{cls.__name__} doesn't send @odata.type {v}")
+            continue
         setter = setters.get(key)
         if setter is not None:
             if key.endswith("@odata.bind"):
-                # As a caller's ODataPath: decoded, then encoded once (a scenario's JSON may hold either)
-                if isinstance(v, list):
-                    getattr(builder, setter)(*(_path(t) for t in v))
+                # As written, already encoded: Python's bind setters take a path's text as it is
+                if plan[key[: -len("@odata.bind")]]["collection"]:
+                    if not isinstance(v, list):
+                        raise ValueError(f"{setter} binds a list of paths, not {v!r}")
+                    getattr(builder, setter)(*(_path(setter, t) for t in v))
                 else:
-                    getattr(builder, setter)(_path(v))
+                    getattr(builder, setter)(_path(setter, v))
             else:
+                _check(declared.get(key), v)
                 getattr(builder, setter)(_value(plan[key]["value"], v))
-        elif not key.startswith("@") and hasattr(builder, "property"):
+        elif not key.startswith("@") and hasattr(builder, "property") and key not in declared:
             builder.property(key, v)
         else:
             raise ValueError(f"{cls.__name__} has no setter for {key}")
     return builder.build()
 
 
-def _path(encoded: str) -> ODataPath:
-    return ODataPath.link(urllib.parse.unquote(encoded))
+def _path(setter: str, path: Any) -> str:
+    if not isinstance(path, str):
+        raise ValueError(f"{setter} binds a path, not {path!r}")
+    return path
+
+
+def _declared(cls: Any) -> dict[str, Any]:
+    """The properties and navigations a write's type declares, its base's too, by name."""
+    name = re.sub(r"(Create|Patch)$", "", cls.__name__)
+    out: dict[str, Any] = {}
+    level = next((t for t in _TYPES.values() if t["name"] == name), None)
+    while level is not None:
+        for prop in level["properties"] + level["navigationProperties"]:
+            out.setdefault(prop["name"], prop)
+        level = _TYPES.get(level["baseType"]) if level.get("baseType") else None
+    return out
+
+
+def _check(prop: Any, v: Any) -> None:
+    """An enum's value must be one TM1 has, as the typed clients refuse what doesn't read back."""
+    if prop is None or v is None or prop["type"] not in _ENUMS:
+        return
+    enum = _ENUMS[prop["type"]]
+    members = {m["name"] for m in enum["members"]}
+    for value in v if isinstance(v, list) else [v]:
+        parts = value.split(",") if enum["flags"] and isinstance(value, str) else [value]
+        if any(part.strip() not in members for part in parts):
+            raise ValueError(f"{value!r} doesn't read back as written: {enum['name']} has no such member")
 
 
 def _subtype(cls: Any, values: dict[str, Any]) -> Any:

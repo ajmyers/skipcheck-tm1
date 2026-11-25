@@ -36,3 +36,29 @@ def test_builds_a_nested_value_with_its_own_builder_and_a_roots_by_subtype() -> 
 def test_sets_an_open_types_undeclared_property_by_name() -> None:
     built = build(p.EncryptionAtRestProviderSettingsPatch, {"KeyRef": "k", "Extra": "x"})
     assert built.json()["Extra"] == "x"
+
+
+def test_takes_a_bindings_path_as_written_encoded() -> None:
+    # A key's %2F is a slash in the key, not between segments
+    built = build(p.CubeCreate, {"Name": "c", "Dimensions@odata.bind": ["Dimensions('a%2Fb')"]})
+    assert built.json()["Dimensions@odata.bind"] == ["Dimensions('a%2Fb')"]
+    with pytest.raises(ValueError, match="binds a list of paths"):
+        build(p.CubeCreate, {"Name": "c", "Dimensions@odata.bind": "Dimensions('d')"})
+
+
+def test_refuses_a_declared_key_no_setter_writes_on_an_open_type() -> None:
+    # NativeView is open, but declares Name, which its patch doesn't offer
+    with pytest.raises(ValueError, match="NativeViewPatch has no setter for Name"):
+        build(p.NativeViewPatch, {"@odata.type": "#ibm.tm1.api.v1.NativeView", "Name": "renamed"})
+
+
+def test_refuses_a_value_that_doesnt_read_back_as_written() -> None:
+    with pytest.raises(ValueError, match="doesn't read back as written"):
+        build(p.ChoreCreate, {"Name": "c", "ExecutionMode": "Nope"})
+    with pytest.raises(ValueError, match="doesn't send @odata.type"):
+        build(p.CubeCreate, {"@odata.type": "#ibm.tm1.api.v1.Cube", "Name": "c"})
+
+
+def test_keeps_a_date_times_offset() -> None:
+    built = build(p.ChoreCreate, {"Name": "c", "StartTime": "2026-03-04T05:06:07.5+02:00"})
+    assert built.json()["StartTime"] == "2026-03-04T05:06:07.5+02:00"
