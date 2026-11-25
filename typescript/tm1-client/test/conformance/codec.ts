@@ -3,17 +3,99 @@
 /** The language-neutral encoding of the conformance fixtures (spec/conformance/README.md): arguments
  * decoded into this client's values, results and errors encoded to compare with what the Java
  * client recorded, and the request comparison every runner makes. */
-import { Filter, ODataPath, ODataQuery } from "../../src/index.js";
+import { readFileSync } from "node:fs";
+import { Filter, ODataPath, ODataQuery, Tm1PatchBuilder } from "../../src/index.js";
 import * as Errors from "../../src/errors/index.js";
 import * as Model from "../../src/generated/model.js";
 import * as Patches from "../../src/generated/patches.js";
 import * as Services from "../../src/services/index.js";
 import { schema } from "../../src/generated/schema.js";
+import { Repo } from "../support/repo.js";
 
 export const SPEC_VERSION = 1;
 
 /** The request headers fixtures record: as the Java recorder's, plus TM1-* but the session's own. */
 const HEADERS = new Set(["accept", "content-type", "if-match", "if-none-match", "odata-version", "odata-maxversion", "prefer"]);
+
+const BIND = "@odata.bind";
+const plan = (JSON.parse(readFileSync(Repo.spec, "utf8")) as { builders: Record<string, { setters: { json: string; value: string | null }[] }> }).builders;
+type Builder = Record<string, (...args: unknown[]) => unknown> & { build(): unknown };
+const settersOf = new Map<unknown, Map<string, string>>();
+
+/** A write as the generated builder makes it, as the Java runner's PatchBuilders: each key by the
+ * setter that writes it, a nested write type's value by its own builder (a root's by the subtype its
+ * `@odata.type` names), a binding by the bind setter (its path decoded, so the setter encodes it
+ * once), an open type's undeclared key by `property`. A key no setter writes is refused: a caller
+ * can't send it, so neither can a scenario. */
+export function build(type: any, values: Record<string, Json>): unknown {
+  const write = subtype(type, values);
+  const b = write.builder() as Builder;
+  const setters = settersFor(write);
+  const values_ = new Map(plan[write.name]!.setters.map((s) => [s.json, s.value]));
+  for (const [key, value] of Object.entries(values)) {
+    if (key === "@odata.type") continue; // the builder sends its own; the subtype was picked by it
+    const setter = setters.get(key);
+    if (setter !== undefined) {
+      if (key.endsWith(BIND)) {
+        if (Array.isArray(value)) b[setter]!(...value.map((p) => path(p as string)));
+        else b[setter]!(path(value as string));
+      } else b[setter]!(nested(values_.get(key) ?? null, value));
+    } else if (!key.startsWith("@") && typeof b["property"] === "function") b["property"](key, value);
+    else throw new Error(`${write.name} has no setter for ${key}`);
+  }
+  return b.build();
+}
+
+function subtype(type: any, values: Record<string, Json>): any {
+  const id = values["@odata.type"];
+  if (typeof id !== "string") return type;
+  const suffix = type.name.endsWith("Create") ? "Create" : "Patch";
+  const sub = (Patches as Record<string, any>)[id.slice(id.lastIndexOf(".") + 1) + suffix];
+  if (typeof sub !== "function" || !(sub === type || sub.prototype instanceof type)) throw new Error(`no write type for ${id} that is a ${type.name}`);
+  return sub;
+}
+
+function nested(write: string | null, value: Json): unknown {
+  if (value === null || write === null) return value;
+  const type = (Patches as Record<string, any>)[write];
+  return Array.isArray(value) ? value.map((v) => build(type, v as Record<string, Json>)) : build(type, value as Record<string, Json>);
+}
+
+/** A binding's path, which the JSON holds as sent, percent-encoded. */
+const path = (encoded: string): ODataPath => ODataPath.link(decodeURIComponent(encoded));
+
+/** The builder's setters, by the JSON name each writes: each called once on a fresh builder, with its
+ * `set`, `bind` and `bindAll` watched, as the builder manifest finds them. */
+function settersFor(type: any): Map<string, string> {
+  let out = settersOf.get(type);
+  if (out) return out;
+  out = new Map();
+  const names = new Set<string>();
+  for (let p = Object.getPrototypeOf(type.builder()) as object; p !== Tm1PatchBuilder.prototype; p = Object.getPrototypeOf(p) as object)
+    for (const name of Object.getOwnPropertyNames(p))
+      if (!["constructor", "build", "property"].includes(name) && typeof (p as Record<string, unknown>)[name] === "function") names.add(name);
+  for (const name of names) {
+    const fresh = type.builder() as Builder;
+    const wrote: string[] = [];
+    const watched = fresh as unknown as Record<string, (n: string, v: unknown) => unknown>;
+    for (const [method, suffix] of [
+      ["set", ""],
+      ["bind", BIND],
+      ["bindAll", BIND],
+    ] as const) {
+      const original = watched[method]!.bind(fresh);
+      watched[method] = (n: string, v: unknown) => {
+        wrote.push(n + suffix);
+        return original(n, v);
+      };
+    }
+    fresh[name]!(/^bind[A-Z]/.test(name) ? ODataPath.of("x") : null);
+    if (wrote.length !== 1) throw new Error(`${type.name}.${name} writes ${wrote.join(", ")}`);
+    out.set(wrote[0]!, name);
+  }
+  settersOf.set(type, out);
+  return out;
+}
 
 /** A tag or type this runner can't decode: a failure, never a skip. */
 export class Unknown extends Error {}
@@ -45,7 +127,8 @@ export function decode(value: Json): unknown {
     case "$patch": {
       const type = (Patches as Record<string, any>)[v.$patch];
       if (typeof type !== "function") throw new Unknown("no patch " + v.$patch);
-      return new type(new Map(Object.entries(v.json)));
+      // Through the generated setters, as a caller makes one (#354)
+      return build(type, v.json as Record<string, Json>);
     }
     case "$model":
       return v.json;
