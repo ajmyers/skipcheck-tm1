@@ -8,7 +8,7 @@
 			"service" : "processes",
 			"method" : "create",
 			"params" : [ "process" ],
-			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${process}", "Parameters" : [ { "Name" : "pName", "Prompt" : "", "Value" : "", "Type" : "String" } ], "PrologProcedure" : "sName = pName;\n" } } ],
+			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${process}", "Parameters" : [ { "Name" : "pName", "Prompt" : "", "Value" : "" } ], "PrologProcedure" : "sName = pName;\n" } } ],
 			"expect" : { "fields" : { "Name" : "${process}" } }
 		},
 		{
