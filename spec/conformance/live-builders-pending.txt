@@ -1,0 +1,87 @@
+# Builders and setters no live scenario writes yet (#354). LiveBuildersCoverageTest holds this
+# list: what a scenario comes to write is taken off it, and nothing is added but a newly generated
+# builder or setter, until a scenario writes it. A whole builder no scenario writes is one line.
+
+# Server settings: no scenario writes them yet; one that writes each and restores it is to come (#354)
+AccessSettingsPatch
+AdministrationSettingsPatch
+AuditLogSettingsPatch
+AuthenticationSettingsPatch
+CAMSettingsPatch
+CAPISettingsPatch
+ClientSettingsPatch
+DebugLogSettingsPatch
+EventLogSettingsPatch
+ExternalDatabaseSettingsPatch
+FileRetrySettingsPatch
+HTTPSettingsPatch
+JavaSettingsPatch
+JobQueuingSettingsPatch
+LDAPSettingsPatch
+LockingSettingsPatch
+MTCubeLoadSettingsPatch
+MTFeedersSettingsPatch
+MTQSettingsPatch
+MemorySettingsPatch
+ModellingSettingsPatch
+NetworkSettingsPatch
+PerformanceSettingsPatch
+RulesSettingsPatch
+SSLSettingsPatch
+ServerLogSettingsPatch
+ServerSettingsPatch
+SpreadingSettingsPatch
+StargateSettingsPatch
+StartupSettingsPatch
+SynchronizationSettingsPatch
+TISettingsPatch
+TM1WebSettingsPatch
+TopLogSettingsPatch
+ViewCalculationSettingsPatch
+
+# Encryption at rest providers: need a key store; to try with a local key file, else to exclude (#354)
+KeyProtectSettingsPatch
+VaultSettingsPatch
+
+# Groups: no service takes them yet; GroupService.create is to take a GroupCreate (#354)
+GroupCreate
+GroupPatch
+
+# Git: needs a repository TM1 can reach; to try with a local one, else to exclude (#354)
+GitConfigurationPatch
+
+# Others: to write in the scenarios of their services (#354)
+AttributesPatch.Caption
+CellsetUpdatePatch
+ChorePatch.Tasks
+ChoreReferenceCreate
+ChoreTaskPatch.Process@odata.bind
+CubeCreate.PrivateViews
+CubeCreate.Views
+CubeUpdatePatch.ReferenceCell
+CubeUpdatePatch.ReferenceCell@odata.bind
+CubeUpdatePatch.ReferenceCube
+CubeUpdatePatch.ReferenceCube@odata.bind
+CubeUpdatePatch.Tuple
+DimensionCreate.DefaultHierarchy
+DimensionPatch.DefaultHierarchy
+DimensionReferenceCreate
+ElementCreate.Components
+ElementCreate.Components@odata.bind
+ElementCreate.Parents
+ElementCreate.Parents@odata.bind
+ElementPatch.Components
+ElementPatch.Components@odata.bind
+FolderCreate.Contents
+FolderCreate.PrivateContents
+HierarchyCreate.PrivateSubsets
+HierarchyCreate.Subsets
+ProcessCreate.Code
+ProcessPatch.Code
+ProcessReferenceCreate
+ProcessVariablePatch
+SubsetReferenceCreate
+UserCreate.Groups
+ViewAxisSelectionPatch.Subset@odata.bind
+ViewReferenceCreate
+ViewTitlePatch.Subset@odata.bind

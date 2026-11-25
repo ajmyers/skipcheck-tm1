@@ -160,6 +160,14 @@ The runners are Java's `ConformanceScenarioTm1Test`, Python's `tests/live/test_c
 
 [`scripts/compare-live-traffic.py`](../../scripts/compare-live-traffic.py) normalizes the logs: names go back to placeholders, entity tags are dropped, and a cellset's ID, which TM1 makes up for each run, becomes `<id>`. It then requires every language to have sent the same requests, with the same statuses, in the same order, but for a step's `unordered` runs. [`scripts/live-tests.sh`](../../scripts/live-tests.sh) runs it after the suites. Each runner also has offline tests: the cubes scenario against a fake TM1; the data scenarios (cellsets, views, sandboxes) against a fake that answers as TM1 would; and other scenarios (subsets, members, edges, member-sets, content, encryption, git and more) against a fake answering each step's one request with what the step expects (and what it saves, as `saved_<name>`, if it doesn't expect it). A byte stream's result is checked as `{"fields": {"$bytes": …}}`.
 
+### Every builder, live (`live-builders-pending.txt`, `live-builders-excluded.txt`)
+
+Every generated create and patch builder, and each of its setters, is to be written by some live scenario, which every client builds through its setters and `compareLiveTraffic` compares (#354). The Java client's `LiveBuildersCoverageTest` holds that, from the spec's write plan (`builders`):
+
+- A setter counts when a scenario's write of its builder has its key (`Name`, or `Dimensions@odata.bind` for a binding). A nested value counts for its own write type. A subtype's write counts for the setters its root declares.
+- What no scenario writes yet is in `live-builders-pending.txt`, a whole builder as one line. The list only shrinks: a newly generated builder or setter is added until a scenario writes it, and an entry a scenario comes to write fails the test until it's taken off.
+- What a TM1 container can't be written with goes in `live-builders-excluded.txt`, each entry with why.
+
 ### Adding a scenario
 
 Write `live/<name>.json` with the steps a service's live test covers, using only names from `names`, then run `./gradlew liveTest --continue` (or `scripts/live-tests.sh`).

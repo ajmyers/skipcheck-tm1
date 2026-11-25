@@ -16,6 +16,7 @@ ArchitectureTest#serviceMethodsAreReactiveAndDeclareTheirEndpoints: Java's Mono 
 # The conformance recorder: Java records the fixtures in spec/conformance/calls, this client replays them
 ConformanceFixturesTest: checks every fixture has a Java test class that records it; this client records none and replays them all (ConformanceCallsTests)
 ProbedWritesCoverageTest: checks spec/conformance/live against the probe file (every write TM1 applies is in some scenario), which no client code takes part in; this client runs every scenario live
+LiveBuildersCoverageTest: checks spec/conformance/live against the spec's write plan (every builder and setter is written by some scenario, or listed), which no client code takes part in; this client runs every scenario live through its builders
 ProbeCoverageTest: checks the builder manifest against the spec's offers and the probe file, which no client code takes part in; this client checks its own builders against the manifest
 
 # Java's metadata snapshot tooling, over its CsdlDocument model of $metadata. This client doesn't
