@@ -158,7 +158,8 @@ function fromRead(spec: Spec, t: SpecType, create: boolean): { statements: strin
       return `${JSON.stringify(c.json)}: (v: model.${read}) => ${c.via === "of" ? `of${c.value}(v)` : `${c.value}.builder(v).build()`}`;
     });
   const bindings = from.bindings.map((n) => {
-    const helper = HELPERS[n.by + (n.collection ? "s" : "")]!;
+    const helper = HELPERS[n.by + (n.collection ? "s" : "")];
+    if (helper === undefined) throw new Error(`${t.name}'s binding of ${n.json} is by ${n.by}: by key or uniqueName`);
     const bind = "bind" + Names.member(n.json);
     const read = `read[${JSON.stringify(n.json)}]`;
     const argument = `[${JSON.stringify(n.key)}]`;
@@ -237,37 +238,39 @@ function emitPatch(spec: Spec, t: SpecType, create = false): string {
   const suffix = create ? "Create" : "Patch";
   const patch = name + suffix;
   const builder = patch + "Builder";
-  const base = spec.base(t);
-  const typeId = base ? JSON.stringify("#" + t.qualifiedName) : "null";
+  const write = plan(spec, t, create);
+  // A subtype's base: its root's write type, the type that writes
+  const base = write.base ? spec.typeByName.get(spec.builder(write.base)!.type) : undefined;
+  const typeId = JSON.stringify(write.odataType);
   const ticks = "`@odata.type`";
-  const subtypes = spec.derived(t);
+  const root = write.dispatch !== null;
   let out = create
     ? `\n/** A create of {@link model.${name}}, for a POST: only the properties set are sent, and only those TM1 was found to apply in a create are offered. Its build() checks what a create needs. */\n`
     : `\n/** A write of {@link model.${name}}: only the properties set are sent, and only those TM1 was found to apply are offered. */\n`;
-  out += `export class ${patch} extends ${base ? base.name + suffix : "Tm1Patch"} {\n`;
+  out += `export class ${patch} extends ${write.base ?? "Tm1Patch"} {\n`;
   // Nothing at run time: it makes the type nominal. Without it every write type has the same
   // shape, so a CubeCreate would pass for a ProcessPatch; a subtype's stays its base's, which it
   // extends
   out += `  /** @internal What makes a value of another write type not one of this. */\n  declare private readonly _${patch}: never;\n\n`;
-  if (subtypes.length && create) {
+  if (root && create) {
     // A hierarchy's root: its create starts from a read of any of its types, with that type's
-    const cases = plan(spec, t, true)
-      .dispatch!.map((c) => spec.typeByName.get(c.type)!.name)
-      .map((d) => `    if (type === ${JSON.stringify(d)}) return ${d}Create.builder(read as model.${d});\n`)
+    const cases = write
+      .dispatch!.map((c) => [spec.typeByName.get(c.type)!.name, c.builder] as const)
+      .map(([d, w]) => `    if (type === ${JSON.stringify(d)}) return ${w}.builder(read as model.${d});\n`)
       .join("");
     out += `  /** A builder with nothing set; or, given an entity read from TM1, a create of what it holds that a POST applies, to recreate it, by its type: that type's builder(read), which extends this one's. @throws RangeError if TM1 makes none of its type */\n`;
     out += `  static builder(read?: model.${name}): ${builder} {\n    if (!read) return new ${builder}();\n`;
     out += `    const type = typeOf(model.${name}, read);\n${cases}`;
     out += "    throw new RangeError(`A ${type} has no create: TM1 makes none of its type`);\n  }\n}\n\n";
-  } else if (subtypes.length) {
+  } else if (root) {
     out += `  /** A builder with nothing set${base ? " but " + ticks : ""}. */\n`;
     out += `  static ${base ? "override " : ""}builder(): ${builder} {\n    return new ${builder}();\n  }\n}\n\n`;
     // A hierarchy's root: a nested value of any of its types is written by its type, as the Java
     // patch's of(); one of a type this client doesn't know as the root's own, without the
     // @odata.type a builder of the root doesn't send
-    const cases = plan(spec, t, false)
-      .dispatch!.map((c) => spec.typeByName.get(c.type)!.name)
-      .map((d) => `  if (type === ${JSON.stringify(d)}) return ${d}Patch.builder(read as model.${d}).build();\n`)
+    const cases = write
+      .dispatch!.map((c) => [spec.typeByName.get(c.type)!.name, c.builder] as const)
+      .map(([d, w]) => `  if (type === ${JSON.stringify(d)}) return ${w}.builder(read as model.${d}).build();\n`)
       .join("");
     out += `/** A patch of what \`read\`, a value read from TM1, holds that a write takes, by its type: for nested values. */\n`;
     out += `function of${patch}(read: model.${name}): ${patch} {\n  const type = typeOf(model.${name}, read);\n${cases}`;
@@ -282,12 +285,12 @@ function emitPatch(spec: Spec, t: SpecType, create = false): string {
   }
   // A subtype's builder extends its base's, as the Java model's: a root's builder(read) returns
   // one, typed as the root's
-  const baseBuilder = base ? base.name + suffix + "Builder" : undefined;
+  const baseBuilder = write.base ? write.base + "Builder" : undefined;
   const inherited = new Map((base ? setters(spec, base, create) : []).map((s) => [s.method, s.json]));
   const made = "(values: ReadonlyMap<string, unknown>) => " + patch;
   out += `/** Builds a {@link ${patch}}; each setter replaces what an earlier call set. */\n`;
   out += `export class ${builder} extends ${baseBuilder ?? `Tm1PatchBuilder<${patch}>`} {\n`;
-  if (subtypes.length) {
+  if (root) {
     // What a subtype's builder makes, and the @odata.type it sends, are its own
     out += `  /** A builder with nothing set. @internal The arguments are a subtype's builder's. */\n`;
     out += `  constructor(make: ${made} = (values) => new ${patch}(values), odataType: string | null = ${typeId}) {\n    super(make, odataType);\n  }\n`;
@@ -295,7 +298,7 @@ function emitPatch(spec: Spec, t: SpecType, create = false): string {
     out += `  constructor() {\n    super((values) => new ${patch}(values), ${typeId});\n  }\n`;
   }
   // A subtype's build() checks what its own create needs, as Java's: the plan holds its root's to no more
-  const required = plan(spec, t, create).required;
+  const required = write.required;
   if (required.length || base) {
     out += required.length
       ? `\n  /** The create, with what's been set so far. @throws Error if it lacks what a create needs. */\n`
@@ -313,8 +316,8 @@ function emitPatch(spec: Spec, t: SpecType, create = false): string {
       throw new Error(`${builder}.${s.method} writes ${s.json}, but ${baseBuilder}'s writes ${inherited.get(s.method)}`);
     out += `\n${s.doc}  ${overrides ? "override " : ""}${s.code}`;
   }
-  if (spec.chain(t).some((l) => l.open)) {
-    const overrides = base !== undefined && spec.chain(base).some((l) => l.open);
+  if (write.open) {
+    const overrides = write.base !== null && spec.builder(write.base)!.open;
     out += "\n  /** Sets a property `$metadata` doesn't declare, which this open type can have, such as an attribute's value. */\n";
     out += `  ${overrides ? "override " : ""}property(name: string, value: unknown): this {\n    return this.set(name, value);\n  }\n`;
   }

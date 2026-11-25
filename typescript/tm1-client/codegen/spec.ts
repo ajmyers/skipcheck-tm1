@@ -160,10 +160,6 @@ export class Spec {
     return this.doc.builders[name];
   }
 
-  isEntity(typeName: string): boolean {
-    return this.typeByName.get(typeName)?.kind === "entity";
-  }
-
   aliasName(qualified: string): string {
     for (const [ns, alias] of this.aliases) {
       if (qualified.startsWith(ns + ".")) return alias + qualified.slice(ns.length);
