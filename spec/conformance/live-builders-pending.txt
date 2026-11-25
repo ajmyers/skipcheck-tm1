@@ -61,6 +61,3 @@ CellsetUpdatePatch.ReferenceCube
 CubeUpdatePatch.ReferenceCell
 CubeUpdatePatch.ReferenceCube
 CubeUpdatePatch.Tuple
-
-# Others: to write in the scenarios of their services (#354)
-AttributesPatch.Caption
