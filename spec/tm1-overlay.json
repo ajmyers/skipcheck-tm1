@@ -1,5 +1,5 @@
 {
-	"$comment": "What TM1 does differently from its own $metadata, shared by every client's code generator. Notes are Markdown; each generator renders them in its own doc format. Keys are Type/Property for properties and coverage-gate endpoint IDs for endpoints. writes: setters a write type offers though the probe doesn't verify them, by Builder.Setter (or a whole write type by Builder), each kept (the probe tried it, and what it found is accounted for) or unverified (the probe can't try it), with why.",
+	"$comment": "What TM1 does differently from its own $metadata, shared by every client's code generator. Notes are Markdown; each generator renders them in its own doc format. Keys are Type/Property for properties and coverage-gate endpoint IDs for endpoints. writes: setters a write type offers though the probe doesn't verify them, by Builder.Setter (or a whole write type by Builder), each kept (the probe tried it, and what it found is accounted for) or unverified (the probe can't try it), with why; and setters a write type leaves out though the probe verifies them, each withheld, with why (the only service that takes the write would refuse them, and another method does that write).",
 	"departures": {
 		"CAMSettings/ClientPingCAMPassport": {
 			"read": "json",
@@ -92,6 +92,12 @@
 		"HierarchyCreate.Edges": {
 			"kept": "a create's edges join elements in the same body, which the probe's nested edge has none of, so TM1 refuses it there; the live tests (edges, elements, hierarchies, levels, members) create hierarchies with their edges and read them back"
 		},
+		"HierarchyPatch.Edges": {
+			"withheld": "a hierarchy PATCH with `Edges` replaces them, deleting the ones it doesn't list: `HierarchyService.replaceStructure` sends them with the elements"
+		},
+		"HierarchyPatch.Elements": {
+			"withheld": "a hierarchy PATCH with `Elements` replaces them, deleting the elements it doesn't list: `HierarchyService.replaceStructure` sends them with the edges"
+		},
 		"KeyProtectSettingsPatch": {
 			"unverified": "an encryption key provider: probing it needs a key store"
 		},
@@ -118,6 +124,12 @@
 		},
 		"SSLSettingsPatch.PwdKeyFile": {
 			"unverified": "TM1 never returns it, so the probe can't set it back after a try"
+		},
+		"UserPatch.Groups": {
+			"withheld": "a user PATCH with `Groups` replaces them: `UserService.setGroups` binds them"
+		},
+		"UserPatch.Groups@odata.bind": {
+			"withheld": "a user PATCH binding `Groups` replaces them: `UserService.setGroups` binds them"
 		},
 		"VaultSettingsPatch": {
 			"unverified": "an encryption key provider: probing it needs a key store"

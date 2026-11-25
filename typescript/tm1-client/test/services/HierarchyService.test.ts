@@ -36,10 +36,15 @@ describe("HierarchyService", () => {
   it("refuses an update with structure", () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    const withElements = HierarchyPatch.builder()
+    // HierarchyPatch offers neither: a PATCH with them replaces them, as replaceStructure does (#361)
+    expect("elements" in HierarchyPatch.builder()).toBe(false);
+    expect("edges" in HierarchyPatch.builder()).toBe(false);
+    // The compiler refuses a HierarchyCreate as a HierarchyPatch; a caller without it (JavaScript) is
+    // refused here
+    const withElements = HierarchyCreate.builder()
       .elements([ElementCreate.builder().name("x").build()])
-      .build();
-    const withEdges = HierarchyPatch.builder().edges([]).build();
+      .build() as unknown as HierarchyPatch;
+    const withEdges = HierarchyCreate.builder().edges([]).build() as unknown as HierarchyPatch;
     for (const patch of [withElements, withEdges]) {
       expect(() => client.hierarchies.update("Region", "Region", patch)).toThrow(/replaceStructure/);
       expect(() => client.hierarchies.update("Region", "Region", patch)).toThrow(RangeError);

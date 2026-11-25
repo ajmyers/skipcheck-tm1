@@ -14049,12 +14049,6 @@
 			"ComponentsSortType" : {
 				"verified" : "applied"
 			},
-			"Edges" : {
-				"verified" : "replaces"
-			},
-			"Elements" : {
-				"verified" : "applied"
-			},
 			"ElementsSortSense" : {
 				"verified" : "applied"
 			},
@@ -14886,12 +14880,6 @@
 				"verified" : "applied"
 			},
 			"FriendlyName" : {
-				"verified" : "applied"
-			},
-			"Groups" : {
-				"verified" : "applied"
-			},
-			"Groups@odata.bind" : {
 				"verified" : "applied"
 			},
 			"Password" : {
@@ -18080,24 +18068,6 @@
 					"set" : true,
 					"bind" : false,
 					"value" : null
-				},
-				{
-					"json" : "Elements",
-					"declaredOn" : "ibm.tm1.api.v1.Hierarchy",
-					"navigation" : true,
-					"collection" : true,
-					"set" : true,
-					"bind" : false,
-					"value" : "ElementCreate"
-				},
-				{
-					"json" : "Edges",
-					"declaredOn" : "ibm.tm1.api.v1.Hierarchy",
-					"navigation" : true,
-					"collection" : true,
-					"set" : true,
-					"bind" : false,
-					"value" : "EdgeCreate"
 				}
 			],
 			"fromRead" : {
@@ -22419,15 +22389,6 @@
 					"set" : true,
 					"bind" : false,
 					"value" : null
-				},
-				{
-					"json" : "Groups",
-					"declaredOn" : "ibm.tm1.api.v1.User",
-					"navigation" : true,
-					"collection" : true,
-					"set" : true,
-					"bind" : true,
-					"value" : "GroupCreate"
 				}
 			],
 			"fromRead" : {

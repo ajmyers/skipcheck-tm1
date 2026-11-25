@@ -38,7 +38,8 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code Type/Property}, with a note: the write probe reads them as ignored, so
  * {@link Writes} counts them as written
  * @param writes setters a write type offers though the probe doesn't verify them, by
- * {@code Builder.Setter}, or a whole write type by {@code Builder}: why ({@link Offers})
+ * {@code Builder.Setter}, or a whole write type by {@code Builder}, and setters it leaves
+ * out though the probe verifies them: why ({@link Offers})
  */
 public record Overlay(Map<String, String> departures, Map<String, String> lenientDates,
 		Map<String, EndpointNote> endpoints, Map<String, UndeclaredType> undeclared, Map<String, String> writeOnly,
@@ -57,17 +58,20 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 	}
 
 	/**
-	 * Why a write type offers a setter the probe doesn't verify.
+	 * Why a write type offers a setter the probe doesn't verify, or leaves out one it
+	 * does.
 	 *
 	 * @param kind {@code kept}: the probe tried it, and what it found is accounted for
 	 * (TM1 transforms it as it should, or it needs a configuration the probe server
-	 * lacks); {@code unverified}: the probe can't try it
+	 * lacks); {@code unverified}: the probe can't try it; {@code withheld}: the probe
+	 * verifies it, but the write type doesn't offer it, since the only service that takes
+	 * the write would refuse it (another method does that write)
 	 * @param note why, in Markdown
 	 */
 	public record WriteException(String kind, String note) {
 
 		/** The kinds. */
-		public static final List<String> KINDS = List.of("kept", "unverified");
+		public static final List<String> KINDS = List.of("kept", "unverified", "withheld");
 
 		/**
 		 * Checks the kind.
@@ -75,7 +79,7 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 		 */
 		public WriteException {
 			if (!KINDS.contains(kind)) {
-				throw new IllegalArgumentException("A write exception is kept or unverified, not " + kind);
+				throw new IllegalArgumentException("A write exception is kept, unverified or withheld, not " + kind);
 			}
 		}
 
@@ -162,8 +166,8 @@ public record Overlay(Map<String, String> departures, Map<String, String> lenien
 		root.path("writes").properties().forEach(e -> {
 			List<String> kinds = new ArrayList<>(e.getValue().propertyNames());
 			if (kinds.size() != 1) {
-				throw new IllegalArgumentException(
-						"The overlay's writes entry " + e.getKey() + " needs one of kept or unverified, with why");
+				throw new IllegalArgumentException("The overlay's writes entry " + e.getKey()
+						+ " needs one of kept, unverified or withheld, with why");
 			}
 			writes.put(e.getKey(), new WriteException(kinds.get(0), e.getValue().path(kinds.get(0)).asString()));
 		});

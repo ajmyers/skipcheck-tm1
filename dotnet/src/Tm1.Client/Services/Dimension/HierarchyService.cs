@@ -51,20 +51,20 @@ public sealed class HierarchyService : Tm1Service
         Session.ExecuteAsync(Tm1Request.Post<Hierarchy>(HierarchiesPath(dimension), Require(hierarchy, nameof(hierarchy))), cancellationToken);
 
     /// <summary><c>PATCH Dimensions('d')/Hierarchies('h')</c>: changes the properties the patch sets.
-    /// TM1 (11.8) ignores <c>Visible</c>. A patch with <c>Elements</c> or <c>Edges</c> is refused
-    /// (<see cref="ArgumentException"/>): it would replace them, so use <see cref="ReplaceStructureAsync"/>.</summary>
+    /// TM1 (11.8) ignores <c>Visible</c>. Its elements and edges are <see cref="ReplaceStructureAsync"/>'s:
+    /// a PATCH with them replaces them, so <c>HierarchyPatch</c> has no setter for them.</summary>
     [Tm1Endpoint("Navigation Dimension/Hierarchies")]
     public Task UpdateAsync(string dimension, string hierarchy, HierarchyPatch patch, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Patch(HierarchyPath(dimension, hierarchy), WithoutStructure(patch)), cancellationToken);
+        Session.ExecuteAsync(Tm1Request.Patch(HierarchyPath(dimension, hierarchy), Require(patch, nameof(patch))), cancellationToken);
 
     /// <summary><c>PATCH Dimensions('d')/Hierarchies('h')</c> with <c>If-Match</c>: changes the properties
     /// the patch sets, unless the hierarchy changed since it was read with <paramref name="etag"/>
-    /// (<c>Hierarchy.ETag</c>); a <c>Tm1PreconditionFailedException</c> if it had changed. A patch with
-    /// <c>Elements</c> or <c>Edges</c> is refused: use <see cref="ReplaceStructureAsync"/>.</summary>
+    /// (<c>Hierarchy.ETag</c>); a <c>Tm1PreconditionFailedException</c> if it had changed. Its elements
+    /// and edges are <see cref="ReplaceStructureAsync"/>'s.</summary>
     [Tm1Endpoint("Navigation Dimension/Hierarchies")]
     public Task UpdateAsync(string dimension, string hierarchy, HierarchyPatch patch, string etag, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(
-            Tm1Request.Patch(HierarchyPath(dimension, hierarchy), WithoutStructure(patch)).IfMatch(Require(etag, nameof(etag))),
+            Tm1Request.Patch(HierarchyPath(dimension, hierarchy), Require(patch, nameof(patch))).IfMatch(Require(etag, nameof(etag))),
             cancellationToken
         );
 
@@ -80,8 +80,13 @@ public sealed class HierarchyService : Tm1Service
         CancellationToken cancellationToken = default
     )
     {
-        var patch = HierarchyPatch.Builder().Elements(Require(elements, nameof(elements))).Edges(Require(edges, nameof(edges))).Build();
-        return Session.ExecuteAsync(Tm1Request.Patch(HierarchyPath(dimension, hierarchy), patch), cancellationToken);
+        // Not a HierarchyPatch, which offers neither, so UpdateAsync can't do this by accident
+        var body = new Dictionary<string, object?>
+        {
+            ["Elements"] = Require(elements, nameof(elements)).ToList(),
+            ["Edges"] = Require(edges, nameof(edges)).ToList(),
+        };
+        return Session.ExecuteAsync(Tm1Request.Patch(HierarchyPath(dimension, hierarchy), body), cancellationToken);
     }
 
     /// <summary><c>DELETE Dimensions('d')/Hierarchies('h')</c>.</summary>
@@ -194,23 +199,6 @@ public sealed class HierarchyService : Tm1Service
             ),
             cancellationToken
         );
-
-    private static HierarchyPatch WithoutStructure(HierarchyPatch patch)
-    {
-        // Bindings to the collections (Elements@odata.bind) are structure changes too
-        if (
-            Require(patch, nameof(patch))
-                .Values.Any(v =>
-                    v.Key is "Elements" or "Edges"
-                    || v.Key.StartsWith("Elements@", StringComparison.Ordinal)
-                    || v.Key.StartsWith("Edges@", StringComparison.Ordinal)
-                )
-        )
-        {
-            throw new ArgumentException("A hierarchy PATCH with Elements or Edges replaces them, deleting what it doesn't list: use ReplaceStructureAsync");
-        }
-        return patch;
-    }
 
     internal static ODataPath DimensionPath(string dimension) => ODataPath.Of("Dimensions").Key(Require(dimension, nameof(dimension)));
 

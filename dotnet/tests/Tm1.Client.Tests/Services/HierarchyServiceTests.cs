@@ -42,23 +42,11 @@ public class HierarchyServiceTests
     }
 
     [Fact]
-    public async Task AnUpdateWithStructureIsRefused()
+    public void AnUpdateWithStructureIsRefused()
     {
-        var tm1 = _tm1.Client();
-        var withElements = HierarchyPatch.Builder().Elements([ElementCreate.Builder().Name("x").Build()]).Build();
-        var withEdges = HierarchyPatch.Builder().Edges([]).Build();
-        foreach (var patch in new[] { withElements, withEdges })
-        {
-            var e = Assert.Throws<ArgumentException>(() =>
-            {
-                _ = tm1.Hierarchies.UpdateAsync("Region", "Region", patch);
-            });
-            Assert.Contains("ReplaceStructureAsync", e.Message);
-            Assert.Throws<ArgumentException>(() =>
-            {
-                _ = tm1.Hierarchies.UpdateAsync("Region", "Region", patch, "W/\"1\"");
-            });
-        }
+        // Refused at compile time: HierarchyPatch offers neither Elements nor Edges, as a PATCH with
+        // them replaces them; ReplaceStructureAsync does that (#361)
+        Assert.DoesNotContain(typeof(HierarchyPatch.PatchBuilder).GetMethods(), m => m.Name is "Elements" or "Edges" or "BindElements" or "BindEdges");
         Assert.Empty(_tm1.Requests);
     }
 

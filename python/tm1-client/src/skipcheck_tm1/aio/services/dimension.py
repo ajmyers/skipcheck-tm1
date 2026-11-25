@@ -11,7 +11,6 @@ from typing import Any
 from ..._calls import endpoint
 from ..._generated.model import Dimension, Edge, Element, Hierarchy, Level, Member, Subset
 from ..._generated.operations import Tm1Operations
-from ..._generated.patches import HierarchyPatch
 from ...odata import ODataPath, ODataQuery
 from ...operation import Tm1Operation
 from ...request import Tm1Request, body_of
@@ -266,8 +265,9 @@ class HierarchyService(Service):
         with ``etag``, only if the hierarchy hasn't changed since it was read (``If-Match``).
         TM1 (11.8) ignores ``Visible``.
 
-        Raises ``ValueError`` if the patch sets or binds ``Elements`` or ``Edges``, which would
-        replace them: use :meth:`replace_structure`."""
+        Its elements and edges are :meth:`replace_structure`'s: a PATCH with them replaces them, so
+        ``HierarchyPatch`` has no setter for them. A mapping that sets or binds them raises
+        ``ValueError``, sending nothing."""
         request = Tm1Request.patch(_hierarchy(dimension, hierarchy), _without_structure(_require(patch, "patch")))
         await self._session.execute(request if etag is None else request.if_match(etag))
 
@@ -275,8 +275,9 @@ class HierarchyService(Service):
     async def replace_structure(self, dimension: str, hierarchy: str, elements: Sequence[Any], edges: Sequence[Any]) -> None:
         """``PATCH Dimensions('d')/Hierarchies('h')`` with ``Elements`` and ``Edges``: makes them
         exactly these. TM1 deletes every element not listed, with its data."""
-        patch = HierarchyPatch.builder().elements(list(elements)).edges(list(edges)).build()
-        await self._session.execute(Tm1Request.patch(_hierarchy(dimension, hierarchy), patch))
+        # Not a HierarchyPatch, which offers neither, so update can't do this by accident
+        body = {"Elements": list(elements), "Edges": list(edges)}
+        await self._session.execute(Tm1Request.patch(_hierarchy(dimension, hierarchy), body))
 
     @endpoint("Navigation Dimension/Hierarchies")
     async def delete(self, dimension: str, hierarchy: str) -> None:

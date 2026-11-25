@@ -83,10 +83,8 @@ public sealed class UserAndGroupLiveTests : IAsyncLifetime
         Assert.Equal([_g2], await Groups()); // replaced
         Assert.Equal([_user], await _tm1.Groups.UsersAsync(_g2).Select(u => u.Name).ToListAsync());
         Assert.Equal(_g1, (await _tm1.Groups.GetAsync(_g1)).Name); // left, not deleted
-        var e = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _tm1.Users.UpdateAsync(_user, UserPatch.Builder().BindGroups(ODataPath.Of("Groups").Key(_g1)).Build())
-        );
-        Assert.Contains("SetGroups", e.Message, StringComparison.Ordinal);
+        // UserPatch offers no Groups: a PATCH with them replaces them, as SetGroupsAsync does
+        Assert.DoesNotContain(typeof(UserPatch.PatchBuilder).GetMethods(), m => m.Name is "Groups" or "BindGroups");
     }
 
     [Tm1Fact]

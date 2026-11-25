@@ -47,13 +47,11 @@ public class UserServiceTests
     }
 
     [Fact]
-    public async Task UpdateRefusesGroups()
+    public void UpdateRefusesGroups()
     {
-        var tm1 = _tm1.Client();
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            tm1.Users.UpdateAsync("jsmith", UserPatch.Builder().BindGroups(ODataPath.Of("Groups").Key("Finance")).Build())
-        );
-        await Assert.ThrowsAsync<ArgumentException>(() => tm1.Users.UpdateAsync("jsmith", UserPatch.Builder().Groups([]).Build()));
+        // Refused at compile time: UserPatch offers no Groups, as a PATCH with them replaces them;
+        // SetGroupsAsync sets them (#361)
+        Assert.DoesNotContain(typeof(UserPatch.PatchBuilder).GetMethods(), m => m.Name is "Groups" or "BindGroups");
         Assert.DoesNotContain(_tm1.Requests, r => r.Method == "PATCH");
     }
 

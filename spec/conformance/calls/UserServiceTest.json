@@ -919,58 +919,6 @@
 			}
 		},
 		{
-			"id" : "UserServiceTest#refusesAnUpdateThatSetsGroups#1",
-			"service" : "users",
-			"method" : "update",
-			"params" : [
-				"name",
-				"patch"
-			],
-			"args" : [
-				"alice",
-				{
-					"$patch" : "UserPatch",
-					"json" : {
-						"Groups@odata.bind" : [
-							"Groups('Planners')"
-						]
-					}
-				}
-			],
-			"exchanges" : [ ],
-			"error" : {
-				"exception" : "IllegalArgumentException",
-				"category" : "argument"
-			}
-		},
-		{
-			"id" : "UserServiceTest#refusesAnUpdateThatSetsGroups#2",
-			"service" : "users",
-			"method" : "update",
-			"params" : [
-				"name",
-				"patch"
-			],
-			"args" : [
-				"alice",
-				{
-					"$patch" : "UserPatch",
-					"json" : {
-						"Groups" : [
-							{
-								"Name" : "Planners"
-							}
-						]
-					}
-				}
-			],
-			"exchanges" : [ ],
-			"error" : {
-				"exception" : "IllegalArgumentException",
-				"category" : "argument"
-			}
-		},
-		{
 			"id" : "UserServiceTest#setsGroupsWhole#1",
 			"service" : "users",
 			"method" : "setGroups",

@@ -3,10 +3,11 @@
 package io.skipcheck.tm1.client.service.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.reflect.Method;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -97,9 +98,9 @@ class UserAndGroupTm1Test {
 			.containsExactly(user);
 		assertThat(tm1.groups().get(g1, ODataQuery.none()).block(WAIT).name()).as("left, not deleted").isEqualTo(g1);
 
-		assertThatIllegalArgumentException().isThrownBy(
-				() -> tm1.users().update(user, UserPatch.builder().bindGroups(ODataPath.of("Groups").key(g1)).build()))
-			.withMessageContaining("setGroups");
+		// UserPatch offers no Groups: a PATCH with them replaces them, as setGroups does
+		assertThat(Arrays.stream(UserPatch.Builder.class.getMethods()).map(Method::getName)).doesNotContain("groups",
+				"bindGroups");
 	}
 
 	@Test
