@@ -51,4 +51,44 @@ public class PatchBuildersTests
         var built = PatchBuilders.Build(typeof(EncryptionAtRestProviderSettingsPatch), Json("""{"KeyRef": "k", "Extra": "x"}"""));
         Assert.Equal("x", ((EncryptionAtRestProviderSettingsPatch)built).Values.Single(v => v.Key == "Extra").Value);
     }
+
+    [Fact]
+    public void TakesABindingsPathAsWrittenEncoded()
+    {
+        // A key's %2F is a slash in the key, not between segments
+        var built = PatchBuilders.Build(typeof(CubeCreate), Json("""{"Name": "c", "Dimensions@odata.bind": ["Dimensions('a%2Fb')"]}"""));
+        Assert.Equal("Dimensions('a%2Fb')", Sent(built)["Dimensions@odata.bind"]![0]!.GetValue<string>());
+        var e = Assert.Throws<ArgumentException>(() =>
+            PatchBuilders.Build(typeof(CubeCreate), Json("""{"Name": "c", "Dimensions@odata.bind": "Dimensions('d')"}"""))
+        );
+        Assert.Contains("binds a list of paths", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RefusesADeclaredKeyNoSetterWritesOnAnOpenType()
+    {
+        // NativeView is open, but declares Name, which its patch doesn't offer
+        var e = Assert.Throws<ArgumentException>(() =>
+            PatchBuilders.Build(typeof(NativeViewPatch), Json("""{"@odata.type": "#ibm.tm1.api.v1.NativeView", "Name": "renamed"}"""))
+        );
+        Assert.Equal("NativeViewPatch has no setter for Name", e.Message);
+    }
+
+    [Fact]
+    public void RefusesAValueThatDoesntReadBackAsWritten()
+    {
+        var mode = Assert.Throws<ArgumentException>(() => PatchBuilders.Build(typeof(ChoreCreate), Json("""{"Name": "c", "ExecutionMode": "Nope"}""")));
+        Assert.Contains("doesn't read back as written", mode.Message, StringComparison.Ordinal);
+        var type = Assert.Throws<ArgumentException>(() =>
+            PatchBuilders.Build(typeof(CubeCreate), Json("""{"@odata.type": "#ibm.tm1.api.v1.Cube", "Name": "c"}"""))
+        );
+        Assert.Contains("doesn't send @odata.type", type.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void KeepsADateTimesOffset()
+    {
+        var built = PatchBuilders.Build(typeof(ChoreCreate), Json("""{"Name": "c", "StartTime": "2026-03-04T05:06:07.5+02:00"}"""));
+        Assert.Equal("2026-03-04T05:06:07.5+02:00", Sent(built)["StartTime"]!.GetValue<string>());
+    }
 }
