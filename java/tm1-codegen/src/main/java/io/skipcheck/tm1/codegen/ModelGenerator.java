@@ -716,7 +716,9 @@ public final class ModelGenerator {
 			.addAnnotation(GENERATED)
 			.addJavadoc("$L", (create ? "A create of {@link " + record
 					+ "}, for a {@code POST}: only the properties set are sent, and only those TM1 applies in a create are offered"
-					+ ": what the probe verified (" + writes.schemaVersion() + "), or the overlay keeps"
+					+ ": what the probe verified"
+					+ (writes.schemaVersion().isEmpty() ? "" : " (" + writes.schemaVersion() + ")")
+					+ ", or the overlay keeps"
 					+ ". {@code build()} checks what a create needs. {@code builder(read)} starts one from a read entity, to recreate it.\n\n<p>\n"
 					: "") + "A write of {@link " + record
 					+ "}: for a {@code PATCH}, only the properties set are sent, an explicit {@code null} included; for a {@code POST}, the new entity's properties, nested patches for deep inserts and {@code @odata.bind} references to existing entities.\n\n<p>\n"

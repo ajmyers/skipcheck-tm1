@@ -58,9 +58,10 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 
 		/**
 		 * Whether {@code builder(read)} copies a property into a patch: a PATCH sets it
-		 * (it applies or transforms it, or it wasn't probed), and isn't a collection a
-		 * PATCH appends to (copying one would add its members again). A collection a
-		 * PATCH replaces is copied: the read holds all of it.
+		 * (it applies or transforms it, it's write-only, its outcome is untested, or it
+		 * wasn't probed), and isn't a collection a PATCH appends to (copying one would
+		 * add its members again). A collection a PATCH replaces is copied: the read holds
+		 * all of it.
 		 * @param property the property's name
 		 * @return whether a patch made from a read copies it
 		 */

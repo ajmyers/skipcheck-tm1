@@ -305,8 +305,9 @@ class ModelGeneratorTest {
 
 	/**
 	 * A generator with the bundled overlay, offering a patch of every type with a setter
-	 * for each of its properties and navigations (a binding, too, for one to an entity):
-	 * what the patches' generated code looks like, without a probe.
+	 * for each of its properties (a stream's too, which the generator leaves out) and
+	 * navigations (a binding, too, for one to an entity): what the patches' generated
+	 * code looks like, without a probe.
 	 */
 	private static ModelGenerator everyPatch(CsdlDocument metadata) {
 		Map<String, Map<String, Offers.Offer>> offers = new TreeMap<>();
@@ -315,10 +316,7 @@ class ModelGeneratorTest {
 			Map<String, Offers.Offer> setters = new TreeMap<>();
 			for (CsdlStructuredType level = t; level != null; level = level.baseType() == null ? null
 					: metadata.structuredType(metadata.qualify(level.baseType())).orElseThrow()) {
-				level.properties()
-					.stream()
-					.filter(p -> !p.type().name().equals("Edm.Stream"))
-					.forEach(p -> setters.put(p.name(), offer));
+				level.properties().forEach(p -> setters.put(p.name(), offer));
 				for (CsdlNavigationProperty n : level.navigationProperties()) {
 					setters.put(n.name(), offer);
 					setters.put(n.name() + "@odata.bind", offer);

@@ -85,8 +85,8 @@ class BuildersTest {
 
 	private static final Map<String, Map<String, Offers.Offer>> OFFERS = Map.ofEntries(
 			Map.entry("CubeCreate",
-					Map.of("Name", V, "Rules", V, "Tags", V, "Box", V, "Views", V, "Dimensions@odata.bind", V,
-							"Measure@odata.bind", V, "DefaultView@odata.bind", V)),
+					Map.of("Name", V, "Rules", V, "Tags", V, "Box", V, "Content", V, "Views", V,
+							"Dimensions@odata.bind", V, "Measure@odata.bind", V, "DefaultView@odata.bind", V)),
 			Map.entry("CubePatch",
 					Map.of("Rules", V, "Tags", V, "Box", V, "Drill", V, "Dimensions@odata.bind", V,
 							"Measure@odata.bind", V)),

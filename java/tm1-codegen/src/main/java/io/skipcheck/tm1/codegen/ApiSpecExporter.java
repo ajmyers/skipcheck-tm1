@@ -82,39 +82,7 @@ public final class ApiSpecExporter {
 	 * @param snapshot the snapshot's file name, recorded in the spec
 	 */
 	public ApiSpecExporter(CsdlDocument metadata, Overlay overlay, String snapshot) {
-		this(metadata, overlay, snapshot, Undeclared.NONE, null);
-	}
-
-	/**
-	 * An exporter, with properties a probe found that {@code $metadata} doesn't declare.
-	 * @param metadata the {@code $metadata} document, with the undeclared properties
-	 * {@linkplain Undeclared#applyTo(CsdlDocument) added}
-	 * @param overlay what TM1 does differently from it, with the undeclared properties'
-	 * {@linkplain Undeclared#applyTo(Overlay) departures}
-	 * @param snapshot the snapshot's file name, recorded in the spec
-	 * @param undeclared the undeclared properties, marked in the spec
-	 * @param probe the probe file's name, recorded in the spec, or null if there's none
-	 */
-	public ApiSpecExporter(CsdlDocument metadata, Overlay overlay, String snapshot, Undeclared undeclared,
-			@Nullable String probe) {
-		this(metadata, overlay, snapshot, undeclared, Writes.NONE, probe);
-	}
-
-	/**
-	 * An exporter, with what a probe found: the undeclared properties, and what a POST
-	 * and a PATCH do with each property.
-	 * @param metadata the {@code $metadata} document, with the undeclared properties
-	 * added
-	 * @param overlay what TM1 does differently from it, with the undeclared properties'
-	 * departures
-	 * @param snapshot the snapshot's file name, recorded in the spec
-	 * @param undeclared the undeclared properties, marked in the spec
-	 * @param writes what writes do, exported as each type's write section
-	 * @param probe the probe file's name, recorded in the spec, or null if there's none
-	 */
-	public ApiSpecExporter(CsdlDocument metadata, Overlay overlay, String snapshot, Undeclared undeclared,
-			Writes writes, @Nullable String probe) {
-		this(metadata, overlay, snapshot, undeclared, writes, Offers.NONE, probe);
+		this(metadata, overlay, snapshot, Undeclared.NONE, Writes.NONE, Offers.NONE, null);
 	}
 
 	/**
