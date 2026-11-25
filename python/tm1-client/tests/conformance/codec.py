@@ -12,6 +12,7 @@ import enum
 import inspect
 import json
 import re
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
@@ -49,8 +50,11 @@ def build(cls: Any, values: dict[str, Any]) -> Any:
         setter = setters.get(key)
         if setter is not None:
             if key.endswith("@odata.bind"):
-                # As sent, already encoded: Python's bind setters take a path's text as it is
-                getattr(builder, setter)(*v) if isinstance(v, list) else getattr(builder, setter)(v)
+                # As a caller's ODataPath: decoded, then encoded once (a scenario's JSON may hold either)
+                if isinstance(v, list):
+                    getattr(builder, setter)(*(_path(t) for t in v))
+                else:
+                    getattr(builder, setter)(_path(v))
             else:
                 getattr(builder, setter)(_value(plan[key]["value"], v))
         elif not key.startswith("@") and hasattr(builder, "property"):
@@ -58,6 +62,10 @@ def build(cls: Any, values: dict[str, Any]) -> Any:
         else:
             raise ValueError(f"{cls.__name__} has no setter for {key}")
     return builder.build()
+
+
+def _path(encoded: str) -> ODataPath:
+    return ODataPath.link(urllib.parse.unquote(encoded))
 
 
 def _subtype(cls: Any, values: dict[str, Any]) -> Any:
