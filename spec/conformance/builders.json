@@ -714,7 +714,7 @@
       "odataType" : null,
       "open" : false,
       "required" : [ ],
-      "setters" : [ "Alias", "Elements@odata.bind", "ExpandAbove", "Expression", "Name" ],
+      "setters" : [ "Alias", "Elements@odata.bind", "ExpandAbove", "Expression", "Hierarchy@odata.bind", "Name" ],
       "values" : { }
     },
     "SubsetPatch" : {
