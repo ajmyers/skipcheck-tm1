@@ -16,8 +16,9 @@ Run the Gradle task for what you changed before you push. They're what CI runs.
 
 | You changed | Run |
 |---|---|
-| Java only, and no test or behaviour of the Java client | `./gradlew build` |
+| Java only, and no test or behaviour of the Java client or of `tm1-testcontainers` | `./gradlew build` |
 | The Java client's API, services, behaviour or tests, or `spec/` | `./gradlew checkAll` (the other clients' parity tests read them) |
+| `java/tm1-testcontainers`: its public API or its tests | `./gradlew checkAll` (the other languages' Testcontainers parity tests read them: a new or renamed Java test needs the same test in Python, .NET and TypeScript) |
 | The Python, .NET or TypeScript client | `./gradlew checkPython`, `checkDotnet`, `checkTypescript` |
 | What a package contains or depends on | `./gradlew packageTest` |
 | `scripts/`, `.githooks/`, shell scripts | `./gradlew checkScripts` |

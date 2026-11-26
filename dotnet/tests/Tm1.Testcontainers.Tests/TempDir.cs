@@ -50,6 +50,8 @@ public static class Repo
 
     public static string JavaSources => Path.Combine(Root, "java", "tm1-testcontainers", "src", "main", "java", "io", "skipcheck", "tm1", "testcontainers");
 
+    public static string JavaTests => Path.Combine(Root, "java", "tm1-testcontainers", "src", "test", "java");
+
     private static string Find()
     {
         var dir = AppContext.BaseDirectory;

@@ -25,8 +25,9 @@ Linux and Windows. Run what matches what you changed:
 
 | You changed | Run |
 |---|---|
-| Java only, and no test or behaviour of the Java client | `./gradlew build` |
+| Java only, and no test or behaviour of the Java client or of `tm1-testcontainers` | `./gradlew build` |
 | The Java client's public API, services, behaviour or tests, or anything in `spec/` | `./gradlew checkAll`: the other clients' parity and conformance tests read them |
+| `java/tm1-testcontainers`: its public API or its tests | `./gradlew checkAll`: the other languages' Testcontainers parity tests read them, so a new or renamed Java test needs the same test in Python, .NET and TypeScript |
 | The Python, .NET or TypeScript client | `./gradlew checkPython`, `checkDotnet` or `checkTypescript` |
 | What a package contains or depends on (`pyproject.toml`, a `.csproj`, `package.json`, the publishing plugin, a build hook) | `./gradlew packageTest` ([package-tests](package-tests/README.md)) |
 | `scripts/`, `.githooks/`, a shell script, `docker/pa-setup`'s setup scripts | `./gradlew checkScripts` |
@@ -51,6 +52,8 @@ and fail a client's checks, or the docs build, when it lacks something Java has:
 | A live test | The live-parity tests, and each client's `coverage/live-excluded.txt` |
 | A unit test of the runtime (session, pool, batch, authenticators, OData, errors) | The unit-parity tests, and each client's `coverage/unit-excluded.txt` |
 | A public type, and a public member of a documented type | The docs build ([`api-site/scripts/members.mjs`](api-site/scripts/members.mjs)), and each client's `coverage/members-excluded.txt` |
+| A public class or method of `tm1-testcontainers` | Each language's Testcontainers `java-parity` tests |
+| A test of `tm1-testcontainers` (unit or live, the example tests too) | Each language's Testcontainers test-parity tests, and its exclusions file: `python/tm1-testcontainers/coverage/unit-excluded.txt`, `dotnet/coverage/testcontainers-unit-excluded.txt`, `typescript/tm1-testcontainers/coverage/unit-excluded.txt` |
 
 A test with no meaning in a client gets a line in its exclusions file saying why; a line that has
 gone stale fails the gate. "Not ported yet" is not a reason. The gates can't see a behaviour change

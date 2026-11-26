@@ -317,7 +317,7 @@ export abstract class GenericContainer implements Startable {
   }
 
   async #build(): Promise<TcGenericContainer> {
-    let c = new TcGenericContainer(this.#image).withEnvironment(Object.fromEntries(this.#env)).withLabels({
+    let c: TcGenericContainer = new OnItsNetwork(this.#image).withEnvironment(Object.fromEntries(this.#env)).withLabels({
       ...Object.fromEntries(this.#labels),
       "io.skipcheck.tm1.testcontainers": "typescript",
     });
@@ -343,8 +343,9 @@ export abstract class GenericContainer implements Startable {
         .withStartupTimeout(w.timeout);
     if (this.#network) {
       // Testcontainers for Node takes only a network that's been created
-      c = c.withNetwork(await this.#network.create());
-      if (this.#aliases.length > 0) c = c.withNetworkAliases(...this.#aliases);
+      const network = await this.#network.create();
+      c = c.withNetwork(network);
+      (c as OnItsNetwork).aliases(network.getName(), this.#aliases);
     }
     return c;
   }
@@ -416,4 +417,29 @@ async function exitMessage(container: Parameters<WaitStrategy["waitUntilReady"]>
     new Promise<string>((r) => setTimeout(() => r(""), 2_000).unref()),
   ]);
   return `The container exited while starting, with code ${code}. The end of its log:\n${log.trim()}`;
+}
+
+/** A container that is created on its network, with its aliases there, as Testcontainers for Java
+ * creates one.
+ *
+ * Testcontainers for Node, given aliases (`withNetworkAliases`), creates the container on Docker's
+ * default bridge network and connects it to its own afterwards, so it's on both. A TM1 server then
+ * registers its bridge address with the Admin Server, and TM1 Web or PAW, which are only on the
+ * environment's network, can't reach it there: they list no servers. So the aliases go into the
+ * create request here, and Testcontainers is given none.
+ * @internal */
+export class OnItsNetwork extends TcGenericContainer {
+  #network: string | undefined;
+  #aliases: string[] = [];
+
+  /** The names to be reached by on the network named `network`. */
+  aliases(network: string, aliases: readonly string[]): void {
+    this.#network = network;
+    this.#aliases = [...aliases];
+  }
+
+  protected override async beforeContainerCreated(): Promise<void> {
+    if (this.#network !== undefined && this.#aliases.length > 0)
+      this.createOpts.NetworkingConfig = { EndpointsConfig: { [this.#network]: { Aliases: this.#aliases } } };
+  }
 }
