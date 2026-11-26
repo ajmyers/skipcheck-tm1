@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
 
 import org.jspecify.annotations.Nullable;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 import com.github.dockerjava.api.command.InspectContainerResponse;
@@ -171,10 +170,8 @@ public class CognosContainer extends GenericContainer<CognosContainer> {
 		});
 		// The image's healthcheck: 200 (anonymous session) or 441 (logon prompt, with
 		// users)
-		waitingFor(Wait.forHttp("/bi/v1/login")
-			.forPort(DISPATCHER_PORT)
-			.forStatusCodeMatching(code -> code == 200 || code == 441)
-			.withStartupTimeout(STARTUP_TIMEOUT));
+		waitingFor(new HttpOrExitWaitStrategy("/bi/v1/login", DISPATCHER_PORT, code -> code == 200 || code == 441,
+				STARTUP_TIMEOUT));
 		applySource();
 	}
 

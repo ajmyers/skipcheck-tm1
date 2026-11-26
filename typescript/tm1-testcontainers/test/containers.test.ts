@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Tm1Version } from "@skipcheck/tm1-client";
 import { describe, expect } from "vitest";
-import { PawContainer, PlanningAnalyticsEnvironment, Tm1ServerContainer, Tm1WebContainer } from "../src/index.js";
+import { PawContainer, PlanningAnalyticsEnvironment, Tm1ServerContainer, Tm1Source, Tm1WebContainer } from "../src/index.js";
 import { PawSession } from "../src/PawSession.js";
 import { RequiresPaw, requiresCognos, requiresPaw, requiresTm1, requiresTm1Web } from "../src/vitest.js";
 import { Tm1WebSession } from "./support/Tm1WebSession.js";
@@ -48,6 +51,30 @@ describe("Tm1ServerContainer", () => {
     await using tm1 = new Tm1ServerContainer(shared.getSource()).withExpectedVersion(Tm1Version.parse("99.0"));
     await expect(tm1.start()).rejects.toThrow("Expected TM1 99.0 but the server from");
     expect(tm1.isRunning()).toBe(false);
+  });
+
+  requiresTm1("fails at once when the container exits", async () => {
+    // An install whose programs can't run, as when TM1 lacks a library: the container exits at
+    // once, and start() says so with its log, rather than waiting out the startup timeout
+    const install = mkdtempSync(join(tmpdir(), "tm1-install-"));
+    try {
+      // executable, with an interpreter that doesn't exist: exec fails the same way whatever the
+      // host's file permissions
+      mkdirSync(join(install, "bin64"));
+      for (const program of ["tm1s.exe", "tm1admsrv.exe"]) writeFileSync(join(install, "bin64", program), "#!/not/a/program\n", { mode: 0o755 });
+      const started = Date.now();
+      await using tm1 = new Tm1ServerContainer(new Tm1Source.InstallDir(install));
+      const failed = await tm1.start().then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      expect(String(failed)).toContain("The container exited while starting, with code");
+      expect(String(failed)).toContain("[tm1-entrypoint] Starting TM1 Admin Server");
+      // Well inside the five-minute startup timeout, with room for pulling the image
+      expect(Date.now() - started).toBeLessThan(240_000);
+    } finally {
+      rmSync(install, { recursive: true, force: true });
+    }
   });
 });
 

@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Objects;
 
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 import com.github.dockerjava.api.command.InspectContainerResponse;
@@ -73,10 +72,7 @@ public class Tm1AdminServerContainer extends GenericContainer<Tm1AdminServerCont
 			host.withBinds(all);
 		});
 		// The image's healthcheck in admin mode: the server list answers without a login
-		waitingFor(Wait.forHttp("/api/v1/Servers")
-			.forPort(REST_PORT)
-			.forStatusCode(200)
-			.withStartupTimeout(STARTUP_TIMEOUT));
+		waitingFor(new HttpOrExitWaitStrategy("/api/v1/Servers", REST_PORT, code -> code == 200, STARTUP_TIMEOUT));
 		Tm1ServerContainer.mountSource(source, binds, this::withEnv);
 	}
 

@@ -50,6 +50,42 @@ public class Tm1ServerContainerTests(Tm1ServerFixture fixture) : IClassFixture<T
     }
 
     [RequiresTm1Fact]
+    public async Task FailsAtOnceWhenTheContainerExits()
+    {
+        // An install whose programs can't run, as when TM1 lacks a library: the container exits at
+        // once, and StartAsync says so with its log, rather than waiting out the startup timeout
+        var install = System.IO.Directory.CreateTempSubdirectory("tm1-install-").FullName;
+        try
+        {
+            // executable, with an interpreter that doesn't exist: exec fails the same way whatever
+            // the host's file permissions
+            System.IO.Directory.CreateDirectory(System.IO.Path.Combine(install, "bin64"));
+            foreach (var program in new[] { "tm1s.exe", "tm1admsrv.exe" })
+            {
+                var path = System.IO.Path.Combine(install, "bin64", program);
+                await System.IO.File.WriteAllTextAsync(path, "#!/not/a/program\n");
+                if (!OperatingSystem.IsWindows())
+                {
+                    System.IO.File.SetUnixFileMode(path, (System.IO.UnixFileMode)0b111_101_101);
+                }
+            }
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            await using (var tm1 = new Tm1ServerContainer(new Tm1Source.InstallDir(install)))
+            {
+                var e = await Assert.ThrowsAnyAsync<Exception>(() => tm1.StartAsync());
+                Assert.Contains("The container exited while starting, with code", e.ToString(), StringComparison.Ordinal);
+                Assert.Contains("[tm1-entrypoint] Starting TM1 Admin Server", e.ToString(), StringComparison.Ordinal);
+            }
+            // Well inside the five-minute startup timeout, with room for pulling the image
+            Assert.True(started.Elapsed < TimeSpan.FromMinutes(4), $"took {started.Elapsed}");
+        }
+        finally
+        {
+            System.IO.Directory.Delete(install, recursive: true);
+        }
+    }
+
+    [RequiresTm1Fact]
     public async Task GivesAClientOfTheSharedServer()
     {
         await using var client = fixture.Client();

@@ -12,7 +12,6 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 import com.github.dockerjava.api.command.InspectContainerResponse;
@@ -99,7 +98,7 @@ public class Tm1WebContainer extends GenericContainer<Tm1WebContainer> {
 			host.withBinds(all);
 		});
 		// The login page, as the image's healthcheck uses: 200 once both apps are up.
-		waitingFor(Wait.forHttp("/tm1web/").forPort(HTTP_PORT).forStatusCode(200).withStartupTimeout(STARTUP_TIMEOUT));
+		waitingFor(new HttpOrExitWaitStrategy("/tm1web/", HTTP_PORT, code -> code == 200, STARTUP_TIMEOUT));
 		applySource();
 	}
 

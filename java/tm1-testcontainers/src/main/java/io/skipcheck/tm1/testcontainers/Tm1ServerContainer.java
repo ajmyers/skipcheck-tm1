@@ -24,7 +24,6 @@ import java.util.function.BiConsumer;
 import org.jspecify.annotations.Nullable;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
@@ -153,10 +152,8 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		});
 		// TM1 serves $metadata without a login, so a 200 means the REST API is really up.
 		// This is also the image's healthcheck.
-		waitingFor(Wait.forHttp("/api/v1/$metadata")
-			.forPort(REST_PORT)
-			.forStatusCode(200)
-			.withStartupTimeout(STARTUP_TIMEOUT));
+		// It stops waiting if the container exits, as it does when TM1 can't start.
+		waitingFor(new HttpOrExitWaitStrategy("/api/v1/$metadata", REST_PORT, code -> code == 200, STARTUP_TIMEOUT));
 		applySource();
 	}
 

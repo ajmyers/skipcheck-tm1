@@ -15,7 +15,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 /**
@@ -80,10 +79,7 @@ public class KeycloakContainer extends GenericContainer<KeycloakContainer> {
 		withEnv("KC_HTTP_ENABLED", "true");
 		// One issuer for Cognos and the tests, whichever address they use
 		withEnv("KC_HOSTNAME", getNetworkUrl());
-		waitingFor(Wait.forHttp("/realms/master")
-			.forPort(HTTP_PORT)
-			.forStatusCode(200)
-			.withStartupTimeout(Duration.ofMinutes(3)));
+		waitingFor(new HttpOrExitWaitStrategy("/realms/master", HTTP_PORT, code -> code == 200, Duration.ofMinutes(3)));
 	}
 
 	/**
