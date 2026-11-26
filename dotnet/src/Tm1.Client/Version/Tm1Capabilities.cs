@@ -24,6 +24,10 @@ public sealed class Tm1Capabilities
     private readonly HashSet<string> _imports;
     private readonly Dictionary<string, string> _aliases;
 
+    // Each operation's parameters, by "binding type/name" or by import name, one set per overload,
+    // without the binding parameter
+    private readonly Dictionary<string, List<HashSet<string>>> _parameters;
+
     private Tm1Capabilities(
         string? schemaVersion,
         Tm1Version? productVersion,
@@ -33,9 +37,11 @@ public sealed class Tm1Capabilities
         HashSet<string> entitySets,
         HashSet<string> singletons,
         HashSet<string> imports,
-        Dictionary<string, string> aliases
+        Dictionary<string, string> aliases,
+        Dictionary<string, List<HashSet<string>>> parameters
     )
     {
+        _parameters = parameters;
         SchemaVersion = schemaVersion;
         ProductVersion = productVersion;
         Endpoints = endpoints;
@@ -112,6 +118,9 @@ public sealed class Tm1Capabilities
         var endpoints = new HashSet<string>();
         var types = new Dictionary<string, (string?, HashSet<string>)>();
         var bound = new Dictionary<string, HashSet<string>>();
+        var parameters = new Dictionary<string, List<HashSet<string>>>();
+        var unbound = new Dictionary<string, List<HashSet<string>>>();
+        var importsOf = new Dictionary<string, string>();
         var sets = new HashSet<string>();
         var singletons = new HashSet<string>();
         var imports = new HashSet<string>();
@@ -129,6 +138,11 @@ public sealed class Tm1Capabilities
             }
             foreach (var kind in new[] { "Action", "Function" })
             {
+                foreach (var op in schema.Elements(Edm + kind).Where(o => (string?)o.Attribute("IsBound") != "true"))
+                {
+                    // An unbound operation's parameters, by its qualified name, for its import
+                    Add(unbound, $"{ns}.{Required(op, "Name")}", op.Elements(Edm + "Parameter").Select(p => Required(p, "Name")));
+                }
                 foreach (var op in schema.Elements(Edm + kind).Where(o => (string?)o.Attribute("IsBound") == "true"))
                 {
                     var first = op.Elements(Edm + "Parameter").FirstOrDefault();
@@ -147,6 +161,10 @@ public sealed class Tm1Capabilities
                         bound[key] = names = new HashSet<string>();
                     }
                     names.Add(Required(op, "Name"));
+                    if (!collection)
+                    {
+                        Add(parameters, key + "/" + Required(op, "Name"), op.Elements(Edm + "Parameter").Skip(1).Select(p => Required(p, "Name")));
+                    }
                 }
             }
             foreach (var t in schema.Elements(Edm + "EntityType").Concat(schema.Elements(Edm + "ComplexType")))
@@ -173,16 +191,34 @@ public sealed class Tm1Capabilities
                     {
                         endpoints.Add($"{tag} {Required(item, "Name")}");
                         set.Add(Required(item, "Name"));
+                        if (((string?)item.Attribute("Action") ?? (string?)item.Attribute("Function")) is { } imported)
+                        {
+                            importsOf[Required(item, "Name")] = Qualify(imported);
+                        }
                     }
                 }
             }
         }
-        return new Tm1Capabilities(version, productVersion, endpoints, types, bound, sets, singletons, imports, aliases);
+        // An import's parameters, under its own name, once every schema is read
+        foreach (var (name, imported) in importsOf)
+        {
+            parameters[name] = unbound.TryGetValue(imported, out var overloads) ? overloads : [];
+        }
+        return new Tm1Capabilities(version, productVersion, endpoints, types, bound, sets, singletons, imports, aliases, parameters);
+    }
+
+    private static void Add(Dictionary<string, List<HashSet<string>>> parameters, string key, IEnumerable<string> names)
+    {
+        if (!parameters.TryGetValue(key, out var overloads))
+        {
+            parameters[key] = overloads = [];
+        }
+        overloads.Add([.. names]);
     }
 
     /// <summary>A copy that knows the server's product version.</summary>
     public Tm1Capabilities WithProductVersion(Tm1Version? productVersion) =>
-        new(SchemaVersion, productVersion, Endpoints, _types, _bound, _entitySets, _singletons, _imports, _aliases);
+        new(SchemaVersion, productVersion, Endpoints, _types, _bound, _entitySets, _singletons, _imports, _aliases, _parameters);
 
     /// <summary>Whether the server's <c>$metadata</c> defines
     /// <paramref name="capability"/>.</summary>
@@ -217,6 +253,42 @@ public sealed class Tm1Capabilities
         }
         message += added is not null ? "" : ")";
         return new Tm1UnsupportedOperationException(message, missing);
+    }
+
+    /// <summary>Whether the server's definition of an operation has <paramref name="parameter"/>. For a
+    /// bound operation, any operation of that name bound to the type or one of its base types counts;
+    /// for an operation import, the operation it imports.</summary>
+    /// <exception cref="ArgumentException"><paramref name="operation"/> isn't an operation.</exception>
+    public bool SupportsParameter(Tm1Capability operation, string parameter)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(parameter);
+        IEnumerable<HashSet<string>> defined = operation.Kind switch
+        {
+            Tm1Capability.CapabilityKind.BoundOperation => Hierarchy(operation.Type!)
+                .SelectMany(t => _parameters.TryGetValue(t + "/" + Simple(operation.Name), out var overloads) ? overloads : []),
+            Tm1Capability.CapabilityKind.UnboundOperation => _parameters.TryGetValue(operation.Name, out var overloads) ? overloads : [],
+            _ => throw new ArgumentException(operation.Describe() + " isn't an operation", nameof(operation)),
+        };
+        return defined.Any(names => names.Contains(parameter));
+    }
+
+    /// <summary>Null if the server's definition of the operation has the parameter; otherwise the
+    /// error saying what's missing and which schema version the server reports, as Java's.</summary>
+    public Tm1UnsupportedOperationException? CheckParameter(Tm1Capability operation, string parameter, string server)
+    {
+        if (SupportsParameter(operation, parameter))
+        {
+            return null;
+        }
+        var missing = $"parameter {parameter} of {operation.Describe()}";
+        var message = $"{missing} isn't defined by the TM1 server at {server} (";
+        message += SchemaVersion is not null ? "the server reports schema " + SchemaVersion : "the server reports no schema version";
+        if (ProductVersion is not null)
+        {
+            message += ", product version " + ProductVersion;
+        }
+        return new Tm1UnsupportedOperationException(message + ")", missing);
     }
 
     /// <inheritdoc/>

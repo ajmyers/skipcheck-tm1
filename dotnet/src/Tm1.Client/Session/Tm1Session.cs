@@ -173,7 +173,7 @@ public sealed class Tm1Session : IAsyncDisposable
 
     /// <summary>What the server supports, from its own <c>$metadata</c>. Fetched once per server
     /// version and shared by every session built from the same settings, a pool's included. A
-    /// request that declares <see cref="Tm1Request{T}.Requires"/> is checked against it before it's
+    /// request that declares <see cref="Tm1Request{T}.Requires(Version.Tm1Capability)"/> is checked against it before it's
     /// sent.</summary>
     public Task<Tm1Capabilities> CapabilitiesAsync(CancellationToken cancellationToken = default) => _connection.CapabilitiesAsync(cancellationToken);
 
@@ -194,7 +194,7 @@ public sealed class Tm1Session : IAsyncDisposable
             // Null only when TM1 answers a JSON null, which is then what T has to allow
             return (T)(await _batch.Add(this, request, r => Read(request, r)).ConfigureAwait(false))!;
         }
-        await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
+        request = await PrepareAsync(request, cancellationToken).ConfigureAwait(false);
         var reply = await SendAsync(request, Target(request.RelativeUri()), _async, cancellationToken).ConfigureAwait(false);
         return Read(request, reply);
     }
@@ -225,7 +225,7 @@ public sealed class Tm1Session : IAsyncDisposable
             else
             {
                 running = _connection.Running();
-                await CheckAsync(request.Requirement, cancellationToken).ConfigureAwait(false);
+                request = await PrepareAsync(request, cancellationToken).ConfigureAwait(false);
                 page = ReadPage(request, await SendAsync(request, Target(request.RelativeUri()), _async, cancellationToken).ConfigureAwait(false));
             }
             while (true)
@@ -252,17 +252,86 @@ public sealed class Tm1Session : IAsyncDisposable
     }
 
     /// <summary>Fails with <see cref="Tm1UnsupportedOperationException"/> if the server doesn't define
-    /// <paramref name="requirement"/>, reading its <c>$metadata</c> if that hasn't been read yet.</summary>
-    internal async Task CheckAsync(Tm1Capability? requirement, CancellationToken ct)
+    /// <paramref name="requirement"/>, reading its <c>$metadata</c> if that hasn't been read yet; null if
+    /// there's nothing to check, otherwise the server's capabilities.</summary>
+    internal async Task<Tm1Capabilities?> CheckAsync(Tm1Capability? requirement, CancellationToken ct)
     {
         if (requirement is null || !_connection.CheckCapabilities)
         {
-            return;
+            return null;
         }
-        var refused = (await _connection.CapabilitiesAsync(ct).ConfigureAwait(false)).Check(requirement, _connection.Root);
+        var capabilities = await _connection.CapabilitiesAsync(ct).ConfigureAwait(false);
+        var refused = capabilities.Check(requirement, _connection.Root);
         if (refused is not null)
         {
             throw refused;
+        }
+        return capabilities;
+    }
+
+    /// <summary>The request as it can be sent to this server, as Java's <c>Connection.prepare</c>: what
+    /// it needs is checked first, and so are the parameters its body sends, for a request that names its
+    /// operation. A parameter the server lacks fails the call, unless its default is what the body sends,
+    /// in which case it's left out of the body.</summary>
+    private async Task<Tm1Request<T>> PrepareAsync<T>(Tm1Request<T> request, CancellationToken ct)
+    {
+        var capabilities = await CheckAsync(request.Requirement, ct).ConfigureAwait(false);
+        if (
+            capabilities is null
+            || request.Operation is not { Kind: Tm1Operation.OperationKind.Action } operation
+            || request.Body is not IDictionary<string, object?> body
+        )
+        {
+            return request;
+        }
+        var sent = new Dictionary<string, object?>(body);
+        CheckParameters(
+            capabilities,
+            request.Requirement!,
+            operation,
+            request.ParameterDefaults,
+            sent.ContainsKey,
+            k => JsonSerializer.SerializeToNode(sent[k], Tm1Json.Options),
+            k => sent.Remove(k),
+            _connection.Root
+        );
+        return sent.Count == body.Count ? request : request.WithBody(sent);
+    }
+
+    /// <summary>Checks each of the operation's parameters the body sends against the server's
+    /// definition, leaving out (with <paramref name="remove"/>) one the server lacks whose default is
+    /// what the body sends, and failing on any other the server lacks.</summary>
+    internal static void CheckParameters(
+        Tm1Capabilities capabilities,
+        Tm1Capability needed,
+        Tm1Operation operation,
+        IReadOnlyDictionary<string, object> defaults,
+        Func<string, bool> has,
+        Func<string, System.Text.Json.Nodes.JsonNode?> valueOf,
+        Action<string> remove,
+        string server
+    )
+    {
+        foreach (var parameter in operation.Parameters)
+        {
+            var name = parameter.Name;
+            var key =
+                has(name) ? name
+                : has(name + "@odata.bind") ? name + "@odata.bind"
+                : null;
+            if (key is null || capabilities.SupportsParameter(needed, name))
+            {
+                continue;
+            }
+            if (
+                defaults.TryGetValue(name, out var leftOut)
+                && System.Text.Json.Nodes.JsonNode.DeepEquals(JsonSerializer.SerializeToNode(leftOut, leftOut.GetType(), Tm1Json.Options), valueOf(key))
+            )
+            {
+                remove(key);
+                continue;
+            }
+            throw capabilities.CheckParameter(needed, name, server)!; // not null: the server lacks it
         }
     }
 
@@ -485,7 +554,7 @@ public sealed class Tm1Session : IAsyncDisposable
 /// joins the batch, and a change to the body object afterwards isn't sent. If TM1 answers a
 /// <c>$batch</c> with no body, every call in it fails with <see cref="Tm1ProtocolException"/>.
 ///
-/// <para>A request that requires (<see cref="Tm1Request{T}.Requires"/>) something the server
+/// <para>A request that requires (<see cref="Tm1Request{T}.Requires(Version.Tm1Capability)"/>) something the server
 /// doesn't define is checked when the batch runs: its call fails with
 /// <see cref="Tm1UnsupportedOperationException"/> and it isn't sent, and the others still are.</para></summary>
 public sealed class Tm1SessionBatch
@@ -549,7 +618,11 @@ internal sealed class BatchQueue
             using var doc = JsonDocument.Parse(written);
             body = doc.RootElement.Clone();
         }
-        var entry = new Entry(request.Method, view.Contextual(request.RelativeUri()), request.Headers, body, request.Accept, request.Requirement, read);
+        var entry = new Entry(request.Method, view.Contextual(request.RelativeUri()), request.Headers, body, request.Accept, request.Requirement, read)
+        {
+            Operation = request.Operation,
+            Defaults = request.ParameterDefaults,
+        };
         lock (_entries)
         {
             if (_ran)
@@ -584,8 +657,8 @@ internal sealed class BatchQueue
         {
             try
             {
-                await _sender.CheckAsync(e.Requirement, ct).ConfigureAwait(false);
-                sendable.Add(e);
+                var capabilities = await _sender.CheckAsync(e.Requirement, ct).ConfigureAwait(false);
+                sendable.Add(capabilities is null ? e : Prepared(e, capabilities, _sender.ServiceRoot()));
             }
             catch (Exception error)
             {
@@ -683,6 +756,20 @@ internal sealed class BatchQueue
         }
     }
 
+    /// <summary>The entry as it can be sent, as outside a batch: the body may lose a parameter the server
+    /// lacks whose value is what leaving it out means.</summary>
+    private static Entry Prepared(Entry e, Tm1Capabilities capabilities, string server)
+    {
+        if (e.Operation is not { Kind: Tm1Operation.OperationKind.Action } operation || e.Body is not { ValueKind: JsonValueKind.Object } json)
+        {
+            return e;
+        }
+        var body = System.Text.Json.Nodes.JsonNode.Parse(json.GetRawText())!.AsObject();
+        var before = body.Count;
+        Tm1Session.CheckParameters(capabilities, e.Requirement!, operation, e.Defaults, body.ContainsKey, k => body[k], k => body.Remove(k), server);
+        return body.Count == before ? e : e with { Body = JsonSerializer.SerializeToElement(body) };
+    }
+
     /// <summary>A queued call. Its body is the JSON it was when queued: a change to the caller's object afterwards isn't sent.</summary>
     private sealed record Entry(
         string Method,
@@ -694,7 +781,11 @@ internal sealed class BatchQueue
         Func<Reply, object?> Read
     )
     {
-        public TaskCompletionSource<object?> Result { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<object?> Result { get; init; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Tm1Operation? Operation { get; init; }
+
+        public IReadOnlyDictionary<string, object> Defaults { get; init; } = new Dictionary<string, object>();
     }
 }
 

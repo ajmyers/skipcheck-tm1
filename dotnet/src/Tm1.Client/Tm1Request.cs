@@ -118,7 +118,7 @@ public sealed record Tm1Request<T>
 
     /// <summary>The body, serialized as JSON when sent (bytes are sent as they are), or null for
     /// none.</summary>
-    public object? Body { get; }
+    public object? Body { get; init; }
 
     /// <summary>How the response body is read.</summary>
     public Tm1Response Response { get; }
@@ -128,6 +128,14 @@ public sealed record Tm1Request<T>
 
     /// <summary>What this request needs the server to define, or null.</summary>
     public Tm1Capability? Requirement { get; init; }
+
+    /// <summary>The operation whose parameters are checked against the server, as
+    /// <see cref="Requires(Tm1Operation)"/> sets it, or null.</summary>
+    public Tm1Operation? Operation { get; init; }
+
+    /// <summary>What the server assumes for each parameter left out, by parameter name, as
+    /// <see cref="WithParameterDefault"/> sets them.</summary>
+    public IReadOnlyDictionary<string, object> ParameterDefaults { get; init; } = new Dictionary<string, object>();
 
     /// <summary>A copy with these query options instead.</summary>
     public Tm1Request<T> WithQuery(ODataQuery? query) => this with { Query = query ?? ODataQuery.None() };
@@ -151,6 +159,34 @@ public sealed record Tm1Request<T>
 
     /// <summary>The request, checked against the server's <c>$metadata</c> before it's sent.</summary>
     public Tm1Request<T> Requires(Tm1Capability capability) => this with { Requirement = capability ?? throw new ArgumentNullException(nameof(capability)) };
+
+    /// <summary>The request, sent only if the server has <paramref name="operation"/>, as
+    /// <c>Requires(operation.Capability())</c>, and only with parameters the server's definition of it
+    /// has: each of the operation's parameters the body sends (a key named after it, or after it with
+    /// <c>@odata.bind</c>) is checked against the server's own <c>$metadata</c>, and one the server
+    /// lacks fails the call with <see cref="Errors.Tm1UnsupportedOperationException"/> without calling
+    /// the server, unless <see cref="WithParameterDefault"/> says what leaving it out means and the body
+    /// sends just that, in which case it's left out. Only an action's body is checked; a function's
+    /// parameters are in its path.</summary>
+    public Tm1Request<T> Requires(Tm1Operation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        return this with { Requirement = operation.Capability(), Operation = operation };
+    }
+
+    /// <summary>A copy that says what the server assumes when <paramref name="parameter"/> is left out:
+    /// on a server whose <see cref="Requires(Tm1Operation)"/> operation lacks the parameter, a body that
+    /// sends <paramref name="value"/> for it is sent without it, rather than refused, since that asks for
+    /// the same thing.</summary>
+    public Tm1Request<T> WithParameterDefault(string parameter, object value)
+    {
+        ArgumentNullException.ThrowIfNull(parameter);
+        ArgumentNullException.ThrowIfNull(value);
+        return this with { ParameterDefaults = new Dictionary<string, object>(ParameterDefaults) { [parameter] = value } };
+    }
+
+    /// <summary>A copy with another body, for the session to send in place of this one's.</summary>
+    public Tm1Request<T> WithBody(object? body) => this with { Body = body };
 
     /// <summary>A copy sent with <c>If-Match: etag</c>, failing with 412 if the entity has changed
     /// since.</summary>

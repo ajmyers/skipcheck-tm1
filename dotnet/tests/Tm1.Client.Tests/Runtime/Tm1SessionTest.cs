@@ -1123,6 +1123,90 @@ public class Tm1SessionCapabilitiesTest
         Assert.DoesNotContain("Bananas", sent);
     }
 
+    private const string CheckFeedersKey = "POST Cubes('Sales')/tm1.CheckFeeders";
+
+    /// <summary>A server whose CheckFeeders has no Selection, as before schema 11.8.32.</summary>
+    private void WithoutSelection()
+    {
+        var snapshot = File.ReadAllText(Repo.Snapshot);
+        var metadata = new System.Text.RegularExpressions.Regex(
+            "(<Action Name=\"CheckFeeders\".*?)<Parameter Name=\"Selection\".*?</Parameter>",
+            System.Text.RegularExpressions.RegexOptions.Singleline
+        ).Replace(snapshot, "$1", 1);
+        Assert.NotEqual(snapshot, metadata);
+        _tm1.On(MetadataKey, _ => Xml(metadata));
+    }
+
+    private static Tm1Request<JsonElement> CheckFeeders(string selection) =>
+        Tm1Request
+            .PostList<JsonElement>(
+                ODataPath.Of("Cubes").Key("Sales").Action("tm1.CheckFeeders"),
+                new Dictionary<string, object?>
+                {
+                    ["Tuple@odata.bind"] = new List<string> { "Dimensions('Region')/Hierarchies('Region')/Elements('Total')" },
+                    ["Selection"] = selection,
+                }
+            )
+            .Requires(Model.Tm1Operations.CubeCheckFeeders)
+            .WithParameterDefault("Selection", "Unfed");
+
+    [Fact]
+    public async Task SendsEveryParameterTheServerDefines()
+    {
+        _tm1.On(CheckFeedersKey, _ => ScriptedTm1.Json(200, "{\"value\":[]}"));
+        await _tm1.Session().StreamAsync(CheckFeeders("Both")).ToListAsync();
+        Assert.Contains("\"Selection\":\"Both\"", Assert.Single(_tm1.Requests(CheckFeedersKey)).Text);
+    }
+
+    [Fact]
+    public async Task RefusesAParameterTheServerDoesntDefineWithoutSendingIt()
+    {
+        WithoutSelection();
+        var u = await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(async () => await _tm1.Session().StreamAsync(CheckFeeders("Both")).ToListAsync());
+        Assert.Equal("parameter Selection of Cube.CheckFeeders", u.Missing);
+        Assert.Contains("reports schema 11.8.35", u.Message);
+        Assert.Empty(_tm1.Requests(CheckFeedersKey));
+    }
+
+    [Fact]
+    public async Task LeavesOutAParameterTheServerDoesntDefineWhenItsValueIsWhatLeavingItOutMeans()
+    {
+        WithoutSelection();
+        _tm1.On(CheckFeedersKey, _ => ScriptedTm1.Json(200, "{\"value\":[]}"));
+        await _tm1.Session().StreamAsync(CheckFeeders("Unfed")).ToListAsync();
+        var sent = Assert.Single(_tm1.Requests(CheckFeedersKey)).Text;
+        Assert.Contains("Tuple@odata.bind", sent);
+        Assert.DoesNotContain("Selection", sent);
+    }
+
+    [Fact]
+    public async Task LeavesOutAParameterInABatchToo()
+    {
+        WithoutSelection();
+        _tm1.On("POST $batch", r =>
+            ScriptedTm1.Json(
+                200,
+                "{\"responses\":["
+                    + string.Join(
+                        ",",
+                        r.Json.GetProperty("requests")
+                            .EnumerateArray()
+                            .Select(q => $"{{\"id\":\"{q.GetProperty("id").GetString()}\",\"status\":200,\"body\":{{\"value\":[]}}}}")
+                    )
+                    + "]}"
+            )
+        );
+        var batch = _tm1.Session().Batch();
+        var unfed = batch.Session.StreamAsync(CheckFeeders("Unfed")).ToListAsync().AsTask();
+        var both = batch.Session.StreamAsync(CheckFeeders("Both")).ToListAsync().AsTask();
+        await batch.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Empty(await unfed.WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(() => both.WaitAsync(TimeSpan.FromSeconds(5)));
+        var sent = Assert.Single(_tm1.Requests("POST $batch")).Text;
+        Assert.Contains("tm1.CheckFeeders", sent);
+        Assert.DoesNotContain("Selection", sent);
+    }
+
     [Fact]
     public async Task ReadsTheVersionAgainAfterLoggingInAgain()
     {
