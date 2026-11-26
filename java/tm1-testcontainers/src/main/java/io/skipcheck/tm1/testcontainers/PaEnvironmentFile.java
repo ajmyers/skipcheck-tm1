@@ -237,8 +237,9 @@ final class PaEnvironmentFile {
 		Engine engine = null;
 		Integer enginePort = null;
 		Integer datastorePort = null;
+		Integer engineKeycloakPort = null;
 		if (engineSection != null) {
-			keys(engineSection, List.of("port", "databases", "users", "datastore"), "tm1Engine");
+			keys(engineSection, List.of("port", "databases", "users", "datastore", "oauth2"), "tm1Engine");
 			// name -> instance, in the file's order
 			Map<String, String> databases = new LinkedHashMap<>();
 			Object raw = engineSection.get("databases");
@@ -283,9 +284,13 @@ final class PaEnvironmentFile {
 			// Every user first, then the names, as pa_setup: a bad entry is reported
 			// before a
 			// name listed twice
+			// With oauth2 in the section a password is meant, so user:password says what
+			// it
+			// means: on, or false to keep the passwords with OAuth 2.0 off
+			boolean passwordUsed = engineSection.get("oauth2") != null;
 			List<EngineUser> engineUsers = new ArrayList<>();
 			for (int i = 0; i < list.size(); i++) {
-				engineUsers.add(engineUser(list.get(i), "tm1Engine.users[" + i + "]"));
+				engineUsers.add(engineUser(list.get(i), "tm1Engine.users[" + i + "]", passwordUsed));
 			}
 			Set<String> engineNames = new LinkedHashSet<>();
 			for (EngineUser user : engineUsers) {
@@ -299,17 +304,29 @@ final class PaEnvironmentFile {
 			enginePort = port(engineSection.get("port"), "tm1Engine", 4444);
 			// Published only when a port is given
 			datastorePort = ds.get("port") == null ? null : port(ds.get("port"), "tm1Engine.datastore", 27017);
+			Object oauth2 = engineSection.get("oauth2");
+			// On with true or a mapping, an empty one too: only absent or false is off
+			if (oauth2 != null && !Boolean.FALSE.equals(oauth2)) {
+				Map<?, ?> o = keys(Boolean.TRUE.equals(oauth2) ? Map.of() : oauth2, List.of("keycloakPort"),
+						"tm1Engine.oauth2");
+				if (engineUsers.stream().allMatch(u -> u.password().isEmpty())) {
+					throw error("tm1Engine.oauth2: needs a user with a password to log in as, "
+							+ "e.g. users: [analyst:analystpw:Analysts]");
+				}
+				engineKeycloakPort = port(o.get("keycloakPort"), "tm1Engine.oauth2", 8181);
+			}
 			for (String name : servers.keySet()) {
 				// The engine's two compose services in pa-setup: a server of that name
 				// would
 				// be replaced by them
 				String lowered = name.toLowerCase(Locale.ROOT);
-				if (lowered.equals("tm1-engine") || lowered.equals("tm1-engine-mongo")) {
+				if (lowered.equals("tm1-engine") || lowered.equals("tm1-engine-mongo")
+						|| (engineKeycloakPort != null && lowered.equals("tm1-engine-keycloak"))) {
 					throw error("tm1.servers." + name
 							+ ": that name is the TM1 v12 engine's here; give the server another");
 				}
 			}
-			engine = new Engine(databases, engineUsers);
+			engine = new Engine(databases, engineUsers, engineKeycloakPort != null);
 		}
 
 		if (servers.isEmpty() && cam == null && engine == null) {
@@ -318,6 +335,7 @@ final class PaEnvironmentFile {
 		List<Integer> ports = new ArrayList<>();
 		addIfSet(ports, enginePort);
 		addIfSet(ports, datastorePort);
+		addIfSet(ports, engineKeycloakPort);
 		servers.values().forEach(s -> ports.add(s.port()));
 		addIfSet(ports, admin);
 		addIfSet(ports, webPort);
@@ -359,7 +377,17 @@ final class PaEnvironmentFile {
 				wanted.databases().forEach((name, instance) -> container.withDatabase(instance, name));
 				// TM1 v12 keeps no passwords: a user's is checked and not used
 				wanted.users().forEach(u -> container.withUser(u.name(), u.groups().toArray(new String[0])));
+				if (wanted.oauth2()) {
+					// With OAuth 2.0 a password is the user's at Keycloak
+					wanted.users()
+						.stream()
+						.filter(u -> !u.password().isEmpty())
+						.forEach(u -> container.withLogin(u.name(), u.password()));
+				}
 			};
+			if (engine.oauth2()) {
+				b.tm1EngineOAuth2();
+			}
 		}
 		// Whatever the file's sections: an engine added in code runs the file's image too
 		b.tm1EngineImage = image(images, "tm1Engine");
@@ -520,17 +548,18 @@ final class PaEnvironmentFile {
 	 * pa_setup.parse_user with password_optional: an engine's user, whose password may be
 	 * left out or empty, since TM1 v12 keeps none.
 	 */
-	private EngineUser engineUser(@Nullable Object entry, String where) {
+	private EngineUser engineUser(@Nullable Object entry, String where, boolean passwordUsed) {
 		Object name;
 		Object password;
 		List<Object> groups = new ArrayList<>();
 		if (entry instanceof String text) {
 			String[] parts = text.split(":", -1);
-			if (parts.length == 2 && !parts[1].isEmpty()) {
+			if (parts.length == 2 && !parts[1].isEmpty() && !passwordUsed) {
 				// The image's own form has groups there; here the second part is a
 				// password
 				throw error(where + ": '" + text + "' reads as a password, which TM1 v12 doesn't keep: "
-						+ "for a group, write " + parts[0] + "::" + parts[1]);
+						+ "for a group, write " + parts[0] + "::" + parts[1] + ". (A password kept for OAuth 2.0 "
+						+ "logins needs oauth2 in the section: oauth2: false keeps it, off.)");
 			}
 			if (parts.length > 3) {
 				throw error(
@@ -572,7 +601,7 @@ final class PaEnvironmentFile {
 			}
 			groupNames.add(group);
 		}
-		return new EngineUser(userName, List.copyOf(groupNames));
+		return new EngineUser(userName, pw, List.copyOf(groupNames));
 	}
 
 	/** A tm1s.cfg value as pa_setup writes it, with Python's str(): true is True. */
@@ -615,10 +644,10 @@ final class PaEnvironmentFile {
 		return new IllegalArgumentException(file + ": " + message);
 	}
 
-	private record Engine(Map<String, String> databases, List<EngineUser> users) {
+	private record Engine(Map<String, String> databases, List<EngineUser> users, boolean oauth2) {
 	}
 
-	private record EngineUser(String name, List<String> groups) {
+	private record EngineUser(String name, String password, List<String> groups) {
 	}
 
 	private record Server(int port, String seed, Map<String, String> cfg) {

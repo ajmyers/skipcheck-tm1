@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.testcontainers.KeycloakContainer;
 import io.skipcheck.tm1.testcontainers.RequiresTm1Engine;
 import io.skipcheck.tm1.testcontainers.Tm1Database;
 import io.skipcheck.tm1.testcontainers.Tm1EngineContainer;
@@ -59,6 +60,26 @@ final class Tm1EngineExamples {
 
 	}
 	// @end
+
+	void oauth2(Tm1EngineSource source) throws Exception {
+		// @start region = oauth2
+		// Entering the block starts Keycloak first, then the engine; the Keycloak is
+		// yours to close
+		try (var keycloak = new KeycloakContainer();
+				var engine = new Tm1EngineContainer(source).withUser("analyst", "Analysts")
+					.withLogin("analyst", "analystpw")
+					.withOAuth2(keycloak)) {
+			engine.start();
+			Tm1Database db = engine.database("tm1");
+			// A token from Keycloak, with the analyst's password, sent to TM1 as Bearer
+			HttpRequest request = db.oauth2Login("analyst")
+				.authorizeWithToken(HttpRequest.newBuilder(URI.create(db.getRestUrl() + "Cubes?$select=Name")))
+				.build();
+			// @end
+			assertEquals(200,
+					HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString()).statusCode());
+		}
+	}
 
 	void container(Tm1EngineSource source) {
 		// @start region = container

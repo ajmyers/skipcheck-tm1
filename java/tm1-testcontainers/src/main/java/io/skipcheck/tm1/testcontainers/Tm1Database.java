@@ -87,6 +87,20 @@ public final class Tm1Database {
 		return engine.login(instance, user);
 	}
 
+	/**
+	 * A login through OAuth 2.0: as a user the engine's Keycloak knows the password of
+	 * ({@link Tm1EngineContainer#withLogin}). The login gets a token from Keycloak with
+	 * that password and sends it to TM1, as a program acting for the user would.
+	 * @param user the user's name
+	 * @return the login
+	 * @throws IllegalStateException if the engine has no
+	 * {@link Tm1EngineContainer#withOAuth2}
+	 * @throws IllegalArgumentException if the user has no password
+	 */
+	public Tm1Login oauth2Login(String user) {
+		return engine.oauth2Login(this, user);
+	}
+
 	@Override
 	public boolean equals(Object other) {
 		return other instanceof Tm1Database that && engine.equals(that.engine) && instance.equals(that.instance)

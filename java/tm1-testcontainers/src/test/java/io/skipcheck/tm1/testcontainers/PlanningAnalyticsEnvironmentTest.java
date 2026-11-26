@@ -397,6 +397,46 @@ class PlanningAnalyticsEnvironmentTest {
 	}
 
 	@Test
+	void anEngineTakesOAuth2TokensFromTheEnvironmentsKeycloak() {
+		var env = engineBuilder().tm1Engine(engine -> engine.withUser("analyst").withLogin("analyst", "analystpw"))
+			.tm1EngineOAuth2()
+			.build();
+		// Added for the engine, without Cognos
+		var keycloak = env.keycloak();
+		assertThat(env.tm1Engine().getKeycloak()).isSameAs(keycloak);
+		assertThat(keycloak.getNetwork()).isSameAs(env.network()).isSameAs(env.tm1Engine().getNetwork());
+		assertThat(env.tm1Engine().getEnvMap()).containsEntry("TM1_OAUTH2_ISSUER_URL",
+				"http://keycloak:8080/realms/tm1");
+		assertThat(env.containers()).containsExactly(keycloak, env.tm1Engine());
+		assertThat(env.tm1Database("tm1").oauth2Login("analyst").getPassword()).isEqualTo("analystpw");
+
+		assertThatIllegalStateException().isThrownBy(() -> builder().tm1("legacy").tm1EngineOAuth2().build())
+			.withMessageContaining("OAuth 2.0 logins are a TM1 v12 engine's: add tm1Engine() too");
+		assertThatIllegalStateException().isThrownBy(() -> builder().tm1("legacy").keycloak().build())
+			.withMessageContaining("add cognos(...) or tm1EngineOAuth2() too");
+	}
+
+	@Test
+	void fromConfigTurnsOAuth2OnWithTheUsersWhoHaveAPassword() {
+		var env = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-oauth2.yaml")).build();
+		var engine = env.tm1Engine();
+		assertThat(engine.getKeycloak()).isSameAs(env.keycloak());
+		engine.configure();
+		// TM1 gets names and groups; Keycloak the passwords
+		assertThat(engine.getEnvMap()).containsEntry("TM1_USERS", "analyst:Analysts,boss,viewer,planner:Planners");
+		var db = env.tm1Database("tm1");
+		assertThat(db.oauth2Login("analyst").getPassword()).isEqualTo("analyst$pw");
+		assertThat(db.oauth2Login("boss").getPassword()).isEqualTo("bosspw");
+		assertThat(db.oauth2Login("planner").getPassword()).isEqualTo("plannerpw");
+		assertThatIllegalArgumentException().isThrownBy(() -> db.oauth2Login("viewer"));
+
+		// oauth2: false is off, with the passwords in the file left readable
+		var off = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-oauth2-off.yaml")).build();
+		assertThat(off.tm1Engine().getKeycloak()).isNull();
+		assertThat(off.tm1Engine().getEnvMap()).doesNotContainKey("TM1_OAUTH2_ISSUER_URL");
+	}
+
+	@Test
 	void anEnvironmentWithAnEngineCantBeReused() {
 		// Whatever the developer's switch says: the same code must do the same everywhere
 		for (boolean enabled : new boolean[] { true, false }) {

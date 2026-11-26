@@ -161,9 +161,10 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		this.network = given != null ? given
 				: reused ? new ReusableNetwork(() -> NETWORK_PREFIX + identity()) : Network.newNetwork();
 		this.ownsNetwork = given == null;
-		this.keycloak = b.keycloak == null ? null : (b.keycloakImage == null ? new KeycloakContainer()
-				: new KeycloakContainer(DockerImageName.parse(b.keycloakImage)))
-			.withNetwork(network);
+		this.keycloak = b.keycloak == null && !b.tm1EngineOAuth2 ? null
+				: (b.keycloakImage == null ? new KeycloakContainer()
+						: new KeycloakContainer(DockerImageName.parse(b.keycloakImage)))
+					.withNetwork(network);
 		CognosContainer cognos = null;
 		if (b.cognos != null) {
 			CognosSource source = b.get(b.cognosSource, ibm -> new CognosSource.Zip(ibm, null), CognosSource::discover,
@@ -248,6 +249,12 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 				.withNetwork(network)
 				// Its name on the network, as in the compose project pa-setup writes
 				.withNetworkAliases(ENGINE_ALIAS);
+			if (b.tm1EngineOAuth2) {
+				// The environment's one Keycloak: its address on the network is its
+				// issuer for
+				// Cognos and for the engine alike
+				engine.withOAuth2(Objects.requireNonNull(keycloak, "keycloak"));
+			}
 			// What the file said first; then, below, what the caller says
 			apply(b.fileTm1Engine, engine);
 		}
@@ -681,6 +688,8 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 
 		@Nullable String tm1EngineImage;
 
+		private boolean tm1EngineOAuth2;
+
 		// The file's own settings for the engine, kept when the caller adds theirs
 		@Nullable Consumer<Tm1EngineContainer> fileTm1Engine;
 
@@ -882,6 +891,18 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		}
 
 		/**
+		 * Has the TM1 v12 engine take OAuth 2.0 logins, with tokens from the
+		 * environment's Keycloak, which is added if {@link #keycloak()} wasn't called.
+		 * Give users a password with {@link Tm1EngineContainer#withLogin}, in
+		 * {@link #tm1Engine(Consumer)}, and log in with {@link Tm1Database#oauth2Login}.
+		 * @return this builder
+		 */
+		public Builder tm1EngineOAuth2() {
+			this.tm1EngineOAuth2 = true;
+			return this;
+		}
+
+		/**
 		 * Where the engine gets TM1 v12 from, instead of what
 		 * {@link Tm1EngineSource#discover()} finds.
 		 * @param source the source
@@ -960,8 +981,12 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 				throw new IllegalStateException("An environment with a TM1 v12 engine can't be reused: the engine "
 						+ "and its datastore belong together, and a kept one keeps every database tests left");
 			}
-			if (keycloak != null && cognos == null) {
-				throw new IllegalStateException("Keycloak gives Cognos its OIDC namespace: add cognos(...) too");
+			if (keycloak != null && cognos == null && !tm1EngineOAuth2) {
+				throw new IllegalStateException("Keycloak gives Cognos its OIDC namespace, or a TM1 v12 engine its "
+						+ "OAuth 2.0 logins: add cognos(...) or tm1EngineOAuth2() too");
+			}
+			if (tm1EngineOAuth2 && tm1Engine == null) {
+				throw new IllegalStateException("OAuth 2.0 logins are a TM1 v12 engine's: add tm1Engine() too");
 			}
 			if (camNamespace == Namespace.OIDC && keycloak == null) {
 				throw new IllegalStateException("CAM security through OIDC needs keycloak()");

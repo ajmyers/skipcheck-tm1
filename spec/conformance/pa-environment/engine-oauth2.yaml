@@ -1,0 +1,10 @@
+# OAuth 2.0 logins to the TM1 v12 engine: a Keycloak, and the users with a password in it
+version: 1
+ibm: ibm
+tm1Engine:
+  users:
+    - analyst:analyst$pw:Analysts
+    - boss:bosspw
+    - viewer
+    - { name: planner, password: plannerpw, groups: [Planners] }
+  oauth2: { keycloakPort: 8191 }

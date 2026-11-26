@@ -11,10 +11,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.utility.DockerImageName;
 
 /**
@@ -56,7 +60,12 @@ public class KeycloakContainer extends GenericContainer<KeycloakContainer> {
 
 	private static final Pattern ID_TOKEN = Pattern.compile("\"id_token\"\\s*:\\s*\"([^\"]+)\"");
 
+	private static final Pattern ACCESS_TOKEN = Pattern.compile("\"access_token\"\\s*:\\s*\"([^\"]+)\"");
+
 	private static final Duration TIMEOUT = Duration.ofSeconds(30);
+
+	// Realms to import at start, by name: a TM1 v12 engine's, for OAuth 2.0 logins
+	private final Map<String, Supplier<String>> realms = new LinkedHashMap<>();
 
 	/** Keycloak on the default image (or {@code KEYCLOAK_IMAGE}), in development mode. */
 	public KeycloakContainer() {
@@ -81,6 +90,56 @@ public class KeycloakContainer extends GenericContainer<KeycloakContainer> {
 		// One issuer for Cognos and the tests, whichever address they use
 		withEnv("KC_HOSTNAME", getNetworkUrl());
 		waitingFor(new HttpOrExitWaitStrategy("/realms/master", HTTP_PORT, code -> code == 200, Duration.ofMinutes(3)));
+	}
+
+	/**
+	 * A realm for this Keycloak to import when it starts, as JSON. The JSON is asked for
+	 * when Keycloak starts, so whoever gives it can still be changed until then.
+	 */
+	KeycloakContainer withRealm(String name, Supplier<String> json) {
+		realms.put(name, json);
+		return this;
+	}
+
+	@Override
+	protected void configure() {
+		if (!realms.isEmpty()) {
+			withCommand("start-dev", "--import-realm");
+			realms.forEach((name, json) -> withCopyToContainer(Transferable.of(json.get()),
+					"/opt/keycloak/data/import/" + name + "-realm.json"));
+		}
+	}
+
+	/**
+	 * An access token for a user of a realm, by the password grant, as a program holding
+	 * the user's password gets one.
+	 */
+	String accessToken(String realm, String client, String user, String password) {
+		String form = "grant_type=password&client_id=" + encode(client) + "&username=" + encode(user) + "&password="
+				+ encode(password);
+		HttpRequest request = HttpRequest
+			.newBuilder(URI.create(getUrl() + "/realms/" + realm + "/protocol/openid-connect/token"))
+			.header("Content-Type", "application/x-www-form-urlencoded")
+			.timeout(TIMEOUT)
+			.POST(HttpRequest.BodyPublishers.ofString(form))
+			.build();
+		try {
+			HttpResponse<String> response = HttpClient.newHttpClient()
+				.send(request, HttpResponse.BodyHandlers.ofString());
+			Matcher m = ACCESS_TOKEN.matcher(response.body());
+			if (response.statusCode() != 200 || !m.find()) {
+				throw new IllegalStateException(
+						"Keycloak refused " + user + " (HTTP " + response.statusCode() + "): " + response.body());
+			}
+			return m.group(1);
+		}
+		catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException(e);
+		}
 	}
 
 	/**
