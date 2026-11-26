@@ -39,7 +39,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --target) TARGET=$2; shift 2 ;;
     --print-key) PRINT_KEY=T; shift ;;
-    -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '4,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) [ -z "$SOURCE" ] || die "unexpected argument: $1"; SOURCE=$1; shift ;;
   esac
 done
@@ -100,8 +100,10 @@ if [ ! -e "$INSTALLING" ] && [ -n "$KEY" ] && [ -f "$MARKER" ] && [ "$(cat "$MAR
   log "TM1 already installed in $TARGET from this package ($SHOWN)"
   exit 0
 fi
-if [ -e "$TARGET/bin" ] && [ ! -f "$MARKER" ] && [ ! -e "$INSTALLING" ]; then
-  die "$TARGET already contains a TM1 install not created by tm1-engine-install; refusing to overwrite it"
+# Installing empties the target, so it has to be empty or an install of this script's
+if [ ! -f "$MARKER" ] && [ ! -e "$INSTALLING" ] \
+    && [ -n "$(find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .install.lock ! -name lost+found -print -quit)" ]; then
+  die "$TARGET isn't empty, and what's in it wasn't installed by tm1-engine-install; refusing to replace it. Install into an empty folder or volume."
 fi
 
 work=$(mktemp -d)

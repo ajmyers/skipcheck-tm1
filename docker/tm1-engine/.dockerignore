@@ -3,6 +3,7 @@
 tm1-engine-files/
 bundles/
 examples/
+test/
 .env
 *.tgz
 *.tar.gz

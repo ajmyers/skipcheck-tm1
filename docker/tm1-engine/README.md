@@ -195,7 +195,9 @@ gateway's port, and the datastore. Everything else in a `config.internal.json` y
 is left as it is.
 
 **Not yet in this image:** settings for OAuth 2.0 and pass-through logins, and TLS. You
-can set them in `config.internal.json` yourself, as IBM's guide describes.
+can set the two logins in `config.internal.json` yourself, as IBM's guide describes. TLS
+on the gateway isn't supported yet: the container talks to it over plain HTTP to set TM1
+up, check its health and stop it.
 
 ## Image
 

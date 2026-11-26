@@ -5,8 +5,9 @@
 # CI has no IBM binaries, so this can't start TM1. It checks that the image contains no
 # IBM software or MongoDB, has what TM1 needs from the OS, fails cleanly with a helpful
 # message when there's no TM1, and installs a stand-in package (a made-up installer
-# with IBM's layout) the way it installs IBM's. The setup tool's logic is tested in
-# scripts/tests/test_tm1_engine.py; starting real TM1 is tested by hand.
+# with IBM's layout) the way it installs IBM's, and runs from start to stop on it, with
+# test/fake_tm1sd.py standing in for TM1. The setup tool's logic is tested in
+# scripts/tests/test_tm1_engine.py; real TM1 is tested by hand.
 #
 # Usage: ci-smoke-test.sh <image>
 set -euo pipefail
@@ -77,7 +78,7 @@ def tar_of(files, mode):
     return data.getvalue()
 payload = tar_of({
     "./installer.sh": b"#!/bin/bash\nVERSION=\"12.0.0\"\nexit 1\n",
-    "./bin/tm1sd.exe": b"#!/bin/sh\nexit 0\n",
+    "./bin/tm1sd.exe": open("/fake/fake_tm1sd.py", "rb").read(),
     "./deployment/config.internal.json": b"{}",
     "./deployment/tls/ca/cert.pem": b"cert",
     "./scripts/datastore.sh": b"#!/bin/bash\nDS_VERSION=\"8.0.1\"\n",
@@ -90,8 +91,13 @@ os.makedirs(sys.argv[1], exist_ok=True)
 with open(os.path.join(sys.argv[1], "tm1-v12.0.0-standalone-linux.tgz"), "wb") as out:
     out.write(tar_of({"tm1-v12.0.0-standalone-installer-linux.run": run, "README.md": b"readme"}, "w:gz"))
 open(os.path.join(sys.argv[1], "tm1server-9.9.9-1-linuxi38664h_bundle.tar.gz"), "wb").write(b"not ours")
+# A stand-in MongoDB download too, with its checksum beside it as mongodb.org has
+mongo = tar_of({"mongodb-linux/bin/mongod": b"#!/bin/sh\nexit 0\n", "mongodb-linux/LICENSE-Community.txt": b"license"}, "w:gz")
+open(os.path.join(sys.argv[1], "mongodb.tgz"), "wb").write(mongo)
+open(os.path.join(sys.argv[1], "mongodb.tgz.sha256"), "w").write(hashlib.sha256(mongo).hexdigest() + "  mongodb.tgz\n")
 '
-out=$(run -e MAKE="$make_package" --entrypoint bash "$image" -c '
+fake=(-v "$here/test:/fake:ro")
+out=$(run "${fake[@]}" -e MAKE="$make_package" --entrypoint bash "$image" -c '
   set -e
   python3 -c "$MAKE" /ibm good
   tm1-engine-install
@@ -105,10 +111,15 @@ grep -q "version=12.0.0 datastore=8.0.1" <<<"$out" || fail "the install didn't r
 grep -q "again-is-a-no-op" <<<"$out" || fail "a second install wasn't a no-op: $out"
 pass "a package is installed without running its installer, once"
 set +e
-out=$(run -e MAKE="$make_package" --entrypoint bash "$image" -c 'python3 -c "$MAKE" /ibm damaged && tm1-engine-install' 2>&1); rc=$?
+out=$(run "${fake[@]}" -e MAKE="$make_package" --entrypoint bash "$image" -c 'python3 -c "$MAKE" /ibm damaged && tm1-engine-install' 2>&1); rc=$?
 set -e
 [ "$rc" -eq 2 ] && grep -q "damaged" <<<"$out" || fail "a damaged installer wasn't refused (exit $rc): $out"
 pass "a damaged installer is refused"
+set +e
+out=$(run "${fake[@]}" -e MAKE="$make_package" --entrypoint bash "$image" -c 'python3 -c "$MAKE" /ibm good && mkdir -p /opt/ibm/tm1-engine && echo mine > /opt/ibm/tm1-engine/notes.txt && tm1-engine-install; echo "rc=$? kept=$(cat /opt/ibm/tm1-engine/notes.txt)"' 2>&1)
+set -e
+grep -q "rc=2 kept=mine" <<<"$out" && grep -q "isn't empty" <<<"$out" || fail "installing into a folder with files in it wasn't refused: $out"
+pass "a folder with something else in it is never emptied"
 
 # 8. What setup would create, from the environment
 out=$(run -e TM1_DATABASES=planning,finance/sales -e TM1_USERS=analyst:Analysts "$image" tm1-engine plan) || fail "tm1-engine plan failed: $out"
@@ -130,5 +141,56 @@ out=$(run --entrypoint sh "$image" -c '
 [ "$out" = "--port 27027 --dbpath /a b --auth --wiredTigerCacheSizeGB 0.5
 --wiredTigerCacheSizeGB 2 --auth" ] || fail "the mongod wrapper changed the arguments wrongly: $out"
 pass "the MongoDB wrapper holds the cache to TM1_DATASTORE_CACHE_GB"
+
+# 10. From start to stop, with the stand-in for TM1 in the package: a new deployment, setup,
+#     health, a login, a clean stop, and a second start that creates nothing again
+name=tm1-engine-smoke-$$
+packages=tm1-engine-smoke-packages-$$
+cleanup() { docker rm -f "$name" "$name-own" >/dev/null 2>&1 || true; docker volume rm "$packages" >/dev/null 2>&1 || true; }
+trap cleanup EXIT
+docker volume create "$packages" >/dev/null
+run "${fake[@]}" -v "$packages:/ibm" -e MAKE="$make_package" --entrypoint python3 "$image" -c 'import os; exec(os.environ["MAKE"])' /ibm good \
+  || fail "couldn't make the stand-in package"
+healthy() {  # healthy <container>: waits up to 90 s
+  for _ in $(seq 1 45); do
+    case "$(docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' "$1" 2>/dev/null)" in
+      "running healthy") return 0 ;;
+      exited*) return 1 ;;
+    esac
+    sleep 2
+  done
+  return 1
+}
+docker run -d --name "$name" -v "$packages:/ibm:ro" -e TM1_DATASTORE_URL=mongodb://tm1:d4tast0rePW@mongo:27017 \
+  -e HTTP_PROXY=http://127.0.0.1:9 -e TM1_DATABASES=planning -e TM1_USERS=analyst:Analysts "$image" >/dev/null
+healthy "$name" || fail "the container didn't become healthy: $(docker logs "$name" 2>&1 | tail -30)"
+out=$(docker logs "$name" 2>&1)
+grep -q "New deployment in /tm1/deployment" <<<"$out" && grep -q "Created application tm1/tm1" <<<"$out" && grep -q "Creating database tm1/planning" <<<"$out" \
+  || fail "the first start didn't set TM1 up: $out"
+! grep -q "d4tast0rePW" <<<"$out" || fail "the datastore password was logged: $out"
+[ "$(docker exec "$name" tm1-engine session tm1 analyst)" = "TM1SessionId=tm1:analyst" ] || fail "tm1-engine session didn't log in"
+docker exec "$name" tm1-engine credentials | grep -qF "/tm1/api/v1/Databases('planning')/" || fail "tm1-engine credentials doesn't list the database"
+pass "the container sets TM1 up and becomes healthy (behind a proxy setting, too)"
+docker stop -t 60 "$name" >/dev/null
+[ "$(docker inspect -f '{{.State.ExitCode}}' "$name")" = 0 ] || fail "stopping didn't exit 0: $(docker logs "$name" 2>&1 | tail -15)"
+docker logs "$name" 2>&1 | grep -q "Stopped 1 database(s) cleanly" || fail "the database wasn't stopped through TM1: $(docker logs "$name" 2>&1 | tail -15)"
+pass "stopping stops each database through TM1 first, and exits 0"
+docker start "$name" >/dev/null
+healthy "$name" || fail "the container didn't become healthy again: $(docker logs "$name" 2>&1 | tail -30)"
+[ "$(docker logs "$name" 2>&1 | grep -c "Created application")" = 1 ] || fail "the second start made the application again: $(docker logs "$name" 2>&1 | tail -30)"
+[ "$(docker exec "$name" tm1-engine session tm1 analyst)" = "TM1SessionId=tm1:analyst" ] || fail "no login after the restart"
+pass "a second start brings the database back and creates nothing again"
+
+# 11. Without TM1_DATASTORE_URL: MongoDB is downloaded, checked against the checksum beside
+#     it, and put behind the wrapper
+docker run -d --name "$name-own" -v "$packages:/ibm:ro" -e TM1_DATASTORE_DOWNLOAD_URL='file:///ibm/mongodb.tgz?X-Amz-Signature=SECRET123' "$image" >/dev/null
+healthy "$name-own" || fail "the container with TM1's own MongoDB didn't become healthy: $(docker logs "$name-own" 2>&1 | tail -30)"
+out=$(docker logs "$name-own" 2>&1)
+grep -q "datastore: embedded" <<<"$out" || fail "TM1 wasn't started with its own MongoDB: $out"
+! grep -q "not verified" <<<"$out" || fail "the MongoDB download's checksum wasn't found: $out"
+! grep -q "SECRET123" <<<"$out" || fail "the MongoDB download URL's credentials were printed: $out"
+docker exec "$name-own" sh -c 'd=/opt/ibm/tm1-engine/third_party/datastore; test -x "$d/mongod.bin" && cmp -s "$d/mongod" /usr/local/lib/tm1-engine/mongod-wrapper.sh' \
+  || fail "MongoDB wasn't put behind the wrapper"
+pass "TM1's own MongoDB is downloaded, verified and wrapped"
 
 echo "All smoke tests passed."

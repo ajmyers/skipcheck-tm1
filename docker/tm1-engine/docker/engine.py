@@ -48,6 +48,7 @@ CREDENTIALS = os.environ.get("TM1_ENGINE_CREDENTIALS", "/tm1/credentials")
 PORT = 4444  # the gateway's port inside the container; fixed, like tm1-server's 8010
 BASE = f"http://127.0.0.1:{PORT}"
 READY = "/tmp/tm1-engine-ready.json"  # written when setup is done; read by health
+STARTED = "/tmp/tm1-engine-started"  # when the entrypoint started TM1 (UTC, as TM1's logs write dates)
 STOPPED = os.path.join(DEPLOYMENT, ".tm1-engine-stopped.json")  # databases stop-databases stopped
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 DEFAULT_INSTANCE = "tm1"
@@ -104,9 +105,13 @@ def plan(env=None):
                 instance(name)["applications"].append(application)
     users = []
     for item in _items(env.get("TM1_USERS", "")):
-        name, *groups = [part.strip() for part in item.split(":")]
-        if not name or any(not group for group in groups):
+        name, *listed = [part.strip() for part in item.split(":")]
+        if not name or any(not group for group in listed):
             raise Failure(f"TM1_USERS: {item!r}: expected USER[:GROUP[:GROUP]]")
+        groups = []
+        for group in listed:  # a group named twice is one group: TM1's group names aren't case-sensitive
+            if group.lower() not in (kept.lower() for kept in groups):
+                groups.append(group)
         if name.lower() in (user["name"].lower() for user in users):
             raise Failure(f"TM1_USERS: {name!r} is listed twice")
         users.append({"name": name, "groups": groups})
@@ -127,6 +132,11 @@ def seconds(value, name, default):
 
 # ---- HTTP ---------------------------------------------------------------------------
 
+# The gateway is in this container: never through a proxy, whatever HTTP_PROXY says (it's
+# often set, for the package or MongoDB download)
+DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def call(method, path, basic=None, cookie=None, body=None, timeout=120):
     """One request to the gateway. Returns (status, parsed JSON or text, headers)."""
     headers = {"Accept": "application/json"}
@@ -140,7 +150,7 @@ def call(method, path, basic=None, cookie=None, body=None, timeout=120):
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(BASE + path, data=data, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with DIRECT.open(request, timeout=timeout) as response:
             status, raw, got = response.status, response.read(), response.headers
     except urllib.error.HTTPError as error:
         status, raw, got = error.code, error.read(), error.headers
@@ -167,7 +177,7 @@ def key(name):
 
 def quote(name):
     """key(name) for use in a URL."""
-    return urllib.parse.quote(key(name))
+    return urllib.parse.quote(key(name), safe="")
 
 
 def root():
@@ -242,9 +252,14 @@ def session(instance, user, application=None):
 # ---- setup --------------------------------------------------------------------------
 
 def recent_errors(limit=5):
-    """The last distinct errors in TM1's own logs: what TM1 says went wrong."""
+    """The last distinct errors TM1 logged since this start: what TM1 says went wrong."""
     folder = os.path.join(DEPLOYMENT, "logs")
-    found = []
+    try:
+        with open(STARTED) as file:
+            since = file.read().strip()  # the logs are kept with the deployment: older errors aren't this start's
+    except OSError:
+        since = ""
+    dated = []
     try:
         files = sorted(name for name in os.listdir(folder) if name.endswith(".jsonl"))
     except OSError:
@@ -260,10 +275,15 @@ def recent_errors(limit=5):
                 entry = json.loads(line)
             except ValueError:
                 continue
-            if isinstance(entry, dict) and entry.get("level") in ("error", "fatal"):
-                text = " ".join(str(entry[key]) for key in ("message", "error") if entry.get(key))
-                if text and text not in found:
-                    found.append(text)
+            if isinstance(entry, dict) and entry.get("level") in ("error", "fatal") and str(entry.get("date", "")) >= since:
+                text = " ".join(str(entry[part]) for part in ("message", "error") if entry.get(part))
+                if text:
+                    dated.append((str(entry.get("date", "")), text))
+    found = []
+    for _, text in sorted(dated):
+        if text in found:
+            found.remove(text)  # keep the latest of a repeated error
+        found.append(text)
     return found[-limit:]
 
 
@@ -355,7 +375,8 @@ def apply_users(instance, database, users):
 
 def setup():
     wanted = plan()
-    wait_for_gateway(seconds(os.environ.get("TM1_ENGINE_START_TIMEOUT"), "TM1_ENGINE_START_TIMEOUT", 300))
+    limit = seconds(os.environ.get("TM1_ENGINE_START_TIMEOUT"), "TM1_ENGINE_START_TIMEOUT", 300)
+    wait_for_gateway(limit)
     client_id, client_secret = root()
     _write_secret(os.path.join(CREDENTIALS, "root.json"), {"clientId": client_id, "clientSecret": client_secret})
 
@@ -383,10 +404,17 @@ def setup():
             elif database_state(instance, database)[0] == 0:
                 manage("PATCH", f"Instances({quote(instance)})/Databases({quote(database)})", {"Replicas": 1})
             databases.append((instance, database))
-    wait_ready(databases + [pair for pair in stopped if pair not in databases and pair[0] in have_instances
-                            and pair[1] in names(f"Instances({quote(pair[0])})/Databases")], 300)
+    wait_ready(databases, limit)
     if os.path.exists(STOPPED):
         os.remove(STOPPED)  # only now: a stop before this point must still know what to bring back
+    # Databases brought back that setup wasn't asked for (made by hand): one that won't come
+    # up is said, and doesn't stop the container on this and every later start
+    others = [pair for pair in stopped if pair not in databases and pair[0] in have_instances
+              and pair[1] in names(f"Instances({quote(pair[0])})/Databases")]
+    try:
+        wait_ready(others, min(limit, 120))
+    except Failure as failure:
+        log(f"WARNING: {failure}")
     for instance, database in databases:
         if held_application(instance):
             apply_users(instance, database, wanted["users"])
@@ -456,7 +484,7 @@ def command_database(args):
         if len(database) < 3:
             raise Failure(f"{database!r}: TM1 needs database names of at least 3 characters")
         manage("POST", f"Instances({quote(instance)})/Databases", {"Name": database})
-        wait_ready([(instance, database)], 300)
+        wait_ready([(instance, database)], seconds(os.environ.get("TM1_ENGINE_START_TIMEOUT"), "TM1_ENGINE_START_TIMEOUT", 300))
         users = plan()["users"]
         if users and not held_application(instance):
             log(f"WARNING: no application in instance {instance}, so TM1_USERS wasn't applied to {database}")
@@ -563,16 +591,18 @@ def parse_datastore_url(url):
     if not match:
         raise Failure("TM1_DATASTORE_URL must start with mongodb:// or mongodb+srv://")
     protocol, rest = match.groups()
-    location, _, tail = rest.partition("/")
-    auth, at, hosts = location.rpartition("@")
+    rest, _, query = rest.partition("?")
+    # The user and password end at the last @, so a password holding / or @ isn't cut short
+    auth, at, location = rest.rpartition("@")
     user, _, password = auth.partition(":") if at else ("", "", "")
+    hosts, _, database = location.partition("/")
     if not hosts:
         raise Failure("TM1_DATASTORE_URL names no host")
-    options = dict(urllib.parse.parse_qsl(tail.partition("?")[2], keep_blank_values=True))
+    options = dict(urllib.parse.parse_qsl(query, keep_blank_values=True))
     return {
         "external": True, "protocol": protocol, "host": hosts, "user": user, "pass": password,
         "authMechanism": options.get("authMechanism", "SCRAM-SHA-256"),
-        "authSource": options.get("authSource", "admin"),
+        "authSource": options.get("authSource") or database or "admin",  # as MongoDB reads a URL
         "replicaSet": options.get("replicaSet", ""),
         "tlsPath": options.get("tlsCAFile", options.get("sslCAFile", "")),
     }

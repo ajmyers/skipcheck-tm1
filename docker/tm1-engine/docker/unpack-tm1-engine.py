@@ -29,7 +29,7 @@ with open(run, "rb") as file:
             raise SystemExit("not a TM1 v12 installer (its header is cut short)")
         offset = end + 1
     expected = re.search(rb'^SHA="([0-9a-f]{64})"$', header, re.M)
-    if expected:
+    if expected and expected.group(1).strip(b"0"):  # all zeros: built without a checksum
         file.seek(offset)
         digest = hashlib.sha256()
         for chunk in iter(lambda: file.read(1024 * 1024), b""):

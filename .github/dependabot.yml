@@ -81,6 +81,7 @@ updates:
   - package-ecosystem: docker
     directories:
       - /docker/tm1-server
+      - /docker/tm1-engine
       - /docker/tm1-web
       - /docker/cognos-server
       - /docker/pa-setup

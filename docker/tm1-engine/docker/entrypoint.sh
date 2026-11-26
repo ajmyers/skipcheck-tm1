@@ -55,6 +55,10 @@ LIB=/usr/local/lib/tm1-engine
 log() { echo "[tm1-engine-entrypoint] $*"; }
 die() { echo "[tm1-engine-entrypoint] ERROR: $*" >&2; exit 2; }
 
+# What to create is checked before anything starts: a mistake there shouldn't cost a
+# start of TM1 to find
+/usr/local/bin/tm1-engine plan >/dev/null || exit $?
+
 # ---- find or install TM1 ----------------------------------------------------
 have_bundle() {
   [ -n "${TM1_ENGINE_BUNDLE_URL:-}" ] || [ -n "${TM1_ENGINE_BUNDLE:-}" ] && return 0
@@ -125,23 +129,27 @@ if [ "$datastore" = embedded ]; then
     [ -w "$TM1_ENGINE_HOME/" ] || die "TM1 needs MongoDB. Set TM1_DATASTORE_URL to one (e.g. a mongo:8.0 container: mongodb://user:password@mongo:27017), or mount $TM1_ENGINE_HOME read-write so MongoDB can be downloaded into it."
     version=$(cat "$TM1_ENGINE_HOME/datastore-version.txt" 2>/dev/null || true); version=${version:-8.0.32}
     url=${TM1_DATASTORE_DOWNLOAD_URL:-https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2404-$version.tgz}
+    # Shown without a query string or credentials (a pre-signed link carries them), and the
+    # checksum's address has .sha256 before any query
+    shown=$(printf '%s' "$url" | sed -E 's#\?.*$##; s#^([a-z]+://)[^/@]*@#\1#')
+    case "$url" in *\?*) sum_url="${url%%\?*}.sha256?${url#*\?}" ;; *) sum_url="$url.sha256" ;; esac
     # "|| die" on every step: errexit is off inside a subshell that is the left side of ||
     (
       flock 9 || die "couldn't lock $TM1_ENGINE_HOME"
       [ -x "$ds/mongod" ] && exit 0   # another container sharing this install got there first
       log "TM1_DATASTORE_URL isn't set, so TM1 runs its own MongoDB: downloading MongoDB $version (one-time)"
       tmp=$(mktemp -d) || die "couldn't make a temporary folder"
-      curl -fsSL --retry 3 --retry-delay 2 -o "$tmp/mongodb.tgz" "$url" || die "download failed: $url. Set TM1_DATASTORE_URL to a MongoDB instead."
-      if sum=$(curl -fsSL --retry 3 "$url.sha256" 2>/dev/null); then
-        echo "${sum%% *}  $tmp/mongodb.tgz" | sha256sum -c --quiet - || die "checksum mismatch for $url"
+      curl -fsSL --retry 3 --retry-delay 2 -o "$tmp/mongodb.tgz" "$url" || die "download failed: $shown. Set TM1_DATASTORE_URL to a MongoDB instead."
+      if sum=$(curl -fsSL --retry 3 "$sum_url" 2>/dev/null); then
+        echo "${sum%% *}  $tmp/mongodb.tgz" | sha256sum -c --quiet - || die "checksum mismatch for $shown"
       else
-        log "WARNING: no checksum at $url.sha256 - not verified"
+        log "WARNING: no checksum at $shown.sha256 - not verified"
       fi
       # Python, not tar: GNU tar 1.35 needs openat2, which emulators such as Rosetta lack
       python3 -c 'import sys, tarfile; tarfile.open(sys.argv[1]).extractall(sys.argv[2], filter="tar")' "$tmp/mongodb.tgz" "$tmp" \
-        || die "couldn't unpack $url"
+        || die "couldn't unpack $shown"
       real=$(find "$tmp" -type f -name mongod | head -1)
-      [ -n "$real" ] || die "no mongod in $url"
+      [ -n "$real" ] || die "no mongod in $shown"
       mkdir -p "$ds" || die "couldn't create $ds"
       find "$tmp" -type f \( -name 'LICENSE*' -o -name 'MPL-2' -o -name 'THIRD-PARTY-NOTICES' -o -name README \) -exec mv {} "$ds/" \;
       mv "$real" "$ds/mongod.bin" || die "couldn't put MongoDB in $ds"
@@ -162,6 +170,7 @@ touch logs/tm1sd.jsonl
 tail -n 0 -F logs/tm1sd.jsonl 2>/dev/null &
 TAIL_PID=$!
 
+date -u +%Y-%m-%dT%H:%M:%S > /tmp/tm1-engine-started   # setup shows TM1's errors from now on, if it fails
 log "Starting TM1 $(cat "$TM1_ENGINE_HOME/version.txt" 2>/dev/null || true) (gateway on 4444, datastore: $datastore)"
 "$BIN/tm1sd.exe" -z "$DEPLOYMENT" &
 TM1_PID=$!
