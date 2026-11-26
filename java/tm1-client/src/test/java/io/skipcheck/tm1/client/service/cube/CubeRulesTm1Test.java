@@ -15,6 +15,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
@@ -33,14 +35,12 @@ import io.skipcheck.tm1.client.model.RuleSyntaxError;
 import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /**
  * Rule checks and traces, on Region (Total = North + South) by Measure (Amount, Double =
  * Amount * 2).
  */
-@RequiresTm1
+@LiveTm1
 class CubeRulesTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
@@ -60,11 +60,8 @@ class CubeRulesTm1Test {
 	private static String measure;
 
 	@BeforeAll
-	static void createCube(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	static void createCube(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 		cubes = tm1.cubes();
 		cube = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		region = cube + "-region";

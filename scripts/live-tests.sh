@@ -11,7 +11,9 @@
 #   TM1_BUNDLE_URL      a download link for the bundle (TM1_BUNDLE_SHA256 checks it)
 #
 # Each suite starts its own tm1-server container from it (they share the bundle cache volume),
-# or, with TM1_URL set, the Python, .NET and TypeScript suites use that server instead.
+# or, with TM1_URL set, every suite uses that server instead (TM1_USER, TM1_PASSWORD, TM1_NAMESPACE,
+# TM1_VERIFY=false as needed). A test that needs a container of its own (CAM, Git's daemon,
+# encryption's own server, the examples' samples) still starts one from a source, or skips.
 #
 # Each suite also runs the live conformance scenarios (spec/conformance/live) and writes what it
 # sent to build/conformance-live/<language>; afterwards scripts/compare-live-traffic.py requires

@@ -16,6 +16,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1Exception;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
@@ -32,11 +34,9 @@ import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.model.ProcessParameterPatch;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /** ChoreService, with a process that creates the dimension its pName parameter names. */
-@RequiresTm1
+@LiveTm1
 class ChoreServiceTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(60);
@@ -52,11 +52,8 @@ class ChoreServiceTm1Test {
 	private String chore;
 
 	@BeforeEach
-	void createProcessAndChore(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	void createProcessAndChore(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 		chores = tm1.chores();
 		id = UUID.randomUUID().toString().substring(0, 8);
 		process = "tm1-client-" + id;

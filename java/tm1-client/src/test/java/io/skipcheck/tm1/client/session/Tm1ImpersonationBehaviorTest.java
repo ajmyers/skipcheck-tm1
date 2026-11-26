@@ -14,15 +14,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 
 /**
  * Pins how TM1 handles {@code TM1-Impersonate}, which the session pool relies on. Over
  * bare HTTP, like {@link Tm1SessionBehaviorTest}. Observed on 11.8.03500.6 with TM1's own
  * security; CAM may behave differently.
  */
-@RequiresTm1
+@LiveTm1
 class Tm1ImpersonationBehaviorTest {
 
 	private RawTm1 tm1;
@@ -34,7 +34,7 @@ class Tm1ImpersonationBehaviorTest {
 	private String bob;
 
 	@BeforeEach
-	void createUsers(Tm1ServerContainer server) {
+	void createUsers(LiveServer server) {
 		tm1 = new RawTm1(server);
 		admin = tm1.login();
 		String run = UUID.randomUUID().toString().substring(0, 6);

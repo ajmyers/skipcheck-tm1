@@ -18,6 +18,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
@@ -35,12 +37,10 @@ import io.skipcheck.tm1.client.model.View;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.cube.ViewScope;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import tools.jackson.databind.JsonNode;
 
 /** Cell writes, on Region (Total = North + South) by Measure (Amount, Note as text). */
-@RequiresTm1
+@LiveTm1
 class CellServiceTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
@@ -56,11 +56,8 @@ class CellServiceTm1Test {
 	private String cube;
 
 	@BeforeAll
-	static void createDimensions(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	static void createDimensions(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 		cells = tm1.cells();
 		String id = UUID.randomUUID().toString().substring(0, 8);
 		region = "tm1-client-" + id + "-region";

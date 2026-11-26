@@ -16,10 +16,10 @@ import java.util.TreeSet;
 
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlParser;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /**
  * Compares the test server's {@code $metadata} with the committed snapshot.
@@ -36,11 +36,11 @@ import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
  * byte for byte; otherwise the test passes.
  * </ul>
  */
-@RequiresTm1
+@LiveTm1
 class MetadataDriftTm1Test {
 
 	@Test
-	void matchesTheSnapshotOrReportsTheDifferences(Tm1ServerContainer tm1) throws Exception {
+	void matchesTheSnapshotOrReportsTheDifferences(LiveServer tm1) throws Exception {
 		String live = HttpClient.newHttpClient()
 			.send(HttpRequest.newBuilder(URI.create(tm1.getRestUrl() + "$metadata")).build(),
 					HttpResponse.BodyHandlers.ofString())

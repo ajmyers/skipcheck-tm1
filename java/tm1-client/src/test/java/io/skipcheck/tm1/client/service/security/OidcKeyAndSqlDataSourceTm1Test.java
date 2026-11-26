@@ -12,17 +12,17 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /**
  * OidcKeyService and SqlDataSourceService. The test server checks no OIDC tokens and its
  * host has no ODBC sources, so both are empty; the test pins how TM1 says so.
  */
-@RequiresTm1
+@LiveTm1
 class OidcKeyAndSqlDataSourceTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
@@ -30,11 +30,8 @@ class OidcKeyAndSqlDataSourceTm1Test {
 	private static Tm1Client tm1;
 
 	@BeforeAll
-	static void connect(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	static void connect(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 	}
 
 	@AfterAll

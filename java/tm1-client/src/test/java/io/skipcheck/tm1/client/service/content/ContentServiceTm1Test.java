@@ -23,6 +23,8 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
@@ -38,13 +40,11 @@ import io.skipcheck.tm1.client.model.Link;
 import io.skipcheck.tm1.client.model.LinkCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /** ContentService: the contents tree, and what TM1 does with documents. */
-@RequiresTm1
+@LiveTm1
 @SuppressWarnings("deprecation") // Entry.ID is deprecated in schema 11.5.0, yet it's the
 									// key
 class ContentServiceTm1Test {
@@ -54,11 +54,8 @@ class ContentServiceTm1Test {
 	private static Tm1Client tm1;
 
 	@BeforeAll
-	static void connect(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	static void connect(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 	}
 
 	@AfterAll
@@ -207,7 +204,7 @@ class ContentServiceTm1Test {
 	}
 
 	@Test
-	void refusesAChunkedUpload(Tm1ServerContainer server) throws Exception {
+	void refusesAChunkedUpload(LiveServer server) throws Exception {
 		String name = unique();
 		ContentPath folder = ContentPath.applications().child(name);
 		tm1.contents()

@@ -26,13 +26,11 @@ import io.skipcheck.tm1.client.model.ProcessExecuteResult;
 import io.skipcheck.tm1.client.model.ProcessExecuteStatusCode;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /** Tm1Batch against TM1: many calls in one $batch, each with its own result. */
-@RequiresTm1
+@LiveTm1
 class Tm1BatchTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(60);
@@ -40,11 +38,8 @@ class Tm1BatchTm1Test {
 	private static Tm1Client tm1;
 
 	@BeforeAll
-	static void connect(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	static void connect(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 	}
 
 	@AfterAll

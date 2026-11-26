@@ -15,8 +15,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 import tools.jackson.databind.JsonNode;
@@ -29,13 +29,13 @@ import tools.jackson.databind.JsonNode;
  * they show what TM1 does rather than what the client does. If a TM1 version changes one
  * of these behaviors, its test fails, and the session code needs a version branch.
  */
-@RequiresTm1
+@LiveTm1
 class Tm1SessionBehaviorTest {
 
 	private RawTm1 tm1;
 
 	@BeforeEach
-	void connect(Tm1ServerContainer server) {
+	void connect(LiveServer server) {
 		tm1 = new RawTm1(server);
 	}
 
@@ -314,7 +314,7 @@ class Tm1SessionBehaviorTest {
 	 * aren't closed: 2000 requests on one were fine.
 	 */
 	@Test
-	void closesAConnectionIdleForNinetySeconds(Tm1ServerContainer server) throws InterruptedException {
+	void closesAConnectionIdleForNinetySeconds(LiveServer server) throws InterruptedException {
 		ConnectionProvider one = ConnectionProvider.builder("idle-probe").maxConnections(1).build();
 		CompletableFuture<Long> closedAfter = new CompletableFuture<>();
 		long[] used = { System.nanoTime() };

@@ -17,10 +17,10 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.csdl.CsdlParser;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /**
  * Writes a new metadata snapshot from the TM1 test server. Runs only when asked:
@@ -49,12 +49,12 @@ import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
  * later documents are declared from, since a document is found by the builds above its
  * own.
  */
-@RequiresTm1
+@LiveTm1
 @EnabledIfEnvironmentVariable(named = "TM1_UPDATE_METADATA_SNAPSHOT", matches = "true|later")
 class MetadataSnapshotUpdateTest {
 
 	@Test
-	void writesTheSnapshot(Tm1ServerContainer tm1) throws Exception {
+	void writesTheSnapshot(LiveServer tm1) throws Exception {
 		String live = HttpClient.newHttpClient()
 			.send(HttpRequest.newBuilder(URI.create(tm1.getRestUrl() + "$metadata")).build(),
 					HttpResponse.BodyHandlers.ofString())

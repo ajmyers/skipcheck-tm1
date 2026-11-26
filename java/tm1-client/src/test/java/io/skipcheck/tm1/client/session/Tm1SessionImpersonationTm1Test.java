@@ -14,18 +14,18 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1ApiException;
 import io.skipcheck.tm1.client.error.Tm1ErrorKind;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
 
 /** Impersonation through {@link Tm1Session}, against a real TM1. */
-@RequiresTm1
+@LiveTm1
 class Tm1SessionImpersonationTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
@@ -33,7 +33,7 @@ class Tm1SessionImpersonationTm1Test {
 	private static final Tm1Request<JsonNode> ACTIVE_USER = Tm1Request.get(ODataPath.of("ActiveUser"),
 			ODataQuery.none().select("Name"), JsonNode.class);
 
-	private Tm1ServerContainer server;
+	private LiveServer server;
 
 	private RawTm1 raw;
 
@@ -42,7 +42,7 @@ class Tm1SessionImpersonationTm1Test {
 	private String alice;
 
 	@BeforeEach
-	void createUser(Tm1ServerContainer server) {
+	void createUser(LiveServer server) {
 		this.server = server;
 		raw = new RawTm1(server);
 		admin = raw.login();

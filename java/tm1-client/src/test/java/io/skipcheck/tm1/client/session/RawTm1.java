@@ -22,7 +22,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.client.LiveServer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -47,10 +47,9 @@ final class RawTm1 {
 
 	private final String basic;
 
-	RawTm1(Tm1ServerContainer tm1) {
+	RawTm1(LiveServer tm1) {
 		this.root = tm1.getRestUrl();
-		this.basic = "Basic " + Base64.getEncoder()
-			.encodeToString((tm1.getUsername() + ":" + tm1.getPassword()).getBytes(StandardCharsets.UTF_8));
+		this.basic = tm1.getAuthorization();
 	}
 
 	/**

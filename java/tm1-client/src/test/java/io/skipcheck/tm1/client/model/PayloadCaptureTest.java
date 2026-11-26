@@ -20,12 +20,12 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.session.Tm1Session;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -46,7 +46,7 @@ import tools.jackson.databind.json.JsonMapper;
  * indented, under {@code src/test/resources/payloads/<schema version>/}. The requests go
  * through the JDK's HTTP client, so nothing of the client under test touches the JSON.
  */
-@RequiresTm1
+@LiveTm1
 @EnabledIfEnvironmentVariable(named = "TM1_CAPTURE_PAYLOADS", matches = "true")
 class PayloadCaptureTest {
 
@@ -59,7 +59,7 @@ class PayloadCaptureTest {
 	private static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 
 	@Test
-	void capturesPayloads(Tm1ServerContainer tm1) throws Exception {
+	void capturesPayloads(LiveServer tm1) throws Exception {
 		Tm1Session session = Tm1Session.builder()
 			.baseUrl(tm1.getRestUrl())
 			.basicAuth(tm1.getUsername(), tm1.getPassword())
@@ -223,19 +223,19 @@ class PayloadCaptureTest {
 		return ElementCreate.builder().name(name).type(type).build();
 	}
 
-	private static String schemaVersion(Tm1ServerContainer tm1) throws Exception {
+	private static String schemaVersion(LiveServer tm1) throws Exception {
 		String metadata = get(tm1, ODataPath.metadata(), null, true);
 		int at = metadata.indexOf("Core.SchemaVersion");
 		int start = metadata.indexOf("<String>", at) + "<String>".length();
 		return metadata.substring(start, metadata.indexOf("</String>", start));
 	}
 
-	private static String get(Tm1ServerContainer tm1, ODataPath path, @Nullable ODataQuery query, boolean xml)
+	private static String get(LiveServer tm1, ODataPath path, @Nullable ODataQuery query, boolean xml)
 			throws Exception {
 		return send(tm1, HttpRequest.newBuilder(uri(tm1, path, query)).GET(), xml);
 	}
 
-	private static String post(Tm1ServerContainer tm1, ODataPath path, ODataQuery query, String body) throws Exception {
+	private static String post(LiveServer tm1, ODataPath path, ODataQuery query, String body) throws Exception {
 		return send(tm1,
 				HttpRequest.newBuilder(uri(tm1, path, query))
 					.header("Content-Type", "application/json")
@@ -243,12 +243,12 @@ class PayloadCaptureTest {
 				false);
 	}
 
-	private static URI uri(Tm1ServerContainer tm1, ODataPath path, @Nullable ODataQuery query) {
+	private static URI uri(LiveServer tm1, ODataPath path, @Nullable ODataQuery query) {
 		String q = query == null || query.isEmpty() ? "" : "?" + query.toQueryString();
 		return URI.create(tm1.getRestUrl() + path + q);
 	}
 
-	private static String send(Tm1ServerContainer tm1, HttpRequest.Builder request, boolean xml) throws Exception {
+	private static String send(LiveServer tm1, HttpRequest.Builder request, boolean xml) throws Exception {
 		String auth = Base64.getEncoder()
 			.encodeToString((tm1.getUsername() + ":" + tm1.getPassword()).getBytes(StandardCharsets.UTF_8));
 		HttpResponse<String> response = HttpClient.newHttpClient()

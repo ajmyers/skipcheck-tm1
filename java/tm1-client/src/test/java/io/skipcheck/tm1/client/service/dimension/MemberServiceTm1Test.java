@@ -12,6 +12,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.EdgeCreate;
@@ -20,11 +22,9 @@ import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.Member;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /** MemberService, on World = Europe (France, Spain) + Asia (Japan). */
-@RequiresTm1
+@LiveTm1
 class MemberServiceTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
@@ -34,11 +34,8 @@ class MemberServiceTm1Test {
 	private static String d;
 
 	@BeforeAll
-	static void createDimension(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	static void createDimension(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 		d = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.dimensions()
 			.create(DimensionCreate.builder()

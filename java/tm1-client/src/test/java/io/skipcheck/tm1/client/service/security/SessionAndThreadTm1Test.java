@@ -16,6 +16,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1ServerException;
 import io.skipcheck.tm1.client.model.ProcessCreate;
@@ -23,28 +25,23 @@ import io.skipcheck.tm1.client.model.ProcessExecuteResult;
 import io.skipcheck.tm1.client.model.Session;
 import io.skipcheck.tm1.client.model.Thread;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /**
  * SessionService and ThreadService, with a second client to look at, close and interrupt.
  */
-@RequiresTm1
+@LiveTm1
 class SessionAndThreadTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(60);
 
-	private static Tm1ServerContainer server;
+	private static LiveServer server;
 
 	private static Tm1Client tm1;
 
 	@BeforeAll
-	static void connect(Tm1ServerContainer container) {
+	static void connect(LiveServer container) {
 		server = container;
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+		tm1 = server.clientBuilder().build();
 	}
 
 	@AfterAll
@@ -55,11 +52,7 @@ class SessionAndThreadTm1Test {
 	@Test
 	void readsSessionsTheirUsersAndThreadsAndClosesAnother() {
 		String label = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
-		Tm1Client other = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.sessionContext(label)
-			.build();
+		Tm1Client other = server.clientBuilder().sessionContext(label).build();
 		try {
 			other.connect().block(WAIT);
 			long id = other.sessions().activeSession(ODataQuery.none()).block(WAIT).id();
@@ -95,10 +88,7 @@ class SessionAndThreadTm1Test {
 				.prologProcedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n")
 				.build())
 			.block(WAIT);
-		Tm1Client runner = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+		Tm1Client runner = server.clientBuilder().build();
 		CompletableFuture<ProcessExecuteResult> run = runner.processes()
 			.executeWithReturn(process, Map.of(), ODataQuery.none())
 			.toFuture();

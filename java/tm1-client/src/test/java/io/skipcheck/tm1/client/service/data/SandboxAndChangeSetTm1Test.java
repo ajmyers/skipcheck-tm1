@@ -15,6 +15,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.CubeCreate;
 import io.skipcheck.tm1.client.model.DimensionCreate;
@@ -25,12 +27,10 @@ import io.skipcheck.tm1.client.model.Sandbox;
 import io.skipcheck.tm1.client.model.SandboxCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import tools.jackson.databind.JsonNode;
 
 /** Sandboxes and change sets, on a cube of two dimensions with cells X and Y. */
-@RequiresTm1
+@LiveTm1
 class SandboxAndChangeSetTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
@@ -40,11 +40,8 @@ class SandboxAndChangeSetTm1Test {
 	private String cube;
 
 	@BeforeEach
-	void createCube(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	void createCube(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 		cube = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		for (String d : List.of(cube + "-a", cube + "-b")) {
 			tm1.dimensions()
