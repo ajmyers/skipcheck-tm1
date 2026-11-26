@@ -12,8 +12,9 @@ image.
 testImplementation("io.skipcheck:tm1-testcontainers:<version>")
 ```
 
-Tested with TM1 Server 11.8.03500.6 (Planning Analytics 2.1.19), the only version we've had
-to test with. If you run it with another version, please open an issue saying how it went.
+The client's live tests run with TM1 Server 11.8.03500.6 (Planning Analytics 2.1.19). The
+`tm1-server` image also starts Planning Analytics 2.1.2 to 2.1.25 ([which ones](../../docker/tm1-server/README.md#getting-tm1-into-the-container)).
+If you run it with another version, please open an issue saying how it went.
 
 To run the same parts by hand, outside tests (to develop against, or to look at in a browser), use
 [`pa-setup`](../../docker/pa-setup/README.md). It starts the same images from one file, `pa-environment.yaml`.
