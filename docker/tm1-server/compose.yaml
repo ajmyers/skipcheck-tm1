@@ -17,6 +17,14 @@
 #   - TM1_SERVER_IMAGE: a private image with TM1 built in (or your own build)
 #
 # Each server's files are in ./tm1-files/<server>/{config,data,logs} (or TM1_FILES_DIR).
+# The tm1 and sample servers' files can go elsewhere, to a folder or a Docker volume (set
+# in .env; the Admin Server's and TM1 Web's logs stay under TM1_FILES_DIR):
+#   TM1_CONFIG_DIR, TM1_DATA_DIR, TM1_LOGS_DIR                      the "tm1" server's
+#   TM1_SDATA_CONFIG_DIR, TM1_SDATA_DATA_DIR, TM1_SDATA_LOGS_DIR   the sample server's
+#   a path starting with /, ./ or ~   a folder on your computer
+#   tm1-config, tm1-data, tm1-logs, tm1-sdata-config, tm1-sdata-data, tm1-sdata-logs
+#                                     the Docker volume declared for it at the end of this
+#                                     file. Nothing is moved into it: see the README.
 # One Admin Server (tm1-admin) serves every TM1 server, as in a real deployment.
 
 x-tm1: &tm1
@@ -67,9 +75,9 @@ services:
     volumes:
       - *tm1-home
       - *bundles
-      - ${TM1_FILES_DIR:-./tm1-files}/tm1/config:/tm1/config
-      - ${TM1_FILES_DIR:-./tm1-files}/tm1/data:/tm1/data
-      - ${TM1_FILES_DIR:-./tm1-files}/tm1/logs:/tm1/logs
+      - ${TM1_CONFIG_DIR:-${TM1_FILES_DIR:-./tm1-files}/tm1/config}:/tm1/config
+      - ${TM1_DATA_DIR:-${TM1_FILES_DIR:-./tm1-files}/tm1/data}:/tm1/data
+      - ${TM1_LOGS_DIR:-${TM1_FILES_DIR:-./tm1-files}/tm1/logs}:/tm1/logs
 
   sdata:
     <<: *tm1
@@ -87,9 +95,9 @@ services:
     volumes:
       - *tm1-home
       - *bundles
-      - ${TM1_FILES_DIR:-./tm1-files}/sdata/config:/tm1/config
-      - ${TM1_FILES_DIR:-./tm1-files}/sdata/data:/tm1/data
-      - ${TM1_FILES_DIR:-./tm1-files}/sdata/logs:/tm1/logs
+      - ${TM1_SDATA_CONFIG_DIR:-${TM1_FILES_DIR:-./tm1-files}/sdata/config}:/tm1/config
+      - ${TM1_SDATA_DATA_DIR:-${TM1_FILES_DIR:-./tm1-files}/sdata/data}:/tm1/data
+      - ${TM1_SDATA_LOGS_DIR:-${TM1_FILES_DIR:-./tm1-files}/sdata/logs}:/tm1/logs
 
   # TM1 Web (the tm1-web image), listing the servers registered with tm1-admin.
   # Installed from the tm1web-*_bundle.tar.gz in the same bundles folder.
@@ -121,3 +129,12 @@ volumes:
   # The TM1 Web install when TM1_WEB_HOME_DIR isn't set (the web profile). Filled
   # once from your tm1web bundle; remove it the same way to change versions.
   tm1-web-install:
+  # Used only when a *_DIR setting names one, in place of a folder (see the top of this
+  # file). They then hold your config, database and logs: "docker compose down -v"
+  # removes them.
+  tm1-config:
+  tm1-data:
+  tm1-logs:
+  tm1-sdata-config:
+  tm1-sdata-data:
+  tm1-sdata-logs:

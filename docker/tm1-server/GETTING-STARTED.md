@@ -312,6 +312,7 @@ Each TM1 server has three kinds of files: its **config** (`tm1s.cfg`), its
 | **2** | **Start from an existing server's config or database** | You copy them in before the first start. |
 | **3** | **Somewhere else on your computer** | Same as 1, in a folder you choose. |
 | **4** | **Nowhere: a throwaway server** | Everything is deleted when the container is removed. |
+| **5** | **In Docker volumes** | Faster on Mac and Windows, but not folders you can open. |
 
 ### 1. In the `tm1-files` folder (default)
 
@@ -361,6 +362,24 @@ docker run --rm -p 8010:8010 -v "${PWD}\bundles:/ibm:ro" ghcr.io/ajmyers/tm1-ser
 If you chose **S** in Step 2, use `tm1-server:local` in place of
 `ghcr.io/ajmyers/tm1-server`. Press **Ctrl+C** to stop it, and everything is gone.
 (This is what automated tests do.)
+
+### 5. In Docker volumes
+
+In `.env`, name the volume for each of the server's three folders:
+```
+TM1_CONFIG_DIR=tm1-config
+TM1_DATA_DIR=tm1-data
+TM1_LOGS_DIR=tm1-logs
+```
+The rest of this guide speaks of the `tm1-files` folder. With volumes:
+
+- **Start over with an empty database:** `docker compose down`, then
+  `docker volume rm tm1_tm1-data tm1_tm1-config` (the volumes carry your folder's name
+  in front: `tm1_` for a folder named `tm1`), then `docker compose up -d`.
+- **TM1's own log files:** `docker compose exec tm1 ls /tm1/logs`.
+- **Removing everything:** `docker compose down -v` removes them with the containers.
+- **Changing an existing server to volumes** doesn't move its files: the
+  [README](README.md#compose) has the command that copies them in.
 
 ---
 
