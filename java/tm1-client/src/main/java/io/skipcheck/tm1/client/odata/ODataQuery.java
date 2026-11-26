@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 
@@ -275,8 +276,8 @@ public final class ODataQuery {
 		for (Map.Entry<String, String> option : systemOptions().entrySet()) {
 			parts.add(option.getKey() + "=" + ODataEncoding.queryValue(option.getValue()));
 		}
-		custom.forEach((name, value) -> parts.add(name + "=" + ODataEncoding.queryValue(value)));
-		aliases.forEach((name, value) -> parts.add(name + "=" + ODataEncoding.queryValue(value)));
+		lifted(q -> q.custom).forEach((name, value) -> parts.add(name + "=" + ODataEncoding.queryValue(value)));
+		lifted(q -> q.aliases).forEach((name, value) -> parts.add(name + "=" + ODataEncoding.queryValue(value)));
 		return String.join("&", parts);
 	}
 
@@ -285,8 +286,8 @@ public final class ODataQuery {
 	public String toString() {
 		List<String> parts = new ArrayList<>();
 		systemOptions().forEach((name, value) -> parts.add(name + "=" + value));
-		custom.forEach((name, value) -> parts.add(name + "=" + value));
-		aliases.forEach((name, value) -> parts.add(name + "=" + value));
+		lifted(q -> q.custom).forEach((name, value) -> parts.add(name + "=" + value));
+		lifted(q -> q.aliases).forEach((name, value) -> parts.add(name + "=" + value));
 		return String.join("&", parts);
 	}
 
@@ -306,7 +307,18 @@ public final class ODataQuery {
 	 * @return the option's value, unencoded, or {@code null} if it isn't set
 	 */
 	public @Nullable String option(String name) {
-		return custom.get(name);
+		return lifted(q -> q.custom).get(name);
+	}
+
+	/**
+	 * Custom options or parameter aliases, this query's and its expands', at any depth:
+	 * they only mean something at the top of the URL, so a nested query's go there, after
+	 * this one's, and the first of a name wins.
+	 */
+	private Map<String, String> lifted(Function<ODataQuery, Map<String, String>> part) {
+		Map<String, String> out = new LinkedHashMap<>(part.apply(this));
+		expand.values().forEach(nested -> nested.lifted(part).forEach(out::putIfAbsent));
+		return out;
 	}
 
 	private Map<String, String> systemOptions() {

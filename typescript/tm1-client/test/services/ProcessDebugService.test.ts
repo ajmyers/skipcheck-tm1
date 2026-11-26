@@ -93,12 +93,13 @@ describe("ProcessDebugService", () => {
   it("says where the run is", async () => {
     const tm1 = new FakeTm1();
     const client = tm1.client();
-    tm1.respond = () => ({ ID: 2 });
+    // Through the context's expand: TM1 before 11.8.035 refuses a GET of the navigation
+    tm1.respond = () => ({ ID: "d1", CurrentBreakpoint: { ID: 2 } });
     expect((await client.processDebugging.currentBreakpoint("d1"))?.ID).toBe(2);
-    expect(sent(tm1.last)).toBe("GET ProcessDebugContexts('d1')/CurrentBreakpoint");
-    tm1.respond = () => null;
+    expect(sent(tm1.last)).toBe("GET ProcessDebugContexts('d1')?$select=ID&$expand=CurrentBreakpoint");
+    tm1.respond = () => ({ ID: "d1", CurrentBreakpoint: null });
     expect(await client.processDebugging.currentBreakpoint("d1", ODataQuery.none().select("ID"))).toBeUndefined();
-    expect(tm1.last.target).toBe("ProcessDebugContexts('d1')/CurrentBreakpoint?$select=ID");
+    expect(tm1.last.target).toBe("ProcessDebugContexts('d1')?$select=ID&$expand=CurrentBreakpoint($select%3DID)");
     tm1.respond = () => FakeTm1.collection({ ID: "f0", Procedure: "Prolog", LineNumber: 3 });
     const frames = await client.processDebugging.callStack("d1", ODataQuery.none().expand("Variables")).toArray();
     expect(frames.map((f) => [f.ID, f.Procedure, f.LineNumber])).toEqual([["f0", "Prolog", 3]]);

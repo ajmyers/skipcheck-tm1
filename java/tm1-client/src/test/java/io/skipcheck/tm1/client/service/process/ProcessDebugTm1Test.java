@@ -94,6 +94,8 @@ class ProcessDebugTm1Test {
 
 	private static void stopsAndRunsToTheEnd(String id) {
 		assertThat(settled(id).status()).as("paused before the first line").isEqualTo(ProcessDebugContextStatus.PAUSED);
+		assertThat(debug.currentBreakpoint(id, ODataQuery.none()).blockOptional(WAIT)).as("at no breakpoint yet")
+			.isEmpty();
 		debug
 			.addBreakpoint(id,
 					ProcessDebugContextLineBreakpointCreate.builder()

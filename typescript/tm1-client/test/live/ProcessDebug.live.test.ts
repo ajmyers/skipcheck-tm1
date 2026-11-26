@@ -64,6 +64,7 @@ describe("ProcessDebugService on TM1" + liveReason, () => {
   async function stopsAndRunsToTheEnd(id: string): Promise<void> {
     const debug = tm1.processDebugging;
     expect((await settled(id)).Status, "paused before the first line").toBe("Paused");
+    expect(await debug.currentBreakpoint(id, ODataQuery.none()), "at no breakpoint yet").toBeUndefined();
     await debug.addBreakpoint(id, line(1, 3));
     const breakpoints = await debug.breakpoints(id, ODataQuery.none()).toArray();
     expect(breakpoints).toHaveLength(1);

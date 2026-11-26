@@ -419,10 +419,15 @@ class ProcessDebugService(Service):
 
     @endpoint("Navigation ProcessDebugContext/CurrentBreakpoint")
     async def current_breakpoint(self, id: str, query: ODataQuery | None = None, **options: Any) -> ProcessDebugContextBreakpoint | None:
-        """``GET …/CurrentBreakpoint``: the breakpoint the run is paused at, or None if it
-        isn't paused at one."""
-        request = Tm1Request.get(_context(id).nav("CurrentBreakpoint"), ODataQuery.of(query, **options), ProcessDebugContextBreakpoint | None)
-        return await self._session.execute(request)
+        """The breakpoint the run is paused at, or None if it isn't paused at one: read as the
+        context's ``CurrentBreakpoint``, expanded (``GET ProcessDebugContexts('id')?$select=ID&$expand=CurrentBreakpoint``),
+        with ``query`` applied inside the expand. TM1 before 11.8.035 (Planning Analytics 2.1.2 to
+        2.1.16) refuses a ``GET`` of the navigation itself, though its ``$metadata`` declares it;
+        every version tried answers the expand."""
+        nested = ODataQuery.of(query, **options)
+        request = Tm1Request.get(_context(id), ODataQuery.none().select("ID").expand("CurrentBreakpoint", nested), ProcessDebugContext | None)
+        context = await self._session.execute(request)
+        return None if context is None else context.current_breakpoint
 
     @endpoint("Navigation ProcessDebugContext/CallStack")
     async def call_stack(self, id: str, query: ODataQuery | None = None, **options: Any) -> list[ProcessDebugContextStackFrame]:

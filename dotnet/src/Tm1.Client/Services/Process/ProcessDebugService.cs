@@ -220,11 +220,22 @@ public sealed class ProcessDebugService : Tm1Service
     public Task RemoveBreakpointAsync(string id, int breakpoint, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Delete(ContextPath(id).Nav("Breakpoints").Key(breakpoint)), cancellationToken);
 
-    /// <summary><c>GET ProcessDebugContexts('id')/CurrentBreakpoint</c>: the breakpoint the run is
-    /// paused at.</summary>
+    /// <summary>The breakpoint the run is paused at, or null if it isn't paused at one: read as the
+    /// context's <c>CurrentBreakpoint</c>, expanded
+    /// (<c>GET ProcessDebugContexts('id')?$select=ID&amp;$expand=CurrentBreakpoint</c>), with
+    /// <paramref name="query"/> applied inside the expand. TM1 before 11.8.035 (Planning Analytics
+    /// 2.1.2 to 2.1.16) refuses a <c>GET</c> of the navigation itself, though its <c>$metadata</c>
+    /// declares it; every version tried answers the expand.</summary>
     [Tm1Endpoint("Navigation ProcessDebugContext/CurrentBreakpoint")]
-    public Task<ProcessDebugContextBreakpoint> CurrentBreakpointAsync(string id, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
-        Session.ExecuteAsync(Tm1Request.Get<ProcessDebugContextBreakpoint>(ContextPath(id).Nav("CurrentBreakpoint"), query), cancellationToken);
+    public Task<ProcessDebugContextBreakpoint?> CurrentBreakpointAsync(string id, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    {
+        // The request first, so a bad id throws at the call, as the other methods' do
+        var nested = query ?? ODataQuery.None();
+        var request = Tm1Request.Get<ProcessDebugContext>(ContextPath(id), ODataQuery.None().Select("ID").Expand("CurrentBreakpoint", _ => nested));
+        return Read();
+
+        async Task<ProcessDebugContextBreakpoint?> Read() => (await Session.ExecuteAsync(request, cancellationToken).ConfigureAwait(false))?.CurrentBreakpoint;
+    }
 
     /// <summary><c>GET ProcessDebugContexts('id')/CallStack</c>: where the run is, innermost first, streamed.</summary>
     [Tm1Endpoint("Navigation ProcessDebugContext/CallStack")]

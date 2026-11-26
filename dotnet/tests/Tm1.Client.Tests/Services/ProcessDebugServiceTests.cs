@@ -105,9 +105,17 @@ public class ProcessDebugServiceTests
     public async Task WhereTheRunIs()
     {
         var tm1 = _tm1.Client();
-        _tm1.Respond = _ => new Dictionary<string, object?> { ["ID"] = 2 };
-        Assert.Equal(2, (await tm1.ProcessDebugging.CurrentBreakpointAsync("d1")).Id);
-        Assert.Equal("ProcessDebugContexts('d1')/CurrentBreakpoint", _tm1.Last.Target);
+        // Through the context's expand: TM1 before 11.8.035 refuses a GET of the navigation
+        _tm1.Respond = _ => new Dictionary<string, object?>
+        {
+            ["ID"] = "d1",
+            ["CurrentBreakpoint"] = new Dictionary<string, object?> { ["ID"] = 2 },
+        };
+        Assert.Equal(2, (await tm1.ProcessDebugging.CurrentBreakpointAsync("d1"))!.Id);
+        Assert.Equal("ProcessDebugContexts('d1')?$select=ID&$expand=CurrentBreakpoint", _tm1.Last.Target);
+        _tm1.Respond = _ => new Dictionary<string, object?> { ["ID"] = "d1", ["CurrentBreakpoint"] = null };
+        Assert.Null(await tm1.ProcessDebugging.CurrentBreakpointAsync("d1", ODataQuery.None().Select("ID")));
+        Assert.Equal("ProcessDebugContexts('d1')?$select=ID&$expand=CurrentBreakpoint($select%3DID)", _tm1.Last.Target);
         _tm1.Respond = _ => FakeTm1.Collection(new { ID = "f0" });
         Assert.Single(await tm1.ProcessDebugging.CallStackAsync("d1", ODataQuery.None().Expand("Variables")).ToListAsync());
         Assert.Equal("ProcessDebugContexts('d1')/CallStack?$expand=Variables", _tm1.Last.Target);

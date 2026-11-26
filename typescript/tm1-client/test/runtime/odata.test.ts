@@ -43,6 +43,27 @@ describe("ODataQuery", () => {
     expect(query.toString()).toBe("$select=Name,Type&$expand=Hierarchies&$filter=Level eq 0&$orderby=Name&$top=10&$skip=5&$count=true");
   });
 
+  it("lifts an expand's custom options and aliases to the top", () => {
+    // They mean nothing inside $expand: a nested one goes to the top, after the outer's, and the
+    // outer's wins a name both set
+    const query = ODataQuery.none()
+      .option("!sandbox", "Outer")
+      .expand("CurrentBreakpoint", (b) =>
+        b
+          .option("!sandbox", "Inner")
+          .option("!x", "1")
+          .alias(new ODataPath.Alias("@p"), "'a'")
+          .expand("Nested", (n) => n.option("!y", "2")),
+      );
+    expect(query.toString()).toBe("$expand=CurrentBreakpoint($expand=Nested)&!sandbox=Outer&!x=1&!y=2&@p='a'");
+    expect(query.option("!x")).toBe("1");
+    expect(
+      ODataQuery.none()
+        .expand("B", (b) => b.option("!sandbox", "S"))
+        .option("!sandbox"),
+    ).toBe("S");
+  });
+
   it("nests expand options with semicolons", () => {
     const query = ODataQuery.none()
       .select("Name")

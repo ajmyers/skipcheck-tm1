@@ -50,6 +50,23 @@ class ODataQueryTest {
 	}
 
 	@Test
+	void liftsAnExpandsCustomOptionsAndAliasesToTheTop() {
+		// They mean nothing inside $expand: a nested one goes to the top, after the
+		// outer's, and
+		// the outer's wins a name both set
+		ODataQuery query = ODataQuery.none()
+			.option("!sandbox", "Outer")
+			.expand("CurrentBreakpoint",
+					b -> b.option("!sandbox", "Inner")
+						.option("!x", "1")
+						.alias(new ODataPath.Alias("@p"), "'a'")
+						.expand("Nested", n -> n.option("!y", "2")));
+		assertThat(query).hasToString("$expand=CurrentBreakpoint($expand=Nested)&!sandbox=Outer&!x=1&!y=2&@p='a'");
+		assertThat(query.option("!x")).isEqualTo("1");
+		assertThat(ODataQuery.none().expand("B", b -> b.option("!sandbox", "S")).option("!sandbox")).isEqualTo("S");
+	}
+
+	@Test
 	void appliesNestedOptionsInAnyOrder() {
 		// select() is an instance method, so in a nested expand it adds to that expand's
 		// options

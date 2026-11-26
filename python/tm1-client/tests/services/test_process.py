@@ -180,9 +180,13 @@ def test_breakpoints_need_an_id(api: Api, fake: FakeTm1) -> None:
 
 def test_reads_where_the_run_is(api: Api, fake: FakeTm1) -> None:
     debug = api.client.process_debugging
-    fake.respond = lambda r: None  # not paused at a breakpoint: 204
-    assert api.run(debug.current_breakpoint("c1")) is None
-    assert target(fake.last) == "GET ProcessDebugContexts('c1')/CurrentBreakpoint"
+    # Through the context's expand: TM1 before 11.8.035 refuses a GET of the navigation
+    fake.respond = lambda r: {"ID": "c1", "CurrentBreakpoint": {"ID": 2, "Enabled": True}}
+    assert api.run(debug.current_breakpoint("c1")).id == 2
+    assert target(fake.last) == "GET ProcessDebugContexts('c1')?$select=ID&$expand=CurrentBreakpoint"
+    fake.respond = lambda r: {"ID": "c1", "CurrentBreakpoint": None}  # not paused at a breakpoint
+    assert api.run(debug.current_breakpoint("c1", select="ID")) is None
+    assert target(fake.last) == "GET ProcessDebugContexts('c1')?$select=ID&$expand=CurrentBreakpoint($select%3DID)"
     fake.respond = lambda r: {"value": [{"ID": "f0", "LineNumber": 3}]}
     frames = api.run(debug.call_stack("c1", expand="Variables"))
     assert target(fake.last) == "GET ProcessDebugContexts('c1')/CallStack?$expand=Variables"

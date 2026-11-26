@@ -702,7 +702,7 @@ class ODataQuery:
         """With a value, a query with a custom option (``!sandbox``); without, that option's
         value, or None (as Java's two ``option`` methods)."""
         if value is _MISSING:
-            return self._custom.get(name)
+            return self._lifted("_custom").get(name)
         if not isinstance(name, str) or not _CUSTOM.match(name):
             raise ValueError(f"Not a valid custom query option name: {name}")
         out = self._copy()
@@ -722,17 +722,30 @@ class ODataQuery:
 
     @property
     def custom(self) -> dict[str, str]:
-        """The custom options (those that are not OData system options), by name."""
-        return dict(self._custom)
+        """The custom options (those that are not OData system options), by name, an expand's
+        included."""
+        return self._lifted("_custom")
 
     @property
     def aliases(self) -> dict[str, str]:
-        """The parameter aliases, by name with its ``@``, each with its literal or JSON value."""
-        return dict(self._aliases)
+        """The parameter aliases, by name with its ``@``, each with its literal or JSON value, an
+        expand's included."""
+        return self._lifted("_aliases")
 
     def params(self) -> list[tuple[str, str]]:
         """Every option as ``(name, value)``, unencoded, in order."""
-        return list(self._system().items()) + list(self._custom.items()) + list(self._aliases.items())
+        return list(self._system().items()) + list(self._lifted("_custom").items()) + list(self._lifted("_aliases").items())
+
+    def _lifted(self, slot: str) -> dict[str, str]:
+        """Custom options or parameter aliases, this query's and its expands', at any depth: they
+        only mean something at the top of the URL, so a nested query's go there, after this one's,
+        and the first of a name wins (as Java's ``ODataQuery.lifted``)."""
+        out: dict[str, str] = dict(getattr(self, slot))
+        for nested in self._expand.values():
+            if nested is not None:
+                for name, value in nested._lifted(slot).items():
+                    out.setdefault(name, value)
+        return out
 
     def to_query_string(self) -> str:
         """The encoded query string, without ``?``."""

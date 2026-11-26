@@ -101,7 +101,7 @@ export class ODataQuery {
    * the value is given unencoded. With a name alone, reads that option's value. Custom options
    * must not start with `$` or `@`. @throws RangeError if `name` isn't a valid custom option name */
   option(name: string, value?: string): ODataQuery | string | undefined {
-    if (value === undefined) return this.customList.find(([n]) => n === name)?.[1];
+    if (value === undefined) return this.lifted((q) => q.customList).find(([n]) => n === name)?.[1];
     if (typeof name !== "string" || !CUSTOM.test(name)) throw new RangeError("Not a valid custom query option name: " + name);
     return this.with((q) => (q.customList = [...this.customList.filter(([n]) => n !== name), [name, value]]));
   }
@@ -119,12 +119,23 @@ export class ODataQuery {
 
   /** @internal */
   customOptions(): readonly Pair[] {
-    return this.customList;
+    return this.lifted((q) => q.customList);
   }
 
   /** Every option, unencoded, in order. */
   parameters(): Pair[] {
-    return [...this.systemOptions(), ...this.customList, ...this.aliasList];
+    return [...this.systemOptions(), ...this.lifted((q) => q.customList), ...this.lifted((q) => q.aliasList)];
+  }
+
+  /** Custom options or parameter aliases, this query's and its expands', at any depth: they only
+   * mean something at the top of the URL, so a nested query's go there, after this one's, and the
+   * first of a name wins (as Java's `ODataQuery.lifted`). */
+  private lifted(part: (q: ODataQuery) => readonly Pair[]): Pair[] {
+    const out: Pair[] = [...part(this)];
+    for (const [, nested] of this.expandList) {
+      for (const option of nested.lifted(part)) if (!out.some(([n]) => n === option[0])) out.push(option);
+    }
+    return out;
   }
 
   /** The encoded query string, without `?`. */

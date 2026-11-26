@@ -75,6 +75,7 @@ def test_stops_at_a_breakpoint_reads_the_state_and_runs_to_the_end(tm1: Tm1Clien
 def _stops_and_runs_to_the_end(tm1: Tm1Client, three_lines: str, id: str) -> None:
     debug = tm1.process_debugging
     assert settled(debug, id).status is ProcessDebugContextStatus.PAUSED, "paused before the first line"
+    assert debug.current_breakpoint(id) is None, "at no breakpoint yet"
     debug.add_breakpoint(id, line(three_lines, 1, 3))
     (breakpoint,) = debug.breakpoints(id)
     assert isinstance(breakpoint, ProcessDebugContextLineBreakpoint) and breakpoint.line_number == 3

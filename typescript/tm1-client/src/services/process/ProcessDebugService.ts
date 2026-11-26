@@ -211,9 +211,27 @@ export class ProcessDebugService extends Tm1Service {
     return this.session.execute(Tm1Request.delete(breakpointPath(id, breakpoint)), options);
   }
 
-  /** `GET …/CurrentBreakpoint`: the breakpoint the run is paused at, or undefined if it isn't paused at one. */
+  /** The breakpoint the run is paused at, or undefined if it isn't paused at one: read as the
+   * context's `CurrentBreakpoint`, expanded (`GET ProcessDebugContexts('id')?$select=ID&$expand=CurrentBreakpoint`),
+   * with `query` applied inside the expand. TM1 before 11.8.035 (Planning Analytics 2.1.2 to 2.1.16)
+   * refuses a `GET` of the navigation itself, though its `$metadata` declares it; every version
+   * tried answers the expand. */
   currentBreakpoint(id: string, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<ProcessDebugContextBreakpoint | undefined> {
-    return this.session.execute(Tm1Request.get(contextPath(id).nav("CurrentBreakpoint"), query, ProcessDebugContextBreakpoint), options);
+    // The path first, so a bad id throws at the call, as the other methods' do
+    const path = contextPath(id);
+    const nested = query ?? ODataQuery.none();
+    return this.session
+      .execute(
+        Tm1Request.get(
+          path,
+          ODataQuery.none()
+            .select("ID")
+            .expand("CurrentBreakpoint", () => nested),
+          ProcessDebugContext,
+        ),
+        options,
+      )
+      .then((context) => context?.CurrentBreakpoint ?? undefined);
   }
 
   /** `GET …/CallStack`, streamed: where the run is, innermost frame first; `query` can expand `Variables`. */
