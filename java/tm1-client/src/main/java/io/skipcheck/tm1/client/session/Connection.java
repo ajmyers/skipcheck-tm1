@@ -5,6 +5,7 @@ package io.skipcheck.tm1.client.session;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -28,6 +29,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import io.micrometer.common.KeyValue;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
+import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.error.ODataError;
@@ -217,6 +219,49 @@ final class Connection {
 		return capabilities().flatMap(c -> {
 			Optional<Tm1UnsupportedOperationException> missing = c.check(capability, root);
 			return missing.isPresent() ? Mono.<Void>error(missing.get()) : Mono.<Void>empty();
+		});
+	}
+
+	/**
+	 * The request as it can be sent to this server, after {@link #require} of what it
+	 * needs: for a request that names its {@linkplain Tm1Request#operation() operation},
+	 * each of the operation's parameters its body sends is checked against the server's
+	 * definition. One the server lacks fails with
+	 * {@link Tm1UnsupportedOperationException}, unless the request's
+	 * {@linkplain Tm1Request#parameterDefaults() default} for it is what the body sends,
+	 * in which case it's left out of the body.
+	 */
+	<T> Mono<Tm1Request<T>> prepare(Tm1Request<T> request) {
+		Optional<Tm1Capability> needed = request.requirement();
+		if (needed.isEmpty()) {
+			return Mono.just(request);
+		}
+		return capabilities().flatMap(c -> {
+			Optional<Tm1UnsupportedOperationException> missing = c.check(needed.get(), root);
+			if (missing.isPresent()) {
+				return Mono.error(missing.get());
+			}
+			Optional<Tm1Operation> operation = request.operation();
+			if (operation.isEmpty() || operation.get().kind() != Tm1Operation.Kind.ACTION
+					|| !(request.body() instanceof Map<?, ?> body)) {
+				return Mono.just(request);
+			}
+			Map<Object, Object> sent = new LinkedHashMap<>(body);
+			for (Tm1Operation.Parameter parameter : operation.get().parameters()) {
+				String name = parameter.name();
+				String key = sent.containsKey(name) ? name
+						: sent.containsKey(name + "@odata.bind") ? name + "@odata.bind" : null;
+				if (key == null || c.supportsParameter(needed.get(), name)) {
+					continue;
+				}
+				Object leftOut = request.parameterDefaults().get(name);
+				if (leftOut != null && leftOut.equals(sent.get(key))) {
+					sent.remove(key);
+					continue;
+				}
+				return Mono.error(c.checkParameter(needed.get(), name, root).orElseThrow());
+			}
+			return Mono.just(sent.size() == body.size() ? request : request.withBody(sent));
 		});
 	}
 

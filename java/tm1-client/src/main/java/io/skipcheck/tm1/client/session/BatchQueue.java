@@ -105,13 +105,20 @@ final class BatchQueue {
 	 * can't be found out), the entry's call fails and it isn't sent, as outside a batch.
 	 */
 	private Mono<Entry> supported(Entry entry) {
-		return entry.request()
-			.requirement()
-			.map(needed -> connection.require(needed).then(Mono.just(entry)).onErrorResume(e -> {
+		if (entry.request().requirement().isEmpty()) {
+			return Mono.just(entry);
+		}
+		// As outside a batch: the body may lose a parameter the server lacks whose value
+		// is
+		// what leaving it out means
+		return connection.prepare(entry.request())
+			.map(ready -> ready == entry.request() ? entry
+					: new Entry(entry.id(), ready,
+							ready.body() == null ? null : mapper.readTree(connection.json(ready.body())), entry.sink()))
+			.onErrorResume(e -> {
 				entry.sink().tryEmitError(e);
 				return Mono.empty();
-			}))
-			.orElseGet(() -> Mono.just(entry));
+			});
 	}
 
 	private Mono<Void> send(List<Entry> chunk) {

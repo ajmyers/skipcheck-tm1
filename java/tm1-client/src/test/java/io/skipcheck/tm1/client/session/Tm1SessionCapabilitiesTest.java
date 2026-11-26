@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import io.skipcheck.tm1.client.conformance.ConformanceTm1;
 import io.skipcheck.tm1.client.error.Tm1ProtocolException;
 import io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException;
 import io.skipcheck.tm1.client.metadata.MetadataSnapshot;
+import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.version.Tm1Capability;
@@ -103,6 +105,75 @@ class Tm1SessionCapabilitiesTest {
 			.satisfies(sent -> assertThat(new String(ConformanceTm1.body(sent).block(), StandardCharsets.UTF_8))
 				.contains("Server")
 				.doesNotContain("Bananas"));
+	}
+
+	@Test
+	void sendsEveryParameterTheServerDefines() {
+		tm1.on(CHECK_FEEDERS, r -> Mono.just(FakeTm1.json(200, "{\"value\":[]}")));
+		StepVerifier.create(tm1.session().stream(checkFeeders("Both"))).verifyComplete();
+		assertThat(sentBody()).contains("\"Selection\":\"Both\"");
+	}
+
+	@Test
+	void refusesAParameterTheServerDoesntDefineWithoutSendingIt() {
+		withoutSelection();
+		StepVerifier.create(tm1.session().stream(checkFeeders("Both")))
+			.expectErrorSatisfies(
+					e -> assertThat(e).isInstanceOfSatisfying(Tm1UnsupportedOperationException.class, u -> {
+						assertThat(u.missing()).isEqualTo("parameter Selection of Cube.CheckFeeders");
+						assertThat(u.getMessage()).contains("reports schema 11.8.35");
+					}))
+			.verify();
+		assertThat(tm1.requests(CHECK_FEEDERS)).isEmpty();
+	}
+
+	@Test
+	void leavesOutAParameterTheServerDoesntDefineWhenItsValueIsWhatLeavingItOutMeans() {
+		withoutSelection();
+		tm1.on(CHECK_FEEDERS, r -> Mono.just(FakeTm1.json(200, "{\"value\":[]}")));
+		StepVerifier.create(tm1.session().stream(checkFeeders("Unfed"))).verifyComplete();
+		assertThat(sentBody()).contains("Tuple@odata.bind").doesNotContain("Selection");
+	}
+
+	@Test
+	void leavesOutAParameterInABatchToo() {
+		withoutSelection();
+		tm1.on("POST $batch", r -> Mono.just(FakeTm1.json(200,
+				"{\"responses\":[{\"id\":\"1\",\"status\":200,\"body\":{\"value\":[]}},{\"id\":\"2\",\"status\":200,\"body\":{\"value\":[]}}]}")));
+		Tm1SessionBatch batch = tm1.session().batch();
+		Flux<JsonNode> unfed = batch.session().stream(checkFeeders("Unfed"));
+		Flux<JsonNode> both = batch.session().stream(checkFeeders("Both"));
+		StepVerifier.create(batch.run()).expectComplete().verify(Duration.ofSeconds(5));
+		StepVerifier.create(unfed).expectComplete().verify(Duration.ofSeconds(5));
+		StepVerifier.create(both).expectError(Tm1UnsupportedOperationException.class).verify(Duration.ofSeconds(5));
+		assertThat(tm1.requests("POST $batch")).singleElement()
+			.satisfies(sent -> assertThat(new String(ConformanceTm1.body(sent).block(), StandardCharsets.UTF_8))
+				.contains("tm1.CheckFeeders")
+				.doesNotContain("Selection"));
+	}
+
+	private static final String CHECK_FEEDERS = "POST Cubes('Sales')/tm1.CheckFeeders";
+
+	/** A server whose CheckFeeders has no Selection, as before schema 11.8.32. */
+	private void withoutSelection() {
+		String metadata = MetadataSnapshot.text()
+			.replaceFirst("(?s)(<Action Name=\"CheckFeeders\".*?)<Parameter Name=\"Selection\".*?</Parameter>", "$1");
+		assertThat(metadata).isNotEqualTo(MetadataSnapshot.text());
+		tm1.on(METADATA, r -> Mono.just(xml(metadata)));
+	}
+
+	private static Tm1Request<JsonNode> checkFeeders(String selection) {
+		return Tm1Request
+			.postList(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"),
+					Map.of("Tuple@odata.bind", List.of("Dimensions('Region')/Hierarchies('Region')/Elements('Total')"),
+							"Selection", selection),
+					JsonNode.class)
+			.requires(Tm1Operations.CUBE_CHECK_FEEDERS)
+			.withParameterDefault("Selection", "Unfed");
+	}
+
+	private String sentBody() {
+		return new String(ConformanceTm1.body(tm1.requests(CHECK_FEEDERS).get(0)).block(), StandardCharsets.UTF_8);
 	}
 
 	@Test

@@ -5,6 +5,7 @@ package io.skipcheck.tm1.client.version;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 
@@ -12,6 +13,7 @@ import io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException;
 import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlEntityContainer;
 import io.skipcheck.tm1.csdl.CsdlNavigationProperty;
+import io.skipcheck.tm1.csdl.CsdlOperation;
 import io.skipcheck.tm1.csdl.CsdlProperty;
 import io.skipcheck.tm1.csdl.CsdlStructuredType;
 
@@ -122,6 +124,65 @@ public final class Tm1Capabilities {
 			.orElse("the server reports no schema version"));
 		productVersion().ifPresent(v -> message.append(", product version ").append(v));
 		message.append(capability.addedInVersion().isPresent() ? "" : ")");
+		return Optional.of(new Tm1UnsupportedOperationException(message.toString(), missing));
+	}
+
+	/**
+	 * Whether the server's definition of an operation has {@code parameter}. For a bound
+	 * operation, any operation of that name bound to the type or one of its base types
+	 * counts; for an operation import, the operation it imports.
+	 * @param operation the operation, as {@link Tm1Capability#boundOperation} or
+	 * {@link Tm1Capability#unboundOperation}
+	 * @param parameter the parameter's name, such as {@code Selection}
+	 * @return {@code true} if the server defines the operation with that parameter
+	 * @throws IllegalArgumentException if {@code operation} isn't an operation
+	 */
+	public boolean supportsParameter(Tm1Capability operation, String parameter) {
+		Objects.requireNonNull(operation, "operation");
+		Objects.requireNonNull(parameter, "parameter");
+		List<CsdlOperation> defined = switch (operation.kind()) {
+			case BOUND_OPERATION -> hierarchy(operation).stream()
+				.flatMap(type -> metadata.qualifiedName(type)
+					.map(t -> metadata.boundTo(t).stream().filter(op -> op.name().equals(simple(operation.name()))))
+					.orElseGet(Stream::empty))
+				.toList();
+			case UNBOUND_OPERATION -> container().map(c -> Stream
+				.concat(c.actionImports()
+					.stream()
+					.filter(a -> a.name().equals(operation.name()))
+					.map(CsdlEntityContainer.ActionImport::action),
+						c.functionImports()
+							.stream()
+							.filter(f -> f.name().equals(operation.name()))
+							.map(CsdlEntityContainer.FunctionImport::function))
+				.flatMap(name -> metadata.operations(name).stream())
+				.toList()).orElse(List.of());
+			default -> throw new IllegalArgumentException(operation.describe() + " isn't an operation");
+		};
+		return defined.stream().anyMatch(op -> op.parameters().stream().anyMatch(p -> p.name().equals(parameter)));
+	}
+
+	/**
+	 * Checks the server's definition of an operation has {@code parameter}.
+	 * @param operation the operation
+	 * @param parameter the parameter's name
+	 * @param server the server, for the message, such as its service root
+	 * @return empty if it has, otherwise the exception to fail with, saying what's
+	 * missing and which schema version the server reports
+	 */
+	public Optional<Tm1UnsupportedOperationException> checkParameter(Tm1Capability operation, String parameter,
+			String server) {
+		if (supportsParameter(operation, parameter)) {
+			return Optional.empty();
+		}
+		String missing = "parameter " + parameter + " of " + operation.describe();
+		StringBuilder message = new StringBuilder(missing).append(" isn't defined by the TM1 server at ")
+			.append(server)
+			.append(" (")
+			.append(schemaVersion().map(v -> "the server reports schema " + v)
+				.orElse("the server reports no schema version"));
+		productVersion().ifPresent(v -> message.append(", product version ").append(v));
+		message.append(')');
 		return Optional.of(new Tm1UnsupportedOperationException(message.toString(), missing));
 	}
 
