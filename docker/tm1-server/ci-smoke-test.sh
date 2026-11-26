@@ -81,7 +81,7 @@ grep -q "download failed: http://127.0.0.1:9/tm1server-bundle.tar.gz" <<<"$out" 
 ! grep -q "SECRET123" <<<"$out" || fail "bundle URL credentials were printed: $out"
 pass "unreachable bundle URL fails cleanly without printing credentials"
 
-# 7a. IBM's older full installer (Planning Analytics 2.1.2, 2.1.7): a fake one, built here, with a
+# 7a. IBM's older full installer (Planning Analytics 2.1.2 to 2.1.7): a fake one, built here, with a
 #     server component, a shared library from a gate component, a language pack (left out) and
 #     the version component, whose version.xml is wrong as 2.1.7's is. Found in the bundle folder
 #     by its name, installed, and its versions written from the components' names

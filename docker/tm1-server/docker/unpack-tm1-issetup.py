@@ -6,7 +6,7 @@ Usage:
   unpack-tm1-issetup.py detect <bundle.tar.gz>             exit 0 if it is one, 1 if not
   unpack-tm1-issetup.py install <bundle.tar.gz> <target>   install it into <target>
 
-Planning Analytics 2.1.2 and 2.1.7 come only in this format: an issetup installer with
+Planning Analytics 2.1.2 to 2.1.7 come only in this format: an issetup installer with
 no manifest for unpack-tm1.py to follow. Its components are zipfiles/linuxi38664h/
 <name>-linuxi38664h-<app|gate>-<version>-inst.tar.gz, each rooted at the install folder.
 What IBM's installer does for a server install is, in effect, to unpack them all into one

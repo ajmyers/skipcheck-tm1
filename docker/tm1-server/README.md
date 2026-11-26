@@ -185,7 +185,7 @@ unpacks the TM1 Server, Admin Server, Tools and Samples components. That's the
 same result as the installer, and it also works where the installer can't run
 (e.g. macOS).
 
-Planning Analytics 2.1.2 and 2.1.7 come only as IBM's older full installer,
+Planning Analytics 2.1.2 to 2.1.7 come only as IBM's older full installer,
 `tm1_linuxi38664h_<ver>_ml.tar.gz`, which has no manifest: its components are
 `zipfiles/linuxi38664h/*-inst.tar.gz`, each rooted at the install folder. The
 container unpacks them all but the language packs, in name order, and writes

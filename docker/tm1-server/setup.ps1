@@ -189,7 +189,7 @@ function Write-Utf8([string]$Path, [string]$Text) {
   [System.IO.File]::WriteAllText($Path, ($Text -replace "`r`n", "`n"), (New-Object System.Text.UTF8Encoding $false))
 }
 
-$BundleHelp = 'It should be named tm1server-<version>-linuxi38664h_bundle.tar.gz (for Planning Analytics 2.1.2 and 2.1.7, tm1_linuxi38664h_<version>_ml.tar.gz): the Linux download, even on Windows.'
+$BundleHelp = 'It should be named tm1server-<version>-linuxi38664h_bundle.tar.gz (for Planning Analytics 2.1.2 to 2.1.7, tm1_linuxi38664h_<version>_ml.tar.gz): the Linux download, even on Windows.'
 function Test-Bundle([string]$File) {
   if (-not (Test-Path -LiteralPath $File -PathType Leaf)) { Fail "Bundle file not found: $File" @($BundleHelp) }
   $name = Split-Path -Leaf $File

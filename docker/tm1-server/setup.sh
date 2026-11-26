@@ -202,7 +202,7 @@ env_line() {
   printf "%s='%s'\n" "$1" "$2"
 }
 
-BUNDLE_GLOB_HELP="It should be named tm1server-<version>-linuxi38664h_bundle.tar.gz (for Planning Analytics 2.1.2 and 2.1.7, tm1_linuxi38664h_<version>_ml.tar.gz): the Linux download, even on Mac or Windows."
+BUNDLE_GLOB_HELP="It should be named tm1server-<version>-linuxi38664h_bundle.tar.gz (for Planning Analytics 2.1.2 to 2.1.7, tm1_linuxi38664h_<version>_ml.tar.gz): the Linux download, even on Mac or Windows."
 # check_bundle FILE: the IBM Linux bundle, or die explaining what's wrong
 check_bundle() {
   [ -f "$1" ] || die "Bundle file not found: $1" "$BUNDLE_GLOB_HELP"

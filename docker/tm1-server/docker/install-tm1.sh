@@ -20,7 +20,7 @@
 #
 # A bundle is IBM's tm1server-<ver>-linuxi38664h_bundle.tar.gz, the repository zip
 # inside it, or the older full installer tm1_linuxi38664h_<ver>_ml.tar.gz (the only
-# download for Planning Analytics 2.1.2 and 2.1.7; see unpack-tm1-issetup.py). The
+# download for Planning Analytics 2.1.2 to 2.1.7; see unpack-tm1-issetup.py). The
 # type is detected from the file contents, so URLs don't need a file extension. Set
 # TM1_BUNDLE_SHA256 to verify the bundle before installing.
 #
