@@ -43,6 +43,13 @@ public sealed class Tm1Database : IEquatable<Tm1Database>
     /// in this database is then refused here (403).</summary>
     public Tm1Login Login(string user) => Engine.Login(Instance, user);
 
+    /// <summary>A login through OAuth 2.0: as a user the engine's Keycloak knows the password of
+    /// (<see cref="Tm1EngineContainer.WithLogin"/>). The login gets a token from Keycloak with that password and sends
+    /// it to TM1, as a program acting for the user would. It can be made before the engine has started.</summary>
+    /// <exception cref="InvalidOperationException">The engine has no <see cref="Tm1EngineContainer.WithOAuth2"/>.</exception>
+    /// <exception cref="ArgumentException">The user has no password.</exception>
+    public Tm1Login OAuth2Login(string user) => Engine.OAuth2Login(this, user);
+
     /// <inheritdoc/>
     public bool Equals(Tm1Database? other) =>
         other is not null

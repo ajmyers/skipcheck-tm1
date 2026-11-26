@@ -34,7 +34,8 @@ public class CubeTests(Tm1ServerFixture tm1) : IClassFixture<Tm1ServerFixture>
 | A `Tm1ServerContainer` / `Tm1WebContainer` / `PawContainer` / `CognosSource` test parameter | `Tm1ServerFixture` / `Tm1WebFixture` / `PawFixture` / `CognosFixture` as an `IClassFixture` |
 | A `Tm1Database` test parameter with `@RequiresTm1Engine` | `Tm1DatabaseFixture<TheTestClass>` as an `IClassFixture`; with `shareDatabase = true`, `Tm1EngineFixture` |
 | `engine.databases()`, `createDatabase(…)`, `dropDatabase(…)` | `DatabasesAsync()`, `CreateDatabaseAsync(…)`, `DropDatabaseAsync(…)` |
-| `login.cookie()`, `token()`, `session(…)`, `authorize(HttpRequest.Builder)` | `CookieAsync()`, `TokenAsync()`, `SessionAsync(…)`, `AuthorizeAsync(HttpRequestMessage)` |
+| `engine.withOAuth2(keycloak)`, `getKeycloak()`, `db.oauth2Login(user)`, `OAUTH2_REALM` | `WithOAuth2(keycloak)`, `Keycloak`, `db.OAuth2Login(user)`, `OAuth2Realm`: OAuth is written as the name is |
+| `login.cookie()`, `token()`, `session(…)`, `authorize(HttpRequest.Builder)`, `authorizeWithToken(…)` | `CookieAsync()`, `TokenAsync()`, `SessionAsync(…)`, `AuthorizeAsync(HttpRequestMessage)`, `AuthorizeWithTokenAsync(HttpRequestMessage)` |
 
 ### TM1 v12 (the TM1 engine)
 
@@ -65,6 +66,28 @@ public class CubeTests(Tm1DatabaseFixture<CubeTests> tm1) : IClassFixture<Tm1Dat
 - **The shared engine isn't reused** between runs, whatever the switch below says: an engine and its datastore belong together, and a kept engine would keep every database tests left in it.
 - **Its own cache volume,** `tm1-engine-testcontainers-cache`, shared with the other languages' tests.
 
+### OAuth 2.0 logins to the engine
+
+TM1 v12 logs users in from an identity provider through OAuth 2.0. `WithOAuth2(keycloak)` has the engine take tokens from a Keycloak beside it, and `WithLogin(user, password)` gives a user a password there (TM1 v12 keeps none itself):
+
+```csharp
+await using var keycloak = new KeycloakContainer();   // yours to stop: the engine only starts it first
+await using var engine = new Tm1EngineContainer(source)
+    .WithUser("analyst", "Analysts")
+    .WithLogin("analyst", "analystpw")
+    .WithOAuth2(keycloak);
+await engine.StartAsync();
+var db = engine.Database("tm1");
+using var request = new HttpRequestMessage(HttpMethod.Get, db.RestUrl + "Cubes?$select=Name");
+await db.OAuth2Login("analyst").AuthorizeWithTokenAsync(request);   // Authorization: Bearer <a token from Keycloak>
+```
+
+- **The realm.** Keycloak imports a realm, `tm1` (`Tm1EngineContainer.OAuth2Realm`), as it starts: a public client `tm1` (`OAuth2Client`) whose access tokens carry the audience TM1 expects, and each user who has a password. It's made when Keycloak starts, so users and logins added after `WithOAuth2` are in it. A password for someone who isn't a user of the engine (`WithUser`, or `admin`) fails the start.
+- **The issuer.** The engine is given Keycloak's address on the network (`http://keycloak:8080/realms/tm1`), which is what Keycloak's tokens name however they're fetched, the mapped port on the host included.
+- **The login.** `db.OAuth2Login(user)` can be made before the engine starts. `TokenAsync()` gets a new access token with the user's password (`TokenUrl`, `ClientId`, `User` and `Password` are there for a client that asks itself). `AuthorizeWithTokenAsync(request)` sends one as `Authorization: Bearer`. TM1 takes it on any request and answers with a session cookie. `CookieAsync()` and `AuthorizeAsync(request)` keep that session. `SessionAsync(…)` refuses: TM1 doesn't take a provider's token at its session endpoint.
+- **Beside the application's logins.** `db.Login(user)` keeps working.
+- **In an environment,** `Tm1EngineOAuth2()` on the builder uses the environment's one Keycloak, added if `Keycloak()` wasn't called. From `pa-environment.yaml`, `tm1Engine.oauth2` (`true`, or `{ keycloakPort }`, the port ignored) turns it on, and each user with a password gets it as a login: `analyst:analystpw:Analysts`. With `oauth2: false` the passwords are read and not used.
+
 ### How the containers are built
 
 Testcontainers for .NET configures containers through immutable builders. Each container class here keeps its configuration (environment, network, aliases, dependencies) in a form you can read and change before the container starts, as Java's `GenericContainer` does. The builder only runs when the container starts. This is what lets `PlanningAnalyticsEnvironment` wire containers together, and lets the tests check that wiring without Docker.
@@ -89,6 +112,7 @@ var planning = env.Tm1Database("planning");   // env.Tm1Engine().Database(instan
 
 - `Tm1Engine()`, `Tm1Engine(customizer)` and `Tm1EngineSource(source)` on the builder; `Tm1Engine()` and `Tm1Database(name)` on the environment.
 - The engine and its MongoDB are on the environment's network, the engine under the name `tm1-engine` (as in the compose project `pa-setup` writes) and its MongoDB as `tm1-datastore`, and start with TM1 11's parts, before PAW. The environment's network is the environment's to remove, not the engine's.
+- `Tm1EngineOAuth2()` has the engine take OAuth 2.0 logins from the environment's Keycloak ([above](#oauth-20-logins-to-the-engine)).
 - A TM1 server can't be named `tm1-engine` or `tm1-datastore` (in any case) beside an engine: two containers would answer to the name.
 - On a builder from `FromConfig`, `Tm1Engine(customizer)` adds to the file's databases and users rather than replacing them, and `images.tm1Engine` is the image of an engine added in code too.
 - The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: they need a TM1 server.

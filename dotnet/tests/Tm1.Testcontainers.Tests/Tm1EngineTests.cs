@@ -6,6 +6,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Skipcheck.Tm1.Client.Version;
 using Skipcheck.Tm1.Testcontainers.Xunit;
@@ -183,6 +184,135 @@ public class Tm1EngineWiringTests : TempDir
         Assert.Equal("tm1datastore", datastore.EnvMap["MONGO_INITDB_ROOT_PASSWORD"]);
         Assert.Equal(["--wiredTigerCacheSizeGB", "0.5"], datastore.CommandParts);
         Assert.Equal([Tm1EngineContainer.Port], engine.ExposedPorts);
+    }
+
+    [Fact]
+    public void TakesOAuth2TokensFromAKeycloakOnItsNetwork()
+    {
+        var keycloak = new KeycloakContainer();
+        var engine = new Tm1EngineContainer(Source).WithOAuth2(keycloak);
+        // Keycloak's address on the network is what its tokens name, and what TM1 can reach
+        Assert.Equal("http://keycloak:8080/realms/tm1", engine.EnvMap["TM1_OAUTH2_ISSUER_URL"]);
+        Assert.Equal("tm1", engine.EnvMap["TM1_OAUTH2_AUDIENCE"]);
+        Assert.Equal("preferred_username", engine.EnvMap["TM1_OAUTH2_ID_CLAIMS"]);
+        // Which Keycloak says of itself, wherever a token is asked for from
+        Assert.Equal("http://keycloak:8080", keycloak.EnvMap["KC_HOSTNAME"]);
+        Assert.NotNull(keycloak.Network);
+        Assert.Same(engine.Network, keycloak.Network);
+        Assert.Same(engine.Datastore.Network, keycloak.Network);
+        Assert.Contains(keycloak, engine.Dependencies);
+        Assert.Contains(engine.Datastore, engine.Dependencies);
+        Assert.Same(keycloak, engine.Keycloak);
+        Assert.Null(new Tm1EngineContainer(Source).Keycloak);
+
+        // Moved off the Keycloak's network, TM1 couldn't reach its issuer
+        var datastoreNetwork = engine.Datastore.Network;
+        Assert.Contains("set the network before WithOAuth2", Assert.Throws<InvalidOperationException>(() => engine.WithNetwork(Network.NewNetwork())).Message);
+        // And nothing moved
+        Assert.Same(keycloak.Network, engine.Network);
+        Assert.Same(datastoreNetwork, engine.Datastore.Network);
+        Assert.Same(engine, engine.WithNetwork(keycloak.Network));
+
+        // A Keycloak that has a network already is joined there, the datastore too
+        var network = Network.NewNetwork();
+        var placed = new KeycloakContainer().WithNetwork(network);
+        var joining = new Tm1EngineContainer(Source).WithOAuth2(placed);
+        Assert.Same(network, joining.Network);
+        Assert.Same(network, joining.Datastore.Network);
+    }
+
+    [Fact]
+    public void GivesKeycloakARealmWithTheUsersWhoHaveAPassword()
+    {
+        var keycloak = new KeycloakContainer();
+        var engine = new Tm1EngineContainer(Source)
+            .WithOAuth2(keycloak)
+            // After WithOAuth2: the realm is asked for when Keycloak starts
+            .WithUser("analyst", "Analysts")
+            .WithUser("viewer")
+            .WithLogin("analyst", "an$pw")
+            .WithLogin("Admin", "adminpw");
+        using var document = JsonDocument.Parse(engine.Realm());
+        var realm = document.RootElement;
+        Assert.Equal("tm1", realm.GetProperty("realm").GetString());
+        Assert.True(realm.GetProperty("enabled").GetBoolean());
+        var client = realm.GetProperty("clients")[0];
+        Assert.Equal("tm1", client.GetProperty("clientId").GetString());
+        Assert.True(client.GetProperty("publicClient").GetBoolean());
+        Assert.True(client.GetProperty("directAccessGrantsEnabled").GetBoolean());
+        Assert.False(client.GetProperty("standardFlowEnabled").GetBoolean());
+        var mapper = client.GetProperty("protocolMappers")[0];
+        Assert.Equal("oidc-audience-mapper", mapper.GetProperty("protocolMapper").GetString());
+        Assert.Equal("tm1", mapper.GetProperty("config").GetProperty("included.custom.audience").GetString());
+        // viewer has no password, so nothing to log in to Keycloak with; admin is always a user
+        var users = realm.GetProperty("users");
+        Assert.Equal(2, users.GetArrayLength());
+        Assert.Equal("analyst", users[0].GetProperty("username").GetString());
+        Assert.Equal("an$pw", users[0].GetProperty("credentials")[0].GetProperty("value").GetString());
+        Assert.Equal("user1@example.com", users[0].GetProperty("email").GetString());
+        Assert.Equal("Admin", users[1].GetProperty("username").GetString());
+        // The whole of it, as the other languages write it (quotes written ' here)
+        var whole =
+            "{'realm':'tm1','enabled':true,'clients':[{'clientId':'tm1','publicClient':true,'directAccessGrantsEnabled':true,'standardFlowEnabled':false,"
+            + "'protocolMappers':[{'name':'tm1-audience','protocol':'openid-connect','protocolMapper':'oidc-audience-mapper',"
+            + "'config':{'included.custom.audience':'tm1','access.token.claim':'true','id.token.claim':'false'}}]}],"
+            + "'users':[{'username':'analyst','enabled':true,'emailVerified':true,'email':'user1@example.com','firstName':'analyst','lastName':'Test',"
+            + "'credentials':[{'type':'password','value':'an$pw','temporary':false}]},"
+            + "{'username':'Admin','enabled':true,'emailVerified':true,'email':'user2@example.com','firstName':'Admin','lastName':'Test',"
+            + "'credentials':[{'type':'password','value':'adminpw','temporary':false}]}]}";
+        Assert.Equal(whole.Replace('\'', '"'), JsonSerializer.Serialize(realm));
+        // TM1 gets names and groups only
+        engine.Configure();
+        Assert.Equal("analyst:Analysts,viewer", engine.EnvMap["TM1_USERS"]);
+
+        // Keycloak imports it as it starts, from a file made then: nothing is written before
+        Assert.Equal(["start-dev"], keycloak.CommandParts);
+        Assert.Empty(keycloak.Contents);
+        engine.WithUser("late").WithLogin("late", "latepw");
+        keycloak.Configure();
+        Assert.Equal(["start-dev", "--import-realm"], keycloak.CommandParts);
+        Assert.Equal(["/opt/keycloak/data/import/tm1-realm.json"], keycloak.Contents.Keys);
+        Assert.Equal(engine.Realm(), Encoding.UTF8.GetString(keycloak.Contents["/opt/keycloak/data/import/tm1-realm.json"]));
+        Assert.Contains("\"late\"", engine.Realm(), StringComparison.Ordinal);
+        // A Keycloak without a realm to import starts as it did
+        var plain = new KeycloakContainer();
+        plain.Configure();
+        Assert.Equal(["start-dev"], plain.CommandParts);
+        Assert.Empty(plain.Contents);
+    }
+
+    [Fact]
+    public async Task RefusesAnOAuth2LoginItCantGive()
+    {
+        var engine = new Tm1EngineContainer(Source).WithUser("analyst").WithLogin("analyst", "pw");
+        var database = engine.Database("tm1");
+        Assert.Contains("give it a Keycloak with WithOAuth2", Assert.Throws<InvalidOperationException>(() => database.OAuth2Login("analyst")).Message);
+        engine.WithOAuth2(new KeycloakContainer());
+        Assert.Contains("viewer has no password to log in with", Assert.Throws<ArgumentException>(() => database.OAuth2Login("viewer")).Message);
+        // A name is one whatever its case
+        Assert.Equal("analyst", database.OAuth2Login("ANALYST").User);
+        // And a second password for it replaces the first
+        engine.WithLogin("Analyst", "second");
+        Assert.Equal("second", database.OAuth2Login("analyst").Password);
+        using (var realm = JsonDocument.Parse(engine.Realm()))
+        {
+            Assert.Equal(1, realm.RootElement.GetProperty("users").GetArrayLength());
+        }
+        engine.WithLogin("analyst", "pw");
+        Assert.True(database.OAuth2Login("analyst").IsOAuth2);
+        Assert.Equal("pw", database.OAuth2Login("analyst").Password);
+        Assert.Equal("tm1", database.OAuth2Login("analyst").ClientId);
+        Assert.Equal("", database.OAuth2Login("analyst").ClientSecret);
+        Assert.Equal("tm1", database.OAuth2Login("analyst").Instance);
+        Assert.Throws<ArgumentException>(() => engine.WithLogin("analyst", ""));
+        Assert.Throws<ArgumentException>(() => engine.WithLogin("two words", "pw"));
+        // A password for someone who isn't a user is a mistake, found when the realm is made
+        var stray = new Tm1EngineContainer(Source).WithLogin("nobody", "pw");
+        Assert.Contains("isn't a user of the engine", Assert.Throws<InvalidOperationException>(() => stray.Realm()).Message);
+        // An OAuth 2.0 login has no session endpoint to ask, and that needs no engine to say
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => database.OAuth2Login("analyst").SessionAsync("Bearer x"));
+        Assert.Contains("An OAuth 2.0 login has no session to ask for", refused.Message);
+        Assert.Contains("(AuthorizeWithTokenAsync)", refused.Message);
     }
 
     [Fact]
@@ -491,6 +621,172 @@ public class Tm1EngineContainerTests(Tm1EngineContainerTests.OwnEngine own, ITes
             if (engine is not null)
             {
                 await engine.DisposeAsync();
+            }
+        }
+    }
+}
+
+/// <summary>Java's Tm1EngineOAuth2Test: OAuth 2.0 logins against real TM1 v12 and Keycloak. An engine of the
+/// class's own, taking tokens from a Keycloak beside it. Skipped without Docker or a TM1 v12 source.</summary>
+[Collection(OwnContainers.Name)]
+public class Tm1EngineOAuth2Tests(Tm1EngineOAuth2Tests.OwnEngine own, ITestOutputHelper output) : IClassFixture<Tm1EngineOAuth2Tests.OwnEngine>
+{
+    private KeycloakContainer Keycloak => own.Keycloak;
+
+    private Tm1Database Planning => own.Engine.Database("planning");
+
+    [RequiresTm1EngineFact]
+    public async Task AKeycloakTokenLogsTheUserIn()
+    {
+        var analyst = Planning.OAuth2Login("analyst");
+        // The token on a request of its own: TM1 answers, and gives a session
+        using var request = await analyst.AuthorizeWithTokenAsync(new HttpRequestMessage(HttpMethod.Get, Planning.RestUrl + "ActiveUser?$select=Name,Type"));
+        var (status, body, cookies) = await Tm1EngineRest.SendForCookiesAsync(request);
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("\"Name\":\"analyst\"", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"Type\":\"User\"", body, StringComparison.Ordinal);
+        Assert.Contains(cookies, cookie => cookie.StartsWith("TM1SessionId=", StringComparison.Ordinal));
+        // And the session that gives serves later requests
+        Assert.StartsWith("TM1SessionId=", await analyst.CookieAsync(), StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.OK, (await Tm1EngineRest.GetAsync(Planning, analyst, "ActiveUser")).Status);
+    }
+
+    [RequiresTm1EngineFact]
+    public async Task TheAdministratorLogsInThroughOAuth2Too()
+    {
+        var (status, body) = await Tm1EngineRest.GetAsync(Planning, Planning.OAuth2Login("admin"), "ActiveUser?$select=Name,Type");
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("\"Type\":\"Admin\"", body, StringComparison.Ordinal);
+    }
+
+    [RequiresTm1EngineFact]
+    public async Task ATokenOfAnotherRealmIsRefused()
+    {
+        // Signed by the same Keycloak, but not by the issuer TM1 trusts, and without its audience
+        var other = await Keycloak.AccessTokenAsync("master", "admin-cli", "admin", "admin");
+        Assert.Equal(HttpStatusCode.Unauthorized, await ActiveUserAsync(other));
+    }
+
+    [RequiresTm1EngineFact]
+    public async Task SomethingThatIsntATokenIsRefused() => Assert.Equal(HttpStatusCode.Unauthorized, await ActiveUserAsync("not.a.token"));
+
+    [RequiresTm1EngineFact]
+    public async Task AnExpiredTokenIsRefused()
+    {
+        // Tokens that live a second, for as long as it takes to get one
+        var admin = await Keycloak.AccessTokenAsync("master", "admin-cli", "admin", "admin");
+        await SetTokenLifeAsync(admin, 1);
+        string token;
+        try
+        {
+            token = await Planning.OAuth2Login("analyst").TokenAsync();
+        }
+        finally
+        {
+            await SetTokenLifeAsync(admin, 300);
+        }
+        // TM1 may allow a clock some slack: wait for it to refuse, for up to two minutes
+        var waited = Stopwatch.StartNew();
+        HttpStatusCode status = default;
+        while (waited.Elapsed < TimeSpan.FromMinutes(2))
+        {
+            status = await ActiveUserAsync(token);
+            if (status == HttpStatusCode.Unauthorized)
+            {
+                break;
+            }
+            await Task.Delay(TimeSpan.FromSeconds(2));
+        }
+        output.WriteLine($"TM1 refused the expired token after {waited.Elapsed.TotalSeconds:F0} s");
+        Assert.Equal(HttpStatusCode.Unauthorized, status);
+    }
+
+    [RequiresTm1EngineFact]
+    public async Task LoginsThroughTheApplicationStillWork()
+    {
+        var analyst = Planning.Login("analyst");
+        Assert.False(analyst.IsOAuth2);
+        Assert.Equal(HttpStatusCode.OK, (await Tm1EngineRest.GetAsync(Planning, analyst, "ActiveUser")).Status);
+        // TM1's own token isn't one to send on a request
+        using var request = new HttpRequestMessage(HttpMethod.Get, Planning.RestUrl + "ActiveUser");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => analyst.AuthorizeWithTokenAsync(request));
+        // And an OAuth 2.0 login has no session endpoint to ask
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Planning.OAuth2Login("analyst").SessionAsync("Bearer x"));
+    }
+
+    [RequiresTm1EngineFact]
+    public async Task TheLoginSaysWhereItsTokensComeFrom()
+    {
+        var analyst = Planning.OAuth2Login("analyst");
+        Assert.Equal(Keycloak.Url + "/realms/tm1/protocol/openid-connect/token", analyst.TokenUrl);
+        Assert.Equal("tm1", analyst.ClientId);
+        Assert.Equal("analyst$pw", analyst.Password);
+        Assert.Equal(3, (await analyst.TokenAsync()).Split('.').Length);
+    }
+
+    /// <summary>What TM1 answers a request that carries <paramref name="token"/> as its Bearer.</summary>
+    private async Task<HttpStatusCode> ActiveUserAsync(string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, Planning.RestUrl + "ActiveUser");
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + token);
+        return (await Tm1EngineRest.SendAsync(request)).Status;
+    }
+
+    /// <summary>Sets how long the realm's access tokens live, through Keycloak's admin API.</summary>
+    private async Task SetTokenLifeAsync(string adminToken, int seconds)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, Keycloak.Url + "/admin/realms/tm1")
+        {
+            Content = new StringContent(
+                "{\"accessTokenLifespan\":" + seconds.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}",
+                Encoding.UTF8,
+                "application/json"
+            ),
+        };
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + adminToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await Tm1EngineRest.SendAsync(request)).Status);
+    }
+
+    /// <summary>The class's engine and its Keycloak, as Java's <c>@BeforeAll</c> and <c>@AfterAll</c>. Nothing starts
+    /// when the tests are skipped.</summary>
+    public sealed class OwnEngine : IAsyncLifetime
+    {
+        private KeycloakContainer? keycloak;
+        private Tm1EngineContainer? engine;
+
+        public Tm1EngineContainer Engine =>
+            engine ?? throw new InvalidOperationException(RequiresTm1EngineFactAttribute.EngineSkipReason() ?? "The engine isn't started");
+
+        public KeycloakContainer Keycloak =>
+            keycloak ?? throw new InvalidOperationException(RequiresTm1EngineFactAttribute.EngineSkipReason() ?? "Keycloak isn't started");
+
+        public async Task InitializeAsync()
+        {
+            if (RequiresTm1EngineFactAttribute.EngineSkipReason() is not null)
+            {
+                return;
+            }
+            var source = Tm1EngineSource.Discover() ?? throw new InvalidOperationException(RequiresTm1EngineFactAttribute.NoSourceMessage);
+            keycloak = new KeycloakContainer();
+            engine = new Tm1EngineContainer(source)
+                .WithDatabase("planning")
+                .WithUser("analyst", "Analysts")
+                .WithLogin("analyst", "analyst$pw")
+                .WithLogin("admin", "adminpw")
+                .WithOAuth2(keycloak);
+            await engine.StartAsync();
+        }
+
+        public async Task DisposeAsync()
+        {
+            if (engine is not null)
+            {
+                await engine.DisposeAsync();
+            }
+            // The Keycloak is the caller's to stop: the engine only started it first
+            if (keycloak is not null)
+            {
+                await keycloak.DisposeAsync();
             }
         }
     }

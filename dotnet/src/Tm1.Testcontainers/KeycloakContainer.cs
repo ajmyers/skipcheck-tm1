@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,6 +36,9 @@ public partial class KeycloakContainer : GenericContainer<KeycloakContainer>
 
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
+    // Realms to import at start, by name, in the order given: a TM1 v12 engine's, for OAuth 2.0 logins
+    private readonly List<(string Name, Func<string> Json)> realms = [];
+
     /// <summary>Keycloak's image is built for every platform, so it runs as the machine's own.</summary>
     private protected override string? Platform => null;
 
@@ -54,6 +58,54 @@ public partial class KeycloakContainer : GenericContainer<KeycloakContainer>
         WithEnv("KC_HTTP_ENABLED", "true");
         WithEnv("KC_HOSTNAME", NetworkUrl);
         WaitingForHttp("/realms/master", HttpPort, code => code == HttpStatusCode.OK, TimeSpan.FromMinutes(3));
+    }
+
+    /// <summary>A realm for this Keycloak to import when it starts, as JSON. The JSON is asked for when Keycloak
+    /// starts, so whoever gives it can still be changed until then.</summary>
+    internal KeycloakContainer WithRealm(string name, Func<string> json)
+    {
+        realms.RemoveAll(realm => realm.Name == name);
+        realms.Add((name, json));
+        return this;
+    }
+
+    /// <inheritdoc/>
+    protected internal override void Configure()
+    {
+        if (realms.Count > 0)
+        {
+            WithCommand("start-dev", "--import-realm");
+            foreach (var (name, json) in realms)
+            {
+                WithContent("/opt/keycloak/data/import/" + name + "-realm.json", Encoding.UTF8.GetBytes(json()));
+            }
+        }
+    }
+
+    /// <summary>An access token for a user of a realm, by the password grant, as a program holding the user's
+    /// password gets one.</summary>
+    /// <exception cref="InvalidOperationException">Keycloak refused.</exception>
+    internal async Task<string> AccessTokenAsync(string realm, string client, string user, string password, CancellationToken cancellationToken = default)
+    {
+        using var http = new HttpClient { Timeout = Timeout };
+        using var form = new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["grant_type"] = "password",
+                ["client_id"] = client,
+                ["username"] = user,
+                ["password"] = password,
+            }
+        );
+        using var response = await http.PostAsync(new Uri(Url + "/realms/" + realm + "/protocol/openid-connect/token"), form, cancellationToken)
+            .ConfigureAwait(false);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        var m = AccessToken().Match(body);
+        if (response.StatusCode != HttpStatusCode.OK || !m.Success)
+        {
+            throw new InvalidOperationException($"Keycloak refused {user} (HTTP {(int)response.StatusCode}): {body}");
+        }
+        return m.Groups[1].Value;
     }
 
     /// <summary>Keycloak's address on its network, as Cognos and TM1 reach it.</summary>
@@ -87,6 +139,9 @@ public partial class KeycloakContainer : GenericContainer<KeycloakContainer>
         }
         return m.Groups[1].Value;
     }
+
+    [GeneratedRegex("\"access_token\"\\s*:\\s*\"([^\"]+)\"")]
+    private static partial Regex AccessToken();
 
     [GeneratedRegex("\"id_token\"\\s*:\\s*\"([^\"]+)\"")]
     private static partial Regex IdToken();

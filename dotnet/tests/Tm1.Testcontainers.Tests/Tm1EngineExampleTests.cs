@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Skipcheck.Tm1.Client.Version;
 using Skipcheck.Tm1.Testcontainers.Xunit;
@@ -86,6 +87,31 @@ public class DatabasePerClassSharedExampleTests(Tm1EngineFixture tm1) : IClassFi
         Assert.Equal(Tm1EngineContainer.DefaultDatabase, db.Name);
         // Which the other class's dimension isn't in
         Assert.Equal(HttpStatusCode.NotFound, (await Tm1EngineRest.GetAsync(db, db.Login(), "Dimensions('Region')?$select=Name")).Status);
+    }
+}
+
+/// <summary>Java's OAuth2ExampleTest: OAuth 2.0 logins, with Keycloak, the way TM1 v12 logs users in from an identity
+/// provider. The engine takes tokens from a Keycloak beside it, which knows the users who were given a password. A test
+/// gets a token as the user and sends it to TM1.</summary>
+[Collection(OwnContainers.Name)]
+public class OAuth2ExampleTests
+{
+    [RequiresTm1EngineFact]
+    public async Task AUserLogsInWithATokenFromKeycloak()
+    {
+        var source = Tm1EngineSource.Discover() ?? throw new InvalidOperationException(RequiresTm1EngineFactAttribute.NoSourceMessage);
+        // Disposed last: the Keycloak is yours to stop
+        await using var keycloak = new KeycloakContainer();
+        await using var engine = new Tm1EngineContainer(source).WithUser("analyst", "Analysts").WithLogin("analyst", "analystpw").WithOAuth2(keycloak);
+        await engine.StartAsync();
+        var db = engine.Database("tm1");
+
+        using var request = await db.OAuth2Login("analyst")
+            .AuthorizeWithTokenAsync(new HttpRequestMessage(HttpMethod.Get, db.RestUrl + "ActiveUser?$select=Name"));
+        var (status, body) = await Tm1EngineRest.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("\"Name\":\"analyst\"", body, StringComparison.OrdinalIgnoreCase);
     }
 }
 

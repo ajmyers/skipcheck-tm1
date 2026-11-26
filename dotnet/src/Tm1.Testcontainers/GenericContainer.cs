@@ -29,6 +29,9 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     private readonly Dictionary<string, string> extraHosts = new(StringComparer.Ordinal);
     private readonly List<(string Source, string Target)> copies = [];
 
+    // Files written into the container before it starts, by their path there
+    private readonly Dictionary<string, byte[]> contents = new(StringComparer.Ordinal);
+
     // The first is on every container this library starts, in every language; its value is the language.
     // A label like any other: WithLabel can replace it, and it's part of what a reused container is found by
     private readonly Dictionary<string, string> labels = new(StringComparer.Ordinal) { ["io.skipcheck.tm1.testcontainers"] = "dotnet" };
@@ -120,8 +123,9 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     /// <summary>Joins <paramref name="network"/> (created when the first container on it starts).</summary>
     public TSelf WithNetwork(Network? network)
     {
-        Network = network;
+        // First: it may refuse the network
         NetworkSet(network);
+        Network = network;
         return Self;
     }
 
@@ -175,6 +179,14 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
         reuse = true;
         labels[label] = value;
     }
+
+    /// <summary>The files written into the container before it starts, by their path there: what a container makes
+    /// itself, where <see cref="WithCopyFileToContainer"/> takes a file of the host's.</summary>
+    internal IReadOnlyDictionary<string, byte[]> Contents => contents;
+
+    /// <summary>Writes a file into the container before it starts, as Java's <c>withCopyToContainer(Transferable.of(…))</c>.
+    /// Said again for a path, it replaces what was said.</summary>
+    private protected void WithContent(string containerPath, byte[] content) => contents[containerPath] = content;
 
     /// <summary>Copies a host file or folder into the container before it starts.</summary>
     public TSelf WithCopyFileToContainer(string hostPath, string containerPath)
@@ -364,6 +376,10 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
             builder = System.IO.Directory.Exists(source)
                 ? builder.WithResourceMapping(DirectoryPath.Of(source), DirectoryPath.Of(target))
                 : builder.WithResourceMapping(FilePath.Of(source), DirectoryPath.Of(target));
+        }
+        foreach (var (target, content) in contents)
+        {
+            builder = builder.WithResourceMapping(content, FilePath.Of(target));
         }
         if (reuse && DockerHost.ReuseEnabled())
         {

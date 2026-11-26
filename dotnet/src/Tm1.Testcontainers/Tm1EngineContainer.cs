@@ -67,6 +67,12 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     /// a package installs it. Remove the volume to clear it.</summary>
     public const string CacheVolume = "tm1-engine-testcontainers-cache";
 
+    /// <summary>The Keycloak realm an engine with <see cref="WithOAuth2"/> takes tokens from.</summary>
+    public const string OAuth2Realm = "tm1";
+
+    /// <summary>The client of that realm a test asks for tokens as, and the audience its tokens carry.</summary>
+    public const string OAuth2Client = "tm1";
+
     internal const string InstallPath = "/opt/ibm/tm1-engine";
 
     // The datastore is this engine's alone and goes with it: nothing else is given the password
@@ -86,6 +92,9 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     // instance/database, in the order they were added
     private readonly List<string> databases = [];
     private readonly List<(string Name, string[] Groups)> users = [];
+
+    // The users who can log in through OAuth 2.0, and what with, in the order they were last given one
+    private readonly List<(string User, string Password)> passwords = [];
 
     // One command at a time, with the reading of what it changed: test classes run side by side, and
     // each creates and drops its database in the one shared engine
@@ -198,6 +207,57 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
         return this;
     }
 
+    /// <summary>Takes OAuth 2.0 logins: tokens from a Keycloak, which gets a realm (<c>tm1</c>) with the users given a
+    /// password by <see cref="WithLogin"/>. A test then logs in with <see cref="Tm1Database.OAuth2Login"/>. Logins through
+    /// the engine's application (<see cref="Tm1Database.Login()"/>) keep working beside it.
+    /// <para>The Keycloak joins the engine's network, unless it has one already, which the engine then joins. It's yours
+    /// to stop: the engine only starts it first.</para></summary>
+    public Tm1EngineContainer WithOAuth2(KeycloakContainer keycloak)
+    {
+        ArgumentNullException.ThrowIfNull(keycloak);
+        Keycloak = keycloak;
+        if (keycloak.Network is not null)
+        {
+            WithNetwork(keycloak.Network);
+        }
+        else
+        {
+            JoinNetwork();
+            keycloak.WithNetwork(Network);
+        }
+        DependsOn(keycloak);
+        // Asked for when Keycloak starts, so users added after this call are in it
+        keycloak.WithRealm(OAuth2Realm, Realm);
+        // Keycloak's address on the network is what its tokens name, however they're fetched, and TM1 has to reach
+        // the issuer a token names
+        WithEnv("TM1_OAUTH2_ISSUER_URL", keycloak.NetworkUrl + "/realms/" + OAuth2Realm);
+        WithEnv("TM1_OAUTH2_AUDIENCE", OAuth2Client);
+        WithEnv("TM1_OAUTH2_ID_CLAIMS", "preferred_username");
+        return this;
+    }
+
+    /// <summary>Gives a user a password to log in with through OAuth 2.0 (<see cref="WithOAuth2"/>). TM1 v12 keeps no
+    /// passwords itself: it's the Keycloak's. The user is one added with <see cref="WithUser"/>, or <c>admin</c>.</summary>
+    /// <exception cref="ArgumentException">The name isn't a user's, or the password is empty.</exception>
+    public Tm1EngineContainer WithLogin(string user, string password)
+    {
+        if (user is null || !UserName().IsMatch(user))
+        {
+            throw new ArgumentException("A user's name is letters, digits, '.', '_' and '-': " + user, nameof(user));
+        }
+        if (string.IsNullOrEmpty(password))
+        {
+            throw new ArgumentException("The password of " + user + " must not be empty", nameof(password));
+        }
+        // A name is one whatever its case, to Keycloak and to TM1: a second password for it replaces the first
+        passwords.RemoveAll(login => login.User.Equals(user, StringComparison.OrdinalIgnoreCase));
+        passwords.Add((user, password));
+        return this;
+    }
+
+    /// <summary>The Keycloak the engine takes OAuth 2.0 tokens from, or null without <see cref="WithOAuth2"/>.</summary>
+    public KeycloakContainer? Keycloak { get; private set; }
+
     /// <summary>Where TM1 comes from.</summary>
     public Tm1EngineSource Source { get; }
 
@@ -290,6 +350,90 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
         return new Tm1Login(Url + instance + "/auth/v1/", instance, clientId, clientSecret, user);
     }
 
+    /// <summary>A login through OAuth 2.0, as a user given a password with <see cref="WithLogin"/>.</summary>
+    internal Tm1Login OAuth2Login(Tm1Database database, string user)
+    {
+        var from = Keycloak ?? throw new InvalidOperationException("This engine takes no OAuth 2.0 logins: give it a Keycloak with WithOAuth2");
+        // A name is one whatever its case, to Keycloak and to TM1
+        foreach (var (name, password) in passwords)
+        {
+            if (name.Equals(user, StringComparison.OrdinalIgnoreCase))
+            {
+                return new Tm1Login(from, database, name, password);
+            }
+        }
+        throw new ArgumentException(
+            $"{user} has no password to log in with: give one with WithLogin. Those who have: [{string.Join(", ", passwords.Select(login => login.User))}]",
+            nameof(user)
+        );
+    }
+
+    /// <summary>The realm the Keycloak imports, as JSON: a client whose tokens carry the audience TM1 expects, and the
+    /// users who have a password.</summary>
+    /// <exception cref="InvalidOperationException">Someone has a password who isn't a user of the engine.</exception>
+    internal string Realm()
+    {
+        foreach (var (user, _) in passwords)
+        {
+            if (!user.Equals("admin", StringComparison.OrdinalIgnoreCase) && !users.Any(u => u.Name.Equals(user, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException(user + " has a password (WithLogin) but isn't a user of the engine: add them with WithUser");
+            }
+        }
+        using var buffer = new MemoryStream();
+        using (var json = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = true }))
+        {
+            json.WriteStartObject();
+            json.WriteString("realm", OAuth2Realm);
+            json.WriteBoolean("enabled", true);
+            json.WriteStartArray("clients");
+            json.WriteStartObject();
+            json.WriteString("clientId", OAuth2Client);
+            json.WriteBoolean("publicClient", true);
+            json.WriteBoolean("directAccessGrantsEnabled", true);
+            json.WriteBoolean("standardFlowEnabled", false);
+            json.WriteStartArray("protocolMappers");
+            json.WriteStartObject();
+            json.WriteString("name", "tm1-audience");
+            json.WriteString("protocol", "openid-connect");
+            json.WriteString("protocolMapper", "oidc-audience-mapper");
+            json.WriteStartObject("config");
+            json.WriteString("included.custom.audience", OAuth2Client);
+            json.WriteString("access.token.claim", "true");
+            json.WriteString("id.token.claim", "false");
+            json.WriteEndObject();
+            json.WriteEndObject();
+            json.WriteEndArray();
+            json.WriteEndObject();
+            json.WriteEndArray();
+            json.WriteStartArray("users");
+            var number = 0;
+            foreach (var (user, password) in passwords)
+            {
+                // Keycloak wants a profile that's complete before it gives a user a token. The address isn't made
+                // from the name: Keycloak refuses some that a name may be
+                json.WriteStartObject();
+                json.WriteString("username", user);
+                json.WriteBoolean("enabled", true);
+                json.WriteBoolean("emailVerified", true);
+                json.WriteString("email", "user" + (++number).ToString(System.Globalization.CultureInfo.InvariantCulture) + "@example.com");
+                json.WriteString("firstName", user);
+                json.WriteString("lastName", "Test");
+                json.WriteStartArray("credentials");
+                json.WriteStartObject();
+                json.WriteString("type", "password");
+                json.WriteString("value", password);
+                json.WriteBoolean("temporary", false);
+                json.WriteEndObject();
+                json.WriteEndArray();
+                json.WriteEndObject();
+            }
+            json.WriteEndArray();
+            json.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(buffer.ToArray());
+    }
+
     /// <summary>What's passed to the image as TM1_DATABASES: what was added, or the default.</summary>
     internal IReadOnlyList<string> Configured() => databases.Count == 0 ? [DefaultInstance + "/" + DefaultDatabase] : databases;
 
@@ -298,8 +442,16 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
 
     /// <summary>The datastore goes on the engine's network at once, not when the engine starts: whatever starts the
     /// engine may start what it depends on first, and the datastore must be there by then.</summary>
+    /// <exception cref="InvalidOperationException">The engine's Keycloak is on another network.</exception>
     private protected override void NetworkSet(Network? network)
     {
+        if (Keycloak is { } joined && !ReferenceEquals(joined.Network, network))
+        {
+            // The Keycloak is the caller's, and may serve others: it isn't moved from here
+            throw new InvalidOperationException(
+                "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: set the network before WithOAuth2, or give the Keycloak the same"
+            );
+        }
         // Null while the base class is still being made
         Datastore?.WithNetwork(network);
         if (!ReferenceEquals(network, ownNetwork))
@@ -350,7 +502,8 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
         {
             // Testcontainers removes what's left when the run ends
         }
-        if (ownNetwork is { } made)
+        // Not with a Keycloak on it: that's the caller's, and may be running there still
+        if (ownNetwork is { } made && Keycloak is null)
         {
             // Another for the next start, as a new engine has
             ownNetwork = Network.NewNetwork();
