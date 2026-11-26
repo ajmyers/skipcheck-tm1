@@ -215,7 +215,7 @@ public final class Tm1Login {
 	public String session(String authorization) {
 		if (keycloak != null) {
 			throw new IllegalStateException("An OAuth 2.0 login has no session to ask for: TM1 takes its token "
-					+ "on any request (authorize), and cookie() keeps the session that gives");
+					+ "on any request (authorizeWithToken), and cookie() keeps the session that gives");
 		}
 		HttpResponse<String> response = send(HttpRequest.newBuilder(URI.create(authUrl + "session"))
 			.header("Authorization", Objects.requireNonNull(authorization, "authorization"))

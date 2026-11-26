@@ -147,13 +147,13 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 
 	private final Map<String, List<String>> users = new LinkedHashMap<>();
 
-	// Read and cleared under this container's lock: test classes may use the shared
-	// engine at once
 	// The users who can log in through OAuth 2.0, and what with
 	private final Map<String, String> passwords = new LinkedHashMap<>();
 
 	private @Nullable KeycloakContainer keycloak;
 
+	// Read and cleared under this container's lock: test classes may use the shared
+	// engine at once
 	private @Nullable JsonNode credentials;
 
 	private @Nullable Tm1Version version;
@@ -215,6 +215,13 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	 */
 	@Override
 	public Tm1EngineContainer withNetwork(Network network) {
+		KeycloakContainer joined = keycloak;
+		if (joined != null && !Objects.equals(joined.getNetwork(), network)) {
+			// The Keycloak is the caller's, and may serve others: it isn't moved from
+			// here
+			throw new IllegalStateException("The engine takes tokens from a Keycloak on another network, which TM1 "
+					+ "couldn't reach from this one: set the network before withOAuth2, or give the Keycloak the same");
+		}
 		super.withNetwork(network);
 		// At once, not when the engine starts: whatever starts the engine may start what
 		// it
@@ -340,6 +347,10 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 		if (password == null || password.isEmpty()) {
 			throw new IllegalArgumentException("The password of " + user + " must not be empty");
 		}
+		// A name is one whatever its case, to Keycloak and to TM1: a second password for
+		// it
+		// replaces the first
+		passwords.keySet().removeIf(known -> known.equalsIgnoreCase(user));
 		passwords.put(user, password);
 		return self();
 	}

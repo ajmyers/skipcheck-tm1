@@ -99,6 +99,11 @@ class Tm1EngineWiringTest {
 		assertThat(engine.getKeycloak()).isSameAs(keycloak);
 		assertThat(new Tm1EngineContainer(SOURCE).getKeycloak()).isNull();
 
+		// Moved off the Keycloak's network, TM1 couldn't reach its issuer
+		assertThatIllegalStateException().isThrownBy(() -> engine.withNetwork(Network.newNetwork()))
+			.withMessageContaining("set the network before withOAuth2");
+		assertThat(engine.withNetwork(keycloak.getNetwork())).isSameAs(engine);
+
 		// A Keycloak that has a network already is joined there, the datastore too
 		Network network = Network.newNetwork();
 		var placed = new KeycloakContainer().withNetwork(network);
@@ -145,8 +150,13 @@ class Tm1EngineWiringTest {
 		engine.withOAuth2(new KeycloakContainer());
 		assertThatIllegalArgumentException().isThrownBy(() -> database.oauth2Login("viewer"))
 			.withMessageContaining("viewer has no password to log in with");
-		// A name is one whatever its case
+		// A name is one whatever its case: to log in as, and a second password replaces
+		// the first
 		assertThat(database.oauth2Login("ANALYST").getUser()).isEqualTo("analyst");
+		engine.withLogin("Analyst", "second");
+		assertThat(database.oauth2Login("analyst").getPassword()).isEqualTo("second");
+		assertThat(JsonMapper.shared().readTree(engine.realm()).path("users")).hasSize(1);
+		engine.withLogin("analyst", "pw");
 		assertThat(database.oauth2Login("analyst").isOAuth2()).isTrue();
 		assertThat(database.oauth2Login("analyst").getPassword()).isEqualTo("pw");
 		assertThat(database.oauth2Login("analyst").getClientId()).isEqualTo("tm1");

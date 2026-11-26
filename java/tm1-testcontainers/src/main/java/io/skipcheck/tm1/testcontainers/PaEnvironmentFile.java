@@ -301,9 +301,8 @@ final class PaEnvironmentFile {
 			Object datastore = engineSection.get("datastore");
 			Map<?, ?> ds = datastore == null || datastore instanceof Boolean ? Map.of()
 					: keys(datastore, List.of("port"), "tm1Engine.datastore");
-			enginePort = port(engineSection.get("port"), "tm1Engine", 4444);
-			// Published only when a port is given
-			datastorePort = ds.get("port") == null ? null : port(ds.get("port"), "tm1Engine.datastore", 27017);
+			// Before the ports, as pa_setup: a file wrong in both says the same in each
+			// reader
 			Object oauth2 = engineSection.get("oauth2");
 			// On with true or a mapping, an empty one too: only absent or false is off
 			if (oauth2 != null && !Boolean.FALSE.equals(oauth2)) {
@@ -315,6 +314,9 @@ final class PaEnvironmentFile {
 				}
 				engineKeycloakPort = port(o.get("keycloakPort"), "tm1Engine.oauth2", 8181);
 			}
+			enginePort = port(engineSection.get("port"), "tm1Engine", 4444);
+			// Published only when a port is given
+			datastorePort = ds.get("port") == null ? null : port(ds.get("port"), "tm1Engine.datastore", 27017);
 			for (String name : servers.keySet()) {
 				// The engine's two compose services in pa-setup: a server of that name
 				// would

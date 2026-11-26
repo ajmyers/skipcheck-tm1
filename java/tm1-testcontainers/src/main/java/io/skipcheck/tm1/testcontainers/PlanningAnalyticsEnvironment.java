@@ -173,7 +173,10 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 					? new CognosContainer(image(b.cognosImage, CognosContainer.DEFAULT_IMAGE), source)
 					: new CognosContainer(source))
 				.withNetwork(network);
-			if (keycloak != null) {
+			// Only when Keycloak was asked for: one that's there for the engine's OAuth
+			// 2.0
+			// logins alone doesn't give Cognos an OIDC namespace nobody wanted
+			if (keycloak != null && b.keycloak != null) {
 				cognos.withKeycloak(keycloak);
 			}
 			// First: the TM1 servers' CAM security is wired from the test users

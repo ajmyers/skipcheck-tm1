@@ -410,6 +410,15 @@ class PlanningAnalyticsEnvironmentTest {
 		assertThat(env.containers()).containsExactly(keycloak, env.tm1Engine());
 		assertThat(env.tm1Database("tm1").oauth2Login("analyst").getPassword()).isEqualTo("analystpw");
 
+		// A Keycloak that's there for the engine alone gives Cognos no OIDC namespace
+		var beside = engineBuilder().tm1("legacy")
+			.cognos(cognos -> cognos.withUser("admin", "adminpw"))
+			.tm1Engine(engine -> engine.withLogin("admin", "adminpw"))
+			.tm1EngineOAuth2()
+			.build();
+		assertThat(beside.cognos().getKeycloak()).isNull();
+		assertThat(beside.tm1Engine().getKeycloak()).isSameAs(beside.keycloak());
+
 		assertThatIllegalStateException().isThrownBy(() -> builder().tm1("legacy").tm1EngineOAuth2().build())
 			.withMessageContaining("OAuth 2.0 logins are a TM1 v12 engine's: add tm1Engine() too");
 		assertThatIllegalStateException().isThrownBy(() -> builder().tm1("legacy").keycloak().build())
