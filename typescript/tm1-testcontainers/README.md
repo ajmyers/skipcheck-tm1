@@ -63,7 +63,8 @@ env.tm1Database("planning").getRestUrl();
 ```
 
 - **A server or an engine:** an environment needs one of them. The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's, and need a TM1 server.
-- **On the environment's network:** the engine and its MongoDB are on it from the moment the environment is built, and the engine starts beside TM1 11's parts, before PAW.
+- **On the environment's network:** the engine and its MongoDB are on it from the moment the environment is built, as `tm1-engine` and `tm1-datastore`, and the engine starts beside TM1 11's parts, before PAW. A TM1 server can't have either name (in any case) beside an engine: `build()` refuses it.
+- **With `fromConfig`:** `tm1Engine(customizer)` adds to the file's databases and users rather than replacing them, and `images.tm1Engine` is the image of an engine added in code too, whether or not the file has a `tm1Engine` section.
 - **Not reusable:** `reuse(true)` with an engine is refused when the environment is built, whatever your reuse switch says. An engine and its datastore belong together, and a kept one would keep every database tests left.
 
 ### An engine of your own

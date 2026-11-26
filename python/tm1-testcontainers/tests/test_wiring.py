@@ -366,8 +366,7 @@ def test_starting_a_reused_environment_marks_every_container_with_its_identity()
 ROOT = Path(__file__).resolve().parents[3]
 FIXTURES = ROOT / "spec" / "conformance" / "pa-environment"
 EXAMPLES = ROOT / "docker" / "pa-setup" / "examples"
-# The pa-environment.yaml files for TM1 v12, and the conformance scenarios, shared with the other languages
-ENGINE_FIXTURES = ROOT / "testcontainers-conformance" / "pa-environment"
+# The container conformance scenarios, shared with the other languages
 SCENARIOS = ROOT / "testcontainers-conformance" / "scenarios"
 
 
@@ -384,6 +383,8 @@ def test_an_engine_runs_beside_the_tm1_servers() -> None:
     # Its datastore is the engine's own, on the environment's network with it: before configure(),
     # since the environment's start starts what the engine depends on first
     assert engine.datastore.network is env.network()
+    # Its name on the network, as in pa-setup's compose project
+    assert "tm1-engine" in engine.network_aliases
     engine.configure()
     assert engine.datastore.network is env.network()
     assert engine.env_map["TM1_DATABASES"] == "tm1/planning"
@@ -412,10 +413,31 @@ def test_the_admin_server_tm1_web_paw_and_cognos_need_a_tm1_server_not_an_engine
         engine_builder().tm1_engine().tm1_web(),
         engine_builder().tm1_engine().admin_server(),
         engine_builder().tm1_engine().cognos(lambda cognos: cognos.with_user("admin", "adminpw")),
-        engine_builder().tm1_engine().paw(lambda paw: paw.accept_license()),
+        engine_builder().tm1_engine().paw_source(paw_source()).paw(lambda paw: paw.accept_license()),
     ):
         with pytest.raises(RuntimeError, match=r"are TM1 11's: add a TM1 server with tm1\(name\)"):
             incomplete.build()
+
+
+def test_a_server_cant_take_the_engines_names_on_the_network() -> None:
+    for name in ("tm1-datastore", "TM1-Engine"):
+        with pytest.raises(RuntimeError, match=f"A TM1 server can't be named {name} beside a TM1 v12 engine"):
+            engine_builder().tm1(name).tm1_engine().build()
+    # Without an engine the names are free
+    assert "tm1-datastore" in builder().tm1("tm1-datastore").build().tm1_servers()
+
+
+def test_from_config_keeps_the_files_engine_under_a_customizer_and_its_image_without_a_section() -> None:
+    # A customizer adds to the file's databases and users; it doesn't replace them
+    env = PlanningAnalyticsEnvironment.from_config(FIXTURES / "tm1-engine.yaml").tm1_engine(lambda engine: engine.with_user("extra")).build()
+    env.tm1_engine().configure()
+    assert env.tm1_engine().env_map["TM1_DATABASES"] == "tm1/planning,tm1/Sales,other/sales"
+    assert env.tm1_engine().env_map["TM1_USERS"] == "analyst:Analysts:Planners,viewer,boss:ADMIN,planner:Planners,extra"
+
+    # images.tm1Engine is the image of an engine added in code too
+    added = PlanningAnalyticsEnvironment.from_config(FIXTURES / "engine-image-only.yaml").tm1_engine().build()
+    assert added.tm1_engine().image == "registry.example.com/tm1-engine:local"
+    assert added.tm1_engine().source == Tm1EngineSource.Bundle(FIXTURES / "ibm", None)
 
 
 def test_an_environment_with_an_engine_cant_be_reused() -> None:
@@ -462,8 +484,8 @@ def test_starting_the_environment_starts_the_datastore_on_its_network(monkeypatc
 
 
 def test_from_config_adds_the_engine_with_its_databases_and_users() -> None:
-    env = PlanningAnalyticsEnvironment.from_config(ENGINE_FIXTURES / "tm1-engine.yaml").build()
-    ibm = ENGINE_FIXTURES / "ibm"
+    env = PlanningAnalyticsEnvironment.from_config(FIXTURES / "tm1-engine.yaml").build()
+    ibm = FIXTURES / "ibm"
     engine = env.tm1_engine()
     engine.configure()
     # Sales and sales are two databases to TM1 v12, and each is in its instance
@@ -487,7 +509,7 @@ def test_from_config_runs_an_engine_alone() -> None:
 
 
 def test_from_config_takes_oidc_true_as_on() -> None:
-    env = PlanningAnalyticsEnvironment.from_config(ENGINE_FIXTURES / "oidc-true.yaml").build()
+    env = PlanningAnalyticsEnvironment.from_config(FIXTURES / "oidc-true.yaml").build()
     assert env.keycloak() is not None
     planning = env.tm1("planning")
     planning.configure()
@@ -568,11 +590,8 @@ def test_from_config_runs_paw_with_cognos() -> None:
 
 
 def test_from_config_refuses_what_it_cannot_run() -> None:
-    invalid: list[Path] = []
-    for folder in (FIXTURES / "invalid", ENGINE_FIXTURES / "invalid"):
-        found = sorted(folder.glob("*.yaml"))
-        assert found, folder
-        invalid += found
+    invalid = sorted((FIXTURES / "invalid").glob("*.yaml"))
+    assert len(invalid) > 40
     for file in invalid:
         first = file.read_text(encoding="utf-8").splitlines()[0]
         assert first.startswith("# error: "), file

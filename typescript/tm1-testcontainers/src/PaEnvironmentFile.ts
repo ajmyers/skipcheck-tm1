@@ -34,6 +34,8 @@ export interface FileSources {
   keycloakImage?: string;
   /** The TM1 v12 engine's image. */
   tm1EngineImage?: string;
+  /** The file's own settings for the engine: its databases and users. */
+  fileTm1Engine?: (engine: Tm1EngineContainer) => void;
 }
 
 interface Server {
@@ -302,17 +304,20 @@ class PaEnvironmentFile {
       tm1WebImage: image(images, "tm1Web"),
       cognosImage: image(images, "cognosServer"),
       keycloakImage: image(images, "keycloak"),
+      // Whatever the file's sections: an engine added in code runs the file's image too.
       // images.mongo is checked and not used: the engine's MongoDB is the container's own here
-      tm1EngineImage: engine === undefined ? undefined : image(images, "tm1Engine"),
+      tm1EngineImage: image(images, "tm1Engine"),
+      // Kept apart from the caller's customizer, which a later tm1Engine(...) sets
+      fileTm1Engine:
+        engine === undefined
+          ? undefined
+          : (container) => {
+              for (const [name, instance] of engine.databases) container.withDatabase(instance, name);
+              // TM1 v12 keeps no passwords: a user's is checked and not used
+              for (const u of engine.users) container.withUser(u.name, ...u.groups);
+            },
     });
-    if (engine !== undefined) {
-      const wanted = engine;
-      b.tm1Engine((container) => {
-        for (const [name, instance] of wanted.databases) container.withDatabase(instance, name);
-        // TM1 v12 keeps no passwords: a user's is checked and not used
-        for (const u of wanted.users) container.withUser(u.name, ...u.groups);
-      });
-    }
+    if (engine !== undefined) b.tm1Engine();
     return b;
   }
 

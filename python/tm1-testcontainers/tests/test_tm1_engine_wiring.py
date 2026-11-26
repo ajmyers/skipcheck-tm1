@@ -139,6 +139,46 @@ def test_an_instances_name_has_no_least_length() -> None:
         engine.with_database("eu", "sa")
 
 
+def test_stops_its_datastore_and_closes_its_network_when_removing_the_engine_fails() -> None:
+    class Unremovable:
+        def remove(self, **_: object) -> None:
+            raise OSError("the Docker daemon went away")
+
+    class Recording(Network):
+        closed = 0
+
+        def close(self) -> None:
+            self.closed += 1
+
+    engine = Tm1EngineContainer(SOURCE)
+    own = Recording()
+    engine._own_network = own
+    engine.with_network(own)
+    stopped: list[bool] = []
+    engine.datastore.stop = lambda *_, **__: stopped.append(True)  # type: ignore[method-assign]
+    engine._container = Unremovable()
+    with pytest.raises(OSError, match="went away"):
+        engine.stop()
+    assert stopped == [True]
+    assert own.closed == 1
+
+    # And a datastore that can't be removed still leaves the network closed; one the engine was
+    # given stays
+    def failing(*_: object, **__: object) -> None:
+        raise OSError("the datastore is stuck")
+
+    engine.datastore.stop = failing  # type: ignore[method-assign]
+    engine._container = None
+    with pytest.raises(OSError, match="stuck"):
+        engine.stop()
+    assert own.closed == 2
+    given = Recording()
+    engine.with_network(given)
+    with pytest.raises(OSError, match="stuck"):
+        engine.stop()
+    assert given.closed == 0 and own.closed == 2
+
+
 def test_picks_the_image_as_tm1_server_does(monkeypatch: pytest.MonkeyPatch) -> None:
     volume = Tm1EngineSource.InstallVolume("tm1-engine")
     monkeypatch.delenv(Tm1EngineContainer.ENGINE_IMAGE, raising=False)

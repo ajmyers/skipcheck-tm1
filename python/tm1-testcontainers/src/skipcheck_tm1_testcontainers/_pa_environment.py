@@ -295,8 +295,11 @@ class _Reader:
                 for user in wanted.users:
                     container.with_user(user.name, *user.groups)
 
-            b.tm1_engine(customize)
-            b._tm1_engine_image = _image(images, "tm1Engine")
+            b.tm1_engine()
+            # Kept apart from the caller's customizer, which a later tm1_engine(...) sets
+            b._file_tm1_engine = customize
+        # Whatever the file's sections: an engine added in code runs the file's image too
+        b._tm1_engine_image = _image(images, "tm1Engine")
         return b
 
     def _keys(self, section: Any, allowed: list[str], where: str) -> dict[Any, Any]:

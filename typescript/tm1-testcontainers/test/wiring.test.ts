@@ -198,9 +198,6 @@ function thrown(action: () => unknown): Error {
   throw new Error("Nothing was thrown");
 }
 
-/** The pa-environment.yaml files for TM1 v12, shared with the other languages. */
-const engineFixture = (name: string): string => join(Repo.paEnvironmentEngineFixtures, name);
-
 const pawSource = (): PawSource => new PawSource(join(fixture("ibm"), "ipa_workspace_local_0.0.0.zip"));
 
 const builder = (): PlanningAnalyticsEnvironment.Builder =>
@@ -520,10 +517,13 @@ describe("PlanningAnalyticsEnvironment", () => {
     expect(engine.getNetwork()).toBe(env.network());
     expect(env.tm1("legacy").getNetwork()).toBe(env.network());
     expect(engine.getSource()).toStrictEqual(new Tm1EngineSource.PrivateImage("tm1-engine:test"));
-    // Its datastore is the engine's own, on the environment's network with it: before anything
-    // is configured or started, and after
+    // Before anything configures or starts it: its datastore may be started first
     expect(engine.getDatastore().getNetwork()).toBe(env.network());
+    // Its name on the network, as in pa-setup's compose project; its datastore's is its own
+    expect(engine.getNetworkAliases()).toEqual(["tm1-engine"]);
+    expect(engine.getDatastore().getNetworkAliases()).toEqual(["tm1-datastore"]);
     engine.configure();
+    // Its datastore is the engine's own, on the environment's network with it
     expect(engine.getDatastore().getNetwork()).toBe(env.network());
     expect(engine.getEnvMap().get("TM1_DATABASES")).toBe("tm1/planning");
     expect(engine.getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts");
@@ -591,6 +591,33 @@ describe("PlanningAnalyticsEnvironment", () => {
     }
   });
 
+  it("a server can't take the engine's names on the network", () => {
+    for (const name of ["tm1-datastore", "TM1-Engine"]) {
+      const taken = (): unknown => engineBuilder().tm1(name).tm1Engine().build();
+      expect(taken).toThrow(IllegalStateException);
+      expect(taken).toThrow(`A TM1 server can't be named ${name} beside a TM1 v12 engine`);
+    }
+    // Without an engine the names are free
+    expect(builder().tm1("tm1-datastore").build().tm1Servers().has("tm1-datastore")).toBe(true);
+  });
+
+  it("from config keeps the file's engine under a customizer, and its image without a section", () => {
+    // A customizer adds to the file's databases and users; it doesn't replace them
+    const env = PlanningAnalyticsEnvironment.fromConfig(fixture("tm1-engine.yaml"))
+      .tm1Engine((engine) => engine.withUser("extra"))
+      .build();
+    env.tm1Engine().configure();
+    expect(env.tm1Engine().getEnvMap().get("TM1_DATABASES")).toBe("tm1/planning,tm1/Sales,other/sales");
+    expect(env.tm1Engine().getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts:Planners,viewer,boss:ADMIN,planner:Planners,extra");
+
+    // images.tm1Engine is the image of an engine added in code too
+    const added = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-image-only.yaml")).tm1Engine().build();
+    expect(added.tm1Engine().getDockerImageName()).toBe("registry.example.com/tm1-engine:local");
+    expect(added.tm1Engine().getSource()).toStrictEqual(new Tm1EngineSource.Bundle(resolve(fixture("ibm"))));
+    // And without one in code, the file's image starts no engine
+    expect(() => PlanningAnalyticsEnvironment.fromConfig(fixture("engine-image-only.yaml")).build().tm1Engine()).toThrow("no TM1 v12 engine");
+  });
+
   it("an environment with an engine can't be reused", () => {
     // Whatever the developer's switch says: the same code must do the same everywhere
     for (const enabled of [true, false]) {
@@ -603,8 +630,8 @@ describe("PlanningAnalyticsEnvironment", () => {
   });
 
   it("from config adds the engine with its databases and users", () => {
-    const env = PlanningAnalyticsEnvironment.fromConfig(engineFixture("tm1-engine.yaml")).build();
-    const ibm = resolve(engineFixture("ibm"));
+    const env = PlanningAnalyticsEnvironment.fromConfig(fixture("tm1-engine.yaml")).build();
+    const ibm = resolve(fixture("ibm"));
     const engine = env.tm1Engine();
     engine.configure();
     // Sales and sales are two databases to TM1 v12, and each is in its instance
@@ -634,7 +661,7 @@ describe("PlanningAnalyticsEnvironment", () => {
   });
 
   it("from config takes OIDC true as on", () => {
-    const env = PlanningAnalyticsEnvironment.fromConfig(engineFixture("oidc-true.yaml")).build();
+    const env = PlanningAnalyticsEnvironment.fromConfig(fixture("oidc-true.yaml")).build();
     expect(env.keycloak()).toBeInstanceOf(KeycloakContainer);
     const planning = env.tm1("planning");
     planning.configure();
@@ -642,15 +669,11 @@ describe("PlanningAnalyticsEnvironment", () => {
   });
 
   it("from config refuses what it cannot run", () => {
-    const invalid: string[] = [];
-    for (const folder of [fixture("invalid"), engineFixture("invalid")]) {
-      const found = readdirSync(folder)
-        .filter((f) => f.endsWith(".yaml"))
-        .sort()
-        .map((f) => join(folder, f));
-      expect(found.length, folder).toBeGreaterThan(0);
-      invalid.push(...found);
-    }
+    const invalid = readdirSync(fixture("invalid"))
+      .filter((f) => f.endsWith(".yaml"))
+      .sort()
+      .map((f) => join(fixture("invalid"), f));
+    expect(invalid.length).toBeGreaterThan(40);
     for (const file of invalid) {
       const first = readFileSync(file, "utf8").split(/\r?\n/)[0]!;
       expect(first, file).toMatch(/^# error: /);

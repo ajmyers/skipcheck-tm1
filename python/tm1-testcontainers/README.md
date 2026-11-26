@@ -159,6 +159,10 @@ with env:
 - The engine and its MongoDB are on the environment's network, and start with TM1 11's parts,
   before PAW. `tm1_engine_source(...)` sets where TM1 v12 comes from, instead of
   `Tm1EngineSource.discover()`.
+- The engine's name on the network is `tm1-engine`, and its MongoDB's `tm1-datastore`: a TM1 server
+  can't have either name beside an engine.
+- On a builder from `from_config`, `tm1_engine(customizer)` adds to the file's databases and users,
+  and `images.tm1Engine` is the image of an engine added in code too.
 - The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: they need a TM1 server.
 - An environment with an engine can't be reused: `reuse(True)` is refused at `build()`, whatever
   your reuse switch says. An engine and its datastore belong together, and a kept one keeps every

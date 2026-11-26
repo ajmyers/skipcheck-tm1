@@ -88,7 +88,9 @@ var planning = env.Tm1Database("planning");   // env.Tm1Engine().Database(instan
 ```
 
 - `Tm1Engine()`, `Tm1Engine(customizer)` and `Tm1EngineSource(source)` on the builder; `Tm1Engine()` and `Tm1Database(name)` on the environment.
-- The engine and its MongoDB are on the environment's network, and start with TM1 11's parts, before PAW. The environment's network is the environment's to remove, not the engine's.
+- The engine and its MongoDB are on the environment's network, the engine under the name `tm1-engine` (as in the compose project `pa-setup` writes) and its MongoDB as `tm1-datastore`, and start with TM1 11's parts, before PAW. The environment's network is the environment's to remove, not the engine's.
+- A TM1 server can't be named `tm1-engine` or `tm1-datastore` (in any case) beside an engine: two containers would answer to the name.
+- On a builder from `FromConfig`, `Tm1Engine(customizer)` adds to the file's databases and users rather than replacing them, and `images.tm1Engine` is the image of an engine added in code too.
 - The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: they need a TM1 server.
 - **An environment with an engine can't be reused.** `Reuse(true)` fails at `Build()`, whatever your reuse switch says: the engine and its datastore belong together, and a kept one keeps every database tests left.
 

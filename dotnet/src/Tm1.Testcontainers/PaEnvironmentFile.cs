@@ -352,7 +352,9 @@ internal sealed partial class PaEnvironmentFile
         var b = Configure(servers, admin is not null, heap, cam, pawPort is not null, ibm, pawZip, images);
         if (engine is not null)
         {
-            b.Tm1Engine(container =>
+            b.Tm1Engine();
+            // Kept apart from the caller's customizer, which a later Tm1Engine(...) sets
+            b.FileTm1Engine = container =>
             {
                 foreach (var (name, instance) in engine.Databases)
                 {
@@ -363,9 +365,10 @@ internal sealed partial class PaEnvironmentFile
                 {
                     container.WithUser(user.Name, [.. user.Groups]);
                 }
-            });
-            b.Tm1EngineImage = Image(images, "tm1Engine");
+            };
         }
+        // Whatever the file's sections: an engine added in code runs the file's image too
+        b.Tm1EngineImage = Image(images, "tm1Engine");
         return b;
     }
 
@@ -648,10 +651,11 @@ internal sealed partial class PaEnvironmentFile
 
     private ArgumentException Error(string message) => new(file + ": " + message);
 
-    [GeneratedRegex("^[A-Za-z0-9_-]+$")]
+    [GeneratedRegex(@"\A[A-Za-z0-9_-]+\z")]
     private static partial Regex Name();
 
-    [GeneratedRegex("^[A-Za-z0-9._-]+$")]
+    // To the very end: $ would take a name that ends in a newline
+    [GeneratedRegex(@"\A[A-Za-z0-9._-]+\z")]
     private static partial Regex UserName();
 
     // The tm1-engine image's rule for a database's and an instance's name

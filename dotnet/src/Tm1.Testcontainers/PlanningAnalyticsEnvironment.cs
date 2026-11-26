@@ -76,6 +76,9 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// <summary>The start of a reused environment's network name; the identity follows.</summary>
     internal const string NetworkPrefix = "tm1-environment-";
 
+    /// <summary>The TM1 v12 engine's name on the environment's network.</summary>
+    internal const string EngineAlias = "tm1-engine";
+
     private readonly bool reused;
     private readonly Lock identifying = new();
     private string? identity;
@@ -201,7 +204,12 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
                 Runs(b.Tm1EngineImage, source is Tm1EngineSource.PrivateImage)
                     ? new Tm1EngineContainer(b.Tm1EngineImage, source)
                     : new Tm1EngineContainer(source)
-            ).WithNetwork(network);
+            )
+                .WithNetwork(network)
+                // Its name on the network, as in the compose project pa-setup writes
+                .WithNetworkAliases(EngineAlias);
+            // What the file said first; then, below, what the caller says
+            Apply(b.FileTm1Engine, tm1Engine);
         }
         // The callers' own settings last, so they can change anything set above
         Apply(b.AdminServerCustomizer, AdminServer);
@@ -264,7 +272,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         return PaEnvironmentFile.Read(path);
     }
 
-    /// <summary>Starts everything, what's depended on first, then PAW.</summary>
+    /// <summary>Starts everything, what's depended on first, then PAW. A TM1 v12 engine starts with its MongoDB, beside
+    /// TM1 11's parts and before PAW.</summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         if (reused)
@@ -553,6 +562,9 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
 
         internal string? Tm1EngineImage { get; set; }
 
+        // The file's own settings for the engine, kept when the caller adds theirs
+        internal Action<Tm1EngineContainer>? FileTm1Engine { get; set; }
+
         /// <summary>Adds a TM1 server, named <paramref name="name"/> (its server name and network alias).</summary>
         public EnvironmentBuilder Tm1(string name) => Tm1(name, _ => { });
 
@@ -622,7 +634,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         /// environment needs a server or an engine.</summary>
         public EnvironmentBuilder Tm1Engine() => Tm1Engine(_ => { });
 
-        /// <summary>Adds a TM1 v12 engine, changed with <paramref name="customizer"/>: its databases and users, for instance.</summary>
+        /// <summary>Adds a TM1 v12 engine, changed with <paramref name="customizer"/>: its databases and users, for instance.
+        /// On a builder from <see cref="FromConfig"/>, the file's databases and users stay, and the customizer adds to them.</summary>
         public EnvironmentBuilder Tm1Engine(Action<Tm1EngineContainer> customizer)
         {
             Tm1EngineCustomizer = customizer ?? throw new ArgumentNullException(nameof(customizer));
@@ -682,7 +695,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         /// <summary>Keeps the containers running between test runs, when you've also turned on reuse
         /// (<c>testcontainers.reuse.enable=true</c> in <c>~/.testcontainers.properties</c>, or <c>TESTCONTAINERS_REUSE_ENABLE=true</c>).
         /// A later run with the same configuration finds them, and objects tests left behind are still there. Without the switch
-        /// it has no effect. See <see cref="PlanningAnalyticsEnvironment"/> for what's reused and how to start clean.</summary>
+        /// it has no effect. See <see cref="PlanningAnalyticsEnvironment"/> for what's reused and how to start clean. An environment
+        /// with a TM1 v12 engine can't be reused: <see cref="Build()"/> refuses it, whatever the switch says.</summary>
         /// <remarks>With your own <see cref="Network"/>, reuse only works if it's the same network each run: Testcontainers for
         /// .NET finds a container by a hash that leaves its network out, so a container found would still be on the network it
         /// was created on.</remarks>
@@ -711,6 +725,21 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             )
             {
                 throw new InvalidOperationException("The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: add a TM1 server with Tm1(name)");
+            }
+            if (Tm1EngineCustomizer is not null)
+            {
+                // Two containers would answer to the name on the network
+                foreach (
+                    var name in Tm1Names.Where(n =>
+                        n.Equals(Tm1EngineContainer.DatastoreAlias, StringComparison.OrdinalIgnoreCase)
+                        || n.Equals(EngineAlias, StringComparison.OrdinalIgnoreCase)
+                    )
+                )
+                {
+                    throw new InvalidOperationException(
+                        $"A TM1 server can't be named {name} beside a TM1 v12 engine: that's the engine's name, or its datastore's, on the network"
+                    );
+                }
             }
             if (ReuseSet && Tm1EngineCustomizer is not null)
             {

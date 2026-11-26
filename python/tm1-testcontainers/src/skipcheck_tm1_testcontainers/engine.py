@@ -338,14 +338,19 @@ class Tm1EngineContainer(GenericContainer):
 
     def stop(self, force: bool = True, delete_volume: bool = True) -> None:
         """Stops the engine, then its datastore, and removes the network if the engine made it."""
-        super().stop(force, delete_volume)
-        # Not a dependent: what this depends on is started for it, and stopping is left to us
-        self._datastore.stop(force, delete_volume)
-        self._credentials = None
-        self._version = None
-        # Only its own: a network it was given is whoever gave it's to remove
-        if self.network is self._own_network:
-            self._own_network.close()
+        try:
+            super().stop(force, delete_volume)
+        finally:
+            # Whatever removing the engine said: its datastore and its network aren't left behind
+            try:
+                # Not a dependent: what this depends on is started for it, and stopping is left to us
+                self._datastore.stop(force, delete_volume)
+            finally:
+                self._credentials = None
+                self._version = None
+                # Only its own: a network it was given is whoever gave it's to remove
+                if self.network is self._own_network:
+                    self._own_network.close()
 
     def _await_setup(self) -> None:
         """Waits until the image has created every instance, application, database and user, and

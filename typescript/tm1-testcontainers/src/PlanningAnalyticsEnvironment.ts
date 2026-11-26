@@ -213,7 +213,12 @@ export class PlanningAnalyticsEnvironment implements Startable {
       );
       const image = runs(parts.tm1EngineImage, source instanceof Tm1EngineSource.PrivateImage);
       // Its datastore joins the same network with it
-      this.#tm1Engine = (image !== undefined ? new Tm1EngineContainer(image, source) : new Tm1EngineContainer(source)).withNetwork(network);
+      this.#tm1Engine = (image !== undefined ? new Tm1EngineContainer(image, source) : new Tm1EngineContainer(source))
+        .withNetwork(network)
+        // Its name on the network, as in the compose project pa-setup writes
+        .withNetworkAliases(ENGINE_ALIAS);
+      // What the file said first; then, below, what the caller says
+      apply(parts.fileTm1Engine, this.#tm1Engine);
     }
     // The callers' own settings last, so they can change anything set above
     apply(parts.adminServer, this.#adminServer);
@@ -283,7 +288,8 @@ export class PlanningAnalyticsEnvironment implements Startable {
     return readPaEnvironment(path, new PlanningAnalyticsEnvironment.Builder());
   }
 
-  /** Starts everything, what's depended on first and in parallel where it can, then PAW. */
+  /** Starts everything, what's depended on first and in parallel where it can, then PAW. A TM1 v12
+   * engine starts with its MongoDB, beside TM1 11's parts and before PAW. */
   async start(): Promise<void> {
     if (this.#reused) this.prepareForReuse();
     await Promise.all(
@@ -478,6 +484,8 @@ export interface BuilderParts {
   keycloakImage?: string;
   /** The TM1 v12 engine's image, from pa-environment.yaml. */
   tm1EngineImage?: string;
+  /** The file's own settings for the engine, kept when the caller adds theirs. */
+  fileTm1Engine?: Customizer<Tm1EngineContainer>;
 }
 
 /** The label on a reused environment's containers and network. Its value is the environment's
@@ -486,6 +494,9 @@ const REUSE_LABEL = "io.skipcheck.tm1.environment";
 
 /** The start of a reused environment's network name; the identity follows. */
 const NETWORK_PREFIX = "tm1-environment-";
+
+/** The TM1 v12 engine's name on the environment's network. */
+const ENGINE_ALIAS = "tm1-engine";
 
 const SERVER_NAME = /^[A-Za-z0-9_-]+$/;
 const none = (): void => {};
@@ -541,7 +552,9 @@ export namespace PlanningAnalyticsEnvironment {
 
     /** Adds a TM1 v12 engine, with one database, `tm1`, unless `customizer` names others: it
      * configures the engine, its databases and users for instance. The engine runs beside the TM1
-     * servers, or alone: an environment needs a server or an engine. */
+     * servers, or alone: an environment needs a server or an engine. On a builder from
+     * {@link PlanningAnalyticsEnvironment.fromConfig}, the file's databases and users stay, and the
+     * customizer adds to them. */
     tm1Engine(customizer: Customizer<Tm1EngineContainer> = none): this {
       if (typeof customizer !== "function") throw new TypeError("customizer must be a function");
       this.#parts.tm1Engine = customizer;
@@ -597,7 +610,8 @@ export namespace PlanningAnalyticsEnvironment {
      * (`testcontainers.reuse.enable=true` in `~/.testcontainers.properties`, or
      * `TESTCONTAINERS_REUSE_ENABLE=true`). A later run with the same configuration finds them, and
      * objects tests left behind are still there. Without the switch it has no effect. See
-     * {@link PlanningAnalyticsEnvironment} for what's reused and how to start clean.
+     * {@link PlanningAnalyticsEnvironment} for what's reused and how to start clean. An environment
+     * with a TM1 v12 engine can't be reused: {@link build} refuses it, whatever the switch says.
      *
      * With your own {@link network}, reuse only works if it's the same network each run: its name
      * is part of the environment's identity.
@@ -628,6 +642,16 @@ export namespace PlanningAnalyticsEnvironment {
       }
       if (p.tm1.size === 0 && (p.adminServer !== undefined || p.tm1Web !== undefined || p.paw !== undefined || p.cognos !== undefined)) {
         throw new IllegalStateException("The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: add a TM1 server with tm1(name)");
+      }
+      if (p.tm1Engine !== undefined) {
+        for (const name of p.tm1.keys()) {
+          // Two containers would answer to the name on the network
+          if ([Tm1EngineContainer.DATASTORE_ALIAS, ENGINE_ALIAS].includes(name.toLowerCase())) {
+            throw new IllegalStateException(
+              `A TM1 server can't be named ${name} beside a TM1 v12 engine: that's the engine's name, or its datastore's, on the network`,
+            );
+          }
+        }
       }
       if (p.reuse && p.tm1Engine !== undefined) {
         throw new IllegalStateException(

@@ -401,9 +401,12 @@ public class PlanningAnalyticsEnvironmentTests
         Assert.Same(env.Network, engine.Network);
         Assert.Same(env.Network, env.Tm1("legacy").Network);
         Assert.Equal(new Tm1EngineSource.PrivateImage("tm1-engine:test"), engine.Source);
-        // Its datastore is the engine's own, on the environment's network with it, before anything is configured or started
+        // Before anything configures or starts it: its datastore must be there when it starts
         Assert.Same(env.Network, engine.Datastore.Network);
+        // Its name on the network, as in pa-setup's compose project
+        Assert.Contains("tm1-engine", engine.NetworkAliases);
         engine.Configure();
+        // Its datastore is the engine's own, on the environment's network with it
         Assert.Same(env.Network, engine.Datastore.Network);
         Assert.Equal("tm1/planning", engine.EnvMap["TM1_DATABASES"]);
         Assert.Equal("analyst:Analysts", engine.EnvMap["TM1_USERS"]);
@@ -442,11 +445,67 @@ public class PlanningAnalyticsEnvironmentTests
             EngineBuilder().Tm1Engine().Tm1Web(),
             EngineBuilder().Tm1Engine().AdminServer(),
             EngineBuilder().Tm1Engine().Cognos(cognos => cognos.WithUser("admin", "adminpw")),
-            EngineBuilder().Tm1Engine().Paw(paw => paw.AcceptLicense()),
+            EngineBuilder().Tm1Engine().PawSource(TestPawSource()).Paw(paw => paw.AcceptLicense()),
         ];
         foreach (var builder in incomplete)
         {
             Assert.Contains("are TM1 11's: add a TM1 server with Tm1(name)", Assert.Throws<InvalidOperationException>(() => builder.Build()).Message);
+        }
+    }
+
+    [Fact]
+    public void AServerCantTakeTheEnginesNamesOnTheNetwork()
+    {
+        foreach (var name in new[] { "tm1-datastore", "TM1-Engine" })
+        {
+            Assert.Contains(
+                "A TM1 server can't be named " + name + " beside a TM1 v12 engine",
+                Assert.Throws<InvalidOperationException>(() => EngineBuilder().Tm1(name).Tm1Engine().Build()).Message
+            );
+        }
+        // Without an engine the names are free
+        Assert.Contains("tm1-datastore", Builder().Tm1("tm1-datastore").Build().Tm1Servers.Keys);
+    }
+
+    [Fact]
+    public void FromConfigKeepsTheFilesEngineUnderACustomizerAndItsImageWithoutASection()
+    {
+        // A customizer adds to the file's databases and users; it doesn't replace them
+        var env = PlanningAnalyticsEnvironment.FromConfig(Fixture("tm1-engine.yaml")).Tm1Engine(engine => engine.WithUser("extra")).Build();
+        env.Tm1Engine().Configure();
+        Assert.Equal("tm1/planning,tm1/Sales,other/sales", env.Tm1Engine().EnvMap["TM1_DATABASES"]);
+        Assert.Equal("analyst:Analysts:Planners,viewer,boss:ADMIN,planner:Planners,extra", env.Tm1Engine().EnvMap["TM1_USERS"]);
+
+        // images.tm1Engine is the image of an engine added in code too
+        var added = PlanningAnalyticsEnvironment.FromConfig(Fixture("engine-image-only.yaml")).Tm1Engine().Build();
+        Assert.Equal("registry.example.com/tm1-engine:local", added.Tm1Engine().DockerImageName);
+        Assert.Equal(new Tm1EngineSource.Bundle(Path.GetFullPath(Fixture("ibm"))), added.Tm1Engine().Source);
+    }
+
+    [Fact]
+    public void FromConfigRefusesAUserOrGroupNameThatEndsInANewline()
+    {
+        // Only .NET's reader could take one: its $ matches before a last newline
+        var dir = Directory.CreateTempSubdirectory("tm1-tc-").FullName;
+        try
+        {
+            (string Yaml, string Message)[] files =
+            [
+                ("tm1Engine: { users: [\"analyst\\n\"] }", "tm1Engine.users[0]: user name"),
+                ("tm1Engine: { users: [{ name: analyst, groups: [\"Analysts\\n\"] }] }", "tm1Engine.users[0]: group"),
+                ("tm1: { servers: { tm1: {} } }\ncognos: { users: [{ name: \"admin\\n\", password: pw }] }", "cognos.users[0]: user name"),
+                ("tm1: { servers: { \"tm1\\n\": {} } }", "server names are letters, digits, _ and -"),
+            ];
+            foreach (var (yaml, message) in files)
+            {
+                var file = Path.Combine(dir, "pa-environment.yaml");
+                File.WriteAllText(file, "version: 1\n" + yaml + "\n");
+                Assert.Contains(message, Assert.Throws<ArgumentException>(() => PlanningAnalyticsEnvironment.FromConfig(file)).Message);
+            }
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
         }
     }
 
@@ -466,8 +525,8 @@ public class PlanningAnalyticsEnvironmentTests
     [Fact]
     public void FromConfigAddsTheEngineWithItsDatabasesAndUsers()
     {
-        var env = PlanningAnalyticsEnvironment.FromConfig(EngineFixture("tm1-engine.yaml")).Build();
-        var ibm = Path.GetFullPath(EngineFixture("ibm"));
+        var env = PlanningAnalyticsEnvironment.FromConfig(Fixture("tm1-engine.yaml")).Build();
+        var ibm = Path.GetFullPath(Fixture("ibm"));
         var engine = env.Tm1Engine();
         engine.Configure();
         // Sales and sales are two databases to TM1 v12, and each is in its instance
@@ -501,7 +560,7 @@ public class PlanningAnalyticsEnvironmentTests
     [Fact]
     public void FromConfigTakesOidcTrueAsOn()
     {
-        var env = PlanningAnalyticsEnvironment.FromConfig(EngineFixture("oidc-true.yaml")).Build();
+        var env = PlanningAnalyticsEnvironment.FromConfig(Fixture("oidc-true.yaml")).Build();
         Assert.NotNull(env.Keycloak());
         var planning = env.Tm1("planning");
         planning.Configure();
@@ -511,19 +570,11 @@ public class PlanningAnalyticsEnvironmentTests
     private static PlanningAnalyticsEnvironment.EnvironmentBuilder EngineBuilder() =>
         Builder().Tm1EngineSource(new Tm1EngineSource.PrivateImage("tm1-engine:test"));
 
-    /// <summary>The pa-environment.yaml files for TM1 v12, shared with the other languages.</summary>
-    private static string EngineFixture(string name) => Path.Combine(Repo.Root, "testcontainers-conformance", "pa-environment", name);
-
     [Fact]
     public void FromConfigRefusesWhatItCannotRun()
     {
-        var invalid = new List<string>();
-        foreach (var folder in new[] { Fixture("invalid"), EngineFixture("invalid") })
-        {
-            var found = Directory.GetFiles(folder, "*.yaml").Order(StringComparer.Ordinal).ToList();
-            Assert.True(found.Count > 0, folder);
-            invalid.AddRange(found);
-        }
+        var invalid = Directory.GetFiles(Fixture("invalid"), "*.yaml").Order(StringComparer.Ordinal).ToList();
+        Assert.True(invalid.Count > 40, invalid.Count + " invalid files");
         foreach (var file in invalid)
         {
             var first = File.ReadLines(file).First();
