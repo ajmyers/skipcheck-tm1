@@ -120,9 +120,9 @@ public final class Tm1Session {
 		if (batch != null) {
 			return batch.add(inSandbox(request)).next();
 		}
-		// What it needs, and the parameters the server has, checked first; the body may
-		// lose
-		// a parameter the server lacks whose value is what leaving it out means
+		// What it needs, and the parameters the server has, checked first; the body
+		// may lose a parameter the server lacks whose value is what leaving it out
+		// means
 		return connection.prepare(request)
 			.flatMap(ready -> async != null && ready.response() != Tm1Request.Response.BYTES
 					? connection.async(inSandbox(ready), async).next() : connection.execute(inSandbox(ready)));

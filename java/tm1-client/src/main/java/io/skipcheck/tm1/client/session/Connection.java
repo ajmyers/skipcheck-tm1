@@ -5,7 +5,6 @@ package io.skipcheck.tm1.client.session;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -57,6 +56,7 @@ import reactor.netty.http.client.HttpClientRequest;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * The state every view of one {@link Tm1Session} shares: the HTTP client, the
@@ -212,22 +212,12 @@ final class Connection {
 	}
 
 	/**
-	 * Fails with {@link Tm1UnsupportedOperationException} if the server doesn't define
-	 * {@code capability}.
-	 */
-	Mono<Void> require(Tm1Capability capability) {
-		return capabilities().flatMap(c -> {
-			Optional<Tm1UnsupportedOperationException> missing = c.check(capability, root);
-			return missing.isPresent() ? Mono.<Void>error(missing.get()) : Mono.<Void>empty();
-		});
-	}
-
-	/**
-	 * The request as it can be sent to this server, after {@link #require} of what it
-	 * needs: for a request that names its {@linkplain Tm1Request#operation() operation},
-	 * each of the operation's parameters its body sends is checked against the server's
-	 * definition. One the server lacks fails with
-	 * {@link Tm1UnsupportedOperationException}, unless the request's
+	 * The request as it can be sent to this server: it fails with
+	 * {@link Tm1UnsupportedOperationException} if the server doesn't define what it
+	 * {@linkplain Tm1Request#requirement() needs}. For a request that names its
+	 * {@linkplain Tm1Request#operation() action}, each of the action's parameters its
+	 * body sends, as JSON, is checked against the server's definition too. One the server
+	 * lacks fails the same way, unless the request's
 	 * {@linkplain Tm1Request#parameterDefaults() default} for it is what the body sends,
 	 * in which case it's left out of the body.
 	 */
@@ -242,26 +232,30 @@ final class Connection {
 				return Mono.error(missing.get());
 			}
 			Optional<Tm1Operation> operation = request.operation();
-			if (operation.isEmpty() || operation.get().kind() != Tm1Operation.Kind.ACTION
-					|| !(request.body() instanceof Map<?, ?> body)) {
+			Object body = request.body();
+			if (operation.isEmpty() || operation.get().kind() != Tm1Operation.Kind.ACTION || body == null
+					|| body instanceof byte[]) {
 				return Mono.just(request);
 			}
-			Map<Object, Object> sent = new LinkedHashMap<>(body);
+			// The body as it's written, whatever it was built as: a map, a model, a tree
+			if (!(mapper.valueToTree(body) instanceof ObjectNode sent)) {
+				return Mono.just(request);
+			}
+			boolean changed = false;
 			for (Tm1Operation.Parameter parameter : operation.get().parameters()) {
 				String name = parameter.name();
-				String key = sent.containsKey(name) ? name
-						: sent.containsKey(name + "@odata.bind") ? name + "@odata.bind" : null;
-				if (key == null || c.supportsParameter(needed.get(), name)) {
+				if ((!sent.has(name) && !sent.has(name + "@odata.bind")) || c.supportsParameter(needed.get(), name)) {
 					continue;
 				}
 				Object leftOut = request.parameterDefaults().get(name);
-				if (leftOut != null && leftOut.equals(sent.get(key))) {
-					sent.remove(key);
-					continue;
+				if (sent.has(name + "@odata.bind") || leftOut == null
+						|| !mapper.valueToTree(leftOut).equals(sent.get(name))) {
+					return Mono.error(c.checkParameter(needed.get(), name, root).orElseThrow());
 				}
-				return Mono.error(c.checkParameter(needed.get(), name, root).orElseThrow());
+				sent.remove(name);
+				changed = true;
 			}
-			return Mono.just(sent.size() == body.size() ? request : request.withBody(sent));
+			return Mono.just(changed ? request.withBody(sent) : request);
 		});
 	}
 

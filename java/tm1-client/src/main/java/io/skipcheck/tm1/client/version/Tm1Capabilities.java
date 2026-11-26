@@ -146,6 +146,8 @@ public final class Tm1Capabilities {
 					.map(t -> metadata.boundTo(t).stream().filter(op -> op.name().equals(simple(operation.name()))))
 					.orElseGet(Stream::empty))
 				.toList();
+			// Only unbound overloads: an import's name can also be bound ones'
+			// (tm1.Update)
 			case UNBOUND_OPERATION -> container().map(c -> Stream
 				.concat(c.actionImports()
 					.stream()
@@ -155,11 +157,13 @@ public final class Tm1Capabilities {
 							.stream()
 							.filter(f -> f.name().equals(operation.name()))
 							.map(CsdlEntityContainer.FunctionImport::function))
-				.flatMap(name -> metadata.operations(name).stream())
+				.flatMap(name -> metadata.operations(name).stream().filter(op -> !op.bound()))
 				.toList()).orElse(List.of());
 			default -> throw new IllegalArgumentException(operation.describe() + " isn't an operation");
 		};
-		return defined.stream().anyMatch(op -> op.parameters().stream().anyMatch(p -> p.name().equals(parameter)));
+		// The parameters a caller passes, not the binding parameter
+		return defined.stream()
+			.anyMatch(op -> op.callerParameters().stream().anyMatch(p -> p.name().equals(parameter)));
 	}
 
 	/**

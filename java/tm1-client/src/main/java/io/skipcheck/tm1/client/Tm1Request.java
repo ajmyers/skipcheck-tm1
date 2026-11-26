@@ -263,13 +263,15 @@ public final class Tm1Request<T> {
 	 * A copy that's only sent if the server defines {@code capability}: before sending,
 	 * the session checks the server's {@code $metadata} and otherwise fails with
 	 * {@link io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException}, without
-	 * calling the server. Service methods for newer endpoints declare it.
+	 * calling the server. Service methods for newer endpoints declare it. It replaces an
+	 * {@linkplain #requires(Tm1Operation) operation} set before, whose parameters are
+	 * then no longer checked.
 	 * @param capability what the request needs the server to define
 	 * @return the copy
 	 */
 	public Tm1Request<T> requires(Tm1Capability capability) {
 		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout,
-				Objects.requireNonNull(capability, "capability"), operation, parameterDefaults);
+				Objects.requireNonNull(capability, "capability"), null, parameterDefaults);
 	}
 
 	/**

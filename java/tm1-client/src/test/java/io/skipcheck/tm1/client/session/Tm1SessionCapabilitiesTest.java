@@ -16,12 +16,16 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.conformance.ConformanceTm1;
+import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.error.Tm1ProtocolException;
 import io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException;
 import io.skipcheck.tm1.client.metadata.MetadataSnapshot;
+import io.skipcheck.tm1.client.model.CheckFeedersSelection;
 import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.service.cube.CubeService;
+import io.skipcheck.tm1.client.version.Tm1Capabilities;
 import io.skipcheck.tm1.client.version.Tm1Capability;
 import io.skipcheck.tm1.client.version.Tm1Version;
 import reactor.core.publisher.Flux;
@@ -150,6 +154,46 @@ class Tm1SessionCapabilitiesTest {
 			.satisfies(sent -> assertThat(new String(ConformanceTm1.body(sent).block(), StandardCharsets.UTF_8))
 				.contains("tm1.CheckFeeders")
 				.doesNotContain("Selection"));
+	}
+
+	@Test
+	void knowsTheParametersACallerPassesForEachKindOfOperation() {
+		Tm1Capabilities c = Tm1Capabilities.of(MetadataSnapshot.load(), null);
+		Tm1Capability checkFeeders = Tm1Operations.CUBE_CHECK_FEEDERS.capability();
+		assertThat(c.supportsParameter(checkFeeders, "Selection")).isTrue();
+		assertThat(c.supportsParameter(checkFeeders, "Cube")).as("the binding parameter isn't one a caller passes")
+			.isFalse();
+		// The import Update and the actions Cellset/Update and Cube/Update share a name:
+		// only
+		// the import's own parameters count
+		assertThat(c.supportsParameter(Tm1Capability.unboundOperation("Update"), "Cells")).isTrue();
+		assertThat(c.supportsParameter(Tm1Capability.unboundOperation("Update"), "BeginOrdinal")).isFalse();
+	}
+
+	@Test
+	void checksFeedersWithUnfedOnAServerWithoutSelectionAndRefusesTheRest() {
+		withoutSelection();
+		tm1.on(CHECK_FEEDERS, r -> Mono.just(FakeTm1.json(200, "{\"value\":[]}")));
+		CubeService cubes = new CubeService(tm1.session());
+		Map<String, String> total = Map.of("Region", "Total");
+		StepVerifier.create(cubes.checkFeeders("Sales", total, CheckFeedersSelection.UNFED, ODataQuery.none()))
+			.verifyComplete();
+		assertThat(sentBody()).contains("Tuple@odata.bind").doesNotContain("Selection");
+		StepVerifier.create(cubes.checkFeeders("Sales", total, CheckFeedersSelection.BOTH, ODataQuery.none()))
+			.expectError(Tm1UnsupportedOperationException.class)
+			.verify();
+		assertThat(tm1.requests(CHECK_FEEDERS)).hasSize(1);
+	}
+
+	@Test
+	void checksNoParametersOnceARequirementReplacesTheOperation() {
+		withoutSelection();
+		tm1.on(CHECK_FEEDERS,
+				r -> Mono.just(FakeTm1.json(400, "{\"error\":{\"code\":\"278\",\"message\":\"Invalid parameter\"}}")));
+		Tm1Request<JsonNode> request = checkFeeders("Both")
+			.requires(Tm1Capability.boundOperation("tm1.Cube", "tm1.CheckFeeders"));
+		assertThat(request.operation()).isEmpty();
+		StepVerifier.create(tm1.session().stream(request)).expectError(Tm1BadRequestException.class).verify();
 	}
 
 	private static final String CHECK_FEEDERS = "POST Cubes('Sales')/tm1.CheckFeeders";

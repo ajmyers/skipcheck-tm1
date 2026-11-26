@@ -108,9 +108,8 @@ final class BatchQueue {
 		if (entry.request().requirement().isEmpty()) {
 			return Mono.just(entry);
 		}
-		// As outside a batch: the body may lose a parameter the server lacks whose value
-		// is
-		// what leaving it out means
+		// As outside a batch: the body may lose a parameter the server lacks whose
+		// value is what leaving it out means
 		return connection.prepare(entry.request())
 			.map(ready -> ready == entry.request() ? entry
 					: new Entry(entry.id(), ready,

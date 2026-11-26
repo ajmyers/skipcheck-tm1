@@ -355,9 +355,8 @@ public final class CubeService {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("Tuple@odata.bind", bindings(tuple));
 		body.put("Selection", Objects.requireNonNull(selection.json(), "selection"));
-		// Servers before schema 11.8.32 have no Selection, and answer as for Unfed: so
-		// Unfed
-		// is sent without it there, and Both and Fed are refused
+		// Servers before schema 11.8.32 have no Selection, and answer as for Unfed:
+		// so Unfed is sent without it there, and Both and Fed are refused
 		return session.stream(Tm1Request.postList(cube(name).action(operation.name()), body, FedCellDescriptor.class)
 			.withQuery(query)
 			.requires(operation)
