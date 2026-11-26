@@ -6,6 +6,8 @@ import type { Tm1Database, Tm1Login } from "../../src/index.js";
 export interface Tm1EngineResponse {
   status: number;
   body: string;
+  /** Each `Set-Cookie` header TM1 sent. */
+  cookies: string[];
 }
 
 /** Plain HTTP against a TM1 v12 database, for the tests, as Java's test `Tm1EngineRest`: no client
@@ -32,6 +34,6 @@ export const Tm1EngineRest = {
   /** Sends a request of your own making. */
   async send(url: string, request: RequestInit = {}): Promise<Tm1EngineResponse> {
     const response = await fetch(url, { ...request, redirect: "manual", signal: AbortSignal.timeout(60_000) });
-    return { status: response.status, body: await response.text() };
+    return { status: response.status, body: await response.text(), cookies: response.headers.getSetCookie() };
   },
 };

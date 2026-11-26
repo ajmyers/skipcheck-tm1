@@ -2,7 +2,7 @@
 
 // Examples for requiresTm1Engine (Java's @RequiresTm1Engine) and Tm1EngineContainer, quoted in their
 // documentation: type-checked but never run.
-import { Tm1EngineContainer, type Tm1EngineSource } from "@skipcheck/tm1-testcontainers";
+import { KeycloakContainer, Tm1EngineContainer, type Tm1EngineSource } from "@skipcheck/tm1-testcontainers";
 import { requiresTm1Engine } from "@skipcheck/tm1-testcontainers/vitest";
 import { expect } from "vitest";
 
@@ -23,6 +23,20 @@ requiresSharedDatabase("reads the server's name", async ({ tm1Database: db }) =>
   expect(response.status).toBe(200);
 });
 // @end
+
+export async function oauth2(source: Tm1EngineSource): Promise<void> {
+  // @start region = oauth2
+  // Starting the engine starts Keycloak first; the Keycloak is yours to stop, after the engine
+  await using keycloak = new KeycloakContainer();
+  await using engine = new Tm1EngineContainer(source).withUser("analyst", "Analysts").withLogin("analyst", "analystpw").withOAuth2(keycloak);
+  await engine.start();
+  const db = engine.database("tm1");
+  // A token from Keycloak, with the analyst's password, sent to TM1 as Bearer
+  const request = await db.oauth2Login("analyst").authorizeWithToken();
+  const response = await fetch(db.getRestUrl() + "Cubes?$select=Name", request);
+  // @end
+  expect(response.status).toBe(200);
+}
 
 export async function container(source: Tm1EngineSource): Promise<void> {
   // @start region = container

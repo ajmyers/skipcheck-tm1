@@ -82,7 +82,26 @@ await engine.dropDatabase(scratch);
 
 The engine keeps its metadata in a MongoDB (`mongo:8.0`), which the container starts first, on the engine's network, and stops with it: `getDatastore()`. A failed start stops the datastore too. The shared engine isn't reusable: an engine and its datastore belong together, and a kept one would keep every database tests left. Package installs are cached in the volume `tm1-engine-testcontainers-cache`, not TM1 11's. `TM1_ENGINE_IMAGE` swaps the image (`tm1-engine:local` for a local build).
 
-Not here yet, as in the Java module: settings for OAuth 2.0 and pass-through logins, and TLS.
+### OAuth 2.0 logins
+
+TM1 v12 logs users in from an identity provider through OAuth 2.0. `withOAuth2(keycloak)` has the engine take tokens from a `KeycloakContainer`, and `withLogin(user, password)` gives a user a password there (TM1 v12 keeps none itself): a user added with `withUser`, or `admin`.
+
+```ts
+await using keycloak = new KeycloakContainer();
+await using engine = new Tm1EngineContainer(source).withUser("analyst", "Analysts").withLogin("analyst", "analystpw").withOAuth2(keycloak);
+await engine.start();                         // Keycloak first, then the engine
+const db = engine.database("tm1");
+const response = await fetch(db.getRestUrl() + "Cubes?$select=Name", await db.oauth2Login("analyst").authorizeWithToken());
+```
+
+- **`db.oauth2Login(user)`** is a `Tm1Login` through OAuth 2.0 (`isOAuth2()`). `await login.token()` is the user's access token from Keycloak, by the password grant; `await login.authorizeWithToken(init)` sends a new one as `Authorization: Bearer`, which TM1 takes on any request and answers with a session cookie; `cookie()` and `authorize(init)` keep that session. `getTokenUrl()`, `getClientId()` (`tm1`), `getUser()` and `getPassword()` are for a client that asks for the token itself. A login can be made before the engine starts.
+- **Not at the session endpoint:** TM1 doesn't take the provider's token at `/auth/v1/session`, so `session(…)` refuses an OAuth 2.0 login; and `authorizeWithToken` refuses a login through the application, whose token TM1 takes only there. Logins through the application (`db.login()`) keep working beside OAuth 2.0.
+- **The realm:** Keycloak imports a realm, `tm1`, when it starts, with a public client `tm1` whose tokens carry the audience `tm1`, and each user who has a password. It's made when Keycloak starts, so users and logins added after `withOAuth2` are in it. A password for someone who isn't a user of the engine fails the start.
+- **The issuer** is Keycloak's address on the network, `http://keycloak:8080/realms/tm1`: a `KeycloakContainer`'s tokens name it wherever they're fetched from, and it's where TM1 reaches Keycloak. The Keycloak joins the engine's network, unless it has one already, which the engine and its MongoDB then join.
+- **The Keycloak is yours to stop:** the engine starts it first, and leaves it running when it stops.
+- **In an environment:** `tm1EngineOAuth2()` on the builder uses the environment's one Keycloak, adding it if `keycloak()` wasn't called; give users their passwords in `tm1Engine(customizer)`. In `pa-environment.yaml` it's `tm1Engine.oauth2` (`true`, or `{ keycloakPort }`), which needs a user with a password, and maps each user's password to `withLogin`. `oauth2: false` keeps the passwords in the file with OAuth 2.0 off.
+
+Not here yet, as in the Java module: settings for pass-through logins, and TLS.
 
 ## From pa-environment.yaml
 
@@ -96,7 +115,7 @@ env.tm1("planning").getRestUrl();
 
 It returns the builder, configured, so you can still change it before `build()`. The file is checked as `pa-setup` checks it, with the same defaults and messages.
 
-- **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`, `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `keycloak()`, `cam` as `camSecurity`, `memory`), `paw` (`acceptLicense`, `zip`) and `tm1Engine` (each of `databases` as `withDatabase(instance, name)`, `users` as `withUser(name, ...groups)`). `cognos.oidc: true`, or an empty mapping, turns OIDC on: only leaving it out, or `false`, is off.
+- **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`, `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `keycloak()`, `cam` as `camSecurity`, `memory`), `paw` (`acceptLicense`, `zip`) and `tm1Engine` (each of `databases` as `withDatabase(instance, name)`, `users` as `withUser(name, ...groups)`, and `oauth2` as `tm1EngineOAuth2()` with each user's password as `withLogin(name, password)`). `cognos.oidc: true`, or an empty mapping, turns OIDC on: only leaving it out, or `false`, is off.
 - **Sources:** a part's source set on the builder wins; then `ibm`, the folder of IBM downloads; then the settings above (pa-setup's `.env` sets the same `*_URL` names); then the part's `images` entry, as a private image with IBM's software built in. With another source, an `images` entry is the image the part runs.
 - **Ignored:** `name`, every port, `files`, `tm1Engine.datastore` and `images.mongo` (the engine's MongoDB is the container's own), and a `tm1Engine` user's password (TM1 v12 keeps none). They're still checked. Testcontainers gives the environment its own network, random host ports and a new database each time.
 - **Refused** with an `IllegalArgumentException` naming the setting: `cognos` without `tm1.servers`, and `seed: 24retail`, which the environment can't run yet.
@@ -128,7 +147,8 @@ The file is read as YAML 1.1, with the [`yaml`](https://eemeli.org/yaml/) packag
 | A database per test class | a database per test **file**: the unit vitest shares set-up over |
 | `Tm1EngineContainer.databases()`, `createDatabase(…)`, `dropDatabase(…)`; `Tm1Login.cookie()`, `token()`, `session(…)` | the same names, returning a `Promise`: each asks the container or TM1 |
 | `Tm1EngineContainer.database(…)`, `getRootClientId()`, `Tm1Database.login(…)`, read from the engine when called | answered at once, from what the engine reported when it started and when `databases()`, `createDatabase` or `dropDatabase` last ran |
-| `Tm1Login.authorize(HttpRequest.Builder)` | `await login.authorize(init)`: `fetch`'s second argument, with the `Cookie` header added |
+| `Tm1Login.authorize(HttpRequest.Builder)`, `authorizeWithToken(HttpRequest.Builder)` | `await login.authorize(init)`, `await login.authorizeWithToken(init)`: `fetch`'s second argument, with the `Cookie` or `Authorization` header added |
+| `Tm1EngineContainer.getKeycloak()`, `null` without `withOAuth2` | `undefined` without it |
 | `Tm1Database.equals(…)` | `equals(…)`: `===` compares the objects, and each call of `database(…)` makes one |
 | `logger().info(…)` | Testcontainers for Node's log: `DEBUG=testcontainers*` |
 
@@ -188,7 +208,7 @@ TM1_PRIVATE_IMAGE=tm1-server-private:2.1.19 npm test -w testcontainers
 
 - **`test/java-parity.test.ts`** reads the Java sources and checks that every public type, nested record and enum, constant, constructor and method has its TypeScript counterpart, with Java's parameter names in order, and that what does I/O returns a `Promise`. It also checks that the skip messages match Java's word for word.
 - **Configuration tests** need no Docker. `sources.test.ts` ports Java's `*SourceTest`; `wiring.test.ts` ports `AdminServerWiringTest`, `CognosContainerTest`, `PlanningAnalyticsEnvironmentTest` and `Tm1EngineWiringTest`, and checks the wait for TM1 v12 to be set up; `vitest-helpers.test.ts` checks the skip helpers, `engine-fixtures.test.ts` `requiresTm1Engine`'s fixtures, with an engine that only records what it's asked for, and `engine-login.test.ts` `Tm1Login`, against a local server.
-- **Container tests** are skipped without Docker or a source. `containers.test.ts` ports `Tm1ServerContainerTest`, `Tm1WebContainerTest` (with its `Tm1WebSession`) and `PawContainerTest`. `examples.test.ts` ports every one of Java's `*ExampleTest` classes for TM1 11, each test behind the helper for what it needs (`requiresTm1`, `requiresTm1Web`, `requiresCognos`). For TM1 v12, `engine-containers.test.ts` ports `Tm1EngineContainerTest`, `engine-examples.test.ts` three examples (`HelloTm1EngineExampleTest`, `DatabasePerClassExampleTest`, `S2sUsersExampleTest`) and `engine-environment-example.test.ts` `Tm1EngineEnvironmentExampleTest`, behind `requiresTm1Engine`.
+- **Container tests** are skipped without Docker or a source. `containers.test.ts` ports `Tm1ServerContainerTest`, `Tm1WebContainerTest` (with its `Tm1WebSession`) and `PawContainerTest`. `examples.test.ts` ports every one of Java's `*ExampleTest` classes for TM1 11, each test behind the helper for what it needs (`requiresTm1`, `requiresTm1Web`, `requiresCognos`). For TM1 v12, `engine-containers.test.ts` ports `Tm1EngineContainerTest`, `engine-oauth2.test.ts` `Tm1EngineOAuth2Test` and `OAuth2ExampleTest`, `engine-examples.test.ts` three examples (`HelloTm1EngineExampleTest`, `DatabasePerClassExampleTest`, `S2sUsersExampleTest`) and `engine-environment-example.test.ts` `Tm1EngineEnvironmentExampleTest`, behind `requiresTm1Engine`.
 - **`test/java-test-parity.test.ts`** holds these tests to Java's: every test of `java/tm1-testcontainers/src/test/java` has a test of the same name here, or a line saying why not in `coverage/unit-excluded.txt`.
 
 The client's live tests (`../tm1-client/test/live`) run against one server for the whole run when `TM1_URL` isn't set, one file after the other: see `global-setup.ts` there.

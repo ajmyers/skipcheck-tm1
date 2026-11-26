@@ -30,6 +30,10 @@ describe("The containers Docker is asked for", () => {
   requiresTm1Engine("engine", { timeout: 30 * 60_000 }, async () => {
     await record("engine");
   });
+
+  requiresTm1Engine("engine with OAuth2", { timeout: 30 * 60_000 }, async () => {
+    await record("engine-oauth2");
+  });
 });
 
 async function record(scenario: string): Promise<void> {
@@ -42,6 +46,11 @@ async function record(scenario: string): Promise<void> {
   const admin = env.adminServer();
   if (admin) containers.set("adminServer", admin);
   if (scenario === "servers-and-web") containers.set("tm1Web", env.tm1Web());
+  if (scenario === "engine-oauth2") {
+    containers.set("tm1Engine", env.tm1Engine());
+    containers.set("tm1EngineDatastore", env.tm1Engine().getDatastore());
+    containers.set("keycloak", env.keycloak());
+  }
   if (scenario === "engine") {
     containers.set("tm1Engine", env.tm1Engine());
     containers.set("tm1EngineDatastore", env.tm1Engine().getDatastore());

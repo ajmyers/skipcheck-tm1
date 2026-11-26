@@ -56,6 +56,16 @@ export class Tm1Database {
     return this.#engine.login(this.#instance, user);
   }
 
+  /** A login through OAuth 2.0: as a user the engine's Keycloak knows the password of
+   * ({@link Tm1EngineContainer.withLogin}). The login gets a token from Keycloak with that password
+   * and sends it to TM1, as a program acting for the user would.
+   * @param user the user's name
+   * @throws IllegalStateException if the engine has no {@link Tm1EngineContainer.withOAuth2}
+   * @throws IllegalArgumentException if the user has no password */
+  oauth2Login(user: string): Tm1Login {
+    return this.#engine.oauth2Login(this, user);
+  }
+
   /** Whether `other` is the same database: this name, in this instance of this engine. */
   equals(other: unknown): boolean {
     return other instanceof Tm1Database && this.#engine === other.#engine && this.#instance === other.#instance && this.#name === other.#name;

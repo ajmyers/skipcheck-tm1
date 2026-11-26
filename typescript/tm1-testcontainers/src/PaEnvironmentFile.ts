@@ -48,10 +48,14 @@ interface Engine {
   /** Each database's instance, by the database's name, in the file's order. */
   databases: Map<string, string>;
   users: EngineUser[];
+  /** Whether it takes OAuth 2.0 logins. */
+  oauth2: boolean;
 }
 
 interface EngineUser {
   name: string;
+  /** Empty for none: TM1 v12 keeps no password, and it's Keycloak's with OAuth 2.0. */
+  password: string;
   groups: string[];
 }
 
@@ -227,8 +231,9 @@ class PaEnvironmentFile {
     let engine: Engine | undefined;
     let enginePort: number | undefined;
     let datastorePort: number | undefined;
+    let engineKeycloakPort: number | undefined;
     if (engineSection !== undefined) {
-      this.keys(engineSection, ["port", "databases", "users", "datastore"], "tm1Engine");
+      this.keys(engineSection, ["port", "databases", "users", "datastore", "oauth2"], "tm1Engine");
       const databases = new Map<string, string>();
       const raw = engineSection.get("databases");
       if (raw == null) {
@@ -253,29 +258,42 @@ class PaEnvironmentFile {
       }
       const listed = or(engineSection.get("users"), []);
       if (!Array.isArray(listed)) throw this.error("tm1Engine.users must be a list, e.g. users: [analyst::Analysts]");
+      // With oauth2 in the section a password is meant, so user:password says what it means: on,
+      // or false to keep the passwords with OAuth 2.0 off
+      const passwordUsed = engineSection.get("oauth2") != null;
       // Every user is checked before any is found twice, as in pa_setup
-      const engineUsers = (listed as unknown[]).map((u, n) => this.engineUser(u, "tm1Engine.users[" + n + "]"));
+      const engineUsers = (listed as unknown[]).map((u, n) => this.engineUser(u, "tm1Engine.users[" + n + "]", passwordUsed));
       if (new Set(engineUsers.map((u) => u.name.toLowerCase())).size !== engineUsers.length) throw this.error("tm1Engine.users: a user is listed twice");
       const datastore = engineSection.get("datastore");
       const ds = datastore == null || typeof datastore === "boolean" ? new Map<unknown, unknown>() : this.keys(datastore, ["port"], "tm1Engine.datastore");
+      const oauth2 = engineSection.get("oauth2");
+      // On with true or a mapping, an empty one too: only absent or false is off
+      if (oauth2 != null && oauth2 !== false) {
+        const o = this.keys(oauth2 === true ? new Map() : oauth2, ["keycloakPort"], "tm1Engine.oauth2");
+        if (engineUsers.every((u) => u.password === "")) {
+          throw this.error("tm1Engine.oauth2: needs a user with a password to log in as, e.g. users: [analyst:analystpw:Analysts]");
+        }
+        engineKeycloakPort = this.port(o.get("keycloakPort"), "tm1Engine.oauth2", 8181);
+      }
       enginePort = this.port(engineSection.get("port"), "tm1Engine", 4444);
       // Published only when a port is given
       datastorePort = ds.get("port") == null ? undefined : this.port(ds.get("port"), "tm1Engine.datastore", 27017);
       for (const name of servers.keys()) {
-        // The engine's two compose services in pa-setup: a server of that name would be replaced
-        // by them
+        // The engine's compose services in pa-setup: a server of that name would be replaced by
+        // them
         const lowered = name.toLowerCase();
-        if (lowered === "tm1-engine" || lowered === "tm1-engine-mongo") {
+        if (lowered === "tm1-engine" || lowered === "tm1-engine-mongo" || (engineKeycloakPort !== undefined && lowered === "tm1-engine-keycloak")) {
           throw this.error("tm1.servers." + name + ": that name is the TM1 v12 engine's here; give the server another");
         }
       }
-      engine = { databases, users: engineUsers };
+      engine = { databases, users: engineUsers, oauth2: engineKeycloakPort !== undefined };
     }
 
     if (servers.size === 0 && cam === undefined && engine === undefined) throw this.error("nothing to run: add tm1.servers, tm1Engine and/or cognos");
     const ports: number[] = [];
     if (enginePort !== undefined) ports.push(enginePort);
     if (datastorePort !== undefined) ports.push(datastorePort);
+    if (engineKeycloakPort !== undefined) ports.push(engineKeycloakPort);
     ports.push(...[...servers.values()].map((s) => s.port));
     if (admin !== undefined) ports.push(admin);
     if (webPort !== undefined) ports.push(webPort);
@@ -315,9 +333,12 @@ class PaEnvironmentFile {
               for (const [name, instance] of engine.databases) container.withDatabase(instance, name);
               // TM1 v12 keeps no passwords: a user's is checked and not used
               for (const u of engine.users) container.withUser(u.name, ...u.groups);
+              // With OAuth 2.0 a password is the user's at Keycloak
+              if (engine.oauth2) for (const u of engine.users) if (u.password !== "") container.withLogin(u.name, u.password);
             },
     });
     if (engine !== undefined) b.tm1Engine();
+    if (engine?.oauth2) b.tm1EngineOAuth2();
     return b;
   }
 
@@ -390,15 +411,18 @@ class PaEnvironmentFile {
 
   /** pa_setup.parse_user with password_optional: an engine's user, whose password may be left out
    * or empty, since TM1 v12 keeps none. */
-  engineUser(entry: unknown, where: string): EngineUser {
+  engineUser(entry: unknown, where: string, passwordUsed: boolean): EngineUser {
     let name: unknown;
     let password: unknown;
     const groups: unknown[] = [];
     if (typeof entry === "string") {
       const parts = entry.split(":");
-      if (parts.length === 2 && parts[1] !== "") {
+      if (parts.length === 2 && parts[1] !== "" && !passwordUsed) {
         // The image's own form has groups there; here the second part is a password
-        throw this.error(`${where}: '${entry}' reads as a password, which TM1 v12 doesn't keep: for a group, write ${parts[0]}::${parts[1]}`);
+        throw this.error(
+          `${where}: '${entry}' reads as a password, which TM1 v12 doesn't keep: for a group, write ${parts[0]}::${parts[1]}. ` +
+            "(A password kept for OAuth 2.0 logins needs oauth2 in the section: oauth2: false keeps it, off.)",
+        );
       }
       if (parts.length > 3) throw this.error(`${where}: expected user, user::group,group or user:password:group,group, not '${entry}'`);
       name = parts[0]!;
@@ -423,7 +447,7 @@ class PaEnvironmentFile {
       if (typeof g !== "string" || !USER.test(g)) throw this.error(where + ": group '" + str(g) + "' must be letters, digits, '.', '_' and '-'");
       groupNames.push(g);
     }
-    return { name, groups: groupNames };
+    return { name, password, groups: groupNames };
   }
 
   /** A tm1s.cfg value as pa_setup writes it, with Python's str(): true is True. */

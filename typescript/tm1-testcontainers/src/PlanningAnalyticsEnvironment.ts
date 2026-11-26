@@ -119,7 +119,7 @@ export class PlanningAnalyticsEnvironment implements Startable {
         : Network.newNetwork());
     this.#network = network;
     this.#ownsNetwork = parts.network === undefined;
-    this.#keycloak = parts.keycloak === undefined ? undefined : new KeycloakContainer(parts.keycloakImage).withNetwork(network);
+    this.#keycloak = parts.keycloak === undefined && !parts.tm1EngineOAuth2 ? undefined : new KeycloakContainer(parts.keycloakImage).withNetwork(network);
     if (parts.cognos !== undefined) {
       const source = get(
         parts,
@@ -132,7 +132,9 @@ export class PlanningAnalyticsEnvironment implements Startable {
       );
       const image = runs(parts.cognosImage, source instanceof CognosSource.PrivateImage);
       const cognos = (image !== undefined ? new CognosContainer(image, source) : new CognosContainer(source)).withNetwork(network);
-      if (this.#keycloak) cognos.withKeycloak(this.#keycloak);
+      // Only when Keycloak was asked for: one that's there for the engine's OAuth 2.0 logins alone
+      // doesn't give Cognos an OIDC namespace nobody wanted
+      if (this.#keycloak && parts.keycloak !== undefined) cognos.withKeycloak(this.#keycloak);
       // First: the TM1 servers' CAM security is wired from the test users
       parts.cognos(cognos);
       this.#cognos = cognos;
@@ -217,6 +219,12 @@ export class PlanningAnalyticsEnvironment implements Startable {
         .withNetwork(network)
         // Its name on the network, as in the compose project pa-setup writes
         .withNetworkAliases(ENGINE_ALIAS);
+      if (parts.tm1EngineOAuth2) {
+        // The environment's one Keycloak: its address on the network is its issuer for Cognos
+        // and for the engine alike
+        if (this.#keycloak === undefined) throw new IllegalStateException("OAuth 2.0 logins need the environment's Keycloak");
+        this.#tm1Engine.withOAuth2(this.#keycloak);
+      }
       // What the file said first; then, below, what the caller says
       apply(parts.fileTm1Engine, this.#tm1Engine);
     }
@@ -258,7 +266,8 @@ export class PlanningAnalyticsEnvironment implements Startable {
    * - `tm1Engine`: {@link PlanningAnalyticsEnvironment.Builder.tm1Engine}, with each of `databases`
    *   as {@link Tm1EngineContainer.withDatabase} in its `instance`, and `users` as
    *   {@link Tm1EngineContainer.withUser} (a user's password is checked and not used: TM1 v12 keeps
-   *   none). It runs beside `tm1`, or alone;
+   *   none). With `oauth2`, {@link PlanningAnalyticsEnvironment.Builder.tm1EngineOAuth2}, and each
+   *   user's password as {@link Tm1EngineContainer.withLogin}. It runs beside `tm1`, or alone;
    * - `ibm`: each part's source, the folder as {@link Tm1Source.Bundle}, {@link Tm1WebSource.Bundle},
    *   {@link Tm1EngineSource.Bundle} and {@link CognosSource.Zip}. A relative path is from the file's folder; `~` is the user's
    *   home;
@@ -484,6 +493,8 @@ export interface BuilderParts {
   keycloakImage?: string;
   /** The TM1 v12 engine's image, from pa-environment.yaml. */
   tm1EngineImage?: string;
+  /** Whether the engine takes OAuth 2.0 logins, with tokens from the environment's Keycloak. */
+  tm1EngineOAuth2?: boolean;
   /** The file's own settings for the engine, kept when the caller adds theirs. */
   fileTm1Engine?: Customizer<Tm1EngineContainer>;
 }
@@ -544,7 +555,8 @@ export namespace PlanningAnalyticsEnvironment {
       return this;
     }
 
-    /** Adds Keycloak, giving Cognos an OIDC namespace, changed with `customizer`. */
+    /** Adds Keycloak, giving Cognos an OIDC namespace, changed with `customizer`. It's also where a
+     * TM1 v12 engine's OAuth 2.0 tokens come from ({@link tm1EngineOAuth2}). */
     keycloak(customizer: Customizer<KeycloakContainer> = none): this {
       this.#parts.keycloak = customizer;
       return this;
@@ -590,6 +602,15 @@ export namespace PlanningAnalyticsEnvironment {
     /** Where Cognos comes from, rather than {@link CognosSource.discover}. */
     cognosSource(source: CognosSource): this {
       this.#parts.cognosSource = source;
+      return this;
+    }
+
+    /** Has the TM1 v12 engine take OAuth 2.0 logins, with tokens from the environment's Keycloak,
+     * which is added if {@link keycloak} wasn't called. Give users a password with
+     * {@link Tm1EngineContainer.withLogin}, in {@link tm1Engine}, and log in with
+     * {@link Tm1Database.oauth2Login}. */
+    tm1EngineOAuth2(): this {
+      this.#parts.tm1EngineOAuth2 = true;
       return this;
     }
 
@@ -658,7 +679,12 @@ export namespace PlanningAnalyticsEnvironment {
           "An environment with a TM1 v12 engine can't be reused: the engine and its datastore belong together, and a kept one keeps every database tests left",
         );
       }
-      if (p.keycloak !== undefined && p.cognos === undefined) throw new IllegalStateException("Keycloak gives Cognos its OIDC namespace: add cognos(...) too");
+      if (p.keycloak !== undefined && p.cognos === undefined && !p.tm1EngineOAuth2) {
+        throw new IllegalStateException(
+          "Keycloak gives Cognos its OIDC namespace, or a TM1 v12 engine its OAuth 2.0 logins: add cognos(...) or tm1EngineOAuth2() too",
+        );
+      }
+      if (p.tm1EngineOAuth2 && p.tm1Engine === undefined) throw new IllegalStateException("OAuth 2.0 logins are a TM1 v12 engine's: add tm1Engine() too");
       if (p.camNamespace === CognosContainer.Namespace.OIDC && p.keycloak === undefined)
         throw new IllegalStateException("CAM security through OIDC needs keycloak()");
       return new PlanningAnalyticsEnvironment(p, reuseEnabled);

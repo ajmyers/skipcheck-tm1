@@ -47,6 +47,8 @@ export abstract class GenericContainer implements Startable {
   readonly #dependencies: Startable[] = [];
   readonly #extraHosts = new Map<string, string>();
   readonly #copies: { source: string; target: string }[] = [];
+  // Text written into the container before it starts, by the path it's written to
+  readonly #contents = new Map<string, string>();
   readonly #binds: Bind[] = [];
   // The first is on every container this library starts, in every language; its value is the
   // language. A label like any other: withLabel can replace it, and it's part of what a reused
@@ -222,6 +224,19 @@ export abstract class GenericContainer implements Startable {
     return this;
   }
 
+  /** Writes `content` to a file in the container before it starts; again for the same path
+   * replaces what was to be written there. */
+  protected withCopyContentToContainer(content: string, containerPath: string): this {
+    this.#contents.set(containerPath, content);
+    return this;
+  }
+
+  /** The text to be written into the container, by the path it's written to.
+   * @internal */
+  getCopiedContents(): ReadonlyMap<string, string> {
+    return this.#contents;
+  }
+
   /** Copies a host file or folder into the container before it starts. */
   withCopyFileToContainer(hostPath: string, containerPath: string): this {
     this.#copies.push({ source: hostPath, target: containerPath });
@@ -344,6 +359,7 @@ export abstract class GenericContainer implements Startable {
         files.map((f) => ({ source: f.source, target: f.target.endsWith("/") ? f.target + f.source.split(/[\\/]/).pop() : f.target })),
       );
     if (dirs.length > 0) c = c.withCopyDirectoriesToContainer(dirs);
+    if (this.#contents.size > 0) c = c.withCopyContentToContainer([...this.#contents].map(([target, content]) => ({ content, target })));
     if (this.#reuse && DockerHost.reuseEnabled()) c = c.withReuse();
     const w = this.#wait;
     if (w)
