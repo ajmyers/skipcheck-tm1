@@ -57,6 +57,8 @@ docker run -d --name tm1 -p 8010:8010 \
   ghcr.io/ajmyers/tm1-server
 ```
 
+A Docker volume works in place of any of those folders, e.g. `-v tm1-data:/tm1/data`.
+
 ## Image
 
 Published to GitHub Container Registry by [`.github/workflows/docker.yml`](../../.github/workflows/docker.yml):
@@ -121,12 +123,36 @@ PAW), [`pa-setup`](../pa-setup/README.md) writes a compose project from `pa-envi
 
 **Your files.** Each server's config, database and logs are in
 `tm1-files/<server>/{config,data,logs}` (or set `TM1_FILES_DIR`), created on first
-start. Any of them can go elsewhere, to a folder or a **Docker volume**: set
-`TM1_CONFIG_DIR`, `TM1_DATA_DIR` or `TM1_LOGS_DIR` in `.env` to a path, or to the volume
-the compose file declares for it (`tm1-config`, `tm1-data`, `tm1-logs`). The sample
-server has `TM1_SDATA_CONFIG_DIR`, `TM1_SDATA_DATA_DIR` and `TM1_SDATA_LOGS_DIR`, with
-the volumes `tm1-sdata-config`, `tm1-sdata-data` and `tm1-sdata-logs`. A database in
-a volume is faster than in a folder on Mac and Windows, and isn't a folder you can open. Like a real deployment, one Admin Server serves every TM1 server: the
+start. The `tm1` and sample servers' files can go elsewhere, each to another folder or a
+**Docker volume**. Set these in `.env`:
+
+| Server | Settings | The volume each can name |
+|---|---|---|
+| `tm1` | `TM1_CONFIG_DIR`, `TM1_DATA_DIR`, `TM1_LOGS_DIR` | `tm1-config`, `tm1-data`, `tm1-logs` |
+| sample (`tm1-sdata`) | `TM1_SDATA_CONFIG_DIR`, `TM1_SDATA_DATA_DIR`, `TM1_SDATA_LOGS_DIR` | `tm1-sdata-config`, `tm1-sdata-data`, `tm1-sdata-logs` |
+
+- **A folder** is a path that starts with `/`, `./` or `~` (or a drive letter on Windows).
+  Anything else is read as a volume's name.
+- **A volume** is the one in the table for that setting, and only that one: two settings
+  naming the same volume would put two things in one place. Docker shows it with the
+  project's name in front (`tm1_tm1-data` in a folder named `tm1`), so a renamed or copied
+  folder starts on new, empty volumes.
+- **Nothing is moved for you.** A server switched to a volume starts with an empty one: a
+  new database and a default `tm1s.cfg`, with your files left in `tm1-files`. Copy them in
+  first, with the server stopped:
+
+  ```sh
+  docker compose down
+  docker compose run --rm --no-deps -v "$PWD/tm1-files/tm1/data:/from:ro" tm1 cp -a /from/. /tm1/data/
+  ```
+
+  (and the same for `config`, with `/tm1/config/`).
+- **`docker compose down -v` removes these volumes,** and the config, database or logs in
+  them. With folders it only removed the installed TM1.
+- The Admin Server's and TM1 Web's logs stay under `TM1_FILES_DIR`.
+
+A database in a volume is faster than in a folder on Mac and Windows, and isn't a folder
+you can open. These settings need this `compose.yaml`: an older one ignores them. Like a real deployment, one Admin Server serves every TM1 server: the
 servers register with `tm1-admin` through `TM1_ADMIN_HOST` (see [Roles](#roles)).
 
 The REST API is plain HTTP by default (`UseSSL=F`), so there are no certificates to

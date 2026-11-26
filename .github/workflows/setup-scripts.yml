@@ -67,6 +67,18 @@ jobs:
           grep -qx "TM1_FILES_DIR='$t/files'" "$t/.env"
           grep -qx "COMPOSE_PROFILES='samples'" "$t/.env"
           (cd "$t" && docker compose config --images | grep -qx 'ghcr.io/ajmyers/tm1-server:edge')
+          # Each server's folders are under TM1_FILES_DIR unless a *_DIR setting names a
+          # folder or one of the declared volumes
+          (cd "$t" && docker compose --profile samples config > "$t/folders.yaml" \
+            && TM1_DATA_DIR=tm1-data TM1_CONFIG_DIR=./elsewhere TM1_SDATA_LOGS_DIR=tm1-sdata-logs docker compose --profile samples config > "$t/moved.yaml")
+          for folder in tm1/config tm1/data tm1/logs sdata/config sdata/data sdata/logs admin/logs; do
+            grep -qx "        source: $t/files/$folder" "$t/folders.yaml"
+          done
+          if grep -B2 'target: /tm1/' "$t/folders.yaml" | grep -q 'type: volume'; then echo "a folder became a volume"; exit 1; fi
+          grep -B2 'target: /tm1/data' "$t/moved.yaml" | grep -qx '        source: tm1-data'
+          grep -B2 'target: /tm1/config' "$t/moved.yaml" | grep -qx "        source: $t/elsewhere"
+          grep -B2 'target: /tm1/logs' "$t/moved.yaml" | grep -qx '        source: tm1-sdata-logs'
+          grep -qx "        source: $t/files/tm1/logs" "$t/moved.yaml"
           # A rerun keeps it all, and says so
           out=$(sh setup.sh --dir "$t" --image other:1 --base-url "$PWD" --no-start 2>&1)
           echo "$out"
