@@ -29,12 +29,17 @@ import io.skipcheck.tm1.csdl.CsdlTypeRef;
  * <p>
  * Type names are written without a namespace, since TM1's API has one.
  */
-final class Endpoints {
+public final class Endpoints {
 
 	private Endpoints() {
 	}
 
-	static NavigableSet<String> of(CsdlDocument doc) {
+	/**
+	 * A document's endpoints, as coverage-gate IDs.
+	 * @param doc the {@code $metadata} document
+	 * @return its endpoints, sorted
+	 */
+	public static NavigableSet<String> of(CsdlDocument doc) {
 		NavigableSet<String> out = new TreeSet<>();
 		doc.entityContainer().ifPresent(c -> container(out, c));
 		for (CsdlSchema schema : doc.schemas()) {

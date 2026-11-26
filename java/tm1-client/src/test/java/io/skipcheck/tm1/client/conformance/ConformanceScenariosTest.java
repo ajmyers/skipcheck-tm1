@@ -14,6 +14,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -31,6 +32,7 @@ import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.version.Tm1Version;
 import reactor.core.publisher.Flux;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -414,6 +416,40 @@ class ConformanceScenariosTest {
 		List<String> steps = traffic.exchanges().stream().map(e -> e.get("step").asString()).toList();
 		assertThat(steps.subList(steps.size() - 3, steps.size())).containsExactly("finally[0]", "finally[1]",
 				"finally[2]");
+	}
+
+	@Test
+	void appliesWhatTheServerHasAndIs() {
+		JsonNode scenario = ConformanceCodec.json()
+			.readTree(
+					"{\"requires\":[\"Action Cube/Reserve\"],\"tm1From\":\"11.8.03000\",\"tm1Before\":\"11.8.04000\"}");
+		Set<String> reserve = Set.of("Action Cube/Reserve");
+		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.03500.6"))).isTrue();
+		assertThat(ConformanceScenarios.applies(scenario, Set.of(), Tm1Version.parse("11.8.03500.6")))
+			.as("an endpoint the server lacks")
+			.isFalse();
+		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.02400.7"))).as("too old")
+			.isFalse();
+		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.04000.1")))
+			.as("tm1Before is exclusive")
+			.isFalse();
+		assertThat(ConformanceScenarios.applies(ConformanceCodec.json().readTree("{}"), Set.of(),
+				Tm1Version.parse("11.8.02400.7")))
+			.as("one with neither applies everywhere")
+			.isTrue();
+	}
+
+	@Test
+	void skipsTheStepsThatDontApplyAndSendsNothingForThem() {
+		// cubes.json without its two dimension creates: they send nothing, the rest run
+		JsonNode scenario = ConformanceScenarios.load(ConformanceScenarios.directory().resolve("cubes.json"));
+		Map<String, String> names = ConformanceScenarios.names(scenario);
+		ConformanceScenarios.Traffic traffic = new ConformanceScenarios.Traffic(ConformanceTm1.ROOT);
+		ConformanceScenarios.run(client(traffic, tm1(names, false)), traffic, scenario, names,
+				step -> !("dimensions".equals(step.path("service").asString())
+						&& "create".equals(step.path("method").asString())));
+		List<String> steps = traffic.exchanges().stream().map(e -> e.get("step").asString()).toList();
+		assertThat(steps).doesNotContain("steps[0]", "steps[1]").contains("steps[2]");
 	}
 
 }

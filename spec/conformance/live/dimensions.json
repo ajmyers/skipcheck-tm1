@@ -17,8 +17,8 @@
 		{"service": "hierarchies", "method": "list", "params": ["dimension", "query"], "args": ["${dimension}", {"$query": {"select": ["Name"], "orderBy": ["Name"]}}], "expect": {"count": 2}},
 		{"service": "dimensions", "method": "lock", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
 		{"service": "dimensions", "method": "unlock", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
-		{"service": "dimensions", "method": "reserve", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
-		{"service": "dimensions", "method": "release", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
+		{"requires": ["Action Dimension/Reserve"], "service": "dimensions", "method": "reserve", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
+		{"requires": ["Action Dimension/Release"], "service": "dimensions", "method": "release", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
 		{"service": "dimensions", "method": "delete", "params": ["name"], "args": ["${dimension}"], "expect": {"none": true}},
 		{"service": "dimensions", "method": "get", "params": ["name", "query"], "args": ["${dimension}", {"$query": {}}], "expect": {"error": {"category": "api", "kind": "NOT_FOUND", "status": 404}}},
 		{"service": "dimensions", "method": "get", "params": ["name", "query"], "args": ["${missing}", {"$query": {}}], "expect": {"error": {"category": "api", "kind": "NOT_FOUND", "status": 404}}}

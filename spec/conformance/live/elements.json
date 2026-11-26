@@ -25,8 +25,8 @@
 		{"service": "elements", "method": "get", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "Note", {"$query": {"select": ["Type"]}}], "expect": {"fields": {"Type": "String"}}},
 		{"service": "elements", "method": "lock", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "North"], "expect": {"none": true}},
 		{"service": "elements", "method": "unlock", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "North"], "expect": {"none": true}},
-		{"service": "elements", "method": "reserve", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "North"], "expect": {"none": true}},
-		{"service": "elements", "method": "release", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "North"], "expect": {"none": true}},
+		{"requires": ["Action Element/Reserve"], "service": "elements", "method": "reserve", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "North"], "expect": {"none": true}},
+		{"requires": ["Action Element/Release"], "service": "elements", "method": "release", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "North"], "expect": {"none": true}},
 		{"service": "elements", "method": "delete", "params": ["dimension", "hierarchy", "element"], "args": ["${dimension}", "${dimension}", "West"], "expect": {"none": true}},
 		{"service": "elements", "method": "get", "params": ["dimension", "hierarchy", "element", "query"], "args": ["${dimension}", "${dimension}", "West", {"$query": {}}], "expect": {"error": {"category": "api", "kind": "NOT_FOUND", "status": 404}}}
 	],
