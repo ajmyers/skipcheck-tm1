@@ -38,10 +38,11 @@ internal static class ServerAssumptions
     /// <summary>Whether the server's product version is at least the version.</summary>
     public static async Task<bool> IsAtLeastAsync(Tm1Client tm1, Tm1Version version) => (await ProductVersionAsync(tm1)).IsAtLeast(version);
 
-    /// <summary>The committed snapshot of the server's own schema version, or null. Every
-    /// supported version has one; a server of a schema without one (a release between those
-    /// committed, or a newer TM1) has the test return, as Java's MetadataDriftTm1Test passes it
-    /// by.</summary>
+    /// <summary>The committed snapshot of the server's own schema version, or null: its first
+    /// document, whose elements a later document of the schema has too (Java's
+    /// MetadataSnapshotTest holds them to it). Every supported version has one; a server of a
+    /// schema without one (a newer TM1) has the test return, as Java's MetadataDriftTm1Test
+    /// passes it by.</summary>
     public static string? OwnSnapshot(Tm1Capabilities capabilities)
     {
         var path = Path.Combine(Repo.Root, "java", "tm1-client", "src", "model", "metadata", $"tm1-schema-{capabilities.SchemaVersion}.xml");

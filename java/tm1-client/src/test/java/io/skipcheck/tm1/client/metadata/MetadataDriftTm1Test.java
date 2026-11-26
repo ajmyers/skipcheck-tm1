@@ -49,9 +49,11 @@ class MetadataDriftTm1Test {
 
 		if (liveDoc.schemaVersion().orElse("").equals(MetadataSnapshot.VERSION)) {
 			assertThat(live)
-				.as("live $metadata (schema %s) against the snapshot; regenerate it with TM1_UPDATE_METADATA_SNAPSHOT=true",
-						MetadataSnapshot.VERSION)
-				.isEqualTo(MetadataSnapshot.text());
+				.as("live $metadata (schema %s, TM1 %s) against the snapshot its build serves; regenerate it with "
+						+ "TM1_UPDATE_METADATA_SNAPSHOT=true, or if older builds of the schema still serve the one "
+						+ "committed, commit this as a later document with TM1_UPDATE_METADATA_SNAPSHOT=later",
+						MetadataSnapshot.VERSION, tm1.getTm1Version())
+				.isEqualTo(MetadataSnapshot.text(MetadataSnapshot.VERSION, tm1.getTm1Version()).orElseThrow());
 			return;
 		}
 
@@ -86,8 +88,9 @@ class MetadataDriftTm1Test {
 			.ifPresent(own -> assertThat(firstDifference(own, live))
 				.as("live $metadata (schema %s, TM1 %s) against its own committed snapshot. Either the server changed, or "
 						+ "this release serves another document of the schema than those committed: several releases can "
-						+ "report one schema. Commit its document as a later one with TM1_UPDATE_METADATA_SNAPSHOT=true, "
-						+ "and add its build to MetadataSnapshot.LATER_DOCUMENTS", schema, tm1.getTm1Version())
+						+ "report one schema. If the server changed, regenerate it with TM1_UPDATE_METADATA_SNAPSHOT=true; "
+						+ "if older builds still serve the one committed, commit this as a later document with "
+						+ "TM1_UPDATE_METADATA_SNAPSHOT=later", schema, tm1.getTm1Version())
 				.isEmpty());
 	}
 

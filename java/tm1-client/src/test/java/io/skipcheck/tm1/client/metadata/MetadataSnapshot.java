@@ -46,11 +46,11 @@ public final class MetadataSnapshot {
 	 * as its schema's first document, so what a schema defines is read from that one.
 	 *
 	 * <p>
-	 * 11.8.02900 (Planning Analytics 2.1.8, and on to 2.1.12) reports schema 11.8.20, as
-	 * 11.8.02400 to 11.8.02800 (2.1.2 to 2.1.7) do, and serves it otherwise written:
+	 * 11.8.02900.8 (Planning Analytics 2.1.8, and on to 2.1.12) reports schema 11.8.20,
+	 * as 11.8.02400 to 11.8.02800 (2.1.2 to 2.1.7) do, and serves it otherwise written:
 	 * {@code Core.Ordered} on collections, and boolean annotations without their values.
 	 */
-	public static final Map<String, List<String>> LATER_DOCUMENTS = Map.of("11.8.20", List.of("11.8.02900"));
+	public static final Map<String, List<String>> LATER_DOCUMENTS = Map.of("11.8.20", List.of("11.8.02900.8"));
 
 	private MetadataSnapshot() {
 	}
@@ -69,7 +69,7 @@ public final class MetadataSnapshot {
 	/**
 	 * The committed snapshot of a schema version (its first document), if there is one.
 	 * @param schemaVersion the schema version, such as {@code 11.8.20}, or a later
-	 * document's name, such as {@code 11.8.20-11.8.02900}
+	 * document's name, such as {@code 11.8.20-11.8.02900.8}
 	 * @return its text, or empty if none is committed
 	 */
 	public static Optional<String> text(String schemaVersion) {
