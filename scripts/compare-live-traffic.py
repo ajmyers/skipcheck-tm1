@@ -47,7 +47,11 @@ SCENARIOS = Path(__file__).resolve().parents[1] / "spec" / "conformance" / "live
 
 def load(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """A log: its header line and its exchanges."""
-    lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    lines = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     if not lines or "names" not in lines[0]:
         raise ValueError(f"{path}: the first line must name the scenario and its names")
     return lines[0], lines[1:]
@@ -55,7 +59,10 @@ def load(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
 
 def _placeholders(names: dict[str, str]) -> list[tuple[str, str]]:
     # Longest first, so a name that contains another is replaced whole
-    return sorted(((actual, "${" + placeholder + "}") for placeholder, actual in names.items()), key=lambda p: -len(p[0]))
+    return sorted(
+        ((actual, "${" + placeholder + "}") for placeholder, actual in names.items()),
+        key=lambda p: -len(p[0]),
+    )
 
 
 def _replace(value: Any, names: list[tuple[str, str]]) -> Any:
@@ -66,47 +73,77 @@ def _replace(value: Any, names: list[tuple[str, str]]) -> Any:
     if isinstance(value, list):
         return [_replace(v, names) for v in value]
     if isinstance(value, dict):
-        return {_replace(k, names): _replace(v, names) for k, v in value.items() if k != "@odata.etag"}
+        return {
+            _replace(k, names): _replace(v, names)
+            for k, v in value.items()
+            if k != "@odata.etag"
+        }
     if isinstance(value, float) and value.is_integer():
         return int(value)
     return value
 
 
-def normalize(header: dict[str, Any], exchanges: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def normalize(
+    header: dict[str, Any], exchanges: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     """A log as it compares: the run's names as placeholders, without entity tags."""
     names = _placeholders(header["names"])
     out = []
     for exchange in exchanges:
         request = dict(exchange["request"])
-        headers = {k: ("<etag>" if k in ETAG_HEADERS else v) for k, v in request.get("headers", {}).items()}
+        headers = {
+            k: ("<etag>" if k in ETAG_HEADERS else v)
+            for k, v in request.get("headers", {}).items()
+        }
         request["headers"] = headers
         request = _replace(request, names)
         request["target"] = CELLSET_ID.sub("Cellsets('<id>')", request["target"])
-        out.append({"step": exchange.get("step"), "request": request, "status": exchange.get("status")})
+        out.append(
+            {
+                "step": exchange.get("step"),
+                "request": request,
+                "status": exchange.get("status"),
+            }
+        )
     return out
 
 
 def unordered(scenario: dict[str, Any]) -> dict[str, re.Pattern[str]]:
     """The steps whose matching requests may go out in any order: step label to pattern."""
-    return {f"steps[{i}]": re.compile(step["unordered"]) for i, step in enumerate(scenario.get("steps", [])) if "unordered" in step}
+    return {
+        f"steps[{i}]": re.compile(step["unordered"])
+        for i, step in enumerate(scenario.get("steps", []))
+        if "unordered" in step
+    }
 
 
-def reorder(exchanges: list[dict[str, Any]], patterns: dict[str, re.Pattern[str]]) -> list[dict[str, Any]]:
+def reorder(
+    exchanges: list[dict[str, Any]], patterns: dict[str, re.Pattern[str]]
+) -> list[dict[str, Any]]:
     """A normalized log with each run of a step's consecutive requests that match its pattern
     sorted, so runs sent in different orders compare equal. Everything else keeps its order."""
 
     def free(x: dict[str, Any]) -> bool:
         pattern = patterns.get(x.get("step") or "")
-        return bool(pattern and pattern.search(f"{x['request']['method']} {x['request']['target']}"))
+        return bool(
+            pattern
+            and pattern.search(f"{x['request']['method']} {x['request']['target']}")
+        )
 
     out: list[dict[str, Any]] = []
     i = 0
     while i < len(exchanges):
         j = i
-        while j < len(exchanges) and free(exchanges[j]) and exchanges[j].get("step") == exchanges[i].get("step"):
+        while (
+            j < len(exchanges)
+            and free(exchanges[j])
+            and exchanges[j].get("step") == exchanges[i].get("step")
+        ):
             j += 1
         if j > i:
-            out.extend(sorted(exchanges[i:j], key=lambda x: json.dumps(x, sort_keys=True)))
+            out.extend(
+                sorted(exchanges[i:j], key=lambda x: json.dumps(x, sort_keys=True))
+            )
             i = j
         else:
             out.append(exchanges[i])
@@ -136,31 +173,49 @@ def repeat_limits(scenario: dict[str, Any]) -> dict[str, int]:
     }
 
 
-def overlong(exchanges: list[dict[str, Any]], patterns: dict[str, re.Pattern[str]], limits: dict[str, int]) -> list[str]:
+def overlong(
+    exchanges: list[dict[str, Any]],
+    patterns: dict[str, re.Pattern[str]],
+    limits: dict[str, int],
+) -> list[str]:
     """Each run of a step's equal consecutive requests matching its pattern that's longer than the
     step's limit, which collapsing them would hide."""
     problems: list[str] = []
     runs: list[tuple[dict[str, Any], int]] = []
     for x in exchanges:
         pattern = patterns.get(x.get("step") or "")
-        if pattern and runs and _ordered(runs[-1][0]) == _ordered(x) and pattern.search(f"{x['request']['method']} {x['request']['target']}"):
+        if (
+            pattern
+            and runs
+            and _ordered(runs[-1][0]) == _ordered(x)
+            and pattern.search(f"{x['request']['method']} {x['request']['target']}")
+        ):
             runs[-1] = (runs[-1][0], runs[-1][1] + 1)
         else:
             runs.append((x, 1))
     for x, count in runs:
         limit = limits.get(x.get("step") or "", REPEAT_LIMIT)
         if x.get("step") in patterns and count > limit:
-            problems.append(f"{x['step']} sent {x['request']['method']} {x['request']['target']} {count} times in a row, more than its {limit}")
+            problems.append(
+                f"{x['step']} sent {x['request']['method']} {x['request']['target']} {count} times in a row, more than its {limit}"
+            )
     return problems
 
 
-def collapse(exchanges: list[dict[str, Any]], patterns: dict[str, re.Pattern[str]]) -> list[dict[str, Any]]:
+def collapse(
+    exchanges: list[dict[str, Any]], patterns: dict[str, re.Pattern[str]]
+) -> list[dict[str, Any]]:
     """A normalized log with each run of a step's equal consecutive requests that match its pattern
     kept once, so polls that took TM1 more or fewer answers compare equal. Everything else stays."""
     out: list[dict[str, Any]] = []
     for x in exchanges:
         pattern = patterns.get(x.get("step") or "")
-        if pattern and out and _ordered(out[-1]) == _ordered(x) and pattern.search(f"{x['request']['method']} {x['request']['target']}"):
+        if (
+            pattern
+            and out
+            and _ordered(out[-1]) == _ordered(x)
+            and pattern.search(f"{x['request']['method']} {x['request']['target']}")
+        ):
             continue
         out.append(x)
     return out
@@ -186,17 +241,27 @@ def compare(logs: dict[str, list[dict[str, Any]]]) -> list[str]:
         a, b = logs[reference], logs[other]
         for i, (x, y) in enumerate(zip(a, b)):
             if _ordered(x) != _ordered(y):
-                problems.append(f"request {i + 1} differs:\n  {reference}: {json.dumps(x)}\n  {other}: {json.dumps(y)}")
+                problems.append(
+                    f"request {i + 1} differs:\n  {reference}: {json.dumps(x)}\n  {other}: {json.dumps(y)}"
+                )
                 break
         else:
             if len(a) != len(b):
-                longer, extra = (reference, a[len(b)]) if len(a) > len(b) else (other, b[len(a)])
-                problems.append(f"{reference} sent {len(a)} requests, {other} {len(b)}: {longer} also sent {json.dumps(extra)}")
+                longer, extra = (
+                    (reference, a[len(b)]) if len(a) > len(b) else (other, b[len(a)])
+                )
+                problems.append(
+                    f"{reference} sent {len(a)} requests, {other} {len(b)}: {longer} also sent {json.dumps(extra)}"
+                )
     return problems
 
 
 def main(argv: list[str]) -> int:
-    root = Path(argv[1]) if len(argv) > 1 else Path(__file__).resolve().parents[1] / "build" / "conformance-live"
+    root = (
+        Path(argv[1])
+        if len(argv) > 1
+        else Path(__file__).resolve().parents[1] / "build" / "conformance-live"
+    )
     if not root.is_dir():
         print(f"No live conformance traffic in {root}: nothing to compare")
         return 0
@@ -205,13 +270,19 @@ def main(argv: list[str]) -> int:
     for log in sorted(root.glob("*/*.jsonl")):
         header, exchanges = load(log)
         spec = SCENARIOS / f"{log.stem}.json"
-        definition = json.loads(spec.read_text(encoding="utf-8")) if spec.is_file() else {}
+        definition = (
+            json.loads(spec.read_text(encoding="utf-8")) if spec.is_file() else {}
+        )
         patterns = repeating(definition)
-        for problem in overlong(normalize(header, exchanges), patterns, repeat_limits(definition)):
+        for problem in overlong(
+            normalize(header, exchanges), patterns, repeat_limits(definition)
+        ):
             failed = True
             print(f"{log.stem}: {log.parent.name} {problem}")
         normalized = collapse(normalize(header, exchanges), patterns)
-        scenarios.setdefault(log.stem, {})[log.parent.name] = reorder(normalized, unordered(definition))
+        scenarios.setdefault(log.stem, {})[log.parent.name] = reorder(
+            normalized, unordered(definition)
+        )
     for scenario, logs in sorted(scenarios.items()):
         problems = compare(logs)
         if len(logs) < 2:
@@ -222,7 +293,9 @@ def main(argv: list[str]) -> int:
             for problem in problems:
                 print("  " + problem.replace("\n", "\n  "))
         else:
-            print(f"{scenario}: {', '.join(sorted(logs))} sent the same {len(next(iter(logs.values())))} requests")
+            print(
+                f"{scenario}: {', '.join(sorted(logs))} sent the same {len(next(iter(logs.values())))} requests"
+            )
     return 1 if failed else 0
 
 

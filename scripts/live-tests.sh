@@ -21,6 +21,8 @@
 #   scripts/live-tests.sh                  # all four
 #   scripts/live-tests.sh python dotnet    # some
 #
+# Against several TM1 versions in turn, each one's results kept: scripts/live-test-versions.py.
+#
 # The suites are Gradle tasks (build.gradle.kts), so the same runs on Windows, where there's no
 # bash: ./gradlew liveTest --continue, or some of :tm1-client:liveTest, liveTestPython,
 # liveTestDotnet, liveTestTypescript with compareLiveTraffic. This script is that, by suite name.

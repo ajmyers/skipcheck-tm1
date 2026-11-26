@@ -51,7 +51,11 @@ def read_junit(path: Path, counts: Counts) -> None:
     """A JUnit XML report: a testsuite, or testsuites of them."""
     root = ET.parse(path).getroot()
     for suite in [root] if root.tag == "testsuite" else root.iter("testsuite"):
-        counts.add(number(suite, "tests"), number(suite, "failures") + number(suite, "errors"), number(suite, "skipped"))
+        counts.add(
+            number(suite, "tests"),
+            number(suite, "failures") + number(suite, "errors"),
+            number(suite, "skipped"),
+        )
 
 
 def read_trx(path: Path, counts: Counts) -> None:
@@ -80,8 +84,14 @@ def collect(root: Path) -> dict[str, Counts]:
 
 
 def table(suites: dict[str, Counts]) -> str:
-    lines = ["| Suite | Tests | Passed | Failed | Skipped |", "|---|---:|---:|---:|---:|"]
-    lines += [f"| {name} | {c.tests} | {c.passed} | {c.failed} | {c.skipped} |" for name, c in suites.items()]
+    lines = [
+        "| Suite | Tests | Passed | Failed | Skipped |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    lines += [
+        f"| {name} | {c.tests} | {c.passed} | {c.failed} | {c.skipped} |"
+        for name, c in suites.items()
+    ]
     return "\n".join(lines)
 
 

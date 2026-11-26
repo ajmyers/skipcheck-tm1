@@ -22,9 +22,17 @@ def test_shell_scripts_pass_shellcheck() -> None:
     if shellcheck is None:
         if os.environ.get("CI"):
             pytest.fail("shellcheck isn't installed, and CI must run this check")
-        pytest.skip("shellcheck isn't installed (brew, apt or scoop install shellcheck)")
+        pytest.skip(
+            "shellcheck isn't installed (brew, apt or scoop install shellcheck)"
+        )
     scripts = HOOKS + git(REPO, "ls-files", "*.sh").splitlines()
     assert len(scripts) > 20, scripts
     # Warnings and errors. The notes below them are style, and the scripts were written to other tastes
-    result = subprocess.run([shellcheck, "--severity=warning", "--external-sources", *scripts], cwd=REPO, capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        [shellcheck, "--severity=warning", "--external-sources", *scripts],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     assert result.returncode == 0, result.stdout + result.stderr
