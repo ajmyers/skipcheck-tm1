@@ -11,7 +11,10 @@
 # start never matched it, so the entrypoint gave up and stopped a server that was running.
 
 # daemon_pattern <command line as run>: an extended regex for that command line, at the end of
-# the process's line, after its start or a space
+# the process's line, after its start or a space. Looser than the whole line being the command: a
+# wrapper whose arguments end with it ("sh -c ./tm1admsrv.exe" from a docker exec) would match too,
+# and the lowest PID is taken. Nothing in the image starts one; telling the emulator's prefix from
+# any other would tie this to how each emulator writes the line.
 daemon_pattern() {
   local quoted
   quoted=$(printf '%s' "$1" | sed 's/[][\.*^$+?(){}|]/\\&/g')
