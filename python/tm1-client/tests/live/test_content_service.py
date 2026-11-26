@@ -26,24 +26,27 @@ def test_lists_the_roots(tm1: Tm1Client) -> None:
 def test_keeps_a_document_in_blobs_behind_a_reference(tm1: Tm1Client, name: str) -> None:
     folder = ContentPath.applications().child(name)
     tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name).build())
+    # TM1 keeps a document as }externals/<name>_<second>.<ext>, server-wide: two made with one name
+    # in one second collide (400, code 226), so each test names its own
+    doc = f"{name}-notes"
     try:
-        made = tm1.contents.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name("notes.txt").build())
+        made = tm1.contents.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name(f"{doc}.txt").build())
         assert isinstance(made, DocumentReference), "a document made in an application is a reference"
-        assert made.id == "notes.txt.blob", "found by ID, the name plus a suffix"
+        assert made.id == f"{doc}.txt.blob", "found by ID, the name plus a suffix"
         notes = folder.child(made)
         with pytest.raises(Tm1NotFoundError):
-            tm1.contents.get(folder.child("notes.txt"))  # not by name
+            tm1.contents.get(folder.child(f"{doc}.txt"))  # not by name
 
         tm1.contents.upload(notes, b"hello there")
         assert tm1.contents.content(notes) == b"hello there"
         document = tm1.contents.document(notes)
         assert document.size == 11
-        assert document.name.startswith("notes_") and document.name.endswith(".txt"), "named by TM1, with a timestamp"
+        assert document.name.startswith(f"{doc}_") and document.name.endswith(".txt"), "named by TM1, with a timestamp"
         blob = ContentPath.blobs().child(document.id)
         assert tm1.contents.content(blob) == b"hello there"
 
-        copy = tm1.contents.copy(notes, folder, ContentScope.PUBLIC, "copy.txt")
-        assert copy.id == "copy.txt.blob"
+        copy = tm1.contents.copy(notes, folder, ContentScope.PUBLIC, f"{doc}-copy.txt")
+        assert copy.id == f"{doc}-copy.txt.blob"
         assert tm1.contents.document(folder.child(copy.id)).id == document.id, "a copy refers to the same document"
         tm1.contents.delete(notes)
         assert tm1.contents.content(blob) == b"hello there", "kept while the copy refers to it"
@@ -93,7 +96,8 @@ def test_refuses_a_chunked_upload(tm1: Tm1Client, name: str) -> None:
     folder = ContentPath.applications().child(name)
     tm1.contents.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name).build())
     try:
-        made = tm1.contents.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name("notes.txt").build())
+        # A name of its own: see test_keeps_a_document_in_blobs_behind_a_reference
+        made = tm1.contents.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name(f"{name}-notes.txt").build())
         url, user, password = target()
         content = f"{url.rstrip('/')}/{folder.child(made.id).path()}/tm1.DocumentReference/Document/Content"
 

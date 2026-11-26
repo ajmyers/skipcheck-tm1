@@ -61,26 +61,36 @@ describe("ContentService on TM1" + liveReason, () => {
   });
 
   tm1Test("keeps a document in Blobs behind a reference", async () => {
-    await inFolder([Live.name()], async ([folder]) => {
-      const made = await tm1.contents.create(folder!, ContentScope.Public, DocumentCreate.builder().name("notes.txt").build());
+    const name = Live.name();
+    // TM1 keeps a document as }externals/<name>_<second>.<ext>, server-wide: two made with one name in
+    // one second collide (400, code 226), so each test names its own
+    const doc = name + "-notes";
+    await inFolder([name], async ([folder]) => {
+      const made = await tm1.contents.create(
+        folder!,
+        ContentScope.Public,
+        DocumentCreate.builder()
+          .name(doc + ".txt")
+          .build(),
+      );
       // A document made in an application is a reference, found by ID, the name plus a suffix
       expect(typeOf(Entry, made)).toBe("DocumentReference");
-      expect(made.ID).toBe("notes.txt.blob");
+      expect(made.ID).toBe(doc + ".txt.blob");
       const notes = folder!.child(made);
       // Not by name
-      await expect(tm1.contents.get(folder!.child("notes.txt"), ODataQuery.none())).rejects.toBeInstanceOf(Tm1NotFoundException);
+      await expect(tm1.contents.get(folder!.child(doc + ".txt"), ODataQuery.none())).rejects.toBeInstanceOf(Tm1NotFoundException);
 
       await tm1.contents.upload(notes, utf8.encode("hello there"));
       expect(await text(tm1.contents.content(notes))).toBe("hello there");
       const document = await tm1.contents.document(notes, ODataQuery.none());
       expect(document.Size).toBe(11);
       // Named by TM1, with a timestamp
-      expect(document.Name).toMatch(/^notes_.*\.txt$/);
+      expect(document.Name?.startsWith(doc + "_") && document.Name.endsWith(".txt"), document.Name).toBe(true);
       const blob = ContentPath.blobs().child(document.ID!);
       expect(await text(tm1.contents.content(blob))).toBe("hello there");
 
-      const copy = await tm1.contents.copy(notes, folder!, ContentScope.Public, "copy.txt");
-      expect(copy.ID).toBe("copy.txt.blob");
+      const copy = await tm1.contents.copy(notes, folder!, ContentScope.Public, doc + "-copy.txt");
+      expect(copy.ID).toBe(doc + "-copy.txt.blob");
       // A copy refers to the same document
       expect((await tm1.contents.document(folder!.child(copy.ID!), ODataQuery.none())).ID).toBe(document.ID);
       await tm1.contents.delete(notes);
@@ -125,8 +135,16 @@ describe("ContentService on TM1" + liveReason, () => {
   });
 
   tm1Test("refuses a chunked upload", async () => {
-    await inFolder([Live.name()], async ([folder]) => {
-      const made = await tm1.contents.create(folder!, ContentScope.Public, DocumentCreate.builder().name("notes.txt").build());
+    const name = Live.name();
+    await inFolder([name], async ([folder]) => {
+      // A name of its own: see "keeps a document in Blobs behind a reference"
+      const made = await tm1.contents.create(
+        folder!,
+        ContentScope.Public,
+        DocumentCreate.builder()
+          .name(name + "-notes.txt")
+          .build(),
+      );
       const target = await Live.target();
       const root = target.url.endsWith("/") ? target.url : target.url + "/";
       // A stream of unknown length is sent chunked

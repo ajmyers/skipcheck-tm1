@@ -99,15 +99,19 @@ class ContentServiceTm1Test {
 		tm1.contents()
 			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name).build())
 			.block(WAIT);
+		// TM1 keeps a document as }externals/<name>_<second>.<ext>, server-wide: two
+		// made with one name in one second collide (400, code 226), so each test names
+		// its own
+		String doc = name + "-notes";
 		try {
 			Entry made = tm1.contents()
-				.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name("notes.txt").build())
+				.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name(doc + ".txt").build())
 				.block(WAIT);
 			assertThat(made).as("a document made in an application is a reference")
 				.isInstanceOf(DocumentReference.class);
-			assertThat(made.id()).as("found by ID, the name plus a suffix").isEqualTo("notes.txt.blob");
+			assertThat(made.id()).as("found by ID, the name plus a suffix").isEqualTo(doc + ".txt.blob");
 			ContentPath notes = folder.child(made);
-			assertThatThrownBy(() -> tm1.contents().get(folder.child("notes.txt"), ODataQuery.none()).block(WAIT))
+			assertThatThrownBy(() -> tm1.contents().get(folder.child(doc + ".txt"), ODataQuery.none()).block(WAIT))
 				.as("not by name")
 				.isInstanceOf(Tm1NotFoundException.class);
 
@@ -115,12 +119,12 @@ class ContentServiceTm1Test {
 			assertThat(text(tm1.contents().content(notes))).isEqualTo("hello there");
 			var document = tm1.contents().document(notes, ODataQuery.none()).block(WAIT);
 			assertThat(document.size()).isEqualTo(11);
-			assertThat(document.name()).as("named by TM1, with a timestamp").startsWith("notes_").endsWith(".txt");
+			assertThat(document.name()).as("named by TM1, with a timestamp").startsWith(doc + "_").endsWith(".txt");
 			ContentPath blob = ContentPath.blobs().child(document.id());
 			assertThat(text(tm1.contents().content(blob))).isEqualTo("hello there");
 
-			Entry copy = tm1.contents().copy(notes, folder, ContentScope.PUBLIC, "copy.txt").block(WAIT);
-			assertThat(copy.id()).isEqualTo("copy.txt.blob");
+			Entry copy = tm1.contents().copy(notes, folder, ContentScope.PUBLIC, doc + "-copy.txt").block(WAIT);
+			assertThat(copy.id()).isEqualTo(doc + "-copy.txt.blob");
 			assertThat(tm1.contents().document(folder.child(copy.id()), ODataQuery.none()).block(WAIT).id())
 				.as("a copy refers to the same document")
 				.isEqualTo(document.id());
@@ -210,8 +214,9 @@ class ContentServiceTm1Test {
 			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name).build())
 			.block(WAIT);
 		try {
+			// A name of its own: see keepsADocumentInBlobsBehindAReference
 			Entry made = tm1.contents()
-				.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name("notes.txt").build())
+				.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name(name + "-notes.txt").build())
 				.block(WAIT);
 			String auth = Base64.getEncoder()
 				.encodeToString((server.getUsername() + ":" + server.getPassword()).getBytes(StandardCharsets.UTF_8));
