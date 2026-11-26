@@ -17,6 +17,11 @@
 //
 //   ./gradlew liveTest --continue  every client's tests against a real TM1, then the comparison of
 //                                  what each sent (needs a TM1 source: see scripts/live-tests.sh)
+//
+//   ./gradlew containerConformance --continue
+//                                  every language's testcontainers starts the same scenarios, then
+//                                  the comparison of what Docker got (needs Docker and a TM1 source:
+//                                  see testcontainers-conformance/README.md)
 //   ./gradlew probeTm1             probes a TM1 for what its $metadata doesn't say, and writes it
 //                                  beside the snapshot (java/tools/tm1-probe/README.md)
 //
@@ -196,6 +201,78 @@ tasks.register("liveTest") {
 	group = "verification"
 	description = "Runs every client's tests against a real TM1, then compares what each sent. Use --continue to run them all when one fails."
 	dependsOn(liveTestJava, liveTestPython, liveTestDotnet, liveTestTypescript, compareLiveTraffic)
+}
+
+// The container conformance run: each language's tm1-testcontainers starts the same scenarios
+// (testcontainers-conformance/scenarios), one language after the other, and writes what Docker got;
+// then all four must have got the same containers. It needs Docker and a TM1 source, as the live tests.
+val containerLogs = layout.buildDirectory.dir("container-conformance")
+
+val containerConformancePrepare = tasks.register("containerConformancePrepare") {
+	description = "Checks a TM1 is configured for the container conformance run, and clears the run before's logs."
+	val configured = liveSources.dropLast(1).map { providers.environmentVariable(it) }
+	val names = liveSources.dropLast(1)
+	val directory = containerLogs
+	outputs.upToDateWhen { false }
+	doLast {
+		if (configured.none { it.isPresent }) {
+			throw GradleException("No TM1 configured: set one of " + names.joinToString(", ") + ". See testcontainers-conformance/README.md.")
+		}
+		directory.get().asFile.deleteRecursively()
+	}
+}
+
+val containerConformanceJava = ":tm1-testcontainers:containerConformance"
+
+val containerConformancePython = tasks.register<PythonTask>("containerConformancePython") {
+	group = "verification"
+	description = "Starts the container conformance scenarios with the Python testcontainers and records what Docker got."
+	python()
+	directory = root.dir("python/tm1-testcontainers")
+	commands = listOf(listOf("python", "-m", "pytest", "tests/test_container_conformance.py", "-rs"))
+	dependsOn(containerConformancePrepare)
+	mustRunAfter(containerConformanceJava)
+}
+
+val containerConformanceDotnet = tasks.register<ToolTask>("containerConformanceDotnet") {
+	group = "verification"
+	description = "Starts the container conformance scenarios with the .NET testcontainers and records what Docker got."
+	directory = root
+	commands = listOf(listOf("dotnet", "test", "dotnet/tests/Tm1.Testcontainers.Tests", "--filter", "FullyQualifiedName~.ContainerConformanceTests."))
+	defaultEnvironment = dotnetEnvironment
+	dependsOn(containerConformancePrepare)
+	mustRunAfter(containerConformanceJava, containerConformancePython)
+}
+
+val containerConformanceTypescript = tasks.register<ToolTask>("containerConformanceTypescript") {
+	dependsOn(npmInstall)
+	group = "verification"
+	description = "Starts the container conformance scenarios with the TypeScript testcontainers and records what Docker got."
+	directory = root.dir("typescript")
+	// The testcontainers import the client, whose generated model isn't committed
+	commands = listOf(
+		listOf("npm", "run", "generate", "-w", "tm1-client"),
+		listOf("npx", "-w", "tm1-testcontainers", "vitest", "run", "test/container-conformance.test.ts"),
+	)
+	dependsOn(containerConformancePrepare)
+	mustRunAfter(containerConformanceJava, containerConformancePython, containerConformanceDotnet)
+}
+
+// Not a dependency of the suites, only after them: with --continue it still compares what the
+// languages that passed got, when another failed
+val compareContainers = tasks.register<PythonTask>("compareContainers") {
+	group = "verification"
+	description = "Requires every language's testcontainers to have got the same containers from Docker in the conformance scenarios."
+	python()
+	directory = root
+	commands = listOf(listOf("python", "scripts/compare-containers.py", containerLogs.get().asFile.path))
+	mustRunAfter(containerConformanceJava, containerConformancePython, containerConformanceDotnet, containerConformanceTypescript)
+}
+
+tasks.register("containerConformance") {
+	group = "verification"
+	description = "Starts the same scenarios with every language's testcontainers, then compares what Docker got. Use --continue to run them all when one fails."
+	dependsOn(containerConformanceJava, containerConformancePython, containerConformanceDotnet, containerConformanceTypescript, compareContainers)
 }
 
 // The probe: what a TM1 version does that its $metadata doesn't say (java/tools/tm1-probe/README.md).

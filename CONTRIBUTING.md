@@ -32,6 +32,7 @@ Linux and Windows. Run what matches what you changed:
 | What a package contains or depends on (`pyproject.toml`, a `.csproj`, `package.json`, the publishing plugin, a build hook) | `./gradlew packageTest` ([package-tests](package-tests/README.md)) |
 | `scripts/`, `.githooks/`, a shell script, `docker/pa-setup`'s setup scripts | `./gradlew checkScripts` |
 | `api-site/` | `./gradlew checkApiSite` |
+| What a `tm1-testcontainers` container is created with, in any language | `./gradlew containerConformance --continue`, with Docker and a TM1 source: every language starts the same scenarios and what Docker got must be equal ([`testcontainers-conformance`](testcontainers-conformance/README.md)). CI has no TM1 and can't run it for you |
 | How a client talks to TM1 | `./gradlew liveTest --continue`, with a TM1 ([`scripts/live-tests.sh`](scripts/live-tests.sh) says how to give it one). CI has no TM1 and can't run these for you |
 | Not sure | `./gradlew checkAll packageTest` |
 
