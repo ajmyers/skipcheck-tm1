@@ -13,6 +13,7 @@
 
 ArchitectureTest: ArchUnit rules over Java's compiled classes (Reactor blocking calls, subscribe(), WebClient URI templates, SLF4J, final service classes); tests/test_architecture.py has each rule's Python counterpart, under a Python name because the rules differ (an event loop, not a Reactor chain; the logging module, not SLF4J)
 ConformanceFixturesTest: checks that each fixture in spec/conformance/calls belongs to the Java test class that records it; Java writes the fixtures, this client only replays them (tests/conformance/test_calls.py)
+LiveServerTest: how Java's live harness reads TM1_URL, TM1_USER, TM1_PASSWORD, TM1_NAMESPACE and TM1_VERIFY; each client tests its own harness's reading of them
 ProbedWritesCoverageTest: checks spec/conformance/live against the probe file (every write TM1 applies is in some scenario), which no client code takes part in; this client runs every scenario live
 LiveBuildersCoverageTest: checks spec/conformance/live against the spec's write plan (every builder and setter is written by some scenario, or listed), which no client code takes part in; this client runs every scenario live through its builders
 ProbeCoverageTest: checks the builder manifest against the spec's offers and the probe file, which no client code takes part in; this client checks its own builders against the manifest

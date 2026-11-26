@@ -116,7 +116,11 @@ class UserAndGroupTm1Test {
 
 	@Test
 	void disconnectsAUser() {
-		Tm1Client asUser = Tm1Client.builder().baseUrl(server.getRestUrl()).basicAuth(user, "pw").build();
+		Tm1Client asUser = Tm1Client.builder()
+			.baseUrl(server.getRestUrl())
+			.basicAuth(user, "pw")
+			.webClient(server.webClient())
+			.build();
 		try {
 			asUser.connect().block(WAIT);
 			assertThat(tm1.users().get(user, ODataQuery.none()).block(WAIT).isActive()).isTrue();

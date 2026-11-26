@@ -120,9 +120,7 @@ class Tm1SessionTm1Test {
 
 	@Test
 	void labelsTheSessionWithItsContext() {
-		Tm1Session session = Tm1Session.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
+		Tm1Session session = server.sessionBuilder()
 			// With a character outside ASCII: TM1 reads the header as UTF-8
 			.sessionContext("tm1-client test, café")
 			.build();
@@ -200,11 +198,7 @@ class Tm1SessionTm1Test {
 	 * sessions.
 	 */
 	private Tm1Session session() {
-		return Tm1Session.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.sessionContext(context)
-			.build();
+		return server.sessionBuilder().sessionContext(context).build();
 	}
 
 }

@@ -318,7 +318,7 @@ class Tm1SessionBehaviorTest {
 		ConnectionProvider one = ConnectionProvider.builder("idle-probe").maxConnections(1).build();
 		CompletableFuture<Long> closedAfter = new CompletableFuture<>();
 		long[] used = { System.nanoTime() };
-		HttpClient http = HttpClient.create(one)
+		HttpClient http = server.secure(HttpClient.create(one))
 			.doOnChannelInit((observer, channel, address) -> channel.closeFuture()
 				.addListener(f -> closedAfter.complete((System.nanoTime() - used[0]) / 1_000_000_000L)))
 			.headers(h -> h.set("Authorization", server.getAuthorization()));

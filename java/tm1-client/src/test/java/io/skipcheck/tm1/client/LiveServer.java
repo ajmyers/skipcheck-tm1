@@ -3,18 +3,23 @@
 package io.skipcheck.tm1.client;
 
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
+import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLException;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.skipcheck.tm1.client.auth.Tm1Authenticator;
+import io.skipcheck.tm1.client.session.Tm1Session;
 import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import reactor.netty.http.client.HttpClient;
@@ -59,20 +64,38 @@ public final class LiveServer {
 		this.version = container == null ? null : container.getTm1Version();
 	}
 
-	/** The running TM1 {@code TM1_URL} names, if it's set (not blank). */
+	/**
+	 * The running TM1 {@code TM1_URL} names, if it's set (not blank): one for the run, so
+	 * its version is read once.
+	 */
 	static Optional<LiveServer> running() {
-		String url = setting(URL);
+		return Running.SERVER;
+	}
+
+	/** Read the first time it's asked for, once for the run. */
+	private static final class Running {
+
+		static final Optional<LiveServer> SERVER = running(LiveServer::lookup);
+
+	}
+
+	/**
+	 * The running TM1 the settings name, read through {@code lookup} (a variable's value,
+	 * or null): the URL, with a blank one taken as unset; the user, {@code admin} unless
+	 * set; the password, {@code apple} unless set, an empty one staying empty
+	 * (tm1-server's admin has none), as the other clients read it; the CAM namespace; and
+	 * whether to check the certificate, unless {@code TM1_VERIFY} is {@code false}.
+	 */
+	static Optional<LiveServer> running(UnaryOperator<@Nullable String> lookup) {
+		String url = blankIsNull(lookup.apply(URL));
 		if (url == null) {
 			return Optional.empty();
 		}
-		String user = setting("TM1_USER");
-		// Set but empty is a blank password (tm1-server's admin has none), as the other
-		// clients
-		// read it: only an unset one defaults
-		String password = System.getenv("TM1_PASSWORD") != null ? System.getenv("TM1_PASSWORD")
-				: System.getProperty("TM1_PASSWORD");
+		String user = blankIsNull(lookup.apply("TM1_USER"));
+		String password = lookup.apply("TM1_PASSWORD");
 		return Optional.of(new LiveServer(url, user == null ? "admin" : user, password == null ? "apple" : password,
-				setting("TM1_NAMESPACE"), !"false".equalsIgnoreCase(setting("TM1_VERIFY")), null));
+				blankIsNull(lookup.apply("TM1_NAMESPACE")),
+				!"false".equalsIgnoreCase(blankIsNull(lookup.apply("TM1_VERIFY"))), null));
 	}
 
 	/** The container, as a live test's server. */
@@ -81,11 +104,12 @@ public final class LiveServer {
 				container);
 	}
 
-	private static @Nullable String setting(String name) {
+	private static @Nullable String lookup(String name) {
 		String value = System.getenv(name);
-		if (value == null) {
-			value = System.getProperty(name);
-		}
+		return value != null ? value : System.getProperty(name);
+	}
+
+	private static @Nullable String blankIsNull(@Nullable String value) {
 		return value == null || value.isBlank() ? null : value.strip();
 	}
 
@@ -132,16 +156,63 @@ public final class LiveServer {
 	public WebClient.Builder webClient() {
 		WebClient.Builder web = WebClient.builder();
 		if (!verify) {
-			try {
-				var insecure = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
-				web.clientConnector(
-						new ReactorClientHttpConnector(HttpClient.create().secure(ssl -> ssl.sslContext(insecure))));
-			}
-			catch (SSLException e) {
-				throw new IllegalStateException("Can't make a client that trusts any certificate", e);
-			}
+			web.clientConnector(new ReactorClientHttpConnector(secure(HttpClient.create())));
 		}
 		return web;
+	}
+
+	/** A session builder for the server: its URL, the login and {@link #webClient()}. */
+	public Tm1Session.Builder sessionBuilder() {
+		return Tm1Session.builder().baseUrl(restUrl).authenticator(authenticator()).webClient(webClient());
+	}
+
+	/**
+	 * A JDK HTTP client builder for the server: one that trusts any certificate when
+	 * {@code TM1_VERIFY} is {@code false}.
+	 */
+	public java.net.http.HttpClient.Builder httpClient() {
+		java.net.http.HttpClient.Builder http = java.net.http.HttpClient.newBuilder();
+		if (!verify) {
+			http.sslContext(trustingContext());
+		}
+		return http;
+	}
+
+	/**
+	 * A Reactor Netty client for the server, as given, but trusting any certificate when
+	 * {@code TM1_VERIFY} is {@code false}.
+	 */
+	public HttpClient secure(HttpClient http) {
+		return verify ? http : http.secure(ssl -> ssl.sslContext(insecure()));
+	}
+
+	/**
+	 * Whether the server's certificate is checked ({@code TM1_VERIFY} isn't
+	 * {@code false}).
+	 */
+	public boolean verifies() {
+		return verify;
+	}
+
+	/** An SSL context that trusts any certificate, for {@code TM1_VERIFY=false}. */
+	public static SSLContext trustingContext() {
+		try {
+			SSLContext context = SSLContext.getInstance("TLS");
+			context.init(null, InsecureTrustManagerFactory.INSTANCE.getTrustManagers(), null);
+			return context;
+		}
+		catch (GeneralSecurityException e) {
+			throw new IllegalStateException("Can't make an SSL context that trusts any certificate", e);
+		}
+	}
+
+	private static SslContext insecure() {
+		try {
+			return SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
+		}
+		catch (SSLException e) {
+			throw new IllegalStateException("Can't make a client that trusts any certificate", e);
+		}
 	}
 
 	/** A client builder for the server: its URL, the login and {@link #webClient()}. */

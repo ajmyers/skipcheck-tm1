@@ -3,7 +3,6 @@
 package io.skipcheck.tm1.client.model;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -11,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,10 +58,7 @@ class PayloadCaptureTest {
 
 	@Test
 	void capturesPayloads(LiveServer tm1) throws Exception {
-		Tm1Session session = Tm1Session.builder()
-			.baseUrl(tm1.getRestUrl())
-			.basicAuth(tm1.getUsername(), tm1.getPassword())
-			.build();
+		Tm1Session session = tm1.sessionBuilder().build();
 		try {
 			createFixtures(session);
 		}
@@ -249,10 +244,9 @@ class PayloadCaptureTest {
 	}
 
 	private static String send(LiveServer tm1, HttpRequest.Builder request, boolean xml) throws Exception {
-		String auth = Base64.getEncoder()
-			.encodeToString((tm1.getUsername() + ":" + tm1.getPassword()).getBytes(StandardCharsets.UTF_8));
-		HttpResponse<String> response = HttpClient.newHttpClient()
-			.send(request.header("Authorization", "Basic " + auth)
+		HttpResponse<String> response = tm1.httpClient()
+			.build()
+			.send(request.header("Authorization", tm1.getAuthorization())
 				.header("Accept", xml ? "application/xml" : "application/json")
 				.build(), HttpResponse.BodyHandlers.ofString());
 		if (response.statusCode() / 100 != 2) {

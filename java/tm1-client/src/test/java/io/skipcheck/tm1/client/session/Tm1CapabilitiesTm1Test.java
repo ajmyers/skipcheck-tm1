@@ -13,7 +13,6 @@ import io.skipcheck.tm1.client.LiveServer;
 import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Request;
-import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -80,14 +79,10 @@ class Tm1CapabilitiesTm1Test {
 
 	@Test
 	void sharesOneFetchBetweenAPoolsSessions(LiveServer server) {
-		Tm1SessionPool pool = Tm1SessionPool.builder(
-				Tm1Session.builder().baseUrl(server.getRestUrl()).basicAuth(server.getUsername(), server.getPassword()))
-			.build();
+		Tm1SessionPool pool = Tm1SessionPool.builder(server.sessionBuilder()).build();
 		try {
 			Tm1Capabilities first = pool.session().capabilities().block(WAIT);
-			Tm1Capabilities second = pool
-				.session(Tm1Identity.withCredentials("again",
-						Tm1Authenticator.basic(server.getUsername(), server.getPassword())))
+			Tm1Capabilities second = pool.session(Tm1Identity.withCredentials("again", server.authenticator()))
 				.capabilities()
 				.block(WAIT);
 			assertThat(second).isSameAs(first);
@@ -103,10 +98,7 @@ class Tm1CapabilitiesTm1Test {
 	}
 
 	private static Tm1Session session(LiveServer server) {
-		return Tm1Session.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+		return server.sessionBuilder().build();
 	}
 
 }

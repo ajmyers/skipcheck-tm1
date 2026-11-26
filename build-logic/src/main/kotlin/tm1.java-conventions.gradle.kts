@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Baseline for every Java subproject: toolchain, compiler flags, JUnit
+import java.security.MessageDigest
+
 import net.ltgt.gradle.errorprone.CheckSeverity
 import net.ltgt.gradle.errorprone.errorprone
 
@@ -86,7 +88,7 @@ tasks.withType<Test>().configureEach {
 		"TM1_PRIVATE_IMAGE", "TM1_HOME_DIR", "TM1_INSTALL_VOLUME", "TM1_BUNDLE_DIR",
 		"TM1_BUNDLE", "TM1_BUNDLE_URL", "TM1_BUNDLE_SHA256", "TM1_SERVER_IMAGE",
 		// ...or one already running, for tm1-client's live tests (LiveTm1)
-		"TM1_URL", "TM1_USER", "TM1_PASSWORD", "TM1_NAMESPACE", "TM1_VERIFY",
+		"TM1_URL", "TM1_USER", "TM1_NAMESPACE", "TM1_VERIFY",
 		// ...and TM1 v12
 		"TM1_ENGINE_PRIVATE_IMAGE", "TM1_ENGINE_HOME_DIR", "TM1_ENGINE_INSTALL_VOLUME", "TM1_ENGINE_BUNDLE_DIR",
 		"TM1_ENGINE_BUNDLE", "TM1_ENGINE_BUNDLE_URL", "TM1_ENGINE_BUNDLE_SHA256", "TM1_ENGINE_IMAGE",
@@ -102,6 +104,13 @@ tasks.withType<Test>().configureEach {
 	)) {
 		inputs.property(name, providers.environmentVariable(name).orElse(""))
 	}
+	// A password changes what a run can do too, but goes into Gradle's task history as a hash,
+	// not as itself
+	inputs.property("TM1_PASSWORD", providers.environmentVariable("TM1_PASSWORD").map { password: String ->
+		MessageDigest.getInstance("SHA-256")
+			.digest(password.toByteArray())
+			.joinToString("") { byte: Byte -> "%02x".format(byte) }
+	}.orElse(""))
 }
 
 dependencies {

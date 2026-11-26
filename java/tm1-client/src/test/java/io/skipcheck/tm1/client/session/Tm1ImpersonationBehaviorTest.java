@@ -27,6 +27,8 @@ class Tm1ImpersonationBehaviorTest {
 
 	private RawTm1 tm1;
 
+	private LiveServer server;
+
 	private String admin;
 
 	private String alice;
@@ -35,6 +37,7 @@ class Tm1ImpersonationBehaviorTest {
 
 	@BeforeEach
 	void createUsers(LiveServer server) {
+		this.server = server;
 		tm1 = new RawTm1(server);
 		admin = tm1.login();
 		String run = UUID.randomUUID().toString().substring(0, 6);
@@ -139,8 +142,9 @@ class Tm1ImpersonationBehaviorTest {
 		createUser(otherAdmin, "ADMIN");
 		createUser(dataAdmin, "DataAdmin");
 		try {
-			for (String[] attempt : new String[][] { { "admin", "", otherAdmin }, { "admin", "", "Admin" },
-					{ dataAdmin, "p", otherAdmin }, { dataAdmin, "p", "Admin" } }) {
+			for (String[] attempt : new String[][] { { server.getUsername(), server.getPassword(), otherAdmin },
+					{ server.getUsername(), server.getPassword(), "Admin" }, { dataAdmin, "p", otherAdmin },
+					{ dataAdmin, "p", "Admin" } }) {
 				HttpResponse<String> refused = impersonate(attempt[0], attempt[1], attempt[2]);
 				assertThat(refused.statusCode()).as("%s impersonating %s", attempt[0], attempt[2]).isEqualTo(403);
 				assertThat(refused.body()).contains("You have insufficient rights to impersonate the user specified!");
@@ -189,7 +193,7 @@ class Tm1ImpersonationBehaviorTest {
 	@Test
 	void refusesADisabledUserLikeWrongCredentials() {
 		tm1.send(tm1.request("PATCH", "Users('" + bob + "')").cookie(admin).body("{\"Enabled\":false}"));
-		HttpResponse<String> refused = impersonate("admin", "", bob);
+		HttpResponse<String> refused = impersonate(server.getUsername(), server.getPassword(), bob);
 		assertThat(refused.statusCode()).isEqualTo(401);
 		assertThat(refused.body()).isEmpty();
 	}
@@ -201,7 +205,7 @@ class Tm1ImpersonationBehaviorTest {
 	 */
 	@Test
 	void treatsAnEmptyHeaderAsNoImpersonation() {
-		HttpResponse<String> login = impersonate("admin", "", "");
+		HttpResponse<String> login = impersonate(server.getUsername(), server.getPassword(), "");
 		try {
 			assertThat(login.statusCode()).isEqualTo(200);
 			assertThat(RawTm1.json(login).get("Name").asString()).isEqualTo("Admin");
@@ -218,7 +222,7 @@ class Tm1ImpersonationBehaviorTest {
 	@Test
 	void matchesUserNamesIgnoringCaseAndSpaces() {
 		for (String written : new String[] { alice.toUpperCase(Locale.ROOT), alice.replace("_", "_ ") }) {
-			HttpResponse<String> login = impersonate("admin", "", written);
+			HttpResponse<String> login = impersonate(server.getUsername(), server.getPassword(), written);
 			try {
 				assertThat(login.statusCode()).as(written).isEqualTo(200);
 				assertThat(RawTm1.json(login).get("Name").asString()).as(written).isEqualTo(alice);
@@ -260,7 +264,7 @@ class Tm1ImpersonationBehaviorTest {
 	}
 
 	private RawTm1.Bytes impersonate(byte[] target) {
-		return tm1.getWithHeaderBytes("ActiveUser?$select=Name", RawTm1.basic("admin", ""), "TM1-Impersonate", target);
+		return tm1.getWithHeaderBytes("ActiveUser?$select=Name", server.getAuthorization(), "TM1-Impersonate", target);
 	}
 
 	private HttpResponse<String> impersonate(String user, String password, String target) {

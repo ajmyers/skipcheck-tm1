@@ -5,7 +5,6 @@ package io.skipcheck.tm1.client.metadata;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -41,7 +40,8 @@ class MetadataDriftTm1Test {
 
 	@Test
 	void matchesTheSnapshotOrReportsTheDifferences(LiveServer tm1) throws Exception {
-		String live = HttpClient.newHttpClient()
+		String live = tm1.httpClient()
+			.build()
 			.send(HttpRequest.newBuilder(URI.create(tm1.getRestUrl() + "$metadata")).build(),
 					HttpResponse.BodyHandlers.ofString())
 			.body();

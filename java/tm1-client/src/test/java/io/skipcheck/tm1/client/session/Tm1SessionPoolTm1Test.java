@@ -53,11 +53,7 @@ class Tm1SessionPoolTm1Test {
 		bob = "zz_bob_" + run;
 		raw.createUser(admin, alice, "a");
 		raw.createUser(admin, bob, "b");
-		pool = Tm1SessionPool
-			.builder(Tm1Session.builder()
-				.baseUrl(server.getRestUrl())
-				.basicAuth(server.getUsername(), server.getPassword())
-				.sessionContext(context))
+		pool = Tm1SessionPool.builder(server.sessionBuilder().sessionContext(context))
 			.idleTimeout(Duration.ofSeconds(1))
 			.closeGrace(Duration.ZERO)
 			.sweepInterval(Duration.ofHours(1))

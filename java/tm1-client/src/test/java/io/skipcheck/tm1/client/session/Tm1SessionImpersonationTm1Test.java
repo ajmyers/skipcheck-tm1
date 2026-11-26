@@ -113,11 +113,7 @@ class Tm1SessionImpersonationTm1Test {
 	}
 
 	private Tm1Session session(String user) {
-		return Tm1Session.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.impersonate(user)
-			.build();
+		return server.sessionBuilder().impersonate(user).build();
 	}
 
 	private static Tm1ErrorKind kindOf(Tm1Session session) {
