@@ -4,12 +4,21 @@ package io.skipcheck.tm1.client.metadata;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Stream;
+
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.csdl.CsdlAnnotation;
 import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlEntityContainer;
 import io.skipcheck.tm1.csdl.CsdlOperation;
+import io.skipcheck.tm1.csdl.CsdlParser;
 import io.skipcheck.tm1.csdl.CsdlRevision;
 import io.skipcheck.tm1.csdl.CsdlSchema;
 
@@ -25,6 +34,26 @@ class MetadataSnapshotTest {
 	void isTheVersionItSaysItIs() {
 		assertThat(doc.schemaVersion()).contains(MetadataSnapshot.VERSION);
 		assertThat(doc.version()).isEqualTo("4.0");
+	}
+
+	@Test
+	void holdsEachCommittedSnapshotToTheSchemaItsNameSays() throws Exception {
+		// Each tm1-schema-<v>.xml is the document of schema <v>, and the newest is
+		// VERSION
+		List<String> versions = new ArrayList<>();
+		try (Stream<Path> files = Files.list(Path.of("src/model/metadata"))) {
+			files.map(f -> f.getFileName().toString())
+				.filter(n -> n.startsWith("tm1-schema-") && n.endsWith(".xml"))
+				.forEach(n -> versions.add(n.substring("tm1-schema-".length(), n.length() - ".xml".length())));
+		}
+		assertThat(versions).contains("11.8.20", "11.8.32", MetadataSnapshot.VERSION);
+		for (String version : versions) {
+			assertThat(CsdlParser.parse(MetadataSnapshot.text(version).orElseThrow()).schemaVersion()).as(version)
+				.contains(version);
+		}
+		assertThat(versions.stream().map(Tm1Version::parse).max(Comparator.naturalOrder()))
+			.contains(Tm1Version.parse(MetadataSnapshot.VERSION));
+		assertThat(MetadataSnapshot.text("0.0")).isEmpty();
 	}
 
 	@Test

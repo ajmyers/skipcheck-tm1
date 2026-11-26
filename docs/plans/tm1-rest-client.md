@@ -435,7 +435,7 @@ properties (#310) and write types (#311) from it. Versions are handled as `$meta
 
 - **One file per schema version**, committed, as the snapshots are. The newest snapshot's file
   drives the model; older files are history.
-- **Drift is detected by a live test**, as `MetadataDriftTest` does for `$metadata`:
+- **Drift is detected by a live test**, as `MetadataDriftTm1Test` does for `$metadata`:
   `ProbeDriftTm1Test` re-probes the configured TM1 (the known names and the write cases, not the
   whole binary). On a version with a committed file, the result must equal it, which also catches a
   fix pack that changes behaviour under the same `Core.SchemaVersion`. On another version, it

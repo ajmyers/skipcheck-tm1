@@ -51,7 +51,7 @@ One file per schema version, as the `$metadata` snapshots are. For a new TM1 ver
 3. Commit both. Today the generators read the file for the snapshot's own version only; merging the
    versions' files into the spec, and checking a server's version at run time where behaviour
    differs, is planned ([#318](https://github.com/ajmyers/skipcheck-tm1/issues/318), plan §9). So is
-   a live drift test that compares a server with the committed file, as `MetadataDriftTest` does for
+   a live drift test that compares a server with the committed file, as `MetadataDriftTm1Test` does for
    `$metadata`.
 
 ## What it does
