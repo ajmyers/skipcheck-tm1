@@ -95,7 +95,7 @@ public final class Tm1Database {
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(System.identityHashCode(engine), instance, name);
+		return Objects.hash(engine, instance, name);
 	}
 
 	@Override

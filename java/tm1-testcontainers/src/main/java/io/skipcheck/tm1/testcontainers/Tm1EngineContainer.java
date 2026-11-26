@@ -376,7 +376,7 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	}
 
 	/**
-	 * Deletes a database of the running engine, with everything in it. Takes about 7
+	 * Deletes a database of the running engine, with everything in it. Takes about 5
 	 * seconds.
 	 * @param database the database
 	 */
@@ -407,7 +407,14 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 		// Before anything starts: Testcontainers starts the datastore, which this depends
 		// on, ahead of configure()
 		joinNetwork();
-		super.start();
+		try {
+			super.start();
+		}
+		catch (RuntimeException e) {
+			// Testcontainers stops the engine it couldn't start, not what it depends on
+			datastore.stop();
+			throw e;
+		}
 	}
 
 	/** Puts the engine and its datastore on one network: the one given, or a new one. */

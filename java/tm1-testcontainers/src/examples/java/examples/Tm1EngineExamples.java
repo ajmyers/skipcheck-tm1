@@ -41,6 +41,25 @@ final class Tm1EngineExamples {
 	}
 	// @end
 
+	// @start region = shared-database
+	// The engine's one shared database instead: nothing to create, but give what you
+	// make a unique name
+	@RequiresTm1Engine(shareDatabase = true)
+	static class ServerNameTest {
+
+		@Test
+		void readsTheServersName(Tm1Database db) throws Exception {
+			HttpRequest request = db.login()
+				.authorize(HttpRequest.newBuilder(URI.create(db.getRestUrl() + "Configuration/ServerName/$value")))
+				.build();
+			HttpResponse<String> response = HttpClient.newHttpClient()
+				.send(request, HttpResponse.BodyHandlers.ofString());
+			assertEquals(200, response.statusCode());
+		}
+
+	}
+	// @end
+
 	void container(Tm1EngineSource source) {
 		// @start region = container
 		try (var engine = new Tm1EngineContainer(source).withDatabase("planning").withUser("analyst", "Analysts")) {

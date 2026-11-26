@@ -29,9 +29,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * {@snippet class = examples.Tm1EngineExamples region = test-class}
  *
  * <p>
- * A database takes about 10 seconds to create and 7 to drop. {@link #shareDatabase} gives
+ * A database takes about 13 seconds to create and 5 to drop. {@link #shareDatabase} gives
  * a class the engine's one shared database instead, at no cost: its tests then need
- * uniquely named objects, and to delete them afterwards.
+ * uniquely named objects, and to delete them afterwards:
+ *
+ * {@snippet class = examples.Tm1EngineExamples region = shared-database}
  *
  * <p>
  * "A test class" is the unit each language's test framework shares set-up over: a JUnit
