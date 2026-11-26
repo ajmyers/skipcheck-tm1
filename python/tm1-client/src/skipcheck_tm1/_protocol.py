@@ -120,6 +120,12 @@ class Call:
     """A :class:`~skipcheck_tm1.version.Tm1Capability` the server must have, checked first."""
     timeout: float | None = None
     """Seconds to wait for the answer, instead of the session's request timeout."""
+    checked_operation: Any = None
+    """A :class:`~skipcheck_tm1.operation.Tm1Operation` whose parameters the body sends are
+    checked against the server's definition of it, as Java's ``Tm1Request.requires(Tm1Operation)``."""
+    parameter_defaults: Mapping[str, Any] = field(default_factory=dict)
+    """What the server assumes for each parameter left out: on a server without the parameter, a
+    body sending this value is sent without it."""
 
     def body(self) -> tuple[bytes | None, dict[str, str]]:
         """The body to send, and the headers that go with it."""

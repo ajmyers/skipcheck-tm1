@@ -228,7 +228,11 @@ class Tm1Capabilities:
         bound: dict[str, set[str]],
         container: dict[str, set[str]],
         aliases: dict[str, str],
+        parameters: dict[tuple[str | None, str], list[set[str]]] | None = None,
     ):
+        self._parameters = parameters or {}
+        """Each operation's parameters, by (qualified binding type, name) or (None, import name),
+        one set per overload, without the binding parameter."""
         self._schema_version = schema_version
         self._product_version = product_version
         self.endpoints = endpoints
@@ -265,6 +269,8 @@ class Tm1Capabilities:
         endpoints: set[str] = set()
         types: dict[str, _Type] = {}
         bound: dict[str, set[str]] = {}
+        parameters: dict[tuple[str | None, str], list[set[str]]] = {}
+        imports: dict[str, str] = {}
         container: dict[str, set[str]] = {"EntitySet": set(), "Singleton": set(), "Import": set()}
         aliases: dict[str, str] = {}
         version = None
@@ -288,6 +294,9 @@ class Tm1Capabilities:
             for kind in ("Action", "Function"):
                 for op in schema.findall(f"{_EDM}{kind}"):
                     if op.get("IsBound") != "true":
+                        # An unbound operation's parameters, by its qualified name, for its import
+                        names = {p.get("Name", "") for p in op.findall(f"{_EDM}Parameter")}
+                        parameters.setdefault((None, f"{ns}.{op.get('Name')}"), []).append(names)
                         continue
                     params = op.findall(f"{_EDM}Parameter")
                     if not params:
@@ -299,6 +308,8 @@ class Tm1Capabilities:
                     simple = _simple(inner)
                     endpoints.add(f"{kind} {'Collection(' + simple + ')' if collection else simple}/{op.get('Name')}")
                     bound.setdefault(qualify(inner), set()).add(op.get("Name", ""))
+                    if not collection:
+                        parameters.setdefault((qualify(inner), op.get("Name", "")), []).append({p.get("Name", "") for p in params[1:]})
             for tag in ("EntityType", "ComplexType"):
                 for t in schema.findall(f"{_EDM}{tag}"):
                     q = f"{ns}.{t.get('Name')}"
@@ -319,11 +330,20 @@ class Tm1Capabilities:
                     for item in c.findall(f"{_EDM}{tag}"):
                         endpoints.add(f"{kind} {item.get('Name')}")
                         container["Import" if "Import" in kind else kind].add(item.get("Name", ""))
-        return Tm1Capabilities(version, product_version, frozenset(endpoints), types, bound, container, aliases)
+                        imported = item.get("Action") or item.get("Function")
+                        if imported:
+                            imports[item.get("Name", "")] = qualify(imported)
+        # An import's parameters, under its own name, once every schema is read
+        operation_parameters = {key: value for key, value in parameters.items() if key[0] is not None}
+        for name, imported in imports.items():
+            operation_parameters[(None, name)] = parameters.get((None, imported), [])
+        return Tm1Capabilities(version, product_version, frozenset(endpoints), types, bound, container, aliases, operation_parameters)
 
     def with_product_version(self, product_version: Tm1Version | None) -> Tm1Capabilities:
         """A copy with the server's product version, which ``$metadata`` doesn't say, for messages."""
-        return Tm1Capabilities(self._schema_version, product_version, self.endpoints, self._types, self._bound, self._container, self._aliases)
+        return Tm1Capabilities(
+            self._schema_version, product_version, self.endpoints, self._types, self._bound, self._container, self._aliases, self._parameters
+        )
 
     @property
     def schema_version(self) -> str | None:
@@ -382,6 +402,34 @@ class Tm1Capabilities:
         if not added:
             message += ")"
         return Tm1UnsupportedOperationError(message, missing)
+
+    def supports_parameter(self, operation: Tm1Capability, parameter: str) -> bool:
+        """Whether the server's definition of an operation has ``parameter``. For a bound operation,
+        any operation of that name bound to the type or one of its base types counts; for an
+        operation import, the operation it imports. ValueError for a capability that isn't an
+        operation."""
+        k = Tm1Capability.Kind
+        if operation.kind is k.BOUND_OPERATION:
+            assert operation.type is not None
+            name = _simple(operation.name)
+            defined = [p for t in self._hierarchy(operation.type) for p in self._parameters.get((t.name, name), [])]
+        elif operation.kind is k.UNBOUND_OPERATION:
+            defined = self._parameters.get((None, operation.name), [])
+        else:
+            raise ValueError(f"{operation.describe()} isn't an operation")
+        return any(parameter in names for names in defined)
+
+    def check_parameter(self, operation: Tm1Capability, parameter: str, server: str) -> Tm1UnsupportedOperationError | None:
+        """None if the server's definition of the operation has the parameter; otherwise the error
+        saying what's missing and which schema version the server reports, as Java's."""
+        if self.supports_parameter(operation, parameter):
+            return None
+        missing = f"parameter {parameter} of {operation.describe()}"
+        message = f"{missing} isn't defined by the TM1 server at {server} ("
+        message += f"the server reports schema {self._schema_version}" if self._schema_version else "the server reports no schema version"
+        if self._product_version is not None:
+            message += f", product version {self._product_version}"
+        return Tm1UnsupportedOperationError(message + ")", missing)
 
     def __repr__(self) -> str:
         return f"Tm1Capabilities[schema {self._schema_version or 'unknown'}, product {self._product_version or 'unknown'}]"

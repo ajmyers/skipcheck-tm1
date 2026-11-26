@@ -31,6 +31,7 @@ import ssl
 import threading
 import time
 from collections.abc import AsyncIterator, Callable, Iterator
+from dataclasses import replace
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -53,6 +54,7 @@ from ..errors import (
 )
 from ..identity import check_impersonated
 from ..odata import ODataPath, ODataQuery
+from ..operation import Tm1Operation
 from ..request import Tm1Request
 from ..timeouts import Tm1Timeouts
 from ..version import Tm1Capabilities, Tm1Dialect, Tm1Version
@@ -623,12 +625,35 @@ class AsyncTm1Session:
         Java's name for :attr:`base_url`."""
         return self._connection.base_url
 
-    async def _check(self, call: p.Call) -> None:
+    async def _prepare(self, call: p.Call) -> p.Call:
+        """The call as it can be sent to this server: what it needs is checked first, and so are
+        the parameters its body sends, for a call that names its operation. A parameter the server
+        lacks fails the call, unless its default is what the body sends, in which case it's left
+        out of the body. As Java's ``Connection.prepare``."""
         needed = capability_of(call)
-        if needed is not None and self._connection.check_capabilities:
-            refused = (await self._connection.capabilities()).check(needed, self._connection.base_url)
-            if refused is not None:
-                raise refused
+        if needed is None or not self._connection.check_capabilities:
+            return call
+        capabilities = await self._connection.capabilities()
+        refused = capabilities.check(needed, self._connection.base_url)
+        if refused is not None:
+            raise refused
+        operation = call.checked_operation
+        body = call.json_body
+        if operation is None or operation.kind is not Tm1Operation.Kind.ACTION or not isinstance(body, dict):
+            return call
+        sent = dict(body)
+        for parameter in operation.parameters:
+            name = parameter.name
+            key = name if name in sent else f"{name}@odata.bind" if f"{name}@odata.bind" in sent else None
+            if key is None or capabilities.supports_parameter(needed, name):
+                continue
+            if name in call.parameter_defaults and call.parameter_defaults[name] == sent[key]:
+                del sent[key]
+                continue
+            missing = capabilities.check_parameter(needed, name, self._connection.base_url)
+            assert missing is not None
+            raise missing
+        return call if len(sent) == len(body) else replace(call, json_body=sent)
 
     async def execute(self, request: Tm1Request[Any] | p.Call) -> Any:
         """Sends a request and reads its answer; in a batch, queues it and returns a ``Deferred``.
@@ -642,7 +667,7 @@ class AsyncTm1Session:
             return self._queue.add(call, self._context)
         # Running for the whole of it, so an async request counts while it's polled
         with self._connection.busy():
-            await self._check(call)
+            call = await self._prepare(call)
             url = self._connection.url(p.target(call, self._context))
             content, headers = call.body()
             if self._async_every is not None and not call.raw:
@@ -806,9 +831,10 @@ class AsyncTm1SessionBatch:
         if per_request < 1:
             raise ValueError(f"A batch needs room for at least one request: {per_request}")
         sendable = []
-        for entry in self._queue.take():
-            if await self._supported(entry[0], entry[2]):
-                sendable.append(entry)
+        for call, context, deferred in self._queue.take():
+            ready = await self._supported(call, deferred)
+            if ready is not None:
+                sendable.append((ready, context, deferred))
         paged = {id(deferred) for deferred in self._queue.paged}
         for start in range(0, len(sendable), per_request):
             chunk = sendable[start : start + per_request]
@@ -842,15 +868,14 @@ class AsyncTm1SessionBatch:
             return
         deferred._value = items
 
-    async def _supported(self, call: p.Call, deferred: p.Deferred[Any]) -> bool:
-        """Whether the server defines what the call requires. If it doesn't (or that can't be found
-        out), the call fails and isn't sent, as outside a batch."""
+    async def _supported(self, call: p.Call, deferred: p.Deferred[Any]) -> p.Call | None:
+        """The call as it can be sent, if the server defines what it requires. If it doesn't (or
+        that can't be found out), the call fails and isn't sent, as outside a batch."""
         try:
-            await self._sender._check(call)
+            return await self._sender._prepare(call)
         except Exception as e:  # noqa: BLE001
             deferred._fail(e)
-            return False
-        return True
+            return None
 
 
 class AsyncTm1SessionBuilder:
