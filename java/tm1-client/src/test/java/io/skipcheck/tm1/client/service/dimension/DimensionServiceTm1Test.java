@@ -14,6 +14,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
@@ -25,6 +26,7 @@ import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.Hierarchy;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
+import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.client.odata.Filter;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -154,6 +156,7 @@ class DimensionServiceTm1Test {
 		dimensions.create(dimension(name)).block(WAIT);
 		try {
 			dimensions.lock(name).then(dimensions.unlock(name)).block(WAIT);
+			ServerAssumptions.assumeSupports(tm1, Tm1Operations.DIMENSION_RESERVE);
 			dimensions.reserve(name).then(dimensions.release(name)).block(WAIT);
 		}
 		finally {

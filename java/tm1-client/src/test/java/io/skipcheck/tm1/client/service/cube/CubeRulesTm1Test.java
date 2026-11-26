@@ -15,6 +15,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.CalculationComponent;
@@ -29,6 +30,7 @@ import io.skipcheck.tm1.client.model.FedCellDescriptor;
 import io.skipcheck.tm1.client.model.FeederTrace;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.RuleSyntaxError;
+import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
@@ -136,6 +138,8 @@ class CubeRulesTm1Test {
 
 	@Test
 	void checksFeedersUnderAConsolidation() {
+		// Both needs Selection, which servers before schema 11.8.32 don't have
+		ServerAssumptions.assumeSupportsParameter(tm1, Tm1Operations.CUBE_CHECK_FEEDERS, "Selection");
 		// A value to feed from; writing cells is phase 4's, so the raw session does it
 		// here
 		tm1.session()

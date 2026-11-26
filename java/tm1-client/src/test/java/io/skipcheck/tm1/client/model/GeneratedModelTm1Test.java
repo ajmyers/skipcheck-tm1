@@ -12,7 +12,9 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Request;
+import io.skipcheck.tm1.client.metadata.MetadataSnapshot;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.session.Tm1Session;
@@ -192,8 +194,18 @@ class GeneratedModelTm1Test {
 			.build();
 		try {
 			Tm1Capabilities capabilities = session.capabilities().block(WAIT);
+			// Every operation the snapshot of the server's own schema defines: an older
+			// server lacks what came later (Reserve in 11.8.34, encryption at rest in
+			// 11.8.35)
+			Tm1Capabilities own = Tm1Capabilities.of(ServerAssumptions.ownSnapshot(capabilities), null);
 			assertThat(Tm1Operations.ALL)
-				.allSatisfy(op -> assertThat(capabilities.supports(op.capability())).as("%s", op.endpoint()).isTrue());
+				.allSatisfy(op -> assertThat(capabilities.supports(op.capability())).as("%s", op.endpoint())
+					.isEqualTo(own.supports(op.capability())));
+			assertThat(Tm1Operations.ALL).as("the newest schema's server has every one")
+				.allSatisfy(
+						op -> assertThat(Tm1Capabilities.of(MetadataSnapshot.load(), null).supports(op.capability()))
+							.as("%s", op.endpoint())
+							.isTrue());
 		}
 		finally {
 			session.close().block(WAIT);

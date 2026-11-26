@@ -13,6 +13,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.model.DimensionCreate;
@@ -22,6 +23,7 @@ import io.skipcheck.tm1.client.model.GitPullPlan;
 import io.skipcheck.tm1.client.model.GitPushPlan;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
@@ -92,11 +94,16 @@ class GitServiceTm1Test {
 				tm1.git().execute(skip).block(WAIT);
 
 				remote.commitCopyOf(dimension, copy);
-				GitPullPlan stale = tm1.git().pull("main", GitCredentials.none(), null, true).block(WAIT);
-				assertThat(stale.commit().summary())
-					.as("the first pull after the remote moves plans the commit TM1 had")
-					.isEqualTo("Add a dimension");
+				// From 11.8.035 the first pull after the remote moves plans the commit
+				// TM1 had;
+				// before, it plans the new one at once
 				GitPullPlan pull = tm1.git().pull("main", GitCredentials.none(), null, true).block(WAIT);
+				if (ServerAssumptions.productVersion(tm1).compareTo(Tm1Version.parse("11.8.03500")) >= 0) {
+					assertThat(pull.commit().summary())
+						.as("the first pull after the remote moves plans the commit TM1 had")
+						.isEqualTo("Add a dimension");
+					pull = tm1.git().pull("main", GitCredentials.none(), null, true).block(WAIT);
+				}
 				assertThat(pull.commit().summary()).isEqualTo("Copy " + dimension);
 				assertThat(pull.operations()).contains("Create Dimensions('" + copy + "')");
 				tm1.git().execute(pull).block(WAIT);
