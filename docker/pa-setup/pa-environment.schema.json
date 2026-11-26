@@ -342,18 +342,25 @@
           }
         },
         "passthrough": {
-          "type": [
-            "object",
-            "boolean"
-          ],
-          "additionalProperties": false,
           "description": "Pass-through logins: a TM1 11 server of this file whose users log in to TM1 v12 with their name and password there. Not with oauth2",
-          "properties": {
-            "server": {
-              "type": "string",
-              "description": "The name of one of tm1.servers"
+          "oneOf": [
+            {
+              "const": false
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "server"
+              ],
+              "properties": {
+                "server": {
+                  "type": "string",
+                  "description": "The name of one of tm1.servers"
+                }
+              }
             }
-          }
+          ]
         }
       }
     }

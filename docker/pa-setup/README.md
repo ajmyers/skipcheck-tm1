@@ -163,11 +163,25 @@ tm1Engine: true            # one database, tm1; log in as admin
   ```
 
   - A user has to be in the v12 database too, to do anything there: list them in
-    `tm1Engine.users`. `admin` always is. pa-setup doesn't create users on the TM1 11 server.
+    `tm1Engine.users`, by name alone. `admin` always is. pa-setup doesn't create users on the
+    TM1 11 server, and a name there with a space or another character `users` doesn't take
+    can't be listed.
+  - **An empty TM1 11 database's `admin` has no password,** and logs in to TM1 v12 the same
+    way (`curl -u admin:`): anyone who reaches the engine's port is its administrator, as on
+    the TM1 11 server itself. `seed: sdata` gives `admin` / `apple`.
+  - The server has to answer plain HTTP on its REST port, as it does unless its `cfg` or a
+    kept `tm1s.cfg` turns `UseSSL` on. `cfg: { UseSSL: T }` is refused with `passthrough`.
+  - The engine starts once that server is healthy, and not without it.
   - It can't be on with `oauth2`: TM1 would take tokens and refuse a name and password.
-  - The name and password logins through the application still work beside it.
+  - Logins through the instance's application (`setup.sh session`) still work beside it.
+  - pa-setup owns the engine's pass-through setting, as its OAuth 2.0 one: one you set by
+    hand in the kept `config.internal.json`, to a server outside the file say, is removed on
+    the next `up` without `passthrough`.
   - Tried against a TM1 11 server with users of its own. **Not tried with Cognos (CAM)
-    security**, which every TM1 server gets when the file has `cognos`.
+    security**, which every TM1 server gets when the file has `cognos`: TM1 v12 refused the
+    header CAM logins use, so it may not log anyone in. `up` says so.
+  - `PlanningAnalyticsEnvironment.fromConfig` doesn't read `passthrough` yet: a file with it
+    is refused there as an unknown setting.
 - **Everything the engine stores is in `pa-files/tm1-engine`:** `deployment` (settings, the
   databases and logs), `credentials`, and `datastore` (MongoDB's data). Keep or delete the three
   together: a database's changes since its last save are in MongoDB.

@@ -104,7 +104,16 @@ tm1Engine:
         # OAuth 2.0 is the oauth2 section, and pass-through the passthrough section
         ("tm1Engine: {login: oauth2}", "tm1Engine: unknown setting(s) login"),
         ("tm1Engine: {passthrough: {url: 'http://x'}}", "tm1Engine.passthrough: unknown setting(s) url"),
-        ("tm1Engine: {passthrough: true}", "tm1Engine.passthrough must be a mapping"),
+        ("tm1Engine: {passthrough: true}", "tm1Engine.passthrough: name the TM1 server that checks names and passwords"),
+        ("tm1Engine: {passthrough: 1}", "tm1Engine.passthrough must be a mapping"),
+        (
+            "tm1: {servers: {legacy: {cfg: {UseSSL: T}}}}\ntm1Engine: {passthrough: {server: legacy}}",
+            "legacy has cfg.UseSSL on, and the engine asks it over plain HTTP",
+        ),
+        (
+            "tm1: {servers: {legacy: {}}}\ntm1Engine: {users: ['analyst:apple'], passthrough: {server: legacy}}",
+            "With passthrough the password is the one the user has on the TM1 server, and isn't written here: write analyst.",
+        ),
         ("tm1Engine: {passthrough: {}}", "tm1Engine.passthrough.server: name one of tm1.servers"),
         ("tm1: {servers: {legacy: {}}}\ntm1Engine: {passthrough: {server: other}}", "name one of tm1.servers, whose users then log in to TM1 v12 with their name and password there (legacy)"),
         ("tm1: {servers: {legacy: {}}}\ntm1Engine: {passthrough: {server: Legacy}}", "tm1Engine.passthrough.server: name one of tm1.servers"),
@@ -636,7 +645,8 @@ def test_up_and_down_remove_what_was_taken_out_of_the_file(
     assert ran == [["up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "1800"], ["down", "--remove-orphans"]]
 
 
-PASS = "tm1: {servers: {Legacy: {seed: sdata}, other: {}}}\ntm1Engine: {users: [analyst], passthrough: {server: Legacy}OAUTH}\n"
+# The named server is the second: the first is what TM1 Web and PAW take, and mustn't be taken here
+PASS = "tm1: {servers: {first: {}, Legacy: {seed: sdata, cfg: {UseSSL: F}}}}\ntm1Engine: {users: [analyst], passthrough: {server: Legacy}OAUTH}\n"
 
 
 def test_passthrough_points_the_engine_at_the_tm1_11_server_and_waits_for_it(pa_setup: ModuleType) -> None:
@@ -646,6 +656,7 @@ def test_passthrough_points_the_engine_at_the_tm1_11_server_and_waits_for_it(pa_
     assert engine["environment"]["TM1_PASSTHROUGH_URL"] == "http://legacy:8010/api/v1/"
     assert engine["environment"]["TM1_OAUTH2_ISSUER_URL"] == "none"
     assert engine["depends_on"]["legacy"] == {"condition": "service_healthy"}
+    assert "first" not in engine["depends_on"]
     # The image's defaults are a TM1 11 server's: nothing else to say
     assert not [name for name in engine["environment"] if name.startswith("TM1_PASSTHROUGH_") and name != "TM1_PASSTHROUGH_URL"]
     assert "tm1-engine-keycloak" not in generated["services"]
@@ -670,7 +681,29 @@ def test_prints_whose_users_log_in_and_how_to_try_it(pa_setup: ModuleType, capsy
     pa_setup.urls(model(pa_setup, PASS.replace("OAUTH", "")))
     out = capsys.readouterr().out
     assert "users of TM1 Legacy log in with their name and password there" in out
-    assert "curl -u NAME:PASSWORD \"http://localhost:4444/tm1/api/v1/Databases('tm1')/ActiveUser\"" in out
+    # The login the server's seed gives it
+    assert "curl -u admin:apple \"http://localhost:4444/tm1/api/v1/Databases('tm1')/ActiveUser\"" in out
+    pa_setup.urls(model(pa_setup, "tm1: {servers: {legacy: {}}}\ntm1Engine: {passthrough: {server: legacy}}\n"))
+    out = capsys.readouterr().out
+    assert "curl -u admin: " in out and "admin has no password on an empty TM1 database" in out
+
+
+def test_says_that_pass_through_to_a_server_in_cam_security_isnt_tried(
+    pa_setup: ModuleType, capsys: pytest.CaptureFixture[str]
+) -> None:
+    text = "cognos: {users: ['admin:adminpw:Admins']}\ntm1: {servers: {legacy: {}}}\ntm1Engine: {passthrough: {server: legacy}}\n"
+    pa_setup.urls(model(pa_setup, text))
+    out = capsys.readouterr().out
+    assert "NOT TRIED" in out and "Cognos (CAM) security" in out
+    assert "curl -u" not in out
+
+
+def test_the_schema_takes_a_server_or_false_for_passthrough_as_the_tool_does(pa_setup: ModuleType) -> None:
+    described = json.loads((SETUP / "pa-environment.schema.json").read_text(encoding="utf-8"))
+    off, on = described["properties"]["tm1Engine"]["properties"]["passthrough"]["oneOf"]
+    # true and {} are refused by the tool: an editor checking the file must say so too
+    assert off == {"const": False}
+    assert on["required"] == ["server"] and on["type"] == "object"
 
 
 def test_the_example_is_valid_and_fits_the_schema_it_documents(pa_setup: ModuleType) -> None:
