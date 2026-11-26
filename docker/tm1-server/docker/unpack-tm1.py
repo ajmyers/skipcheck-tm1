@@ -3,15 +3,18 @@
 """Unpack the parts of selected installables from an IBM TM1 repository zip.
 
 Usage: unpack-tm1.py <extracted-repo-dir> <install-dir> <installable> [...]
+       unpack-tm1.py --check <extracted-repo-dir> <installable> [...]
 
 Mirrors what IBM's installer does: read manifest/*/*.json, follow each
 installable's parts (and installablesRef), and extract each part's archive into
-<install-dir>/<part.installpath>.
+<install-dir>/<part.installpath>. --check only checks the manifest has what's
+asked for, so a bad list can be refused before an earlier install is removed.
 
 An installable named with a trailing ? (TM1_NON-PROD_SWTAG?) is optional: a
 bundle whose manifest doesn't have it installs without it. Planning Analytics
 2.1.8 to 2.1.10 have no software tags (TM1_PROD_SWTAG, TM1_NON-PROD_SWTAG come
-in 2.1.11). Any other name the manifest lacks stops the install.
+in 2.1.11). Any other name the manifest lacks, asked for or referred to by an
+installable asked for, stops it before anything is unpacked.
 """
 import glob
 import json
@@ -20,19 +23,43 @@ import sys
 import tarfile
 import zipfile
 
-repo, target, *wanted = sys.argv[1:]
+args = sys.argv[1:]
+check_only = args[:1] == ["--check"]
+if check_only:
+    repo, *wanted = args[1:]
+    target = None
+else:
+    repo, target, *wanted = args
 manifest_path = glob.glob(os.path.join(repo, "manifest", "*", "*", "*.json"))[0]
 manifest = json.load(open(manifest_path))
 print(f"Manifest: {manifest['productName']} {manifest['productVersion']} ({manifest['platform']})")
 
 installables = {i["name"]: i for i in manifest["installables"]}
-optional = {name[:-1] for name in wanted if name.endswith("?")}
+optional = {name.rstrip("?") for name in wanted if name.endswith("?")}
 wanted = [name.rstrip("?") for name in wanted]
-missing = [name for name in wanted if name not in installables and name not in optional]
+
+
+def missing_from(names, missing, seen):
+    """The names the manifest lacks, among these and the installables they refer to."""
+    for name in names:
+        if name in seen:
+            continue
+        seen.add(name)
+        if name not in installables:
+            missing.append(name)
+        else:
+            missing_from(installables[name].get("installablesRef") or [], missing, seen)
+    return missing
+
+
+missing = missing_from([n for n in wanted if n in installables or n not in optional], [], set())
 if missing:
     raise SystemExit(
         f"This bundle has no {', '.join(missing)} (it has {', '.join(installables)})"
     )
+if check_only:
+    sys.exit(0)
+
 seen_parts = set()
 
 
