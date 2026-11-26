@@ -122,6 +122,12 @@ tasks.withType<Test>().configureEach {
 	if (record) {
 		outputs.upToDateWhen { false }
 	}
+	// The TM1 versions doc, which MetadataReleasesTest holds to the release record and the
+	// snapshots, or with TM1_UPDATE_VERSIONS_DOC=true rewrites
+	inputs.files(rootDir.resolve("spec/tm1-versions.md")).withPathSensitivity(PathSensitivity.RELATIVE)
+	if (providers.environmentVariable("TM1_UPDATE_VERSIONS_DOC").orNull == "true") {
+		outputs.upToDateWhen { false }
+	}
 }
 
 // The tests against a real TM1 on their own (the *Tm1Test classes), for ./gradlew liveTest: test

@@ -93,7 +93,7 @@ tasks.withType<Test>().configureEach {
 		// ...and Cognos
 		"COGNOS_PRIVATE_IMAGE", "COGNOS_INSTALL_VOLUME", "COGNOS_ZIP_DIR", "COGNOS_ZIP", "COGNOS_ZIP_URL",
 		// Opt-in switches for tests that write files (see tm1-client's metadata tests)
-		"TM1_UPDATE_METADATA_SNAPSHOT", "TM1_PROBE",
+		"TM1_UPDATE_METADATA_SNAPSHOT", "TM1_UPDATE_VERSIONS_DOC", "TM1_PROBE",
 	)) {
 		inputs.property(name, providers.environmentVariable(name).orElse(""))
 	}
