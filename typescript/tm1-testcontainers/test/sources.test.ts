@@ -4,7 +4,17 @@ import { readFileSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
-import { CognosSource, IllegalArgumentException, PawContainer, PawSource, Tm1ServerContainer, Tm1Source, Tm1WebSource } from "../src/index.js";
+import {
+  CognosSource,
+  IllegalArgumentException,
+  PawContainer,
+  PawSource,
+  Tm1EngineContainer,
+  Tm1EngineSource,
+  Tm1ServerContainer,
+  Tm1Source,
+  Tm1WebSource,
+} from "../src/index.js";
 import { Repo, settings, useTempDir, without } from "./support/files.js";
 
 /** Java's Tm1SourceTest. */
@@ -279,5 +289,93 @@ describe("Tm1WebSource", () => {
   it("never describes a URL with its credentials", () => {
     const source = new Tm1WebSource.BundleUrl("https://user:token@example.com:8443/b/tm1web.tar.gz?X-Amz-Signature=SECRET");
     expect(source.describe()).toBe("bundle URL https://example.com:8443/b/tm1web.tar.gz");
+  });
+});
+
+/** Java's Tm1EngineSourceTest. */
+describe("Tm1EngineSource", () => {
+  const PACKAGE = "tm1-v12.6.7-standalone-linux.tgz";
+  const temp = useTempDir();
+  const fakeInstall = (): string => {
+    temp.touch(join("tm1-engine", "bin", "tm1sd.exe"));
+    return join(temp.path, "tm1-engine");
+  };
+
+  it("finds nothing when nothing is set", () => {
+    expect(Tm1EngineSource.discover(settings({}))).toBeUndefined();
+    expect(Tm1EngineSource.discover(settings({ [Tm1EngineSource.HOME_DIR]: "  " }))).toBeUndefined();
+  });
+
+  it("tries sources in the image's order", () => {
+    const install = fakeInstall();
+    expect(
+      Tm1EngineSource.discover(
+        settings({ [Tm1EngineSource.PRIVATE_IMAGE]: "registry.example.com/private/tm1-engine:12.6.7", [Tm1EngineSource.HOME_DIR]: install }),
+      ),
+    ).toBeInstanceOf(Tm1EngineSource.PrivateImage);
+    expect(Tm1EngineSource.discover(settings({ [Tm1EngineSource.HOME_DIR]: install, [Tm1EngineSource.INSTALL_VOLUME]: "v" }))).toStrictEqual(
+      new Tm1EngineSource.InstallDir(install),
+    );
+    expect(Tm1EngineSource.discover(settings({ [Tm1EngineSource.INSTALL_VOLUME]: "v", [Tm1EngineSource.BUNDLE_DIR]: temp.path }))).toStrictEqual(
+      new Tm1EngineSource.InstallVolume("v"),
+    );
+    expect(
+      Tm1EngineSource.discover(settings({ [Tm1EngineSource.BUNDLE_DIR]: temp.path, [Tm1EngineSource.BUNDLE_URL]: "https://example.com/p.tgz" })),
+    ).toStrictEqual(new Tm1EngineSource.Bundle(temp.path));
+    const url = Tm1EngineSource.discover(settings({ [Tm1EngineSource.BUNDLE_URL]: "https://example.com/p.tgz", [Tm1EngineSource.BUNDLE_SHA256]: "abc" }));
+    expect(url).toBeInstanceOf(Tm1EngineSource.BundleUrl);
+    expect((url as Tm1EngineSource.BundleUrl).url.href).toBe("https://example.com/p.tgz");
+    expect((url as Tm1EngineSource.BundleUrl).sha256).toBe("abc");
+  });
+
+  it("uses the TM1 bundle folder when it holds TM1 v12", () => {
+    // TM1 11's folder without a v12 package in it: no source, so the tests are skipped
+    temp.touch("tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz");
+    expect(Tm1EngineSource.discover(settings({ [Tm1Source.BUNDLE_DIR]: temp.path }))).toBeUndefined();
+
+    temp.touch(PACKAGE);
+    expect(Tm1EngineSource.discover(settings({ [Tm1Source.BUNDLE_DIR]: temp.path }))).toStrictEqual(new Tm1EngineSource.Bundle(temp.path));
+    // TM1_ENGINE_BUNDLE names a file within it
+    expect(Tm1EngineSource.discover(settings({ [Tm1Source.BUNDLE_DIR]: temp.path, [Tm1EngineSource.BUNDLE]: PACKAGE }))).toStrictEqual(
+      new Tm1EngineSource.Bundle(temp.path, PACKAGE),
+    );
+    // Its own folder setting wins
+    const other = temp.mkdir("other");
+    expect(Tm1EngineSource.discover(settings({ [Tm1Source.BUNDLE_DIR]: temp.path, [Tm1EngineSource.BUNDLE_DIR]: other }))).toStrictEqual(
+      new Tm1EngineSource.Bundle(other),
+    );
+  });
+
+  it("fails on a wrong setting rather than skipping", () => {
+    expect(() => Tm1EngineSource.discover(settings({ [Tm1EngineSource.HOME_DIR]: temp.path }))).toThrow(IllegalArgumentException);
+    expect(() => Tm1EngineSource.discover(settings({ [Tm1EngineSource.HOME_DIR]: temp.path }))).toThrow("no bin/tm1sd.exe");
+    expect(() => Tm1EngineSource.discover(settings({ [Tm1EngineSource.BUNDLE_DIR]: join(temp.path, "missing") }))).toThrow("is not a folder");
+    expect(() => Tm1EngineSource.discover(settings({ [Tm1EngineSource.BUNDLE_DIR]: temp.path, [Tm1EngineSource.BUNDLE]: "missing.tgz" }))).toThrow(
+      "which isn't in",
+    );
+  });
+
+  it("describes a URL without its secrets", () => {
+    const source = new Tm1EngineSource.BundleUrl("https://user:token@downloads.example.com:8443/tm1/p.tgz?X-Amz-Signature=secret");
+    expect(source.describe()).toBe("package URL https://downloads.example.com:8443/tm1/p.tgz");
+    // Nor does printing it: Java's record toString would
+    expect(String(source)).not.toContain("secret");
+    expect(inspect(source)).not.toContain("token");
+  });
+
+  it("uses the edge tm1-engine image unless TM1_ENGINE_IMAGE says otherwise", () => {
+    const saved = process.env[Tm1EngineContainer.ENGINE_IMAGE];
+    try {
+      delete process.env[Tm1EngineContainer.ENGINE_IMAGE];
+      expect(new Tm1EngineContainer(new Tm1EngineSource.InstallVolume("v")).getDockerImageName()).toBe("ghcr.io/ajmyers/tm1-engine:edge");
+      process.env[Tm1EngineContainer.ENGINE_IMAGE] = " tm1-engine:local ";
+      expect(new Tm1EngineContainer(new Tm1EngineSource.InstallVolume("v")).getDockerImageName()).toBe("tm1-engine:local");
+      // A private image is used as it is, and so is one of your own
+      expect(new Tm1EngineContainer(new Tm1EngineSource.PrivateImage("me/tm1-engine:12.6")).getDockerImageName()).toBe("me/tm1-engine:12.6");
+      expect(new Tm1EngineContainer("mine:1", new Tm1EngineSource.InstallVolume("v")).getDockerImageName()).toBe("mine:1");
+    } finally {
+      if (saved === undefined) delete process.env[Tm1EngineContainer.ENGINE_IMAGE];
+      else process.env[Tm1EngineContainer.ENGINE_IMAGE] = saved;
+    }
   });
 });

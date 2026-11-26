@@ -13,13 +13,16 @@ import {
   PawSource,
   PlanningAnalyticsEnvironment,
   Tm1AdminServerContainer,
+  Tm1EngineContainer,
+  Tm1EngineSource,
   Tm1Seed,
   Tm1ServerContainer,
   Tm1Source,
   Tm1WebContainer,
   Tm1WebSource,
 } from "../src/index.js";
-import { Repo } from "./support/files.js";
+import { RequiresTm1Engine } from "../src/vitest.js";
+import { Repo, useTempDir } from "./support/files.js";
 
 /** These need no Docker: they read the wiring before anything starts, as the Java tests do. */
 
@@ -517,5 +520,177 @@ describe("PlanningAnalyticsEnvironment", () => {
     const missing = thrown(() => PlanningAnalyticsEnvironment.fromConfig(fixture("missing.yaml")));
     expect(missing).toBeInstanceOf(IllegalArgumentException);
     expect(missing.message).toContain("not found");
+  });
+});
+
+/** Java's Tm1EngineWiringTest. Wiring only: nothing here starts a container. */
+describe("Tm1Engine wiring", () => {
+  const SOURCE = new Tm1EngineSource.PrivateImage("tm1-engine:test");
+  const temp = useTempDir();
+
+  it("has one database unless some are named", () => {
+    const engine = new Tm1EngineContainer(SOURCE);
+    engine.configure();
+    expect(engine.getEnvMap().get("TM1_DATABASES")).toBe("tm1/tm1");
+    expect(engine.getEnvMap().has("TM1_USERS")).toBe(false);
+    expect(engine.database("tm1").getInstance()).toBe("tm1");
+
+    const named = new Tm1EngineContainer(SOURCE).withDatabase("planning").withDatabase("other", "sales");
+    named.configure();
+    expect(named.getEnvMap().get("TM1_DATABASES")).toBe("tm1/planning,other/sales");
+    expect(named.database("other", "sales").getName()).toBe("sales");
+    expect(() => named.database("tm1")).toThrow(IllegalArgumentException);
+    expect(() => named.database("tm1")).toThrow("No database tm1/tm1 was added (withDatabase). Added: [tm1/planning, other/sales]");
+  });
+
+  it("passes the users and their groups to the image", () => {
+    const engine = new Tm1EngineContainer(SOURCE).withUser("analyst", "Analysts", "Planners").withUser("viewer");
+    engine.configure();
+    expect(engine.getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts:Planners,viewer");
+  });
+
+  it("refuses names the image can't take", () => {
+    const engine = new Tm1EngineContainer(SOURCE);
+    // TM1 wants at least three characters
+    expect(() => engine.withDatabase("ab")).toThrow(IllegalArgumentException);
+    expect(() => engine.withDatabase("two words")).toThrow(IllegalArgumentException);
+    expect(() => engine.withDatabase("a/b", "sales")).toThrow(IllegalArgumentException);
+    expect(() => engine.withUser("two words")).toThrow(IllegalArgumentException);
+    expect(() => engine.withUser("analyst", "a:b")).toThrow(IllegalArgumentException);
+    engine.withUser("analyst");
+    expect(() => engine.withUser("analyst", "Again")).toThrow(IllegalArgumentException);
+    expect(() => engine.withUser("analyst", "Again")).toThrow("already");
+    // Nothing a refused call named was kept
+    engine.configure();
+    expect(engine.getEnvMap().get("TM1_DATABASES")).toBe("tm1/tm1");
+    expect(engine.getEnvMap().get("TM1_USERS")).toBe("analyst");
+  });
+
+  it("runs its datastore on its own network", () => {
+    const engine = new Tm1EngineContainer(SOURCE);
+    engine.configure();
+    const datastore = engine.getDatastore();
+    expect(datastore.getDockerImageName()).toBe("mongo:8.0");
+    expect(engine.getNetwork()).toBeInstanceOf(Network);
+    expect(datastore.getNetwork()).toBe(engine.getNetwork());
+    expect(datastore.getNetworkAliases()).toContain(Tm1EngineContainer.DATASTORE_ALIAS);
+    expect(engine.getDependencies()).toContain(datastore);
+    expect(engine.getEnvMap().get("TM1_DATASTORE_URL")).toBe("mongodb://root:tm1datastore@tm1-datastore:27017");
+    expect(datastore.getEnvMap().get("MONGO_INITDB_ROOT_USERNAME")).toBe("root");
+    expect(datastore.getEnvMap().get("MONGO_INITDB_ROOT_PASSWORD")).toBe("tm1datastore");
+    expect(datastore.getCommandParts()).toEqual(["--wiredTigerCacheSizeGB", "0.5"]);
+    expect(engine.getExposedPorts()).toEqual([Tm1EngineContainer.PORT]);
+    // Both are this library's, like every container it starts
+    expect(engine.getLabels().get("io.skipcheck.tm1.testcontainers")).toBe("typescript");
+    expect(datastore.getLabels().get("io.skipcheck.tm1.testcontainers")).toBe("typescript");
+    // The shared engine isn't kept between runs, and neither is one of your own
+    expect(engine.isShouldBeReused()).toBe(false);
+    expect(datastore.isShouldBeReused()).toBe(false);
+  });
+
+  it("joins a network it is given", () => {
+    const network = Network.newNetwork();
+    const engine = new Tm1EngineContainer(SOURCE).withNetwork(network);
+    engine.configure();
+    expect(engine.getNetwork()).toBe(network);
+    expect(engine.getDatastore().getNetwork()).toBe(network);
+  });
+
+  it("mounts each source where the image looks", () => {
+    temp.touch(join("install", "bin", "tm1sd.exe"));
+    const install = join(temp.path, "install");
+    expect(new Tm1EngineContainer(new Tm1EngineSource.InstallDir(install)).getBinds()).toEqual([`${install}:/opt/ibm/tm1-engine:ro`]);
+    expect(new Tm1EngineContainer(new Tm1EngineSource.InstallVolume("tm1-engine")).getBinds()).toEqual(["tm1-engine:/opt/ibm/tm1-engine"]);
+
+    temp.touch("tm1-v12.6.7-standalone-linux.tgz");
+    const bundle = new Tm1EngineContainer(new Tm1EngineSource.Bundle(temp.path, "tm1-v12.6.7-standalone-linux.tgz"));
+    expect(bundle.getBinds()).toEqual([`${temp.path}:/ibm:ro`, "tm1-engine-testcontainers-cache:/tm1/cache"]);
+    expect(bundle.getEnvMap().get("TM1_ENGINE_BUNDLE")).toBe("tm1-v12.6.7-standalone-linux.tgz");
+
+    const url = new Tm1EngineContainer(new Tm1EngineSource.BundleUrl("https://example.com/p.tgz", "abc"));
+    expect(url.getBinds()).toEqual(["tm1-engine-testcontainers-cache:/tm1/cache"]);
+    expect(url.getEnvMap().get("TM1_ENGINE_BUNDLE_URL")).toBe("https://example.com/p.tgz");
+    expect(url.getEnvMap().get("TM1_ENGINE_BUNDLE_SHA256")).toBe("abc");
+
+    expect(new Tm1EngineContainer(SOURCE).getBinds()).toEqual([]);
+    expect(new Tm1EngineContainer(SOURCE).getDockerImageName()).toBe("tm1-engine:test");
+  });
+
+  // A file here, where Java has a class: the unit vitest shares set-up over
+  it("names a classes' database after the class", () => {
+    expect(RequiresTm1Engine.databaseName("CubeTest", "k3f9")).toBe("cubetest_k3f9");
+    // A short suffix is padded, so the name is always long enough for TM1
+    expect(RequiresTm1Engine.databaseName("T", "7")).toBe("t_0007");
+    expect(RequiresTm1Engine.databaseName("$$", "ab")).toBe("test_00ab");
+    expect(RequiresTm1Engine.databaseName("AVeryLongTestClassNameThatGoesOnAndOn", "zzzz")).toBe("averylongtestclassnameth_zzzz");
+  });
+
+  it("asks nothing of an engine that isn't started", async () => {
+    const engine = new Tm1EngineContainer(SOURCE);
+    expect(() => engine.getTm1Version()).toThrow("The container isn't started yet");
+    expect(() => engine.getRootClientId()).toThrow("The container isn't started yet");
+    expect(() => engine.database("tm1").login()).toThrow("The container isn't started yet");
+    await expect(engine.databases()).rejects.toThrow("The container isn't started yet");
+    await expect(engine.createDatabase("scratch")).rejects.toThrow("The container isn't started yet");
+    expect(engine.database("tm1").toString()).toBe("Tm1Database[tm1/tm1]");
+    expect(engine.database("tm1").equals(engine.database("tm1"))).toBe(true);
+    expect(engine.database("tm1").equals(new Tm1EngineContainer(SOURCE).database("tm1"))).toBe(false);
+  });
+});
+
+/** The wait for the image to finish setting TM1 up, without Docker: {@link Tm1EngineContainer.awaitSetup}
+ * with a container that answers as it's told to. */
+describe("The wait for TM1 to be set up", () => {
+  const exit = "The container exited while starting, with code 3. The end of its log:\nTM1 can't reach its datastore";
+  const probe = (health: (asked: number) => number, exited: (asked: number) => string | undefined = () => undefined) => {
+    const calls = { health: 0, exited: 0 };
+    return {
+      calls,
+      exited: async () => exited(++calls.exited),
+      health: async () => health(++calls.health),
+      logs: async () => "the log",
+    };
+  };
+
+  it("returns once the image's health command passes", async () => {
+    const container = probe((asked) => (asked < 3 ? 1 : 0));
+    await Tm1EngineContainer.awaitSetup(container, 60_000, 1);
+    expect(container.calls.health).toBe(3);
+  });
+
+  it("fails at once, with the exit code and the end of the log, when the container has exited", async () => {
+    const container = probe(
+      () => 1,
+      (asked) => (asked < 3 ? undefined : exit),
+    );
+    await expect(Tm1EngineContainer.awaitSetup(container, 60_000, 1)).rejects.toThrow(exit);
+    // Not asked of a container that's gone
+    expect(container.calls.health).toBe(2);
+  });
+
+  it("says the container exited when that is why it couldn't be asked", async () => {
+    const container = probe(
+      () => {
+        throw new Error("container is not running");
+      },
+      (asked) => (asked < 2 ? undefined : exit),
+    );
+    await expect(Tm1EngineContainer.awaitSetup(container, 60_000, 1)).rejects.toThrow(exit);
+    const unreachable = probe(() => {
+      throw new Error("no such exec");
+    });
+    await expect(Tm1EngineContainer.awaitSetup(unreachable, 60_000, 1)).rejects.toThrow("Couldn't ask the container whether TM1 is set up");
+  });
+
+  it("times out, with the log, when TM1 is never set up", async () => {
+    const container = probe(() => 1);
+    await expect(Tm1EngineContainer.awaitSetup(container, 20, 1)).rejects.toThrow("Timed out after PT0.02S waiting for TM1 to be set up. the log");
+    await expect(
+      Tm1EngineContainer.awaitSetup(
+        probe(() => 1),
+        0,
+        1,
+      ),
+    ).rejects.toThrow(/^Timed out after PT0S waiting for TM1 to be set up\. /);
   });
 });

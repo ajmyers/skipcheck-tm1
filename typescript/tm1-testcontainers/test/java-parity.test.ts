@@ -137,7 +137,7 @@ describe("Java parity", () => {
   it("reads the Java sources", () => {
     expect(publicTypes).toContain("Tm1ServerContainer");
     expect(publicTypes).not.toContain("PawSession"); // package-private
-    expect(annotations).toEqual(["RequiresCognos", "RequiresPaw", "RequiresTm1", "RequiresTm1Web"]);
+    expect(annotations).toEqual(["RequiresCognos", "RequiresPaw", "RequiresTm1", "RequiresTm1Engine", "RequiresTm1Web"]);
     const members = javaMembers(javaFile("Tm1ServerContainer"), 1, false);
     expect(members).toContainEqual({ name: "withCamSecurity", params: ["cognos", "namespace", "admins"], constructor: false });
     expect(members).toContainEqual({ name: "getRestUrl", params: [], constructor: false });

@@ -314,6 +314,15 @@ export abstract class GenericContainer implements Startable {
   /** Runs once it's ready. */
   protected async containerIsStarted(): Promise<void> {}
 
+  /** "The container exited while starting, with code …" and the end of its log, if the started
+   * container has since exited; `undefined` while it runs. For a container whose readiness is
+   * checked after its wait, as {@link ExitAwareWait} says it during the wait. */
+  protected async exitedWhileStarting(): Promise<string | undefined> {
+    const container = (await getContainerRuntimeClient()).container.getById(this.getContainerId());
+    const state = (await container.inspect()).State;
+    return state.Running ? undefined : exitMessage(container, state.ExitCode);
+  }
+
   /** Logs `message`, as Testcontainers logs its own (`DEBUG=testcontainers*`). */
   protected log(message: string): void {
     log.info(message, this.#container ? { containerId: this.#container.getId() } : undefined);
