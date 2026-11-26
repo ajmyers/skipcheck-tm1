@@ -163,7 +163,7 @@ def test_pushes_the_model_and_pulls_it_back(tm1: Tm1Client, remote: GitDaemon) -
 
         if remote.local:
             remote.commit_copy_of(dimension, copy)
-            # The first pull after the remote moves: from 11.8.035 the commit TM1 had, then the new
+            # The first pull after the remote moves: from 11.8.034 the commit TM1 had, then the new
             # one; before, the new one at once
             pull = tm1.git.pull("main", none, None, True)
             if is_at_least(tm1, STALE_FIRST_PULL_FROM):

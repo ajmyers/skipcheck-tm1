@@ -174,7 +174,7 @@ describe("GitService on TM1" + gitReason, () => {
 
         if (remote.local) {
           await remote.commitCopyOf(dimension, copy);
-          // The first pull after the remote moves: from 11.8.035 the commit TM1 had, then the new one;
+          // The first pull after the remote moves: from 11.8.034 the commit TM1 had, then the new one;
           // before, the new one at once
           let pull = await tm1.git.pull("main", none, null, true);
           if (await isAtLeast(tm1, STALE_FIRST_PULL_FROM)) {

@@ -10,10 +10,10 @@ import { Repo } from "../support/repo.js";
  * (`context.skip(why)`), not failed. The server's own `$metadata` decides, as the client decides. */
 
 /** From this TM1 the first Git pull after the remote moves plans the commit TM1 had, and the next
- * the new one; before, the first plans the new one. Tried at 11.8.032 (the new) and 11.8.035 (the
- * stale): a build between falls on the older side unverified, so a failure there is this bound to
- * move. */
-export const STALE_FIRST_PULL_FROM = Tm1Version.parse("11.8.03500");
+ * the new one; before, the first plans the new one. Tried on every Planning Analytics 2.1 release:
+ * 11.8.03200.3 (2.1.13 to 2.1.16) plans the new one, 11.8.03400.2 (2.1.17) the stale, and no build
+ * between them was released. */
+export const STALE_FIRST_PULL_FROM = Tm1Version.parse("11.8.03400");
 
 /** From this TM1 the server makes a local key file itself, so the image's settings check as valid.
  * Tried at 11.8.035 (invalid) and 11.8.040 (valid); a build between falls on the older side
