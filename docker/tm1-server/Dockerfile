@@ -13,6 +13,19 @@
 #   /tm1/logs                log directory
 # See README.md.
 
+# TM1 11.8.024 to 11.8.032 (Planning Analytics 2.1.2, 2.1.7 and 2.1.16 were tried) link
+# libjsig.so, a Java VM's signal-chaining library, which IBM's startup script expects from a
+# JAVA_HOME; 11.8.035 and 11.8.040 don't. Only that file is needed, not a Java runtime:
+# HotSpot's, from OpenJDK (GPLv2 with the Classpath Exception), needs nothing but libc. OpenJ9's
+# (IBM's Java) needs libomrsig.so beside it, and without it TM1 hangs. The package's copyright
+# file and version go with it.
+FROM --platform=linux/amd64 ubuntu:26.04 AS jsig
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openjdk-21-jre-headless \
+ && mkdir /jsig && cp /usr/lib/jvm/java-21-openjdk-amd64/lib/server/libjsig.so /jsig/ \
+ && cp /usr/share/doc/openjdk-21-jre-headless/copyright /jsig/copyright \
+ && dpkg-query -W -f='openjdk-21-jre-headless ${Version}\n' openjdk-21-jre-headless > /jsig/VERSION
+
 FROM --platform=linux/amd64 ubuntu:26.04
 
 LABEL org.opencontainers.image.authors="Andrew Myers (https://ajmyers.net)" \
@@ -35,6 +48,10 @@ ENV LANG=en_US.UTF-8 \
     TM1_BUNDLE_DIR=/ibm \
     LD_LIBRARY_PATH=/opt/ibm/cognos/tm1_64/bin64
 
+# In the loader's cache rather than on LD_LIBRARY_PATH, so it's found whatever LD_LIBRARY_PATH a
+# container sets, and an install's own bin64/libjsig.so (on LD_LIBRARY_PATH) still comes first
+COPY --from=jsig /jsig/ /usr/local/lib/tm1-server/jvm/
+RUN echo /usr/local/lib/tm1-server/jvm > /etc/ld.so.conf.d/tm1-server-jvm.conf && ldconfig
 COPY docker/entrypoint.sh /usr/local/bin/tm1-entrypoint
 COPY docker/install-tm1.sh /usr/local/bin/tm1-install
 COPY docker/unpack-tm1.py docker/cam-setup.py /usr/local/lib/tm1-server/
