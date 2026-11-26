@@ -34,6 +34,16 @@ and takes an identity provider's tokens as logins with (see the README, "OAuth 2
   TM1_OAUTH2_ID_CLAIMS    CLAIM,...  where the user's name is read from (default: sub)
   TM1_OAUTH2_NAME_CLAIMS  CLAIM,...  where a friendly name is read from
 
+or, instead, checks a user's name and password with another server ("pass-through"), such as a
+TM1 11 server (see the README, "Pass-through logins"):
+
+  TM1_PASSTHROUGH_URL              the server's address, e.g. http://tm1-server:8010/api/v1/; "none" for off
+  TM1_PASSTHROUGH_ENDPOINT         what's asked there for who the user is (default: ActiveUser)
+  TM1_PASSTHROUGH_POINTER          where the name is in the answer, a JSON pointer (default: /Name)
+  TM1_PASSTHROUGH_FINALIZE         what's called afterwards to close the session that made there
+                                   (default: ActiveSession/tm1.Close; "none" for nothing)
+  TM1_PASSTHROUGH_FINALIZE_METHOD  with which HTTP method (default: POST)
+
 TM1 v12 is one engine holding instances; an instance holds databases. An application is
 an instance's client ID and secret, which log any user in (service-to-service). Users and
 groups belong to each database.
@@ -90,6 +100,9 @@ def plan(env=None):
     # Checked here too, though setup doesn't use them: the entrypoint runs this first, so a
     # mistake in them costs no install
     oauth2_settings(env)
+    if oauth2_settings(env) and passthrough_settings(env):
+        raise Failure("TM1_OAUTH2_ISSUER_URL and TM1_PASSTHROUGH_URL are both set, and TM1 takes one of the two "
+                      "ways to log in: set one to none")
     instances = {}
 
     def instance(name):
@@ -668,7 +681,82 @@ def configure(config, env=None):
             if key not in oauth2 and key in held:
                 del held[key]
                 changes.append(f"authentication.oauth2.{key}: removed")
+    passthrough = passthrough_settings(env)
+    authentication = config.get("authentication")
+    forwarded = authentication.get("http") if isinstance(authentication, dict) else None
+    if passthrough is None:
+        if isinstance(forwarded, dict) and forwarded.get("serviceRootURL"):
+            changes.append(f"authentication.http: left on (pass-through to {forwarded['serviceRootURL']}); "
+                           "TM1_PASSTHROUGH_URL=none turns pass-through logins off")
+    elif passthrough == {}:
+        if isinstance(authentication, dict) and "http" in authentication:
+            del authentication["http"]
+            changes.append("authentication.http: removed")
+    else:
+        if not isinstance(authentication, dict):
+            authentication = config["authentication"] = {}
+        if not isinstance(forwarded, dict):
+            forwarded = authentication["http"] = {}
+        for key, value in passthrough.items():
+            put(forwarded, key, value, "authentication.http." + key)
+        for key in ("finalizeEndpoint", "finalizeMethod"):
+            # With a server set here the section is this image's: no finalize asked for is none
+            if key not in passthrough and key in forwarded:
+                del forwarded[key]
+                changes.append(f"authentication.http.{key}: removed")
+    authentication = config.get("authentication")
+    if isinstance(authentication, dict):
+        issuer = (authentication.get("oauth2") or {}).get("issuerURL") if isinstance(authentication.get("oauth2"), dict) else None
+        server = (authentication.get("http") or {}).get("serviceRootURL") if isinstance(authentication.get("http"), dict) else None
+        if issuer and server:
+            # TM1 would take OAuth 2.0 and never ask the server: say so, rather than leave half of it dead
+            raise Failure(f"OAuth 2.0 logins ({issuer}) and pass-through logins ({server}) are both on, and TM1 takes "
+                          "one of the two: turn one off with TM1_OAUTH2_ISSUER_URL=none or TM1_PASSTHROUGH_URL=none")
     return changes
+
+
+PASSTHROUGH_OTHERS = ("TM1_PASSTHROUGH_ENDPOINT", "TM1_PASSTHROUGH_POINTER", "TM1_PASSTHROUGH_FINALIZE",
+                      "TM1_PASSTHROUGH_FINALIZE_METHOD")
+
+
+def passthrough_settings(env):
+    """TM1_PASSTHROUGH_*, as config.internal.json's authentication.http: None when nothing is asked
+    for (the section is left as it is), {} to take pass-through off, else its fields. The defaults
+    fit a TM1 11 server: who a name and password are is asked of its ActiveUser, and the session
+    that made there is closed again."""
+    def setting(name):
+        return (env.get(name) or "").strip()  # compose passes an unset variable as empty
+
+    url = setting("TM1_PASSTHROUGH_URL")
+    if url.lower() == "none":
+        return {}  # whatever else is still set: off is off
+    if not url:
+        others = [name for name in PASSTHROUGH_OTHERS if setting(name)]
+        if others:
+            raise Failure(f"{others[0]} is set without TM1_PASSTHROUGH_URL, the address of the server that "
+                          "checks a user's name and password")
+        return None
+    if not re.fullmatch(r"https?://[^/\s]+\S*", url):
+        raise Failure("TM1_PASSTHROUGH_URL must be an http:// or https:// address, e.g. a TM1 11 server's "
+                      "REST API: http://tm1-server:8010/api/v1/")
+    pointer = setting("TM1_PASSTHROUGH_POINTER") or "/Name"
+    if not pointer.startswith("/"):
+        raise Failure("TM1_PASSTHROUGH_POINTER is a JSON pointer to the user's name in the server's answer, "
+                      "and starts with /: /Name")
+    # TM1 joins the two as they are
+    fields = {"serviceRootURL": url if url.endswith("/") else url + "/",
+              "authEndpoint": (setting("TM1_PASSTHROUGH_ENDPOINT") or "ActiveUser").lstrip("/"),
+              "authJSONPointer": pointer}
+    finalize = setting("TM1_PASSTHROUGH_FINALIZE") or "ActiveSession/tm1.Close"
+    if finalize.lower() != "none":
+        method = (setting("TM1_PASSTHROUGH_FINALIZE_METHOD") or "POST").upper()
+        if not re.fullmatch(r"[A-Z]+", method):
+            raise Failure("TM1_PASSTHROUGH_FINALIZE_METHOD is an HTTP method: POST")
+        fields["finalizeEndpoint"] = finalize.lstrip("/")
+        fields["finalizeMethod"] = method
+    elif setting("TM1_PASSTHROUGH_FINALIZE_METHOD"):
+        raise Failure("TM1_PASSTHROUGH_FINALIZE_METHOD is set with TM1_PASSTHROUGH_FINALIZE=none")
+    return fields
 
 
 OAUTH2_OTHERS = ("TM1_OAUTH2_AUDIENCE", "TM1_OAUTH2_ID_CLAIMS", "TM1_OAUTH2_NAME_CLAIMS")

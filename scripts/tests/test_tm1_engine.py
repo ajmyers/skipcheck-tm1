@@ -308,6 +308,102 @@ def test_a_mistake_in_the_oauth2_settings_is_caught_before_anything_is_installed
     assert engine.plan({"TM1_OAUTH2_ISSUER_URL": "http://kc/r", "TM1_OAUTH2_AUDIENCE": "tm1"})["users"] == []
 
 
+V11 = {
+    "serviceRootURL": "http://tm1-server:8010/api/v1/",
+    "authEndpoint": "ActiveUser",
+    "authJSONPointer": "/Name",
+    "finalizeEndpoint": "ActiveSession/tm1.Close",
+    "finalizeMethod": "POST",
+}
+
+
+@pytest.mark.parametrize("url", ["http://tm1-server:8010/api/v1/", " http://tm1-server:8010/api/v1 "])
+def test_configure_forwards_logins_to_a_tm1_11_server_by_default(url: str) -> None:
+    config: dict[str, Any] = {"authentication": {"jwtIssuer": "TM1"}}
+    changes = engine.configure(config, {"TM1_PASSTHROUGH_URL": url})
+    # The defaults are a TM1 11 server's: who the user is, and the session there closed again
+    assert config["authentication"] == {"jwtIssuer": "TM1", "http": V11}
+    assert "authentication.http.authEndpoint: None -> 'ActiveUser'" in changes
+    assert [c for c in engine.configure(config, {"TM1_PASSTHROUGH_URL": url}) if "http" in c] == []
+
+
+def test_configure_takes_another_servers_ways() -> None:
+    config: dict[str, Any] = {}
+    engine.configure(
+        config,
+        {
+            "TM1_PASSTHROUGH_URL": "https://auth.example.com/v2",
+            "TM1_PASSTHROUGH_ENDPOINT": "/whoami",
+            "TM1_PASSTHROUGH_POINTER": "/user/login",
+            "TM1_PASSTHROUGH_FINALIZE": "/logout",
+            "TM1_PASSTHROUGH_FINALIZE_METHOD": "delete",
+        },
+    )
+    assert config["authentication"]["http"] == {
+        "serviceRootURL": "https://auth.example.com/v2/",
+        "authEndpoint": "whoami",
+        "authJSONPointer": "/user/login",
+        "finalizeEndpoint": "logout",
+        "finalizeMethod": "DELETE",
+    }
+    # No finalize asked for is none, an earlier start's included
+    changes = engine.configure(config, {"TM1_PASSTHROUGH_URL": "https://auth.example.com/v2", "TM1_PASSTHROUGH_FINALIZE": "none"})
+    assert "finalizeEndpoint" not in config["authentication"]["http"]
+    assert "authentication.http.finalizeMethod: removed" in changes
+
+
+def test_configure_leaves_pass_through_alone_unless_asked_and_says_when_it_stays_on() -> None:
+    config: dict[str, Any] = {"authentication": {"http": dict(V11)}}
+    changes = engine.configure(config, {"TM1_PASSTHROUGH_URL": ""})
+    assert config["authentication"]["http"] == V11
+    assert [c for c in changes if "http" in c] == [
+        "authentication.http: left on (pass-through to http://tm1-server:8010/api/v1/); "
+        "TM1_PASSTHROUGH_URL=none turns pass-through logins off"
+    ]
+    # none is off, whatever else is still set
+    assert "authentication.http: removed" in engine.configure(config, {"TM1_PASSTHROUGH_URL": "none", "TM1_PASSTHROUGH_ENDPOINT": "x"})
+    assert config["authentication"] == {}
+    untouched: dict[str, Any] = {}
+    engine.configure(untouched, {"TM1_PASSTHROUGH_URL": "none"})
+    assert "authentication" not in untouched
+
+
+@pytest.mark.parametrize(
+    ("env", "message"),
+    [
+        ({"TM1_PASSTHROUGH_POINTER": "/Name"}, "TM1_PASSTHROUGH_POINTER is set without TM1_PASSTHROUGH_URL"),
+        ({"TM1_PASSTHROUGH_URL": "tm1-server:8010"}, "must be an http:// or https:// address"),
+        ({"TM1_PASSTHROUGH_URL": "http://tm1 server/api"}, "must be an http:// or https:// address"),
+        ({"TM1_PASSTHROUGH_URL": "http://s/api", "TM1_PASSTHROUGH_POINTER": "Name"}, "starts with /"),
+        ({"TM1_PASSTHROUGH_URL": "http://s/api", "TM1_PASSTHROUGH_FINALIZE_METHOD": "P O S T"}, "is an HTTP method"),
+        (
+            {"TM1_PASSTHROUGH_URL": "http://s/api", "TM1_PASSTHROUGH_FINALIZE": "none", "TM1_PASSTHROUGH_FINALIZE_METHOD": "POST"},
+            "is set with TM1_PASSTHROUGH_FINALIZE=none",
+        ),
+    ],
+)
+def test_configure_refuses_pass_through_settings_that_cant_work(env: dict[str, str], message: str) -> None:
+    with pytest.raises(engine.Failure, match=message):
+        engine.configure({}, env)
+
+
+def test_oauth2_and_pass_through_cant_both_be_on() -> None:
+    both = {"TM1_OAUTH2_ISSUER_URL": "http://kc/r", "TM1_OAUTH2_AUDIENCE": "tm1", "TM1_PASSTHROUGH_URL": "http://s/api"}
+    # Caught by plan, which the entrypoint runs before it installs anything
+    with pytest.raises(engine.Failure, match="both set, and TM1 takes one of the two"):
+        engine.plan(both)
+    with pytest.raises(engine.Failure, match="are both on, and TM1 takes one of the two"):
+        engine.configure({}, both)
+    # One from an earlier start, kept in the file, and the other asked for now
+    kept: dict[str, Any] = {"authentication": {"oauth2": {"issuerURL": "http://kc/r", "audience": "tm1"}}}
+    with pytest.raises(engine.Failure, match="TM1_OAUTH2_ISSUER_URL=none or TM1_PASSTHROUGH_URL=none"):
+        engine.configure(kept, {"TM1_PASSTHROUGH_URL": "http://s/api"})
+    # Turning the kept one off in the same start is fine
+    switched: dict[str, Any] = {"authentication": {"oauth2": {"issuerURL": "http://kc/r", "audience": "tm1"}}}
+    engine.configure(switched, {"TM1_PASSTHROUGH_URL": "http://s/api", "TM1_OAUTH2_ISSUER_URL": "none"})
+    assert "oauth2" not in switched["authentication"] and switched["authentication"]["http"]["authEndpoint"] == "ActiveUser"
+
+
 def test_configure_points_tm1_at_a_mongodb_with_a_control_database_of_its_own() -> None:
     config = template()
     changes = engine.configure(

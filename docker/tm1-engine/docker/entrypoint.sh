@@ -17,6 +17,8 @@
 #   TM1_DATASTORE_URL        a MongoDB for it to use, e.g. mongodb://root:pw@mongo:27017
 #   TM1_OAUTH2_ISSUER_URL    an identity provider whose tokens are logins (with TM1_OAUTH2_AUDIENCE,
 #                            and optionally TM1_OAUTH2_ID_CLAIMS and TM1_OAUTH2_NAME_CLAIMS)
+#   TM1_PASSTHROUGH_URL      or a server that checks a user's name and password, e.g. a TM1 11
+#                            server's REST API (TM1_PASSTHROUGH_* say how, if it isn't TM1 11)
 #                            (a mongo:8.0 container). The usual way.
 #   (not set)                TM1 runs its own: MongoDB is downloaded into the install on
 #                            first start, with its cache held to TM1_DATASTORE_CACHE_GB
