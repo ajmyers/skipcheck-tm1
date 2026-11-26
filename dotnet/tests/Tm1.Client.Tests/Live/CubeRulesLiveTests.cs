@@ -14,6 +14,7 @@ namespace Skipcheck.Tm1.Client.Tests.Live;
 public sealed class CubeRulesLiveTests : IAsyncLifetime
 {
     private const string RulesText = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\nFEEDERS;\n['Amount'] => ['Double'];\n";
+    private const string UnfedRulesText = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\n";
 
     private readonly Tm1Client _tm1 = Live.Client();
     private readonly string _cube = Live.Name();
@@ -82,14 +83,23 @@ public sealed class CubeRulesLiveTests : IAsyncLifetime
     public async Task ListsUnfedCellsOnEveryServer()
     {
         // Unfed is what servers without Selection (before schema 11.8.32) list, so it works on every
-        // server: there it's sent without Selection. With a value written, North/Double is a fed
-        // cell, which Both lists and Unfed mustn't
-        await LiveModel.WriteAsync(_tm1, _cube, [LiveModel.Element(Region, "North"), LiveModel.Element(Measure, "Amount")], "5");
-        var cells = await Cubes
-            .CheckFeedersAsync(_cube, Tuple("Total", "Double"), CheckFeedersSelection.Unfed, ODataQuery.None().Expand("Tuple"))
-            .ToListAsync();
-        Assert.All(cells, c => Assert.NotEqual(true, c.Fed));
-        Assert.DoesNotContain(cells, c => c.Tuple!.Select(e => e.Name).SequenceEqual(["North", "Double"]));
+        // server: there it's sent without Selection. South written after the feeder is taken out
+        // makes South/Double a cell the rules calculate and nothing feeds (a cell fed once stays
+        // fed, so not North)
+        await Cubes.UpdateAsync(_cube, CubePatch.Builder().Rules(UnfedRulesText).Build());
+        try
+        {
+            await LiveModel.WriteAsync(_tm1, _cube, [LiveModel.Element(Region, "South"), LiveModel.Element(Measure, "Amount")], "5");
+            var cells = await Cubes
+                .CheckFeedersAsync(_cube, Tuple("Total", "Double"), CheckFeedersSelection.Unfed, ODataQuery.None().Expand("Tuple"))
+                .ToListAsync();
+            Assert.All(cells, c => Assert.NotEqual(true, c.Fed));
+            Assert.Contains(cells, c => c.Tuple!.Select(e => e.Name).SequenceEqual(["South", "Double"]));
+        }
+        finally
+        {
+            await Cubes.UpdateAsync(_cube, CubePatch.Builder().Rules(RulesText).Build());
+        }
     }
 
     private Dictionary<string, string> Tuple(string region, string measure) => new() { [Region] = region, [Measure] = measure };

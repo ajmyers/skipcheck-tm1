@@ -20,6 +20,7 @@ import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.CalculationComponent;
 import io.skipcheck.tm1.client.model.CheckFeedersSelection;
 import io.skipcheck.tm1.client.model.CubeCreate;
+import io.skipcheck.tm1.client.model.CubePatch;
 import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.EdgeCreate;
 import io.skipcheck.tm1.client.model.ElementCreate;
@@ -43,6 +44,8 @@ class CubeRulesTm1Test {
 	private static final Duration WAIT = Duration.ofSeconds(30);
 
 	private static final String RULES = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\nFEEDERS;\n['Amount'] => ['Double'];\n";
+
+	private static final String UNFED_RULES = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\n";
 
 	private static Tm1Client tm1;
 
@@ -153,20 +156,31 @@ class CubeRulesTm1Test {
 	@Test
 	void listsUnfedCellsOnEveryServer() {
 		// Unfed is what servers without Selection (before schema 11.8.32) list, so it
-		// works on every server: there it's sent without Selection. With a value written,
-		// North/Double is a fed cell, which Both lists and Unfed mustn't
-		tm1.session()
-			.execute(Tm1Request.post(ODataPath.of("Cubes").key(cube).action("tm1.Update"), Map.of("Cells",
-					List.of(Map.of("Tuple@odata.bind", List.of(element(region, "North"), element(measure, "Amount")))),
-					"Value", "5"), Void.class))
-			.block(WAIT);
-		List<FedCellDescriptor> cells = cubes
-			.checkFeeders(cube, tuple("Total", "Double"), CheckFeedersSelection.UNFED,
-					ODataQuery.none().expand("Tuple"))
-			.collectList()
-			.block(WAIT);
-		assertThat(cells).allSatisfy(c -> assertThat(c.fed()).isNotEqualTo(true))
-			.noneSatisfy(c -> assertThat(c.tuple()).extracting(e -> e.name()).containsExactly("North", "Double"));
+		// works on every server: there it's sent without Selection. South written after
+		// the
+		// feeder is taken out makes South/Double a cell the rules calculate and nothing
+		// feeds (a cell fed once stays fed, so not North)
+		cubes.update(cube, CubePatch.builder().rules(UNFED_RULES).build()).block(WAIT);
+		try {
+			tm1.session()
+				.execute(Tm1Request.post(ODataPath.of("Cubes").key(cube).action("tm1.Update"),
+						Map.of("Cells",
+								List.of(Map.of("Tuple@odata.bind",
+										List.of(element(region, "South"), element(measure, "Amount")))),
+								"Value", "5"),
+						Void.class))
+				.block(WAIT);
+			List<FedCellDescriptor> cells = cubes
+				.checkFeeders(cube, tuple("Total", "Double"), CheckFeedersSelection.UNFED,
+						ODataQuery.none().expand("Tuple"))
+				.collectList()
+				.block(WAIT);
+			assertThat(cells).allSatisfy(c -> assertThat(c.fed()).isNotEqualTo(true))
+				.anySatisfy(c -> assertThat(c.tuple()).extracting(e -> e.name()).containsExactly("South", "Double"));
+		}
+		finally {
+			cubes.update(cube, CubePatch.builder().rules(RULES).build()).block(WAIT);
+		}
 	}
 
 	private static String element(String dimension, String element) {

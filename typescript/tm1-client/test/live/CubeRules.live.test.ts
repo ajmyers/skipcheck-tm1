@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect } from "vitest";
 import {
   CheckFeedersSelection,
   CubeCreate,
+  CubePatch,
   DimensionCreate,
   EdgeCreate,
   ElementCreate,
@@ -17,6 +18,7 @@ import {
 import { Live, liveReason, tm1Test } from "./live.js";
 
 const RULES = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\nFEEDERS;\n['Amount'] => ['Double'];\n";
+const UNFED_RULES = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\n";
 
 const element = (name: string, type: ElementType): ElementCreate => ElementCreate.builder().name(name).type(type).build();
 const edge = (parent: string, component: string): EdgeCreate => EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
@@ -112,16 +114,22 @@ describe("Cube rules on TM1" + liveReason, () => {
 
   tm1Test("lists unfed cells on every server", async () => {
     // Unfed is what servers without Selection (before schema 11.8.32) list, so it works on every
-    // server: there it's sent without Selection. With a value written, North/Double is a fed cell,
-    // which Both lists and Unfed mustn't
-    await tm1.session.execute(
-      Tm1Request.post(ODataPath.of("Cubes").key(cube).action("tm1.Update"), {
-        Cells: [{ "Tuple@odata.bind": [elementPath(region, "North"), elementPath(measure, "Amount")] }],
-        Value: "5",
-      }),
-    );
-    const cells = await tm1.cubes.checkFeeders(cube, tuple("Total", "Double"), CheckFeedersSelection.Unfed, ODataQuery.none().expand("Tuple")).toArray();
-    expect(cells.every((c) => c.Fed !== true)).toBe(true);
-    expect(cells.map((c) => tupleNames(c.Tuple))).not.toContainEqual(["North", "Double"]);
+    // server: there it's sent without Selection. South written after the feeder is taken out makes
+    // South/Double a cell the rules calculate and nothing feeds (a cell fed once stays fed, so not
+    // North)
+    await tm1.cubes.update(cube, CubePatch.builder().rules(UNFED_RULES).build());
+    try {
+      await tm1.session.execute(
+        Tm1Request.post(ODataPath.of("Cubes").key(cube).action("tm1.Update"), {
+          Cells: [{ "Tuple@odata.bind": [elementPath(region, "South"), elementPath(measure, "Amount")] }],
+          Value: "5",
+        }),
+      );
+      const cells = await tm1.cubes.checkFeeders(cube, tuple("Total", "Double"), CheckFeedersSelection.Unfed, ODataQuery.none().expand("Tuple")).toArray();
+      expect(cells.every((c) => c.Fed !== true)).toBe(true);
+      expect(cells.map((c) => tupleNames(c.Tuple))).toContainEqual(["South", "Double"]);
+    } finally {
+      await tm1.cubes.update(cube, CubePatch.builder().rules(RULES).build());
+    }
   });
 });
