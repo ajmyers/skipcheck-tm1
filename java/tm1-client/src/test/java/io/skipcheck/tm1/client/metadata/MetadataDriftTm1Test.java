@@ -30,8 +30,10 @@ import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
  * <li><b>Another version:</b> writes what it adds and removes to
  * {@code build/reports/tm1-metadata-drift.txt}. This is how running the tests against
  * another TM1 version shows its API differences. If a snapshot of that version is
- * committed too (an older supported version), the live metadata must equal it byte for
- * byte; otherwise the test passes.
+ * committed too (an older supported version), the live metadata must equal the one its
+ * build serves
+ * ({@link MetadataSnapshot#text(String, io.skipcheck.tm1.client.version.Tm1Version)})
+ * byte for byte; otherwise the test passes.
  * </ul>
  */
 @RequiresTm1
@@ -80,12 +82,12 @@ class MetadataDriftTm1Test {
 		Files.writeString(file, report, StandardCharsets.UTF_8);
 		System.out.println(report);
 
-		MetadataSnapshot.text(schema)
+		MetadataSnapshot.text(schema, tm1.getTm1Version())
 			.ifPresent(own -> assertThat(firstDifference(own, live))
-				.as("live $metadata (schema %s) against its own committed snapshot. Either the server changed, or this release "
-						+ "serves another document than the one captured: several releases can report one schema. "
-						+ "Regenerate it with TM1_UPDATE_METADATA_SNAPSHOT=true only if the older releases agree",
-						schema)
+				.as("live $metadata (schema %s, TM1 %s) against its own committed snapshot. Either the server changed, or "
+						+ "this release serves another document of the schema than those committed: several releases can "
+						+ "report one schema. Commit its document as a later one with TM1_UPDATE_METADATA_SNAPSHOT=true, "
+						+ "and add its build to MetadataSnapshot.LATER_DOCUMENTS", schema, tm1.getTm1Version())
 				.isEmpty());
 	}
 

@@ -6,8 +6,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlParser;
 
@@ -17,10 +21,11 @@ import io.skipcheck.tm1.csdl.CsdlParser;
  * byte. {@link MetadataSnapshotUpdateTest} writes it.
  *
  * <p>
- * The model is generated from the newest, {@link #VERSION}. Older schema versions'
- * snapshots are committed beside it (one per schema version: servers reporting the same
- * schema have served the same document), so {@link MetadataDriftTm1Test} can hold a
- * server of an older supported version to its own snapshot too.
+ * The model is generated from the newest, {@link #VERSION}. Every document a supported
+ * release serves is committed beside it, so {@link MetadataDriftTm1Test} can hold a
+ * server of any of them to its own: {@code tm1-schema-<schema>.xml}, the first document
+ * of each schema version, and {@code tm1-schema-<schema>-<build>.xml} for a later one
+ * ({@link #LATER_DOCUMENTS}).
  */
 public final class MetadataSnapshot {
 
@@ -32,6 +37,20 @@ public final class MetadataSnapshot {
 
 	/** The newest snapshot's location, as a test resource. */
 	public static final String RESOURCE = resource(VERSION);
+
+	/**
+	 * Schema versions whose servers have served more than one document, each later one
+	 * named by the first TM1 build that serves it, and committed as
+	 * {@code tm1-schema-<schema>-<build>.xml}. A server's document is the latest whose
+	 * build it is at least. {@code MetadataSnapshotTest} holds each to the same elements
+	 * as its schema's first document, so what a schema defines is read from that one.
+	 *
+	 * <p>
+	 * 11.8.02900 (Planning Analytics 2.1.8, and on to 2.1.12) reports schema 11.8.20, as
+	 * 11.8.02400 to 11.8.02800 (2.1.2 to 2.1.7) do, and serves it otherwise written:
+	 * {@code Core.Ordered} on collections, and boolean annotations without their values.
+	 */
+	public static final Map<String, List<String>> LATER_DOCUMENTS = Map.of("11.8.20", List.of("11.8.02900"));
 
 	private MetadataSnapshot() {
 	}
@@ -48,8 +67,9 @@ public final class MetadataSnapshot {
 	}
 
 	/**
-	 * The committed snapshot of a schema version, if there is one.
-	 * @param schemaVersion the schema version, such as {@code 11.8.20}
+	 * The committed snapshot of a schema version (its first document), if there is one.
+	 * @param schemaVersion the schema version, such as {@code 11.8.20}, or a later
+	 * document's name, such as {@code 11.8.20-11.8.02900}
 	 * @return its text, or empty if none is committed
 	 */
 	public static Optional<String> text(String schemaVersion) {
@@ -59,6 +79,22 @@ public final class MetadataSnapshot {
 		catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
+	}
+
+	/**
+	 * The committed snapshot of what a server of this schema and build serves: the latest
+	 * of the schema's {@link #LATER_DOCUMENTS} whose build it is at least, else the
+	 * schema's first document.
+	 * @param schemaVersion the schema version, such as {@code 11.8.20}
+	 * @param productVersion the server's build, such as {@code 11.8.02900.8}
+	 * @return its text, or empty if none is committed for the schema
+	 */
+	public static Optional<String> text(String schemaVersion, Tm1Version productVersion) {
+		Optional<String> build = LATER_DOCUMENTS.getOrDefault(schemaVersion, List.of())
+			.stream()
+			.filter(b -> productVersion.isAtLeast(Tm1Version.parse(b)))
+			.max(Comparator.comparing(Tm1Version::parse));
+		return build.isPresent() ? text(schemaVersion + "-" + build.get()) : text(schemaVersion);
 	}
 
 	private static String resource(String schemaVersion) {
