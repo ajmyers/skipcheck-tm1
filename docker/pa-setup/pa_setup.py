@@ -302,7 +302,7 @@ def normalize(cfg):
 
     engine = section(cfg, "tm1Engine")
     if engine is not None:
-        check_keys(engine, ("port", "databases", "users", "datastore", "oauth2"), "tm1Engine")
+        check_keys(engine, ("port", "databases", "users", "datastore", "oauth2", "passthrough"), "tm1Engine")
         raw = engine.get("databases")
         if raw is None:
             raw = {ENGINE_INSTANCE: None}
@@ -354,9 +354,24 @@ def normalize(cfg):
                 raise ConfigError("tm1Engine.oauth2: needs a user with a password to log in as, "
                                   "e.g. users: [analyst:analystpw:Analysts]")
             oauth2 = {"keycloakPort": port(oauth2.get("keycloakPort"), "tm1Engine.oauth2", 8181)}
+        passthrough = engine.get("passthrough")
+        # Off when absent or false; on, it names the TM1 server that checks names and passwords
+        if passthrough is None or passthrough is False:
+            passthrough = None
+        else:
+            check_keys(passthrough, ("server",), "tm1Engine.passthrough")
+            wanted = passthrough.get("server")
+            if not isinstance(wanted, str) or wanted not in servers:
+                raise ConfigError("tm1Engine.passthrough.server: name one of tm1.servers, whose users then log in "
+                                  "to TM1 v12 with their name and password there"
+                                  + (f" ({', '.join(servers)})" if servers else ""))
+            if oauth2:
+                raise ConfigError("tm1Engine: oauth2 and passthrough can't both be on: TM1 would take tokens and "
+                                  "refuse a name and password")
+            passthrough = {"server": wanted}
         engine = {"port": port(engine.get("port"), "tm1Engine", 4444), "databases": databases, "users": engine_users,
                   "datastorePort": None if published is None else port(published, "tm1Engine.datastore", 27017),
-                  "oauth2": oauth2}
+                  "oauth2": oauth2, "passthrough": passthrough}
         for sname in servers:
             # The engine's two compose services: a server of that name would be replaced by them
             if sname.lower() in ("tm1-engine", "tm1-engine-mongo") + ((ENGINE_KEYCLOAK,) if oauth2 else ()):
@@ -551,6 +566,13 @@ def generate(m):
         else:
             # The deployment is kept between runs: off has to be said, or an earlier run's stays
             env["TM1_OAUTH2_ISSUER_URL"] = "none"
+        if engine["passthrough"]:
+            # The TM1 11 server's REST API, as the engine reaches it; the image's defaults are TM1 11's
+            server = service_name(engine["passthrough"]["server"])
+            env["TM1_PASSTHROUGH_URL"] = f"http://{server}:8010/api/v1/"
+            depends[server] = {"condition": "service_healthy"}
+        else:
+            env["TM1_PASSTHROUGH_URL"] = "none"
         services["tm1-engine"] = {
             "image": m["images"]["tm1Engine"], "platform": "linux/amd64",
             # Each database is stopped through TM1 first, which commits it
@@ -712,6 +734,12 @@ def urls(m):
                          host_join(credentials, instance, "tm1.json"), "as " + " or ".join(names)))
         first = next(iter(engine["databases"]))
         rows.append(("  try it", f"setup.sh session {first}", "a cookie for curl -b"))
+        if engine["passthrough"]:
+            from_server = engine["passthrough"]["server"]
+            rows.append(("  pass-through", f"users of TM1 {from_server} log in with their name and password there",
+                         "those in tm1Engine.users, and admin"))
+            rows.append(("  try it", f"curl -u NAME:PASSWORD \"{base}{engine['databases'][first]['instance']}"
+                         f"/api/v1/Databases('{first}')/ActiveUser\"", ""))
         if engine["oauth2"]:
             known = [u for u in engine["users"] if u["password"]]
             # Who, not their passwords: those are in the file

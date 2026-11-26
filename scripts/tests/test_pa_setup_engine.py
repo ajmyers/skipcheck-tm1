@@ -54,6 +54,7 @@ def test_on_alone_is_one_database_and_no_users(pa_setup: ModuleType, on: str) ->
         "users": [],
         "datastorePort": None,
         "oauth2": None,
+        "passthrough": None,
     }
 
 
@@ -100,14 +101,22 @@ tm1Engine:
     ("text", "message"),
     [
         ("tm1Engine: {prot: 1}", "tm1Engine: unknown setting(s) prot"),
-        # OAuth 2.0 is the oauth2 section; pass-through isn't in pa-setup yet
+        # OAuth 2.0 is the oauth2 section, and pass-through the passthrough section
         ("tm1Engine: {login: oauth2}", "tm1Engine: unknown setting(s) login"),
+        ("tm1Engine: {passthrough: {url: 'http://x'}}", "tm1Engine.passthrough: unknown setting(s) url"),
+        ("tm1Engine: {passthrough: true}", "tm1Engine.passthrough must be a mapping"),
+        ("tm1Engine: {passthrough: {}}", "tm1Engine.passthrough.server: name one of tm1.servers"),
+        ("tm1: {servers: {legacy: {}}}\ntm1Engine: {passthrough: {server: other}}", "name one of tm1.servers, whose users then log in to TM1 v12 with their name and password there (legacy)"),
+        ("tm1: {servers: {legacy: {}}}\ntm1Engine: {passthrough: {server: Legacy}}", "tm1Engine.passthrough.server: name one of tm1.servers"),
+        (
+            "tm1: {servers: {legacy: {}}}\ntm1Engine: {users: ['a:pw:'], oauth2: true, passthrough: {server: legacy}}",
+            "tm1Engine: oauth2 and passthrough can't both be on",
+        ),
         ("tm1Engine: {oauth2: {port: 1}}", "tm1Engine.oauth2: unknown setting(s) port"),
         ("tm1Engine: {oauth2: true}", "tm1Engine.oauth2: needs a user with a password"),
         ("tm1Engine: {oauth2: true, users: [viewer, 'analyst::Analysts']}", "needs a user with a password"),
         ("tm1Engine: {oauth2: 0, users: ['a:pw']}", "tm1Engine.oauth2 must be a mapping"),
         ("tm1Engine: {oauth2: {keycloakPort: 4444}, users: ['a:pw']}", "port(s) 4444 used by more than one service"),
-        ("tm1Engine: {passthrough: {server: legacy}}", "unknown setting(s) passthrough"),
         ("tm1Engine: {databases: {}}", "tm1Engine.databases: name at least one database"),
         ("tm1Engine: {databases: [planning]}", "tm1Engine.databases: name at least one database"),
         ("tm1Engine: {databases: {ab: {}}}", "tm1Engine.databases.ab: TM1 needs database names of at least 3"),
@@ -627,6 +636,43 @@ def test_up_and_down_remove_what_was_taken_out_of_the_file(
     assert ran == [["up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "1800"], ["down", "--remove-orphans"]]
 
 
+PASS = "tm1: {servers: {Legacy: {seed: sdata}, other: {}}}\ntm1Engine: {users: [analyst], passthrough: {server: Legacy}OAUTH}\n"
+
+
+def test_passthrough_points_the_engine_at_the_tm1_11_server_and_waits_for_it(pa_setup: ModuleType) -> None:
+    generated = pa_setup.generate(model(pa_setup, PASS.replace("OAUTH", "")))
+    engine = generated["services"]["tm1-engine"]
+    # The server's REST API as the engine reaches it: its service's name, and TM1's own port
+    assert engine["environment"]["TM1_PASSTHROUGH_URL"] == "http://legacy:8010/api/v1/"
+    assert engine["environment"]["TM1_OAUTH2_ISSUER_URL"] == "none"
+    assert engine["depends_on"]["legacy"] == {"condition": "service_healthy"}
+    # The image's defaults are a TM1 11 server's: nothing else to say
+    assert not [name for name in engine["environment"] if name.startswith("TM1_PASSTHROUGH_") and name != "TM1_PASSTHROUGH_URL"]
+    assert "tm1-engine-keycloak" not in generated["services"]
+
+
+@pytest.mark.parametrize("off", ["", ", passthrough: false", ", passthrough: null"])
+def test_without_passthrough_the_engine_is_told_its_off(pa_setup: ModuleType, off: str) -> None:
+    # The deployment is kept between runs, so leaving the setting out can't mean off
+    generated = pa_setup.generate(model(pa_setup, f"tm1: {{servers: {{legacy: {{}}}}}}\ntm1Engine: {{users: [analyst]{off}}}\n"))
+    engine = generated["services"]["tm1-engine"]
+    assert engine["environment"]["TM1_PASSTHROUGH_URL"] == "none"
+    assert "legacy" not in engine["depends_on"]
+
+
+def test_oauth2_false_beside_passthrough_is_fine(pa_setup: ModuleType) -> None:
+    # Off is off: only the two both on are refused
+    read = model(pa_setup, PASS.replace("OAUTH", ", oauth2: false"))
+    assert read["tm1Engine"]["passthrough"] == {"server": "Legacy"} and read["tm1Engine"]["oauth2"] is None
+
+
+def test_prints_whose_users_log_in_and_how_to_try_it(pa_setup: ModuleType, capsys: pytest.CaptureFixture[str]) -> None:
+    pa_setup.urls(model(pa_setup, PASS.replace("OAUTH", "")))
+    out = capsys.readouterr().out
+    assert "users of TM1 Legacy log in with their name and password there" in out
+    assert "curl -u NAME:PASSWORD \"http://localhost:4444/tm1/api/v1/Databases('tm1')/ActiveUser\"" in out
+
+
 def test_the_example_is_valid_and_fits_the_schema_it_documents(pa_setup: ModuleType) -> None:
     example = yaml.safe_load((SETUP / "examples" / "tm1-engine.yaml").read_text(encoding="utf-8"))
     engine = pa_setup.normalize(example)["tm1Engine"]
@@ -634,6 +680,6 @@ def test_the_example_is_valid_and_fits_the_schema_it_documents(pa_setup: ModuleT
     schema = json.loads((SETUP / "pa-environment.schema.json").read_text(encoding="utf-8"))
     described = schema["properties"]["tm1Engine"]["properties"]
     # Every setting the tool takes is in the schema, and nothing else
-    assert sorted(described) == ["databases", "datastore", "oauth2", "port", "users"]
+    assert sorted(described) == ["databases", "datastore", "oauth2", "passthrough", "port", "users"]
     assert set(example["tm1Engine"]) <= set(described)
     assert {"tm1Engine", "mongo"} <= set(schema["properties"]["images"]["properties"])

@@ -117,6 +117,7 @@ tm1Engine: true            # one database, tm1; log in as admin
 | `tm1Engine.users` | | Users for every database: `user`, `user::group,group`, or a mapping with `name` and `groups`. `admin` is always there. The middle part is a password, as in `cognos.users`, and may be empty; with `oauth2` it's what the user logs in with (`user:password` or `user:password:group,group`). |
 | `tm1Engine.datastore.port` | not published | Publishes the engine's MongoDB on your computer only (`127.0.0.1`). `up` prints its login. |
 | `tm1Engine.oauth2` | off | **OAuth 2.0 logins:** `true`, or `keycloakPort` (8181). Adds a Keycloak for the engine, with the users who have a password. |
+| `tm1Engine.passthrough` | off | **Pass-through logins:** `server`, the name of one of `tm1.servers`, whose users log in to TM1 v12 with their name and password there. Not with `oauth2`. |
 
 - **One engine holds every database.** Unlike TM1 11, a database isn't a container: `database
   create` adds one to the running engine in about 13 seconds.
@@ -153,6 +154,20 @@ tm1Engine: true            # one database, tm1; log in as admin
     `admin` / `admin`.
   - pa-setup owns the engine's OAuth 2.0 setting: one you set by hand in the kept
     `config.internal.json` is removed on the next `up` without `oauth2`.
+- **Pass-through logins** (`passthrough: { server: legacy }`) have TM1 v12 ask a TM1 11 server of
+  the same file who a name and password are. That server's users then log in to TM1 v12 with
+  what they have there, as Basic authentication on any request:
+
+  ```sh
+  curl -u admin:apple "http://localhost:4444/tm1/api/v1/Databases('planning')/Cubes"
+  ```
+
+  - A user has to be in the v12 database too, to do anything there: list them in
+    `tm1Engine.users`. `admin` always is. pa-setup doesn't create users on the TM1 11 server.
+  - It can't be on with `oauth2`: TM1 would take tokens and refuse a name and password.
+  - The name and password logins through the application still work beside it.
+  - Tried against a TM1 11 server with users of its own. **Not tried with Cognos (CAM)
+    security**, which every TM1 server gets when the file has `cognos`.
 - **Everything the engine stores is in `pa-files/tm1-engine`:** `deployment` (settings, the
   databases and logs), `credentials`, and `datastore` (MongoDB's data). Keep or delete the three
   together: a database's changes since its last save are in MongoDB.

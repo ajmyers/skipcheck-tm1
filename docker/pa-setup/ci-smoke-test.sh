@@ -89,6 +89,14 @@ out=$(tool $'version: 1\ntm1Engine: true' generate) || fail "no oauth2: $out"
 grep -qF "TM1_OAUTH2_ISSUER_URL: none" <<<"$out" || fail "without oauth2 the engine isn't told it's off: $out"
 pass "tm1Engine.oauth2 adds the engine's Keycloak and its realm"
 
+# 4d. Pass-through logins: the engine is pointed at the TM1 11 server, and waits for it
+out=$(tool $'version: 1\ntm1: {servers: {legacy: {seed: sdata}}}\ntm1Engine: {passthrough: {server: legacy}}' generate) || fail "passthrough: $out"
+! grep -q "COMPOSE INVALID" <<<"$out" || fail "passthrough: docker compose config refused it: $out"
+grep -qF "TM1_PASSTHROUGH_URL: http://legacy:8010/api/v1/" <<<"$out" || fail "passthrough: the engine isn't pointed at the server: $out"
+out=$(tool $'version: 1\ntm1Engine: true' generate) || fail "no passthrough: $out"
+grep -qF "TM1_PASSTHROUGH_URL: none" <<<"$out" || fail "without passthrough the engine isn't told it's off: $out"
+pass "tm1Engine.passthrough points the engine at a TM1 11 server of the file"
+
 # 5. Bad files fail with exit 2 and say what's wrong
 check_error() {  # check_error <yaml> <expected message>
   local rc=0 out
@@ -105,6 +113,7 @@ check_error $'version: 1\nibm: ./ibm\ntm1: {servers: {tm1: {}}}\npaw: {}' "paw.a
 check_error $'version: 1\ntm1Web: true' "tm1Web: needs a TM1 server"
 check_error $'version: 1\ntm1Engine: {databases: {ab: {}}}' "at least 3 characters"
 check_error $'version: 1\ntm1Engine: {login: oauth2}' "unknown setting(s) login"
+check_error $'version: 1\ntm1Engine: {passthrough: {server: nosuch}}' "name one of tm1.servers"
 check_error $'version: 1\ntm1: {servers: {tm1: {}}}\ncredentials: 1' "unknown setting(s) credentials"
 check_error $'version: 1' "nothing to run"
 # The engine's commands need an engine in the file, and say so
