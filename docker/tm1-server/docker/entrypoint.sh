@@ -67,6 +67,11 @@ esac
 
 TM1_HOME=${TM1_HOME:-/opt/ibm/cognos/tm1_64}
 BIN="$TM1_HOME/bin64"
+# The install's libraries, wherever TM1_HOME points (the image's LD_LIBRARY_PATH names the default)
+case ":${LD_LIBRARY_PATH:-}:" in
+  *":$BIN:"*) ;;
+  *) export LD_LIBRARY_PATH="$BIN${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
+esac
 CONF=${TM1_CONFIG:-/tm1/config}
 DATA=${TM1_DATA:-/tm1/data}
 LOGS=${TM1_LOGS:-/tm1/logs}
