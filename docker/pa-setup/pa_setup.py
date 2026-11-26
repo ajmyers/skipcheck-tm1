@@ -130,7 +130,7 @@ def section(cfg, key):
     return value
 
 
-def parse_user(entry, where, password_optional=False, password_used=True):
+def parse_user(entry, where, password_optional=False, password_used=True, password_elsewhere=False):
     """A test user. TM1 v12 keeps no passwords, so there (password_optional) one may be left
     out or empty: analyst, analyst::Analysts or analyst:analystpw:Analysts."""
     if isinstance(entry, str):
@@ -140,9 +140,12 @@ def parse_user(entry, where, password_optional=False, password_used=True):
                 parts.append("")
             elif len(parts) == 2 and parts[1] and not password_used:
                 # The image's own form has groups there; here the second part is a password
+                hint = ("With passthrough the password is the one the user has on the TM1 server, and isn't "
+                        f"written here: write {parts[0]}." if password_elsewhere else
+                        "A password kept for OAuth 2.0 logins needs oauth2 in the section: oauth2: false keeps "
+                        "it, off.")
                 raise ConfigError(f"{where}: {entry!r} reads as a password, which TM1 v12 doesn't keep: "
-                                  f"for a group, write {parts[0]}::{parts[1]}. (A password kept for OAuth 2.0 "
-                                  "logins needs oauth2 in the section: oauth2: false keeps it, off.)")
+                                  f"for a group, write {parts[0]}::{parts[1]}. ({hint})")
             if len(parts) not in (2, 3):
                 raise ConfigError(f"{where}: expected user, user::group,group or user:password:group,group, "
                                   f"not {entry!r}")
@@ -302,7 +305,7 @@ def normalize(cfg):
 
     engine = section(cfg, "tm1Engine")
     if engine is not None:
-        check_keys(engine, ("port", "databases", "users", "datastore", "oauth2"), "tm1Engine")
+        check_keys(engine, ("port", "databases", "users", "datastore", "oauth2", "passthrough"), "tm1Engine")
         raw = engine.get("databases")
         if raw is None:
             raw = {ENGINE_INSTANCE: None}
@@ -331,7 +334,10 @@ def normalize(cfg):
         # With oauth2 in the section a password is meant, so user:password says what it means:
         # on, or false to keep the passwords with OAuth 2.0 off
         wants_oauth2 = engine.get("oauth2") is not None
-        engine_users = [parse_user(u, f"tm1Engine.users[{i}]", password_optional=True, password_used=wants_oauth2)
+        # With pass-through a password is the TM1 server's to know, not this file's
+        elsewhere = engine.get("passthrough") not in (None, False)
+        engine_users = [parse_user(u, f"tm1Engine.users[{i}]", password_optional=True, password_used=wants_oauth2,
+                                   password_elsewhere=elsewhere)
                         for i, u in enumerate(listed)]
         engine_names = [u["name"].lower() for u in engine_users]
         if len(set(engine_names)) != len(engine_names):
@@ -354,9 +360,33 @@ def normalize(cfg):
                 raise ConfigError("tm1Engine.oauth2: needs a user with a password to log in as, "
                                   "e.g. users: [analyst:analystpw:Analysts]")
             oauth2 = {"keycloakPort": port(oauth2.get("keycloakPort"), "tm1Engine.oauth2", 8181)}
+        passthrough = engine.get("passthrough")
+        # Off when absent or false; on, it names the TM1 server that checks names and passwords
+        if passthrough is None or passthrough is False:
+            passthrough = None
+        else:
+            if passthrough is True:
+                raise ConfigError("tm1Engine.passthrough: name the TM1 server that checks names and passwords, "
+                                  "e.g. passthrough: {server: legacy}")
+            check_keys(passthrough, ("server",), "tm1Engine.passthrough")
+            wanted = passthrough.get("server")
+            if not isinstance(wanted, str) or wanted not in servers:
+                raise ConfigError("tm1Engine.passthrough.server: name one of tm1.servers, whose users then log in "
+                                  "to TM1 v12 with their name and password there"
+                                  + (f" ({', '.join(servers)})" if servers else ""))
+            if oauth2:
+                raise ConfigError("tm1Engine: oauth2 and passthrough can't both be on: TM1 would take tokens and "
+                                  "refuse a name and password")
+            # The engine asks over plain HTTP, and trusts no certificate of the server's
+            # Whatever its case: the server's image matches a tm1s.cfg parameter's name in any
+            use_ssl = next((v for k, v in servers[wanted]["cfg"].items() if k.lower() == "usessl"), "F")
+            if str(use_ssl).strip().lower() not in ("f", "false"):
+                raise ConfigError(f"tm1Engine.passthrough.server: {wanted} has cfg.UseSSL on, and the engine asks it "
+                                  "over plain HTTP: take UseSSL out of that server's cfg")
+            passthrough = {"server": wanted}
         engine = {"port": port(engine.get("port"), "tm1Engine", 4444), "databases": databases, "users": engine_users,
                   "datastorePort": None if published is None else port(published, "tm1Engine.datastore", 27017),
-                  "oauth2": oauth2}
+                  "oauth2": oauth2, "passthrough": passthrough}
         for sname in servers:
             # The engine's two compose services: a server of that name would be replaced by them
             if sname.lower() in ("tm1-engine", "tm1-engine-mongo") + ((ENGINE_KEYCLOAK,) if oauth2 else ()):
@@ -551,6 +581,13 @@ def generate(m):
         else:
             # The deployment is kept between runs: off has to be said, or an earlier run's stays
             env["TM1_OAUTH2_ISSUER_URL"] = "none"
+        if engine["passthrough"]:
+            # The TM1 11 server's REST API, as the engine reaches it; the image's defaults are TM1 11's
+            server = service_name(engine["passthrough"]["server"])
+            env["TM1_PASSTHROUGH_URL"] = f"http://{server}:8010/api/v1/"
+            depends[server] = {"condition": "service_healthy"}
+        else:
+            env["TM1_PASSTHROUGH_URL"] = "none"
         services["tm1-engine"] = {
             "image": m["images"]["tm1Engine"], "platform": "linux/amd64",
             # Each database is stopped through TM1 first, which commits it
@@ -712,6 +749,22 @@ def urls(m):
                          host_join(credentials, instance, "tm1.json"), "as " + " or ".join(names)))
         first = next(iter(engine["databases"]))
         rows.append(("  try it", f"setup.sh session {first}", "a cookie for curl -b"))
+        if engine["passthrough"]:
+            from_server = engine["passthrough"]["server"]
+            rows.append(("  pass-through", f"users of TM1 {from_server} log in with their name and password there",
+                         "those in tm1Engine.users, and admin"))
+            address = f"\"{base}{engine['databases'][first]['instance']}/api/v1/Databases('{first}')/ActiveUser\""
+            if c:
+                # Every TM1 server is in CAM security then, which takes a CAMNamespace header that
+                # TM1 v12 refuses: nothing here shows it working
+                rows.append(("  NOT TRIED", "pass-through to a TM1 server in Cognos (CAM) security", "it may not log anyone in"))
+            else:
+                # The login the server's seed gives it, as the TM1 row has: an empty database's
+                # admin has no password, here as there
+                seed = m["tm1"][from_server]["seed"]
+                login = "admin:apple" if seed == "sdata" else "admin:" if seed == "empty" else "NAME:PASSWORD"
+                rows.append(("  try it", f"curl -u {login} {address}",
+                             "admin has no password on an empty TM1 database" if seed == "empty" else ""))
         if engine["oauth2"]:
             known = [u for u in engine["users"] if u["password"]]
             # Who, not their passwords: those are in the file

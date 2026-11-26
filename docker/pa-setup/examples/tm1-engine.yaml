@@ -17,3 +17,4 @@ tm1Engine:
   # datastore: { port: 27017 }        # publish the engine's MongoDB on the host
   # oauth2: true                      # OAuth 2.0 logins, from a Keycloak of the engine's own: give a
   #                                   # user a password to log in with (analyst:analystpw:Analysts)
+  # passthrough: { server: legacy }   # or: legacy's users log in here with their name and password there
