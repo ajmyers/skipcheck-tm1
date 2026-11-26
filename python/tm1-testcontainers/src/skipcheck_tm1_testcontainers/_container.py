@@ -33,6 +33,8 @@ from testcontainers.core.wait_strategies import HttpWaitStrategy
 __all__ = ["GenericContainer", "Network", "docker_available", "reuse_enabled"]
 
 REUSE_HASH_LABEL = "io.skipcheck.tm1.testcontainers.hash"
+# On every container this library starts, in every language; its value is the language
+LIBRARY_LABEL = "io.skipcheck.tm1.testcontainers"
 
 
 class Network(_TcNetwork):
@@ -295,7 +297,7 @@ class GenericContainer(DockerContainer):
                 host_network = client.find_host_network()
                 if host_network:
                     kwargs["network"] = host_network
-            labels = create_labels(self.image, self._labels)
+            labels = create_labels(self.image, {**self._labels, LIBRARY_LABEL: "python"})
             existing = None
             if reuse:
                 # Not reaped at the end of the session, and found again by its settings

@@ -87,6 +87,14 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	public static final int REST_PORT = 8010;
 
 	/**
+	 * The label on every container this library starts, in every language; its value is
+	 * the language, here {@code java}. {@code docker ps --filter label=...} finds them.
+	 */
+	static final String LIBRARY_LABEL = "io.skipcheck.tm1.testcontainers";
+
+	static final String LIBRARY = "java";
+
+	/**
 	 * The volume bundle installs are cached in, shared by every container on this Docker
 	 * host. Only the first container to see a bundle installs it; the rest reuse it.
 	 * Remove the volume to clear it.
@@ -140,6 +148,7 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	public Tm1ServerContainer(DockerImageName image, Tm1Source source) {
 		super(image);
 		this.source = Objects.requireNonNull(source, "source");
+		withLabel(LIBRARY_LABEL, LIBRARY);
 		withExposedPorts(REST_PORT);
 		withEnv("TM1_SEED", Tm1Seed.EMPTY.value());
 		// TM1 Server only exists for x86-64. On Apple Silicon this runs under Rosetta.

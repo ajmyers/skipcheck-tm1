@@ -60,6 +60,7 @@ public class Tm1AdminServerContainer extends GenericContainer<Tm1AdminServerCont
 	public Tm1AdminServerContainer(DockerImageName image, Tm1Source source) {
 		super(image);
 		this.source = Objects.requireNonNull(source, "source");
+		withLabel(Tm1ServerContainer.LIBRARY_LABEL, Tm1ServerContainer.LIBRARY);
 		withCommand("admin");
 		withExposedPorts(REST_PORT);
 		withNetworkAliases(NETWORK_ALIAS);

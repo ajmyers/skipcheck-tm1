@@ -157,6 +157,7 @@ public class CognosContainer extends GenericContainer<CognosContainer> {
 	public CognosContainer(DockerImageName image, CognosSource source) {
 		super(image);
 		this.source = Objects.requireNonNull(source, "source");
+		withLabel(Tm1ServerContainer.LIBRARY_LABEL, Tm1ServerContainer.LIBRARY);
 		withExposedPorts(DISPATCHER_PORT);
 		withNetworkAliases(NETWORK_ALIAS);
 		withEnv("COGNOS_HOST", NETWORK_ALIAS);

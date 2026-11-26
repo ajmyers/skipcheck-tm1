@@ -71,6 +71,7 @@ public class KeycloakContainer extends GenericContainer<KeycloakContainer> {
 										// Testcontainers pattern
 	public KeycloakContainer(DockerImageName image) {
 		super(image);
+		withLabel(Tm1ServerContainer.LIBRARY_LABEL, Tm1ServerContainer.LIBRARY);
 		withCommand("start-dev");
 		withExposedPorts(HTTP_PORT);
 		withNetworkAliases(NETWORK_ALIAS);

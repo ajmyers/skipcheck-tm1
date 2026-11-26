@@ -304,6 +304,12 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
                 }
                 p.HostConfig ??= new HostConfig();
                 p.HostConfig.Binds = [.. p.HostConfig.Binds ?? [], .. Binds];
+                // Testcontainers for .NET names a container's network only as an endpoint, which leaves
+                // its network mode as Docker's default bridge; Java's, Python's and Node's name it here too
+                if (Network is not null)
+                {
+                    p.HostConfig.NetworkMode = Network.Name;
+                }
             });
         if (command.Length > 0)
         {

@@ -87,6 +87,7 @@ public class Tm1WebContainer extends GenericContainer<Tm1WebContainer> {
 	public Tm1WebContainer(DockerImageName image, Tm1WebSource source) {
 		super(image);
 		this.source = Objects.requireNonNull(source, "source");
+		withLabel(Tm1ServerContainer.LIBRARY_LABEL, Tm1ServerContainer.LIBRARY);
 		withExposedPorts(HTTP_PORT);
 		// TM1 Web's bundled Java only exists for x86-64. On Apple Silicon this runs under
 		// Rosetta.
