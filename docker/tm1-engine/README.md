@@ -190,15 +190,13 @@ API, logins and the management API. Map it to any host port with `-p`.
 | `TM1_ENGINE_START_TIMEOUT` | `300` | Seconds to wait for TM1's gateway before giving up |
 | `TM1_ENGINE_STOP_TIMEOUT` | `60` | Seconds to wait for the databases to stop |
 
-The container sets three things in `config.internal.json`, and logs each change: the
-gateway's port, the datastore, and OAuth 2.0 logins when you ask for them
-([below](#oauth-20-logins)). Everything else in a `config.internal.json` you mount is left
+The container sets these in `config.internal.json`, and logs each change: the gateway's
+port, the datastore, and [OAuth 2.0](#oauth-20-logins) or
+[pass-through](#pass-through-logins) logins when you ask for them. Everything else in a `config.internal.json` you mount is left
 as it is.
 
-**Not yet in this image:** settings for pass-through logins, and TLS. You can set
-pass-through in `config.internal.json` yourself, as IBM's guide describes. TLS on the
-gateway isn't supported yet: the container talks to it over plain HTTP to set TM1 up,
-check its health and stop it.
+**Not yet in this image:** TLS on the gateway. The container talks to it over plain HTTP
+to set TM1 up, check its health and stop it.
 
 ## OAuth 2.0 logins
 
@@ -237,6 +235,47 @@ curl -H "Authorization: Bearer $TOKEN" "http://localhost:4444/tm1/api/v1/Databas
 
 Tried with TM1 12.6.7 and Keycloak 26.4. A provider that comes up after TM1 works once it's
 there: TM1 fetches its keys when a token comes. Not tried: an expired token.
+
+## Pass-through logins
+
+TM1 v12 keeps no passwords, but it can ask another server who a name and password are.
+Pointed at a **TM1 11 server**, that server's users log in to TM1 v12 with the name and
+password they have there:
+
+| Variable | Default | |
+|---|---|---|
+| `TM1_PASSTHROUGH_URL` | | The server's address, e.g. a TM1 11 server's REST API: `http://tm1-server:8010/api/v1/`. `none` takes pass-through off again. |
+| `TM1_PASSTHROUGH_ENDPOINT` | `ActiveUser` | What's asked there, with the user's name and password, for who they are |
+| `TM1_PASSTHROUGH_POINTER` | `/Name` | Where the name is in the answer, as a JSON pointer |
+| `TM1_PASSTHROUGH_FINALIZE` | `ActiveSession/tm1.Close`, with the default endpoint; else nothing | What's called afterwards, to close the session that made on the server. `none` for nothing. |
+| `TM1_PASSTHROUGH_FINALIZE_METHOD` | `POST` | With which HTTP method |
+
+The defaults are a TM1 11 server's, so the address is all it takes. A client then sends
+the name and password as Basic authentication on any request, and gets a session:
+
+```sh
+curl -u admin:apple "http://localhost:4444/tm1/api/v1/Databases('tm1')/Cubes"
+```
+
+- **The name the server answers must be a user of the database** (`TM1_USERS`), matched
+  without regard to case. A user the server knows and the database doesn't gets 403. A
+  wrong password, or a name the server doesn't accept, gets 401.
+- **TM1 must be able to reach the address from inside the container.**
+- **Each login is checked with the server, and the session it opens there is closed
+  again.** Without the finalize setting, every login leaves a session on the server.
+- **OAuth 2.0 and pass-through can't both work:** with both set, TM1 takes tokens and
+  refuses a name and password (401), as a trial showed. So the container refuses to start
+  when the variables turn one on beside the other; turn one off with `none`. Both already
+  in a `config.internal.json` you mounted are left as they are, and the log says so.
+- **Service-to-service logins keep working** beside it (`tm1-engine session`).
+- As with OAuth 2.0: without the variables, what's in `config.internal.json` is left as
+  it is, and the log says when pass-through stays on. A mistake in the variables stops the
+  container before it installs anything; a clash with what's kept in the file is found
+  after.
+
+Tried with TM1 12.6.7 forwarding to TM1 11 (Planning Analytics 2.1.25) with its own
+users. **Not tried: a TM1 11 server in Cognos (CAM) security.** TM1 v12 refused a
+`CAMNamespace` header itself, so a CAM user would have to reach TM1 11 as Basic.
 
 ## Image
 

@@ -278,8 +278,11 @@ def test_none_turns_oauth2_off_whatever_else_is_still_set() -> None:
 
 def test_configure_says_when_oauth2_stays_on_without_the_settings() -> None:
     config: dict[str, Any] = {"authentication": {"oauth2": {"issuerURL": "http://old/realm", "audience": "tm1"}}}
-    changes = engine.configure(config, {})
-    assert [c for c in changes if "oauth2" in c] == [
+    notices: list[str] = []
+    changes = engine.configure(config, {}, notices)
+    # Said, but not a change: the file isn't written for it
+    assert [c for c in changes if "oauth2" in c] == []
+    assert notices == [
         "authentication.oauth2: left on (issuer http://old/realm); TM1_OAUTH2_ISSUER_URL=none turns OAuth 2.0 logins off"
     ]
     assert config["authentication"]["oauth2"]["issuerURL"] == "http://old/realm"
@@ -306,6 +309,150 @@ def test_a_mistake_in_the_oauth2_settings_is_caught_before_anything_is_installed
     with pytest.raises(engine.Failure, match="TM1_OAUTH2_AUDIENCE is needed"):
         engine.plan({"TM1_OAUTH2_ISSUER_URL": "http://kc/r"})
     assert engine.plan({"TM1_OAUTH2_ISSUER_URL": "http://kc/r", "TM1_OAUTH2_AUDIENCE": "tm1"})["users"] == []
+
+
+V11 = {
+    "serviceRootURL": "http://tm1-server:8010/api/v1/",
+    "authEndpoint": "ActiveUser",
+    "authJSONPointer": "/Name",
+    "finalizeEndpoint": "ActiveSession/tm1.Close",
+    "finalizeMethod": "POST",
+}
+
+
+@pytest.mark.parametrize("url", ["http://tm1-server:8010/api/v1/", " http://tm1-server:8010/api/v1 "])
+def test_configure_forwards_logins_to_a_tm1_11_server_by_default(url: str) -> None:
+    config: dict[str, Any] = {"authentication": {"jwtIssuer": "TM1"}}
+    changes = engine.configure(config, {"TM1_PASSTHROUGH_URL": url})
+    # The defaults are a TM1 11 server's: who the user is, and the session there closed again
+    assert config["authentication"] == {"jwtIssuer": "TM1", "http": V11}
+    assert "authentication.http.authEndpoint: None -> 'ActiveUser'" in changes
+    assert [c for c in engine.configure(config, {"TM1_PASSTHROUGH_URL": url}) if "http" in c] == []
+
+
+def test_configure_takes_another_servers_ways() -> None:
+    config: dict[str, Any] = {}
+    engine.configure(
+        config,
+        {
+            "TM1_PASSTHROUGH_URL": "https://auth.example.com/v2",
+            "TM1_PASSTHROUGH_ENDPOINT": "/whoami",
+            "TM1_PASSTHROUGH_POINTER": "/user/login",
+            "TM1_PASSTHROUGH_FINALIZE": "/logout",
+            "TM1_PASSTHROUGH_FINALIZE_METHOD": "delete",
+        },
+    )
+    assert config["authentication"]["http"] == {
+        "serviceRootURL": "https://auth.example.com/v2/",
+        "authEndpoint": "whoami",
+        "authJSONPointer": "/user/login",
+        "finalizeEndpoint": "logout",
+        "finalizeMethod": "DELETE",
+    }
+    # No finalize asked for is none, an earlier start's included
+    changes = engine.configure(config, {"TM1_PASSTHROUGH_URL": "https://auth.example.com/v2", "TM1_PASSTHROUGH_FINALIZE": "none"})
+    assert "finalizeEndpoint" not in config["authentication"]["http"]
+    assert "authentication.http.finalizeMethod: removed" in changes
+
+
+def test_configure_leaves_pass_through_alone_unless_asked_and_says_when_it_stays_on() -> None:
+    config: dict[str, Any] = {"authentication": {"http": dict(V11)}}
+    notices: list[str] = []
+    changes = engine.configure(config, {"TM1_PASSTHROUGH_URL": ""}, notices)
+    assert config["authentication"]["http"] == V11
+    # Said, but not a change: the file, which may be read-only, isn't written for it
+    assert [c for c in changes if "http" in c] == []
+    assert notices == [
+        "authentication.http: left on (pass-through to http://tm1-server:8010/api/v1/); "
+        "TM1_PASSTHROUGH_URL=none turns pass-through logins off"
+    ]
+    # none is off, whatever else is still set
+    assert "authentication.http: removed" in engine.configure(config, {"TM1_PASSTHROUGH_URL": "none", "TM1_PASSTHROUGH_ENDPOINT": "x"})
+    assert config["authentication"] == {}
+    untouched: dict[str, Any] = {}
+    engine.configure(untouched, {"TM1_PASSTHROUGH_URL": "none"})
+    assert "authentication" not in untouched
+
+
+@pytest.mark.parametrize(
+    ("env", "message"),
+    [
+        ({"TM1_PASSTHROUGH_POINTER": "/Name"}, "TM1_PASSTHROUGH_POINTER is set without TM1_PASSTHROUGH_URL"),
+        ({"TM1_PASSTHROUGH_URL": "tm1-server:8010"}, "must be an http:// or https:// address"),
+        ({"TM1_PASSTHROUGH_URL": "http://tm1 server/api"}, "must be an http:// or https:// address"),
+        # TM1 joins the endpoint onto the address as it is
+        ({"TM1_PASSTHROUGH_URL": "http://s/api?x=1"}, "without a query"),
+        ({"TM1_PASSTHROUGH_URL": "http://s/api/#frag"}, "without a query"),
+        ({"TM1_PASSTHROUGH_URL": "http://s/api", "TM1_PASSTHROUGH_ENDPOINT": "/"}, "TM1_PASSTHROUGH_ENDPOINT is a path"),
+        ({"TM1_PASSTHROUGH_URL": "http://s/api", "TM1_PASSTHROUGH_ENDPOINT": "Active User"}, "without spaces"),
+        ({"TM1_PASSTHROUGH_URL": "http://s/api", "TM1_PASSTHROUGH_FINALIZE": "/"}, "TM1_PASSTHROUGH_FINALIZE is a path"),
+        ({"TM1_PASSTHROUGH_URL": "http://s/api", "TM1_PASSTHROUGH_POINTER": "Name"}, "starts with /"),
+        ({"TM1_PASSTHROUGH_URL": "http://s/api", "TM1_PASSTHROUGH_FINALIZE_METHOD": "P O S T"}, "is an HTTP method"),
+        (
+            {"TM1_PASSTHROUGH_URL": "http://s/api", "TM1_PASSTHROUGH_FINALIZE": "none", "TM1_PASSTHROUGH_FINALIZE_METHOD": "POST"},
+            "is set with TM1_PASSTHROUGH_FINALIZE=none",
+        ),
+    ],
+)
+def test_configure_refuses_pass_through_settings_that_cant_work(env: dict[str, str], message: str) -> None:
+    with pytest.raises(engine.Failure, match=message):
+        engine.configure({}, env)
+
+
+def test_another_servers_endpoint_gets_no_tm1_11_finalize_unless_asked() -> None:
+    config: dict[str, Any] = {}
+    engine.configure(config, {"TM1_PASSTHROUGH_URL": "HTTPS://auth.example.com/v2", "TM1_PASSTHROUGH_ENDPOINT": "whoami"})
+    # ActiveSession/tm1.Close is TM1 11's: it isn't sent to a server that isn't one
+    assert config["authentication"]["http"] == {
+        "serviceRootURL": "HTTPS://auth.example.com/v2/",
+        "authEndpoint": "whoami",
+        "authJSONPointer": "/Name",
+    }
+
+
+def test_an_address_is_logged_without_the_login_it_carries() -> None:
+    notices: list[str] = []
+    changes = engine.configure({}, {"TM1_PASSTHROUGH_URL": "http://svc:secret@tm1-server:8010/api/v1/"}, notices)
+    assert "authentication.http.serviceRootURL: 'None' -> 'http://tm1-server:8010/api/v1/'" in changes
+    kept: dict[str, Any] = {"authentication": {"http": {"serviceRootURL": "http://svc:secret@tm1-server:8010/api/v1/"}}}
+    engine.configure(kept, {}, notices)
+    assert not [line for line in changes + notices if "secret" in line] and notices
+
+
+def test_a_mistake_in_the_pass_through_settings_is_caught_before_anything_is_installed() -> None:
+    # The entrypoint runs 'plan' first, with or without OAuth 2.0 set
+    with pytest.raises(engine.Failure, match="must be an http:// or https:// address"):
+        engine.plan({"TM1_PASSTHROUGH_URL": "tm1-server:8010"})
+    with pytest.raises(engine.Failure, match="TM1_PASSTHROUGH_POINTER is set without"):
+        engine.plan({"TM1_PASSTHROUGH_POINTER": "/Name"})
+    assert engine.plan({"TM1_PASSTHROUGH_URL": "http://tm1-server:8010/api/v1/"})["users"] == []
+
+
+def test_both_logins_kept_in_the_file_start_as_they_are_and_are_said() -> None:
+    # Set by hand, or by an earlier image: nothing asked for now, so nothing is refused or written
+    both = {"oauth2": {"issuerURL": "http://kc/r", "audience": "tm1"}, "http": dict(V11)}
+    config: dict[str, Any] = {"services": {"tm1-gateway": {"serverPort": "4444"}}, "authentication": dict(both)}
+    notices: list[str] = []
+    assert engine.configure(config, {}, notices) == []
+    assert config["authentication"] == both
+    assert any("are both on" in line for line in notices)
+
+
+def test_oauth2_and_pass_through_cant_both_be_on() -> None:
+    both = {"TM1_OAUTH2_ISSUER_URL": "http://kc/r", "TM1_OAUTH2_AUDIENCE": "tm1", "TM1_PASSTHROUGH_URL": "http://s/api"}
+    # Caught by plan, which the entrypoint runs before it installs anything
+    with pytest.raises(engine.Failure, match="both set, and TM1 takes one of the two"):
+        engine.plan(both)
+    with pytest.raises(engine.Failure, match="are both on. TM1 takes tokens and never asks the server"):
+        engine.configure({}, both)
+    # One from an earlier start, kept in the file, and the other asked for now
+    kept: dict[str, Any] = {"authentication": {"oauth2": {"issuerURL": "http://kc/r", "audience": "tm1"}}}
+    with pytest.raises(engine.Failure, match="TM1_OAUTH2_ISSUER_URL=none or TM1_PASSTHROUGH_URL=none"):
+        engine.configure(kept, {"TM1_PASSTHROUGH_URL": "http://s/api"})
+    # Turning the kept one off in the same start is fine
+    switched: dict[str, Any] = {"authentication": {"oauth2": {"issuerURL": "http://kc/r", "audience": "tm1"}}}
+    engine.configure(switched, {"TM1_PASSTHROUGH_URL": "http://s/api", "TM1_OAUTH2_ISSUER_URL": "none"})
+    assert "oauth2" not in switched["authentication"] and switched["authentication"]["http"]["authEndpoint"] == "ActiveUser"
 
 
 def test_configure_points_tm1_at_a_mongodb_with_a_control_database_of_its_own() -> None:
