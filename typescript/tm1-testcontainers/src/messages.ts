@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /** Why tests are skipped, word for word as the Java annotations' constants (`RequiresTm1`,
- * `RequiresCognos`, `RequiresTm1Web`, `RequiresPaw`). Here rather than in `./vitest.js`, so the
+ * `RequiresTm1Engine`, `RequiresCognos`, `RequiresTm1Web`, `RequiresPaw`). Here rather than in `./vitest.js`, so the
  * containers can use them without loading vitest. */
 export const Messages = {
   TM1_NO_SOURCE:
     "No TM1 source configured. Set one of TM1_PRIVATE_IMAGE, TM1_HOME_DIR, TM1_INSTALL_VOLUME, TM1_BUNDLE_DIR or TM1_BUNDLE_URL (as an environment variable or system property) to run tests against TM1.",
+  TM1_ENGINE_NO_SOURCE:
+    "No TM1 v12 source configured. Set one of TM1_ENGINE_PRIVATE_IMAGE, TM1_ENGINE_HOME_DIR, TM1_ENGINE_INSTALL_VOLUME, TM1_ENGINE_BUNDLE_DIR or TM1_ENGINE_BUNDLE_URL, or put a tm1-v*-standalone-linux.tgz in TM1_BUNDLE_DIR (as an environment variable or system property) to run tests against TM1 v12.",
   TM1_NO_DOCKER: "Docker isn't available, so there's no TM1 to test against",
   COGNOS_NO_SOURCE:
     "No Cognos source configured. Set one of COGNOS_PRIVATE_IMAGE, COGNOS_INSTALL_VOLUME, COGNOS_ZIP_DIR or COGNOS_ZIP_URL, or put a casrv-*-linuxi38664h.zip in TM1_BUNDLE_DIR (as an environment variable or system property) to run tests against Cognos.",

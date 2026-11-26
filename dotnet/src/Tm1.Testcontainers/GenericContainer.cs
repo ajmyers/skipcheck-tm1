@@ -202,6 +202,7 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
             {
                 return;
             }
+            BeforeDependenciesStart();
             // As Java's Startables.deepStart: what it depends on starts first
             await Task.WhenAll(dependencies.Select(d => d.StartAsync(cancellationToken))).ConfigureAwait(false);
             await DependenciesStartedAsync(cancellationToken).ConfigureAwait(false);
@@ -226,6 +227,11 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
             }
             await ContainerIsStartedAsync(cancellationToken).ConfigureAwait(false);
         }
+        catch
+        {
+            await StartFailedAsync().ConfigureAwait(false);
+            throw;
+        }
         finally
         {
             starting.Release();
@@ -240,6 +246,7 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
             container = null;
             await c.DisposeAsync().ConfigureAwait(false);
         }
+        await StoppedAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Stops it.</summary>
@@ -275,6 +282,16 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     private protected virtual string? Platform => "linux/amd64";
 
     private protected virtual Task DependenciesStartedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>Runs as it starts, before what it depends on does: Java's containers override <c>start()</c> for this.</summary>
+    private protected virtual void BeforeDependenciesStart() { }
+
+    /// <summary>Runs when starting failed, whatever failed, before the failure is thrown on: for a container that
+    /// must leave nothing behind then. It mustn't throw, or its failure would hide the start's.</summary>
+    private protected virtual Task StartFailedAsync() => Task.CompletedTask;
+
+    /// <summary>Runs once it's stopped, and when it's stopped without having started: Java's containers override <c>stop()</c> for this.</summary>
+    private protected virtual Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>Runs once it's ready.</summary>
     protected virtual Task ContainerIsStartedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -360,7 +377,7 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     private sealed record WaitFor(string Path, int Port, Predicate<HttpStatusCode> Ok, TimeSpan Timeout);
 
     /// <summary>Why a container that exited while starting did: its exit code and the end of its log.</summary>
-    private static async Task<string> ExitedAsync(IContainer exited, CancellationToken cancellationToken)
+    private protected static async Task<string> ExitedAsync(IContainer exited, CancellationToken cancellationToken)
     {
         long code;
         string stdout;

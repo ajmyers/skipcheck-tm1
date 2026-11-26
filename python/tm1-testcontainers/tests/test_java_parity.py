@@ -7,8 +7,9 @@ test_java_parity.py does for the client:
 * each public Java type, nested ones too (``Tm1Source.PrivateImage``,
   ``PlanningAnalyticsEnvironment.Builder``), is a Python class of the same name;
 * each public member is there, named the Python way: ``getRestUrl()`` → ``rest_url`` (getters are
-  properties), ``withSeed`` → ``with_seed``, ``isRunning()`` → ``is_running``, constants and enum
-  constants as they are, record components as attributes;
+  properties), ``withSeed`` → ``with_seed``, ``isRunning()`` → ``is_running``, ``toString``,
+  ``equals`` and ``hashCode`` → ``__repr__``, ``__eq__`` and ``__hash__``, constants and enum constants as
+  they are, record components as attributes;
 * each overload's parameters can be passed (overloads become optional parameters);
 * the ``@Requires…`` messages are Java's, word for word, and the JUnit extensions are the pytest
   plugin's markers and fixtures.
@@ -27,6 +28,7 @@ from typing import Any
 import pytest
 
 import skipcheck_tm1_testcontainers
+from skipcheck_tm1 import Tm1Version
 from skipcheck_tm1_testcontainers import plugin
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -58,10 +60,13 @@ def snake(name: str) -> str:
     return s.lower()
 
 
+_DUNDERS = {"toString": "__repr__", "equals": "__eq__", "hashCode": "__hash__"}
+
+
 def python_name(java: str, params: int | None) -> str:
     """``getRestUrl()`` → ``rest_url``; with parameters, ``getUser(name)`` → ``get_user``."""
-    if java == "toString":
-        return "__repr__"
+    if java in _DUNDERS:
+        return _DUNDERS[java]
     if params == 0 and re.match(r"get[A-Z]", java):
         return snake(java[3:])
     return snake(java)
@@ -144,6 +149,9 @@ def python_type(path: str) -> Any:
 
 
 def has(cls: Any, name: str) -> bool:
+    if name in ("__eq__", "__hash__"):
+        # Every class has object's: Java's equals and hashCode are the class's own
+        return any(name in vars(base) for base in cls.__mro__ if base is not object)
     return hasattr(cls, name) or name in getattr(cls, "__dataclass_fields__", {})
 
 
@@ -222,6 +230,7 @@ def _java_message(type_name: str, constant: str) -> str:
     "java,python",
     [
         (("RequiresTm1", "NO_SOURCE_MESSAGE"), skipcheck_tm1_testcontainers.RequiresTm1.NO_SOURCE_MESSAGE),
+        (("RequiresTm1Engine", "NO_SOURCE_MESSAGE"), skipcheck_tm1_testcontainers.RequiresTm1Engine.NO_SOURCE_MESSAGE),
         (("RequiresCognos", "NO_SOURCE_MESSAGE"), skipcheck_tm1_testcontainers.RequiresCognos.NO_SOURCE_MESSAGE),
         (("RequiresTm1Web", "NO_SOURCE_MESSAGE"), skipcheck_tm1_testcontainers.RequiresTm1Web.NO_SOURCE_MESSAGE),
         (("RequiresPaw", "NO_SOURCE_MESSAGE"), skipcheck_tm1_testcontainers.RequiresPaw.NO_SOURCE_MESSAGE),
@@ -234,12 +243,39 @@ def test_skip_messages_are_javas(java: tuple[str, str], python: str) -> None:
 
 def test_the_junit_extensions_are_the_plugins_markers_and_fixtures() -> None:
     assert f'"{plugin.NO_DOCKER_MESSAGE}"' in (JAVA / "Tm1Extension.java").read_text(encoding="utf-8")
-    extensions = {"Tm1Extension": "tm1_server", "CognosExtension": "cognos", "Tm1WebExtension": "tm1_web", "PawExtension": "paw"}
-    for extension, fixture in extensions.items():
-        assert (JAVA / f"{extension}.java").exists()
-        assert callable(getattr(plugin, fixture)), f"No {fixture} fixture for Java's {extension}"
+    assert f'"{plugin.NO_DOCKER_MESSAGE}"' in (JAVA / "Tm1EngineExtension.java").read_text(encoding="utf-8")
+    extensions = {
+        "Tm1Extension": ["tm1_server"],
+        "Tm1EngineExtension": ["tm1_engine", "tm1_database"],
+        "CognosExtension": ["cognos"],
+        "Tm1WebExtension": ["tm1_web"],
+        "PawExtension": ["paw"],
+    }
+    assert set(extensions) == {p.stem for p in JAVA.glob("*Extension.java")}
+    for extension, fixtures in extensions.items():
+        for fixture in fixtures:
+            assert callable(getattr(plugin, fixture)), f"No {fixture} fixture for Java's {extension}"
     annotations = {p.stem for p in JAVA.glob("Requires*.java")}
     assert {"requires_" + snake(a[len("Requires") :]) for a in annotations} == set(plugin._MARKERS)
+
+
+def test_the_engine_markers_options_are_javas() -> None:
+    # @RequiresTm1Engine's elements, with their defaults
+    source = (JAVA / "RequiresTm1Engine.java").read_text(encoding="utf-8")
+    assert "boolean shareDatabase() default false;" in source and 'String minVersion() default "";' in source
+    requires = skipcheck_tm1_testcontainers.RequiresTm1Engine
+    assert (requires.share_database, requires.min_version) == (False, "")
+    assert requires.mark.name == "requires_tm1_engine"
+    for message in ('"Needs TM1 " + minimum + " or later; the engine from "', '" is " + running'):
+        assert message in (JAVA / "Tm1EngineExtension.java").read_text(encoding="utf-8")
+    described = type("Source", (), {"describe": lambda self: "install volume v"})()
+    engine = type("Engine", (), {"tm1_version": Tm1Version.parse("12.5.0"), "source": described})()
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(plugin, "tm1_engine_skip_reason", lambda: None)
+        patch.setattr(plugin.Tm1EngineContainer, "shared", classmethod(lambda cls: engine))
+        assert plugin.tm1_engine_version_skip_reason("12.6") == "Needs TM1 12.6 or later; the engine from install volume v is 12.5.0"
+        assert plugin.tm1_engine_version_skip_reason("12.5") is None
+        assert plugin.tm1_engine_version_skip_reason(" ") is None
 
 
 def test_paw_local_sh_is_the_repositorys() -> None:
