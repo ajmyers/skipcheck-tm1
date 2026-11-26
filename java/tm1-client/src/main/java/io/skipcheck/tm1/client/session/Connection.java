@@ -234,11 +234,13 @@ final class Connection {
 			Optional<Tm1Operation> operation = request.operation();
 			Object body = request.body();
 			if (operation.isEmpty() || operation.get().kind() != Tm1Operation.Kind.ACTION || body == null
-					|| body instanceof byte[]) {
+					|| body instanceof byte[] || body instanceof Tm1Request.Bytes) {
 				return Mono.just(request);
 			}
-			// The body as it's written, whatever it was built as: a map, a model, a tree
-			if (!(mapper.valueToTree(body) instanceof ObjectNode sent)) {
+			// The body as it's written, whatever it was built as (a map, a model, a
+			// tree), and
+			// written as it is when sent, failing the same way
+			if (!(mapper.readTree(json(body)) instanceof ObjectNode sent)) {
 				return Mono.just(request);
 			}
 			boolean changed = false;

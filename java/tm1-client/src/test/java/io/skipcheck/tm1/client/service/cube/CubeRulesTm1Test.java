@@ -152,16 +152,21 @@ class CubeRulesTm1Test {
 
 	@Test
 	void listsUnfedCellsOnEveryServer() {
-		// Unfed is what servers without Selection (before schema 11.8.32) list, so
-		// it works on every server: there it's sent without Selection. The cube has
-		// no unfed cell (every Amount feeds its Double), so what this shows is that
-		// the call works and lists no fed cell
+		// Unfed is what servers without Selection (before schema 11.8.32) list, so it
+		// works on every server: there it's sent without Selection. With a value written,
+		// North/Double is a fed cell, which Both lists and Unfed mustn't
+		tm1.session()
+			.execute(Tm1Request.post(ODataPath.of("Cubes").key(cube).action("tm1.Update"), Map.of("Cells",
+					List.of(Map.of("Tuple@odata.bind", List.of(element(region, "North"), element(measure, "Amount")))),
+					"Value", "5"), Void.class))
+			.block(WAIT);
 		List<FedCellDescriptor> cells = cubes
 			.checkFeeders(cube, tuple("Total", "Double"), CheckFeedersSelection.UNFED,
 					ODataQuery.none().expand("Tuple"))
 			.collectList()
 			.block(WAIT);
-		assertThat(cells).allSatisfy(c -> assertThat(c.fed()).isNotEqualTo(true));
+		assertThat(cells).allSatisfy(c -> assertThat(c.fed()).isNotEqualTo(true))
+			.noneSatisfy(c -> assertThat(c.tuple()).extracting(e -> e.name()).containsExactly("North", "Double"));
 	}
 
 	private static String element(String dimension, String element) {

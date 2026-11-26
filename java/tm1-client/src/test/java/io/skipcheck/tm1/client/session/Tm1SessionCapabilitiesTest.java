@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,6 +33,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 /** Version and capabilities through the session, against {@link FakeTm1}. */
 class Tm1SessionCapabilitiesTest {
@@ -183,6 +186,45 @@ class Tm1SessionCapabilitiesTest {
 			.expectError(Tm1UnsupportedOperationException.class)
 			.verify();
 		assertThat(tm1.requests(CHECK_FEEDERS)).hasSize(1);
+	}
+
+	@Test
+	void refusesABoundParameterTheServerDoesntDefineWhateverTheBodyIsBuiltAs() {
+		// A server whose CheckFeeders has no Tuple either: a binding is refused, default
+		// or
+		// not, and the body is checked as written, here a JSON tree rather than a Map
+		String metadata = MetadataSnapshot.text()
+			.replaceFirst("(?s)(<Action Name=\"CheckFeeders\".*?)<Parameter Name=\"Tuple\".*?</Parameter>", "$1");
+		assertThat(metadata).isNotEqualTo(MetadataSnapshot.text());
+		tm1.on(METADATA, r -> Mono.just(xml(metadata)));
+		ObjectNode body = JsonNodeFactory.instance.objectNode();
+		body.putArray("Tuple@odata.bind").add("Dimensions('Region')/Hierarchies('Region')/Elements('Total')");
+		Tm1Request<JsonNode> request = Tm1Request
+			.postList(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"), body, JsonNode.class)
+			.requires(Tm1Operations.CUBE_CHECK_FEEDERS)
+			.withParameterDefault("Tuple", "x");
+		StepVerifier.create(tm1.session().stream(request))
+			.expectErrorSatisfies(e -> assertThat(e).isInstanceOfSatisfying(Tm1UnsupportedOperationException.class,
+					u -> assertThat(u.missing()).isEqualTo("parameter Tuple of Cube.CheckFeeders")))
+			.verify();
+		assertThat(tm1.requests(CHECK_FEEDERS)).isEmpty();
+	}
+
+	@Test
+	void checksTheBodyAsItWasQueuedInABatch() {
+		withoutSelection();
+		tm1.on("POST $batch", r -> Mono.just(FakeTm1.json(200, "{\"responses\":[]}")));
+		Map<String, Object> body = new HashMap<>(Map.of("Tuple@odata.bind",
+				List.of("Dimensions('Region')/Hierarchies('Region')/Elements('Total')"), "Selection", "Both"));
+		Tm1SessionBatch batch = tm1.session().batch();
+		Flux<JsonNode> both = batch.session()
+			.stream(Tm1Request
+				.postList(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"), body, JsonNode.class)
+				.requires(Tm1Operations.CUBE_CHECK_FEEDERS));
+		// A change after queueing isn't sent, so it isn't what's checked either
+		body.remove("Selection");
+		StepVerifier.create(batch.run()).expectComplete().verify(Duration.ofSeconds(5));
+		StepVerifier.create(both).expectError(Tm1UnsupportedOperationException.class).verify(Duration.ofSeconds(5));
 	}
 
 	@Test

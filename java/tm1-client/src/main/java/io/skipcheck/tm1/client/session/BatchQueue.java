@@ -110,7 +110,8 @@ final class BatchQueue {
 		}
 		// As outside a batch: the body may lose a parameter the server lacks whose
 		// value is what leaving it out means
-		return connection.prepare(entry.request())
+		// The copy queued, the one the batch sends, not the caller's object as it is now
+		return connection.prepare(entry.request().withBody(entry.body()))
 			.map(ready -> ready == entry.request() ? entry
 					: new Entry(entry.id(), ready,
 							ready.body() == null ? null : mapper.readTree(connection.json(ready.body())), entry.sink()))
