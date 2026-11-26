@@ -111,6 +111,11 @@ tm1Engine:
             "legacy has cfg.UseSSL on, and the engine asks it over plain HTTP",
         ),
         (
+            # The server's image takes the parameter's name in any case
+            "tm1: {servers: {legacy: {cfg: {usessl: 'True'}}}}\ntm1Engine: {passthrough: {server: legacy}}",
+            "legacy has cfg.UseSSL on",
+        ),
+        (
             "tm1: {servers: {legacy: {}}}\ntm1Engine: {users: ['analyst:apple'], passthrough: {server: legacy}}",
             "With passthrough the password is the one the user has on the TM1 server, and isn't written here: write analyst.",
         ),

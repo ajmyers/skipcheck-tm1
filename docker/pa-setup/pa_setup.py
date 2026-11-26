@@ -378,7 +378,9 @@ def normalize(cfg):
                 raise ConfigError("tm1Engine: oauth2 and passthrough can't both be on: TM1 would take tokens and "
                                   "refuse a name and password")
             # The engine asks over plain HTTP, and trusts no certificate of the server's
-            if str(servers[wanted]["cfg"].get("UseSSL", "F")).strip().lower() not in ("f", "false"):
+            # Whatever its case: the server's image matches a tm1s.cfg parameter's name in any
+            use_ssl = next((v for k, v in servers[wanted]["cfg"].items() if k.lower() == "usessl"), "F")
+            if str(use_ssl).strip().lower() not in ("f", "false"):
                 raise ConfigError(f"tm1Engine.passthrough.server: {wanted} has cfg.UseSSL on, and the engine asks it "
                                   "over plain HTTP: take UseSSL out of that server's cfg")
             passthrough = {"server": wanted}
