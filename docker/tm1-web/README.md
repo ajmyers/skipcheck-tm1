@@ -68,13 +68,16 @@ holds IBM's installer and a repository zip. Rather than run the installer, the
 container follows the zip's manifest and unpacks the `TM1_WebTier` installable:
 IBM's Java 17, WebSphere Liberty, and the `tm1web` and `evalservice` apps (about
 900 MB). That's what the installer does, and it also works where the installer can't
-run. Logs never show a download URL's query string or credentials.
+run. Planning Analytics 2.1.2 to 2.1.16's bundles are plain tar despite the `.tar.gz`
+name, and install as they are. Logs never show a download URL's query string or credentials.
 
 Start times on Apple Silicon (Rosetta): about 45 s for the first start from a
 bundle, 15–20 s once installed.
 
 Tested with TM1 Web 11.0.112 (Planning Analytics 2.1.19), against `tm1-server` with
-TM1 Server 2.1.19.
+TM1 Server 2.1.19; the TypeScript tm1-testcontainers' TM1 Web tests also pass with 11.0.109
+(2.1.16) and 11.0.118 (2.1.25), each against its own release's TM1 Server. 11.0.95 (2.1.2)
+and 11.0.100 (2.1.7) install; their tests weren't run.
 
 ## Configuration
 

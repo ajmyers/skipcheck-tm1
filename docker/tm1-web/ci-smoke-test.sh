@@ -77,4 +77,40 @@ grep -qF "<add key=\"Tm1DirectConnection\" value='{\"a\":1}' />" <<<"$out" || fa
 grep -qF '<add key="NewKey" value="x" />' <<<"$out" || fail "missing key not added: $out"
 pass "tm1web_config.xml settings applied"
 
+# 9. A tm1web bundle (fakes, built here) installs through its manifest, gzipped as 2.1.25's
+#    is and uncompressed as 2.1.2 to 2.1.16's are, whatever the name says
+fake=$(mktemp -d)
+trap 'rm -rf "$fake"' EXIT
+python3 - "$fake" <<'PY'
+import io, json, sys, tarfile, zipfile
+def tar_with(name, data):
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as t:
+        info = tarfile.TarInfo(name); info.size = len(data); t.addfile(info, io.BytesIO(data))
+    return buf.getvalue()
+repo = io.BytesIO()
+with zipfile.ZipFile(repo, "w") as z:
+    z.writestr("manifest/tm1web/9.9.9/m.json", json.dumps({
+        "productName": "Fake TM1 Web", "productVersion": "9.9.9", "platform": "linuxi38664h",
+        "license": {"name": "license", "version": "1", "repositoryPath": "p/license.tar.gz"},
+        "installables": [{"name": "TM1_WebTier", "parts": [{"name": "web", "version": "9.9.9", "repositoryPath": "p/web.tar.gz"}]}]}))
+    z.writestr("p/license.tar.gz", tar_with("license/LA_en", b"license"))
+    z.writestr("p/web.tar.gz", tar_with("webapps/tm1web.txt", b"web"))
+data = repo.getvalue()
+for name, mode in (("tm1web-9.9.9-1-linuxi38664h_bundle.tar.gz", "w:gz"), ("plain/tm1web-9.9.9-1-linuxi38664h_bundle.tar.gz", "w")):
+    path = sys.argv[1] + "/" + name
+    import os; os.makedirs(os.path.dirname(path), exist_ok=True)
+    with tarfile.open(path, mode) as bundle:
+        info = tarfile.TarInfo("tm1web-9.9.9-1-linuxi38664h.zip"); info.size = len(data); bundle.addfile(info, io.BytesIO(data))
+PY
+for kind in gzipped plain; do
+  dir=$fake; [ "$kind" = plain ] && dir=$fake/plain
+  out=$(run -v "$dir:/ibm:ro" --entrypoint sh "$image" -c '
+    tm1-web-install --target /t >/tmp/install.log 2>&1 || { cat /tmp/install.log; exit 1; }
+    test -f /t/webapps/tm1web.txt && test -f /t/license/LA_en && echo installed' 2>&1) || true
+  grep -qx installed <<<"$out" || fail "a $kind tm1web bundle didn't install: $out"
+done
+rm -rf "$fake"
+pass "a tm1web bundle installs through its manifest, gzipped or not"
+
 echo "All smoke tests passed."
