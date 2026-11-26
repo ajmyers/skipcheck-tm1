@@ -27,7 +27,7 @@ DOC = json.loads(SPEC.read_text(encoding="utf-8"))
 
 
 def test_the_server_has_what_the_spec_says(tm1: Tm1Client) -> None:
-    """Drift between the server's $metadata and the spec, as the Java MetadataDriftTest: equal
+    """Drift between the server's $metadata and the spec, as the Java MetadataDriftTm1Test: equal
     on the snapshot's version, reported otherwise."""
     caps = tm1.session.capabilities()
     spec = {e["id"] for e in DOC["endpoints"]}

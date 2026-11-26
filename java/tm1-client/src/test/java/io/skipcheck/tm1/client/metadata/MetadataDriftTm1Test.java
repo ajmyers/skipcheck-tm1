@@ -28,12 +28,14 @@ import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
  * <li><b>Same schema version:</b> the live metadata must equal the snapshot byte for
  * byte. A difference means the snapshot is stale.
  * <li><b>Another version:</b> writes what it adds and removes to
- * {@code build/reports/tm1-metadata-drift.txt} and passes. This is how running the tests
- * against another TM1 version shows its API differences.
+ * {@code build/reports/tm1-metadata-drift.txt}. This is how running the tests against
+ * another TM1 version shows its API differences. If a snapshot of that version is
+ * committed too (an older supported version), the live metadata must equal it byte for
+ * byte; otherwise the test passes.
  * </ul>
  */
 @RequiresTm1
-class MetadataDriftTest {
+class MetadataDriftTm1Test {
 
 	@Test
 	void matchesTheSnapshotOrReportsTheDifferences(Tm1ServerContainer tm1) throws Exception {
@@ -51,6 +53,7 @@ class MetadataDriftTest {
 			return;
 		}
 
+		String schema = liveDoc.schemaVersion().orElse("unknown");
 		NavigableSet<String> snapshot = Signatures.of(MetadataSnapshot.load());
 		NavigableSet<String> server = Signatures.of(liveDoc);
 		NavigableSet<String> added = new TreeSet<>(server);
@@ -61,7 +64,7 @@ class MetadataDriftTest {
 		StringBuilder report = new StringBuilder().append("TM1 ")
 			.append(tm1.getTm1Version())
 			.append(" (schema ")
-			.append(liveDoc.schemaVersion().orElse("unknown"))
+			.append(schema)
 			.append(") against the snapshot (schema ")
 			.append(MetadataSnapshot.VERSION)
 			.append(")\n\n")
@@ -76,6 +79,30 @@ class MetadataDriftTest {
 		Files.createDirectories(file.getParent());
 		Files.writeString(file, report, StandardCharsets.UTF_8);
 		System.out.println(report);
+
+		MetadataSnapshot.text(schema)
+			.ifPresent(own -> assertThat(firstDifference(own, live))
+				.as("live $metadata (schema %s) against its own committed snapshot. Either the server changed, or this release "
+						+ "serves another document than the one captured: several releases can report one schema. "
+						+ "Regenerate it with TM1_UPDATE_METADATA_SNAPSHOT=true only if the older releases agree",
+						schema)
+				.isEmpty());
+	}
+
+	/**
+	 * The first line where the two differ, as "line N: expected … but was …", or empty.
+	 */
+	private static String firstDifference(String expected, String actual) {
+		String[] want = expected.split("\n", -1);
+		String[] got = actual.split("\n", -1);
+		for (int i = 0; i < Math.max(want.length, got.length); i++) {
+			String w = i < want.length ? want[i] : "(end)";
+			String g = i < got.length ? got[i] : "(end)";
+			if (!w.equals(g)) {
+				return "line " + (i + 1) + ": expected " + w.strip() + " but was " + g.strip();
+			}
+		}
+		return "";
 	}
 
 }

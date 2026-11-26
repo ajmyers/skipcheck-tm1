@@ -7,3 +7,4 @@
 # Keep it short, and the reasons specific. "Needs Cognos" (or TM1 Web, or PAW) is not a reason:
 # those tests are ported, and skip at run time. A line for a class or a test Java doesn't have,
 # or one tests/live has after all, fails the gate.
+MetadataDriftTm1Test: compares the server's $metadata byte for byte with Java's committed snapshot of its schema, and writes Java's drift report; the snapshots and their tooling are Java's, and this client only reads the newest

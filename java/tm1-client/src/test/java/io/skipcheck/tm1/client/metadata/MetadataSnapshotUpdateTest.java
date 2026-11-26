@@ -28,9 +28,13 @@ import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
  * }</pre>
  *
  * <p>
- * It writes {@code src/model/metadata/tm1-schema-<version>.xml}. For a new schema
- * version, also update {@link MetadataSnapshot#VERSION}, then triage the new endpoints
- * the coverage gate reports.
+ * It writes {@code src/model/metadata/tm1-schema-<version>.xml}, named by the server's
+ * schema version. For a new schema version, also update {@link MetadataSnapshot#VERSION}
+ * and the other places that name the newest snapshot's file (the tm1-client and
+ * tm1-codegen builds, {@code ConformanceTm1}, the Python, .NET and TypeScript test
+ * support, and the package tests), then triage the new endpoints the coverage gate
+ * reports. Against an older supported version it writes that version's snapshot, which
+ * only {@link MetadataDriftTm1Test} reads.
  */
 @RequiresTm1
 @EnabledIfEnvironmentVariable(named = "TM1_UPDATE_METADATA_SNAPSHOT", matches = "true")

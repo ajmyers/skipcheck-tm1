@@ -8,3 +8,4 @@
 #
 # Keep it rare and the reason specific. "Needs Cognos" isn't one: those tests are ported and skip
 # at run time.
+MetadataDriftTm1Test: compares the server's $metadata byte for byte with Java's committed snapshot of its schema, and writes Java's drift report; the snapshots and their tooling are Java's, and this client only reads the newest

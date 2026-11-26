@@ -5,3 +5,5 @@
 # out on Windows (CRLF breaks shell scripts and config inside the container).
 /docker/** text eol=lf
 *.sh text eol=lf
+# The $metadata snapshots are compared with live servers byte for byte: never change their line endings
+/java/tm1-client/src/model/metadata/** -text
