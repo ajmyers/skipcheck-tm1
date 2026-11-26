@@ -22,6 +22,7 @@ ProbeCoverageTest: checks the builder manifest against the spec's offers and the
 # Java's metadata snapshot tooling, over its CsdlDocument model of $metadata. This client doesn't
 # model CSDL: Tm1Capabilities.Parse reads only what capability checks need (Tm1CapabilitiesTests).
 ApproximateSchemasTest: Java's tooling that derives older schemas from the snapshot's CsdlDocument (Tm1CapabilitiesTests writes its older schema out instead)
+MetadataReleasesTest: holds Java's tm1-releases.json (every Planning Analytics release's build, schema and $metadata document) to the committed snapshots, with Java's CSDL model (Signatures), and writes spec/tm1-versions.md from them; the release record, the snapshots and the doc are the repository's, kept by Java, and none of them is client behaviour
 MetadataSnapshotTest: checks Java's CsdlDocument model of the snapshot (type counts, revisions, descriptions, signatures), which this client doesn't have
 MetadataSnapshotUpdateTest: Java's tool that writes the snapshot from a live server, run by hand
 
