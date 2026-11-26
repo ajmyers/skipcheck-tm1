@@ -27,6 +27,13 @@ What setup creates comes from the environment:
   TM1_APPLICATIONS  [INSTANCE/]APPLICATION,...  default: one named tm1 in each instance
   TM1_USERS         USER[:GROUP[:GROUP]],...    users (and their groups) for every database
 
+and takes an identity provider's tokens as logins with (see the README, "OAuth 2.0 logins"):
+
+  TM1_OAUTH2_ISSUER_URL   the provider's address, as tokens name it in 'iss'; "none" for off
+  TM1_OAUTH2_AUDIENCE     the audience a token must carry (needed with the issuer)
+  TM1_OAUTH2_ID_CLAIMS    CLAIM,...  where the user's name is read from (default: sub)
+  TM1_OAUTH2_NAME_CLAIMS  CLAIM,...  where a friendly name is read from
+
 TM1 v12 is one engine holding instances; an instance holds databases. An application is
 an instance's client ID and secret, which log any user in (service-to-service). Users and
 groups belong to each database.
@@ -80,6 +87,9 @@ def _qualified(item, what):
 def plan(env=None):
     """What setup creates: {"instances": {name: {"applications": [...], "databases": [...]}}, "users": [...]}."""
     env = os.environ if env is None else env
+    # Checked here too, though setup doesn't use them: the entrypoint runs this first, so a
+    # mistake in them costs no install
+    oauth2_settings(env)
     instances = {}
 
     def instance(name):
@@ -633,22 +643,35 @@ def configure(config, env=None):
         for key, value in fields.items():
             put(datastore, key, value, "datastore." + key)
     oauth2 = oauth2_settings(env)
-    authentication = config.setdefault("authentication", {})
-    if oauth2 == {}:
+    authentication = config.get("authentication")
+    held = authentication.get("oauth2") if isinstance(authentication, dict) else None
+    if oauth2 is None:
+        if isinstance(held, dict) and held.get("issuerURL"):
+            # Kept from an earlier start or a mounted file: say so, as nothing else would
+            changes.append(f"authentication.oauth2: left on (issuer {held['issuerURL']}); "
+                           "TM1_OAUTH2_ISSUER_URL=none turns OAuth 2.0 logins off")
+    elif oauth2 == {}:
         # Asked for by name ("none"): an earlier start's settings don't outlive the variable
-        if "oauth2" in authentication:
+        if isinstance(authentication, dict) and "oauth2" in authentication:
             del authentication["oauth2"]
             changes.append("authentication.oauth2: removed")
-    elif oauth2:
-        section = authentication.setdefault("oauth2", {})
+    else:
+        if not isinstance(authentication, dict):
+            authentication = config["authentication"] = {}
+        if not isinstance(held, dict):  # absent, or null in a file someone mounted
+            held = authentication["oauth2"] = {}
         for key, value in oauth2.items():
-            put(section, key, value, "authentication.oauth2." + key)
+            put(held, key, value, "authentication.oauth2." + key)
         for key in ("idClaims", "friendlyNameClaims"):
-            # Unset here is TM1's own default, not what an earlier start asked for
-            if key not in oauth2 and key in section:
-                del section[key]
+            # With an issuer set here, both lists are this image's: unset is TM1's own default,
+            # not what an earlier start or a mounted file had
+            if key not in oauth2 and key in held:
+                del held[key]
                 changes.append(f"authentication.oauth2.{key}: removed")
     return changes
+
+
+OAUTH2_OTHERS = ("TM1_OAUTH2_AUDIENCE", "TM1_OAUTH2_ID_CLAIMS", "TM1_OAUTH2_NAME_CLAIMS")
 
 
 def oauth2_settings(env):
@@ -658,15 +681,21 @@ def oauth2_settings(env):
         return (env.get(name) or "").strip()  # compose passes an unset variable as empty
 
     def claims(name):
-        return [claim.strip() for claim in setting(name).split(",") if claim.strip()]
+        listed = [claim.strip() for claim in setting(name).split(",") if claim.strip()]
+        if setting(name) and not listed:
+            raise Failure(f"{name} names no claim: write them with commas between, e.g. preferred_username,email")
+        return listed
 
     issuer = setting("TM1_OAUTH2_ISSUER_URL")
-    others = [name for name in ("TM1_OAUTH2_AUDIENCE", "TM1_OAUTH2_ID_CLAIMS", "TM1_OAUTH2_NAME_CLAIMS") if setting(name)]
-    if not issuer or issuer.lower() == "none":
+    if issuer.lower() == "none":
+        return {}  # whatever else is still set: off is off
+    if not issuer:
+        others = [name for name in OAUTH2_OTHERS if setting(name)]
         if others:
             raise Failure(f"{others[0]} is set without TM1_OAUTH2_ISSUER_URL, the address of the identity provider")
-        return {} if issuer else None
-    if not re.match(r"^https?://[^/s]+", issuer):
+        return None
+    # The whole value: an address with a host, and no space anywhere
+    if not re.fullmatch(r"https?://[^/\s]+\S*", issuer):
         raise Failure("TM1_OAUTH2_ISSUER_URL must be an http:// or https:// address, as tokens name it in 'iss'")
     if not setting("TM1_OAUTH2_AUDIENCE"):
         raise Failure("TM1_OAUTH2_AUDIENCE is needed with TM1_OAUTH2_ISSUER_URL: the audience ('aud') a token "
