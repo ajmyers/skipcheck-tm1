@@ -66,6 +66,70 @@ public class RequiresTm1FactAttribute : FactAttribute
     }
 }
 
+/// <summary>A test against a TM1 v12 engine in Docker, as Java's <c>@RequiresTm1Engine</c>: skipped
+/// when Docker isn't available or no <see cref="Tm1EngineSource"/> is configured; run (and failing)
+/// when a source is set but wrong. For TM1 11, use <see cref="RequiresTm1FactAttribute"/>.
+/// <para>One engine serves the whole test run (<see cref="Tm1EngineContainer.SharedAsync"/>), and
+/// <b>each test class gets a database of its own</b> through
+/// <see cref="Tm1DatabaseFixture{TTestClass}"/> (an <c>IClassFixture</c>), created before the class's
+/// first test and dropped after its last, so classes don't see each other's objects. A database
+/// takes about 10 seconds to create and 7 to drop. <see cref="Tm1EngineFixture"/> gives a class the
+/// engine's one shared database instead, at no cost (Java's <c>shareDatabase = true</c>): its tests
+/// then need uniquely named objects, and to delete them afterwards.</para>
+/// <para>"A test class" is the unit each language's test framework shares set-up over: a class in
+/// xUnit here, a JUnit class in Java, a module in pytest, and a file in vitest.</para>
+/// <para>Java's <c>minVersion</c> has no counterpart: xUnit 2 can't skip a test once the engine is
+/// started, so a test for a newer TM1 checks <see cref="Tm1Database.Version"/> and returns.</para></summary>
+/// <example><code>
+/// public class CubeTests(Tm1DatabaseFixture&lt;CubeTests&gt; tm1) : IClassFixture&lt;Tm1DatabaseFixture&lt;CubeTests&gt;&gt;
+/// {
+///     [RequiresTm1EngineFact]
+///     public async Task ListsCubes() { var db = tm1.Database; … }
+/// }
+/// </code></example>
+[AttributeUsage(AttributeTargets.Method)]
+public class RequiresTm1EngineFactAttribute : FactAttribute
+{
+    /// <summary>Why a test is skipped without a source.</summary>
+    public const string NoSourceMessage =
+        "No TM1 v12 source configured. Set one of "
+        + Tm1EngineSource.PrivateImageSetting
+        + ", "
+        + Tm1EngineSource.HomeDir
+        + ", "
+        + Tm1EngineSource.InstallVolumeSetting
+        + ", "
+        + Tm1EngineSource.BundleDir
+        + " or "
+        + Tm1EngineSource.BundleUrlSetting
+        + ", or put a tm1-v*-standalone-linux.tgz in "
+        + Tm1Source.BundleDir
+        + " (as an environment variable or system property) to run tests against TM1 v12.";
+
+    /// <summary>Skips unless there's a TM1 v12 engine to test against.</summary>
+    public RequiresTm1EngineFactAttribute()
+    {
+        Skip = EngineSkipReason();
+    }
+
+    /// <summary>Why a TM1 v12 test is skipped, or null to run it (a wrong source runs it, to fail).</summary>
+    public static string? EngineSkipReason()
+    {
+        if (!DockerHost.Available())
+        {
+            return RequiresTm1FactAttribute.NoDockerMessage;
+        }
+        try
+        {
+            return Tm1EngineSource.Discover() is null ? NoSourceMessage : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+}
+
 /// <summary>A test against Cognos (and TM1), as Java's <c>@RequiresCognos</c>; get the source from
 /// <see cref="CognosFixture"/>.</summary>
 [AttributeUsage(AttributeTargets.Method)]

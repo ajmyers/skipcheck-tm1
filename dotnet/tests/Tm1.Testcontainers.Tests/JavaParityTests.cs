@@ -21,7 +21,22 @@ namespace Skipcheck.Tm1.Testcontainers.Tests;
 public partial class JavaParityTests
 {
     /// <summary>Java methods that do I/O, which .NET makes <c>…Async</c>.</summary>
-    private static readonly HashSet<string> Io = ["shared", "start", "stop", "idToken", "passport"];
+    private static readonly HashSet<string> Io =
+    [
+        "shared",
+        "start",
+        "stop",
+        "idToken",
+        "passport",
+        // Tm1EngineContainer's, which run the image's command in the container, and Tm1Login's, which log in
+        "databases",
+        "createDatabase",
+        "dropDatabase",
+        "cookie",
+        "token",
+        "session",
+        "authorize",
+    ];
 
     /// <summary>Java names .NET can't keep: a constant can't share its name with a nested type, a
     /// method or a property of the same type. They're the lines with a new name in

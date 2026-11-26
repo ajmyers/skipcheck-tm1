@@ -27,6 +27,10 @@ Tm1WebSource.PRIVATE_IMAGE -> PrivateImageSetting | the PrivateImage record has 
 Tm1WebSource.INSTALL_VOLUME -> InstallVolumeSetting | the InstallVolume record has the name
 Tm1WebSource.BUNDLE -> BundleSetting | the Bundle record has the name
 Tm1WebSource.BUNDLE_URL -> BundleUrlSetting | the BundleUrl record has the name
+Tm1EngineSource.PRIVATE_IMAGE -> PrivateImageSetting | the PrivateImage record has the name
+Tm1EngineSource.INSTALL_VOLUME -> InstallVolumeSetting | the InstallVolume record has the name
+Tm1EngineSource.BUNDLE -> BundleSetting | the Bundle record has the name
+Tm1EngineSource.BUNDLE_URL -> BundleUrlSetting | the BundleUrl record has the name
 CognosSource.PRIVATE_IMAGE -> PrivateImageSetting | the PrivateImage record has the name
 CognosSource.INSTALL_VOLUME -> InstallVolumeSetting | the InstallVolume record has the name
 CognosSource.ZIP -> ZipSetting | the Zip record has the name
@@ -36,6 +40,9 @@ PawContainer.ACCEPT_LICENSE -> AcceptLicenseSetting | the AcceptLicense() method
 CognosContainer.NAMESPACE -> NamespaceId | the Namespace enum has the name
 PlanningAnalyticsEnvironment.Builder -> EnvironmentBuilder | the Builder() method has the name
 RequiresTm1 -> RequiresTm1FactAttribute | an xUnit fact, written [RequiresTm1Fact], where Java's is a JUnit annotation
+RequiresTm1Engine -> RequiresTm1EngineFactAttribute | an xUnit fact, written [RequiresTm1EngineFact], where Java's is a JUnit annotation
+RequiresTm1Engine.shareDatabase | a fact can't hand a test its database: the class takes Tm1EngineFixture (the engine's shared database) or Tm1DatabaseFixture<TTestClass> (one of its own) as its IClassFixture
+RequiresTm1Engine.minVersion | xUnit 2 can't skip a test that has started, and checking the version starts the engine: a test checks Tm1Database.Version and returns
 RequiresTm1Web -> RequiresTm1WebFactAttribute | an xUnit fact, written [RequiresTm1WebFact], where Java's is a JUnit annotation
 RequiresCognos -> RequiresCognosFactAttribute | an xUnit fact, written [RequiresCognosFact], where Java's is a JUnit annotation
 RequiresPaw -> RequiresPawFactAttribute | an xUnit fact, written [RequiresPawFact], where Java's is a JUnit annotation
