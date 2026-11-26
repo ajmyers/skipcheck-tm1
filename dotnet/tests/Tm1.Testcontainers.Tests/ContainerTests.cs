@@ -195,6 +195,7 @@ public class PawContainerTests(PawFixture fixture) : IClassFixture<PawFixture>
 
 /// <summary>Java's PawCamSecurityTest: PAW with Cognos (CAM) security, in a PlanningAnalyticsEnvironment. PAW and Cognos together need
 /// most of a developer machine's Docker memory, so nothing else should run beside it. Skipped without TM1, Cognos and PAW sources.</summary>
+[Collection(OwnContainers.Name)]
 public class PawCamSecurityTests
 {
     [RequiresCognosAndPawFact]
@@ -239,10 +240,53 @@ public class PawCamSecurityTests
     }
 }
 
-/// <summary>Java's EnvironmentExampleTest#aReusedEnvironmentKeepsItsContainersForTheNextRun: skipped without a TM1 source, or
-/// with Testcontainers reuse off.</summary>
+/// <summary>Java's EnvironmentExampleTest: a whole environment in one object. PlanningAnalyticsEnvironment starts and wires any mix
+/// of TM1 servers, an Admin Server, TM1 Web, PAW and Cognos security. Each is skipped without its sources;
+/// AReusedEnvironmentKeepsItsContainersForTheNextRun with Testcontainers reuse off, too.</summary>
+[Collection(OwnContainers.Name)]
 public class EnvironmentExampleTests
 {
+    [RequiresTm1WebFact]
+    public async Task TwoServersAndTm1Web()
+    {
+        await using var env = PlanningAnalyticsEnvironment.Builder().Tm1("planning", tm1 => tm1.WithSeed(Tm1Seed.Sdata)).Tm1("reporting").Tm1Web().Build();
+        await env.StartAsync();
+
+        // Two servers share one Admin Server, and TM1 Web lists both
+        using var session = await Tm1WebSession.OpenAsync(env.Tm1Web());
+        var servers = await session.ServersAsync(env.Tm1Web().AdminHost);
+        Assert.Contains("planning", servers);
+        Assert.Contains("reporting", servers);
+        await using var planning = new Tm1Rest(env.Tm1("planning"));
+        await using var reporting = new Tm1Rest(env.Tm1("reporting"));
+        Assert.True(await planning.ModelCubeCountAsync() > 0);
+        Assert.Equal(0, await reporting.ModelCubeCountAsync());
+    }
+
+    [RequiresCognosFact]
+    public async Task TwoServersInCamSecurityWithLdapAndOidc()
+    {
+        await using var env = PlanningAnalyticsEnvironment
+            .Builder()
+            .Tm1("planning")
+            .Tm1("reporting")
+            .Cognos(cognos => cognos.WithUser("admin", "adminpw", "Admins").WithUser("viewer", "viewerpw", "Readers"))
+            .Keycloak()
+            .CamSecurity(CognosContainer.Namespace.Oidc, "admin")
+            .Build();
+        await env.StartAsync();
+
+        var cognos = env.Cognos();
+        var viewerPassport = "CAMPassport " + await cognos.PassportAsync(await env.Keycloak().IdTokenAsync("viewer", "viewerpw"));
+        foreach (var server in env.Tm1Servers.Values)
+        {
+            await using var admin = new Tm1Rest(server, cognos.CamAuthorization("admin", CognosContainer.Namespace.Oidc));
+            await using var viewer = new Tm1Rest(server, viewerPassport);
+            Assert.Contains("\"Type\":\"Admin\"", await admin.GetAsync("ActiveUser?$select=Type"), StringComparison.Ordinal);
+            Assert.Contains("CAMID(\\\"OIDC:g:readers\\\")", await viewer.GetAsync("ActiveUser/Groups?$select=Name"), StringComparison.Ordinal);
+        }
+    }
+
     [RequiresTm1AndReuseFact]
     public async Task AReusedEnvironmentKeepsItsContainersForTheNextRun()
     {

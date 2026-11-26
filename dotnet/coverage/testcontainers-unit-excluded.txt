@@ -1,0 +1,8 @@
+# Java tm1-testcontainers tests (java/tm1-testcontainers/src/test/java: every @Test and
+# @ParameterizedTest of a *Test class, the examples' tests included) the .NET library deliberately
+# doesn't have, as: ClassName#methodName: reason, or ClassName: reason for a whole class. Every
+# other one has a test of the same name in Pascal case in tests/Tm1.Testcontainers.Tests
+# (JavaTestParityTests), with the [Requires…Fact] that skips it where Java's @Requires… does.
+# A test belongs here only if it has no meaning in this library; "not ported" isn't a reason.
+
+# None: every Java test is here.
