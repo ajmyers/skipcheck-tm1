@@ -135,7 +135,8 @@ grep -qx "marker: incomplete" <<<"$out" && grep -q "Installed: tm1server = 11.9.
 rm -rf "$fake"
 pass "IBM's older full installer is found, installed without language packs, with its versions"
 
-# 7a2. A tm1server bundle (a fake, built here) still installs through its manifest
+# 7a2. A tm1server bundle (a fake, built here) still installs through its manifest. It has no
+#     software tags, as Planning Analytics 2.1.8 to 2.1.10 haven't: TM1_NON-PROD_SWTAG is optional
 fake=$(mktemp -d)
 python3 - "$fake/tm1server-9.9.9-1-linuxi38664h_bundle.tar.gz" <<'PY'
 import io, json, sys, tarfile, zipfile
@@ -146,7 +147,7 @@ def tar_with(name, data):
     return buf.getvalue()
 repo = io.BytesIO()
 with zipfile.ZipFile(repo, "w") as z:
-    empty = [{"name": n, "parts": []} for n in ("TM1_Admin_Server", "TM1_Tools", "TM1_Samples", "TM1_NON-PROD_SWTAG")]
+    empty = [{"name": n, "parts": []} for n in ("TM1_Admin_Server", "TM1_Tools", "TM1_Samples")]
     z.writestr("manifest/tm1server-manifest/9.9.9/m.json", json.dumps({
         "productName": "Fake TM1", "productVersion": "9.9.9", "platform": "linuxi38664h",
         "license": {"name": "license", "version": "1", "repositoryPath": "p/license.tar.gz"},
@@ -159,10 +160,25 @@ with tarfile.open(sys.argv[1], "w:gz") as bundle:
 PY
 out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c '
   tm1-install --target /t >/tmp/install.log 2>&1 || { cat /tmp/install.log; exit 1; }
-  test -x /t/bin64/tm1s.exe && test -f /t/license/LA_en && echo installed' 2>&1) || true
+  test -x /t/bin64/tm1s.exe && test -f /t/license/LA_en && echo installed
+  grep -q "TM1_NON-PROD_SWTAG: not in this bundle, skipped" /tmp/install.log && echo "tag skipped"' 2>&1) || true
 grep -qx installed <<<"$out" || fail "a tm1server bundle didn't install through its manifest: $out"
+grep -qx "tag skipped" <<<"$out" || fail "the default list didn't skip the missing tag: $out"
+pass "a tm1server bundle installs through its manifest, without the tag it lacks"
+
+# 7a3. TM1_INSTALLABLES: names on separate lines are all read, and one the bundle lacks is refused
+#      before an earlier install is removed
+out=$(run -v "$fake:/ibm:ro" -e TM1_INSTALLABLES=$'TM1_Server\nTM1_Tools' --entrypoint sh "$image" -c '
+  tm1-install --target /t >/tmp/install.log 2>&1 || { cat /tmp/install.log; exit 1; }
+  grep -q "Installable TM1_Tools" /tmp/install.log && echo "both read"
+  echo another-bundle > /t/.tm1-server-install   # so it installs again rather than finding it done
+  TM1_INSTALLABLES="TM1_Server TM1_Servr" tm1-install --target /t >/tmp/again.log 2>&1 && echo "typo installed"
+  grep -q "This bundle has no TM1_Servr" /tmp/again.log && test -x /t/bin64/tm1s.exe && echo "earlier install kept"' 2>&1) || true
+grep -qx "both read" <<<"$out" || fail "TM1_INSTALLABLES on two lines lost a name: $out"
+! grep -qx "typo installed" <<<"$out" || fail "a name the bundle lacks was installed anyway: $out"
+grep -qx "earlier install kept" <<<"$out" || fail "a name the bundle lacks removed the earlier install: $out"
 rm -rf "$fake"
-pass "a tm1server bundle installs through its manifest"
+pass "TM1_INSTALLABLES is read across lines, and a name the bundle lacks is refused before removing anything"
 
 # 7b. CAM setup builds CAMIDs from short names and keeps full CAMIDs as given
 out=$(run -e 'TM1_CAM_ADMINS=admin,CAMID("AD:u:uid=x, ou=people,dc=a")' -e 'TM1_CAM_GROUPS=Analysts,Readers' --entrypoint python3 "$image" /usr/local/lib/tm1-server/cam-setup.py --print 2>&1) \

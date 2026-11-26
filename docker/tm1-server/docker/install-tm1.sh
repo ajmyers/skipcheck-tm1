@@ -30,7 +30,9 @@
 set -euo pipefail
 
 SRC_DIR=${TM1_BUNDLE_DIR:-/ibm}
-INSTALLABLES=${TM1_INSTALLABLES:-TM1_Server TM1_Admin_Server TM1_Tools TM1_Samples TM1_NON-PROD_SWTAG}
+# What to install from a bundle's manifest; a trailing ? makes one optional (see unpack-tm1.py):
+# 2.1.8 to 2.1.10 have no software tags
+INSTALLABLES=${TM1_INSTALLABLES:-TM1_Server TM1_Admin_Server TM1_Tools TM1_Samples TM1_NON-PROD_SWTAG?}
 
 log() { echo "[tm1-install] $*" >&2; }
 die() { echo "[tm1-install] ERROR: $*" >&2; exit 2; }
@@ -134,21 +136,18 @@ if [ -n "${TM1_BUNDLE_SHA256:-}" ]; then
   log "Checksum verified"
 fi
 
-log "Installing TM1 Server from $SHOWN into $TARGET (one-time)"
-find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .install.lock -exec rm -rf {} +
-# Until it's done: an install that fails partway (a full disk) leaves this, so the next run
-# installs again rather than refusing a folder it didn't make, or starting half a TM1
-echo incomplete > "$MARKER"
+# Split the list into words (across lines too), without globbing: a ? would match file names
+read -r -d '' -a installables <<<"$INSTALLABLES" || true
 
 # Detect the type from the contents: gzip (1f8b) = the IBM bundle or the older full installer,
-# told apart by its first entries; zip (504b) = the repository zip.
-zip=
+# told apart by its first entries; zip (504b) = the repository zip. A repository is unpacked
+# and checked against the installables before anything in $TARGET is removed: a bundle
+# without one of them leaves an earlier install as it was.
+issetup=F; zip=
 case "$(head -c2 "$bundle" | od -An -tx1 | tr -d ' \n')" in
   1f8b)
     if python3 /usr/local/lib/tm1-server/unpack-tm1-issetup.py detect "$bundle"; then
-      [ -z "${TM1_INSTALLABLES:-}" ] || log "TM1_INSTALLABLES doesn't apply to IBM's full installer: every component but the language packs is installed"
-      TMPDIR=$work python3 /usr/local/lib/tm1-server/unpack-tm1-issetup.py install "$bundle" "$TARGET" >&2 \
-        || die "couldn't install from the full installer $SHOWN"
+      issetup=T
     else
       tar xzf "$bundle" -C "$work" --wildcards 'tm1server-*.zip' || die "no tm1server-*.zip inside the bundle"
       zip=$(ls -1 "$work"/tm1server-*.zip | head -1)
@@ -156,11 +155,25 @@ case "$(head -c2 "$bundle" | od -An -tx1 | tr -d ' \n')" in
   504b) zip=$bundle ;;
   *) die "$SHOWN is neither a tm1server bundle (.tar.gz), its repository zip, nor IBM's full installer (tm1_linuxi38664h_*_ml.tar.gz)" ;;
 esac
-
 if [ -n "$zip" ]; then
   unzip -q "$zip" -d "$work/repo"
-  # shellcheck disable=SC2086
-  python3 /usr/local/lib/tm1-server/unpack-tm1.py "$work/repo" "$TARGET" $INSTALLABLES >&2
+  python3 /usr/local/lib/tm1-server/unpack-tm1.py --check "$work/repo" "${installables[@]}" >&2 \
+    || die "can't install $SHOWN as asked (TM1_INSTALLABLES)"
+fi
+
+log "Installing TM1 Server from $SHOWN into $TARGET (one-time)"
+find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .install.lock -exec rm -rf {} +
+# Until it's done: an install that fails partway (a full disk) leaves this, so the next run
+# installs again rather than refusing a folder it didn't make, or starting half a TM1
+echo incomplete > "$MARKER"
+
+if [ "$issetup" = T ]; then
+  [ -z "${TM1_INSTALLABLES:-}" ] || log "TM1_INSTALLABLES doesn't apply to IBM's full installer: every component but the language packs is installed"
+  TMPDIR=$work python3 /usr/local/lib/tm1-server/unpack-tm1-issetup.py install "$bundle" "$TARGET" >&2 \
+    || die "couldn't install from the full installer $SHOWN"
+else
+  python3 /usr/local/lib/tm1-server/unpack-tm1.py "$work/repo" "$TARGET" "${installables[@]}" >&2 \
+    || die "couldn't install from $SHOWN"
 fi
 
 chmod -R u+rwX,go+rX "$TARGET"
