@@ -383,7 +383,21 @@ def normalize(cfg):
             if str(use_ssl).strip().lower() not in ("f", "false"):
                 raise ConfigError(f"tm1Engine.passthrough.server: {wanted} has cfg.UseSSL on, and the engine asks it "
                                   "over plain HTTP: take UseSSL out of that server's cfg")
-            passthrough = {"server": wanted}
+            # With cognos a TM1 server is in CAM security, unless its cfg says another mode: the
+            # image applies cfg last
+            mode = next((v for k, v in servers[wanted]["cfg"].items() if k.lower() == "integratedsecuritymode"), 5)
+            in_cam = bool(cognos) and str(mode).strip() in ("4", "5")
+            if in_cam:
+                # Only Cognos's users log in to a TM1 server in CAM security, so only they can here
+                known = {u["name"].lower(): u["name"] for u in cognos["users"]}
+                strangers = [u["name"] for u in engine_users if u["name"].lower() not in known]
+                if strangers:
+                    raise ConfigError(f"tm1Engine.users: {', '.join(strangers)} isn't in cognos.users. With cognos, "
+                                      f"{wanted} is in CAM security, and passthrough logs in Cognos's users only: "
+                                      "add the name to cognos.users, or take it out of tm1Engine.users")
+                for user in engine_users:
+                    user["name"] = known[user["name"].lower()]  # as Cognos spells it: it goes into the CAMID
+            passthrough = {"server": wanted, "cam": in_cam}
         engine = {"port": port(engine.get("port"), "tm1Engine", 4444), "databases": databases, "users": engine_users,
                   "datastorePort": None if published is None else port(published, "tm1Engine.datastore", 27017),
                   "oauth2": oauth2, "passthrough": passthrough}
@@ -546,9 +560,22 @@ def generate(m):
                "TM1_DATABASES": ",".join(f"{d['instance']}/{name}" for name, d in engine["databases"].items()),
                "TM1_ENGINE_BUNDLE_URL": "${TM1_ENGINE_BUNDLE_URL:-}",
                "TM1_ENGINE_BUNDLE_SHA256": "${TM1_ENGINE_BUNDLE_SHA256:-}"}
-        if engine["users"]:
+        listed = [(u["name"], list(u["groups"])) for u in engine["users"]]
+        if engine["passthrough"] and engine["passthrough"]["cam"]:
+            # The TM1 server is in CAM security: it answers a login with the user's CAMID, so the
+            # engine makes its users under theirs. TM1 v12 learns no groups from it, so the
+            # administrators the TM1 servers have are made administrators here too
+            env["TM1_CAM_NAMESPACE"] = cognos["namespace"].upper()
+            env["TM1_CAM_NAMESPACE_TYPE"] = cognos["namespace"]
+            for admin in cognos["admins"]:
+                groups = next((g for name, g in listed if name.lower() == admin.lower()), None)
+                if groups is None:
+                    listed.append((admin, ["ADMIN"]))
+                elif "admin" not in (g.lower() for g in groups):
+                    groups.append("ADMIN")
+        if listed:
             # The image takes user:group:group; TM1 v12 keeps no passwords
-            env["TM1_USERS"] = ",".join(":".join([u["name"], *u["groups"]]) for u in engine["users"])
+            env["TM1_USERS"] = ",".join(":".join([name, *groups]) for name, groups in listed)
         depends = {"tm1-engine-mongo": {"condition": "service_healthy"}}
         if engine["oauth2"]:
             issuer = f"http://{ENGINE_KEYCLOAK}:8080"
@@ -743,22 +770,33 @@ def urls(m):
         for dname, d in engine["databases"].items():
             rows.append((f"  {dname}", f"{base}{d['instance']}/api/v1/Databases('{dname}')/", ""))
         names = ["admin"] + [u["name"] for u in engine["users"] if u["name"].lower() != "admin"]
+        cam = bool(engine["passthrough"] and engine["passthrough"]["cam"])
         for instance in dict.fromkeys(d["instance"] for d in engine["databases"].values()):
             # Where the secret is, never the secret: 'credentials' prints those
             rows.append((f"  login to {instance}", "application tm1, credentials in " +
-                         host_join(credentials, instance, "tm1.json"), "as " + " or ".join(names)))
+                         host_join(credentials, instance, "tm1.json"),
+                         # The users are Cognos's then, each under its CAMID
+                         "as admin, or a Cognos user by its CAMID" if cam else "as " + " or ".join(names)))
         first = next(iter(engine["databases"]))
         rows.append(("  try it", f"setup.sh session {first}", "a cookie for curl -b"))
         if engine["passthrough"]:
             from_server = engine["passthrough"]["server"]
-            rows.append(("  pass-through", f"users of TM1 {from_server} log in with their name and password there",
-                         "those in tm1Engine.users, and admin"))
             address = f"\"{base}{engine['databases'][first]['instance']}/api/v1/Databases('{first}')/ActiveUser\""
-            if c:
-                # Every TM1 server is in CAM security then, which takes a CAMNamespace header that
-                # TM1 v12 refuses: nothing here shows it working
-                rows.append(("  NOT TRIED", "pass-through to a TM1 server in Cognos (CAM) security", "it may not log anyone in"))
+            if cam:
+                # The TM1 server is in CAM security: TM1 v12 passes the Authorization header on, so
+                # a Cognos user logs in with what that server takes
+                namespace = c["namespace"].upper()
+                who = []  # the administrators, then the users listed: each once, whatever its case
+                for name in c["admins"] + [u["name"] for u in engine["users"]]:
+                    if name.lower() not in (kept.lower() for kept in who):
+                        who.append(name)
+                rows.append(("  pass-through", f"Cognos users log in as they do to TM1 {from_server} "
+                             "(CAMNamespace or CAMPassport)", ", ".join(who)))
+                rows.append(("  try it", f"curl -H \"Authorization: CAMNamespace $(printf %s "
+                             f"{who[0]}:PASSWORD:{namespace} | base64 | tr -d '\\n')\" {address}", "passwords in pa-environment.yaml"))
             else:
+                rows.append(("  pass-through", f"users of TM1 {from_server} log in with their name and password there",
+                             "those in tm1Engine.users, and admin"))
                 # The login the server's seed gives it, as the TM1 row has: an empty database's
                 # admin has no password, here as there
                 seed = m["tm1"][from_server]["seed"]

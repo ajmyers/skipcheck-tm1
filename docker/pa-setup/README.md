@@ -156,7 +156,8 @@ tm1Engine: true            # one database, tm1; log in as admin
     `config.internal.json` is removed on the next `up` without `oauth2`.
 - **Pass-through logins** (`passthrough: { server: legacy }`) have TM1 v12 ask a TM1 11 server of
   the same file who a name and password are. That server's users then log in to TM1 v12 with
-  what they have there, as Basic authentication on any request:
+  what they have there. Without `cognos` in the file, that's Basic authentication on any
+  request (with it, see "With `cognos` in the file" below):
 
   ```sh
   curl -u admin:apple "http://localhost:4444/tm1/api/v1/Databases('planning')/Cubes"
@@ -177,9 +178,28 @@ tm1Engine: true            # one database, tm1; log in as admin
   - pa-setup owns the engine's pass-through setting, as its OAuth 2.0 one: one you set by
     hand in the kept `config.internal.json`, to a server outside the file say, is removed on
     the next `up` without `passthrough`.
-  - Tried against a TM1 11 server with users of its own. **Not tried with Cognos (CAM)
-    security**, which every TM1 server gets when the file has `cognos`: TM1 v12 refused the
-    header CAM logins use, so it may not log anyone in. `up` says so.
+  - **With `cognos` in the file** the server is in CAM security, and Cognos's users log in
+    to TM1 v12 as they do to it: `Authorization: CAMNamespace <base64 of
+    user:password:namespace>`, or `CAMPassport` with a passport from a Cognos logon. Basic
+    gets 401. (A server whose `cfg` sets another `IntegratedSecurityMode` than 4 or 5 isn't
+    in CAM security, and is treated as one without `cognos`.)
+    - The engine's users are then Cognos's, each under its CAMID: `tm1Engine.users` names
+      some of `cognos.users`, with the groups they have in TM1 v12 (it learns none from
+      Cognos). `cognos.cam.admins` are administrators here too.
+    - `setup.sh session` still logs in as the database's own `admin`. A Cognos user is
+      there under its CAMID, not its short name:
+      `./setup.sh session planning 'CAMID("LDAP:u:uid=analyst,ou=people")'` (with the OIDC
+      namespace, `'CAMID("OIDC:u:analyst")'`). Not tried through `setup.ps1`.
+    - **A user taken out of `cognos.cam.admins` stays an administrator of TM1 v12,** as of
+      TM1 11: users and groups are added, never removed. Take the user out of `ADMIN` by
+      hand, or start again from an empty `pa-files/tm1-engine`.
+    - It needs a `tm1-engine` image that knows `TM1_CAM_NAMESPACE`. One pulled earlier
+      makes the users under their short names, and every Cognos login gets 403:
+      `docker pull ghcr.io/ajmyers/tm1-engine:edge`.
+    - An earlier version of this page said TM1 v12 refused the header CAM logins use. It
+      passes it on.
+  - Tried against a TM1 11 server with users of its own, and in CAM security with the LDAP
+    and the OIDC namespace.
   - `PlanningAnalyticsEnvironment.fromConfig` doesn't read `passthrough` yet: a file with it
     is refused there as an unknown setting.
 - **Everything the engine stores is in `pa-files/tm1-engine`:** `deployment` (settings, the

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -679,7 +680,7 @@ def test_without_passthrough_the_engine_is_told_its_off(pa_setup: ModuleType, of
 def test_oauth2_false_beside_passthrough_is_fine(pa_setup: ModuleType) -> None:
     # Off is off: only the two both on are refused
     read = model(pa_setup, PASS.replace("OAUTH", ", oauth2: false"))
-    assert read["tm1Engine"]["passthrough"] == {"server": "Legacy"} and read["tm1Engine"]["oauth2"] is None
+    assert read["tm1Engine"]["passthrough"] == {"server": "Legacy", "cam": False} and read["tm1Engine"]["oauth2"] is None
 
 
 def test_prints_whose_users_log_in_and_how_to_try_it(pa_setup: ModuleType, capsys: pytest.CaptureFixture[str]) -> None:
@@ -693,14 +694,86 @@ def test_prints_whose_users_log_in_and_how_to_try_it(pa_setup: ModuleType, capsy
     assert "curl -u admin: " in out and "admin has no password on an empty TM1 database" in out
 
 
-def test_says_that_pass_through_to_a_server_in_cam_security_isnt_tried(
+CAM = (
+    "cognos: {users: ['admin:adminpw:Admins', 'analyst:analystpw:Analysts', 'viewer:viewerpw:Viewers']CAMSET}\n"
+    "tm1: {servers: {legacy: {}}}\ntm1Engine: {users: [USERS], passthrough: {server: legacy}}\n"
+)
+
+
+def cam(pa_setup: ModuleType, users: str = "'analyst::Analysts'", cognos: str = "") -> dict[str, Any]:
+    return model(pa_setup, CAM.replace("USERS", users).replace("CAMSET", cognos))
+
+
+def test_passthrough_to_a_server_in_cam_security_names_the_engines_users_by_their_camids(pa_setup: ModuleType) -> None:
+    # The TM1 server answers a login with the user's CAMID: the engine is told the namespace, and
+    # makes its users under theirs. The TM1 servers' administrators are administrators here too
+    environment = pa_setup.generate(cam(pa_setup))["services"]["tm1-engine"]["environment"]
+    assert environment["TM1_CAM_NAMESPACE"] == "LDAP" and environment["TM1_CAM_NAMESPACE_TYPE"] == "ldap"
+    assert environment["TM1_USERS"] == "analyst:Analysts,admin:ADMIN"
+    assert environment["TM1_PASSTHROUGH_URL"] == "http://legacy:8010/api/v1/"
+
+
+def test_the_oidc_namespace_and_its_administrators_are_passed_on(pa_setup: ModuleType) -> None:
+    read = cam(pa_setup, "'analyst::Analysts', 'Viewer::Readers,admin', admin", ", oidc: true, cam: {namespace: oidc, admins: [viewer, admin]}")
+    environment = pa_setup.generate(read)["services"]["tm1-engine"]["environment"]
+    assert environment["TM1_CAM_NAMESPACE"] == "OIDC" and environment["TM1_CAM_NAMESPACE_TYPE"] == "oidc"
+    # An administrator listed keeps its groups and gets ADMIN, once, whatever the case; and is
+    # named as Cognos spells it, since the name goes into the CAMID
+    assert environment["TM1_USERS"] == "analyst:Analysts,viewer:Readers:admin,admin:ADMIN"
+
+
+def test_without_passthrough_cognos_changes_nothing_for_the_engine(pa_setup: ModuleType) -> None:
+    text = "cognos: {users: ['admin:adminpw:Admins']}\ntm1: {servers: {legacy: {}}}\ntm1Engine: {users: [other]}\n"
+    environment = pa_setup.generate(model(pa_setup, text))["services"]["tm1-engine"]["environment"]
+    assert "TM1_CAM_NAMESPACE" not in environment and "TM1_CAM_NAMESPACE_TYPE" not in environment
+    assert environment["TM1_USERS"] == "other"
+
+
+NATIVE = (
+    "cognos: {users: ['admin:adminpw:Admins']}\n"
+    "tm1: {servers: {legacy: {seed: sdata, cfg: {integratedsecuritymode: 1}}}}\n"
+    "tm1Engine: {users: [planner], passthrough: {server: legacy}}\n"
+)
+
+
+def test_a_server_whose_cfg_takes_it_out_of_cam_security_is_one_with_users_of_its_own(
     pa_setup: ModuleType, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    text = "cognos: {users: ['admin:adminpw:Admins']}\ntm1: {servers: {legacy: {}}}\ntm1Engine: {passthrough: {server: legacy}}\n"
-    pa_setup.urls(model(pa_setup, text))
+    # The image applies cfg last, in any case of the name: that server answers plain names to Basic
+    read = model(pa_setup, NATIVE)
+    environment = pa_setup.generate(read)["services"]["tm1-engine"]["environment"]
+    assert "TM1_CAM_NAMESPACE" not in environment and environment["TM1_USERS"] == "planner"
+    pa_setup.urls(read)
     out = capsys.readouterr().out
-    assert "NOT TRIED" in out and "Cognos (CAM) security" in out
-    assert "curl -u" not in out
+    assert "curl -u admin:apple" in out and "CAMNamespace" not in out
+
+
+@pytest.mark.parametrize("mode", ["4", "5", "' 5 '"])
+def test_a_cfg_that_names_a_cam_mode_keeps_the_server_in_cam_security(pa_setup: ModuleType, mode: str) -> None:
+    read = model(pa_setup, NATIVE.replace("integratedsecuritymode: 1", f"IntegratedSecurityMode: {mode}").replace("[planner]", "[]"))
+    assert pa_setup.generate(read)["services"]["tm1-engine"]["environment"]["TM1_CAM_NAMESPACE"] == "LDAP"
+
+
+def test_a_user_cognos_doesnt_have_is_refused_with_passthrough_to_cam_security(pa_setup: ModuleType) -> None:
+    with pytest.raises(pa_setup.ConfigError, match=re.escape("tm1Engine.users: stranger, other isn't in cognos.users")):
+        cam(pa_setup, "analyst, stranger, other")
+
+
+def test_says_how_a_cognos_user_logs_in_through_a_server_in_cam_security(
+    pa_setup: ModuleType, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # This row said "NOT TRIED", on the belief that TM1 v12 refused the CAMNamespace header. It
+    # passes it on: tried with both namespaces
+    pa_setup.urls(cam(pa_setup))
+    out = capsys.readouterr().out
+    assert "NOT TRIED" not in out and "curl -u" not in out
+    assert "Cognos users log in as they do to TM1 legacy (CAMNamespace or CAMPassport)   (admin, analyst)" in out
+    # Without the newline base64 puts in a long one
+    assert "curl -H \"Authorization: CAMNamespace $(printf %s admin:PASSWORD:LDAP | base64 | tr -d '\\n')\"" in out
+    assert "as admin, or a Cognos user by its CAMID" in out
+    # One user written in two cases is listed once
+    pa_setup.urls(cam(pa_setup, "'Analyst::Analysts', ADMIN"))
+    assert "(CAMNamespace or CAMPassport)   (admin, analyst)" in capsys.readouterr().out
 
 
 def test_the_schema_takes_a_server_or_false_for_passthrough_as_the_tool_does(pa_setup: ModuleType) -> None:
