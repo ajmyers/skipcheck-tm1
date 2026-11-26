@@ -431,15 +431,13 @@ class PlanningAnalyticsEnvironmentTest {
 				invalid.addAll(found);
 			}
 		}
-		{
-			for (Path file : invalid) {
-				String first = Files.readAllLines(file).get(0);
-				assertThat(first).as(file.toString()).startsWith("# error: ");
-				assertThatIllegalArgumentException().as(file.toString())
-					.isThrownBy(() -> PlanningAnalyticsEnvironment.fromConfig(file))
-					.withMessageStartingWith(file.getFileName() + ": ")
-					.withMessageContaining(first.substring("# error: ".length()));
-			}
+		for (Path file : invalid) {
+			String first = Files.readAllLines(file).get(0);
+			assertThat(first).as(file.toString()).startsWith("# error: ");
+			assertThatIllegalArgumentException().as(file.toString())
+				.isThrownBy(() -> PlanningAnalyticsEnvironment.fromConfig(file))
+				.withMessageStartingWith(file.getFileName() + ": ")
+				.withMessageContaining(first.substring("# error: ".length()));
 		}
 		assertThatIllegalArgumentException()
 			.isThrownBy(() -> PlanningAnalyticsEnvironment.fromConfig(fixture("missing.yaml")))

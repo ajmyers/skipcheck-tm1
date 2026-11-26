@@ -51,8 +51,10 @@ class Tm1EngineWiringTest {
 	@Test
 	void refusesNamesTheImageCantTake() {
 		var engine = new Tm1EngineContainer(SOURCE);
-		// TM1 wants at least three characters
+		// TM1 wants at least three characters of a database's name; an instance's may be
+		// shorter
 		assertThatIllegalArgumentException().isThrownBy(() -> engine.withDatabase("ab"));
+		assertThat(new Tm1EngineContainer(SOURCE).withDatabase("qa", "sales").configured()).containsExactly("qa/sales");
 		assertThatIllegalArgumentException().isThrownBy(() -> engine.withDatabase("two words"));
 		assertThatIllegalArgumentException().isThrownBy(() -> engine.withDatabase("a/b", "sales"));
 		assertThatIllegalArgumentException().isThrownBy(() -> engine.withUser("two words"));

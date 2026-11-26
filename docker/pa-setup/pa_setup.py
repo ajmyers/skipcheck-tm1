@@ -320,7 +320,8 @@ def normalize(cfg):
         if len(set(engine_names)) != len(engine_names):
             raise ConfigError("tm1Engine.users: a user is listed twice")
         datastore = engine.get("datastore")
-        datastore = {} if datastore in (None, True, False) else datastore
+        # None, true and false by what they are, not by equality: 0 and 1 aren't on and off
+        datastore = {} if datastore is None or isinstance(datastore, bool) else datastore
         check_keys(datastore, ("port",), "tm1Engine.datastore")
         # Published only when a port is given: the engine reaches it on the project's network
         published = datastore.get("port")

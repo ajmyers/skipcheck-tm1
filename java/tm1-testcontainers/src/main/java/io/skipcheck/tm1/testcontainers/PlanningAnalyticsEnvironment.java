@@ -238,7 +238,7 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 			Tm1EngineSource source = b.get(b.tm1EngineSource, ibm -> new Tm1EngineSource.Bundle(ibm, null),
 					Tm1EngineSource::discover, Tm1EngineSource.PrivateImage::new, b.tm1EngineImage,
 					RequiresTm1Engine.NO_SOURCE_MESSAGE);
-			// Its datastore joins the same network when the engine starts
+			// Its datastore follows it onto the network
 			engine = (runs(b.tm1EngineImage, source instanceof Tm1EngineSource.PrivateImage)
 					? new Tm1EngineContainer(image(b.tm1EngineImage, Tm1EngineContainer.DEFAULT_IMAGE), source)
 					: new Tm1EngineContainer(source))

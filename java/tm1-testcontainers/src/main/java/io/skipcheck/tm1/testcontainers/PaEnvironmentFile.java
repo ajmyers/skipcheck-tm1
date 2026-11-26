@@ -280,14 +280,18 @@ final class PaEnvironmentFile {
 			if (!(listed instanceof List<?> list)) {
 				throw error("tm1Engine.users must be a list, e.g. users: [analyst::Analysts]");
 			}
+			// Every user first, then the names, as pa_setup: a bad entry is reported
+			// before a
+			// name listed twice
 			List<EngineUser> engineUsers = new ArrayList<>();
-			Set<String> engineNames = new LinkedHashSet<>();
 			for (int i = 0; i < list.size(); i++) {
-				EngineUser user = engineUser(list.get(i), "tm1Engine.users[" + i + "]");
+				engineUsers.add(engineUser(list.get(i), "tm1Engine.users[" + i + "]"));
+			}
+			Set<String> engineNames = new LinkedHashSet<>();
+			for (EngineUser user : engineUsers) {
 				if (!engineNames.add(user.name().toLowerCase(Locale.ROOT))) {
 					throw error("tm1Engine.users: a user is listed twice");
 				}
-				engineUsers.add(user);
 			}
 			Object datastore = engineSection.get("datastore");
 			Map<?, ?> ds = datastore == null || datastore instanceof Boolean ? Map.of()

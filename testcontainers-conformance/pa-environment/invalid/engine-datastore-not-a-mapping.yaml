@@ -1,0 +1,4 @@
+# error: tm1Engine.datastore must be a mapping
+# 0 isn't false: only true, false or nothing stand for a mapping
+version: 1
+tm1Engine: { datastore: 0 }
