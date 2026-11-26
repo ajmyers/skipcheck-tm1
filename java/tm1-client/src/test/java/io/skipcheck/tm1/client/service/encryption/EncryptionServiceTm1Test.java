@@ -33,7 +33,10 @@ import reactor.core.publisher.Mono;
  * install (a bundle's, a volume's) they check as valid, and configuring would really
  * convert the server and stop it, which the test doesn't try. On a read-only one (an
  * installed folder, {@code TM1_HOME_DIR}) TM1 can't make the key, the settings check as
- * invalid and every change is refused: the test pins how TM1 says so.
+ * invalid and every change is refused: the test pins how TM1 says so. So on a writable
+ * source the run does change the install: a volume of your own
+ * ({@code TM1_INSTALL_VOLUME}), or the bundle cache, keeps the key TM1 made in its
+ * {@code ibmtm1.kdb}.
  */
 @RequiresTm1
 class EncryptionServiceTm1Test {

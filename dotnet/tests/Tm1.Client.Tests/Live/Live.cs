@@ -66,9 +66,9 @@ public static class Live
                 _ => "writable",
             };
         }
-        catch (ArgumentException)
+        catch (Exception e) when (e is ArgumentException or FormatException)
         {
-            return null; // a source set but wrong, which starting the container reports
+            return null; // a source set but wrong (a folder that isn't there, a URL that isn't one), which starting the container reports
         }
     }
 

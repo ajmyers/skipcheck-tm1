@@ -21,7 +21,9 @@ const LOCAL = LocalKeyFileProviderSettingsPatch.builder().keyRef("/tmp/tm1-clien
  * in its install's `bin64/ssl/ibmtm1.kdb`, so on a writable install (a bundle's, a volume's) they
  * check as valid, and configuring would really convert the server and stop it, which the test
  * doesn't try. On a read-only one (an installed folder, `TM1_HOME_DIR`) TM1 can't make the key, the
- * settings check as invalid and every change is refused: the test pins how TM1 says so. As in Java,
+ * settings check as invalid and every change is refused: the test pins how TM1 says so. So on a
+ * writable source the run does change the install: a volume of your own (`TM1_INSTALL_VOLUME`), or
+ * the bundle cache, keeps the key TM1 made in its `ibmtm1.kdb`. As in Java,
  * it starts a TM1 of its own rather than try encryption on the server the other live tests share;
  * with only a server at `TM1_URL` (no TM1 source), it uses that one, whose install isn't known, so
  * the settings aren't checked there: that would write a key into its install. */

@@ -6,7 +6,9 @@ It needs a server that isn't encrypted. Whether local key file settings check as
 the install, not the version (#439): TM1 makes the key in its install's bin64/ssl/ibmtm1.kdb, so on a
 writable install (a bundle's, a volume's) they check as valid, and configuring would really convert
 the server and stop it, which the test doesn't try. On a read-only one (an installed folder,
-TM1_HOME_DIR) TM1 can't make the key, the settings check as invalid and every change is refused. On a
+TM1_HOME_DIR) TM1 can't make the key, the settings check as invalid and every change is refused. So on
+a writable source the run does change the install: a volume of your own (TM1_INSTALL_VOLUME), or the
+bundle cache, keeps the key TM1 made in its ibmtm1.kdb. On a
 server the suite didn't start (TM1_URL) the install isn't known, and the settings aren't checked: that
 would write a key into its install.
 """

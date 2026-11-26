@@ -42,7 +42,12 @@ public final class ServerAssumptions {
 	 */
 	public enum Install {
 
-		/** Its own install, writable: a bundle's, a volume's or an image's. */
+		/**
+		 * Its own install, writable: a bundle's, a volume's or an image's. Tried with a
+		 * bundle install, a volume holding a copy of an installed folder, and the folder
+		 * mounted read-write; a private image is taken to be the same, since tm1-server
+		 * runs TM1 as root over the image's own layer.
+		 */
 		WRITABLE("writable"),
 
 		/**

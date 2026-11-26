@@ -31,7 +31,7 @@ export function installOf(source: Tm1Source): Install {
 /** The install of the TM1 the live tests share: undefined for a server the suite didn't start
  * (`TM1_URL`), or with no source to start one from. */
 export function sharedInstall(): Install | undefined {
-  if (process.env.TM1_URL) return undefined;
+  if (process.env.TM1_URL?.trim()) return undefined; // as global-setup reads it: a blank one is unset
   try {
     const source = Tm1Source.discover();
     return source ? installOf(source) : undefined;
