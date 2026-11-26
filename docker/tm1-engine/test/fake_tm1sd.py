@@ -53,7 +53,8 @@ class FakeTm1:
         return app
 
     def database(self, instance: str, name: str) -> dict:
-        database = {"Name": name, "Replicas": 1, "users": {"Admin": ["ADMIN"]}, "groups": ["ADMIN", "DataAdmin"]}
+        database = {"Name": name, "Replicas": 1, "users": {"Admin": ["ADMIN"]}, "groups": ["ADMIN", "DataAdmin"],
+                    "friendly": {}}  # the friendly names given; without one TM1 shows the name
         self.instances[instance]["databases"][name] = database
         return database
 
@@ -112,13 +113,24 @@ class FakeTm1:
                 return 201, {"Name": body["Name"]}, {}
             return 200, {"value": [{"Name": group} for group in database["groups"]]}, {}
         if method == "GET":
-            return 200, {"value": [{"Name": user, "Groups": [{"Name": group} for group in groups]} for user, groups in database["users"].items()]}, {}
+            return 200, {"value": [{"Name": user, "FriendlyName": database["friendly"].get(user, user),
+                                    "Groups": [{"Name": group} for group in groups]}
+                                   for user, groups in database["users"].items()]}, {}
         groups = [re.fullmatch(rf"Groups{key}", bound)[1] for bound in body.get("Groups@odata.bind", [])]
         assert all(group in database["groups"] for group in groups), groups
         if method == "POST":
+            # TM1 compares names without regard to case or spaces, and refuses a second of one
+            taken = {"".join(user.split()).lower() for user in database["users"]}
+            if "".join(body["Name"].split()).lower() in taken:
+                return 400, {"error": {"message": f"A user with Name \"{body['Name']}\" already exists."}}, {}
             database["users"][body["Name"]] = groups
+            if "FriendlyName" in body:
+                database["friendly"][body["Name"]] = body["FriendlyName"]
             return 201, {"Name": body["Name"]}, {}
-        database["users"][match[4]] = groups  # PATCH replaces the groups, as TM1 does
+        if "Groups@odata.bind" in body:
+            database["users"][match[4]] = groups  # PATCH replaces the groups, as TM1 does
+        if "FriendlyName" in body:
+            database["friendly"][match[4]] = body["FriendlyName"]
         return 200, {"Name": match[4]}, {}
 
     @staticmethod

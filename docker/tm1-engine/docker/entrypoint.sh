@@ -35,7 +35,8 @@
 #
 # Commands:
 #   (none) | start   run TM1, and create what TM1_DATABASES, TM1_APPLICATIONS and
-#                    TM1_USERS ask for (see tm1-engine --help)
+#                    TM1_USERS ask for, the users under their Cognos CAMIDs with
+#                    TM1_CAM_NAMESPACE (see tm1-engine --help)
 #   install [SOURCE] install TM1 from a package into /opt/ibm/tm1-engine and exit;
 #                    SOURCE is a URL, a file, or - for stdin (see tm1-engine-install --help)
 #   <anything else>  exec'd as-is (e.g. bash, or tm1-engine --help)

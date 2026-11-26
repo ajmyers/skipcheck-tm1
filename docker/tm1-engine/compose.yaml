@@ -41,6 +41,8 @@ services:
       TM1_DATABASES: ${TM1_DATABASES-tm1}      # set but empty: no databases
       TM1_APPLICATIONS: ${TM1_APPLICATIONS:-}
       TM1_USERS: ${TM1_USERS:-}
+      TM1_CAM_NAMESPACE: ${TM1_CAM_NAMESPACE:-}             # Cognos users, by their CAMIDs: see the README
+      TM1_CAM_NAMESPACE_TYPE: ${TM1_CAM_NAMESPACE_TYPE:-}
       TM1_OAUTH2_ISSUER_URL: ${TM1_OAUTH2_ISSUER_URL:-}     # OAuth 2.0 logins: see the README
       TM1_OAUTH2_AUDIENCE: ${TM1_OAUTH2_AUDIENCE:-}
       TM1_OAUTH2_ID_CLAIMS: ${TM1_OAUTH2_ID_CLAIMS:-}
