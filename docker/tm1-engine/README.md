@@ -125,9 +125,9 @@ On every start the container makes sure these exist, and creates only what's mis
 |---|---|---|
 | `TM1_DATABASES` | `tm1` | `[instance/]database,...`: databases, in instance `tm1` unless named. Empty for none. Names need at least 3 characters, and `Sales` and `sales` are two databases. |
 | `TM1_APPLICATIONS` | `tm1` in each instance | `[instance/]application,...`: applications, whose credentials are saved in `/tm1/credentials` |
-| `TM1_USERS` | | `user[:group[:group]],...`: users for every database, in exactly those groups (created if missing). `admin` always stays in `ADMIN`. A user can be a whole `CAMID("...")`, commas and colons included. |
-| `TM1_CAM_NAMESPACE` | | The ID of the Cognos namespace the users are in, e.g. `LDAP`: each plain name in `TM1_USERS` is then created under its CAMID. For [pass-through to a TM1 11 server in CAM security](#with-cognos-cam-security). |
-| `TM1_CAM_NAMESPACE_TYPE` | `ldap` | `ldap` or `oidc`: how a name becomes a CAMID, as in [`tm1-server`](../tm1-server/README.md#cognos-cam-security) |
+| `TM1_USERS` | | `user[:group[:group]],...`: users for every database, in exactly those groups (created if missing). The database's own `admin` always stays in `ADMIN`. A user or a group can be a whole `CAMID("...")`, commas and colons included. |
+| `TM1_CAM_NAMESPACE` | | The ID of the Cognos namespace the users are in, e.g. `LDAP`: each plain name in `TM1_USERS` is then created under its CAMID, `CAMID("LDAP:u:uid=<name>,ou=people")`. For [pass-through to a TM1 11 server in CAM security](#with-cognos-cam-security). Not with OAuth 2.0. |
+| `TM1_CAM_NAMESPACE_TYPE` | `ldap` | `ldap` or `oidc` (`CAMID("OIDC:u:<name>")`): how a name becomes a CAMID, as in [`tm1-server`](../tm1-server/README.md#cognos-cam-security). The shapes are those of [`cognos-server`](../cognos-server/README.md)'s namespaces: for any other, write whole CAMIDs. |
 
 A new database has one user, `Admin`, in the `ADMIN` group. If an application exists
 but its secret isn't in `/tm1/credentials` (the folder was lost), the application is
@@ -295,10 +295,16 @@ curl -H "Authorization: CAMNamespace $(printf %s analyst:analystpw:LDAP | base64
 - **The name TM1 11 answers is the user's CAMID,** such as
   `CAMID("LDAP:u:uid=analyst,ou=people")`, and that's the user the database must have.
   `TM1_CAM_NAMESPACE` creates each plain name of `TM1_USERS` under its CAMID, with the
-  friendly name TM1 11 shows (`LDAP/analyst`). A whole `CAMID("...")` in `TM1_USERS` is
-  taken as it is, for a namespace whose CAMIDs have another shape.
+  friendly name TM1 11 shows (`LDAP/analyst`).
+- **The CAMIDs it makes are those of `cognos-server`'s test directory**
+  (`uid=<name>,ou=people`). Another directory's look different, such as
+  `CAMID("AD:u:<guid>")`: write those whole in `TM1_USERS`, as Cognos shows them. In a
+  shell, put the value in single quotes, so the double quotes reach the container. One
+  that isn't written whole is refused.
 - **Groups are the ones you list.** TM1 11 gets a user's groups from Cognos at logon;
-  TM1 v12 only learns the name. An administrator is a user in `ADMIN`.
+  TM1 v12 only learns the name. An administrator is a user listed with `ADMIN`
+  (`admin:ADMIN`): with the namespace set, `admin` is the Cognos user of that name, not
+  the database's own, and gets no group it isn't given.
 - **With the namespace set, every plain name is a Cognos user.** The database's own
   `Admin` is still there for service-to-service logins, and `tm1-engine session` takes a
   CAMID as the user.

@@ -88,14 +88,40 @@ def _items(value):
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-# One user of TM1_USERS. A CAMID("...") stays whole: it has the commas and colons that part the rest
-_USER_ITEM = re.compile(r'\s*(CAMID\("[^"]*"\)[^,]*|[^,]*)\s*(?:,|$)')
 _CAMID = re.compile(r'CAMID\("[^"]*"\)')
 _PLAIN = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
-def _user_items(value):
-    return [item.strip() for item in _USER_ITEM.findall(value) if item.strip()]
+def _parts(value, separator):
+    """value cut at each separator, but for those inside a CAMID("..."): it has the commas and
+    colons that part users and groups everywhere else."""
+    parts, start, at = [], 0, 0
+    while at < len(value):
+        whole = _CAMID.match(value, at)
+        if whole:
+            at = whole.end()
+        elif value[at] == separator:
+            parts.append(value[start:at].strip())
+            start = at = at + 1
+        else:
+            at += 1
+    parts.append(value[start:].strip())
+    return parts
+
+
+def _checked(name, item):
+    """A user's or a group's name, refused when it's a CAMID that isn't written whole: cut at its
+    commas and colons it would be several users and groups, made without a word."""
+    if '"' in name or name.lower().startswith("camid("):
+        if not _CAMID.fullmatch(name):
+            raise Failure(f'TM1_USERS: {item!r}: a CAMID is written CAMID("..."), capitals and double quotes '
+                          "included. In a shell, put the whole value in single quotes")
+    return name
+
+
+def same(name):
+    """A name as TM1 compares them: without regard to case or spaces."""
+    return "".join(name.split()).lower()
 
 
 def camid(name, namespace, kind):
@@ -150,32 +176,30 @@ def plan(env=None):
     kind = env.get("TM1_CAM_NAMESPACE_TYPE", "").strip().lower() or "ldap"
     if kind not in ("ldap", "oidc"):
         raise Failure(f"TM1_CAM_NAMESPACE_TYPE: {kind!r}: ldap or oidc")
-    if namespace and not NAME.match(namespace):
-        raise Failure(f"TM1_CAM_NAMESPACE: {namespace!r}: a namespace's ID is letters, digits, _ and -")
+    if namespace and not re.fullmatch(r"[A-Za-z0-9._-]+", namespace):
+        raise Failure(f"TM1_CAM_NAMESPACE: {namespace!r}: a namespace's ID is letters, digits, ., _ and -")
     if not namespace and env.get("TM1_CAM_NAMESPACE_TYPE", "").strip():
         raise Failure("TM1_CAM_NAMESPACE_TYPE is set without TM1_CAM_NAMESPACE, the namespace the users are in")
+    if namespace and oauth2:
+        # A token names a user by a claim, never by a CAMID: nobody could log in
+        raise Failure("TM1_CAM_NAMESPACE is set with TM1_OAUTH2_ISSUER_URL: it names the users by their Cognos "
+                      "CAMIDs, for pass-through to a TM1 11 server, and no token names a user so")
     users = []
-    for item in _user_items(env.get("TM1_USERS", "")):
-        whole = _CAMID.match(item)
-        if whole:
-            # CAMID("..."), then its groups: the colons inside it aren't separators
-            name, rest = whole.group(0), item[whole.end():].strip()
-            if rest and not rest.startswith(":"):
-                raise Failure(f"TM1_USERS: {item!r}: expected CAMID(\"...\")[:GROUP[:GROUP]]")
-            listed = [part.strip() for part in rest[1:].split(":")] if rest else []
-        else:
-            name, *listed = [part.strip() for part in item.split(":")]
+    for item in (item for item in _parts(env.get("TM1_USERS", ""), ",") if item):
+        name, *listed = _parts(item, ":")
         if not name or any(not group for group in listed):
             raise Failure(f"TM1_USERS: {item!r}: expected USER[:GROUP[:GROUP]]")
+        name, listed = _checked(name, item), [_checked(group, item) for group in listed]
+        whole = _CAMID.fullmatch(name)
         friendly = None
         if namespace and not whole:
             # Named as TM1 11 names a Cognos user, and shown as it shows one
             name, friendly = camid(name, namespace, kind), f"{namespace}/{name}"
         groups = []
-        for group in listed:  # a group named twice is one group: TM1's group names aren't case-sensitive
-            if group.lower() not in (kept.lower() for kept in groups):
+        for group in listed:  # a group named twice is one group: TM1 compares names without case or spaces
+            if same(group) not in (same(kept) for kept in groups):
                 groups.append(group)
-        if name.lower() in (user["name"].lower() for user in users):
+        if same(name) in (same(user["name"]) for user in users):
             raise Failure(f"TM1_USERS: {name!r} is listed twice")
         users.append({"name": name, "groups": groups, **({"friendlyName": friendly} if friendly else {})})
     return {"instances": instances, "users": users}
@@ -413,20 +437,22 @@ def apply_users(instance, database, users):
             raise Failure(f"{method} {path} in {instance}/{database}: {status} {message(payload)}")
         return payload
 
-    have_groups = {group["Name"].lower(): group["Name"] for group in request("GET", "Groups?$select=Name")["value"]}
-    have_users = {user["Name"].lower(): (user["Name"], sorted(group["Name"].lower() for group in user.get("Groups") or []))
-                  for user in request("GET", "Users?$select=Name&$expand=Groups($select=Name)")["value"]}
+    # Found as TM1 would find them: a CAMID written with a space after its comma is the same user
+    have_groups = {same(group["Name"]): group["Name"] for group in request("GET", "Groups?$select=Name")["value"]}
+    have_users = {same(user["Name"]): (user["Name"], sorted(same(group["Name"]) for group in user.get("Groups") or []),
+                                       user.get("FriendlyName"))
+                  for user in request("GET", "Users?$select=Name,FriendlyName&$expand=Groups($select=Name)")["value"]}
     for user in users:
         groups = list(user["groups"])
         if user["name"].lower() == "admin" and groups and "admin" not in (group.lower() for group in groups):
             groups.append("ADMIN")  # never lock the administrator out of its own database
         bind = []
         for group in groups:
-            if group.lower() not in have_groups:
+            if same(group) not in have_groups:
                 request("POST", "Groups", {"Name": group})
-                have_groups[group.lower()] = group
-            bind.append(f"Groups({key(have_groups[group.lower()])})")
-        existing = have_users.get(user["name"].lower())
+                have_groups[same(group)] = group
+            bind.append(f"Groups({key(have_groups[same(group)])})")
+        existing = have_users.get(same(user["name"]))
         if existing is None:
             body = {"Name": user["name"]}
             if user.get("friendlyName"):
@@ -434,8 +460,14 @@ def apply_users(instance, database, users):
             if bind:
                 body["Groups@odata.bind"] = bind
             request("POST", "Users", body)
-        elif bind and existing[1] != sorted(group.lower() for group in groups):
-            request("PATCH", f"Users({quote(existing[0])})", {"Groups@odata.bind": bind})
+        else:
+            change = {}
+            if bind and existing[1] != sorted(same(group) for group in groups):
+                change["Groups@odata.bind"] = bind
+            if user.get("friendlyName") and existing[2] != user["friendlyName"]:
+                change["FriendlyName"] = user["friendlyName"]  # a user made before the namespace was set
+            if change:
+                request("PATCH", f"Users({quote(existing[0])})", change)
 
 
 def setup():
