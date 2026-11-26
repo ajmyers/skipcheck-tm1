@@ -232,8 +232,9 @@ The `install` command installs from any source into `/opt/ibm/cognos/tm1_64` (or
 `--target DIR`) and exits: `install [URL | file | -]`. Run
 `docker run --rm ghcr.io/ajmyers/tm1-server install --help` for details.
 
-Starts Planning Analytics 2.1.2 (TM1 11.8.02400.7), 2.1.7 (11.8.02800.9), 2.1.16 (11.8.03200.3),
-2.1.19 (11.8.03500.6) and 2.1.25 (11.8.04000.1). TM1 11.8.024 to 11.8.032 link `libjsig.so`, a
+Starts every Planning Analytics 2.1 release from 2.1.2 (TM1 11.8.02400.7) to 2.1.25 (11.8.04000.1),
+each from IBM's own bundle or installer (the releases and their builds are in
+[`spec/tm1-versions.md`](../../spec/tm1-versions.md)). TM1 11.8.024 to 11.8.032 link `libjsig.so`, a
 Java VM's signal-chaining library that IBM's own startup script takes from a `JAVA_HOME`. The
 image carries OpenJDK's HotSpot copy of that one file, not a Java runtime, in
 `/usr/local/lib/tm1-server/jvm` with its `copyright` (GPLv2 with the Classpath Exception) and
