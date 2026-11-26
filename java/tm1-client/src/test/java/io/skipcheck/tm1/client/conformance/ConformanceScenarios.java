@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
@@ -27,6 +28,7 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
 
 import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.version.Tm1Version;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -190,12 +192,32 @@ public final class ConformanceScenarios {
 	 * has TM1's made-up values as their placeholders too.
 	 */
 	public static List<String> run(Tm1Client client, Traffic traffic, JsonNode scenario, Map<String, String> names) {
+		return run(client, traffic, scenario, names, step -> true);
+	}
+
+	/**
+	 * Runs the scenario's steps that {@code applies} accepts, as
+	 * {@link #run(Tm1Client, Traffic, JsonNode, Map)} runs them all: a step it refuses
+	 * (one the server can't serve, by {@link #applies}) sends nothing and isn't checked.
+	 * @param client the client
+	 * @param traffic where requests are recorded
+	 * @param scenario the scenario
+	 * @param names its names
+	 * @param applies whether a step applies to the server
+	 * @return the failures, empty if it passed
+	 */
+	public static List<String> run(Tm1Client client, Traffic traffic, JsonNode scenario, Map<String, String> names,
+			Predicate<JsonNode> applies) {
 		List<String> failures = new ArrayList<>();
 		// What steps keep of their results, as read, for a $fromRead after them
 		Map<String, Object> kept = new LinkedHashMap<>();
 		try {
 			int i = 0;
 			for (JsonNode step : scenario.get("steps")) {
+				if (!applies.test(step)) {
+					i++;
+					continue;
+				}
 				traffic.step("steps[" + i + "]");
 				ObjectNode outcome = outcome(client, step, names, kept);
 				String why = check(substitute(step.get("expect"), names), outcome);
@@ -214,12 +236,35 @@ public final class ConformanceScenarios {
 			int i = 0;
 			for (JsonNode step : scenario.path("finally")) {
 				traffic.step("finally[" + i++ + "]");
-				if (!unkept(step, kept)) {
+				if (applies.test(step) && !unkept(step, kept)) {
 					outcome(client, step, names, kept);
 				}
 			}
 		}
 		return failures;
+	}
+
+	/**
+	 * Whether a scenario or a step applies to a server: every endpoint its
+	 * {@code requires} names (coverage-gate IDs, such as {@code Action Cube/Reserve}) is
+	 * in the server's {@code $metadata}, and the server's product version is at least its
+	 * {@code tm1From} and below its {@code tm1Before}, for behaviour {@code $metadata}
+	 * doesn't show. One with none of them applies everywhere.
+	 * @param node the scenario or step
+	 * @param endpoints the server's endpoints
+	 * @param version the server's product version
+	 * @return whether it applies
+	 */
+	public static boolean applies(JsonNode node, Set<String> endpoints, Tm1Version version) {
+		for (JsonNode endpoint : node.path("requires")) {
+			if (!endpoints.contains(endpoint.asString())) {
+				return false;
+			}
+		}
+		if (node.has("tm1From") && version.compareTo(Tm1Version.parse(node.get("tm1From").asString())) < 0) {
+			return false;
+		}
+		return !node.has("tm1Before") || version.compareTo(Tm1Version.parse(node.get("tm1Before").asString())) < 0;
 	}
 
 	/**

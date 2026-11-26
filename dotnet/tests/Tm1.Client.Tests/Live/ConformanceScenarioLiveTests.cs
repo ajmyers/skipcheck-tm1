@@ -30,7 +30,15 @@ public sealed class ConformanceScenarioLiveTests
         }
         var traffic = new ConformanceLive.Traffic(inner, Live.Url);
         await using var tm1 = Live.Builder().HttpHandler(traffic).Build();
-        var failures = await ConformanceLive.Run(tm1, traffic, scenario, names);
+        // What the server has and is: a scenario or a step for one it isn't is passed over (xUnit 2
+        // can't skip a test once it runs)
+        var capabilities = await tm1.Session.CapabilitiesAsync();
+        var version = capabilities.ProductVersion!;
+        if (!ConformanceLive.Applies(scenario, capabilities.Endpoints, version))
+        {
+            return;
+        }
+        var failures = await ConformanceLive.Run(tm1, traffic, scenario, names, step => ConformanceLive.Applies(step, capabilities.Endpoints, version));
         traffic.Write(scenario["name"]!.GetValue<string>(), names);
         Assert.Empty(failures);
     }

@@ -6,6 +6,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { Tm1Version } from "../../src/index.js";
 import { FakeTm1 } from "../support/fake-tm1.js";
 import * as live from "./live.js";
 
@@ -143,6 +144,36 @@ describe("the live conformance runner", () => {
     expect(failures).toHaveLength(1);
     expect(failures[0]).toMatch(/^step 0 dimensions.create/);
     expect(traffic.exchanges.slice(-3).map((e) => e["step"])).toEqual(["finally[0]", "finally[1]", "finally[2]"]);
+  });
+
+  it("applies what the server has and is", () => {
+    const node = { requires: ["Action Cube/Reserve"], tm1From: "11.8.03000", tm1Before: "11.8.04000" };
+    const reserve = new Set(["Action Cube/Reserve"]);
+    expect(live.applies(node, reserve, Tm1Version.parse("11.8.03500.6"))).toBe(true);
+    expect(live.applies(node, new Set(), Tm1Version.parse("11.8.03500.6")), "an endpoint the server lacks").toBe(false);
+    expect(live.applies(node, reserve, Tm1Version.parse("11.8.02400.7")), "too old").toBe(false);
+    expect(live.applies(node, reserve, Tm1Version.parse("11.8.04000.1")), "tm1Before is exclusive").toBe(false);
+    expect(live.applies({}, new Set(), Tm1Version.parse("11.8.02400.7")), "one with neither applies everywhere").toBe(true);
+  });
+
+  it("skips the steps that don't apply and sends nothing for them", async () => {
+    // cubes.json without its dimension steps, two creates and two finally deletes: they send
+    // nothing, the rest run
+    const names = live.namesFor(scenario);
+    const tm1 = new FakeTm1();
+    tm1.respond = () => ({});
+    const traffic = new live.Traffic(tm1, FakeTm1.BASE);
+    await live.run(
+      tm1.client((b) => b.transport(traffic)),
+      traffic,
+      scenario,
+      names,
+      (step) => step.service !== "dimensions",
+    );
+    const steps = traffic.exchanges.map((e) => e["step"]);
+    for (const absent of ["steps[0]", "steps[1]", "finally[1]", "finally[2]"]) expect(steps).not.toContain(absent);
+    expect(steps).toContain("steps[2]");
+    expect(steps).toContain("finally[0]");
   });
 
   /** What a step expects, as TM1's answer to its one request. */

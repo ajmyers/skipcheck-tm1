@@ -206,6 +206,39 @@ public class ConformanceLiveRunnerTests
         Assert.Equal(["finally[0]", "finally[1]", "finally[2]"], traffic.Exchanges.TakeLast(3).Select(e => e["step"]!.GetValue<string>()));
     }
 
+    [Fact]
+    public void AppliesWhatTheServerHasAndIs()
+    {
+        var scenario = JsonNode.Parse("{\"requires\":[\"Action Cube/Reserve\"],\"tm1From\":\"11.8.03000\",\"tm1Before\":\"11.8.04000\"}")!;
+        var reserve = new System.Collections.Generic.HashSet<string> { "Action Cube/Reserve" };
+        Assert.True(ConformanceLive.Applies(scenario, reserve, Version.Tm1Version.Parse("11.8.03500.6")));
+        Assert.False(ConformanceLive.Applies(scenario, new System.Collections.Generic.HashSet<string>(), Version.Tm1Version.Parse("11.8.03500.6"))); // an endpoint the server lacks
+        Assert.False(ConformanceLive.Applies(scenario, reserve, Version.Tm1Version.Parse("11.8.02400.7"))); // too old
+        Assert.False(ConformanceLive.Applies(scenario, reserve, Version.Tm1Version.Parse("11.8.04000.1"))); // tm1Before is exclusive
+        Assert.True(ConformanceLive.Applies(JsonNode.Parse("{}")!, new System.Collections.Generic.HashSet<string>(), Version.Tm1Version.Parse("11.8.02400.7")));
+    }
+
+    [Fact]
+    public async Task SkipsTheStepsThatDontApplyAndSendsNothingForThem()
+    {
+        // cubes.json without its dimension steps, two creates and two finally deletes: they send
+        // nothing, the rest run
+        var scenario = ConformanceLive.Load("cubes");
+        var names = ConformanceLive.NamesFor(scenario);
+        var fake = new FakeTm1 { Respond = _ => FakeTm1.Json(new { }) };
+        var traffic = new ConformanceLive.Traffic(fake, FakeTm1.Base);
+        await ConformanceLive.Run(fake.Client(b => b.HttpHandler(traffic)), traffic, scenario, names, step =>
+            step["service"]?.GetValue<string>() != "dimensions"
+        );
+        var steps = traffic.Exchanges.Select(e => e["step"]!.GetValue<string>()).ToList();
+        foreach (var absent in new[] { "steps[0]", "steps[1]", "finally[1]", "finally[2]" })
+        {
+            Assert.DoesNotContain(absent, steps);
+        }
+        Assert.Contains("steps[2]", steps);
+        Assert.Contains("finally[0]", steps);
+    }
+
     /// <summary>What a step expects, as TM1's answer to its one request.</summary>
     private static System.Net.Http.HttpResponseMessage Expected(JsonObject expect)
     {

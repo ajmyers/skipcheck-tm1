@@ -1,0 +1,34 @@
+{
+	"specVersion": 1,
+	"name": "encryption-validated",
+	"description": "From TM1 11.8.040, the same local key file settings check as valid: the server can make the key, so configuring would convert the server and stop it. So only the check runs here, and nothing is changed.",
+	"requires": [
+		"FunctionImport ValidateEncryptionAtRestSettings"
+	],
+	"tm1From": "11.8.04000",
+	"names": [],
+	"steps": [
+		{
+			"service": "encryption",
+			"method": "validate",
+			"params": [
+				"settings"
+			],
+			"args": [
+				{
+					"$patch": "LocalKeyFileProviderSettingsPatch",
+					"json": {
+						"@odata.type": "#ibm.tm1.api.v1.LocalKeyFileProviderSettings",
+						"KeyRef": "/tmp/tm1-client.key"
+					}
+				}
+			],
+			"expect": {
+				"fields": {
+					"IsValid": true,
+					"Issues": []
+				}
+			}
+		}
+	]
+}

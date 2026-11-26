@@ -42,3 +42,4 @@ ODataCollectionDecoderTest#streamsALargeCollectionWithoutReadingAheadOfDemand: R
 Tm1SessionPoolTest#observesEvictionsWithTheirReason: a Micrometer observation, which this client doesn't make (the reason is counted in Tm1SessionPoolStats)
 Tm1SessionReloginTest#observesTheReloginWithItsReason: a Micrometer observation, which this client doesn't make
 Tm1SessionTest#observesLoginAndClose: a Micrometer observation, which this client doesn't make
+ConformanceScenariosTest#saysWhatEachScenarioNeedsInTermsEveryClientReadsAlike: checks the shared scenario files in spec/conformance/live (every requires an endpoint list the newest snapshot defines, every bound a version), which Java reads for all four clients; there is no client code of this one to test

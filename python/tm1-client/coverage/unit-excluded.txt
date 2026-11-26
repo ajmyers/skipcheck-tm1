@@ -27,3 +27,4 @@ GeneratedModelTest: tests Java's generated records, patch builders and Jackson m
 
 ODataCollectionDecoderTest#asksForBuffersOnlyAsItemsAreTaken: counts the Reactor buffers asked for within one body; this client reads a page whole, and test_asks_for_pages_only_as_items_are_taken checks it asks for no page before its items are wanted
 ODataCollectionDecoderTest#streamsALargeCollectionWithoutReadingAheadOfDemand: checks Java decodes one 100,000-item body no further than the items taken; this client reads a page whole before giving its items
+ConformanceScenariosTest#saysWhatEachScenarioNeedsInTermsEveryClientReadsAlike: checks the shared scenario files in spec/conformance/live (every requires an endpoint list the newest snapshot defines, every bound a version), which Java reads for all four clients; there is no client code of this one to test

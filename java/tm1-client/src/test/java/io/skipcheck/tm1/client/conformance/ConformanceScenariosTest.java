@@ -14,6 +14,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -31,6 +32,9 @@ import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.metadata.Endpoints;
+import io.skipcheck.tm1.client.metadata.MetadataSnapshot;
+import io.skipcheck.tm1.client.version.Tm1Version;
 import reactor.core.publisher.Flux;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -414,6 +418,80 @@ class ConformanceScenariosTest {
 		List<String> steps = traffic.exchanges().stream().map(e -> e.get("step").asString()).toList();
 		assertThat(steps.subList(steps.size() - 3, steps.size())).containsExactly("finally[0]", "finally[1]",
 				"finally[2]");
+	}
+
+	@Test
+	void appliesWhatTheServerHasAndIs() {
+		JsonNode scenario = ConformanceCodec.json()
+			.readTree(
+					"{\"requires\":[\"Action Cube/Reserve\"],\"tm1From\":\"11.8.03000\",\"tm1Before\":\"11.8.04000\"}");
+		Set<String> reserve = Set.of("Action Cube/Reserve");
+		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.03500.6"))).isTrue();
+		assertThat(ConformanceScenarios.applies(scenario, Set.of(), Tm1Version.parse("11.8.03500.6")))
+			.as("an endpoint the server lacks")
+			.isFalse();
+		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.02400.7"))).as("too old")
+			.isFalse();
+		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.04000.1")))
+			.as("tm1Before is exclusive")
+			.isFalse();
+		assertThat(ConformanceScenarios.applies(ConformanceCodec.json().readTree("{}"), Set.of(),
+				Tm1Version.parse("11.8.02400.7")))
+			.as("one with neither applies everywhere")
+			.isTrue();
+	}
+
+	@Test
+	void skipsTheStepsThatDontApplyAndSendsNothingForThem() {
+		// cubes.json without its dimension steps, two creates and two finally deletes:
+		// they
+		// send nothing, the rest run
+		JsonNode scenario = ConformanceScenarios.load(ConformanceScenarios.directory().resolve("cubes.json"));
+		Map<String, String> names = ConformanceScenarios.names(scenario);
+		ConformanceScenarios.Traffic traffic = new ConformanceScenarios.Traffic(ConformanceTm1.ROOT);
+		ConformanceScenarios.run(client(traffic, tm1(names, false)), traffic, scenario, names,
+				step -> !"dimensions".equals(step.path("service").asString()));
+		List<String> steps = traffic.exchanges().stream().map(e -> e.get("step").asString()).toList();
+		assertThat(steps).doesNotContain("steps[0]", "steps[1]", "finally[1]", "finally[2]")
+			.contains("steps[2]", "finally[0]");
+	}
+
+	@Test
+	void saysWhatEachScenarioNeedsInTermsEveryClientReadsAlike() {
+		// An endpoint ID no server defines would skip its step everywhere unnoticed, and
+		// a
+		// string where a list belongs is read differently by each client
+		Set<String> known = Endpoints.of(MetadataSnapshot.load());
+		for (Path file : ConformanceScenarios.all()) {
+			JsonNode scenario = ConformanceScenarios.load(file);
+			List<JsonNode> nodes = new ArrayList<>();
+			nodes.add(scenario);
+			scenario.path("steps").forEach(nodes::add);
+			scenario.path("finally").forEach(nodes::add);
+			for (JsonNode node : nodes) {
+				String where = file.getFileName() + " " + node.path("method").asString("");
+				if (node.has("requires")) {
+					assertThat(node.get("requires").isArray()).as(where + ": requires is a list").isTrue();
+					node.get("requires")
+						.forEach(id -> assertThat(known).as(where + ": an endpoint the newest snapshot defines")
+							.contains(id.asString()));
+				}
+				for (String bound : List.of("tm1From", "tm1Before")) {
+					if (node.has(bound)) {
+						assertThat(node.get(bound).isString()).as(where + ": " + bound + " is a version").isTrue();
+						Tm1Version.parse(node.get(bound).asString());
+					}
+				}
+			}
+			// A step that may not run keeps nothing for the steps after it
+			scenario.path("steps").forEach(step -> {
+				if (step.has("requires") || step.has("tm1From") || step.has("tm1Before")) {
+					assertThat(step.has("save") || step.has("keep"))
+						.as(file.getFileName() + " " + step.path("method").asString() + ": saves or keeps")
+						.isFalse();
+				}
+			});
+		}
 	}
 
 }

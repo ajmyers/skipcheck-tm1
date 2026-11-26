@@ -5,7 +5,7 @@
  * for scripts/compare-live-traffic.py. */
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Tm1HttpRequest, Tm1HttpResponse, Tm1Transport } from "../../src/index.js";
+import { Tm1Version, type Tm1HttpRequest, type Tm1HttpResponse, type Tm1Transport } from "../../src/index.js";
 import { Repo } from "../support/repo.js";
 import * as codec from "./codec.js";
 
@@ -30,6 +30,10 @@ export interface Step {
   save?: Record<string, string>;
   /** A name to keep the result by, as read, for a `$fromRead` argument after it. */
   keep?: string;
+  /** What the step needs of the server: endpoints, and product versions (see {@link applies}). */
+  requires?: string[];
+  tm1From?: string;
+  tm1Before?: string;
 }
 
 export interface Scenario {
@@ -38,6 +42,10 @@ export interface Scenario {
   names: string[];
   steps: Step[];
   finally?: Step[];
+  /** What the scenario needs of the server, as a step's. */
+  requires?: string[];
+  tm1From?: string;
+  tm1Before?: string;
 }
 
 export function scenarios(): Scenario[] {
@@ -177,14 +185,31 @@ export function save(step: Step, outcome: Outcome, names: Record<string, string>
   return undefined;
 }
 
+/** Whether a scenario or a step applies to a server, as Java's `ConformanceScenarios.applies`:
+ * every endpoint its `requires` names is in the server's `$metadata`, and the server's product
+ * version is at least its `tm1From` and below its `tm1Before`. */
+export function applies(node: { requires?: string[]; tm1From?: string; tm1Before?: string }, endpoints: ReadonlySet<string>, version: Tm1Version): boolean {
+  if ((node.requires ?? []).some((e) => !endpoints.has(e))) return false;
+  if (node.tm1From !== undefined && version.compareTo(Tm1Version.parse(node.tm1From)) < 0) return false;
+  return node.tm1Before === undefined || version.compareTo(Tm1Version.parse(node.tm1Before)) < 0;
+}
+
 /** Runs the scenario; the steps whose expectation failed. Its `finally` steps always run. What a
  * step saves joins `names`, so the traffic written after it has TM1's made-up values as their
- * placeholders too. */
-export async function run(client: unknown, traffic: Traffic, scenario: Scenario, names: Record<string, string>): Promise<string[]> {
+ * placeholders too. Only the steps `applies` accepts run: one it refuses sends nothing
+ * and isn't checked. */
+export async function run(
+  client: unknown,
+  traffic: Traffic,
+  scenario: Scenario,
+  names: Record<string, string>,
+  applies: (step: Step) => boolean = () => true,
+): Promise<string[]> {
   const failures: string[] = [];
   const kept = new Map<string, unknown>();
   try {
     for (const [i, step] of scenario.steps.entries()) {
+      if (!applies(step)) continue;
       traffic.step = `steps[${i}]`;
       const got = await outcome(client, step, names, kept);
       const why = check(substitute(step.expect ?? {}, names), got) ?? save(step, got, names);
@@ -196,6 +221,7 @@ export async function run(client: unknown, traffic: Traffic, scenario: Scenario,
   } finally {
     for (const [i, step] of (scenario.finally ?? []).entries()) {
       traffic.step = `finally[${i}]`;
+      if (!applies(step)) continue;
       // A step setting back what a step that didn't run would have read has nothing to send
       if (step.args.some((a) => a !== null && typeof a === "object" && !Array.isArray(a) && "$fromRead" in a && !kept.has(a.read))) continue;
       await outcome(client, step, names, kept).catch(() => undefined);

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -23,17 +24,37 @@ from ..conformance import scenarios as live
 from .conftest import _builder, target
 
 
+def _applies(capabilities: Any) -> Callable[[dict[str, Any]], bool]:
+    """What the server has and is: a scenario or a step for one it isn't is skipped."""
+    version = capabilities.product_version
+    return lambda node: live.applies(node, capabilities.endpoints, version)
+
+
+def _skip_unless(scenario: dict[str, Any], applies: Callable[[dict[str, Any]], bool], capabilities: Any) -> None:
+    if not applies(scenario):
+        pytest.skip(
+            f"the scenario needs {scenario.get('requires')} {scenario.get('tm1From')} {scenario.get('tm1Before')}; "
+            f"the server is {capabilities.product_version}, schema {capabilities.schema_version}"
+        )
+
+
 def _sync(traffic: live.Traffic, scenario: dict[str, Any], names: dict[str, str], verify: bool) -> list[str]:
     http = httpx2.Client(verify=verify, event_hooks={"response": [traffic.record]})
     with _builder(Tm1Client.builder()).http_client(http).build() as tm1:
-        return live.run(tm1, traffic, scenario, names)
+        capabilities = tm1.session.capabilities()
+        applies = _applies(capabilities)
+        _skip_unless(scenario, applies, capabilities)
+        return live.run(tm1, traffic, scenario, names, applies)
 
 
 def _async(traffic: live.Traffic, scenario: dict[str, Any], names: dict[str, str], verify: bool) -> list[str]:
     async def go() -> list[str]:
         http = httpx2.AsyncClient(verify=verify, event_hooks={"response": [traffic.arecord]})
         async with _builder(AsyncTm1Client.builder()).http_client(http).build() as tm1:
-            return await live.arun(tm1, traffic, scenario, names)
+            capabilities = await tm1.session.capabilities()
+            applies = _applies(capabilities)
+            _skip_unless(scenario, applies, capabilities)
+            return await live.arun(tm1, traffic, scenario, names, applies)
 
     return asyncio.run(go())
 

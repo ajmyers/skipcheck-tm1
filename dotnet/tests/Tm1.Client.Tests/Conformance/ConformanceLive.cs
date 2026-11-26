@@ -272,10 +272,38 @@ public static class ConformanceLive
         }
     }
 
+    /// <summary>Whether a scenario or a step applies to a server, as Java's
+    /// <c>ConformanceScenarios.applies</c>: every endpoint its <c>requires</c> names is in the
+    /// server's <c>$metadata</c>, and the server's product version is at least its <c>tm1From</c> and
+    /// below its <c>tm1Before</c>.</summary>
+    public static bool Applies(JsonNode node, IReadOnlySet<string> endpoints, Version.Tm1Version version)
+    {
+        if ((node["requires"]?.AsArray() ?? []).Any(e => !endpoints.Contains(e!.GetValue<string>())))
+        {
+            return false;
+        }
+        if (node["tm1From"] is { } from && version.CompareTo(Version.Tm1Version.Parse(from.GetValue<string>())) < 0)
+        {
+            return false;
+        }
+        return node["tm1Before"] is not { } before || version.CompareTo(Version.Tm1Version.Parse(before.GetValue<string>())) < 0;
+    }
+
     /// <summary>Runs the scenario; the steps whose expectation failed. Its <c>finally</c> steps always run.
     /// What a step saves joins <paramref name="names"/>, so the traffic written after it has TM1's made-up
     /// values as their placeholders too.</summary>
-    public static async Task<List<string>> Run(Tm1Client client, Traffic traffic, JsonObject scenario, Dictionary<string, string> names)
+    public static Task<List<string>> Run(Tm1Client client, Traffic traffic, JsonObject scenario, Dictionary<string, string> names) =>
+        Run(client, traffic, scenario, names, _ => true);
+
+    /// <summary>Runs the steps <paramref name="applies"/> accepts: one it refuses sends nothing and
+    /// isn't checked.</summary>
+    public static async Task<List<string>> Run(
+        Tm1Client client,
+        Traffic traffic,
+        JsonObject scenario,
+        Dictionary<string, string> names,
+        Func<JsonNode, bool> applies
+    )
     {
         var failures = new List<string>();
         // What steps keep of their results, as read, for a $fromRead after them
@@ -284,6 +312,10 @@ public static class ConformanceLive
         {
             foreach (var (step, i) in scenario["steps"]!.AsArray().Select((s, i) => (s!, i)))
             {
+                if (!applies(step))
+                {
+                    continue;
+                }
                 traffic.Step = $"steps[{i}]";
                 var outcome = await Outcome(client, step, names, kept);
                 var why = Check(Substitute(step["expect"], names)!.AsObject(), outcome) ?? Save(step, outcome, names);
@@ -300,7 +332,12 @@ public static class ConformanceLive
             {
                 traffic.Step = $"finally[{i}]";
                 // A step setting back what a step that didn't run would have read has nothing to send
-                if (step["args"]!.AsArray().Any(a => a is JsonObject o && o.ContainsKey("$fromRead") && !kept.ContainsKey(o["read"]?.GetValue<string>() ?? "")))
+                if (
+                    !applies(step)
+                    || step["args"]!
+                        .AsArray()
+                        .Any(a => a is JsonObject o && o.ContainsKey("$fromRead") && !kept.ContainsKey(o["read"]?.GetValue<string>() ?? ""))
+                )
                 {
                     continue;
                 }

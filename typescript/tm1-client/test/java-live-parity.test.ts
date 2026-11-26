@@ -41,11 +41,11 @@ export function portFile(javaClass: string): string {
 
 /** A live test file's top-level describes and its tests' titles, read from the source: the calls of
  * `it`, `test` and the files' own `…Test` (`tm1Test`, `cognosTest`). A title's
- * placeholders for a parameter (`%s` and `$name` in an `.each` title, `${name}` in a template)
+ * placeholders for a parameter (`%s` and `$name` in an `.each` or `.for` title, `${name}` in a template)
  * don't count: Java's parameterized test is one method. A `$` in any other title is the title's
  * own (`$metadata`). */
 export function portTests(source: string): { describes: number; titles: string[] } {
-  const title = /\b(?:it|test|[a-z]\w*Test)(?:\.(?!each\b)\w+)*(\.each\([\s\S]*?\))?\(\s*(["'`])((?:\\.|(?!\2)[^\\])*)\2/g;
+  const title = /\b(?:it|test|[a-z]\w*Test)(?:\.(?!(?:each|for)\b)\w+)*(\.(?:each|for)\([\s\S]*?\))?\(\s*(["'`])((?:\\.|(?!\2)[^\\])*)\2/g;
   return {
     describes: [...source.matchAll(/^describe(?:\.\w+)*\(/gm)].length,
     titles: [...source.matchAll(title)].map((m) => {
@@ -161,6 +161,8 @@ describe("Java live test parity", () => {
       const source =
         'describe("x", () => {\n  tm1Test.each(scenarios())("creates a cube: $name", f);\n  tm1Test(\n    "lists cubes",\n    f,\n  );\n  it.each(["a"])("lists cubes: %s", f);\n});\n';
       expect(portTests(source)).toEqual({ describes: 1, titles: ["creates a cube: ", "lists cubes", "lists cubes: "] });
+      // .for, as .each: the context it hands the test is how a test skips itself
+      expect(portTests('describe("x", () => {\n  tm1Test.for(scenarios())("runs the scenario: $name", f);\n});\n').titles).toEqual(["runs the scenario: "]);
     });
 
     it("fails on a missing file, a missing test, a test Java doesn't have, and a second describe", () => {

@@ -16,7 +16,7 @@ from typing import Any
 import httpx2
 import pytest
 
-from skipcheck_tm1 import Tm1Client, Tm1Session, auth
+from skipcheck_tm1 import Tm1Client, Tm1Session, Tm1Version, auth
 from skipcheck_tm1.aio import AsyncTm1Client, AsyncTm1Session
 
 from ..conftest import BASE, FakeTm1
@@ -94,6 +94,45 @@ def test_stops_at_a_step_that_misses_its_expectation_and_still_cleans_up(traffic
     failures = live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names)
     assert len(failures) == 1 and failures[0].startswith("step 0 dimensions.create")
     assert [e["step"] for e in traffic.exchanges][-3:] == ["finally[0]", "finally[1]", "finally[2]"]
+
+
+def test_applies_what_the_server_has_and_is() -> None:
+    scenario = {"requires": ["Action Cube/Reserve"], "tm1From": "11.8.03000", "tm1Before": "11.8.04000"}
+    reserve = {"Action Cube/Reserve"}
+    assert live.applies(scenario, reserve, Tm1Version.parse("11.8.03500.6"))
+    assert not live.applies(scenario, set(), Tm1Version.parse("11.8.03500.6")), "an endpoint the server lacks"
+    assert not live.applies(scenario, reserve, Tm1Version.parse("11.8.02400.7")), "too old"
+    assert not live.applies(scenario, reserve, Tm1Version.parse("11.8.04000.1")), "tm1Before is exclusive"
+    assert live.applies({}, set(), Tm1Version.parse("11.8.02400.7")), "one with neither applies everywhere"
+
+
+def test_skips_the_steps_that_dont_apply_and_sends_nothing_for_them(traffic_dir: Path) -> None:
+    # cubes.json without its dimension steps, two creates and two finally deletes: they send
+    # nothing, the rest run; in both flavors
+    scenario = json.loads((live.SCENARIOS / "cubes.json").read_text(encoding="utf-8"))
+
+    def applies(step: dict[str, Any]) -> bool:
+        return step.get("service") != "dimensions"
+
+    names = live.names_for(scenario)
+    fake = _tm1(names)
+    traffic = live.Traffic(BASE)
+    http = httpx2.Client(transport=httpx2.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
+    live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names, applies)
+
+    names2 = live.names_for(scenario)
+    fake2 = _tm1(names2)
+    traffic2 = live.Traffic(BASE)
+
+    async def go() -> list[str]:
+        http = httpx2.AsyncClient(transport=httpx2.MockTransport(fake2.handler), event_hooks={"response": [traffic2.arecord]})
+        return await live.arun(AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic2, scenario, names2, applies)
+
+    asyncio.run(go())
+    for recorded in (traffic, traffic2):
+        steps = [e["step"] for e in recorded.exchanges]
+        assert not {"steps[0]", "steps[1]", "finally[1]", "finally[2]"} & set(steps), steps
+        assert {"steps[2]", "finally[0]"} <= set(steps), steps
 
 
 def _expected(expect: dict[str, Any]) -> httpx2.Response:

@@ -15,6 +15,8 @@ from typing import Any
 
 import httpx2
 
+from skipcheck_tm1 import Tm1Version
+
 from . import codec
 from .codec import snake
 
@@ -199,14 +201,31 @@ def _invoke(client: Any, step: dict[str, Any], names: dict[str, str], kept: dict
     return lambda: method(**kwargs)
 
 
-def run(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str, str]) -> list[str]:
+def applies(node: dict[str, Any], endpoints: Any, version: Tm1Version) -> bool:
+    """Whether a scenario or a step applies to a server, as Java's ``ConformanceScenarios.applies``:
+    every endpoint its ``requires`` names is in the server's ``$metadata``, and the server's product
+    version is at least its ``tm1From`` and below its ``tm1Before``."""
+    if any(endpoint not in endpoints for endpoint in node.get("requires", [])):
+        return False
+    if "tm1From" in node and version < Tm1Version.parse(node["tm1From"]):
+        return False
+    return "tm1Before" not in node or version < Tm1Version.parse(node["tm1Before"])
+
+
+def _always(step: dict[str, Any]) -> bool:
+    return True
+
+
+def run(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str, str], applies: Callable[[dict[str, Any]], bool] = _always) -> list[str]:
     """Runs the scenario with a sync client; the steps whose expectation failed. Its ``finally`` steps
     always run. What a step saves joins ``names``, so the traffic written after it has TM1's made-up
-    values as their placeholders too."""
+    values as their placeholders too. A step ``applies`` refuses sends nothing and isn't checked."""
     failures = []
     kept: dict[str, Any] = {}
     try:
         for i, step in enumerate(scenario["steps"]):
+            if not applies(step):
+                continue
             traffic.step = f"steps[{i}]"
             outcome = _outcome(_invoke(client, step, names, kept), step, kept)
             why = check(substitute(step["expect"], names), outcome) or save(step, outcome, names)
@@ -216,17 +235,21 @@ def run(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str
     finally:
         for i, step in enumerate(scenario.get("finally", [])):
             traffic.step = f"finally[{i}]"
-            if not _unkept(step, kept):
+            if applies(step) and not _unkept(step, kept):
                 _outcome(_invoke(client, step, names, kept), step, kept)
     return failures
 
 
-async def arun(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str, str]) -> list[str]:
+async def arun(
+    client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str, str], applies: Callable[[dict[str, Any]], bool] = _always
+) -> list[str]:
     """Runs the scenario with an asyncio client; the steps whose expectation failed, as :func:`run`."""
     failures = []
     kept: dict[str, Any] = {}
     try:
         for i, step in enumerate(scenario["steps"]):
+            if not applies(step):
+                continue
             traffic.step = f"steps[{i}]"
             outcome = await _aoutcome(_invoke(client, step, names, kept), step, kept)
             why = check(substitute(step["expect"], names), outcome) or save(step, outcome, names)
@@ -236,6 +259,6 @@ async def arun(client: Any, traffic: Traffic, scenario: dict[str, Any], names: d
     finally:
         for i, step in enumerate(scenario.get("finally", [])):
             traffic.step = f"finally[{i}]"
-            if not _unkept(step, kept):
+            if applies(step) and not _unkept(step, kept):
                 await _aoutcome(_invoke(client, step, names, kept), step, kept)
     return failures
