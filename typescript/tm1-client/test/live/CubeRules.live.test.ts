@@ -109,4 +109,11 @@ describe("Cube rules on TM1" + liveReason, () => {
     const cells = await tm1.cubes.checkFeeders(cube, tuple("Total", "Double"), CheckFeedersSelection.Both, ODataQuery.none().expand("Tuple")).toArray();
     expect(cells.filter((c) => c.Fed === true).map((c) => tupleNames(c.Tuple))).toContainEqual(["North", "Double"]);
   });
+
+  tm1Test("lists unfed cells on every server", async () => {
+    // Unfed is what servers without Selection (before schema 11.8.32) list, so it works on every
+    // server: there it's sent without Selection
+    const cells = await tm1.cubes.checkFeeders(cube, tuple("Total", "Double"), CheckFeedersSelection.Unfed, ODataQuery.none().expand("Tuple")).toArray();
+    expect(cells.every((c) => c.Fed !== true)).toBe(true);
+  });
 });

@@ -150,6 +150,19 @@ class CubeRulesTm1Test {
 		});
 	}
 
+	@Test
+	void listsUnfedCellsOnEveryServer() {
+		// Unfed is what servers without Selection (before schema 11.8.32) list, so it
+		// works on
+		// every server: there it's sent without Selection
+		List<FedCellDescriptor> cells = cubes
+			.checkFeeders(cube, tuple("Total", "Double"), CheckFeedersSelection.UNFED,
+					ODataQuery.none().expand("Tuple"))
+			.collectList()
+			.block(WAIT);
+		assertThat(cells).allSatisfy(c -> assertThat(c.fed()).isFalse());
+	}
+
 	private static String element(String dimension, String element) {
 		return ODataPath.of("Dimensions")
 			.key(dimension)

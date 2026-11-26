@@ -78,5 +78,16 @@ public sealed class CubeRulesLiveTests : IAsyncLifetime
         Assert.Contains(cells, c => c.Tuple!.Select(e => e.Name).SequenceEqual(["North", "Double"]) && c.Fed == true);
     }
 
+    [Tm1Fact]
+    public async Task ListsUnfedCellsOnEveryServer()
+    {
+        // Unfed is what servers without Selection (before schema 11.8.32) list, so it works on every
+        // server: there it's sent without Selection
+        var cells = await Cubes
+            .CheckFeedersAsync(_cube, Tuple("Total", "Double"), CheckFeedersSelection.Unfed, ODataQuery.None().Expand("Tuple"))
+            .ToListAsync();
+        Assert.All(cells, c => Assert.NotEqual(true, c.Fed));
+    }
+
     private Dictionary<string, string> Tuple(string region, string measure) => new() { [Region] = region, [Measure] = measure };
 }

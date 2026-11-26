@@ -83,3 +83,11 @@ def test_checks_feeders_under_a_consolidation(tm1: Tm1Client, ruled: tuple[str, 
     )
     cells = tm1.cubes.check_feeders(name, {region: "Total", measure: "Double"}, CheckFeedersSelection.BOTH, expand="Tuple")
     assert any([e.name for e in c.tuple] == ["North", "Double"] and c.fed for c in cells)
+
+
+def test_lists_unfed_cells_on_every_server(tm1: Tm1Client, ruled: tuple[str, str, str]) -> None:
+    # Unfed is what servers without Selection (before schema 11.8.32) list, so it works on every
+    # server: there it's sent without Selection
+    name, region, measure = ruled
+    cells = tm1.cubes.check_feeders(name, {region: "Total", measure: "Double"}, CheckFeedersSelection.UNFED, expand="Tuple")
+    assert all(not c.fed for c in cells)
