@@ -69,11 +69,13 @@ URLS = ("TM1_BUNDLE_URL", "TM1_URL")
 LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 SUMMARY = "summary.md"
 
+# Each suite's Gradle tasks. TypeScript's testcontainers tests are a task of their own, so a failing
+# client live test doesn't leave them unrun (#437)
 TASKS = {
-    "java": ":tm1-client:liveTest",
-    "python": "liveTestPython",
-    "dotnet": "liveTestDotnet",
-    "typescript": "liveTestTypescript",
+    "java": (":tm1-client:liveTest",),
+    "python": ("liveTestPython",),
+    "dotnet": ("liveTestDotnet",),
+    "typescript": ("liveTestTypescript", "liveTestTypescriptContainers"),
 }
 
 # What a run writes, relative to the root, kept per version
@@ -185,7 +187,7 @@ def command(
     return [
         gradlew,
         "--continue",
-        *[TASKS[s] for s in suites or TASKS],
+        *[task for s in suites or TASKS for task in TASKS[s]],
         "compareLiveTraffic",
     ]
 

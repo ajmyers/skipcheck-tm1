@@ -110,6 +110,7 @@ def test_runs_the_suites_asked_for_then_the_comparison(tmp_path: Path) -> None:
         "liveTestPython",
         "liveTestDotnet",
         "liveTestTypescript",
+        "liveTestTypescriptContainers",
         "compareLiveTraffic",
     ]
     assert versions.command(["python", "java"], tmp_path, windows=True) == [
