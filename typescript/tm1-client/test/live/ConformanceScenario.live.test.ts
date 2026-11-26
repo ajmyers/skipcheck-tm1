@@ -10,13 +10,22 @@ import { Live, liveReason, tm1Test } from "./live.js";
  * scripts/compare-live-traffic.py to compare with the other clients'. The Java client's
  * `ConformanceScenarioTm1Test`. */
 describe("live conformance scenarios on TM1" + liveReason, () => {
-  tm1Test.each(live.scenarios())("runs the scenario: $name", async (scenario) => {
+  tm1Test.for(live.scenarios())("runs the scenario: $name", async (scenario, context) => {
     const names = live.namesFor(scenario);
     const target = await Live.target();
     const traffic = new live.Traffic(fetchTransport(), target.url);
     const tm1 = (await Live.builder()).transport(traffic).build();
     try {
-      const failures = await live.run(tm1, traffic, scenario, names);
+      // What the server has and is: a scenario or a step for one it isn't is skipped
+      const capabilities = await tm1.session.capabilities();
+      const version = capabilities.productVersion!;
+      if (!live.applies(scenario, capabilities.endpoints, version)) {
+        context.skip(
+          `the scenario needs ${JSON.stringify(scenario.requires)} ${scenario.tm1From} ${scenario.tm1Before}; the server is ${version.toString()}, schema ${capabilities.schemaVersion}`,
+        );
+        return;
+      }
+      const failures = await live.run(tm1, traffic, scenario, names, (step) => live.applies(step, capabilities.endpoints, version));
       traffic.write(scenario.name, names);
       expect(failures).toEqual([]);
     } finally {
