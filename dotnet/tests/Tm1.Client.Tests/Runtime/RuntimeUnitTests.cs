@@ -293,6 +293,22 @@ public class ODataQueryTest
     }
 
     [Fact]
+    public void LiftsAnExpandsCustomOptionsAndAliasesToTheTop()
+    {
+        // They mean nothing inside $expand: a nested one goes to the top, after the outer's, and
+        // the outer's wins a name both set
+        var query = ODataQuery
+            .None()
+            .Option("!sandbox", "Outer")
+            .Expand("CurrentBreakpoint", b =>
+                b.Option("!sandbox", "Inner").Option("!x", "1").Alias(new ODataPath.Alias("@p"), "'a'").Expand("Nested", n => n.Option("!y", "2"))
+            );
+        Assert.Equal("$expand=CurrentBreakpoint($expand=Nested)&!sandbox=Outer&!x=1&!y=2&@p='a'", query.ToString());
+        Assert.Equal("1", query.Option("!x"));
+        Assert.Equal("S", ODataQuery.None().Expand("B", b => b.Option("!sandbox", "S")).Option("!sandbox"));
+    }
+
+    [Fact]
     public void NestsExpandOptionsWithSemicolons()
     {
         var query = ODataQuery

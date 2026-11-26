@@ -184,6 +184,22 @@ def test_nests_expand_options_with_semicolons() -> None:
     assert query.to_query_string() == "$select=Name&$expand=Hierarchies($select%3DName;$expand%3DElements($select%3DName;$top%3D1)),Cube"
 
 
+def test_lifts_an_expands_custom_options_and_aliases_to_the_top() -> None:
+    # They mean nothing inside $expand: a nested one goes to the top, after the outer's, and the
+    # outer's wins a name both set
+    query = (
+        ODataQuery.none()
+        .option("!sandbox", "Outer")
+        .expand(
+            "CurrentBreakpoint",
+            lambda b: b.option("!sandbox", "Inner").option("!x", "1").alias(Alias("@p"), "'a'").expand("Nested", lambda n: n.option("!y", "2")),
+        )
+    )
+    assert str(query) == "$expand=CurrentBreakpoint($expand=Nested)&!sandbox=Outer&!x=1&!y=2&@p='a'"
+    assert query.option("!x") == "1"
+    assert ODataQuery.none().expand("B", lambda b: b.option("!sandbox", "S")).option("!sandbox") == "S"
+
+
 def test_applies_nested_options_in_any_order() -> None:
     query = ODataQuery.none().expand("Hierarchies", lambda h: h.top(1).select("Name").order_by("Name"))
     assert str(query) == "$expand=Hierarchies($select=Name;$orderby=Name;$top=1)"

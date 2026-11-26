@@ -111,7 +111,7 @@ public sealed partial class ODataQuery : IEquatable<ODataQuery>
     }
 
     /// <summary>The value of a custom option, or null.</summary>
-    public string? Option(string name) => _custom.FirstOrDefault(c => c.Key == name).Value;
+    public string? Option(string name) => Lifted(q => q._custom).FirstOrDefault(c => c.Key == name).Value;
 
     /// <summary>A parameter alias's value: <c>Fn(p=@p)</c> with <c>?@p=…</c>.</summary>
     public ODataQuery Alias(ODataPath.Alias alias, string literalOrJson) =>
@@ -122,10 +122,29 @@ public sealed partial class ODataQuery : IEquatable<ODataQuery>
     /// <summary>True if this query has no options.</summary>
     public bool IsEmpty() => SystemOptions().Count == 0 && _custom.Count == 0 && _aliases.Count == 0;
 
-    internal IReadOnlyList<KeyValuePair<string, string>> CustomOptions => _custom;
+    internal IReadOnlyList<KeyValuePair<string, string>> CustomOptions => Lifted(q => q._custom);
 
     /// <summary>Every option, unencoded, in order.</summary>
-    public IReadOnlyList<KeyValuePair<string, string>> Parameters() => [.. SystemOptions(), .. _custom, .. _aliases];
+    public IReadOnlyList<KeyValuePair<string, string>> Parameters() => [.. SystemOptions(), .. Lifted(q => q._custom), .. Lifted(q => q._aliases)];
+
+    /// <summary>Custom options or parameter aliases, this query's and its expands', at any depth:
+    /// they only mean something at the top of the URL, so a nested query's go there, after this
+    /// one's, and the first of a name wins (as Java's <c>ODataQuery.lifted</c>).</summary>
+    private List<KeyValuePair<string, string>> Lifted(Func<ODataQuery, IReadOnlyList<KeyValuePair<string, string>>> part)
+    {
+        var out_ = new List<KeyValuePair<string, string>>(part(this));
+        foreach (var (_, nested) in _expand)
+        {
+            foreach (var option in nested.Lifted(part))
+            {
+                if (!out_.Exists(o => o.Key == option.Key))
+                {
+                    out_.Add(option);
+                }
+            }
+        }
+        return out_;
+    }
 
     /// <summary>The encoded query string, without <c>?</c>.</summary>
     public string ToQueryString() => string.Join("&", Parameters().Select(p => p.Key + "=" + ODataEncoding.QueryValue(p.Value)));
