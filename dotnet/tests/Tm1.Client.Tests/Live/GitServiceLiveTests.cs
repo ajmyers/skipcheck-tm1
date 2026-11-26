@@ -56,10 +56,10 @@ public class GitServiceLiveTests
             if (remote.Local)
             {
                 remote.CommitCopyOf(dimension, copy);
-                // From 11.8.035 the first pull after the remote moves plans the commit TM1 had;
-                // before, it plans the new one at once
+                // The first pull after the remote moves: from 11.8.035 the commit TM1 had, then the
+                // new one; before, the new one at once
                 var pull = await tm1.Git.PullAsync("main", none, null, true);
-                if ((await ServerAssumptions.ProductVersionAsync(tm1)).CompareTo(Skipcheck.Tm1.Client.Version.Tm1Version.Parse("11.8.03500")) >= 0)
+                if (await ServerAssumptions.IsAtLeastAsync(tm1, ServerAssumptions.StaleFirstPullFrom))
                 {
                     Assert.Equal("Add a dimension", pull.Commit!.Summary);
                     pull = await tm1.Git.PullAsync("main", none, null, true);

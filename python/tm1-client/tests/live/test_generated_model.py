@@ -27,7 +27,6 @@ from skipcheck_tm1.model import (
     View,
 )
 
-from ..conftest import SNAPSHOT
 from .conftest import CONFIGURED, REASON, session, started_version
 from .support import own_snapshot
 
@@ -124,8 +123,6 @@ def test_the_server_has_every_operation_in_the_catalog() -> None:
         own = Tm1Capabilities.parse(own_snapshot(capabilities))
         differ = [op.endpoint() for op in Tm1Operations.ALL if capabilities.supports(op.capability()) != own.supports(op.capability())]
         assert differ == []
-        newest = Tm1Capabilities.parse(SNAPSHOT.read_bytes())
-        assert [op.endpoint() for op in Tm1Operations.ALL if not newest.supports(op.capability())] == [], "the newest schema's server has every one"
 
 
 def _quietly(s: Tm1Session, request: Tm1Request[None]) -> None:

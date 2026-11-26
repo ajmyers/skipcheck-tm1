@@ -23,9 +23,13 @@ from skipcheck_tm1 import (
 )
 
 from .conftest import CONFIGURED, REASON, _builder, session, started_version, target
-from .support import own_snapshot
+from .support import own_snapshot, schema_version_in
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
+
+
+def _metadata(s: Tm1Session) -> str:
+    return s.execute(Tm1Request.text(ODataPath.metadata()).with_header("Accept", "application/xml"))
 
 
 def test_reads_the_version_and_the_capabilities_the_snapshot_describes() -> None:
@@ -34,9 +38,9 @@ def test_reads_the_version_and_the_capabilities_the_snapshot_describes() -> None
         if version is not None:
             assert s.version() == version
         capabilities = s.capabilities()
-        # The snapshot of the server's own schema: every supported version has one
+        # The schema its $metadata says, read from the text, not by the client
+        assert capabilities.schema_version == schema_version_in(_metadata(s))
         snapshot = own_snapshot(capabilities)
-        assert capabilities.schema_version == Tm1Capabilities.parse(snapshot).schema_version
 
         container = next(e for e in ET.fromstring(snapshot).iter() if e.tag.endswith("}EntityContainer"))
         kinds = {"EntitySet": Tm1Capability.entity_set, "Singleton": Tm1Capability.singleton, "ActionImport": Tm1Capability.unbound_operation}
@@ -55,7 +59,7 @@ def test_refuses_a_request_the_server_doesnt_define() -> None:
             s.execute(missing)
         message = str(refused.value)
         assert "added in schema 99.0" in message
-        assert f"reports schema {s.capabilities().schema_version}" in message
+        assert f"reports schema {schema_version_in(_metadata(s))}" in message
         assert f"product version {s.version()}" in message
 
 

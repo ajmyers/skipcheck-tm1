@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System;
-using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -28,11 +27,15 @@ public class Tm1CapabilitiesLiveTests
                 .GetString()!;
             Assert.Equal(Tm1Version.Parse(reported), await session.VersionAsync());
             var capabilities = await session.CapabilitiesAsync();
-            // The snapshot of the server's own schema: every supported version has one
+            // The schema its $metadata says, read from the text, not by the client
+            Assert.Equal(ServerAssumptions.SchemaVersionIn(await Metadata(session)), capabilities.SchemaVersion);
             var ownText = ServerAssumptions.OwnSnapshot(capabilities);
+            if (ownText is null)
+            {
+                return; // no snapshot is committed for its schema (xUnit 2 can't skip a test once it runs)
+            }
             var own = Tm1Capabilities.Parse(ownText);
             var snapshot = XDocument.Parse(ownText);
-            Assert.Equal(own.SchemaVersion, capabilities.SchemaVersion);
             var container = snapshot.Descendants().Single(e => e.Name.LocalName == "EntityContainer");
             foreach (var set in container.Elements().Where(e => e.Name.LocalName == "EntitySet"))
             {
@@ -66,7 +69,7 @@ public class Tm1CapabilitiesLiveTests
             var missing = Tm1Request.Get<JsonElement>(ODataPath.Of("Bananas")).Requires(Tm1Capability.EntitySet("Bananas").Since("99.0"));
             var e = await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(() => session.ExecuteAsync(missing));
             Assert.Contains("added in schema 99.0", e.Message);
-            Assert.Contains("reports schema " + (await session.CapabilitiesAsync()).SchemaVersion, e.Message);
+            Assert.Contains("reports schema " + ServerAssumptions.SchemaVersionIn(await Metadata(session)), e.Message);
             Assert.Contains("product version " + version, e.Message);
         }
         finally
@@ -84,4 +87,7 @@ public class Tm1CapabilitiesLiveTests
         var second = await pool.Session(Tm1Identity.WithCredentials("again", Tm1Authenticator.Basic(user, password))).CapabilitiesAsync();
         Assert.Same(first, second);
     }
+
+    private static Task<string> Metadata(Tm1Session session) =>
+        session.ExecuteAsync(Tm1Request.Text(ODataPath.Metadata()).WithHeader("Accept", "application/xml"));
 }

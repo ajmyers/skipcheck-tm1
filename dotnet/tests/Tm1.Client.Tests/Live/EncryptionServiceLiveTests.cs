@@ -8,9 +8,12 @@ using Skipcheck.Tm1.Client.Model;
 namespace Skipcheck.Tm1.Client.Tests.Live;
 
 /// <summary>EncryptionService against a real TM1: a port of the Java client's EncryptionServiceTm1Test.
-/// The image has no GSKit command line, so the local key file provider can't make a key, and nothing
-/// here gets encrypted: the test pins how TM1 says so. (Java starts a TM1 of its own for this; nothing
-/// here changes the server, so it shares the one the other live tests use.)</summary>
+/// Before TM1 11.8.040 the image's missing GSKit command line stops the local key file provider from
+/// making a key, so the settings check as invalid and every change is refused: the test pins how TM1
+/// says so. From 11.8.040 the server makes the key itself and the settings check as valid, so
+/// configuring would really convert the server and stop it: the test doesn't try that, whatever the
+/// version, where the settings check as valid. (Java starts a TM1 of its own for this; nothing here
+/// changes the server, so it shares the one the other live tests use.)</summary>
 public class EncryptionServiceLiveTests
 {
     private static readonly LocalKeyFileProviderSettingsPatch Local = LocalKeyFileProviderSettingsPatch.Builder().KeyRef("/tmp/tm1-client.key").Build();
@@ -40,9 +43,12 @@ public class EncryptionServiceLiveTests
     public async Task RefusesChangesWithBareCodeNames()
     {
         await using var tm1 = Live.Client();
-        // From 11.8.040 the server can make the key, so configuring would really convert it and
-        // stop it: not tried there
-        if (!await MakesItsOwnKeyAsync(tm1))
+        // Configuring with settings the server takes would convert it and stop it, so only where
+        // they check as invalid, whatever the version
+        var takesThem =
+            await ServerAssumptions.SupportsAsync(tm1, Tm1Operations.ValidateEncryptionAtRestSettings)
+            && (await tm1.Encryption.ValidateAsync(Local)).IsValid == true;
+        if (!takesThem)
         {
             await Refused(tm1, Tm1Operations.ConfigureEncryptionAtRest, () => tm1.Encryption.ConfigureAsync(Local), "DataModelConversion");
         }
@@ -78,8 +84,6 @@ public class EncryptionServiceLiveTests
         }
     }
 
-    /// <summary>From TM1 11.8.040 the server makes the local key file itself, and the settings
-    /// check as valid; before, the image's missing GSKit command line stops it.</summary>
-    private static async Task<bool> MakesItsOwnKeyAsync(Tm1Client tm1) =>
-        (await ServerAssumptions.ProductVersionAsync(tm1)).CompareTo(Skipcheck.Tm1.Client.Version.Tm1Version.Parse("11.8.04000")) >= 0;
+    /// <summary>Whether the server's settings are expected to check as valid.</summary>
+    private static Task<bool> MakesItsOwnKeyAsync(Tm1Client tm1) => ServerAssumptions.IsAtLeastAsync(tm1, ServerAssumptions.MakesOwnKeyFrom);
 }

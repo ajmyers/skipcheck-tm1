@@ -12,13 +12,15 @@ import {
 } from "../../src/index.js";
 import { Tm1Operations } from "../../src/generated/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
-import { lacks, productVersion } from "./server-assumptions.js";
+import { isAtLeast, lacks, MAKES_OWN_KEY_FROM } from "./server-assumptions.js";
 
 const LOCAL = LocalKeyFileProviderSettingsPatch.builder().keyRef("/tmp/tm1-client.key").build();
 
-/** EncryptionService against a real TM1: the Java client's `EncryptionServiceTm1Test`. The image
- * has no GSKit command line, so the local key file provider can't make a key, and nothing here gets
- * encrypted: the test pins how TM1 says so. As in Java, it starts a TM1 of its own rather than
+/** EncryptionService against a real TM1: the Java client's `EncryptionServiceTm1Test`. Before TM1
+ * 11.8.040 the image's missing GSKit command line stops the local key file provider from making a
+ * key, so the settings check as invalid and every change is refused: the test pins how TM1 says so.
+ * From 11.8.040 the server makes the key itself and the settings check as valid, so configuring
+ * would really convert the server and stop it: the test doesn't try that. As in Java, it starts a TM1 of its own rather than
  * try encryption on the server the other live tests share; with only a server at `TM1_URL` (no TM1
  * source), it uses that one. */
 describe("EncryptionService on TM1" + liveReason, () => {
@@ -57,10 +59,9 @@ describe("EncryptionService on TM1" + liveReason, () => {
     expect((e as Error).message).toContain(code);
   }
 
-  /** From TM1 11.8.040 the server makes the local key file itself, and the settings check as valid;
-   * before, the image's missing GSKit command line stops it. */
+  /** Whether the server's settings are expected to check as valid. */
   async function makesItsOwnKey(): Promise<boolean> {
-    return (await productVersion(tm1)).isAtLeast("11.8.04000");
+    return isAtLeast(tm1, MAKES_OWN_KEY_FROM);
   }
 
   tm1Test("validates settings without changing anything", async (context) => {
@@ -78,9 +79,10 @@ describe("EncryptionService on TM1" + liveReason, () => {
   });
 
   tm1Test("refuses changes with bare code names", async () => {
-    // From 11.8.040 the server can make the key, so configuring would really convert it and stop it:
-    // not tried there
-    if (!(await makesItsOwnKey())) await refused(Tm1Operations.ConfigureEncryptionAtRest, () => tm1.encryption.configure(LOCAL), "DataModelConversion");
+    // Configuring with settings the server takes would convert it and stop it, so only where they
+    // check as invalid, whatever the version
+    const takesThem = !(await lacks(tm1, Tm1Operations.ValidateEncryptionAtRestSettings)) && (await tm1.encryption.validate(LOCAL)).IsValid === true;
+    if (!takesThem) await refused(Tm1Operations.ConfigureEncryptionAtRest, () => tm1.encryption.configure(LOCAL), "DataModelConversion");
     await refused(Tm1Operations.DisableEncryptionAtRest, () => tm1.encryption.disable(), "DataModelConversion");
     await refused(Tm1Operations.RotateDataEncryptionKey, () => tm1.encryption.rotateDataEncryptionKey(), "DataEncryptionKeyRotationFailed");
     await refused(Tm1Operations.RotateDataModelKey, () => tm1.encryption.rotateDataModelKey(), "RotateDataModelKey");

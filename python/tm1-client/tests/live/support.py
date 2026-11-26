@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -28,11 +29,21 @@ from skipcheck_tm1.model import (
     SubsetCreate,
 )
 
-# Dimensions made through the raw session, for tests that aren't about the dimension services
 from ..conftest import REPO
 
 # ---- what the server has: as Java's ServerAssumptions, so a test of what an older server doesn't
 # define is skipped there, not failed. The server's own $metadata decides, as the client decides.
+
+STALE_FIRST_PULL_FROM = Tm1Version.parse("11.8.03500")
+"""From this TM1 the first Git pull after the remote moves plans the commit TM1 had, and the next the
+new one; before, the first plans the new one. Tried at 11.8.032 (the new) and 11.8.035 (the stale): a
+build between falls on the older side unverified, so a failure there is this bound to move."""
+
+MAKES_OWN_KEY_FROM = Tm1Version.parse("11.8.04000")
+"""From this TM1 the server makes a local key file itself, so the image's settings check as valid.
+Tried at 11.8.035 (invalid) and 11.8.040 (valid); a build between falls on the older side unverified."""
+
+_SCHEMA_VERSION = re.compile(r'Term="Core\.SchemaVersion">\s*<String>([^<]+)</String>')
 
 
 def _describe(capabilities: Tm1Capabilities) -> str:
@@ -60,11 +71,30 @@ def product_version(tm1: Tm1Client) -> Tm1Version:
     return version
 
 
+def is_at_least(tm1: Tm1Client, version: Tm1Version) -> bool:
+    """Whether the server's product version is at least the version."""
+    return product_version(tm1) >= version
+
+
 def own_snapshot(capabilities: Tm1Capabilities) -> bytes:
-    """The committed snapshot of the server's own schema version: every supported version has one."""
+    """The committed snapshot of the server's own schema version. Every supported version has one; a
+    server of a schema without one (a release between those committed, or a newer TM1) skips the rest
+    of the test, as Java's MetadataDriftTm1Test passes it by."""
     path = REPO / "java" / "tm1-client" / "src" / "model" / "metadata" / f"tm1-schema-{capabilities.schema_version}.xml"
-    assert path.exists(), f"No metadata snapshot for schema {capabilities.schema_version}"
+    if not path.exists():
+        pytest.skip(f"No metadata snapshot is committed for schema {capabilities.schema_version}")
     return path.read_bytes()
+
+
+def schema_version_in(metadata: str) -> str:
+    """The schema version a $metadata document's Core.SchemaVersion annotation gives, read from its
+    text rather than by the client's parser."""
+    found = _SCHEMA_VERSION.search(metadata)
+    assert found, "$metadata has no Core.SchemaVersion annotation"
+    return found.group(1).strip()
+
+
+# Dimensions made through the raw session, for tests that aren't about the dimension services
 
 
 def dim(name: str) -> ODataPath:

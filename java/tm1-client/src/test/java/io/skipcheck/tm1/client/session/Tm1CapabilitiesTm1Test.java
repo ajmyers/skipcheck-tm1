@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 
 import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Request;
@@ -35,9 +36,9 @@ class Tm1CapabilitiesTm1Test {
 		try {
 			assertThat(session.version().block(WAIT)).isEqualTo(server.getTm1Version());
 			Tm1Capabilities capabilities = session.capabilities().block(WAIT);
-			// The snapshot of the server's own schema: every supported version has one
+			// The schema its $metadata says, read from the text, not by the client
+			assertThat(capabilities.schemaVersion()).hasValue(ServerAssumptions.schemaVersionIn(metadata(session)));
 			CsdlDocument snapshot = ServerAssumptions.ownSnapshot(capabilities);
-			assertThat(capabilities.schemaVersion()).isEqualTo(snapshot.schemaVersion());
 
 			CsdlEntityContainer container = snapshot.entityContainer().orElseThrow();
 			container.entitySets()
@@ -65,7 +66,7 @@ class Tm1CapabilitiesTm1Test {
 		try {
 			Tm1Request<JsonNode> missing = Tm1Request.get(ODataPath.of("Bananas"), ODataQuery.none(), JsonNode.class)
 				.requires(Tm1Capability.entitySet("Bananas").since("99.0"));
-			String schema = session.capabilities().block(WAIT).schemaVersion().orElseThrow();
+			String schema = ServerAssumptions.schemaVersionIn(metadata(session));
 			Object outcome = session.execute(missing).map(n -> (Object) n).onErrorResume(e -> Mono.just(e)).block(WAIT);
 			assertThat(outcome).isInstanceOfSatisfying(Tm1UnsupportedOperationException.class,
 					e -> assertThat(e.getMessage()).contains("added in schema 99.0")
@@ -94,6 +95,11 @@ class Tm1CapabilitiesTm1Test {
 		finally {
 			pool.close().block(WAIT);
 		}
+	}
+
+	private static String metadata(Tm1Session session) {
+		return session.execute(Tm1Request.text(ODataPath.metadata()).withHeader(HttpHeaders.ACCEPT, "application/xml"))
+			.block(WAIT);
 	}
 
 	private static Tm1Session session(Tm1ServerContainer server) {

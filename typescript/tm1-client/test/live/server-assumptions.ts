@@ -2,12 +2,23 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Tm1Capabilities, Tm1Client, Tm1Operation, Tm1Version } from "../../src/index.js";
+import { type Tm1Capabilities, type Tm1Client, type Tm1Operation, Tm1Version } from "../../src/index.js";
 import { Repo } from "../support/repo.js";
 
 /** What a live test needs of the server it runs against, as Java's `ServerAssumptions`, so the suite
  * runs against every supported TM1: a test of what an older server doesn't define is skipped there
  * (`context.skip(why)`), not failed. The server's own `$metadata` decides, as the client decides. */
+
+/** From this TM1 the first Git pull after the remote moves plans the commit TM1 had, and the next
+ * the new one; before, the first plans the new one. Tried at 11.8.032 (the new) and 11.8.035 (the
+ * stale): a build between falls on the older side unverified, so a failure there is this bound to
+ * move. */
+export const STALE_FIRST_PULL_FROM = Tm1Version.parse("11.8.03500");
+
+/** From this TM1 the server makes a local key file itself, so the image's settings check as valid.
+ * Tried at 11.8.035 (invalid) and 11.8.040 (valid); a build between falls on the older side
+ * unverified. */
+export const MAKES_OWN_KEY_FROM = Tm1Version.parse("11.8.04000");
 
 function described(capabilities: Tm1Capabilities): string {
   return `the server (schema ${capabilities.schemaVersion}, product version ${capabilities.productVersion?.toString()})`;
@@ -32,9 +43,23 @@ export async function productVersion(tm1: Tm1Client): Promise<Tm1Version> {
   return (await tm1.session.capabilities()).productVersion!;
 }
 
-/** The committed snapshot of the server's own schema version: every supported version has one. */
-export function ownSnapshot(capabilities: Tm1Capabilities): string {
+/** Whether the server's product version is at least the version. */
+export async function isAtLeast(tm1: Tm1Client, version: Tm1Version): Promise<boolean> {
+  return (await productVersion(tm1)).isAtLeast(version);
+}
+
+/** The committed snapshot of the server's own schema version, or undefined. Every supported version
+ * has one; a server of a schema without one (a release between those committed, or a newer TM1)
+ * skips the rest of the test (`context.skip`), as Java's `MetadataDriftTm1Test` passes it by. */
+export function ownSnapshot(capabilities: Tm1Capabilities): string | undefined {
   const path = join(Repo.root, "java", "tm1-client", "src", "model", "metadata", `tm1-schema-${capabilities.schemaVersion}.xml`);
-  if (!existsSync(path)) throw new Error("No metadata snapshot for schema " + capabilities.schemaVersion);
-  return readFileSync(path, "utf8");
+  return existsSync(path) ? readFileSync(path, "utf8") : undefined;
+}
+
+/** The schema version a `$metadata` document's `Core.SchemaVersion` annotation gives, read from its
+ * text rather than by the client's parser. */
+export function schemaVersionIn(metadata: string): string {
+  const found = /Term="Core\.SchemaVersion">\s*<String>([^<]+)<\/String>/.exec(metadata);
+  if (!found) throw new Error("$metadata has no Core.SchemaVersion annotation");
+  return found[1]!.trim();
 }

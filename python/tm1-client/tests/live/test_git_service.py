@@ -18,12 +18,12 @@ from typing import Any
 
 import pytest
 
-from skipcheck_tm1 import Tm1BadRequestError, Tm1Client, Tm1Error, Tm1NotFoundError, Tm1Version
+from skipcheck_tm1 import Tm1BadRequestError, Tm1Client, Tm1Error, Tm1NotFoundError
 from skipcheck_tm1._sync.services.git import GitCommitDetails, GitCredentials
 from skipcheck_tm1.model import DimensionCreate, ElementCreate, GitPushPlan, HierarchyCreate
 
 from .conftest import _RUNNING, CONFIGURED, REASON
-from .support import product_version
+from .support import STALE_FIRST_PULL_FROM, is_at_least
 
 GIVEN = (os.environ.get("TM1_GIT_URL") or "").strip() or None
 
@@ -163,11 +163,11 @@ def test_pushes_the_model_and_pulls_it_back(tm1: Tm1Client, remote: GitDaemon) -
 
         if remote.local:
             remote.commit_copy_of(dimension, copy)
-            # From 11.8.035 the first pull after the remote moves plans the commit TM1 had; before, it
-            # plans the new one at once
+            # The first pull after the remote moves: from 11.8.035 the commit TM1 had, then the new
+            # one; before, the new one at once
             pull = tm1.git.pull("main", none, None, True)
-            if product_version(tm1) >= Tm1Version.parse("11.8.03500"):
-                assert pull.commit.summary == "Add a dimension", "the first pull after the remote moves plans the commit TM1 had"
+            if is_at_least(tm1, STALE_FIRST_PULL_FROM):
+                assert pull.commit.summary == "Add a dimension", "the commit TM1 had"
                 pull = tm1.git.pull("main", none, None, True)
             assert pull.commit.summary == f"Copy {dimension}"
             assert f"Create Dimensions('{copy}')" in (pull.operations or [])

@@ -21,16 +21,18 @@ import io.skipcheck.tm1.client.model.EncryptionAtRestValidationReport;
 import io.skipcheck.tm1.client.model.EncryptionFileType;
 import io.skipcheck.tm1.client.model.LocalKeyFileProviderSettingsPatch;
 import io.skipcheck.tm1.client.model.Tm1Operations;
-import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import io.skipcheck.tm1.testcontainers.Tm1Source;
 import reactor.core.publisher.Mono;
 
 /**
- * EncryptionService, on a TM1 of its own, since encryption changes the server. The image
- * has no GSKit command line, so the local key file provider can't make a key, and nothing
- * here gets encrypted: the test pins how TM1 says so.
+ * EncryptionService, on a TM1 of its own, since encryption changes the server. Before TM1
+ * 11.8.040 the image's missing GSKit command line stops the local key file provider from
+ * making a key, so the settings check as invalid and every change is refused: the test
+ * pins how TM1 says so. From 11.8.040 the server makes the key itself, the settings check
+ * as valid, and configuring would really convert the server and stop it, so the test
+ * doesn't try that.
  */
 @RequiresTm1
 class EncryptionServiceTm1Test {
@@ -80,10 +82,12 @@ class EncryptionServiceTm1Test {
 
 	@Test
 	void refusesChangesWithBareCodeNames() {
-		// From 11.8.040 the server can make the key, so configuring would really convert
-		// it
-		// and stop it: not tried there
-		if (!makesItsOwnKey()) {
+		// Configuring with settings the server takes would convert it and stop it, so
+		// only where they check as invalid, whatever the version
+		boolean takesThem = ServerAssumptions.capabilities(tm1)
+			.supports(Tm1Operations.VALIDATE_ENCRYPTION_AT_REST_SETTINGS.capability())
+				&& tm1.encryption().validate(LOCAL).block(WAIT).isValid();
+		if (!takesThem) {
 			refuses(Tm1Operations.CONFIGURE_ENCRYPTION_AT_REST, () -> tm1.encryption().configure(LOCAL),
 					"DataModelConversion");
 		}
@@ -116,13 +120,9 @@ class EncryptionServiceTm1Test {
 		}
 	}
 
-	/**
-	 * Whether the server makes the local key file itself: from TM1 11.8.040 it does, and
-	 * the settings check as valid. Before, the image's missing GSKit command line stops
-	 * it.
-	 */
+	/** Whether the server's settings are expected to check as valid. */
 	private static boolean makesItsOwnKey() {
-		return ServerAssumptions.productVersion(tm1).isAtLeast(Tm1Version.parse("11.8.04000"));
+		return ServerAssumptions.isAtLeast(tm1, ServerAssumptions.MAKES_OWN_KEY_FROM);
 	}
 
 }
