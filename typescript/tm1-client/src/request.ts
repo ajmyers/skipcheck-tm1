@@ -194,12 +194,14 @@ export class Tm1Request<T> {
   requires(needed: Tm1Capability | Tm1Operation): Tm1Request<T> {
     if (!needed) throw new TypeError("capability is required");
     if (needed instanceof Tm1Operation) return this.copy({ requirement: needed.capability(), operation: needed });
-    return this.copy({ requirement: needed });
+    // A capability replaces an operation set before, whose parameters are then no longer checked
+    return this.copy({ requirement: needed, operation: undefined });
   }
 
   /** A copy that says what the server assumes when `parameter` is left out: on a server whose
    * {@link requires} operation lacks the parameter, a body that sends `value` for it is sent
-   * without it, rather than refused, since that asks for the same thing. */
+   * without it, rather than refused, since that asks for the same thing. A session told not to check
+   * capabilities checks nothing, and leaves nothing out. */
   withParameterDefault(parameter: string, value: unknown): Tm1Request<T> {
     if (typeof parameter !== "string" || value === undefined || value === null) throw new TypeError("a parameter default is a name and a value");
     return this.copy({ parameterDefaults: { ...this.parameterDefaultsValue, [parameter]: value } });

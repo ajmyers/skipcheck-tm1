@@ -25,6 +25,7 @@ from it (``tm1_pygen.unasync``).
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import os
 import ssl
@@ -42,6 +43,7 @@ from .._compat import AsyncIO as runtime
 from .._compat import Expired
 from .._views import CAPABILITIES, Queue, as_call, capability_of, poll_interval, settle
 from ..auth import Authenticator, basic
+from ..base import to_odata
 from ..errors import (
     ODataError,
     Tm1ApiError,
@@ -644,15 +646,18 @@ class AsyncTm1Session:
         sent = dict(body)
         for parameter in operation.parameters:
             name = parameter.name
-            key = name if name in sent else f"{name}@odata.bind" if f"{name}@odata.bind" in sent else None
-            if key is None or capabilities.supports_parameter(needed, name):
+            if (name not in sent and f"{name}@odata.bind" not in sent) or capabilities.supports_parameter(needed, name):
                 continue
-            if name in call.parameter_defaults and call.parameter_defaults[name] == sent[key]:
-                del sent[key]
-                continue
-            missing = capabilities.check_parameter(needed, name, self._connection.base_url)
-            assert missing is not None
-            raise missing
+            # Compared as written JSON, as the other clients compare them
+            if (
+                f"{name}@odata.bind" in sent
+                or name not in call.parameter_defaults
+                or json.dumps(to_odata(call.parameter_defaults[name]), sort_keys=True) != json.dumps(sent[name], sort_keys=True)
+            ):
+                missing = capabilities.check_parameter(needed, name, self._connection.base_url)
+                assert missing is not None
+                raise missing
+            del sent[name]
         return call if len(sent) == len(body) else replace(call, json_body=sent)
 
     async def execute(self, request: Tm1Request[Any] | p.Call) -> Any:

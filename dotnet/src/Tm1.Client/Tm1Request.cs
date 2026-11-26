@@ -158,7 +158,14 @@ public sealed record Tm1Request<T>
         timeout <= TimeSpan.Zero ? throw new ArgumentException("timeout must be positive: " + timeout) : this with { Timeout = timeout };
 
     /// <summary>The request, checked against the server's <c>$metadata</c> before it's sent.</summary>
-    public Tm1Request<T> Requires(Tm1Capability capability) => this with { Requirement = capability ?? throw new ArgumentNullException(nameof(capability)) };
+    /// <remarks>It replaces an operation set with <see cref="Requires(Tm1Operation)"/> before, whose
+    /// parameters are then no longer checked.</remarks>
+    public Tm1Request<T> Requires(Tm1Capability capability) =>
+        this with
+        {
+            Requirement = capability ?? throw new ArgumentNullException(nameof(capability)),
+            Operation = null,
+        };
 
     /// <summary>The request, sent only if the server has <paramref name="operation"/>, as
     /// <c>Requires(operation.Capability())</c>, and only with parameters the server's definition of it
@@ -177,7 +184,8 @@ public sealed record Tm1Request<T>
     /// <summary>A copy that says what the server assumes when <paramref name="parameter"/> is left out:
     /// on a server whose <see cref="Requires(Tm1Operation)"/> operation lacks the parameter, a body that
     /// sends <paramref name="value"/> for it is sent without it, rather than refused, since that asks for
-    /// the same thing.</summary>
+    /// the same thing. A session told not to check capabilities checks nothing, and leaves nothing
+    /// out.</summary>
     public Tm1Request<T> WithParameterDefault(string parameter, object value)
     {
         ArgumentNullException.ThrowIfNull(parameter);

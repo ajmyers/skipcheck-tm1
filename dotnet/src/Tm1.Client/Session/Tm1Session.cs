@@ -276,62 +276,48 @@ public sealed class Tm1Session : IAsyncDisposable
     private async Task<Tm1Request<T>> PrepareAsync<T>(Tm1Request<T> request, CancellationToken ct)
     {
         var capabilities = await CheckAsync(request.Requirement, ct).ConfigureAwait(false);
-        if (
-            capabilities is null
-            || request.Operation is not { Kind: Tm1Operation.OperationKind.Action } operation
-            || request.Body is not IDictionary<string, object?> body
-        )
+        if (capabilities is null || request.Operation is not { Kind: Tm1Operation.OperationKind.Action } operation || request.Body is null or byte[])
         {
             return request;
         }
-        var sent = new Dictionary<string, object?>(body);
-        CheckParameters(
-            capabilities,
-            request.Requirement!,
-            operation,
-            request.ParameterDefaults,
-            sent.ContainsKey,
-            k => JsonSerializer.SerializeToNode(sent[k], Tm1Json.Options),
-            k => sent.Remove(k),
-            _connection.Root
-        );
-        return sent.Count == body.Count ? request : request.WithBody(sent);
+        // The body as it's written, whatever it was built as: a dictionary, a model, an anonymous object
+        if (JsonSerializer.SerializeToNode(request.Body, request.Body.GetType(), Tm1Json.Options) is not System.Text.Json.Nodes.JsonObject sent)
+        {
+            return request;
+        }
+        var before = sent.Count;
+        CheckParameters(capabilities, request.Requirement!, operation, request.ParameterDefaults, sent, _connection.Root);
+        return sent.Count == before ? request : request.WithBody(sent);
     }
 
     /// <summary>Checks each of the operation's parameters the body sends against the server's
-    /// definition, leaving out (with <paramref name="remove"/>) one the server lacks whose default is
+    /// definition, leaving out of <paramref name="body"/> one the server lacks whose default is
     /// what the body sends, and failing on any other the server lacks.</summary>
     internal static void CheckParameters(
         Tm1Capabilities capabilities,
         Tm1Capability needed,
         Tm1Operation operation,
         IReadOnlyDictionary<string, object> defaults,
-        Func<string, bool> has,
-        Func<string, System.Text.Json.Nodes.JsonNode?> valueOf,
-        Action<string> remove,
+        System.Text.Json.Nodes.JsonObject body,
         string server
     )
     {
         foreach (var parameter in operation.Parameters)
         {
             var name = parameter.Name;
-            var key =
-                has(name) ? name
-                : has(name + "@odata.bind") ? name + "@odata.bind"
-                : null;
-            if (key is null || capabilities.SupportsParameter(needed, name))
+            if ((!body.ContainsKey(name) && !body.ContainsKey(name + "@odata.bind")) || capabilities.SupportsParameter(needed, name))
             {
                 continue;
             }
             if (
-                defaults.TryGetValue(name, out var leftOut)
-                && System.Text.Json.Nodes.JsonNode.DeepEquals(JsonSerializer.SerializeToNode(leftOut, leftOut.GetType(), Tm1Json.Options), valueOf(key))
+                body.ContainsKey(name + "@odata.bind")
+                || !defaults.TryGetValue(name, out var leftOut)
+                || !System.Text.Json.Nodes.JsonNode.DeepEquals(JsonSerializer.SerializeToNode(leftOut, leftOut.GetType(), Tm1Json.Options), body[name])
             )
             {
-                remove(key);
-                continue;
+                throw capabilities.CheckParameter(needed, name, server)!; // not null: the server lacks it
             }
-            throw capabilities.CheckParameter(needed, name, server)!; // not null: the server lacks it
+            body.Remove(name);
         }
     }
 
@@ -766,7 +752,7 @@ internal sealed class BatchQueue
         }
         var body = System.Text.Json.Nodes.JsonNode.Parse(json.GetRawText())!.AsObject();
         var before = body.Count;
-        Tm1Session.CheckParameters(capabilities, e.Requirement!, operation, e.Defaults, body.ContainsKey, k => body[k], k => body.Remove(k), server);
+        Tm1Session.CheckParameters(capabilities, e.Requirement!, operation, e.Defaults, body, server);
         return body.Count == before ? e : e with { Body = JsonSerializer.SerializeToElement(body) };
     }
 

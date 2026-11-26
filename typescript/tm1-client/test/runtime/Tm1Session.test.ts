@@ -13,6 +13,7 @@ import {
   Tm1AuthenticationException,
   Tm1Authenticator,
   Tm1BadRequestException,
+  Tm1Capabilities,
   Tm1Capability,
   Tm1ForbiddenException,
   Tm1NotFoundException,
@@ -28,7 +29,8 @@ import {
   Tm1Version,
   type Tm1Exception,
 } from "../../src/index.js";
-import { Tm1Operations } from "../../src/generated/index.js";
+import { CheckFeedersSelection, Tm1Operations } from "../../src/generated/index.js";
+import { CubeService } from "../../src/services/cube/CubeService.js";
 import { asyncResult } from "../../src/session/connection.js";
 import { Repo } from "../support/repo.js";
 import { eventually, Pending, ScriptedTm1, seeded, settle } from "../support/scripted-tm1.js";
@@ -1073,6 +1075,37 @@ describe("Tm1Session capabilities", () => {
     })
       .requires(Tm1Operations.CubeCheckFeeders)
       .withParameterDefault("Selection", "Unfed");
+
+  it("knows the parameters a caller passes for each kind of operation", () => {
+    const c = Tm1Capabilities.parse(SNAPSHOT);
+    const checkFeeders = Tm1Operations.CubeCheckFeeders.capability();
+    expect(c.supportsParameter(checkFeeders, "Selection")).toBe(true);
+    expect(c.supportsParameter(checkFeeders, "Cube"), "the binding parameter isn't one a caller passes").toBe(false);
+    // The import Update and the actions Cellset/Update and Cube/Update share a name: only the
+    // import's own parameters count
+    expect(c.supportsParameter(Tm1Capability.unboundOperation("Update"), "Cells")).toBe(true);
+    expect(c.supportsParameter(Tm1Capability.unboundOperation("Update"), "BeginOrdinal")).toBe(false);
+  });
+
+  it("checks feeders with Unfed on a server without Selection and refuses the rest", async () => {
+    const tm1 = withoutSelection(scripted()).on(CHECK_FEEDERS, () => ScriptedTm1.json(200, '{"value":[]}'));
+    const cubes = new CubeService(tm1.session());
+    await cubes.checkFeeders("Sales", { Region: "Total" }, CheckFeedersSelection.Unfed).toArray();
+    const sent = tm1.requests(CHECK_FEEDERS)[0]!.text;
+    expect(sent).toContain("Tuple@odata.bind");
+    expect(sent).not.toContain("Selection");
+    expect(await failure(cubes.checkFeeders("Sales", { Region: "Total" }, CheckFeedersSelection.Both).toArray())).toBeInstanceOf(
+      Tm1UnsupportedOperationException,
+    );
+    expect(tm1.requests(CHECK_FEEDERS)).toHaveLength(1);
+  });
+
+  it("checks no parameters once a requirement replaces the operation", async () => {
+    const tm1 = withoutSelection(scripted()).on(CHECK_FEEDERS, () => ScriptedTm1.json(400, '{"error":{"code":"278","message":"Invalid parameter"}}'));
+    const request = checkFeeders("Both").requires(Tm1Capability.boundOperation("tm1.Cube", "tm1.CheckFeeders"));
+    expect(request.operation()).toBeUndefined();
+    expect(await failure(tm1.session().stream(request).toArray())).toBeInstanceOf(Tm1BadRequestException);
+  });
 
   it("sends every parameter the server defines", async () => {
     const tm1 = scripted().on(CHECK_FEEDERS, () => ScriptedTm1.json(200, '{"value":[]}'));

@@ -29,6 +29,7 @@ from skipcheck_tm1 import (
     Tm1ApiError,
     Tm1AuthenticationError,
     Tm1BadRequestError,
+    Tm1Capabilities,
     Tm1Capability,
     Tm1ErrorKind,
     Tm1ForbiddenError,
@@ -43,6 +44,7 @@ from skipcheck_tm1 import (
     Tm1Version,
     auth,
 )
+from skipcheck_tm1._generated.model import CheckFeedersSelection
 from skipcheck_tm1._generated.operations import Tm1Operations
 from skipcheck_tm1._protocol import Call, async_result
 from skipcheck_tm1.aio import cognos as aio_cognos
@@ -926,6 +928,36 @@ def test_leaves_out_a_parameter_in_a_batch_too(rt: Runtime) -> None:
         both.result()
     (sent,) = requests_to(rt, "POST $batch")
     assert "tm1.CheckFeeders" in sent.content.decode() and "Selection" not in sent.content.decode()
+
+
+def test_knows_the_parameters_a_caller_passes_for_each_kind_of_operation() -> None:
+    c = Tm1Capabilities.parse(SNAPSHOT.read_bytes())
+    check_feeders = Tm1Operations.CUBE_CHECK_FEEDERS.capability()
+    assert c.supports_parameter(check_feeders, "Selection")
+    assert not c.supports_parameter(check_feeders, "Cube"), "the binding parameter isn't one a caller passes"
+    # The import Update and the actions Cellset/Update and Cube/Update share a name: only the
+    # import's own parameters count
+    assert c.supports_parameter(Tm1Capability.unbound_operation("Update"), "Cells")
+    assert not c.supports_parameter(Tm1Capability.unbound_operation("Update"), "BeginOrdinal")
+
+
+def test_checks_feeders_with_unfed_on_a_server_without_selection_and_refuses_the_rest(rt: Runtime) -> None:
+    _without_selection(rt)
+    rt.fake.respond = lambda r: {"value": []}
+    cubes = rt.Client(rt.session()).cubes
+    rt.run(cubes.check_feeders("Sales", {"Region": "Total"}, CheckFeedersSelection.UNFED))
+    (sent,) = requests_to(rt, CHECK_FEEDERS)
+    assert "Tuple@odata.bind" in sent.content.decode() and "Selection" not in sent.content.decode()
+    rt.raises(Tm1UnsupportedOperationError, lambda: cubes.check_feeders("Sales", {"Region": "Total"}, CheckFeedersSelection.BOTH))
+    assert len(requests_to(rt, CHECK_FEEDERS)) == 1
+
+
+def test_checks_no_parameters_once_a_requirement_replaces_the_operation(rt: Runtime) -> None:
+    _without_selection(rt)
+    rt.fake.respond = lambda r: json_response(400, {"error": {"code": "278", "message": "Invalid parameter"}})
+    request = _check_feeders("Both").requires(Tm1Capability.bound_operation("tm1.Cube", "tm1.CheckFeeders"))
+    assert request.operation is None
+    rt.raises(Tm1BadRequestError, lambda: rt.session().collect(request))
 
 
 def test_fails_only_the_calls_that_need_them_in_a_batch_when_the_capabilities_cant_be_read(rt: Runtime) -> None:

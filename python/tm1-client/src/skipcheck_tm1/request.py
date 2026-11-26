@@ -167,7 +167,7 @@ class Tm1Request(Generic[T]):
             raise ValueError(f"timeout must be positive: {seconds}")
         return replace(self, timeout=float(seconds))
 
-    def requires(self, needed: Tm1Capability | Tm1Operation) -> Tm1Request[T]:
+    def requires(self, capability: Tm1Capability | Tm1Operation) -> Tm1Request[T]:
         """The request, checked against the server's ``$metadata`` before it's sent: an
         :class:`~skipcheck_tm1.errors.Tm1UnsupportedOperationError` instead if it lacks it.
 
@@ -178,14 +178,16 @@ class Tm1Request(Generic[T]):
         :meth:`with_parameter_default` says what leaving it out means and the body sends just that,
         in which case it's left out. Only an action's body is checked; a function's parameters are
         in its path."""
-        if isinstance(needed, Tm1Operation):
-            return replace(self, capability=needed.capability(), operation=needed)
-        return replace(self, capability=needed)
+        if isinstance(capability, Tm1Operation):
+            return replace(self, capability=capability.capability(), operation=capability)
+        # A capability replaces an operation set before, whose parameters are then no longer checked
+        return replace(self, capability=capability, operation=None)
 
     def with_parameter_default(self, parameter: str, value: Any) -> Tm1Request[T]:
         """A copy that says what the server assumes when ``parameter`` is left out: on a server
         whose :meth:`requires` operation lacks the parameter, a body that sends ``value`` for it
-        is sent without it, rather than refused, since that asks for the same thing."""
+        is sent without it, rather than refused, since that asks for the same thing. A session told not
+        to check capabilities checks nothing, and leaves nothing out."""
         if parameter is None or value is None:
             raise ValueError("parameter and value")
         return replace(self, parameter_defaults={**self.parameter_defaults, parameter: value})

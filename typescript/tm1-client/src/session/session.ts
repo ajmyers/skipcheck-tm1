@@ -246,9 +246,13 @@ export class Tm1Session implements AsyncDisposable {
   private async prepare<T>(request: Tm1Request<T>, options: Tm1CallOptions | undefined): Promise<Tm1Request<T>> {
     const capabilities = await this.check(request.requirement(), options);
     const operation = request.operation();
-    if (!capabilities || operation?.kind !== "Action" || !isPlainObject(request.body)) return request;
-    const sent = checkParameters(capabilities, request.requirement()!, operation, request.parameterDefaults(), request.body, this.connection.root);
-    return sent === request.body ? request : request.withBody(sent);
+    if (!capabilities || operation?.kind !== "Action" || request.body === undefined || request.body === null || request.body instanceof Uint8Array)
+      return request;
+    // The body as it's written, whatever it was built as: a plain object, a model, a class instance
+    const written: unknown = JSON.parse(writeJson(request.body));
+    if (!isPlainObject(written)) return request;
+    const sent = checkParameters(capabilities, request.requirement()!, operation, request.parameterDefaults(), written, this.connection.root);
+    return sent === written ? request : request.withBody(sent);
   }
 
   /** @internal The URL of a path and query, with the view's `!sandbox` and `!ChangeSet` unless the
@@ -739,14 +743,13 @@ export function checkParameters(
   let sent = body;
   for (const parameter of operation.parameters) {
     const name = parameter.name;
-    const key = name in sent ? name : name + "@odata.bind" in sent ? name + "@odata.bind" : undefined;
-    if (key === undefined || capabilities.supportsParameter(needed, name)) continue;
-    if (name in defaults && writeJson(defaults[name]) === writeJson(sent[key])) {
-      sent = { ...sent };
-      delete sent[key];
-      continue;
+    if ((!(name in sent) && !(name + "@odata.bind" in sent)) || capabilities.supportsParameter(needed, name)) continue;
+    // Compared as written JSON, as the other clients compare them
+    if (name + "@odata.bind" in sent || !(name in defaults) || writeJson(defaults[name]) !== writeJson(sent[name])) {
+      throw capabilities.checkParameter(needed, name, server)!;
     }
-    throw capabilities.checkParameter(needed, name, server)!;
+    sent = { ...sent };
+    delete sent[name];
   }
   return sent;
 }

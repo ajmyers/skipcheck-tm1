@@ -1151,6 +1151,46 @@ public class Tm1SessionCapabilitiesTest
             .WithParameterDefault("Selection", "Unfed");
 
     [Fact]
+    public void KnowsTheParametersACallerPassesForEachKindOfOperation()
+    {
+        var c = Version.Tm1Capabilities.Parse(File.ReadAllText(Repo.Snapshot));
+        var checkFeeders = Model.Tm1Operations.CubeCheckFeeders.Capability();
+        Assert.True(c.SupportsParameter(checkFeeders, "Selection"));
+        Assert.False(c.SupportsParameter(checkFeeders, "Cube")); // the binding parameter isn't one a caller passes
+        // The import Update and the actions Cellset/Update and Cube/Update share a name: only the
+        // import's own parameters count
+        Assert.True(c.SupportsParameter(Version.Tm1Capability.UnboundOperation("Update"), "Cells"));
+        Assert.False(c.SupportsParameter(Version.Tm1Capability.UnboundOperation("Update"), "BeginOrdinal"));
+    }
+
+    [Fact]
+    public async Task ChecksFeedersWithUnfedOnAServerWithoutSelectionAndRefusesTheRest()
+    {
+        WithoutSelection();
+        _tm1.On(CheckFeedersKey, _ => ScriptedTm1.Json(200, "{\"value\":[]}"));
+        var cubes = new Skipcheck.Tm1.Client.Services.CubeService(_tm1.Session());
+        var total = new Dictionary<string, string> { ["Region"] = "Total" };
+        await cubes.CheckFeedersAsync("Sales", total, Model.CheckFeedersSelection.Unfed).ToListAsync();
+        var sent = Assert.Single(_tm1.Requests(CheckFeedersKey)).Text;
+        Assert.Contains("Tuple@odata.bind", sent);
+        Assert.DoesNotContain("Selection", sent);
+        await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(async () =>
+            await cubes.CheckFeedersAsync("Sales", total, Model.CheckFeedersSelection.Both).ToListAsync()
+        );
+        Assert.Single(_tm1.Requests(CheckFeedersKey));
+    }
+
+    [Fact]
+    public async Task ChecksNoParametersOnceARequirementReplacesTheOperation()
+    {
+        WithoutSelection();
+        _tm1.On(CheckFeedersKey, _ => ScriptedTm1.Json(400, "{\"error\":{\"code\":\"278\",\"message\":\"Invalid parameter\"}}"));
+        var request = CheckFeeders("Both").Requires(Version.Tm1Capability.BoundOperation("tm1.Cube", "tm1.CheckFeeders"));
+        Assert.Null(request.Operation);
+        await Assert.ThrowsAsync<Tm1BadRequestException>(async () => await _tm1.Session().StreamAsync(request).ToListAsync());
+    }
+
+    [Fact]
     public async Task SendsEveryParameterTheServerDefines()
     {
         _tm1.On(CheckFeedersKey, _ => ScriptedTm1.Json(200, "{\"value\":[]}"));
