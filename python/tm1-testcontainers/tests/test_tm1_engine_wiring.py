@@ -75,6 +75,17 @@ def test_runs_its_datastore_on_its_own_network() -> None:
     assert datastore._labels["io.skipcheck.tm1.testcontainers"] == "python"
 
 
+def test_its_datastore_is_on_its_network_before_anything_starts() -> None:
+    # Not only once the engine starts or is configured: an environment starts what the engine
+    # depends on first, and TM1 couldn't reach a datastore left off the network
+    engine = Tm1EngineContainer(SOURCE)
+    assert engine.network is not None
+    assert engine.network is engine.datastore.network
+    network = Network.new_network()
+    engine.with_network(network)
+    assert engine.datastore.network is network
+
+
 def test_joins_a_network_it_is_given() -> None:
     network = Network.new_network()
     engine = Tm1EngineContainer(SOURCE).with_network(network)
@@ -116,6 +127,16 @@ def test_names_a_classes_database_after_the_class() -> None:
 
 
 # Python's own: what Java's types and JUnit give, and here is code
+
+
+def test_an_instances_name_has_no_least_length() -> None:
+    # Where a database's has three characters
+    engine = Tm1EngineContainer(SOURCE)
+    assert engine.with_database("e", "sales").database("e", "sales").instance == "e"
+    with pytest.raises(ValueError, match="A TM1 instance's name is letters, digits, '_' and '-'"):
+        engine.with_database("_eu", "sales")
+    with pytest.raises(ValueError, match="A TM1 database's name is at least three"):
+        engine.with_database("eu", "sa")
 
 
 def test_picks_the_image_as_tm1_server_does(monkeypatch: pytest.MonkeyPatch) -> None:

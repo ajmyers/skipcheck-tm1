@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 import yaml
 
 from .cognos import Namespace, User
+from .engine import Tm1EngineContainer
 from .paw import PawContainer
 from .tm1 import Tm1Seed
 
@@ -25,6 +26,8 @@ if TYPE_CHECKING:
 _NAME = re.compile(r"[A-Za-z0-9_-]+")
 _USER = re.compile(r"[A-Za-z0-9._-]+")
 _SEEDS = ["empty", "sdata", "24retail"]
+# The tm1-engine image's rule for a database's and an instance's name
+_ENGINE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
 
 @dataclass(frozen=True)
@@ -42,6 +45,19 @@ class _Cognos:
     namespace: Namespace
     admins: list[str]
     memory: int
+
+
+@dataclass(frozen=True)
+class _EngineUser:
+    name: str
+    groups: list[str]
+
+
+@dataclass(frozen=True)
+class _Engine:
+    # name -> instance, in the file's order
+    databases: dict[str, str]
+    users: list[_EngineUser]
 
 
 def read(path: Path | str) -> PlanningAnalyticsEnvironment.Builder:
@@ -82,13 +98,13 @@ class _Reader:
 
     def apply(self, root: Any, folder: Path) -> PlanningAnalyticsEnvironment.Builder:
         # pa_setup.normalize: the same checks, in the same order
-        cfg = self._keys(root, ["version", "name", "ibm", "files", "images", "tm1", "tm1Web", "paw", "cognos"], "the file")
+        cfg = self._keys(root, ["version", "name", "ibm", "files", "images", "tm1", "tm1Web", "paw", "cognos", "tm1Engine"], "the file")
         version = cfg.get("version")
         if not _is_int(version) or version != 1:
             raise self.error("version: must be 1")
         ibm = self._host_path(cfg.get("ibm"), "ibm", folder) if cfg.get("ibm") else None
         self._host_path(_or(cfg.get("files"), "pa-files"), "files", folder)
-        images = self._keys(_or(cfg.get("images"), {}), ["tm1Server", "tm1Web", "cognosServer", "keycloak"], "images")
+        images = self._keys(_or(cfg.get("images"), {}), ["tm1Server", "tm1Web", "cognosServer", "keycloak", "tm1Engine", "mongo"], "images")
 
         tm1 = self._section(cfg, "tm1")
         servers: dict[str, _Server] = {}
@@ -154,7 +170,8 @@ class _Reader:
             if oidc is True:
                 oidc = {}
             keycloak_port: int | None = None
-            if oidc:
+            # On with true or a mapping, an empty one too: only absent or false is off
+            if oidc is not None and oidc is not False:
                 o = self._keys(oidc, ["keycloakPort"], "cognos.oidc")
                 if not users:
                     raise self.error("cognos.oidc: needs cognos.users")
@@ -199,9 +216,58 @@ class _Reader:
             paw_port = self._port(paw.get("port"), "paw", 8800)
             paw_zip = _text(paw.get("zip")) if paw.get("zip") else None
 
-        if not servers and cam is None:
-            raise self.error("nothing to run: add tm1.servers and/or cognos")
-        ports = [s.port for s in servers.values()]
+        engine_section = self._section(cfg, "tm1Engine")
+        engine: _Engine | None = None
+        engine_port: int | None = None
+        datastore_port: int | None = None
+        if engine_section is not None:
+            self._keys(engine_section, ["port", "databases", "users", "datastore"], "tm1Engine")
+            databases: dict[str, str] = {}
+            raw = engine_section.get("databases")
+            if raw is None:
+                databases[Tm1EngineContainer.DEFAULT_DATABASE] = Tm1EngineContainer.DEFAULT_INSTANCE
+            elif not isinstance(raw, dict) or not raw:
+                raise self.error("tm1Engine.databases: name at least one database, e.g. tm1Engine: {databases: {planning: {}}}")
+            else:
+                for name, value in raw.items():
+                    where = f"tm1Engine.databases.{_text(name)}"
+                    # No check for names that differ only in case, as tm1.servers has: Sales and
+                    # sales are two databases to TM1 v12
+                    if not isinstance(name, str):
+                        raise self.error(f"{where}: YAML reads this name as a number or true/false: put it in quotes")
+                    if not _ENGINE_NAME.fullmatch(name):
+                        raise self.error(f"{where}: database names are letters, digits, _ and -, starting with a letter or digit")
+                    if len(name) < 3:
+                        raise self.error(f"{where}: TM1 needs database names of at least 3 characters")
+                    d = self._keys(_or(value, {}), ["instance"], where)
+                    instance = Tm1EngineContainer.DEFAULT_INSTANCE if d.get("instance") is None else d.get("instance")
+                    if not isinstance(instance, str) or not _ENGINE_NAME.fullmatch(instance):
+                        raise self.error(f"{where}.instance: instance names are letters, digits, _ and -, starting with a letter or digit")
+                    databases[name] = instance
+            listed_users = _or(engine_section.get("users"), [])
+            if not isinstance(listed_users, list):
+                raise self.error("tm1Engine.users must be a list, e.g. users: [analyst::Analysts]")
+            # Every user is checked before any is found twice, as pa_setup does
+            engine_users = [self._engine_user(entry, f"tm1Engine.users[{u}]") for u, entry in enumerate(listed_users)]
+            engine_names = [user.name.lower() for user in engine_users]
+            if len(set(engine_names)) != len(engine_names):
+                raise self.error("tm1Engine.users: a user is listed twice")
+            datastore = engine_section.get("datastore")
+            ds = {} if datastore is None or isinstance(datastore, bool) else self._keys(datastore, ["port"], "tm1Engine.datastore")
+            engine_port = self._port(engine_section.get("port"), "tm1Engine", 4444)
+            # Published only when a port is given
+            datastore_port = None if ds.get("port") is None else self._port(ds.get("port"), "tm1Engine.datastore", 27017)
+            for name in servers:
+                # The engine's two compose services in pa-setup: a server of that name would be
+                # replaced by them
+                if name.lower() in ("tm1-engine", "tm1-engine-mongo"):
+                    raise self.error(f"tm1.servers.{name}: that name is the TM1 v12 engine's here; give the server another")
+            engine = _Engine(databases, engine_users)
+
+        if not servers and cam is None and engine is None:
+            raise self.error("nothing to run: add tm1.servers, tm1Engine and/or cognos")
+        ports = [p for p in (engine_port, datastore_port) if p is not None]
+        ports += [s.port for s in servers.values()]
         ports += [p for p in (admin, web_port) if p is not None]
         if cam is not None:
             ports += [p for p in (cam.port, cam.keycloak_port) if p is not None]
@@ -218,7 +284,20 @@ class _Reader:
             if server.seed == "24retail":
                 raise self.error(f"tm1.servers.{name}.seed: 24retail isn't available in tm1-testcontainers (Tm1Seed has empty and sdata)")
 
-        return _configure(servers, admin is not None, heap, cam, paw_port is not None, ibm, paw_zip, images)
+        b = _configure(servers, admin is not None, heap, cam, paw_port is not None, ibm, paw_zip, images)
+        if engine is not None:
+            wanted = engine
+
+            def customize(container: Tm1EngineContainer) -> None:
+                for name, instance in wanted.databases.items():
+                    container.with_database(instance, name)
+                # TM1 v12 keeps no passwords: a user's is checked and not used
+                for user in wanted.users:
+                    container.with_user(user.name, *user.groups)
+
+            b.tm1_engine(customize)
+            b._tm1_engine_image = _image(images, "tm1Engine")
+        return b
 
     def _keys(self, section: Any, allowed: list[str], where: str) -> dict[Any, Any]:
         """pa_setup.check_keys: a mapping with only the allowed settings."""
@@ -287,6 +366,42 @@ class _Reader:
             if not isinstance(g, str) or not _USER.fullmatch(g):
                 raise self.error(f"{where}: group '{_text(g)}' must be letters, digits, '.', '_' and '-'")
         return User(name, password, tuple(groups))
+
+    def _engine_user(self, entry: Any, where: str) -> _EngineUser:
+        """pa_setup.parse_user with password_optional: an engine's user, whose password may be left
+        out or empty, since TM1 v12 keeps none."""
+        name: Any
+        password: Any
+        groups: list[Any] = []
+        if isinstance(entry, str):
+            parts = entry.split(":")
+            if len(parts) == 2 and parts[1]:
+                # The image's own form has groups there; here the second part is a password
+                raise self.error(f"{where}: '{entry}' reads as a password, which TM1 v12 doesn't keep: for a group, write {parts[0]}::{parts[1]}")
+            if len(parts) > 3:
+                raise self.error(f"{where}: expected user, user::group,group or user:password:group,group, not '{entry}'")
+            name = parts[0]
+            password = parts[1] if len(parts) > 1 else ""
+            if len(parts) == 3:
+                groups = [g for g in parts[2].split(",") if g]
+        elif isinstance(entry, dict):
+            mapping = self._keys(entry, ["name", "password", "groups"], where)
+            name = mapping.get("name")
+            password = "" if mapping.get("password") is None else mapping.get("password")
+            listed = _or(mapping.get("groups"), [])
+            if not isinstance(listed, list):
+                raise self.error(f"{where}: groups must be a list, e.g. groups: [Analysts]")
+            groups = list(listed)
+        else:
+            raise self.error(f"{where}: a user is user:password[:groups] or a mapping")
+        if not isinstance(name, str) or not _USER.fullmatch(name):
+            raise self.error(f"{where}: user name '{_text(name)}' must be letters, digits, '.', '_' and '-'")
+        if not isinstance(password, str) or re.search(r"[:\s]", password):
+            raise self.error(f"{where}: {name}'s password must be text without ':' or spaces (quote a number)")
+        for g in groups:
+            if not isinstance(g, str) or not _USER.fullmatch(g):
+                raise self.error(f"{where}: group '{_text(g)}' must be letters, digits, '.', '_' and '-'")
+        return _EngineUser(name, [str(g) for g in groups])
 
     def _cfg_value(self, value: Any, where: str) -> str:
         """A tm1s.cfg value as pa_setup writes it, with str(): true is True."""
