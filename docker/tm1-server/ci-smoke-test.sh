@@ -81,6 +81,42 @@ grep -q "download failed: http://127.0.0.1:9/tm1server-bundle.tar.gz" <<<"$out" 
 ! grep -q "SECRET123" <<<"$out" || fail "bundle URL credentials were printed: $out"
 pass "unreachable bundle URL fails cleanly without printing credentials"
 
+# 7a. IBM's older full installer (Planning Analytics 2.1.2, 2.1.7): a fake one, built here, with a
+#     server component, a shared library from a gate component, a language pack (left out) and
+#     the version component, whose version.xml is wrong as 2.1.7's is. Found in the bundle folder
+#     by its name, installed, and its versions written from the components' names
+fake=$(mktemp -d)
+python3 - "$fake/tm1_linuxi38664h_9.9.9.1_ml.tar.gz" <<'PY'
+import io, sys, tarfile
+def tar_with(files):
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as t:
+        for name, data in files.items():
+            info = tarfile.TarInfo(name); info.size = len(data); info.mode = 0o755; t.addfile(info, io.BytesIO(data))
+    return buf.getvalue()
+parts = {
+    "tm1server-linuxi38664h-app-11.9.00100.1-inst.tar.gz": {"bin64/tm1s.exe": b"#!/bin/sh\n", "bin64/tm1server-linuxi38664h-app-11.9.00100.1.txt": b""},
+    "zlib-linuxi38664h-gate-1.2.3-inst.tar.gz": {"bin64/libz.so": b"z"},
+    "langpack_de-linuxi38664h-app-11.0.1-inst.tar.gz": {"bin64/de/tm1s.lng": b"de"},
+    "verxml-linuxi38664h-app-9.9.9.1-inst.tar.gz": {"bin64/version.xml": b'<version productMajor="9" productMinor="9" releaseMinor="1"/>'},
+}
+with tarfile.open(sys.argv[1], "w:gz") as bundle:
+    for d in ("./", "./zipfiles/", "./zipfiles/linuxi38664h/"):
+        info = tarfile.TarInfo(d); info.type = tarfile.DIRTYPE; bundle.addfile(info)
+    for name, files in parts.items():
+        data = tar_with(files); info = tarfile.TarInfo("./zipfiles/linuxi38664h/" + name); info.size = len(data)
+        bundle.addfile(info, io.BytesIO(data))
+PY
+out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c '
+  tm1-install --target /t >/dev/null 2>&1 &&
+  test -x /t/bin64/tm1s.exe && test -f /t/bin64/libz.so && test ! -e /t/bin64/de/tm1s.lng && cat /t/versions.txt' 2>&1) || true
+grep -qx "Planning Analytics 9.9.9" <<<"$out" && grep -qx "tm1server = 11.9.00100.1" <<<"$out" \
+  || fail "full installer not installed: $out"
+out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c 'tm1-install /ibm/tm1_linuxi38664h_9.9.9.1_ml.tar.gz --target /t 2>&1 | tail -1' 2>&1) || true
+grep -q "Installed: tm1server = 11.9.00100.1" <<<"$out" || fail "full installer by name not installed: $out"
+rm -rf "$fake"
+pass "IBM's older full installer is found, installed without language packs, with its versions"
+
 # 7b. CAM setup builds CAMIDs from short names and keeps full CAMIDs as given
 out=$(run -e 'TM1_CAM_ADMINS=admin,CAMID("AD:u:uid=x, ou=people,dc=a")' -e 'TM1_CAM_GROUPS=Analysts,Readers' --entrypoint python3 "$image" /usr/local/lib/tm1-server/cam-setup.py --print 2>&1) \
   || fail "cam-setup.py --print failed: $out"
