@@ -18,6 +18,10 @@ then copies what the run wrote (each suite's results and the scenario traffic) t
 build/live-versions/<label>/, and at the end writes build/live-versions/summary.md: per version,
 whether the run passed, and each suite's counts (scripts/test-summary.py's table).
 
+The walkthroughs' examples record what they print in api-site/example-output, which the docs show,
+so after a run it holds what the last version printed: commit it only from the version the docs
+show (or restore it with git checkout).
+
 Not a Gradle task: the suites read their TM1 from the environment, and a task can't run this
 project's build again with another one (the inner build would wait on the outer one's locks).
 Standard library only. Exits 1 if any version's run failed, 2 on a bad list.

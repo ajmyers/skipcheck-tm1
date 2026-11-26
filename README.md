@@ -29,6 +29,29 @@ Java is the reference: the other clients have its API, and their tests replay wh
 
 The Java libraries require Java 17+, the Python client Python 3.11+, the .NET client .NET 10, the TypeScript client Node 22+ or a modern browser (its testcontainers, Node 22.22+).
 
+## Supported TM1 versions
+
+TM1 Server 11.8 from **Planning Analytics 2.1.2** (TM1 11.8.02400.7) on. Each client reads what a server supports from the server's own `$metadata`, so one build works with all of them:
+
+- An operation or parameter the server doesn't define is refused before anything is sent (`Tm1UnsupportedOperationException`, saying which schema the server reports).
+- A parameter whose value is what leaving it out means is left out, such as CheckFeeders' `Unfed` before schema 11.8.32.
+
+[`docker/tm1-server`](docker/tm1-server) runs each of these versions, from IBM's installers for the oldest.
+
+Last checked on 2026-11-26, with every client's live tests ([`scripts/live-test-versions.py`](scripts/live-test-versions.py)):
+
+| Planning Analytics | TM1 | Schema | Live tests |
+|---|---|---|---|
+| 2.1.2 | 11.8.02400.7 | 11.8.20 | Pass. What its schema lacks is skipped: Reserve and Release, encryption at rest, CheckFeeders' `Selection`. |
+| 2.1.7 | 11.8.02800.9 | 11.8.20 | Pass, as 2.1.2. |
+| 2.1.16 | 11.8.03200.3 | 11.8.32 | Pass. Reserve and Release and encryption at rest are skipped. |
+| 2.1.19 | 11.8.03500.6 | 11.8.35 | Pass. |
+| 2.1.25 | 11.8.04000.1 | 11.8.35 | Pass. |
+
+On every version, the `settings` conformance scenario failed in one client's run: TM1 read back one setting it had just been given as empty ([#399](https://github.com/ajmyers/skipcheck-tm1/issues/399)). Everything else passed, and every client sent TM1 the same requests.
+
+Planning Analytics 3.x (TM1 v12) is a different engine, run by [`docker/tm1-engine`](docker/tm1-engine), and isn't covered by this table.
+
 ## Stability
 
 These libraries are pre-1.0: their API may still change. Until 1.0.0, the version says what to expect:
@@ -50,6 +73,7 @@ So pin an exact version, or a range that stays within one minor release: `^0.1.0
 ./gradlew checkScripts checkApiSite      # the scripts and git hooks, and the API docs site (both part of checkAll)
 ./gradlew packageTest                    # build every package as a release does, install each somewhere clean, run it
 ./gradlew liveTest --continue            # every client's tests against a real TM1 (bring your own: see scripts/live-tests.sh)
+scripts/live-test-versions.py versions.txt   # the same against each TM1 in a list, each one's results kept
 ```
 
 The `check` and `liveTest` tasks run each client's own tool, the same on macOS, Linux and Windows, and are what CI runs: `pytest python` in a virtual environment Gradle makes (`build/python-venv`), `dotnet test dotnet/Tm1.slnx`, and `npm ci`, `npm test` and `npm run build` in `typescript`. Those commands work on their own too. They need Python 3.11+, the .NET 10 SDK and Node 22+ installed; `./gradlew build` needs only a JDK. [CONTRIBUTING](CONTRIBUTING.md#checks) says which to run for what, and what a pull request has to pass.
