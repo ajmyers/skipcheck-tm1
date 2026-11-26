@@ -1,0 +1,4 @@
+# Java types and members this package doesn't have under the same name, each with its reason: the
+# API docs build fails on one that's missing from here (api-site/scripts/members.mjs).
+RequiresTm1Engine.shareDatabase | a vitest test takes options as fixtures: requiresTm1Engine.extend({ shareDatabase: true }), documented on Tm1EngineFixtures
+RequiresTm1Engine.minVersion | a vitest test takes options as fixtures: requiresTm1Engine.extend({ minVersion: "12.6" }), documented on Tm1EngineFixtures; RequiresTm1Engine.skipReason(minVersion) is the check itself

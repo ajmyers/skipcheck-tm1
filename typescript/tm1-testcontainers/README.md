@@ -43,9 +43,10 @@ requiresTm1Engine("lists cubes", async ({ tm1Database: db }) => {     // Java's 
 ```
 
 - **The source** is a `Tm1EngineSource`, from `TM1_ENGINE_PRIVATE_IMAGE`, `TM1_ENGINE_HOME_DIR`, `TM1_ENGINE_INSTALL_VOLUME`, `TM1_ENGINE_BUNDLE_DIR` (with `TM1_ENGINE_BUNDLE`) or `TM1_ENGINE_BUNDLE_URL` (with `TM1_ENGINE_BUNDLE_SHA256`), the first set winning. After those comes `TM1_BUNDLE_DIR`, when that folder holds a `tm1-v*-standalone-linux.tgz` too, so one downloads folder serves both versions. Without a source the tests are skipped, with Java's message.
-- **`requiresTm1Engine`** starts one engine (`Tm1EngineContainer.shared()`) and gives the test its fixtures: `tm1Database`, a `Tm1Database`, and `tm1Engine`, the engine.
+- **`requiresTm1Engine`** starts the shared engine (`Tm1EngineContainer.shared()`) and gives the test its fixtures: `tm1Database`, a `Tm1Database`, and `tm1Engine`, the engine.
+- **One engine per test file, by default.** `shared()` is one engine per module registry, and vitest isolates test files, each with its own modules (see [Sharing](#sharing)). So under vitest's default isolation every test file that needs the engine starts its own (about 40 seconds), where Java has one per JVM. One engine serves the whole run only when the files share their modules: `isolate: false`, or a single worker without isolation.
 - **A database per test file.** Java gives each test class a database of its own; the unit here is the vitest **file**. The file's database is created when one of its tests first names `tm1Database` (about 10 seconds), named after the file with a few random characters, and dropped when the file is done. So a file can create what it likes under any name and leave it there.
-- **`requiresTm1Engine.extend({ shareDatabase: true })`** is a `test` whose tests get the engine's one shared database, `tm1`, instead (Java's `shareDatabase = true`). It costs nothing to get; its tests need uniquely named objects, and to delete them. **`extend({ minVersion: "12.6" })`** skips its tests on an older engine (Java's `minVersion`).
+- **`requiresTm1Engine.extend({ shareDatabase: true })`** is a `test` whose tests get the engine's one shared database, `tm1`, instead (Java's `shareDatabase = true`). It costs nothing to get. With an engine per test file, that database is the file's alone, so sharing loses no isolation: it's the option to use there, and saves creating and dropping a database in every file. Where one engine serves several files, its tests need uniquely named objects, and to delete them. **`extend({ minVersion: "12.6" })`** skips its tests on an older engine (Java's `minVersion`).
 - **Logging in:** `db.login()` is `admin`, `db.login("analyst")` any other user. A `Tm1Login` gives the session cookie (`await login.cookie()`, or `await login.authorize(init)` for `fetch`), a bearer token (`token()`, then `session("Bearer " + token)`), or the application's client ID and secret for a client that logs in itself.
 
 An engine of your own, with the databases and users you name:
@@ -59,7 +60,7 @@ const scratch = await engine.createDatabase("scratch");
 await engine.dropDatabase(scratch);
 ```
 
-The engine keeps its metadata in a MongoDB (`mongo:8.0`), which the container starts first, on the engine's network, and stops with it: `getDatastore()`. The shared engine isn't reusable: an engine and its datastore belong together, and a kept one would keep every database tests left. Package installs are cached in the volume `tm1-engine-testcontainers-cache`, not TM1 11's. `TM1_ENGINE_IMAGE` swaps the image (`tm1-engine:local` for a local build).
+The engine keeps its metadata in a MongoDB (`mongo:8.0`), which the container starts first, on the engine's network, and stops with it: `getDatastore()`. A failed start stops the datastore too. The shared engine isn't reusable: an engine and its datastore belong together, and a kept one would keep every database tests left. Package installs are cached in the volume `tm1-engine-testcontainers-cache`, not TM1 11's. `TM1_ENGINE_IMAGE` swaps the image (`tm1-engine:local` for a local build).
 
 Not here yet, as in the Java module: settings for OAuth 2.0 and pass-through logins, and TLS.
 
@@ -116,7 +117,7 @@ Testcontainers for Node configures a container on its `GenericContainer`, whose 
 
 ### Sharing
 
-`shared()` gives one server per module graph: per test file, by default, since vitest isolates files. Java's is one per JVM. To share one across files, start it once in a vitest `globalSetup` and `provide` its URL and login to the files, which is what the client's live tests do (`../tm1-client/test/live/global-setup.ts`); or run the files without isolation (`isolate: false`); or turn on reuse. A global setup runs in vitest's own process, so it imports from `@skipcheck/tm1-testcontainers`, not from `@skipcheck/tm1-testcontainers/vitest`.
+`shared()` gives one server per module graph: per test file, by default, since vitest isolates files. `Tm1EngineContainer.shared()` is the same, and so is the engine `requiresTm1Engine` uses. Java's is one per JVM. To share one across files, start it once in a vitest `globalSetup` and `provide` its URL and login to the files, which is what the client's live tests do (`../tm1-client/test/live/global-setup.ts`); or run the files without isolation (`isolate: false`); or turn on reuse. A global setup runs in vitest's own process, so it imports from `@skipcheck/tm1-testcontainers`, not from `@skipcheck/tm1-testcontainers/vitest`.
 
 ### Reuse
 

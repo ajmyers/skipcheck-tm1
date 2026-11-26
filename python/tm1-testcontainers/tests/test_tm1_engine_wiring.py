@@ -158,20 +158,110 @@ def test_a_database_is_its_engines_instance_and_name() -> None:
         engine.create_database("scratch")
 
 
+class _Node:
+    """What the plugin asks a test for: its requires_tm1_engine markers, the nearest first."""
+
+    def __init__(self, *markers: pytest.MarkDecorator | pytest.Mark) -> None:
+        self._marks = [marker.mark if isinstance(marker, pytest.MarkDecorator) else marker for marker in markers]
+
+    def iter_markers(self, name: str) -> list[pytest.Mark]:
+        assert name == "requires_tm1_engine"
+        return self._marks
+
+
 def test_reads_the_nearest_markers_options() -> None:
-    class Node:
-        def __init__(self, marker: pytest.MarkDecorator | None) -> None:
-            self._mark = None if marker is None else marker.mark
-
-        def get_closest_marker(self, name: str) -> pytest.Mark | None:
-            assert name == "requires_tm1_engine"
-            return self._mark
-
-    assert plugin._engine_options(Node(None)) == (False, "")
-    assert plugin._engine_options(Node(RequiresTm1Engine.mark)) == (RequiresTm1Engine.share_database, RequiresTm1Engine.min_version)
-    assert plugin._engine_options(Node(pytest.mark.requires_tm1_engine(share_database=True, min_version="12.6"))) == (True, "12.6")
-    # A misspelt option fails rather than being ignored
+    assert plugin._engine_options(_Node()) == (False, "")
+    assert plugin._engine_options(_Node(RequiresTm1Engine.mark)) == (RequiresTm1Engine.share_database, RequiresTm1Engine.min_version)
+    assert plugin._engine_options(_Node(pytest.mark.requires_tm1_engine(share_database=True, min_version="12.6"))) == (True, "12.6")
+    # The nearest marker that sets an option wins
+    near = pytest.mark.requires_tm1_engine(share_database=False, min_version="12.7")
+    assert plugin._engine_options(_Node(near, pytest.mark.requires_tm1_engine(share_database=True, min_version="12.6"))) == (False, "12.7")
+    # A misspelt option fails rather than being ignored, on a wider marker too
     with pytest.raises(pytest.UsageError, match="share_databse"):
-        plugin._engine_options(Node(pytest.mark.requires_tm1_engine(share_databse=True)))
+        plugin._engine_options(_Node(pytest.mark.requires_tm1_engine(share_databse=True)))
+    with pytest.raises(pytest.UsageError, match="share_databse"):
+        plugin._engine_options(_Node(RequiresTm1Engine.mark, pytest.mark.requires_tm1_engine(share_databse=True)))
     with pytest.raises(pytest.UsageError, match="12.6"):
-        plugin._engine_options(Node(pytest.mark.requires_tm1_engine("12.6")))
+        plugin._engine_options(_Node(pytest.mark.requires_tm1_engine("12.6")))
+
+
+@pytest.mark.requires_tm1_engine(share_database=True, min_version="12.6")
+class _Base:
+    pass
+
+
+class _Sub(_Base):
+    pass
+
+
+def test_a_subclass_keeps_the_annotations_options() -> None:
+    # Java's @Inherited. pytest gives a subclass its base's markers, and a test the markers of
+    # every scope around it: options set at a wider scope have to come with them, when a nearer
+    # marker doesn't set them
+    inherited = [mark for mark in _Sub.pytestmark if mark.name == "requires_tm1_engine"]  # type: ignore[attr-defined]
+    assert plugin._engine_options(_Node(*inherited)) == (True, "12.6")
+    assert plugin._engine_options(_Node(RequiresTm1Engine.mark, *inherited)) == (True, "12.6")
+    assert plugin._engine_options(_Node(pytest.mark.requires_tm1_engine(min_version="12.7"), *inherited)) == (True, "12.7")
+    assert plugin._engine_options(_Node(pytest.mark.requires_tm1_engine(share_database=False), *inherited)) == (False, "12.6")
+
+
+class _Exec:
+    def __init__(self, exit_code: int, stdout: bytes = b"", stderr: bytes = b"") -> None:
+        self.exit_code, self.output = exit_code, (stdout or None, stderr or None)
+
+
+class _Container:
+    """A running container whose tm1-engine command answers as told: (exit code, stdout, stderr) by sub-command."""
+
+    status = "running"
+
+    def __init__(self, answers: dict[str, _Exec]) -> None:
+        self.answers = answers
+        self.commands: list[list[str]] = []
+
+    def reload(self) -> None:
+        pass
+
+    def exec_run(self, command: list[str], demux: bool = False) -> _Exec:
+        assert demux
+        self.commands.append(command)
+        return self.answers[command[-2] if command[3] == "database" else command[3]]
+
+
+def test_logs_in_through_the_first_application_whose_secret_it_has(monkeypatch: pytest.MonkeyPatch) -> None:
+    credentials = (
+        b'{"root":{"clientId":"r","clientSecret":"rs"},"instances":['
+        b'{"name":"tm1","applications":[{"name":"lost","clientId":"a","clientSecret":null},{"name":"tm1","clientId":"b","clientSecret":"bs"}],"databases":[{"name":"tm1"}]},'
+        b'{"name":"other","applications":[{"name":"lost","clientId":"c","clientSecret":null}],"databases":[]}]}'
+    )
+    engine = Tm1EngineContainer(SOURCE)
+    engine._container = _Container({"credentials": _Exec(0, credentials)})
+    monkeypatch.setattr(Tm1EngineContainer, "url", "http://localhost:1/")
+    login = engine._login("tm1", "analyst")
+    assert (login.client_id, login.client_secret, login.user, login.auth_url) == ("b", "bs", "analyst", "http://localhost:1/tm1/auth/v1/")
+    with pytest.raises(RuntimeError, match="The instance other has no application to log in through"):
+        engine._login("other", "admin")
+    with pytest.raises(RuntimeError, match="The instance missing has no application to log in through"):
+        engine._login("missing", "admin")
+    engine._container = None
+
+
+def test_gives_a_create_longer_than_the_image_waits_and_drops_what_a_failed_one_left() -> None:
+    engine = Tm1EngineContainer(SOURCE)
+    container = _Container({"create": _Exec(0, b"/tm1/api/v1/Databases('scratch')\n")})
+    engine._container = container
+    made = engine.create_database("scratch")
+    assert (made.instance, made.name) == ("tm1", "scratch")
+    assert container.commands == [["timeout", "330", "tm1-engine", "database", "create", "tm1/scratch"]]
+
+    # A create that fails: the half-made database is dropped, and the create's error is the one raised
+    for drop in (_Exec(0), _Exec(1, stderr=b"no such database")):
+        container = _Container({"create": _Exec(124, stderr=b"timed out"), "drop": drop})
+        engine._container = container
+        with pytest.raises(RuntimeError, match=r"tm1-engine database create other/scratch failed \(exit 124\): timed out"):
+            engine.create_database("other", "scratch")
+        assert container.commands == [
+            ["timeout", "330", "tm1-engine", "database", "create", "other/scratch"],
+            ["timeout", "180", "tm1-engine", "database", "drop", "other/scratch"],
+        ]
+    engine._container = None

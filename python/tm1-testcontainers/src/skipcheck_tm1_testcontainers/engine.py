@@ -27,6 +27,9 @@ __all__ = ["Tm1Database", "Tm1EngineContainer", "Tm1Login"]
 _INSTALL_PATH = "/opt/ibm/tm1-engine"
 _STARTUP_TIMEOUT = 5 * 60.0
 _COMMAND_TIMEOUT = 3 * 60
+# The image waits up to five minutes for a new database to be ready: longer than that, so its
+# own message is the one a slow create ends with
+_CREATE_TIMEOUT = 330
 _REQUEST_TIMEOUT = 30.0
 
 # The image's own rule: at least three characters, and nothing the commands or a URL would need
@@ -249,7 +252,18 @@ class Tm1EngineContainer(GenericContainer):
         ``create_database(name)`` in the instance ``tm1``, or ``create_database(instance, name)`` in a
         named instance, which must exist. Takes about 10 seconds."""
         instance, name = _instance_and_name(instance_or_name, name)
-        self._engine_command("database", "create", _require_name(instance, "instance") + "/" + _require_name(name, "database"))
+        path = _require_name(instance, "instance") + "/" + _require_name(name, "database")
+        try:
+            self._engine_command("database", "create", path, timeout=_CREATE_TIMEOUT)
+        except RuntimeError:
+            # Not left half-made, to fail the next create of the name; the create's error is the one to show
+            try:
+                self._engine_command("database", "drop", path)
+            except Exception:  # noqa: BLE001 - whatever the drop says, the create's error stands
+                self.logger.debug("Couldn't drop the half-made database %s", path, exc_info=True)
+            finally:
+                self._credentials = None
+            raise
         self._credentials = None
         return Tm1Database(self, instance, name)
 
@@ -259,14 +273,14 @@ class Tm1EngineContainer(GenericContainer):
         self._credentials = None
 
     def _login(self, instance: str, user: str) -> Tm1Login:
-        """A login to an instance, through its first application."""
+        """A login to an instance, through its first application whose secret the image holds."""
         for found in self._read_credentials().get("instances") or []:
-            applications = found.get("applications") or []
-            if found.get("name") == instance and applications:
-                application = applications[0]
-                return Tm1Login(
-                    f"{self.url}{instance}/auth/v1/", instance, str(application.get("clientId", "")), str(application.get("clientSecret", "")), user
-                )
+            if found.get("name") != instance:
+                continue
+            for application in found.get("applications") or []:
+                # The image lists an application it doesn't hold the secret of, with a null secret
+                if application.get("clientSecret"):
+                    return Tm1Login(f"{self.url}{instance}/auth/v1/", instance, str(application.get("clientId", "")), str(application["clientSecret"]), user)
         raise RuntimeError(f"The instance {instance} has no application to log in through")
 
     def _configured(self) -> list[str]:
@@ -344,14 +358,14 @@ class Tm1EngineContainer(GenericContainer):
                 raise RuntimeError(f"Timed out after {int(_STARTUP_TIMEOUT)} s waiting for TM1 to be set up. {logs}")
             time.sleep(1)
 
-    def _engine_command(self, *arguments: str) -> str:
+    def _engine_command(self, *arguments: str, timeout: int = _COMMAND_TIMEOUT) -> str:
         """Runs the image's tm1-engine command, and returns what it printed."""
         import docker.errors
 
         if not self.is_running:
             raise RuntimeError("The container isn't started yet")
         try:
-            result = self.get_wrapped_container().exec_run(["timeout", str(_COMMAND_TIMEOUT), "tm1-engine", *arguments], demux=True)
+            result = self.get_wrapped_container().exec_run(["timeout", str(timeout), "tm1-engine", *arguments], demux=True)
         except docker.errors.APIError as e:
             raise RuntimeError(f"Couldn't run tm1-engine {arguments[0]} in the container") from e
         # demux: (stdout, stderr), either None when the command wrote nothing to it

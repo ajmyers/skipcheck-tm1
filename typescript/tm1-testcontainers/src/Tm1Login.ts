@@ -109,11 +109,8 @@ export class Tm1Login {
     return found;
   }
 
-  /** Adds this login's session cookie to a request: what `fetch` takes as its second argument.
-   *
-   * ```ts
-   * const response = await fetch(db.getRestUrl() + "Cubes", await db.login().authorize());
-   * ```
+  /** Adds this login's session cookie to a request: what `fetch` takes as its second argument, as
+   * in `fetch(url, await db.login().authorize())`.
    * @param request the request being built; none for a plain GET
    * @returns `request` with the `Cookie` header, as a new object */
   async authorize(request: RequestInit = {}): Promise<RequestInit> {

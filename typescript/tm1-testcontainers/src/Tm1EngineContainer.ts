@@ -15,6 +15,8 @@ const INSTALL_PATH = "/opt/ibm/tm1-engine";
 const STARTUP_TIMEOUT = 5 * 60_000;
 /** The image's commands are given this long, in seconds, by `timeout` in the container. */
 const COMMAND_TIMEOUT = 180;
+/** Creating a database is given longer: at least the image's own wait for the database to be ready. */
+const CREATE_TIMEOUT = 330;
 const REQUEST_TIMEOUT = 30_000;
 
 // The image's own rule: at least three characters, and nothing the commands or a URL would need
@@ -33,7 +35,7 @@ interface Credentials {
   root?: { clientId?: string; clientSecret?: string };
   instances?: {
     name?: string;
-    applications?: { name?: string; clientId?: string; clientSecret?: string }[];
+    applications?: { name?: string; clientId?: string; clientSecret?: string | null }[];
     databases?: { name?: string }[];
   }[];
 }
@@ -73,7 +75,7 @@ class Datastore extends GenericContainer {
  *
  * One engine holds **instances**, each holding **databases**. Most tests use the one instance,
  * `tm1`, and a database of their own: `requiresTm1Engine` (from
- * `@skipcheck/tm1-testcontainers/vitest`) gives each test file one. A container you make yourself
+ * `@skipcheck/tm1-testcontainers/vitest`) gives each test file one, in {@link shared}'s engine. A container you make yourself
  * has the databases you name with {@link withDatabase}, or one called `tm1`:
  *
  * ```ts
@@ -147,9 +149,14 @@ export class Tm1EngineContainer extends GenericContainer {
     this.#mountSource();
   }
 
-  /** The engine most tests share: one per test run (per vitest worker), started on first use with
-   * the source {@link Tm1EngineSource.discover} finds. Testcontainers removes it when the run
-   * ends. It has one database, `tm1`; `requiresTm1Engine` creates one more for each test file.
+  /** The engine tests share, started on first use with the source
+   * {@link Tm1EngineSource.discover} finds; Testcontainers removes it when the run ends. It has one
+   * database, `tm1`; `requiresTm1Engine` creates one more for each test file.
+   *
+   * It's one per module registry, where Java's is one per JVM. vitest isolates test files by
+   * default, each with its own modules, so that is **one engine per test file**, started (about 40
+   * seconds) by the first test of the file that needs it. It's one for the whole run only when the
+   * files share their modules: `isolate: false`, or a single worker without isolation.
    *
    * It isn't marked reusable: an engine and its datastore belong together, and a kept engine would
    * keep every database tests left in it.
@@ -272,24 +279,36 @@ export class Tm1EngineContainer extends GenericContainer {
   createDatabase(instance: string, name: string): Promise<Tm1Database>;
   async createDatabase(instance: string, name?: string): Promise<Tm1Database> {
     if (name === undefined) return this.createDatabase(Tm1EngineContainer.DEFAULT_INSTANCE, instance);
-    await this.#command("database", "create", qualified(instance, name));
+    const database = qualified(instance, name);
+    try {
+      await this.#command(CREATE_TIMEOUT, "database", "create", database);
+    } catch (e) {
+      // TM1 may have made it before the command gave up: don't leave half a database. If it wasn't
+      // made, or can't be dropped, the first failure is still the one to report
+      await this.#command(COMMAND_TIMEOUT, "database", "drop", database).catch(() => undefined);
+      await this.#readCredentials().catch(() => undefined);
+      throw e;
+    }
     await this.#readCredentials();
     return new Tm1Database(this, instance, name);
   }
 
   /** Deletes a database of the running engine, with everything in it. Takes about 7 seconds. */
   async dropDatabase(database: Tm1Database): Promise<void> {
-    await this.#command("database", "drop", database.getInstance() + "/" + database.getName());
+    await this.#command(COMMAND_TIMEOUT, "database", "drop", database.getInstance() + "/" + database.getName());
     await this.#readCredentials();
   }
 
-  /** A login to an instance, through its first application.
+  /** A login to an instance, through its first application the image holds the secret of: TM1
+   * shows a secret once, so an application made elsewhere is listed without.
    * @internal */
   login(instance: string, user: string): Tm1Login {
     for (const found of this.#read().instances ?? []) {
-      const application = found.applications?.[0];
-      if (found.name === instance && application) {
-        return new Tm1Login(this.getUrl() + instance + "/auth/v1/", instance, application.clientId ?? "", application.clientSecret ?? "", user);
+      if (found.name !== instance) continue;
+      for (const application of found.applications ?? []) {
+        if (typeof application.clientSecret === "string") {
+          return new Tm1Login(this.getUrl() + instance + "/auth/v1/", instance, application.clientId ?? "", application.clientSecret, user);
+        }
       }
     }
     throw new IllegalStateException("The instance " + instance + " has no application to log in through");
@@ -305,7 +324,11 @@ export class Tm1EngineContainer extends GenericContainer {
   override start(): Promise<void> {
     // Before anything starts: what this depends on, the datastore, is started ahead of configure()
     this.#joinNetwork();
-    return super.start();
+    return super.start().catch(async (e: unknown) => {
+      // The engine that couldn't start is stopped for us, not what it depends on
+      await this.#datastore.stop().catch(() => undefined);
+      throw e;
+    });
   }
 
   /** @internal */
@@ -375,11 +398,11 @@ export class Tm1EngineContainer extends GenericContainer {
   }
 
   /** Runs the image's tm1-engine command, and returns what it printed. */
-  async #command(...args: string[]): Promise<string> {
+  async #command(timeout: number, ...args: string[]): Promise<string> {
     if (!this.isRunning()) throw new IllegalStateException("The container isn't started yet");
     let result: { exitCode: number; stdout: string; stderr: string };
     try {
-      result = await this.getContainer().exec(["timeout", String(COMMAND_TIMEOUT), "tm1-engine", ...args]);
+      result = await this.getContainer().exec(["timeout", String(timeout), "tm1-engine", ...args]);
     } catch (e) {
       throw new Error(`Couldn't run tm1-engine ${args[0]} in the container`, { cause: e });
     }
@@ -391,7 +414,7 @@ export class Tm1EngineContainer extends GenericContainer {
 
   /** Asks the image for the engine's addresses and credentials, and keeps them. */
   async #readCredentials(): Promise<Credentials> {
-    const credentials = JSON.parse(await this.#command("credentials", "--json")) as Credentials;
+    const credentials = JSON.parse(await this.#command(COMMAND_TIMEOUT, "credentials", "--json")) as Credentials;
     this.#credentials = credentials;
     return credentials;
   }

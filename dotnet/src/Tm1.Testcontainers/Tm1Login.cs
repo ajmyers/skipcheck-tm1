@@ -24,7 +24,18 @@ public sealed class Tm1Login
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
 
     // Without a cookie container: a session's cookie is this login's to keep, not the process's
-    private static readonly HttpClient Http = new(new SocketsHttpHandler { UseCookies = false, ConnectTimeout = RequestTimeout }) { Timeout = RequestTimeout };
+    private static readonly HttpClient Http = new(
+        new SocketsHttpHandler
+        {
+            UseCookies = false,
+            // The login's own answer carries the cookie
+            AllowAutoRedirect = false,
+            ConnectTimeout = RequestTimeout,
+        }
+    )
+    {
+        Timeout = RequestTimeout,
+    };
 
     // The session request's property, which is TM1's name for it and not this class's
     private const string UserProperty = "User";

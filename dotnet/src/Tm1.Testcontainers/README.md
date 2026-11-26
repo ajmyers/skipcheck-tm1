@@ -32,7 +32,6 @@ public class CubeTests(Tm1ServerFixture tm1) : IClassFixture<Tm1ServerFixture>
 | `PlanningAnalyticsEnvironment.fromConfig(Path.of("pa-environment.yaml"))` | `PlanningAnalyticsEnvironment.FromConfig("pa-environment.yaml")` |
 | `@RequiresTm1`, `@RequiresCognos`, `@RequiresTm1Web`, `@RequiresPaw`, `@RequiresTm1Engine` | `[RequiresTm1Fact]`, `[RequiresCognosFact]`, `[RequiresTm1WebFact]`, `[RequiresPawFact]`, `[RequiresTm1EngineFact]` |
 | A `Tm1ServerContainer` / `Tm1WebContainer` / `PawContainer` / `CognosSource` test parameter | `Tm1ServerFixture` / `Tm1WebFixture` / `PawFixture` / `CognosFixture` as an `IClassFixture` |
-
 | A `Tm1Database` test parameter with `@RequiresTm1Engine` | `Tm1DatabaseFixture<TheTestClass>` as an `IClassFixture`; with `shareDatabase = true`, `Tm1EngineFixture` |
 | `engine.databases()`, `createDatabase(…)`, `dropDatabase(…)` | `DatabasesAsync()`, `CreateDatabaseAsync(…)`, `DropDatabaseAsync(…)` |
 | `login.cookie()`, `token()`, `session(…)`, `authorize(HttpRequest.Builder)` | `CookieAsync()`, `TokenAsync()`, `SessionAsync(…)`, `AuthorizeAsync(HttpRequestMessage)` |

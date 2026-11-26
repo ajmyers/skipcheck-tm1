@@ -112,6 +112,25 @@ class Tm1EngineWiringTest {
 	}
 
 	@Test
+	void aSubclassKeepsTheAnnotationsOptions() {
+		// JUnit runs the extension for a subclass of an annotated class, so the options
+		// have to come with it
+		var inherited = Sub.class.getAnnotation(RequiresTm1Engine.class);
+		assertThat(inherited).isNotNull();
+		assertThat(inherited.shareDatabase()).isTrue();
+		assertThat(inherited.minVersion()).isEqualTo("12.6");
+	}
+
+	@RequiresTm1Engine(shareDatabase = true, minVersion = "12.6")
+	abstract static class Base {
+
+	}
+
+	static final class Sub extends Base {
+
+	}
+
+	@Test
 	void namesAClassesDatabaseAfterTheClass() {
 		assertThat(Tm1EngineExtension.databaseName("CubeTest", "k3f9")).isEqualTo("cubetest_k3f9");
 		// A short suffix is padded, so the name is always long enough for TM1

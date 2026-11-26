@@ -216,6 +216,67 @@ public class Tm1EngineWiringTests : TempDir
     }
 
     [Fact]
+    public async Task AStartThatFailsLeavesNothingBehind()
+    {
+        // Fails before anything reaches Docker, with the engine and its datastore already on the
+        // network this made for them
+        var engine = new FailsToStart(Source);
+        Assert.Equal("can't start", (await Assert.ThrowsAsync<InvalidOperationException>(() => engine.StartAsync())).Message);
+        Assert.NotNull(engine.Made);
+        Assert.Null(engine.Network);
+        Assert.Null(engine.Datastore.Network);
+        Assert.Equal(1, engine.Stopped);
+        Assert.False(engine.IsRunning);
+        Assert.False(engine.Datastore.IsRunning);
+
+        // A network it was given is the caller's to remove, and stays
+        var network = Network.NewNetwork();
+        var given = new FailsToStart(Source);
+        given.WithNetwork(network);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => given.StartAsync());
+        Assert.Same(network, given.Network);
+        Assert.Same(network, given.Datastore.Network);
+        Assert.Equal(1, given.Stopped);
+    }
+
+    private sealed class FailsToStart(Tm1EngineSource source) : Tm1EngineContainer(source)
+    {
+        public Network? Made { get; private set; }
+
+        public int Stopped { get; private set; }
+
+        private protected override void BeforeDependenciesStart()
+        {
+            base.BeforeDependenciesStart();
+            Made = Network;
+            throw new InvalidOperationException("can't start");
+        }
+
+        private protected override async Task StoppedAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            await base.StoppedAsync(cancellationToken);
+            Stopped++;
+        }
+    }
+
+    [Fact]
+    public void LogsInThroughTheFirstApplicationWhoseSecretItHolds()
+    {
+        var credentials = Tm1EngineContainer.Credentials.Parse(
+            """
+            {"root":{"clientId":"root","clientSecret":"rootsecret"},"instances":[
+              {"name":"tm1","applications":[{"name":"lost","clientId":"a","clientSecret":null},{"name":"tm1","clientId":"b","clientSecret":"s"},
+                {"name":"later","clientId":"c","clientSecret":"t"}],"databases":[{"name":"tm1"}]},
+              {"name":"other","applications":[{"name":"lost","clientId":"d","clientSecret":null},{"name":"none","clientId":"e"}],"databases":[]}]}
+            """
+        );
+        Assert.Equal(("b", "s"), credentials.Application("tm1"));
+        // None with a secret, or no such instance: Login then says there's no application to log in through
+        Assert.Null(credentials.Application("other"));
+        Assert.Null(credentials.Application("missing"));
+    }
+
+    [Fact]
     public void MountsEachSourceWhereTheImageLooks()
     {
         Touch(Path.Combine("install", "bin", "tm1sd.exe"));

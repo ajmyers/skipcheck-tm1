@@ -92,15 +92,18 @@ def tm1_engine_version_skip_reason(minimum: str) -> str | None:
 
 
 def _engine_options(node: Any) -> tuple[bool, str]:
-    """share_database and min_version of the requires_tm1_engine marker nearest a test: its own,
-    then its class's, then its module's."""
-    marker = node.get_closest_marker("requires_tm1_engine")
-    if marker is None:
-        return False, ""
-    unknown = sorted(set(marker.kwargs) - {"share_database", "min_version"})
-    if marker.args or unknown:
-        raise pytest.UsageError(f"requires_tm1_engine takes share_database=... and min_version=..., not {[*marker.args, *unknown]}")
-    return bool(marker.kwargs.get("share_database", False)), str(marker.kwargs.get("min_version") or "")
+    """share_database and min_version for a test, each from the nearest requires_tm1_engine marker
+    that sets it: the test's own, then its class's, then its module's. So a marker on a test that
+    sets one option keeps the other from its class or module, as JUnit evaluates a class's
+    annotation as well as its method's."""
+    options: dict[str, Any] = {}
+    for marker in node.iter_markers(name="requires_tm1_engine"):  # the nearest first
+        unknown = sorted(set(marker.kwargs) - {"share_database", "min_version"})
+        if marker.args or unknown:
+            raise pytest.UsageError(f"requires_tm1_engine takes share_database=... and min_version=..., not {[*marker.args, *unknown]}")
+        for name, value in marker.kwargs.items():
+            options.setdefault(name, value)
+    return bool(options.get("share_database", False)), str(options.get("min_version") or "")
 
 
 def cognos_skip_reason() -> str | None:

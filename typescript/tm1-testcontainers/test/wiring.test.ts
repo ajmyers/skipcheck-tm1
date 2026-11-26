@@ -2,10 +2,12 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { Tm1Version } from "@skipcheck/tm1-client";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   CognosContainer,
   CognosSource,
+  DockerHost,
   IllegalArgumentException,
   IllegalStateException,
   KeycloakContainer,
@@ -13,6 +15,7 @@ import {
   PawSource,
   PlanningAnalyticsEnvironment,
   Tm1AdminServerContainer,
+  Tm1Database,
   Tm1EngineContainer,
   Tm1EngineSource,
   Tm1Seed,
@@ -21,7 +24,7 @@ import {
   Tm1WebContainer,
   Tm1WebSource,
 } from "../src/index.js";
-import { RequiresTm1Engine } from "../src/vitest.js";
+import { RequiresTm1Engine, requiresTm1Engine } from "../src/vitest.js";
 import { Repo, useTempDir } from "./support/files.js";
 
 /** These need no Docker: they read the wiring before anything starts, as the Java tests do. */
@@ -616,6 +619,50 @@ describe("Tm1Engine wiring", () => {
     expect(new Tm1EngineContainer(SOURCE).getDockerImageName()).toBe("tm1-engine:test");
   });
 
+  // Java's options are the annotation's, kept by a subclass (@Inherited). Here they're fixtures of
+  // the test, kept by a test extended from it. An engine that only answers stands in for the
+  // shared one, and a source is set, so the test runs wherever this does
+  describe("extended again", () => {
+    const requiresInherited = requiresTm1Engine.extend({ shareDatabase: true, minVersion: "12.6" }).extend({});
+    const saved = process.env[Tm1EngineSource.PRIVATE_IMAGE];
+    const asked: string[] = [];
+    let ran = false;
+
+    beforeAll(() => {
+      process.env[Tm1EngineSource.PRIVATE_IMAGE] = "tm1-engine:test";
+      vi.spyOn(DockerHost, "available").mockResolvedValue(true);
+      const engine = new (class extends Tm1EngineContainer {
+        override getTm1Version(): Tm1Version {
+          asked.push("version");
+          return Tm1Version.parse("12.6.7");
+        }
+        override database(name: string): Tm1Database {
+          return new Tm1Database(this, Tm1EngineContainer.DEFAULT_INSTANCE, name);
+        }
+      })(SOURCE);
+      vi.spyOn(Tm1EngineContainer, "shared").mockResolvedValue(engine);
+    });
+
+    afterAll(() => {
+      vi.restoreAllMocks();
+      if (saved === undefined) delete process.env[Tm1EngineSource.PRIVATE_IMAGE];
+      else process.env[Tm1EngineSource.PRIVATE_IMAGE] = saved;
+    });
+
+    requiresInherited("a subclass keeps the annotation's options", ({ shareDatabase, minVersion, tm1Database }) => {
+      ran = true;
+      expect(shareDatabase).toBe(true);
+      expect(minVersion).toBe("12.6");
+      // And they're used: the version was checked, and the database is the engine's own
+      expect(asked).toEqual(["version"]);
+      expect(tm1Database.getName()).toBe(Tm1EngineContainer.DEFAULT_DATABASE);
+    });
+
+    it("ran the test that keeps the options, rather than skipping it", () => {
+      expect(ran).toBe(true);
+    });
+  });
+
   // A file here, where Java has a class: the unit vitest shares set-up over
   it("names a classes' database after the class", () => {
     expect(RequiresTm1Engine.databaseName("CubeTest", "k3f9")).toBe("cubetest_k3f9");
@@ -635,6 +682,110 @@ describe("Tm1Engine wiring", () => {
     expect(engine.database("tm1").toString()).toBe("Tm1Database[tm1/tm1]");
     expect(engine.database("tm1").equals(engine.database("tm1"))).toBe(true);
     expect(engine.database("tm1").equals(new Tm1EngineContainer(SOURCE).database("tm1"))).toBe(false);
+  });
+});
+
+/** What a running engine does with the image's `tm1-engine` command, without Docker: a started
+ * container that answers each command as it's told to, and keeps what it was asked. */
+describe("A running Tm1EngineContainer", () => {
+  const credentials = {
+    root: { clientId: "root-id", clientSecret: "root-secret" },
+    instances: [
+      {
+        name: "tm1",
+        applications: [
+          { name: "elsewhere", clientId: "made-elsewhere", clientSecret: null },
+          { name: "tm1", clientId: "the-id", clientSecret: "the-secret" },
+          { name: "later", clientId: "later-id", clientSecret: "later-secret" },
+        ],
+        databases: [{ name: "tm1" }],
+      },
+      { name: "other", applications: [{ name: "elsewhere", clientId: "made-elsewhere", clientSecret: null }], databases: [{ name: "sales" }] },
+    ],
+  };
+
+  function running(answer: (command: string[]) => { exitCode: number; stdout?: string; stderr?: string }): { engine: Tm1EngineContainer; asked: string[] } {
+    const asked: string[] = [];
+    const container = {
+      getHost: () => "localhost",
+      getMappedPort: () => 54321,
+      exec: async (command: string[]) => {
+        asked.push(command.join(" "));
+        const result = command.includes("credentials") ? { exitCode: 0, stdout: JSON.stringify(credentials) } : answer(command);
+        return { stdout: "", stderr: "", output: "", ...result };
+      },
+    };
+    const engine = new (class extends Tm1EngineContainer {
+      override isRunning(): boolean {
+        return true;
+      }
+      override getContainer(): ReturnType<Tm1EngineContainer["getContainer"]> {
+        return container as unknown as ReturnType<Tm1EngineContainer["getContainer"]>;
+      }
+    })(new Tm1EngineSource.PrivateImage("tm1-engine:test"));
+    return { engine, asked };
+  }
+
+  it("logs in through the instance's first application whose secret the image holds", async () => {
+    const { engine } = running(() => ({ exitCode: 0 }));
+    const databases = await engine.databases();
+    expect(databases.map(String)).toEqual(["Tm1Database[tm1/tm1]", "Tm1Database[other/sales]"]);
+    const login = engine.database("tm1").login("analyst");
+    expect([login.getClientId(), login.getClientSecret(), login.getUser(), login.getAuthUrl()]).toEqual([
+      "the-id",
+      "the-secret",
+      "analyst",
+      "http://localhost:54321/tm1/auth/v1/",
+    ]);
+    // An instance whose only application was made elsewhere has none to log in through
+    expect(() => engine.database("other", "sales").login()).toThrow(IllegalStateException);
+    expect(() => engine.database("other", "sales").login()).toThrow("The instance other has no application to log in through");
+    expect(engine.getRootClientId()).toBe("root-id");
+    expect(engine.getRootClientSecret()).toBe("root-secret");
+  });
+
+  it("gives creating a database the image's own wait, and the other commands three minutes", async () => {
+    const { engine, asked } = running(() => ({ exitCode: 0 }));
+    const made = await engine.createDatabase("scratch");
+    await engine.dropDatabase(made);
+    expect(asked).toEqual([
+      "timeout 330 tm1-engine database create tm1/scratch",
+      "timeout 180 tm1-engine credentials --json",
+      "timeout 180 tm1-engine database drop tm1/scratch",
+      "timeout 180 tm1-engine credentials --json",
+    ]);
+  });
+
+  it("drops a database it couldn't finish creating, and says why the creation failed", async () => {
+    const { engine, asked } = running((command) => (command.includes("create") ? { exitCode: 124, stderr: "still starting\n" } : { exitCode: 0 }));
+    await expect(engine.createDatabase("other", "scratch")).rejects.toThrow("tm1-engine database create other/scratch failed (exit 124): still starting");
+    expect(asked.slice(0, 2)).toEqual(["timeout 330 tm1-engine database create other/scratch", "timeout 180 tm1-engine database drop other/scratch"]);
+
+    // The drop failing too changes nothing: the first failure is the one reported
+    const neither = running((command) => ({
+      exitCode: command.includes("create") ? 1 : 2,
+      stderr: command.includes("create") ? "no such instance" : "no such database",
+    }));
+    await expect(neither.engine.createDatabase("scratch")).rejects.toThrow("tm1-engine database create tm1/scratch failed (exit 1): no such instance");
+    expect(neither.asked.slice(0, 2)).toEqual(["timeout 330 tm1-engine database create tm1/scratch", "timeout 180 tm1-engine database drop tm1/scratch"]);
+    // A name the image can't take is refused before anything is asked
+    await expect(neither.engine.createDatabase("ab")).rejects.toThrow(IllegalArgumentException);
+    expect(neither.asked.filter((a) => a.includes("database")).length).toBe(2);
+  });
+
+  it("stops the datastore when the engine can't start", async () => {
+    const engine = new Tm1EngineContainer(new Tm1EngineSource.PrivateImage("tm1-engine:test"));
+    const datastore = engine.getDatastore();
+    // Fails before Docker is asked for anything: what the engine depends on is started first
+    const start = vi.spyOn(datastore, "start").mockRejectedValue(new Error("no Docker here"));
+    const stop = vi.spyOn(datastore, "stop").mockResolvedValue();
+    await expect(engine.start()).rejects.toThrow("no Docker here");
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(engine.isRunning()).toBe(false);
+    // And a datastore that can't be stopped doesn't hide why the engine didn't start
+    stop.mockRejectedValue(new Error("can't stop"));
+    await expect(engine.start()).rejects.toThrow("no Docker here");
   });
 });
 

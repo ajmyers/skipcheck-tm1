@@ -227,6 +227,11 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
             }
             await ContainerIsStartedAsync(cancellationToken).ConfigureAwait(false);
         }
+        catch
+        {
+            await StartFailedAsync().ConfigureAwait(false);
+            throw;
+        }
         finally
         {
             starting.Release();
@@ -280,6 +285,10 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
 
     /// <summary>Runs as it starts, before what it depends on does: Java's containers override <c>start()</c> for this.</summary>
     private protected virtual void BeforeDependenciesStart() { }
+
+    /// <summary>Runs when starting failed, whatever failed, before the failure is thrown on: for a container that
+    /// must leave nothing behind then. It mustn't throw, or its failure would hide the start's.</summary>
+    private protected virtual Task StartFailedAsync() => Task.CompletedTask;
 
     /// <summary>Runs once it's stopped, and when it's stopped without having started: Java's containers override <c>stop()</c> for this.</summary>
     private protected virtual Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;

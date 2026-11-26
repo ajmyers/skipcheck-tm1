@@ -75,6 +75,10 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromMinutes(3);
+
+    // The image itself waits up to five minutes for a new database to be ready: longer than that, so
+    // it's the image's own message that comes back
+    private static readonly TimeSpan CreateTimeout = TimeSpan.FromSeconds(330);
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
     private static readonly SemaphoreSlim SharedLock = new(1, 1);
     private static Tm1EngineContainer? shared;
@@ -88,6 +92,9 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     private readonly SemaphoreSlim commands = new(1, 1);
     private Credentials? credentials;
     private Tm1Version? version;
+
+    // The network this made for itself, which goes with a start that failed; not one it was given
+    private Network? ownNetwork;
 
     /// <summary>TM1 from <paramref name="source"/>, in the default image for it: a private image as it
     /// is; otherwise <c>TM1_ENGINE_IMAGE</c> if set; otherwise <see cref="DefaultImage"/> tagged with
@@ -254,12 +261,13 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     public Task<Tm1Database> CreateDatabaseAsync(string name, CancellationToken cancellationToken = default) =>
         CreateDatabaseAsync(DefaultInstance, name, cancellationToken);
 
-    /// <summary>Creates a database in a named instance of the running engine, which must exist.</summary>
+    /// <summary>Creates a database in a named instance of the running engine, which must exist. If
+    /// that fails, what was made of the database is dropped again.</summary>
     /// <exception cref="InvalidOperationException">It isn't started, or TM1 refuses.</exception>
     public async Task<Tm1Database> CreateDatabaseAsync(string instance, string name, CancellationToken cancellationToken = default)
     {
-        await ChangeAsync(["database", "create", RequireName(instance, "instance") + "/" + RequireName(name, "database")], cancellationToken)
-            .ConfigureAwait(false);
+        var database = RequireName(instance, "instance") + "/" + RequireName(name, "database");
+        await ChangeAsync(["database", "create", database], cancellationToken, CreateTimeout, undo: ["database", "drop", database]).ConfigureAwait(false);
         return new Tm1Database(this, instance, name);
     }
 
@@ -271,15 +279,11 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
         await ChangeAsync(["database", "drop", database.Instance + "/" + database.Name], cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>A login to an instance, through its first application.</summary>
+    /// <summary>A login to an instance, through its first application whose secret the image holds.</summary>
     internal Tm1Login Login(string instance, string user)
     {
-        var found = Current().Instances.FirstOrDefault(i => i.Name == instance && i.Applications.Count > 0);
-        if (found is null)
-        {
-            throw new InvalidOperationException("The instance " + instance + " has no application to log in through");
-        }
-        var (clientId, clientSecret) = found.Applications[0];
+        var (clientId, clientSecret) = Current().Application(instance)
+            ?? throw new InvalidOperationException("The instance " + instance + " has no application to log in through");
         return new Tm1Login(Url + instance + "/auth/v1/", instance, clientId, clientSecret, user);
     }
 
@@ -317,6 +321,40 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
         version = null;
     }
 
+    /// <summary>A start that failed leaves nothing behind: not the engine, were it up and never set up, nor its
+    /// datastore, nor the network this made for them. As Java's <c>start()</c>, which stops what it started.</summary>
+    private protected override async Task StartFailedAsync()
+    {
+#pragma warning disable CA1031 // whatever goes wrong clearing up, it's the start's failure that's thrown
+        try
+        {
+            await StopAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Testcontainers removes what's left when the run ends
+        }
+        if (ownNetwork is { } made)
+        {
+            ownNetwork = null;
+            if (ReferenceEquals(Network, made))
+            {
+                // The next start makes another
+                WithNetwork(null);
+                Datastore.WithNetwork(null);
+            }
+            try
+            {
+                await made.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // As above
+            }
+        }
+#pragma warning restore CA1031
+    }
+
     /// <summary>The image for <paramref name="source"/>, as Java's <c>defaultImage</c>.</summary>
     internal static string DefaultImageFor(Tm1EngineSource source) =>
         source is Tm1EngineSource.PrivateImage p ? p.Image : Tm1ServerContainer.ImageFor(EngineImage, DefaultImage);
@@ -326,7 +364,8 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     {
         if (Network is null)
         {
-            WithNetwork(Network.NewNetwork());
+            ownNetwork = Network.NewNetwork();
+            WithNetwork(ownNetwork);
         }
         Datastore.WithNetwork(Network);
     }
@@ -368,13 +407,13 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     }
 
     /// <summary>Runs the image's tm1-engine command, and returns what it printed.</summary>
-    private async Task<string> CommandAsync(string[] arguments, CancellationToken cancellationToken)
+    private async Task<string> CommandAsync(string[] arguments, TimeSpan timeout, CancellationToken cancellationToken)
     {
         if (!IsRunning)
         {
             throw new InvalidOperationException("The container isn't started yet");
         }
-        var seconds = ((int)CommandTimeout.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var seconds = ((int)timeout.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
         var result = await Container.ExecAsync(["timeout", seconds, "tm1-engine", .. arguments], cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
         {
@@ -388,16 +427,38 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     /// <summary>Runs a command that changes the databases, if one is given, then reads the engine's
     /// addresses and credentials again, as the image reports them, and keeps them. One at a time, so
     /// what's kept is never older than a change that has finished.</summary>
-    private async Task<Credentials> ChangeAsync(string[]? command, CancellationToken cancellationToken)
+    /// <param name="command">The command, or null only to read.</param>
+    /// <param name="cancellationToken">Stops waiting.</param>
+    /// <param name="timeout">How long the command may take; <see cref="CommandTimeout"/> if null.</param>
+    /// <param name="undo">A command to run if <paramref name="command"/> fails, before its failure is thrown on.</param>
+    private async Task<Credentials> ChangeAsync(string[]? command, CancellationToken cancellationToken, TimeSpan? timeout = null, string[]? undo = null)
     {
         await commands.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             if (command is not null)
             {
-                await CommandAsync(command, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await CommandAsync(command, timeout ?? CommandTimeout, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception) when (undo is not null)
+                {
+#pragma warning disable CA1031 // whatever goes wrong undoing it, it's the command's failure that's thrown
+                    try
+                    {
+                        // Not the caller's token: a create that was cancelled is undone too
+                        await CommandAsync(undo, CommandTimeout, CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch (Exception)
+                    {
+                        // Nothing was made, or it can't be dropped: either way the first failure says why
+                    }
+#pragma warning restore CA1031
+                    throw;
+                }
             }
-            var read = Credentials.Parse(await CommandAsync(["credentials", "--json"], cancellationToken).ConfigureAwait(false));
+            var read = Credentials.Parse(await CommandAsync(["credentials", "--json"], CommandTimeout, cancellationToken).ConfigureAwait(false));
             credentials = read;
             return read;
         }
@@ -418,7 +479,17 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     private static async Task<Tm1Version> ReadVersionAsync(List<Tm1Database> found, CancellationToken cancellationToken)
     {
         var first = found.FirstOrDefault() ?? throw new InvalidOperationException("The engine has no database to read its version from");
-        using var http = new HttpClient(new SocketsHttpHandler { UseCookies = false, ConnectTimeout = RequestTimeout }) { Timeout = RequestTimeout };
+        using var http = new HttpClient(
+            new SocketsHttpHandler
+            {
+                UseCookies = false,
+                AllowAutoRedirect = false,
+                ConnectTimeout = RequestTimeout,
+            }
+        )
+        {
+            Timeout = RequestTimeout,
+        };
         using var request = new HttpRequestMessage(HttpMethod.Get, first.RestUrl + "Configuration/ProductVersion/$value");
         await first.Login().AuthorizeAsync(request, cancellationToken).ConfigureAwait(false);
         try
@@ -498,7 +569,7 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     }
 
     /// <summary>What <c>tm1-engine credentials --json</c> prints.</summary>
-    private sealed record Credentials(string RootClientId, string RootClientSecret, IReadOnlyList<Credentials.Instance> Instances)
+    internal sealed record Credentials(string RootClientId, string RootClientSecret, IReadOnlyList<Credentials.Instance> Instances)
     {
         public static Credentials Parse(string json)
         {
@@ -517,6 +588,20 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
                         )),
                 ]
             );
+        }
+
+        /// <summary>The application to log in to <paramref name="instance"/> through: its first whose secret
+        /// the image holds (it lists one whose secret it doesn't with <c>"clientSecret": null</c>), or null.</summary>
+        public (string ClientId, string ClientSecret)? Application(string instance)
+        {
+            foreach (var found in Instances.Where(i => i.Name == instance))
+            {
+                foreach (var application in found.Applications.Where(a => a.ClientSecret.Length > 0))
+                {
+                    return application;
+                }
+            }
+            return null;
         }
 
         private static JsonElement? Property(JsonElement? parent, string name) =>

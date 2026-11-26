@@ -83,7 +83,11 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	/** The database a container has when none is named. */
 	public static final String DEFAULT_DATABASE = "tm1";
 
-	/** The datastore's name on the engine's network. */
+	/**
+	 * The datastore's name on the engine's network. It's the same for every engine, so
+	 * give each engine a network of its own, as it has unless you set one: two engines on
+	 * one network would each find either's datastore under this name.
+	 */
 	public static final String DATASTORE_ALIAS = "tm1-datastore";
 
 	/**
@@ -98,6 +102,9 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(5);
 
 	private static final Duration COMMAND_TIMEOUT = Duration.ofMinutes(3);
+
+	// The image's own wait for a new database to be ready is five minutes
+	private static final Duration CREATE_TIMEOUT = Duration.ofSeconds(330);
 
 	private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
@@ -126,6 +133,8 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 
 	private final Map<String, List<String>> users = new LinkedHashMap<>();
 
+	// Read and cleared under this container's lock: test classes may use the shared
+	// engine at once
 	private @Nullable JsonNode credentials;
 
 	private @Nullable Tm1Version version;
@@ -313,7 +322,7 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	 */
 	public List<Tm1Database> databases() {
 		// Read again: createDatabase and dropDatabase change them
-		credentials = null;
+		forgetCredentials();
 		List<Tm1Database> found = new ArrayList<>();
 		for (JsonNode instance : credentials().path("instances")) {
 			for (JsonNode database : instance.path("databases")) {
@@ -370,9 +379,26 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	 * @return the database
 	 */
 	public Tm1Database createDatabase(String instance, String name) {
-		command("database", "create", requireName(instance, "instance") + "/" + requireName(name, "database"));
-		credentials = null;
-		return new Tm1Database(this, instance, name);
+		Tm1Database database = new Tm1Database(this, requireName(instance, "instance"), requireName(name, "database"));
+		try {
+			command(CREATE_TIMEOUT, "database", "create", instance + "/" + name);
+		}
+		catch (RuntimeException e) {
+			// TM1 may have made it before the command gave up: don't leave half a
+			// database
+			try {
+				command(COMMAND_TIMEOUT, "database", "drop", instance + "/" + name);
+			}
+			catch (RuntimeException ignored) {
+				// It wasn't made, or can't be dropped: the first failure is the one to
+				// report
+			}
+			throw e;
+		}
+		finally {
+			forgetCredentials();
+		}
+		return database;
 	}
 
 	/**
@@ -381,17 +407,24 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	 * @param database the database
 	 */
 	public void dropDatabase(Tm1Database database) {
-		command("database", "drop", database.getInstance() + "/" + database.getName());
-		credentials = null;
+		command(COMMAND_TIMEOUT, "database", "drop", database.getInstance() + "/" + database.getName());
+		forgetCredentials();
 	}
 
-	/** A login to an instance, through its first application. */
+	/**
+	 * A login to an instance, through its first application the image holds the secret
+	 * of: TM1 shows a secret once, so an application made elsewhere is listed without.
+	 */
 	Tm1Login login(String instance, String user) {
 		for (JsonNode found : credentials().path("instances")) {
-			if (found.path("name").asString().equals(instance) && !found.path("applications").isEmpty()) {
-				JsonNode application = found.path("applications").get(0);
-				return new Tm1Login(getUrl() + instance + "/auth/v1/", instance,
-						application.path("clientId").asString(), application.path("clientSecret").asString(), user);
+			if (!found.path("name").asString().equals(instance)) {
+				continue;
+			}
+			for (JsonNode application : found.path("applications")) {
+				if (application.path("clientSecret").isString()) {
+					return new Tm1Login(getUrl() + instance + "/auth/v1/", instance,
+							application.path("clientId").asString(), application.path("clientSecret").asString(), user);
+				}
 			}
 		}
 		throw new IllegalStateException("The instance " + instance + " has no application to log in through");
@@ -450,7 +483,7 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 		// Not a dependent: Testcontainers starts what this depends on, and leaves
 		// stopping to us
 		datastore.stop();
-		credentials = null;
+		forgetCredentials();
 		version = null;
 	}
 
@@ -469,7 +502,19 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 						+ String.join("\n", lines.subList(Math.max(0, lines.size() - 30), lines.size())));
 			}
 			try {
-				if (execInContainer("tm1-engine", "health").getExitCode() == 0) {
+				int health;
+				try {
+					health = execInContainer("tm1-engine", "health").getExitCode();
+				}
+				catch (RuntimeException e) {
+					// It exited between the look and the command: look again, and say
+					// that
+					if (!Boolean.TRUE.equals(getCurrentContainerInfo().getState().getRunning())) {
+						continue;
+					}
+					throw e;
+				}
+				if (health == 0) {
 					return;
 				}
 				if (System.nanoTime() - deadline > 0) {
@@ -489,13 +534,13 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	}
 
 	/** Runs the image's tm1-engine command, and returns what it printed. */
-	private String command(String... arguments) {
+	private String command(Duration timeout, String... arguments) {
 		if (!isRunning()) {
 			throw new IllegalStateException("The container isn't started yet");
 		}
 		String[] all = new String[arguments.length + 3];
 		all[0] = "timeout";
-		all[1] = String.valueOf(COMMAND_TIMEOUT.toSeconds());
+		all[1] = String.valueOf(timeout.toSeconds());
 		all[2] = "tm1-engine";
 		System.arraycopy(arguments, 0, all, 3, arguments.length);
 		try {
@@ -517,10 +562,16 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 
 	/** The engine's addresses and credentials, as the image reports them. */
 	private synchronized JsonNode credentials() {
-		if (credentials == null) {
-			credentials = JsonMapper.shared().readTree(command("credentials", "--json"));
+		JsonNode read = credentials;
+		if (read == null) {
+			read = JsonMapper.shared().readTree(command(COMMAND_TIMEOUT, "credentials", "--json"));
+			credentials = read;
 		}
-		return credentials;
+		return read;
+	}
+
+	private synchronized void forgetCredentials() {
+		credentials = null;
 	}
 
 	/**

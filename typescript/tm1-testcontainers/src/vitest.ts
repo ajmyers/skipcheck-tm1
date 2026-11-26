@@ -146,13 +146,15 @@ export interface PawFixtures extends Tm1Fixtures {
 
 /** What a `requiresTm1Engine` test gets, and the two settings of Java's `@RequiresTm1Engine`. */
 export interface Tm1EngineFixtures {
-  /** The shared TM1 v12 engine, started on first use. */
+  /** The shared TM1 v12 engine ({@link Tm1EngineContainer.shared}), started on first use: one per
+   * test file under vitest's default isolation. */
   tm1Engine: Tm1EngineContainer;
   /** The test file's own database, created when a test of the file first asks for it and dropped
    * when the file is done; the engine's shared one, `tm1`, with {@link shareDatabase}. */
   tm1Database: Tm1Database;
   /** Whether the tests use the engine's shared database, `tm1`, rather than one of the file's
-   * own; `false` unless set: `requiresTm1Engine.extend({ shareDatabase: true })`. */
+   * own; `false` unless set: `requiresTm1Engine.extend({ shareDatabase: true })`. With an engine
+   * per test file (vitest's default), that database is the file's alone anyway. */
   shareDatabase: boolean;
   /** The oldest TM1 the tests apply to, such as `12.6`; they're skipped on an older engine.
    * Checking it starts the engine. Empty, for any, unless set:
@@ -235,10 +237,15 @@ export const requiresPaw: TestAPI<PawFixtures> = requiresTm1.extend<{ paw: PawCo
  * (with Java's message) when Docker isn't available or no TM1 v12 source is configured; run, and
  * failing, when a source is set but wrong. For TM1 11, use {@link requiresTm1}.
  *
- * One engine serves the run ({@link Tm1EngineContainer.shared}), and **each test file gets a
- * database of its own**, created when a test of the file first names `tm1Database` and dropped when
- * the file is done. So files don't see each other's objects. A test that names `tm1Engine` gets the
- * engine.
+ * The tests share an engine ({@link Tm1EngineContainer.shared}), and **each test file gets a
+ * database of its own** in it, created when a test of the file first names `tm1Database` and
+ * dropped when the file is done. So files don't see each other's objects. A test that names
+ * `tm1Engine` gets the engine.
+ *
+ * **How many engines:** one per module registry. Under vitest's default isolation every test file
+ * has its own modules, so that is one engine **per test file**, not one for the run, started by
+ * the file's first test that needs it (about 40 seconds). One engine serves the whole run only
+ * when the files share their modules: `isolate: false`, or a single worker without isolation.
  *
  * ```ts
  * import { requiresTm1Engine } from "@skipcheck/tm1-testcontainers/vitest";
@@ -252,8 +259,10 @@ export const requiresPaw: TestAPI<PawFixtures> = requiresTm1.extend<{ paw: PawCo
  *
  * A database takes about 10 seconds to create and 7 to drop.
  * `requiresTm1Engine.extend({ shareDatabase: true })` is a `test` whose tests get the engine's one
- * shared database instead, at no cost: they then need uniquely named objects, and to delete them
- * afterwards. `extend({ minVersion: "12.6" })` skips its tests on an older engine.
+ * shared database, `tm1`, instead, at no cost. With an engine per test file, that database is the
+ * file's alone, so sharing loses no isolation and is the option to use there. Where one engine
+ * serves several files, its tests need uniquely named objects, and to delete them afterwards.
+ * `extend({ minVersion: "12.6" })` skips its tests on an older engine.
  *
  * "A test class", which Java gives a database, is the unit each language's test framework shares
  * set-up over: a JUnit class there, a module in pytest, a class in xUnit, and a file here. */
