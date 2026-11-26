@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -60,16 +61,20 @@ class Tm1ServerContainerTest {
 	void failsAtOnceWhenTheContainerExits(@TempDir Path install) throws Exception {
 		// An install whose programs can't run, as when TM1 lacks a library: the container
 		// exits at once, and start() says so with its log, rather than waiting out the
-		// startup timeout
+		// startup timeout. They're executable, with an interpreter that doesn't exist, so
+		// exec fails the same way whatever the host's file permissions
 		Files.createDirectories(install.resolve("bin64"));
-		Files.writeString(install.resolve("bin64/tm1s.exe"), "not a program");
-		Files.writeString(install.resolve("bin64/tm1admsrv.exe"), "not a program");
+		for (String program : List.of("tm1s.exe", "tm1admsrv.exe")) {
+			Path file = Files.writeString(install.resolve("bin64").resolve(program), "#!/not/a/program\n");
+			file.toFile().setExecutable(true, false);
+		}
 		long started = System.nanoTime();
 		try (var tm1 = new Tm1ServerContainer(new Tm1Source.InstallDir(install))) {
 			assertThatThrownBy(tm1::start).hasStackTraceContaining("The container exited while starting, with code")
 				.hasStackTraceContaining("[tm1-entrypoint] Starting TM1 Admin Server");
 		}
-		assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMinutes(2));
+		// Well inside the five-minute startup timeout, with room for pulling the image
+		assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMinutes(4));
 	}
 
 	private HttpResponse<String> get(Tm1ServerContainer tm1, String path) throws Exception {

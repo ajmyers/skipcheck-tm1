@@ -53,9 +53,12 @@ def test_refuses_to_start_on_the_wrong_version(tm1_server: Tm1ServerContainer) -
 def test_fails_at_once_when_the_container_exits(tmp_path: Path) -> None:
     # An install whose programs can't run, as when TM1 lacks a library: the container exits at
     # once, and start() says so with its log, rather than waiting out the startup timeout
+    # executable, with an interpreter that doesn't exist: exec fails the same way whatever the
+    # host's file permissions
     (tmp_path / "bin64").mkdir()
-    (tmp_path / "bin64" / "tm1s.exe").write_text("not a program")
-    (tmp_path / "bin64" / "tm1admsrv.exe").write_text("not a program")
+    for program in ("tm1s.exe", "tm1admsrv.exe"):
+        (tmp_path / "bin64" / program).write_text("#!/not/a/program\n")
+        (tmp_path / "bin64" / program).chmod(0o755)
     started = time.monotonic()
     tm1 = Tm1ServerContainer(Tm1Source.InstallDir(tmp_path))
     try:
@@ -65,4 +68,5 @@ def test_fails_at_once_when_the_container_exits(tmp_path: Path) -> None:
         assert "[tm1-entrypoint] Starting TM1 Admin Server" in str(failed.value)
     finally:
         tm1.stop()
-    assert time.monotonic() - started < 120
+    # Well inside the five-minute startup timeout, with room for pulling the image
+    assert time.monotonic() - started < 240

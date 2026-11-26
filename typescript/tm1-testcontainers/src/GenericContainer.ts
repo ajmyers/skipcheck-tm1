@@ -350,40 +350,70 @@ export abstract class GenericContainer implements Startable {
   }
 }
 
-/** Stops waiting when the container has exited, as Java's wait does, and says why: its exit code
- * and the end of its log. Testcontainers' own HTTP wait would keep trying until its timeout, so a
- * TM1 that can't start cost the whole startup timeout before anything said so. */
-class ExitAwareWait implements WaitStrategy {
+/** Stops waiting as soon as the container has exited, as Java's wait does, and says why: its
+ * exit code and the end of its log. Testcontainers' own HTTP wait would keep trying until its
+ * timeout (its abortOnContainerExit stops only for "exited", not "dead"), so a TM1 that can't
+ * start cost the whole startup timeout before anything said so.
+ * @internal */
+export class ExitAwareWait implements WaitStrategy {
+  /** Wraps `inner`, the wait for the container to be ready. */
   constructor(private readonly inner: WaitStrategy) {}
 
+  /** Waits as `inner` does, until the container has exited. */
   async waitUntilReady(...[container, boundPorts, startTime]: Parameters<WaitStrategy["waitUntilReady"]>): Promise<void> {
+    let done = false;
+    const exited = (async (): Promise<never> => {
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 1_000).unref());
+        if (done) return new Promise<never>(() => {});
+        const state = await container.inspect().then(
+          (info) => info.State,
+          () => undefined,
+        );
+        if (state && !state.Running) throw new Error(await exitMessage(container, state.ExitCode));
+      }
+    })();
     try {
-      await this.inner.waitUntilReady(container, boundPorts, startTime);
+      await Promise.race([this.inner.waitUntilReady(container, boundPorts, startTime), exited]);
     } catch (e) {
       const state = await container.inspect().then(
         (info) => info.State,
         () => undefined,
       );
       if (!state || state.Running) throw e;
-      const client = await getContainerRuntimeClient();
-      const log = await client.container.logs(container, { tail: 30 }).then(
-        (stream) => text(stream),
-        () => "",
-      );
-      throw new Error(`The container exited while starting, with code ${state.ExitCode}. The end of its log:\n${log.trim()}`, { cause: e });
+      throw new Error(await exitMessage(container, state.ExitCode), { cause: e });
+    } finally {
+      done = true;
+      exited.catch(() => {});
     }
   }
 
+  /** Sets `inner`'s timeout. */
   withStartupTimeout(startupTimeoutMs: number): this {
     this.inner.withStartupTimeout(startupTimeoutMs);
     return this;
   }
 
+  /** Whether `inner`'s timeout is set. */
   isStartupTimeoutSet(): boolean {
     return this.inner.isStartupTimeoutSet();
   }
 
+  /** `inner`'s timeout. */
   getStartupTimeout(): number {
     return this.inner.getStartupTimeout();
   }
+}
+
+/** "The container exited while starting, with code …", and the last 30 lines of its log, read
+ * for at most 2 s. */
+async function exitMessage(container: Parameters<WaitStrategy["waitUntilReady"]>[0], code: number): Promise<string> {
+  const log = await Promise.race([
+    getContainerRuntimeClient()
+      .then((client) => client.container.logs(container, { tail: 30 }))
+      .then((stream) => text(stream))
+      .catch(() => ""),
+    new Promise<string>((r) => setTimeout(() => r(""), 2_000).unref()),
+  ]);
+  return `The container exited while starting, with code ${code}. The end of its log:\n${log.trim()}`;
 }

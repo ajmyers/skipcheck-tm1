@@ -107,9 +107,10 @@ class _HttpWait(HttpWaitStrategy):
         if self._container is not None:
             self._container.reload()
             if self._container.status in ("exited", "dead"):
-                out, err = self._container.get_logs()
-                code = (self._container.get_wrapped_container().attrs.get("State") or {}).get("ExitCode")
-                tail = "\n".join((out + err).decode(errors="replace").splitlines()[-30:])
+                wrapped = self._container.get_wrapped_container()
+                code = (wrapped.attrs.get("State") or {}).get("ExitCode")
+                # Both streams in the order they were written, as Java's and TypeScript's
+                tail = wrapped.logs(stdout=True, stderr=True, tail=30).decode(errors="replace").rstrip("\n")
                 raise RuntimeError(f"The container exited while starting, with code {code}. The end of its log:\n{tail}")
         return super()._try_http_request(url, headers, ssl_context)
 

@@ -8,7 +8,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.function.IntPredicate;
 
@@ -33,6 +32,15 @@ final class HttpOrExitWaitStrategy extends AbstractWaitStrategy {
 
 	private static final int LOG_LINES = 30;
 
+	// One for every wait: Java 17 has no HttpClient.close(), so a client per start would
+	// leave its selector thread until it's collected. HTTP/1.1 and redirects followed, as
+	// the HttpURLConnection behind Wait.forHttp has it
+	private static final HttpClient HTTP = HttpClient.newBuilder()
+		.version(HttpClient.Version.HTTP_1_1)
+		.followRedirects(HttpClient.Redirect.NORMAL)
+		.connectTimeout(REQUEST_TIMEOUT)
+		.build();
+
 	private final String path;
 
 	private final int port;
@@ -48,8 +56,8 @@ final class HttpOrExitWaitStrategy extends AbstractWaitStrategy {
 
 	@Override
 	protected void waitUntilReady() {
-		Instant deadline = Instant.now().plus(startupTimeout);
-		HttpClient http = HttpClient.newBuilder().connectTimeout(REQUEST_TIMEOUT).build();
+		// The monotonic clock: a clock change or a sleep doesn't move the deadline
+		long deadline = System.nanoTime() + startupTimeout.toNanos();
 		while (true) {
 			InspectContainerResponse info = waitStrategyTarget.getCurrentContainerInfo();
 			InspectContainerResponse.ContainerState state = info.getState();
@@ -59,7 +67,7 @@ final class HttpOrExitWaitStrategy extends AbstractWaitStrategy {
 			URI uri = URI
 				.create("http://" + waitStrategyTarget.getHost() + ":" + waitStrategyTarget.getMappedPort(port) + path);
 			try {
-				HttpResponse<Void> response = http.send(
+				HttpResponse<Void> response = HTTP.send(
 						HttpRequest.newBuilder(uri).timeout(REQUEST_TIMEOUT).GET().build(),
 						HttpResponse.BodyHandlers.discarding());
 				if (ok.test(response.statusCode())) {
@@ -73,7 +81,7 @@ final class HttpOrExitWaitStrategy extends AbstractWaitStrategy {
 				Thread.currentThread().interrupt();
 				throw new ContainerLaunchException("Interrupted while waiting for " + uri, ex);
 			}
-			if (Instant.now().isAfter(deadline)) {
+			if (System.nanoTime() - deadline > 0) {
 				throw new ContainerLaunchException(
 						"Timed out after " + startupTimeout + " waiting for " + uri + " to answer");
 			}

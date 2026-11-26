@@ -216,7 +216,10 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
             catch (ContainerNotRunningException e)
             {
                 // As Java's and the other clients': the exit code and the end of the log, in one message
-                throw new InvalidOperationException(await ExitedAsync(started).ConfigureAwait(false), e);
+                var message = await ExitedAsync(started, cancellationToken).ConfigureAwait(false);
+                container = null;
+                await started.DisposeAsync().ConfigureAwait(false);
+                throw new InvalidOperationException(message, e);
             }
             await ContainerIsStartedAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -349,22 +352,30 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     private sealed record WaitFor(string Path, int Port, Predicate<HttpStatusCode> Ok, TimeSpan Timeout);
 
     /// <summary>Why a container that exited while starting did: its exit code and the end of its log.</summary>
-    private static async Task<string> ExitedAsync(IContainer exited)
+    private static async Task<string> ExitedAsync(IContainer exited, CancellationToken cancellationToken)
     {
         long code;
-        string log;
+        string stdout;
+        string stderr;
         try
         {
-            code = await exited.GetExitCodeAsync().ConfigureAwait(false);
-            var (stdout, stderr) = await exited.GetLogsAsync().ConfigureAwait(false);
-            log = stdout + stderr;
+            code = await exited.GetExitCodeAsync(cancellationToken).ConfigureAwait(false);
+            // With timestamps, so the two streams can be put back in the order they were written
+            (stdout, stderr) = await exited.GetLogsAsync(timestampsEnabled: true, ct: cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception e) when (e is not OutOfMemoryException)
+        catch (Exception e) when (e is not OutOfMemoryException and not OperationCanceledException)
         {
             return "The container exited while starting; its exit code and log couldn't be read: " + e.Message;
         }
-        var lines = log.Split('\n');
-        return $"The container exited while starting, with code {code}. The end of its log:\n" + string.Join('\n', lines[Math.Max(0, lines.Length - 30)..]);
+        var lines = (stdout + "\n" + stderr)
+            .Split('\n')
+            .Select(l => l.TrimEnd('\r'))
+            .Where(l => l.Length > 0)
+            .Select(l => l.IndexOf(' ', StringComparison.Ordinal) is var space and > 0 ? (Time: l[..space], Text: l[(space + 1)..]) : (Time: "", Text: l))
+            .OrderBy(l => l.Time, StringComparer.Ordinal)
+            .Select(l => l.Text)
+            .ToList();
+        return $"The container exited while starting, with code {code}. The end of its log:\n" + string.Join('\n', lines.TakeLast(30));
     }
 }
 

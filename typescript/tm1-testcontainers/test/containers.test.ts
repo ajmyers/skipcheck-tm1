@@ -58,9 +58,10 @@ describe("Tm1ServerContainer", () => {
     // once, and start() says so with its log, rather than waiting out the startup timeout
     const install = mkdtempSync(join(tmpdir(), "tm1-install-"));
     try {
+      // executable, with an interpreter that doesn't exist: exec fails the same way whatever the
+      // host's file permissions
       mkdirSync(join(install, "bin64"));
-      writeFileSync(join(install, "bin64", "tm1s.exe"), "not a program");
-      writeFileSync(join(install, "bin64", "tm1admsrv.exe"), "not a program");
+      for (const program of ["tm1s.exe", "tm1admsrv.exe"]) writeFileSync(join(install, "bin64", program), "#!/not/a/program\n", { mode: 0o755 });
       const started = Date.now();
       await using tm1 = new Tm1ServerContainer(new Tm1Source.InstallDir(install));
       const failed = await tm1.start().then(
@@ -69,7 +70,8 @@ describe("Tm1ServerContainer", () => {
       );
       expect(String(failed)).toContain("The container exited while starting, with code");
       expect(String(failed)).toContain("[tm1-entrypoint] Starting TM1 Admin Server");
-      expect(Date.now() - started).toBeLessThan(120_000);
+      // Well inside the five-minute startup timeout, with room for pulling the image
+      expect(Date.now() - started).toBeLessThan(240_000);
     } finally {
       rmSync(install, { recursive: true, force: true });
     }
