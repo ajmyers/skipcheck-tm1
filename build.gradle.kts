@@ -173,17 +173,34 @@ val liveTestDotnet = tasks.register<ToolTask>("liveTestDotnet") {
 val liveTestTypescript = tasks.register<ToolTask>("liveTestTypescript") {
 	dependsOn(npmInstall)
 	group = "verification"
-	description = "Runs the TypeScript client's tests against a real TM1 (test/live), and the testcontainers' tests."
+	description = "Runs the TypeScript client's tests against a real TM1 (test/live)."
 	directory = root.dir("typescript")
 	// test:live, unlike npm test, doesn't generate the model first, and it isn't committed: in a
 	// fresh checkout the live tests would find no src/generated (#321)
 	commands = listOf(
 		listOf("npm", "run", "generate", "-w", "tm1-client"),
 		listOf("npm", "run", "test:live", "-w", "tm1-client", "--", "--reporter=default", "--reporter=junit", "--outputFile.junit=" + testResults.file("typescript-live/vitest.xml").asFile.path),
-		listOf("npm", "test", "-w", "tm1-testcontainers", "--", "--reporter=default", "--reporter=junit", "--outputFile.junit=" + testResults.file("typescript-live/tm1-testcontainers.xml").asFile.path),
 	)
 	dependsOn(liveTestPrepare)
 	mustRunAfter(liveTestJava, liveTestPython, liveTestDotnet)
+}
+
+// A task of its own, not a command after the client's: a task stops at its first failing command,
+// so a failing client live test left these unrun and missing from the report (#437). With
+// --continue one task's failure doesn't stop the other.
+val liveTestTypescriptContainers = tasks.register<ToolTask>("liveTestTypescriptContainers") {
+	dependsOn(npmInstall)
+	group = "verification"
+	description = "Runs the TypeScript tm1-testcontainers' tests against a real TM1."
+	directory = root.dir("typescript")
+	// The client's model first, as liveTestTypescript does: these import the client, whose
+	// src/generated isn't committed, and this task can run on its own (#321)
+	commands = listOf(
+		listOf("npm", "run", "generate", "-w", "tm1-client"),
+		listOf("npm", "test", "-w", "tm1-testcontainers", "--", "--reporter=default", "--reporter=junit", "--outputFile.junit=" + testResults.file("typescript-live/tm1-testcontainers.xml").asFile.path),
+	)
+	dependsOn(liveTestPrepare)
+	mustRunAfter(liveTestJava, liveTestPython, liveTestDotnet, liveTestTypescript)
 }
 
 // Not a dependency of the suites, only after them: with --continue it still compares what the
@@ -194,13 +211,13 @@ val compareLiveTraffic = tasks.register<PythonTask>("compareLiveTraffic") {
 	python()
 	directory = root
 	commands = listOf(listOf("python", "scripts/compare-live-traffic.py", traffic.get().asFile.path))
-	mustRunAfter(liveTestJava, liveTestPython, liveTestDotnet, liveTestTypescript)
+	mustRunAfter(liveTestJava, liveTestPython, liveTestDotnet, liveTestTypescript, liveTestTypescriptContainers)
 }
 
 tasks.register("liveTest") {
 	group = "verification"
 	description = "Runs every client's tests against a real TM1, then compares what each sent. Use --continue to run them all when one fails."
-	dependsOn(liveTestJava, liveTestPython, liveTestDotnet, liveTestTypescript, compareLiveTraffic)
+	dependsOn(liveTestJava, liveTestPython, liveTestDotnet, liveTestTypescript, liveTestTypescriptContainers, compareLiveTraffic)
 }
 
 // The container conformance run: each language's tm1-testcontainers starts the same scenarios

@@ -25,7 +25,7 @@
 #
 # The suites are Gradle tasks (build.gradle.kts), so the same runs on Windows, where there's no
 # bash: ./gradlew liveTest --continue, or some of :tm1-client:liveTest, liveTestPython,
-# liveTestDotnet, liveTestTypescript with compareLiveTraffic. This script is that, by suite name.
+# liveTestDotnet, liveTestTypescript (and liveTestTypescriptContainers) with compareLiveTraffic. This script is that, by suite name.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -37,7 +37,7 @@ for suite in "${suites[@]}"; do
     java) tasks+=(:tm1-client:liveTest) ;;
     python) tasks+=(liveTestPython) ;;
     dotnet) tasks+=(liveTestDotnet) ;;
-    typescript) tasks+=(liveTestTypescript) ;;
+    typescript) tasks+=(liveTestTypescript liveTestTypescriptContainers) ;;
     *) echo "Unknown suite: $suite (java, python, dotnet, typescript)" >&2; exit 2 ;;
   esac
 done
