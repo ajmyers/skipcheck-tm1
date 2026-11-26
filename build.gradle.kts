@@ -193,7 +193,10 @@ val liveTestTypescriptContainers = tasks.register<ToolTask>("liveTestTypescriptC
 	group = "verification"
 	description = "Runs the TypeScript tm1-testcontainers' tests against a real TM1."
 	directory = root.dir("typescript")
+	// The client's model first, as liveTestTypescript does: these import the client, whose
+	// src/generated isn't committed, and this task can run on its own (#321)
 	commands = listOf(
+		listOf("npm", "run", "generate", "-w", "tm1-client"),
 		listOf("npm", "test", "-w", "tm1-testcontainers", "--", "--reporter=default", "--reporter=junit", "--outputFile.junit=" + testResults.file("typescript-live/tm1-testcontainers.xml").asFile.path),
 	)
 	dependsOn(liveTestPrepare)

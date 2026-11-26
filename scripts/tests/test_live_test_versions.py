@@ -124,6 +124,18 @@ def test_runs_the_suites_asked_for_then_the_comparison(tmp_path: Path) -> None:
         versions.command(["cobol"])
 
 
+
+def test_runs_every_task_of_a_suite_that_has_several(tmp_path: Path) -> None:
+    # TypeScript's testcontainers tests are a task of their own, so a failing client test can't
+    # leave them unrun (#437)
+    assert versions.command(["typescript"], tmp_path, windows=False) == [
+        str(tmp_path / "gradlew"),
+        "--continue",
+        "liveTestTypescript",
+        "liveTestTypescriptContainers",
+        "compareLiveTraffic",
+    ]
+
 def _report(path: Path, tests: int, failures: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
