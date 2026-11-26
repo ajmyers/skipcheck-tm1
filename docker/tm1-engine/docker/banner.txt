@@ -1,0 +1,12 @@
+  ------------------------------------------------------------------
+   tm1-engine: a local IBM TM1 v12 engine (Planning Analytics) in Docker
+   Free and open source, made by Andrew Myers (https://ajmyers.net)
+
+     Website  https://skipcheck.io
+     GitHub   https://github.com/ajmyers
+     Issues   https://github.com/ajmyers/skipcheck-tm1/issues
+
+   Useful? A star helps: https://github.com/ajmyers/skipcheck-tm1
+   Need help with TM1? https://ajmyers.net
+   Not affiliated with IBM. You need your own licensed copy of TM1.
+  ------------------------------------------------------------------
