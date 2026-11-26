@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.model.Cellset;
@@ -33,14 +35,12 @@ import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.cube.ViewScope;
 import io.skipcheck.tm1.client.service.dimension.SubsetScope;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /**
  * Cube drillthrough: a cube with a view "Detail", a }Drill_Detail process returning it,
  * and rules naming it.
  */
-@RequiresTm1
+@LiveTm1
 class DrillthroughTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
@@ -54,11 +54,8 @@ class DrillthroughTm1Test {
 	private static List<String> dimensions;
 
 	@BeforeAll
-	static void createFixtures(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	static void createFixtures(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 		String id = UUID.randomUUID().toString().substring(0, 8);
 		cube = "tm1-client-" + id;
 		process = "}Drill_Detail" + id;

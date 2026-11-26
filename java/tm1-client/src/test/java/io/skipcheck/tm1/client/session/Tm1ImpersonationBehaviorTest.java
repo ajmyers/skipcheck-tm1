@@ -14,18 +14,23 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 
 /**
  * Pins how TM1 handles {@code TM1-Impersonate}, which the session pool relies on. Over
  * bare HTTP, like {@link Tm1SessionBehaviorTest}. Observed on 11.8.03500.6 with TM1's own
  * security; CAM may behave differently.
  */
-@RequiresTm1
+@LiveTm1
 class Tm1ImpersonationBehaviorTest {
 
 	private RawTm1 tm1;
+
+	/** Stands for the server's own login in a table of attempts. */
+	private static final String ADMIN = "(the server's login)";
+
+	private LiveServer server;
 
 	private String admin;
 
@@ -34,7 +39,8 @@ class Tm1ImpersonationBehaviorTest {
 	private String bob;
 
 	@BeforeEach
-	void createUsers(Tm1ServerContainer server) {
+	void createUsers(LiveServer server) {
+		this.server = server;
 		tm1 = new RawTm1(server);
 		admin = tm1.login();
 		String run = UUID.randomUUID().toString().substring(0, 6);
@@ -74,7 +80,7 @@ class Tm1ImpersonationBehaviorTest {
 			assertThat(
 					name(tm1.request("GET", "ActiveUser?$select=Name").cookie(plain).header("TM1-Impersonate", alice)))
 				.as("impersonation on a later request of an admin session")
-				.isEqualTo("Admin");
+				.isEqualToIgnoringCase(server.getUsername());
 			tm1.close(plain);
 		}
 		finally {
@@ -139,9 +145,10 @@ class Tm1ImpersonationBehaviorTest {
 		createUser(otherAdmin, "ADMIN");
 		createUser(dataAdmin, "DataAdmin");
 		try {
-			for (String[] attempt : new String[][] { { "admin", "", otherAdmin }, { "admin", "", "Admin" },
+			for (String[] attempt : new String[][] { { ADMIN, "", otherAdmin }, { ADMIN, "", "Admin" },
 					{ dataAdmin, "p", otherAdmin }, { dataAdmin, "p", "Admin" } }) {
-				HttpResponse<String> refused = impersonate(attempt[0], attempt[1], attempt[2]);
+				HttpResponse<String> refused = ADMIN.equals(attempt[0]) ? impersonateAsTheServersAdmin(attempt[2])
+						: impersonate(attempt[0], attempt[1], attempt[2]);
 				assertThat(refused.statusCode()).as("%s impersonating %s", attempt[0], attempt[2]).isEqualTo(403);
 				assertThat(refused.body()).contains("You have insufficient rights to impersonate the user specified!");
 			}
@@ -189,7 +196,7 @@ class Tm1ImpersonationBehaviorTest {
 	@Test
 	void refusesADisabledUserLikeWrongCredentials() {
 		tm1.send(tm1.request("PATCH", "Users('" + bob + "')").cookie(admin).body("{\"Enabled\":false}"));
-		HttpResponse<String> refused = impersonate("admin", "", bob);
+		HttpResponse<String> refused = impersonateAsTheServersAdmin(bob);
 		assertThat(refused.statusCode()).isEqualTo(401);
 		assertThat(refused.body()).isEmpty();
 	}
@@ -201,10 +208,10 @@ class Tm1ImpersonationBehaviorTest {
 	 */
 	@Test
 	void treatsAnEmptyHeaderAsNoImpersonation() {
-		HttpResponse<String> login = impersonate("admin", "", "");
+		HttpResponse<String> login = impersonateAsTheServersAdmin("");
 		try {
 			assertThat(login.statusCode()).isEqualTo(200);
-			assertThat(RawTm1.json(login).get("Name").asString()).isEqualTo("Admin");
+			assertThat(RawTm1.json(login).get("Name").asString()).isEqualToIgnoringCase(server.getUsername());
 		}
 		finally {
 			RawTm1.cookie(login).ifPresent(tm1::close);
@@ -218,7 +225,7 @@ class Tm1ImpersonationBehaviorTest {
 	@Test
 	void matchesUserNamesIgnoringCaseAndSpaces() {
 		for (String written : new String[] { alice.toUpperCase(Locale.ROOT), alice.replace("_", "_ ") }) {
-			HttpResponse<String> login = impersonate("admin", "", written);
+			HttpResponse<String> login = impersonateAsTheServersAdmin(written);
 			try {
 				assertThat(login.statusCode()).as(written).isEqualTo(200);
 				assertThat(RawTm1.json(login).get("Name").asString()).as(written).isEqualTo(alice);
@@ -260,9 +267,17 @@ class Tm1ImpersonationBehaviorTest {
 	}
 
 	private RawTm1.Bytes impersonate(byte[] target) {
-		return tm1.getWithHeaderBytes("ActiveUser?$select=Name", RawTm1.basic("admin", ""), "TM1-Impersonate", target);
+		return tm1.getWithHeaderBytes("ActiveUser?$select=Name", server.getAuthorization(), "TM1-Impersonate", target);
 	}
 
+	/** Impersonating as the server's own login: Basic, or through its CAM namespace. */
+	private HttpResponse<String> impersonateAsTheServersAdmin(String target) {
+		return tm1.send(tm1.request("GET", "ActiveUser?$select=Name")
+			.header("Authorization", server.getAuthorization())
+			.header("TM1-Impersonate", target));
+	}
+
+	/** Impersonating as a user the test made, a native one, with Basic. */
 	private HttpResponse<String> impersonate(String user, String password, String target) {
 		return tm1.send(tm1.request("GET", "ActiveUser?$select=Name")
 			.header("Authorization", RawTm1.basic(user, password))

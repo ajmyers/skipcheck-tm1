@@ -55,8 +55,8 @@ Run the Gradle task for what you changed before you push. They're what CI runs.
   a client the commit touches, not its tests). Java can go in a commit before the other clients,
   but a commit that leaves the Java build failing has to be squashed before pushing.
 - New code comes with tests that CI runs, scripts and hooks included.
-- A test that needs TM1 is marked with the language's `RequiresTm1`, so it's skipped without a TM1
-  rather than left out. Never delete, disable or loosen a test to get a check through.
+- A test that needs TM1 is marked with the language's `RequiresTm1` (in tm1-client's Java live tests,
+  `@LiveTm1`, which also takes a running `TM1_URL`), so it's skipped without a TM1 rather than left out. Never delete, disable or loosen a test to get a check through.
 - Report what you ran and what you couldn't. "Not run: no TM1 here" is a fine thing to say; a
   check that didn't run isn't one that passed.
 

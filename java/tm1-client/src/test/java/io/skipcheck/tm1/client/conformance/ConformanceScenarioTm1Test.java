@@ -17,13 +17,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.metadata.Endpoints;
 import io.skipcheck.tm1.client.version.Tm1Capabilities;
 import io.skipcheck.tm1.client.version.Tm1Version;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -32,13 +32,13 @@ import tools.jackson.databind.JsonNode;
  * {@code build/conformance-live/java} for {@code scripts/compare-live-traffic.py} to
  * compare with the other clients'.
  */
-@RequiresTm1
+@LiveTm1
 class ConformanceScenarioTm1Test {
 
-	private static Tm1ServerContainer server;
+	private static LiveServer server;
 
 	@BeforeAll
-	static void server(Tm1ServerContainer tm1) {
+	static void server(LiveServer tm1) {
 		server = tm1;
 	}
 
@@ -57,18 +57,14 @@ class ConformanceScenarioTm1Test {
 		JsonNode scenario = ConformanceScenarios.load(file);
 		Map<String, String> names = ConformanceScenarios.names(scenario);
 		ConformanceScenarios.Traffic traffic = new ConformanceScenarios.Traffic(server.getRestUrl());
-		Tm1Client tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.webClient(WebClient.builder().filter(traffic))
-			.build();
+		Tm1Client tm1 = server.clientBuilder().webClient(WebClient.builder().filter(traffic)).build();
 		try {
 			// What the server has and is: a scenario or a step for one it isn't is
 			// skipped
 			Tm1Capabilities capabilities = tm1.session().capabilities().block();
 			Set<String> endpoints = Endpoints.of(capabilities.metadata());
 			Tm1Version version = capabilities.productVersion().orElseThrow();
-			ServerAssumptions.Install install = ServerAssumptions.install(server.getSource());
+			ServerAssumptions.Install install = server.install();
 			assumeTrue(ConformanceScenarios.applies(scenario, endpoints, version, install),
 					() -> "the scenario needs " + scenario.path("requires") + " " + scenario.path("tm1From") + " "
 							+ scenario.path("tm1Before") + " " + scenario.path("install") + "; the server is " + version

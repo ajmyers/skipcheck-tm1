@@ -13,13 +13,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1ApiException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
@@ -28,7 +28,7 @@ import tools.jackson.databind.JsonNode;
  * {@link Tm1Session} against a real TM1: logging in, requests, and leaving no session
  * behind.
  */
-@RequiresTm1
+@LiveTm1
 class Tm1SessionTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
@@ -36,7 +36,7 @@ class Tm1SessionTm1Test {
 	private static final Tm1Request<JsonNode> SERVER = Tm1Request.get(ODataPath.of("Server"),
 			ODataQuery.none().select("Name", "ProductVersion"), JsonNode.class);
 
-	private Tm1ServerContainer server;
+	private LiveServer server;
 
 	private RawTm1 raw;
 
@@ -45,7 +45,7 @@ class Tm1SessionTm1Test {
 	private String context;
 
 	@BeforeEach
-	void connect(Tm1ServerContainer server) {
+	void connect(LiveServer server) {
 		this.server = server;
 		this.raw = new RawTm1(server);
 		this.admin = raw.login();
@@ -120,9 +120,7 @@ class Tm1SessionTm1Test {
 
 	@Test
 	void labelsTheSessionWithItsContext() {
-		Tm1Session session = Tm1Session.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
+		Tm1Session session = server.sessionBuilder()
 			// With a character outside ASCII: TM1 reads the header as UTF-8
 			.sessionContext("tm1-client test, café")
 			.build();
@@ -200,11 +198,7 @@ class Tm1SessionTm1Test {
 	 * sessions.
 	 */
 	private Tm1Session session() {
-		return Tm1Session.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.sessionContext(context)
-			.build();
+		return server.sessionBuilder().sessionContext(context).build();
 	}
 
 }

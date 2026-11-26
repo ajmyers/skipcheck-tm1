@@ -13,6 +13,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.AttributeDefinition;
 import io.skipcheck.tm1.client.model.AttributeDefinitionCreate;
@@ -33,11 +35,9 @@ import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.service.cube.ViewScope;
 import io.skipcheck.tm1.client.service.dimension.SubsetScope;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /** Attributes and translations of cubes and views. */
-@RequiresTm1
+@LiveTm1
 class CubeAttributeTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
@@ -49,11 +49,8 @@ class CubeAttributeTm1Test {
 	private static List<String> dimensions;
 
 	@BeforeAll
-	static void createCube(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	static void createCube(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 		cube = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		dimensions = List.of(cube + "-a", cube + "-b");
 		for (String d : dimensions) {

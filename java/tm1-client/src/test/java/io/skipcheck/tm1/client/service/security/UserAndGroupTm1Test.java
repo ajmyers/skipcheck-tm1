@@ -16,6 +16,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
@@ -27,16 +29,14 @@ import io.skipcheck.tm1.client.model.UserPatch;
 import io.skipcheck.tm1.client.model.UserType;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /** UserService and GroupService, on a user and two groups of their own. */
-@RequiresTm1
+@LiveTm1
 class UserAndGroupTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
 
-	private Tm1ServerContainer server;
+	private LiveServer server;
 
 	private Tm1Client tm1;
 
@@ -47,12 +47,9 @@ class UserAndGroupTm1Test {
 	private String g2;
 
 	@BeforeEach
-	void createUserAndGroups(Tm1ServerContainer server) {
+	void createUserAndGroups(LiveServer server) {
 		this.server = server;
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+		tm1 = server.clientBuilder().build();
 		String id = UUID.randomUUID().toString().substring(0, 8);
 		user = "tm1-client-" + id;
 		g1 = "tm1-client-g1-" + id;
@@ -119,7 +116,8 @@ class UserAndGroupTm1Test {
 
 	@Test
 	void disconnectsAUser() {
-		Tm1Client asUser = Tm1Client.builder().baseUrl(server.getRestUrl()).basicAuth(user, "pw").build();
+		Tm1Client asUser = server.trusting(Tm1Client.builder().baseUrl(server.getRestUrl()).basicAuth(user, "pw"))
+			.build();
 		try {
 			asUser.connect().block(WAIT);
 			assertThat(tm1.users().get(user, ODataQuery.none()).block(WAIT).isActive()).isTrue();

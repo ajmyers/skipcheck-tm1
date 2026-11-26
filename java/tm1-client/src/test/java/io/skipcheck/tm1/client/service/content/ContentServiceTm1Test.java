@@ -6,12 +6,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,6 +21,8 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
@@ -38,13 +38,11 @@ import io.skipcheck.tm1.client.model.Link;
 import io.skipcheck.tm1.client.model.LinkCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /** ContentService: the contents tree, and what TM1 does with documents. */
-@RequiresTm1
+@LiveTm1
 @SuppressWarnings("deprecation") // Entry.ID is deprecated in schema 11.5.0, yet it's the
 									// key
 class ContentServiceTm1Test {
@@ -54,11 +52,8 @@ class ContentServiceTm1Test {
 	private static Tm1Client tm1;
 
 	@BeforeAll
-	static void connect(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	static void connect(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 	}
 
 	@AfterAll
@@ -207,7 +202,7 @@ class ContentServiceTm1Test {
 	}
 
 	@Test
-	void refusesAChunkedUpload(Tm1ServerContainer server) throws Exception {
+	void refusesAChunkedUpload(LiveServer server) throws Exception {
 		String name = unique();
 		ContentPath folder = ContentPath.applications().child(name);
 		tm1.contents()
@@ -218,17 +213,15 @@ class ContentServiceTm1Test {
 			Entry made = tm1.contents()
 				.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name(name + "-notes.txt").build())
 				.block(WAIT);
-			String auth = Base64.getEncoder()
-				.encodeToString((server.getUsername() + ":" + server.getPassword()).getBytes(StandardCharsets.UTF_8));
 			HttpRequest chunked = HttpRequest
 				.newBuilder(URI.create(server.getRestUrl() + folder.child(made.id()).path()
 						+ "/tm1.DocumentReference/Document/Content"))
-				.header("Authorization", "Basic " + auth)
+				.header("Authorization", server.getAuthorization())
 				.header("Content-Type", "application/octet-stream")
 				// a publisher of unknown length is sent chunked
 				.PUT(HttpRequest.BodyPublishers.fromPublisher(HttpRequest.BodyPublishers.ofString("hello")))
 				.build();
-			assertThat(HttpClient.newHttpClient().send(chunked, HttpResponse.BodyHandlers.discarding()).statusCode())
+			assertThat(server.httpClient().build().send(chunked, HttpResponse.BodyHandlers.discarding()).statusCode())
 				.isEqualTo(400);
 		}
 		finally {

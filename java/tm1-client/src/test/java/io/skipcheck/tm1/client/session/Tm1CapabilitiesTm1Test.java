@@ -9,9 +9,10 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Request;
-import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -19,19 +20,17 @@ import io.skipcheck.tm1.client.version.Tm1Capabilities;
 import io.skipcheck.tm1.client.version.Tm1Capability;
 import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlEntityContainer;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
 
 /** Version and capabilities read from a real TM1. */
-@RequiresTm1
+@LiveTm1
 class Tm1CapabilitiesTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
 
 	@Test
-	void readsTheVersionAndTheCapabilitiesTheSnapshotDescribes(Tm1ServerContainer server) {
+	void readsTheVersionAndTheCapabilitiesTheSnapshotDescribes(LiveServer server) {
 		Tm1Session session = session(server);
 		try {
 			assertThat(session.version().block(WAIT)).isEqualTo(server.getTm1Version());
@@ -61,7 +60,7 @@ class Tm1CapabilitiesTm1Test {
 	}
 
 	@Test
-	void refusesARequestTheServerDoesntDefine(Tm1ServerContainer server) {
+	void refusesARequestTheServerDoesntDefine(LiveServer server) {
 		Tm1Session session = session(server);
 		try {
 			Tm1Request<JsonNode> missing = Tm1Request.get(ODataPath.of("Bananas"), ODataQuery.none(), JsonNode.class)
@@ -79,15 +78,11 @@ class Tm1CapabilitiesTm1Test {
 	}
 
 	@Test
-	void sharesOneFetchBetweenAPoolsSessions(Tm1ServerContainer server) {
-		Tm1SessionPool pool = Tm1SessionPool.builder(
-				Tm1Session.builder().baseUrl(server.getRestUrl()).basicAuth(server.getUsername(), server.getPassword()))
-			.build();
+	void sharesOneFetchBetweenAPoolsSessions(LiveServer server) {
+		Tm1SessionPool pool = Tm1SessionPool.builder(server.sessionBuilder()).build();
 		try {
 			Tm1Capabilities first = pool.session().capabilities().block(WAIT);
-			Tm1Capabilities second = pool
-				.session(Tm1Identity.withCredentials("again",
-						Tm1Authenticator.basic(server.getUsername(), server.getPassword())))
+			Tm1Capabilities second = pool.session(Tm1Identity.withCredentials("again", server.authenticator()))
 				.capabilities()
 				.block(WAIT);
 			assertThat(second).isSameAs(first);
@@ -102,11 +97,8 @@ class Tm1CapabilitiesTm1Test {
 			.block(WAIT);
 	}
 
-	private static Tm1Session session(Tm1ServerContainer server) {
-		return Tm1Session.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	private static Tm1Session session(LiveServer server) {
+		return server.sessionBuilder().build();
 	}
 
 }

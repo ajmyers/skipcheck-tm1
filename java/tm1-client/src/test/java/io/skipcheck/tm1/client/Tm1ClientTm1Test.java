@@ -10,22 +10,17 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import tools.jackson.databind.JsonNode;
 
 /**
  * The smallest whole use of the client: connect, read {@code Server}, close.
  */
-@RequiresTm1
+@LiveTm1
 class Tm1ClientTm1Test {
 
 	@Test
-	void connectsReadsTheServerAndCloses(Tm1ServerContainer tm1) {
-		Tm1Client client = Tm1Client.builder()
-			.baseUrl(tm1.getRestUrl())
-			.basicAuth(tm1.getUsername(), tm1.getPassword())
-			.build();
+	void connectsReadsTheServerAndCloses(LiveServer tm1) {
+		Tm1Client client = tm1.clientBuilder().build();
 
 		JsonNode server = client.connect()
 			.flatMap(c -> c.session()

@@ -11,19 +11,19 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.error.Tm1ApiException;
 import io.skipcheck.tm1.client.error.Tm1ErrorKind;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
 
 /** {@link Tm1SessionPool} against a real TM1: identities, eviction and close. */
-@RequiresTm1
+@LiveTm1
 class Tm1SessionPoolTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
@@ -43,8 +43,11 @@ class Tm1SessionPoolTm1Test {
 
 	private Tm1SessionPool pool;
 
+	private String login;
+
 	@BeforeEach
-	void setUp(Tm1ServerContainer server) {
+	void setUp(LiveServer server) {
+		login = server.getUsername();
 		raw = new RawTm1(server);
 		admin = raw.login();
 		context = RawTm1.uniqueContext();
@@ -53,11 +56,7 @@ class Tm1SessionPoolTm1Test {
 		bob = "zz_bob_" + run;
 		raw.createUser(admin, alice, "a");
 		raw.createUser(admin, bob, "b");
-		pool = Tm1SessionPool
-			.builder(Tm1Session.builder()
-				.baseUrl(server.getRestUrl())
-				.basicAuth(server.getUsername(), server.getPassword())
-				.sessionContext(context))
+		pool = Tm1SessionPool.builder(server.sessionBuilder().sessionContext(context))
 			.idleTimeout(Duration.ofSeconds(1))
 			.closeGrace(Duration.ZERO)
 			.sweepInterval(Duration.ofHours(1))
@@ -78,7 +77,7 @@ class Tm1SessionPoolTm1Test {
 		assertThat(name(pool.session(Tm1Identity.impersonating(bob)))).isEqualTo(bob);
 		assertThat(name(pool.session(Tm1Identity.withCredentials(bob, Tm1Authenticator.basic(bob, "b")))))
 			.isEqualTo(bob);
-		assertThat(name(pool.session())).isEqualTo("Admin");
+		assertThat(name(pool.session())).isEqualToIgnoringCase(login);
 		assertThat(pool.stats().held()).isEqualTo(4);
 	}
 

@@ -12,27 +12,24 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.session.Tm1Session;
 import io.skipcheck.tm1.client.version.Tm1Capabilities;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /** The generated model, read straight from a real TM1 through the session. */
-@RequiresTm1
+@LiveTm1
 class GeneratedModelTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
 
 	@Test
-	void readsTheServerAndStreamsDimensionsIntoGeneratedTypes(Tm1ServerContainer tm1) {
-		Tm1Session session = Tm1Session.builder()
-			.baseUrl(tm1.getRestUrl())
-			.basicAuth(tm1.getUsername(), tm1.getPassword())
-			.build();
+	void readsTheServerAndStreamsDimensionsIntoGeneratedTypes(LiveServer tm1) {
+		Tm1Session session = tm1.sessionBuilder().build();
 		try {
 			Server server = session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), Server.class))
 				.block(WAIT);
@@ -56,11 +53,8 @@ class GeneratedModelTm1Test {
 	}
 
 	@Test
-	void createsAViewAsItsSubtypeAndReadsItBackThroughTheHierarchy(Tm1ServerContainer tm1) {
-		Tm1Session session = Tm1Session.builder()
-			.baseUrl(tm1.getRestUrl())
-			.basicAuth(tm1.getUsername(), tm1.getPassword())
-			.build();
+	void createsAViewAsItsSubtypeAndReadsItBackThroughTheHierarchy(LiveServer tm1) {
+		Tm1Session session = tm1.sessionBuilder().build();
 		String name = "tm1-client-" + UUID.randomUUID();
 		ODataPath views = ODataPath.of("Cubes").key("}ClientGroups").nav("Views");
 		try {
@@ -91,11 +85,8 @@ class GeneratedModelTm1Test {
 	}
 
 	@Test
-	void queriesWithFieldConstantsAndEnumLiterals(Tm1ServerContainer tm1) {
-		Tm1Session session = Tm1Session.builder()
-			.baseUrl(tm1.getRestUrl())
-			.basicAuth(tm1.getUsername(), tm1.getPassword())
-			.build();
+	void queriesWithFieldConstantsAndEnumLiterals(LiveServer tm1) {
+		Tm1Session session = tm1.sessionBuilder().build();
 		ODataPath elements = ODataPath.of("Dimensions")
 			.key("}Groups")
 			.nav("Hierarchies")
@@ -124,11 +115,8 @@ class GeneratedModelTm1Test {
 	}
 
 	@Test
-	void createsADimensionAndACubeFromPatchesThenPatchesAndClearsItsRules(Tm1ServerContainer tm1) {
-		Tm1Session session = Tm1Session.builder()
-			.baseUrl(tm1.getRestUrl())
-			.basicAuth(tm1.getUsername(), tm1.getPassword())
-			.build();
+	void createsADimensionAndACubeFromPatchesThenPatchesAndClearsItsRules(LiveServer tm1) {
+		Tm1Session session = tm1.sessionBuilder().build();
 		String name = "tm1-client-" + UUID.randomUUID();
 		ODataPath dimension = ODataPath.of("Dimensions").key(name);
 		ODataPath cube = ODataPath.of("Cubes").key(name);
@@ -186,11 +174,8 @@ class GeneratedModelTm1Test {
 	}
 
 	@Test
-	void theServerHasEveryOperationInTheCatalog(Tm1ServerContainer tm1) {
-		Tm1Session session = Tm1Session.builder()
-			.baseUrl(tm1.getRestUrl())
-			.basicAuth(tm1.getUsername(), tm1.getPassword())
-			.build();
+	void theServerHasEveryOperationInTheCatalog(LiveServer tm1) {
+		Tm1Session session = tm1.sessionBuilder().build();
 		try {
 			Tm1Capabilities capabilities = session.capabilities().block(WAIT);
 			// Every operation the snapshot of the server's own schema defines: an older

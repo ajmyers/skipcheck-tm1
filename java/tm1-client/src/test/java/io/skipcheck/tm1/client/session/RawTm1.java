@@ -21,8 +21,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.client.LiveServer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -41,16 +44,19 @@ final class RawTm1 {
 
 	private static final String COOKIE = "TM1SessionId";
 
-	private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+	private final HttpClient http;
+
+	private final boolean verify;
 
 	private final String root;
 
 	private final String basic;
 
-	RawTm1(Tm1ServerContainer tm1) {
+	RawTm1(LiveServer tm1) {
 		this.root = tm1.getRestUrl();
-		this.basic = "Basic " + Base64.getEncoder()
-			.encodeToString((tm1.getUsername() + ":" + tm1.getPassword()).getBytes(StandardCharsets.UTF_8));
+		this.basic = tm1.getAuthorization();
+		this.http = tm1.httpClient().version(HttpClient.Version.HTTP_1_1).build();
+		this.verify = tm1.verifies();
 	}
 
 	/**
@@ -143,10 +149,12 @@ final class RawTm1 {
 	 */
 	Bytes getWithHeaderBytes(String path, String authorization, String header, byte[] value) {
 		URI uri = URI.create(root + path);
+		boolean tls = "https".equalsIgnoreCase(uri.getScheme());
+		int port = uri.getPort() >= 0 ? uri.getPort() : tls ? 443 : 80;
 		String head = "GET " + uri.getRawPath() + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery())
-				+ " HTTP/1.1\r\nHost: " + uri.getHost() + ":" + uri.getPort() + "\r\nAuthorization: " + authorization
+				+ " HTTP/1.1\r\nHost: " + uri.getHost() + ":" + port + "\r\nAuthorization: " + authorization
 				+ "\r\nAccept: application/json\r\nConnection: close\r\n" + header + ": ";
-		try (Socket socket = new Socket(uri.getHost(), uri.getPort())) {
+		try (Socket socket = socket(uri.getHost(), port, tls)) {
 			socket.setSoTimeout(30_000);
 			OutputStream out = socket.getOutputStream();
 			out.write(head.getBytes(StandardCharsets.US_ASCII));
@@ -159,6 +167,26 @@ final class RawTm1 {
 		catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
+	}
+
+	/**
+	 * A socket to the server, over TLS for an https URL, trusting any certificate when
+	 * TM1_VERIFY is false.
+	 */
+	private Socket socket(String host, int port, boolean tls) throws IOException {
+		if (!tls) {
+			return new Socket(host, port);
+		}
+		SSLSocketFactory factory = verify ? (SSLSocketFactory) SSLSocketFactory.getDefault()
+				: LiveServer.trustingContext().getSocketFactory();
+		SSLSocket socket = (SSLSocket) factory.createSocket(host, port);
+		if (verify) {
+			// The host name too, as the JDK's HTTP client and Reactor Netty check it
+			SSLParameters parameters = socket.getSSLParameters();
+			parameters.setEndpointIdentificationAlgorithm("HTTPS");
+			socket.setSSLParameters(parameters);
+		}
+		return socket;
 	}
 
 	/**

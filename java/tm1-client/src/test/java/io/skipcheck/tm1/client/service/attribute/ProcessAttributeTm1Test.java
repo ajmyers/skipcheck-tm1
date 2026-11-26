@@ -14,6 +14,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import io.skipcheck.tm1.client.LiveServer;
+import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.AttributeDefinition;
 import io.skipcheck.tm1.client.model.AttributeDefinitionCreate;
@@ -26,11 +28,9 @@ import io.skipcheck.tm1.client.model.LocalizedAttributesCreate;
 import io.skipcheck.tm1.client.model.ProcessCreate;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
-import io.skipcheck.tm1.testcontainers.RequiresTm1;
-import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 
 /** Attributes and translations of processes and chores. */
-@RequiresTm1
+@LiveTm1
 class ProcessAttributeTm1Test {
 
 	private static final Duration WAIT = Duration.ofSeconds(30);
@@ -42,11 +42,8 @@ class ProcessAttributeTm1Test {
 	private static String chore;
 
 	@BeforeAll
-	static void createProcessAndChore(Tm1ServerContainer server) {
-		tm1 = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(server.getUsername(), server.getPassword())
-			.build();
+	static void createProcessAndChore(LiveServer server) {
+		tm1 = server.clientBuilder().build();
 		String id = UUID.randomUUID().toString().substring(0, 8);
 		process = "tm1-client-" + id;
 		chore = "tm1-client-chore-" + id;

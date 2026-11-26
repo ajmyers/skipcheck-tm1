@@ -212,6 +212,28 @@ def test_pre_push_refuses_a_push_with_a_commit_that_doesnt_build(built: Path) ->
     assert "BROKEN is here" in result.stderr and "push refused" in result.stderr
 
 
+def test_pre_push_builds_with_no_tm1_settings(built: Path) -> None:
+    # A TM1 source or a running TM1 (TM1_URL, which Java's live tests take now) would turn the
+    # TM1 tests on in ./gradlew build, against a real server, once per commit
+    script(
+        built / "gradlew",
+        'if env | grep -q "^TM1_"; then echo "TM1 settings reached the build: $(env | grep "^TM1_" | cut -d= -f1)"; exit 1; fi\n',
+    )
+    git(built, "add", "gradlew")
+    base = git(built, "rev-parse", "HEAD")
+    tip = commit(built, "a", "First")
+    settings = {
+        "TM1_HOME_DIR": "/somewhere",
+        "TM1_URL": "http://tm1:8010/api/v1/",
+        "TM1_USER": "admin",
+        "TM1_PASSWORD": "apple",
+        "TM1_NAMESPACE": "LDAP",
+        "TM1_VERIFY": "false",
+    }
+    result = push(built, tip, base, **settings)
+    assert result.returncode == 0, result.stderr
+
+
 def test_pre_push_builds_nothing_for_a_deleted_branch_or_in_ci(built: Path) -> None:
     broken = commit(built, "BROKEN", "Break the build")
     deleted = hook(
