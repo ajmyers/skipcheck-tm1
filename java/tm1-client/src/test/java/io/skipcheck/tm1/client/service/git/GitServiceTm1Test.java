@@ -93,7 +93,7 @@ class GitServiceTm1Test {
 				tm1.git().execute(skip).block(WAIT);
 
 				remote.commitCopyOf(dimension, copy);
-				// The first pull after the remote moves: from 11.8.035 the commit TM1
+				// The first pull after the remote moves: from 11.8.034 the commit TM1
 				// had, then the new one; before, the new one at once
 				GitPullPlan pull = tm1.git().pull("main", GitCredentials.none(), null, true).block(WAIT);
 				if (ServerAssumptions.isAtLeast(tm1, ServerAssumptions.STALE_FIRST_PULL_FROM)) {

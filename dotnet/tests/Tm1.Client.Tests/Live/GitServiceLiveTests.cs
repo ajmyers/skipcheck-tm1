@@ -56,7 +56,7 @@ public class GitServiceLiveTests
             if (remote.Local)
             {
                 remote.CommitCopyOf(dimension, copy);
-                // The first pull after the remote moves: from 11.8.035 the commit TM1 had, then the
+                // The first pull after the remote moves: from 11.8.034 the commit TM1 had, then the
                 // new one; before, the new one at once
                 var pull = await tm1.Git.PullAsync("main", none, null, true);
                 if (await ServerAssumptions.IsAtLeastAsync(tm1, ServerAssumptions.StaleFirstPullFrom))
