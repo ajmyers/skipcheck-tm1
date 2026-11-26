@@ -32,6 +32,11 @@ run --entrypoint sh "$image" -c 'ldconfig -p | grep -q "libcurl.so.4 " && comman
   || fail "missing runtime dependency (libcurl4 / tini / procps)"
 pass "runtime dependencies present"
 
+# 3b. libjsig.so, which TM1 builds before 11.8.035 link, resolves from LD_LIBRARY_PATH alone
+run --entrypoint python3 "$image" -c 'import ctypes; ctypes.CDLL("libjsig.so")' \
+  || fail "libjsig.so doesn't load from LD_LIBRARY_PATH"
+pass "libjsig.so loads (for TM1 before 11.8.035)"
+
 # 4. Without a TM1 install: exits 2 and explains what to mount
 set +e
 out=$(run "$image" 2>&1); rc=$?

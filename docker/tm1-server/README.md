@@ -193,7 +193,11 @@ The `install` command installs from any source into `/opt/ibm/cognos/tm1_64` (or
 `--target DIR`) and exits: `install [URL | file | -]`. Run
 `docker run --rm ghcr.io/ajmyers/tm1-server install --help` for details.
 
-Tested with TM1 Server 2.1.19 (11.8.03500.6).
+Starts Planning Analytics 2.1.2 (TM1 11.8.02400.7), 2.1.7 (11.8.02800.9), 2.1.16 (11.8.03200.3),
+2.1.19 (11.8.03500.6) and 2.1.25 (11.8.04000.1). TM1 before 11.8.035 links `libjsig.so`, a Java
+VM's signal-chaining library that IBM's own startup script takes from a `JAVA_HOME`; the image
+carries OpenJDK's copy of that one file (not a Java runtime) on `LD_LIBRARY_PATH`, after the
+install's `bin64`.
 
 ## Configuration
 
