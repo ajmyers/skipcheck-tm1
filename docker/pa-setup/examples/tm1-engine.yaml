@@ -1,0 +1,17 @@
+# A TM1 v12 engine (Planning Analytics 3.x) beside a TM1 11 server: both versions in one
+# environment. For the engine alone, "tm1Engine: true" is enough: one database, tm1.
+version: 1
+ibm: ~/Downloads/ibm       # holds tm1-v*-standalone-linux.tgz, and TM1 11's bundle beside it
+tm1:
+  servers:
+    legacy: { port: 8010, seed: sdata }
+tm1Engine:
+  port: 4444
+  databases:
+    planning: {}
+    sales: {}
+    # isolated: { instance: other }   # an instance of its own: other credentials, sessions and URL prefix
+  users:                              # for every database; TM1 v12 keeps no passwords
+    - analyst::Analysts,Planners
+    - viewer
+  # datastore: { port: 27017 }        # publish the engine's MongoDB on the host

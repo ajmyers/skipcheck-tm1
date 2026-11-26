@@ -61,6 +61,22 @@ for want in "http://localhost:8010/api/v1/" "http://localhost:9510/tm1web/" "htt
 done
 pass "urls lists every service"
 
+# 4b. A TM1 v12 engine: its two services, valid compose, and what urls prints
+out=$(tool "$(cat "$here/examples/tm1-engine.yaml")" generate) || fail "tm1-engine.yaml: $out"
+! grep -q "COMPOSE INVALID" <<<"$out" || fail "tm1-engine.yaml: docker compose config refused it: $out"
+for want in "  tm1-engine:" "  tm1-engine-mongo:" "  legacy:" "TM1_DATABASES: tm1/planning,tm1/sales" \
+  "TM1_USERS: analyst:Analysts:Planners,viewer" "4444:4444" "/home/me/Downloads/ibm:/ibm:ro" \
+  "/host/project/pa-files/tm1-engine/deployment:/tm1/deployment" \
+  "/host/project/pa-files/tm1-engine/datastore:/data/db"; do
+  grep -qF -- "$want" <<<"$out" || fail "tm1-engine.yaml: compose.yaml lacks '$want': $out"
+done
+out=$(tool $'version: 1\ntm1Engine: true' urls) || fail "engine urls: $out"
+for want in "http://localhost:4444/manage/v1/" "http://localhost:4444/tm1/api/v1/Databases('tm1')/" \
+  "/host/project/pa-files/tm1-engine/credentials/tm1/tm1.json" "setup.sh session tm1"; do
+  grep -qF -- "$want" <<<"$out" || fail "engine urls lacks '$want': $out"
+done
+pass "examples/tm1-engine.yaml generates the engine and its MongoDB, and urls lists them"
+
 # 5. Bad files fail with exit 2 and say what's wrong
 check_error() {  # check_error <yaml> <expected message>
   local rc=0 out
@@ -75,7 +91,16 @@ check_error $'version: 1\ntm1: {servers: {tm1: {}}}\ncognos: {users: ["a:p"], ca
 check_error $'version: 1\ntm1: {servers: {tm1: {}}}\ncognos: {users: ["a:p"], cam: {admins: [b]}}' "b isn't one of cognos.users"
 check_error $'version: 1\nibm: ./ibm\ntm1: {servers: {tm1: {}}}\npaw: {}' "paw.acceptLicense"
 check_error $'version: 1\ntm1Web: true' "tm1Web: needs a TM1 server"
+check_error $'version: 1\ntm1Engine: {databases: {ab: {}}}' "at least 3 characters"
+check_error $'version: 1\ntm1Engine: {login: oauth2}' "unknown setting(s) login"
+check_error $'version: 1\ntm1: {servers: {tm1: {}}}\ncredentials: 1' "unknown setting(s) credentials"
 check_error $'version: 1' "nothing to run"
+# The engine's commands need an engine in the file, and say so
+rc=0; out=$(tool $'version: 1\ntm1: {servers: {tm1: {}}}' credentials) || rc=$?
+[ "$rc" -eq 2 ] && grep -qF "add tm1Engine to the file" <<<"$out" || fail "credentials without an engine: got $rc: $out"
+# An option after the command is still an option
+rc=0; out=$(tool $'version: 1\ntm1Engine: true' urls -f nosuch.yaml) || rc=$?
+[ "$rc" -eq 2 ] && grep -qF "nosuch.yaml not found" <<<"$out" || fail "urls -f nosuch.yaml: got $rc: $out"
 pass "bad files fail with a clear message"
 
 # 6. init writes a starting file that generates
