@@ -7,6 +7,11 @@ Usage: unpack-tm1.py <extracted-repo-dir> <install-dir> <installable> [...]
 Mirrors what IBM's installer does: read manifest/*/*.json, follow each
 installable's parts (and installablesRef), and extract each part's archive into
 <install-dir>/<part.installpath>.
+
+An installable named with a trailing ? (TM1_NON-PROD_SWTAG?) is optional: a
+bundle whose manifest doesn't have it installs without it. Planning Analytics
+2.1.8 to 2.1.10 have no software tags (TM1_PROD_SWTAG, TM1_NON-PROD_SWTAG come
+in 2.1.11). Any other name the manifest lacks stops the install.
 """
 import glob
 import json
@@ -21,6 +26,13 @@ manifest = json.load(open(manifest_path))
 print(f"Manifest: {manifest['productName']} {manifest['productVersion']} ({manifest['platform']})")
 
 installables = {i["name"]: i for i in manifest["installables"]}
+optional = {name[:-1] for name in wanted if name.endswith("?")}
+wanted = [name.rstrip("?") for name in wanted]
+missing = [name for name in wanted if name not in installables and name not in optional]
+if missing:
+    raise SystemExit(
+        f"This bundle has no {', '.join(missing)} (it has {', '.join(installables)})"
+    )
 seen_parts = set()
 
 
@@ -55,7 +67,10 @@ def install(name, depth=0):
 os.makedirs(target, exist_ok=True)
 extract(manifest["license"])
 for name in wanted:
-    install(name)
+    if name in installables:
+        install(name)
+    else:
+        print(f"Installable {name}: not in this bundle, skipped (optional)")
 
 # Same bookkeeping IBM's unixPostInstall.sh does
 pa = os.path.join(target, "configuration", "pa_2.1.txt")

@@ -30,7 +30,9 @@
 set -euo pipefail
 
 SRC_DIR=${TM1_BUNDLE_DIR:-/ibm}
-INSTALLABLES=${TM1_INSTALLABLES:-TM1_Server TM1_Admin_Server TM1_Tools TM1_Samples TM1_NON-PROD_SWTAG}
+# What to install from a bundle's manifest; a trailing ? makes one optional (see unpack-tm1.py):
+# 2.1.8 to 2.1.10 have no software tags
+INSTALLABLES=${TM1_INSTALLABLES:-TM1_Server TM1_Admin_Server TM1_Tools TM1_Samples TM1_NON-PROD_SWTAG?}
 
 log() { echo "[tm1-install] $*" >&2; }
 die() { echo "[tm1-install] ERROR: $*" >&2; exit 2; }
@@ -159,8 +161,9 @@ esac
 
 if [ -n "$zip" ]; then
   unzip -q "$zip" -d "$work/repo"
-  # shellcheck disable=SC2086
-  python3 /usr/local/lib/tm1-server/unpack-tm1.py "$work/repo" "$TARGET" $INSTALLABLES >&2
+  # Split into words, without globbing: a ? would match file names
+  read -r -a installables <<<"$INSTALLABLES"
+  python3 /usr/local/lib/tm1-server/unpack-tm1.py "$work/repo" "$TARGET" "${installables[@]}" >&2
 fi
 
 chmod -R u+rwX,go+rX "$TARGET"

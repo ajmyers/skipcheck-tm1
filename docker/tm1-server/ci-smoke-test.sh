@@ -135,7 +135,8 @@ grep -qx "marker: incomplete" <<<"$out" && grep -q "Installed: tm1server = 11.9.
 rm -rf "$fake"
 pass "IBM's older full installer is found, installed without language packs, with its versions"
 
-# 7a2. A tm1server bundle (a fake, built here) still installs through its manifest
+# 7a2. A tm1server bundle (a fake, built here) still installs through its manifest. It has no
+#     software tags, as Planning Analytics 2.1.8 to 2.1.10 haven't: TM1_NON-PROD_SWTAG is optional
 fake=$(mktemp -d)
 python3 - "$fake/tm1server-9.9.9-1-linuxi38664h_bundle.tar.gz" <<'PY'
 import io, json, sys, tarfile, zipfile
@@ -146,7 +147,7 @@ def tar_with(name, data):
     return buf.getvalue()
 repo = io.BytesIO()
 with zipfile.ZipFile(repo, "w") as z:
-    empty = [{"name": n, "parts": []} for n in ("TM1_Admin_Server", "TM1_Tools", "TM1_Samples", "TM1_NON-PROD_SWTAG")]
+    empty = [{"name": n, "parts": []} for n in ("TM1_Admin_Server", "TM1_Tools", "TM1_Samples")]
     z.writestr("manifest/tm1server-manifest/9.9.9/m.json", json.dumps({
         "productName": "Fake TM1", "productVersion": "9.9.9", "platform": "linuxi38664h",
         "license": {"name": "license", "version": "1", "repositoryPath": "p/license.tar.gz"},
