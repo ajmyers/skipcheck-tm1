@@ -39,7 +39,11 @@ import tools.jackson.databind.ObjectMapper;
  */
 class MetadataReleasesTest {
 
-	private static final Path DOC = Path.of(System.getProperty("tm1.repo", "../.."), "spec", "tm1-versions.md");
+	private static final Path REPO = Path.of(System.getProperty("tm1.repo", "../.."));
+
+	private static final Path DOC = REPO.resolve("spec/tm1-versions.md");
+
+	private static final Path SNAPSHOTS = REPO.resolve("java/tm1-client/src/model/metadata");
 
 	private final List<Release> releases = releases();
 
@@ -59,6 +63,11 @@ class MetadataReleasesTest {
 				.contains(text);
 		}
 		for (int i = 1; i < releases.size(); i++) {
+			// In release order, which says which release a document came with
+			assertThat(Tm1Version.parse(releases.get(i - 1).planningAnalytics())
+				.isBefore(Tm1Version.parse(releases.get(i).planningAnalytics())))
+				.as("%s comes after %s", releases.get(i).planningAnalytics(), releases.get(i - 1).planningAnalytics())
+				.isTrue();
 			assertThat(releases.get(i).tm1().isAtLeast(releases.get(i - 1).tm1()))
 				.as("%s's build is no older than %s's", releases.get(i).planningAnalytics(),
 						releases.get(i - 1).planningAnalytics())
@@ -69,7 +78,7 @@ class MetadataReleasesTest {
 	@Test
 	void everyCommittedDocumentIsSomeReleases() throws IOException {
 		NavigableSet<String> committed = new TreeSet<>();
-		try (var files = Files.list(Path.of("src/model/metadata"))) {
+		try (var files = Files.list(SNAPSHOTS)) {
 			files.map(f -> f.getFileName().toString())
 				.filter(n -> n.startsWith("tm1-schema-") && n.endsWith(".xml"))
 				.forEach(n -> committed.add(n.substring("tm1-schema-".length(), n.length() - ".xml".length())));
