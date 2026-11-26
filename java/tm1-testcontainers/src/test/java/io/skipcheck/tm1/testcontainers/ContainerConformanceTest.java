@@ -44,6 +44,12 @@ class ContainerConformanceTest {
 		record("cam-security");
 	}
 
+	@Test
+	@RequiresTm1Engine(shareDatabase = true)
+	void engine() throws Exception {
+		record("engine");
+	}
+
 	private static void record(String scenario) throws IOException, InterruptedException {
 		Path home = Path.of(System.getProperty("tm1.containerConformance.scenarios"));
 		try (var env = PlanningAnalyticsEnvironment.fromConfig(home.resolve(scenario + ".yaml")).build()) {
@@ -54,6 +60,10 @@ class ContainerConformanceTest {
 			env.adminServer().ifPresent(admin -> containers.put("adminServer", admin));
 			if (scenario.equals("servers-and-web")) {
 				containers.put("tm1Web", env.tm1Web());
+			}
+			if (scenario.equals("engine")) {
+				containers.put("tm1Engine", env.tm1Engine());
+				containers.put("tm1EngineDatastore", env.tm1Engine().getDatastore());
 			}
 			if (scenario.equals("cam-security")) {
 				containers.put("cognos", env.cognos());

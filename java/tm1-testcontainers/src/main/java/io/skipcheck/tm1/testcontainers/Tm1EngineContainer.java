@@ -112,6 +112,9 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	// would need quoting for
 	private static final Pattern NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]{2,}");
 
+	// An instance's name has no least length: only a database's does
+	private static final Pattern INSTANCE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
+
 	private static final Pattern USER = Pattern.compile("[A-Za-z0-9._-]+");
 
 	// The datastore is this engine's alone and goes with it: nothing else is given the
@@ -183,7 +186,26 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 		withEnv("TM1_DATASTORE_URL",
 				"mongodb://" + DATASTORE_USER + ":" + DATASTORE_PASSWORD + "@" + DATASTORE_ALIAS + ":27017");
 		dependsOn(datastore);
+		// A network of their own unless one is given. It's made in Docker only when used.
+		withNetwork(Network.newNetwork());
 		mountSource();
+	}
+
+	/**
+	 * Puts the engine, and its datastore with it, on a network. They have one of their
+	 * own unless this is called.
+	 * @param network the network
+	 * @return this container
+	 */
+	@Override
+	public Tm1EngineContainer withNetwork(Network network) {
+		super.withNetwork(network);
+		// At once, not when the engine starts: whatever starts the engine may start what
+		// it
+		// depends on first, as Startables.deepStart does, and the datastore must be here
+		// by then
+		datastore.withNetwork(network);
+		return self();
 	}
 
 	/**
@@ -228,7 +250,7 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	 * @return this container
 	 */
 	public Tm1EngineContainer withDatabase(String instance, String name) {
-		databases.add(requireName(instance, "instance") + "/" + requireName(name, "database"));
+		databases.add(requireInstance(instance) + "/" + requireName(name, "database"));
 		return self();
 	}
 
@@ -379,7 +401,7 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	 * @return the database
 	 */
 	public Tm1Database createDatabase(String instance, String name) {
-		Tm1Database database = new Tm1Database(this, requireName(instance, "instance"), requireName(name, "database"));
+		Tm1Database database = new Tm1Database(this, requireInstance(instance), requireName(name, "database"));
 		try {
 			command(CREATE_TIMEOUT, "database", "create", instance + "/" + name);
 		}
@@ -646,6 +668,14 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 			return DockerImageName.parse(override.strip()).asCompatibleSubstituteFor(DEFAULT_IMAGE);
 		}
 		return DEFAULT_IMAGE.withTag(Tm1ServerContainer.imageTag(Tm1ServerContainer.libraryVersion()));
+	}
+
+	private static String requireInstance(String name) {
+		if (name == null || !INSTANCE.matcher(name).matches()) {
+			throw new IllegalArgumentException(
+					"A TM1 instance's name is letters, digits, '_' and '-', starting with a letter or digit: " + name);
+		}
+		return name;
 	}
 
 	private static String requireName(String name, String what) {

@@ -42,6 +42,11 @@ final class PaEnvironmentFile {
 
 	private static final List<String> SEEDS = List.of("empty", "sdata", "24retail");
 
+	// The tm1-engine image's rule for a database's and an instance's name
+	private static final Pattern ENGINE_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
+
+	private static final Pattern PASSWORD_BREAK = Pattern.compile("[:\\s]");
+
 	private final String file;
 
 	private PaEnvironmentFile(String file) {
@@ -71,14 +76,15 @@ final class PaEnvironmentFile {
 	private PlanningAnalyticsEnvironment.Builder apply(Object root, Path dir) {
 		// pa_setup.normalize: the same checks, in the same order
 		Map<?, ?> cfg = keys(root,
-				List.of("version", "name", "ibm", "files", "images", "tm1", "tm1Web", "paw", "cognos"), "the file");
+				List.of("version", "name", "ibm", "files", "images", "tm1", "tm1Web", "paw", "cognos", "tm1Engine"),
+				"the file");
 		if (!Integer.valueOf(1).equals(cfg.get("version"))) {
 			throw error("version: must be 1");
 		}
 		Path ibm = cfg.get("ibm") != null && truthy(cfg.get("ibm")) ? hostPath(cfg.get("ibm"), "ibm", dir) : null;
 		hostPath(or(cfg.get("files"), "pa-files"), "files", dir);
 		Map<?, ?> images = keys(or(cfg.get("images"), Map.of()),
-				List.of("tm1Server", "tm1Web", "cognosServer", "keycloak"), "images");
+				List.of("tm1Server", "tm1Web", "cognosServer", "keycloak", "tm1Engine", "mongo"), "images");
 
 		Map<?, ?> tm1 = section(cfg, "tm1");
 		Map<String, Server> servers = new LinkedHashMap<>();
@@ -163,7 +169,8 @@ final class PaEnvironmentFile {
 				oidc = Map.of();
 			}
 			Integer keycloakPort = null;
-			if (oidc != null && truthy(oidc)) {
+			// On with true or a mapping, an empty one too: only absent or false is off
+			if (oidc != null && !Boolean.FALSE.equals(oidc)) {
 				Map<?, ?> o = keys(oidc, List.of("keycloakPort"), "cognos.oidc");
 				if (users.isEmpty()) {
 					throw error("cognos.oidc: needs cognos.users");
@@ -226,10 +233,87 @@ final class PaEnvironmentFile {
 			pawZip = paw.get("zip") != null && truthy(paw.get("zip")) ? String.valueOf(paw.get("zip")) : null;
 		}
 
-		if (servers.isEmpty() && cam == null) {
-			throw error("nothing to run: add tm1.servers and/or cognos");
+		Map<?, ?> engineSection = section(cfg, "tm1Engine");
+		Engine engine = null;
+		Integer enginePort = null;
+		Integer datastorePort = null;
+		if (engineSection != null) {
+			keys(engineSection, List.of("port", "databases", "users", "datastore"), "tm1Engine");
+			// name -> instance, in the file's order
+			Map<String, String> databases = new LinkedHashMap<>();
+			Object raw = engineSection.get("databases");
+			if (raw == null) {
+				databases.put(Tm1EngineContainer.DEFAULT_DATABASE, Tm1EngineContainer.DEFAULT_INSTANCE);
+			}
+			else if (!(raw instanceof Map<?, ?> named) || named.isEmpty()) {
+				throw error("tm1Engine.databases: name at least one database, "
+						+ "e.g. tm1Engine: {databases: {planning: {}}}");
+			}
+			else {
+				for (Map.Entry<?, ?> entry : named.entrySet()) {
+					String where = "tm1Engine.databases." + entry.getKey();
+					// No check for names that differ only in case, as tm1.servers has:
+					// Sales
+					// and sales are two databases to TM1 v12
+					if (!(entry.getKey() instanceof String name)) {
+						throw error(where + ": YAML reads this name as a number or true/false: put it in quotes");
+					}
+					if (!ENGINE_NAME.matcher(name).matches()) {
+						throw error(where
+								+ ": database names are letters, digits, _ and -, starting with a letter or digit");
+					}
+					if (name.length() < 3) {
+						throw error(where + ": TM1 needs database names of at least 3 characters");
+					}
+					Map<?, ?> d = keys(or(entry.getValue(), Map.of()), List.of("instance"), where);
+					Object instance = d.get("instance") == null ? Tm1EngineContainer.DEFAULT_INSTANCE
+							: d.get("instance");
+					if (!(instance instanceof String in) || !ENGINE_NAME.matcher(in).matches()) {
+						throw error(where + ".instance: instance names are letters, digits, _ and -, "
+								+ "starting with a letter or digit");
+					}
+					databases.put(name, in);
+				}
+			}
+			Object listed = engineSection.get("users") != null && truthy(engineSection.get("users"))
+					? engineSection.get("users") : List.of();
+			if (!(listed instanceof List<?> list)) {
+				throw error("tm1Engine.users must be a list, e.g. users: [analyst::Analysts]");
+			}
+			List<EngineUser> engineUsers = new ArrayList<>();
+			Set<String> engineNames = new LinkedHashSet<>();
+			for (int i = 0; i < list.size(); i++) {
+				EngineUser user = engineUser(list.get(i), "tm1Engine.users[" + i + "]");
+				if (!engineNames.add(user.name().toLowerCase(Locale.ROOT))) {
+					throw error("tm1Engine.users: a user is listed twice");
+				}
+				engineUsers.add(user);
+			}
+			Object datastore = engineSection.get("datastore");
+			Map<?, ?> ds = datastore == null || datastore instanceof Boolean ? Map.of()
+					: keys(datastore, List.of("port"), "tm1Engine.datastore");
+			enginePort = port(engineSection.get("port"), "tm1Engine", 4444);
+			// Published only when a port is given
+			datastorePort = ds.get("port") == null ? null : port(ds.get("port"), "tm1Engine.datastore", 27017);
+			for (String name : servers.keySet()) {
+				// The engine's two compose services in pa-setup: a server of that name
+				// would
+				// be replaced by them
+				String lowered = name.toLowerCase(Locale.ROOT);
+				if (lowered.equals("tm1-engine") || lowered.equals("tm1-engine-mongo")) {
+					throw error("tm1.servers." + name
+							+ ": that name is the TM1 v12 engine's here; give the server another");
+				}
+			}
+			engine = new Engine(databases, engineUsers);
+		}
+
+		if (servers.isEmpty() && cam == null && engine == null) {
+			throw error("nothing to run: add tm1.servers, tm1Engine and/or cognos");
 		}
 		List<Integer> ports = new ArrayList<>();
+		addIfSet(ports, enginePort);
+		addIfSet(ports, datastorePort);
 		servers.values().forEach(s -> ports.add(s.port()));
 		addIfSet(ports, admin);
 		addIfSet(ports, webPort);
@@ -261,7 +345,18 @@ final class PaEnvironmentFile {
 			}
 		});
 
-		return configure(servers, admin != null, heap, cam, pawPort != null, ibm, pawZip, images);
+		PlanningAnalyticsEnvironment.Builder b = configure(servers, admin != null, heap, cam, pawPort != null, ibm,
+				pawZip, images);
+		if (engine != null) {
+			Engine wanted = engine;
+			b.tm1Engine(container -> {
+				wanted.databases().forEach((name, instance) -> container.withDatabase(instance, name));
+				// TM1 v12 keeps no passwords: a user's is checked and not used
+				wanted.users().forEach(u -> container.withUser(u.name(), u.groups().toArray(new String[0])));
+			});
+			b.tm1EngineImage = image(images, "tm1Engine");
+		}
+		return b;
 	}
 
 	private static PlanningAnalyticsEnvironment.Builder configure(Map<String, Server> servers, boolean admin,
@@ -414,6 +509,65 @@ final class PaEnvironmentFile {
 		return new CognosContainer.User(userName, pw, List.copyOf(groupNames));
 	}
 
+	/**
+	 * pa_setup.parse_user with password_optional: an engine's user, whose password may be
+	 * left out or empty, since TM1 v12 keeps none.
+	 */
+	private EngineUser engineUser(@Nullable Object entry, String where) {
+		Object name;
+		Object password;
+		List<Object> groups = new ArrayList<>();
+		if (entry instanceof String text) {
+			String[] parts = text.split(":", -1);
+			if (parts.length == 2 && !parts[1].isEmpty()) {
+				// The image's own form has groups there; here the second part is a
+				// password
+				throw error(where + ": '" + text + "' reads as a password, which TM1 v12 doesn't keep: "
+						+ "for a group, write " + parts[0] + "::" + parts[1]);
+			}
+			if (parts.length > 3) {
+				throw error(
+						where + ": expected user, user::group,group or user:password:group,group, not '" + text + "'");
+			}
+			name = parts[0];
+			password = parts.length > 1 ? parts[1] : "";
+			if (parts.length == 3) {
+				for (String g : parts[2].split(",", -1)) {
+					if (!g.isEmpty()) {
+						groups.add(g);
+					}
+				}
+			}
+		}
+		else if (entry instanceof Map<?, ?>) {
+			Map<?, ?> map = keys(entry, List.of("name", "password", "groups"), where);
+			name = map.get("name");
+			password = map.get("password") == null ? "" : map.get("password");
+			Object listed = map.get("groups") != null && truthy(map.get("groups")) ? map.get("groups") : List.of();
+			if (!(listed instanceof List<?> list)) {
+				throw error(where + ": groups must be a list, e.g. groups: [Analysts]");
+			}
+			groups.addAll(list);
+		}
+		else {
+			throw error(where + ": a user is user:password[:groups] or a mapping");
+		}
+		if (!(name instanceof String userName) || !USER.matcher(userName).matches()) {
+			throw error(where + ": user name '" + name + "' must be letters, digits, '.', '_' and '-'");
+		}
+		if (!(password instanceof String pw) || PASSWORD_BREAK.matcher(pw).find()) {
+			throw error(where + ": " + userName + "'s password must be text without ':' or spaces (quote a number)");
+		}
+		List<String> groupNames = new ArrayList<>();
+		for (Object g : groups) {
+			if (!(g instanceof String group) || !USER.matcher(group).matches()) {
+				throw error(where + ": group '" + g + "' must be letters, digits, '.', '_' and '-'");
+			}
+			groupNames.add(group);
+		}
+		return new EngineUser(userName, List.copyOf(groupNames));
+	}
+
 	/** A tm1s.cfg value as pa_setup writes it, with Python's str(): true is True. */
 	private String cfgValue(@Nullable Object value, String where) {
 		if (value instanceof Boolean flag) {
@@ -452,6 +606,12 @@ final class PaEnvironmentFile {
 
 	private IllegalArgumentException error(String message) {
 		return new IllegalArgumentException(file + ": " + message);
+	}
+
+	private record Engine(Map<String, String> databases, List<EngineUser> users) {
+	}
+
+	private record EngineUser(String name, List<String> groups) {
 	}
 
 	private record Server(int port, String seed, Map<String, String> cfg) {

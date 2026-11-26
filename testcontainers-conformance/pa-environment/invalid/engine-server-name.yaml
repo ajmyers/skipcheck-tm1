@@ -1,0 +1,4 @@
+# error: that name is the TM1 v12 engine's here
+version: 1
+tm1: { servers: { TM1-Engine: {} } }
+tm1Engine: true

@@ -1,0 +1,8 @@
+# A TM1 v12 engine with two databases and a user, and the MongoDB it keeps its metadata in.
+version: 1
+tm1Engine:
+  databases:
+    planning: {}
+    sales: {}
+  users:
+    - analyst::Analysts

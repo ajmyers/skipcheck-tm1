@@ -16,13 +16,20 @@ import pytest
 from conftest import REPO
 
 FIXTURES = REPO / "spec" / "conformance" / "pa-environment"
+# TM1 v12's, beside the container conformance scenarios
+ENGINE_FIXTURES = REPO / "testcontainers-conformance" / "pa-environment"
 VALID = [
     FIXTURES / "settings.yaml",
     FIXTURES / "paw.yaml",
     FIXTURES / "paw-cognos.yaml",
     REPO / "docker" / "pa-setup" / "examples" / "everything.yaml",
+    REPO / "docker" / "pa-setup" / "examples" / "tm1-engine.yaml",
+    ENGINE_FIXTURES / "tm1-engine.yaml",
+    ENGINE_FIXTURES / "oidc-true.yaml",
 ]
-INVALID = sorted((FIXTURES / "invalid").glob("*.yaml"))
+INVALID = sorted((FIXTURES / "invalid").glob("*.yaml")) + sorted(
+    (ENGINE_FIXTURES / "invalid").glob("*.yaml")
+)
 
 
 @pytest.fixture(scope="module")

@@ -150,6 +150,8 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 
 	private final @Nullable KeycloakContainer keycloak;
 
+	private final @Nullable Tm1EngineContainer tm1Engine;
+
 	private PlanningAnalyticsEnvironment(Builder b, boolean reuseEnabled) {
 		this.reused = b.reuse && reuseEnabled;
 		Network given = b.network;
@@ -174,15 +176,18 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 			b.cognos.accept(cognos);
 		}
 		this.cognos = cognos;
-		Tm1Source tm1Source = b.get(b.tm1Source, ibm -> new Tm1Source.Bundle(ibm, null), Tm1Source::discover,
-				Tm1Source.PrivateImage::new, b.tm1Image, RequiresTm1.NO_SOURCE_MESSAGE);
+		// TM1 11's parts, when there's a server: an environment may be a TM1 v12 engine
+		// alone
+		Tm1Source tm1Source = b.tm1.isEmpty() ? null : b.get(b.tm1Source, ibm -> new Tm1Source.Bundle(ibm, null),
+				Tm1Source::discover, Tm1Source.PrivateImage::new, b.tm1Image, RequiresTm1.NO_SOURCE_MESSAGE);
 		boolean tm1Image = runs(b.tm1Image, tm1Source instanceof Tm1Source.PrivateImage);
-		this.adminServer = b.adminServer != null || b.tm1.size() > 1 ? (tm1Image
+		this.adminServer = tm1Source != null && (b.adminServer != null || b.tm1.size() > 1) ? (tm1Image
 				? new Tm1AdminServerContainer(image(b.tm1Image, Tm1ServerContainer.DEFAULT_IMAGE), tm1Source)
 				: new Tm1AdminServerContainer(tm1Source))
 			.withNetwork(network) : null;
 		Map<String, Tm1ServerContainer> servers = new LinkedHashMap<>();
 		for (String name : b.tm1.keySet()) {
+			Objects.requireNonNull(tm1Source, "tm1Source");
 			Tm1ServerContainer server = (tm1Image
 					? new Tm1ServerContainer(image(b.tm1Image, Tm1ServerContainer.DEFAULT_IMAGE), tm1Source)
 					: new Tm1ServerContainer(tm1Source))
@@ -198,9 +203,10 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 			servers.put(name, server);
 		}
 		this.tm1Servers = Collections.unmodifiableMap(servers);
-		Tm1ServerContainer first = servers.values().iterator().next();
+		// build() has checked that TM1 Web and PAW come with a server
+		Tm1ServerContainer first = servers.isEmpty() ? null : servers.values().iterator().next();
 		Tm1WebContainer web = null;
-		if (b.tm1Web != null) {
+		if (b.tm1Web != null && first != null) {
 			Tm1WebSource source = b.get(b.tm1WebSource, ibm -> new Tm1WebSource.Bundle(ibm, null),
 					Tm1WebSource::discover, Tm1WebSource.PrivateImage::new, b.tm1WebImage,
 					RequiresTm1Web.NO_SOURCE_MESSAGE);
@@ -218,7 +224,7 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		}
 		this.tm1Web = web;
 		PawContainer paw = null;
-		if (b.paw != null) {
+		if (b.paw != null && first != null) {
 			paw = new PawContainer(
 					b.get(b.pawSource, b::pawFromIbm, PawSource::discover, null, null, RequiresPaw.NO_SOURCE_MESSAGE))
 				.withTm1Server(first);
@@ -227,6 +233,18 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 			}
 		}
 		this.paw = paw;
+		Tm1EngineContainer engine = null;
+		if (b.tm1Engine != null) {
+			Tm1EngineSource source = b.get(b.tm1EngineSource, ibm -> new Tm1EngineSource.Bundle(ibm, null),
+					Tm1EngineSource::discover, Tm1EngineSource.PrivateImage::new, b.tm1EngineImage,
+					RequiresTm1Engine.NO_SOURCE_MESSAGE);
+			// Its datastore joins the same network when the engine starts
+			engine = (runs(b.tm1EngineImage, source instanceof Tm1EngineSource.PrivateImage)
+					? new Tm1EngineContainer(image(b.tm1EngineImage, Tm1EngineContainer.DEFAULT_IMAGE), source)
+					: new Tm1EngineContainer(source))
+				.withNetwork(network);
+		}
+		this.tm1Engine = engine;
 
 		// The callers' own settings last, so they can change anything set above
 		apply(b.adminServer, adminServer);
@@ -234,6 +252,7 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		apply(b.tm1Web, tm1Web);
 		apply(b.paw, paw);
 		apply(b.keycloak, keycloak);
+		apply(b.tm1Engine, tm1Engine);
 	}
 
 	/**
@@ -270,6 +289,10 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 	 * <li>{@code paw}: {@link Builder#paw} with {@link PawContainer#acceptLicense()},
 	 * which the file must say ({@code acceptLicense: true}); the zip is {@code zip} in
 	 * {@code ibm}, or the newest there;
+	 * <li>{@code tm1Engine}: {@link Builder#tm1Engine}, with each of {@code databases} as
+	 * {@link Tm1EngineContainer#withDatabase(String, String)} in its {@code instance},
+	 * and {@code users} as {@link Tm1EngineContainer#withUser} (a user's password is
+	 * checked and not used: TM1 v12 keeps none). It runs beside {@code tm1}, or alone;
 	 * <li>{@code ibm}: each part's source, the folder as {@link Tm1Source.Bundle},
 	 * {@link Tm1WebSource.Bundle} and {@link CognosSource.Zip}. A relative path is from
 	 * the file's folder; {@code ~} is the user's home;
@@ -287,10 +310,11 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 	 * Ignored, because they place things on the host that Testcontainers manages itself:
 	 * {@code name} (the compose project; the environment has its own network), every
 	 * {@code port}, {@code adminPort} and {@code keycloakPort} (Testcontainers maps
-	 * random host ports), and {@code files} (the host folder pa-setup keeps databases in;
-	 * each test environment starts from a new database, or one copied in with
-	 * {@link Tm1ServerContainer#withData}). They're still checked as {@code pa-setup}
-	 * checks them.
+	 * random host ports), {@code tm1Engine.datastore} and {@code images.mongo} (the
+	 * engine's MongoDB is its own here), and {@code files} (the host folder pa-setup
+	 * keeps databases in; each test environment starts from a new database, or one copied
+	 * in with {@link Tm1ServerContainer#withData}). They're still checked as
+	 * {@code pa-setup} checks them.
 	 *
 	 * <p>
 	 * Refused, because the environment can't run them yet: {@code cognos} without
@@ -405,6 +429,27 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 	 */
 	public KeycloakContainer keycloak() {
 		return require(keycloak, "Keycloak", "keycloak()");
+	}
+
+	/**
+	 * The TM1 v12 engine.
+	 * @return the engine
+	 * @throws IllegalStateException if the environment has none
+	 */
+	public Tm1EngineContainer tm1Engine() {
+		return require(tm1Engine, "TM1 v12 engine", "tm1Engine()");
+	}
+
+	/**
+	 * A database of the TM1 v12 engine, in the instance {@code tm1}; for another
+	 * instance's, use {@code tm1Engine().database(instance, name)}.
+	 * @param name the database's name
+	 * @return the database
+	 * @throws IllegalStateException if the environment has no engine
+	 * @throws IllegalArgumentException if the engine has no such database
+	 */
+	public Tm1Database tm1Database(String name) {
+		return tm1Engine().database(name);
 	}
 
 	/**
@@ -540,6 +585,10 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		if (tm1Web != null) {
 			all.add(tm1Web);
 		}
+		// Beside TM1 11's parts: nothing of theirs depends on it, nor it on them
+		if (tm1Engine != null) {
+			all.add(tm1Engine);
+		}
 		if (paw != null) {
 			all.add(paw);
 		}
@@ -586,6 +635,10 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 
 		private @Nullable Consumer<KeycloakContainer> keycloak;
 
+		private @Nullable Consumer<Tm1EngineContainer> tm1Engine;
+
+		private @Nullable Tm1EngineSource tm1EngineSource;
+
 		private Namespace camNamespace = Namespace.LDAP;
 
 		private List<String> camAdmins = List.of();
@@ -616,6 +669,8 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		@Nullable String cognosImage;
 
 		@Nullable String keycloakImage;
+
+		@Nullable String tm1EngineImage;
 
 		private Builder() {
 		}
@@ -734,6 +789,29 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		}
 
 		/**
+		 * Adds a TM1 v12 engine, with one database, {@code tm1}. It runs beside the TM1
+		 * servers, or alone: an environment needs a server or an engine.
+		 * @return this builder
+		 */
+		public Builder tm1Engine() {
+			return tm1Engine(engine -> {
+			});
+		}
+
+		/**
+		 * Adds a TM1 v12 engine and configures it: its databases and users, for instance.
+		 *
+		 * {@snippet class = examples.PlanningAnalyticsEnvironmentExamples region =
+		 * engine}
+		 * @param customizer configures the engine
+		 * @return this builder
+		 */
+		public Builder tm1Engine(Consumer<Tm1EngineContainer> customizer) {
+			this.tm1Engine = Objects.requireNonNull(customizer, "customizer");
+			return this;
+		}
+
+		/**
 		 * How the TM1 servers use Cognos: the namespace their administrators and groups
 		 * are in, and which test users are TM1 administrators. Default:
 		 * {@link Namespace#LDAP}, with the first test user as the administrator.
@@ -790,6 +868,17 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		}
 
 		/**
+		 * Where the engine gets TM1 v12 from, instead of what
+		 * {@link Tm1EngineSource#discover()} finds.
+		 * @param source the source
+		 * @return this builder
+		 */
+		public Builder tm1EngineSource(Tm1EngineSource source) {
+			this.tm1EngineSource = Objects.requireNonNull(source, "source");
+			return this;
+		}
+
+		/**
 		 * The Docker network to put everything on; a new one, removed by
 		 * {@link PlanningAnalyticsEnvironment#close()}, by default.
 		 * @param network the network
@@ -834,8 +923,17 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 
 		/** Builds, with the developer's reuse switch given, so tests needn't set it. */
 		PlanningAnalyticsEnvironment build(boolean reuseEnabled) {
-			if (tm1.isEmpty()) {
-				throw new IllegalStateException("Add at least one TM1 server with tm1(name)");
+			if (tm1.isEmpty() && tm1Engine == null) {
+				throw new IllegalStateException(
+						"Add at least one TM1 server with tm1(name), or a TM1 v12 engine with tm1Engine()");
+			}
+			if (tm1.isEmpty() && (adminServer != null || tm1Web != null || paw != null || cognos != null)) {
+				throw new IllegalStateException("The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: "
+						+ "add a TM1 server with tm1(name)");
+			}
+			if (reuse && tm1Engine != null) {
+				throw new IllegalStateException("An environment with a TM1 v12 engine can't be reused: the engine "
+						+ "and its datastore belong together, and a kept one keeps every database tests left");
 			}
 			if (keycloak != null && cognos == null) {
 				throw new IllegalStateException("Keycloak gives Cognos its OIDC namespace: add cognos(...) too");

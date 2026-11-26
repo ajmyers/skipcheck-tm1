@@ -248,7 +248,8 @@ def normalize(cfg):
         oidc = cognos.get("oidc")
         if oidc is True:
             oidc = {}
-        if oidc:
+        # On with true or a mapping, an empty one too: only absent or false is off
+        if oidc is not None and oidc is not False:
             check_keys(oidc, ("keycloakPort",), "cognos.oidc")
             if not users:
                 raise ConfigError("cognos.oidc: needs cognos.users")

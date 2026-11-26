@@ -1,0 +1,22 @@
+# Every tm1Engine setting PlanningAnalyticsEnvironment.fromConfig maps, none of them at its default,
+# beside a TM1 11 server. The ports are checked but ignored: Testcontainers places those itself.
+version: 1
+ibm: ibm
+images:
+  tm1Engine: registry.example.com/tm1-engine:local
+  mongo: registry.example.com/mongo:8
+tm1:
+  servers:
+    legacy: { port: 8020 }
+tm1Engine:
+  port: 4445
+  databases:
+    planning:
+    Sales: {}
+    sales: { instance: other }
+  users:
+    - analyst::Analysts,Planners
+    - viewer
+    - boss:bosspw:ADMIN
+    - { name: planner, groups: [Planners] }
+  datastore: { port: 27018 }

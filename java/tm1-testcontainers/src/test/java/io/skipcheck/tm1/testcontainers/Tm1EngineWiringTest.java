@@ -79,6 +79,19 @@ class Tm1EngineWiringTest {
 	}
 
 	@Test
+	void itsDatastoreIsOnItsNetworkBeforeAnythingStarts() {
+		// Not only once the engine starts or is configured: an environment starts what
+		// the
+		// engine depends on first, and TM1 couldn't reach a datastore left off the
+		// network
+		var engine = new Tm1EngineContainer(SOURCE);
+		assertThat(engine.getNetwork()).isNotNull().isSameAs(engine.getDatastore().getNetwork());
+		Network network = Network.newNetwork();
+		engine.withNetwork(network);
+		assertThat(engine.getDatastore().getNetwork()).isSameAs(network);
+	}
+
+	@Test
 	void joinsANetworkItIsGiven() {
 		Network network = Network.newNetwork();
 		var engine = new Tm1EngineContainer(SOURCE).withNetwork(network);

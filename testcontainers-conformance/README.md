@@ -40,6 +40,7 @@ images and no `ibm` folder, so each part's source is what the machine is set up 
 | [`one-server`](scenarios/one-server.yaml) | One TM1 server with the sample database and a `tm1s.cfg` setting | TM1 |
 | [`servers-and-web`](scenarios/servers-and-web.yaml) | Two TM1 servers, their Admin Server, TM1 Web | TM1, TM1 Web |
 | [`cam-security`](scenarios/cam-security.yaml) | Two TM1 servers in CAM security, Cognos, Keycloak | TM1, Cognos |
+| [`engine`](scenarios/engine.yaml) | A TM1 v12 engine with two databases and a user, and its MongoDB | TM1 v12 |
 
 A line `# unordered: <container> <container>` names containers that don't depend on each other: a
 language may start them at once or one after the other.

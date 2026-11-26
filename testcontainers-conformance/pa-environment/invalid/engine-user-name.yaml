@@ -1,0 +1,3 @@
+# error: tm1Engine.users[0]: user name
+version: 1
+tm1Engine: { users: ['bad user'] }

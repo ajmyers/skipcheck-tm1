@@ -1,0 +1,3 @@
+# error: tm1Engine.databases: name at least one database
+version: 1
+tm1Engine: { databases: {} }
