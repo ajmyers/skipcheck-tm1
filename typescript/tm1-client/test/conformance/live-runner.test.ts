@@ -149,11 +149,21 @@ describe("the live conformance runner", () => {
   it("applies what the server has and is", () => {
     const node = { requires: ["Action Cube/Reserve"], tm1From: "11.8.03000", tm1Before: "11.8.04000" };
     const reserve = new Set(["Action Cube/Reserve"]);
-    expect(live.applies(node, reserve, Tm1Version.parse("11.8.03500.6"))).toBe(true);
-    expect(live.applies(node, new Set(), Tm1Version.parse("11.8.03500.6")), "an endpoint the server lacks").toBe(false);
-    expect(live.applies(node, reserve, Tm1Version.parse("11.8.02400.7")), "too old").toBe(false);
-    expect(live.applies(node, reserve, Tm1Version.parse("11.8.04000.1")), "tm1Before is exclusive").toBe(false);
-    expect(live.applies({}, new Set(), Tm1Version.parse("11.8.02400.7")), "one with neither applies everywhere").toBe(true);
+    expect(live.applies(node, reserve, Tm1Version.parse("11.8.03500.6"), "writable")).toBe(true);
+    expect(live.applies(node, new Set(), Tm1Version.parse("11.8.03500.6"), "writable"), "an endpoint the server lacks").toBe(false);
+    expect(live.applies(node, reserve, Tm1Version.parse("11.8.02400.7"), "writable"), "too old").toBe(false);
+    expect(live.applies(node, reserve, Tm1Version.parse("11.8.04000.1"), "writable"), "tm1Before is exclusive").toBe(false);
+    expect(live.applies({}, new Set(), Tm1Version.parse("11.8.02400.7"), undefined), "one with none of them applies everywhere").toBe(true);
+  });
+
+  it("applies what depends on the install to that install only", () => {
+    const version = Tm1Version.parse("11.8.03500.6");
+    expect(live.applies({ install: "readOnly" }, new Set(), version, "readOnly")).toBe(true);
+    expect(live.applies({ install: "readOnly" }, new Set(), version, "writable")).toBe(false);
+    expect(live.applies({ install: "writable" }, new Set(), version, "writable")).toBe(true);
+    expect(live.applies({ install: "writable" }, new Set(), version, "readOnly")).toBe(false);
+    expect(live.applies({ install: "readOnly" }, new Set(), version, undefined), "a server the suite didn't start").toBe(false);
+    expect(live.applies({ install: "writable" }, new Set(), version, undefined), "a server the suite didn't start").toBe(false);
   });
 
   it("skips the steps that don't apply and sends nothing for them", async () => {

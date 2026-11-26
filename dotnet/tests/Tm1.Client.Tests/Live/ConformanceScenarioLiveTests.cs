@@ -34,11 +34,13 @@ public sealed class ConformanceScenarioLiveTests
         // can't skip a test once it runs)
         var capabilities = await tm1.Session.CapabilitiesAsync();
         var version = capabilities.ProductVersion!;
-        if (!ConformanceLive.Applies(scenario, capabilities.Endpoints, version))
+        if (!ConformanceLive.Applies(scenario, capabilities.Endpoints, version, Live.Install))
         {
             return;
         }
-        var failures = await ConformanceLive.Run(tm1, traffic, scenario, names, step => ConformanceLive.Applies(step, capabilities.Endpoints, version));
+        var failures = await ConformanceLive.Run(tm1, traffic, scenario, names, step =>
+            ConformanceLive.Applies(step, capabilities.Endpoints, version, Live.Install)
+        );
         traffic.Write(scenario["name"]!.GetValue<string>(), names);
         Assert.Empty(failures);
     }

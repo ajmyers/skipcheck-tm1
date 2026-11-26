@@ -39,10 +39,6 @@ STALE_FIRST_PULL_FROM = Tm1Version.parse("11.8.03500")
 new one; before, the first plans the new one. Tried at 11.8.032 (the new) and 11.8.035 (the stale): a
 build between falls on the older side unverified, so a failure there is this bound to move."""
 
-MAKES_OWN_KEY_FROM = Tm1Version.parse("11.8.04000")
-"""From this TM1 the server makes a local key file itself, so the image's settings check as valid.
-Tried at 11.8.035 (invalid) and 11.8.040 (valid); a build between falls on the older side unverified."""
-
 _SCHEMA_VERSION = re.compile(r'Term="Core\.SchemaVersion">\s*<String>([^<]+)</String>')
 
 

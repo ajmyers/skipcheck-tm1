@@ -27,6 +27,7 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
 
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.version.Tm1Version;
 import reactor.core.Exceptions;
@@ -249,13 +250,20 @@ public final class ConformanceScenarios {
 	 * {@code requires} names (coverage-gate IDs, such as {@code Action Cube/Reserve}) is
 	 * in the server's {@code $metadata}, and the server's product version is at least its
 	 * {@code tm1From} and below its {@code tm1Before}, for behaviour {@code $metadata}
-	 * doesn't show. One with none of them applies everywhere.
+	 * doesn't show, and its install is the {@code install} named ({@code writable} or
+	 * {@code readOnly}), for behaviour that depends on it. One with none of them applies
+	 * everywhere; one naming an install doesn't apply to a server the suite didn't start.
 	 * @param node the scenario or step
 	 * @param endpoints the server's endpoints
 	 * @param version the server's product version
+	 * @param install the server's install
 	 * @return whether it applies
 	 */
-	public static boolean applies(JsonNode node, Set<String> endpoints, Tm1Version version) {
+	public static boolean applies(JsonNode node, Set<String> endpoints, Tm1Version version,
+			ServerAssumptions.Install install) {
+		if (node.has("install") && !node.get("install").asString().equals(install.term())) {
+			return false;
+		}
 		for (JsonNode endpoint : node.path("requires")) {
 			if (!endpoints.contains(endpoint.asString())) {
 				return false;

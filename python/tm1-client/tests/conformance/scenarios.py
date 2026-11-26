@@ -201,10 +201,14 @@ def _invoke(client: Any, step: dict[str, Any], names: dict[str, str], kept: dict
     return lambda: method(**kwargs)
 
 
-def applies(node: dict[str, Any], endpoints: Any, version: Tm1Version) -> bool:
+def applies(node: dict[str, Any], endpoints: Any, version: Tm1Version, install: str | None) -> bool:
     """Whether a scenario or a step applies to a server, as Java's ``ConformanceScenarios.applies``:
-    every endpoint its ``requires`` names is in the server's ``$metadata``, and the server's product
-    version is at least its ``tm1From`` and below its ``tm1Before``."""
+    every endpoint its ``requires`` names is in the server's ``$metadata``, the server's product
+    version is at least its ``tm1From`` and below its ``tm1Before``, and its install is the
+    ``install`` named (``writable`` or ``readOnly``; None, a server the suite didn't start, is
+    neither)."""
+    if "install" in node and node["install"] != install:
+        return False
     if any(endpoint not in endpoints for endpoint in node.get("requires", [])):
         return False
     if "tm1From" in node and version < Tm1Version.parse(node["tm1From"]):

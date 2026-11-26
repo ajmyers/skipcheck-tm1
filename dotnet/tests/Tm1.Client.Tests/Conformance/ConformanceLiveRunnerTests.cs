@@ -211,11 +211,28 @@ public class ConformanceLiveRunnerTests
     {
         var scenario = JsonNode.Parse("{\"requires\":[\"Action Cube/Reserve\"],\"tm1From\":\"11.8.03000\",\"tm1Before\":\"11.8.04000\"}")!;
         var reserve = new System.Collections.Generic.HashSet<string> { "Action Cube/Reserve" };
-        Assert.True(ConformanceLive.Applies(scenario, reserve, Version.Tm1Version.Parse("11.8.03500.6")));
-        Assert.False(ConformanceLive.Applies(scenario, new System.Collections.Generic.HashSet<string>(), Version.Tm1Version.Parse("11.8.03500.6"))); // an endpoint the server lacks
-        Assert.False(ConformanceLive.Applies(scenario, reserve, Version.Tm1Version.Parse("11.8.02400.7"))); // too old
-        Assert.False(ConformanceLive.Applies(scenario, reserve, Version.Tm1Version.Parse("11.8.04000.1"))); // tm1Before is exclusive
-        Assert.True(ConformanceLive.Applies(JsonNode.Parse("{}")!, new System.Collections.Generic.HashSet<string>(), Version.Tm1Version.Parse("11.8.02400.7")));
+        Assert.True(ConformanceLive.Applies(scenario, reserve, Version.Tm1Version.Parse("11.8.03500.6"), "writable"));
+        Assert.False(ConformanceLive.Applies(scenario, new System.Collections.Generic.HashSet<string>(), Version.Tm1Version.Parse("11.8.03500.6"), "writable")); // an endpoint the server lacks
+        Assert.False(ConformanceLive.Applies(scenario, reserve, Version.Tm1Version.Parse("11.8.02400.7"), "writable")); // too old
+        Assert.False(ConformanceLive.Applies(scenario, reserve, Version.Tm1Version.Parse("11.8.04000.1"), "writable")); // tm1Before is exclusive
+        Assert.True(
+            ConformanceLive.Applies(JsonNode.Parse("{}")!, new System.Collections.Generic.HashSet<string>(), Version.Tm1Version.Parse("11.8.02400.7"), null)
+        ); // one with none of them applies everywhere
+    }
+
+    [Fact]
+    public void AppliesWhatDependsOnTheInstallToThatInstallOnly()
+    {
+        var none = new System.Collections.Generic.HashSet<string>();
+        var version = Version.Tm1Version.Parse("11.8.03500.6");
+        var readOnly = JsonNode.Parse("{\"install\":\"readOnly\"}")!;
+        var writable = JsonNode.Parse("{\"install\":\"writable\"}")!;
+        Assert.True(ConformanceLive.Applies(readOnly, none, version, "readOnly"));
+        Assert.False(ConformanceLive.Applies(readOnly, none, version, "writable"));
+        Assert.True(ConformanceLive.Applies(writable, none, version, "writable"));
+        Assert.False(ConformanceLive.Applies(writable, none, version, "readOnly"));
+        Assert.False(ConformanceLive.Applies(readOnly, none, version, null)); // a server the suite didn't start
+        Assert.False(ConformanceLive.Applies(writable, none, version, null)); // a server the suite didn't start
     }
 
     [Fact]

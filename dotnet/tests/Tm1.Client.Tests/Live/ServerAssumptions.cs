@@ -19,11 +19,6 @@ internal static class ServerAssumptions
     /// there is this bound to move.</summary>
     public static readonly Tm1Version StaleFirstPullFrom = Tm1Version.Parse("11.8.03500");
 
-    /// <summary>From this TM1 the server makes a local key file itself, so the image's settings
-    /// check as valid. Tried at 11.8.035 (invalid) and 11.8.040 (valid); a build between falls on
-    /// the older side unverified.</summary>
-    public static readonly Tm1Version MakesOwnKeyFrom = Tm1Version.Parse("11.8.04000");
-
     /// <summary>Whether the server defines the operation.</summary>
     public static async Task<bool> SupportsAsync(Tm1Client tm1, Tm1Operation operation) =>
         (await tm1.Session.CapabilitiesAsync()).Supports(operation.Capability());

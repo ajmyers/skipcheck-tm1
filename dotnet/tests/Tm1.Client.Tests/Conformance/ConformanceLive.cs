@@ -274,10 +274,15 @@ public static class ConformanceLive
 
     /// <summary>Whether a scenario or a step applies to a server, as Java's
     /// <c>ConformanceScenarios.applies</c>: every endpoint its <c>requires</c> names is in the
-    /// server's <c>$metadata</c>, and the server's product version is at least its <c>tm1From</c> and
-    /// below its <c>tm1Before</c>.</summary>
-    public static bool Applies(JsonNode node, IReadOnlySet<string> endpoints, Version.Tm1Version version)
+    /// server's <c>$metadata</c>, the server's product version is at least its <c>tm1From</c> and
+    /// below its <c>tm1Before</c>, and its install is the <c>install</c> named (<c>writable</c> or
+    /// <c>readOnly</c>; null, a server the suite didn't start, is neither).</summary>
+    public static bool Applies(JsonNode node, IReadOnlySet<string> endpoints, Version.Tm1Version version, string? install)
     {
+        if (node["install"] is { } wanted && wanted.GetValue<string>() != install)
+        {
+            return false;
+        }
         if ((node["requires"]?.AsArray() ?? []).Any(e => !endpoints.Contains(e!.GetValue<string>())))
         {
             return false;

@@ -17,6 +17,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.metadata.Endpoints;
 import io.skipcheck.tm1.client.version.Tm1Capabilities;
@@ -67,12 +68,13 @@ class ConformanceScenarioTm1Test {
 			Tm1Capabilities capabilities = tm1.session().capabilities().block();
 			Set<String> endpoints = Endpoints.of(capabilities.metadata());
 			Tm1Version version = capabilities.productVersion().orElseThrow();
-			assumeTrue(ConformanceScenarios.applies(scenario, endpoints, version),
+			ServerAssumptions.Install install = ServerAssumptions.install(server.getSource());
+			assumeTrue(ConformanceScenarios.applies(scenario, endpoints, version, install),
 					() -> "the scenario needs " + scenario.path("requires") + " " + scenario.path("tm1From") + " "
-							+ scenario.path("tm1Before") + "; the server is " + version + ", schema "
-							+ capabilities.schemaVersion().orElse("unknown"));
+							+ scenario.path("tm1Before") + " " + scenario.path("install") + "; the server is " + version
+							+ ", schema " + capabilities.schemaVersion().orElse("unknown") + ", install " + install);
 			List<String> failures = ConformanceScenarios.run(tm1, traffic, scenario, names,
-					step -> ConformanceScenarios.applies(step, endpoints, version));
+					step -> ConformanceScenarios.applies(step, endpoints, version, install));
 			traffic.write(scenario.get("name").asString(), names);
 			assertThat(failures).isEmpty();
 		}

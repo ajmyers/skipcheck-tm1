@@ -21,20 +21,21 @@ from skipcheck_tm1 import Tm1Client
 from skipcheck_tm1.aio import AsyncTm1Client
 
 from ..conformance import scenarios as live
-from .conftest import _builder, target
+from .conftest import INSTALL, _builder, target
 
 
 def _applies(capabilities: Any) -> Callable[[dict[str, Any]], bool]:
     """What the server has and is: a scenario or a step for one it isn't is skipped."""
     version = capabilities.product_version
-    return lambda node: live.applies(node, capabilities.endpoints, version)
+    return lambda node: live.applies(node, capabilities.endpoints, version, INSTALL)
 
 
 def _skip_unless(scenario: dict[str, Any], applies: Callable[[dict[str, Any]], bool], capabilities: Any) -> None:
     if not applies(scenario):
         pytest.skip(
-            f"the scenario needs {scenario.get('requires')} {scenario.get('tm1From')} {scenario.get('tm1Before')}; "
-            f"the server is {capabilities.product_version}, schema {capabilities.schema_version}"
+            f"the scenario needs {scenario.get('requires')} {scenario.get('tm1From')} {scenario.get('tm1Before')} "
+            f"{scenario.get('install')}; the server is {capabilities.product_version}, schema {capabilities.schema_version}, "
+            f"install {INSTALL}"
         )
 
 

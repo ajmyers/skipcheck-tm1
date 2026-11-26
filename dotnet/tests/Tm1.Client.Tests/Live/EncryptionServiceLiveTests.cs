@@ -8,26 +8,28 @@ using Skipcheck.Tm1.Client.Model;
 namespace Skipcheck.Tm1.Client.Tests.Live;
 
 /// <summary>EncryptionService against a real TM1: a port of the Java client's EncryptionServiceTm1Test.
-/// Before TM1 11.8.040 the image's missing GSKit command line stops the local key file provider from
-/// making a key, so the settings check as invalid and every change is refused: the test pins how TM1
-/// says so. From 11.8.040 the server makes the key itself and the settings check as valid, so
-/// configuring would really convert the server and stop it: the test doesn't try that, whatever the
-/// version, where the settings check as valid. (Java starts a TM1 of its own for this; nothing here
-/// changes the server, so it shares the one the other live tests use.)</summary>
+/// Whether local key file settings check as valid depends on the install, not the version (#439): TM1
+/// makes the key in its install's bin64/ssl/ibmtm1.kdb, so on a writable install (a bundle's, a
+/// volume's) they check as valid, and configuring would really convert the server and stop it, which
+/// the test doesn't try. On a read-only one (an installed folder, TM1_HOME_DIR) TM1 can't make the key,
+/// the settings check as invalid and every change is refused: the test pins how TM1 says so. On a
+/// server the suite didn't start (TM1_URL) the install isn't known, and the settings aren't checked:
+/// that would write a key into its install. (Java starts a TM1 of its own for this; nothing here
+/// converts the server, so it shares the one the other live tests use.)</summary>
 public class EncryptionServiceLiveTests
 {
     private static readonly LocalKeyFileProviderSettingsPatch Local = LocalKeyFileProviderSettingsPatch.Builder().KeyRef("/tmp/tm1-client.key").Build();
 
     [Tm1Fact]
-    public async Task ValidatesSettingsWithoutChangingAnything()
+    public async Task ValidatesLocalKeyFileSettings()
     {
         await using var tm1 = Live.Client();
-        if (!await ServerAssumptions.SupportsAsync(tm1, Tm1Operations.ValidateEncryptionAtRestSettings))
+        if (!await ServerAssumptions.SupportsAsync(tm1, Tm1Operations.ValidateEncryptionAtRestSettings) || Live.Install is null)
         {
-            return; // the server doesn't define it (xUnit 2 can't skip a test once it runs)
+            return; // the server doesn't define it, or the suite didn't start it (xUnit 2 can't skip a test once it runs)
         }
         var report = await tm1.Encryption.ValidateAsync(Local);
-        if (await MakesItsOwnKeyAsync(tm1))
+        if (Live.Install == "writable")
         {
             Assert.True(report.IsValid);
             Assert.Empty(report.Issues ?? []);
@@ -44,10 +46,14 @@ public class EncryptionServiceLiveTests
     {
         await using var tm1 = Live.Client();
         // Configuring with settings the server takes would convert it and stop it, so only where
-        // they check as invalid, whatever the version
+        // that server says they're invalid, whatever its install; and not at all on a server the
+        // suite didn't start, where validating would write a key into its install
         var takesThem =
-            await ServerAssumptions.SupportsAsync(tm1, Tm1Operations.ValidateEncryptionAtRestSettings)
-            && (await tm1.Encryption.ValidateAsync(Local)).IsValid == true;
+            Live.Install is null
+            || (
+                await ServerAssumptions.SupportsAsync(tm1, Tm1Operations.ValidateEncryptionAtRestSettings)
+                && (await tm1.Encryption.ValidateAsync(Local)).IsValid == true
+            );
         if (!takesThem)
         {
             await Refused(tm1, Tm1Operations.ConfigureEncryptionAtRest, () => tm1.Encryption.ConfigureAsync(Local), "DataModelConversion");
@@ -83,7 +89,4 @@ public class EncryptionServiceLiveTests
             await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(call);
         }
     }
-
-    /// <summary>Whether the server's settings are expected to check as valid.</summary>
-    private static Task<bool> MakesItsOwnKeyAsync(Tm1Client tm1) => ServerAssumptions.IsAtLeastAsync(tm1, ServerAssumptions.MakesOwnKeyFrom);
 }

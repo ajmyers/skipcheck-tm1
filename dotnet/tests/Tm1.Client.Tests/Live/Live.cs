@@ -45,6 +45,33 @@ public static class Live
     private static readonly string? Running = Environment.GetEnvironmentVariable("TM1_URL");
     private static readonly string? ContainerSkip = string.IsNullOrWhiteSpace(Running) ? RequiresTm1FactAttribute.Tm1SkipReason() : null;
 
+    /// <summary>Whether the TM1 the tests run against can write to its own install, as Java's
+    /// ServerAssumptions.Install names it: <c>readOnly</c> for an installed folder (TM1_HOME_DIR, which
+    /// Skipcheck.Tm1.Testcontainers mounts read-only), <c>writable</c> for any other source, and null
+    /// for a server the suite didn't start (TM1_URL).</summary>
+    public static string? Install { get; } = InstallOf();
+
+    private static string? InstallOf()
+    {
+        if (!string.IsNullOrWhiteSpace(Running))
+        {
+            return null;
+        }
+        try
+        {
+            return Tm1Source.Discover() switch
+            {
+                null => null,
+                Tm1Source.InstallDir => "readOnly",
+                _ => "writable",
+            };
+        }
+        catch (ArgumentException)
+        {
+            return null; // a source set but wrong, which starting the container reports
+        }
+    }
+
     /// <summary>Whether there's a TM1 to test against.</summary>
     public static bool Configured { get; } = !string.IsNullOrWhiteSpace(Running) || ContainerSkip is null;
 

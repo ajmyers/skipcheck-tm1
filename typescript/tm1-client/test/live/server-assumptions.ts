@@ -2,6 +2,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { Tm1Source } from "@skipcheck/tm1-testcontainers";
 import { type Tm1Capabilities, type Tm1Client, type Tm1Operation, Tm1Version } from "../../src/index.js";
 import { Repo } from "../support/repo.js";
 
@@ -15,10 +16,29 @@ import { Repo } from "../support/repo.js";
  * move. */
 export const STALE_FIRST_PULL_FROM = Tm1Version.parse("11.8.03500");
 
-/** From this TM1 the server makes a local key file itself, so the image's settings check as valid.
- * Tried at 11.8.035 (invalid) and 11.8.040 (valid); a build between falls on the older side
- * unverified. */
-export const MAKES_OWN_KEY_FROM = Tm1Version.parse("11.8.04000");
+/** Whether TM1 can write to its own install, as Java's `ServerAssumptions.Install` names it: TM1
+ * makes a local encryption key in its install's `bin64/ssl/ibmtm1.kdb`, so local key file settings
+ * check as valid on a writable install and invalid on a read-only one, whatever the version (#439).
+ * The scenarios' `install` term names one. */
+export type Install = "writable" | "readOnly";
+
+/** The install of the TM1 a source starts: read-only for an installed folder (`TM1_HOME_DIR`, which
+ * tm1-testcontainers mounts read-only), writable for any other. */
+export function installOf(source: Tm1Source): Install {
+  return source instanceof Tm1Source.InstallDir ? "readOnly" : "writable";
+}
+
+/** The install of the TM1 the live tests share: undefined for a server the suite didn't start
+ * (`TM1_URL`), or with no source to start one from. */
+export function sharedInstall(): Install | undefined {
+  if (process.env.TM1_URL) return undefined;
+  try {
+    const source = Tm1Source.discover();
+    return source ? installOf(source) : undefined;
+  } catch {
+    return undefined; // a source set but wrong, which starting the container reports
+  }
+}
 
 function described(capabilities: Tm1Capabilities): string {
   return `the server (schema ${capabilities.schemaVersion}, product version ${capabilities.productVersion?.toString()})`;

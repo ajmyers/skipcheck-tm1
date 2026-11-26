@@ -14,6 +14,7 @@ import io.skipcheck.tm1.client.version.Tm1Capabilities;
 import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlParser;
+import io.skipcheck.tm1.testcontainers.Tm1Source;
 
 /**
  * What a live test needs of the server it runs against, so the suite runs against every
@@ -33,11 +34,50 @@ public final class ServerAssumptions {
 	public static final Tm1Version STALE_FIRST_PULL_FROM = Tm1Version.parse("11.8.03500");
 
 	/**
-	 * From this TM1 the server makes a local key file itself, so the image's settings
-	 * check as valid. Tried at 11.8.035 (invalid) and 11.8.040 (valid); a build between
-	 * falls on the older side unverified.
+	 * Whether TM1 can write to its own install, which TM1 needs to make a local
+	 * encryption key: validating local key file settings writes the key into the
+	 * install's {@code bin64/ssl/ibmtm1.kdb}, and a read-only install checks as invalid
+	 * ("Could not generate a new key using the local GSKit installation"), whatever the
+	 * version (#439). The scenarios' {@code install} term names one.
 	 */
-	public static final Tm1Version MAKES_OWN_KEY_FROM = Tm1Version.parse("11.8.04000");
+	public enum Install {
+
+		/** Its own install, writable: a bundle's, a volume's or an image's. */
+		WRITABLE("writable"),
+
+		/**
+		 * An installed folder ({@code TM1_HOME_DIR}), which tm1-testcontainers mounts
+		 * read-only.
+		 */
+		READ_ONLY("readOnly"),
+
+		/** A server the suite didn't start. */
+		UNKNOWN(null);
+
+		private final String term;
+
+		Install(String term) {
+			this.term = term;
+		}
+
+		/**
+		 * What the scenarios call it, {@code writable} or {@code readOnly}; null for an
+		 * install no scenario names, which matches none.
+		 */
+		public String term() {
+			return term;
+		}
+
+	}
+
+	/**
+	 * Whether the install of a TM1 started from the source is writable.
+	 * @param source where its TM1 comes from
+	 * @return read-only for an installed folder, else writable
+	 */
+	public static Install install(Tm1Source source) {
+		return source instanceof Tm1Source.InstallDir ? Install.READ_ONLY : Install.WRITABLE;
+	}
 
 	private static final Pattern SCHEMA_VERSION = Pattern
 		.compile("Term=\"Core\\.SchemaVersion\">\\s*<String>([^<]+)</String>");
