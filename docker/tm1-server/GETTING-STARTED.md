@@ -361,6 +361,7 @@ docker run --rm -p 8010:8010 -v "${PWD}\bundles:/ibm:ro" ghcr.io/ajmyers/tm1-ser
 ```
 If you chose **S** in Step 2, use `tm1-server:local` in place of
 `ghcr.io/ajmyers/tm1-server`. Press **Ctrl+C** to stop it, and everything is gone.
+(This is what automated tests do.)
 
 ### 5. In Docker volumes
 
@@ -379,7 +380,6 @@ The rest of this guide speaks of the `tm1-files` folder. With volumes:
 - **Removing everything:** `docker compose down -v` removes them with the containers.
 - **Changing an existing server to volumes** doesn't move its files: the
   [README](README.md#compose) has the command that copies them in.
-(This is what automated tests do.)
 
 ---
 
