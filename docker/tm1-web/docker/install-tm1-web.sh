@@ -137,10 +137,16 @@ log "Installing TM1 Web from $SHOWN into $TARGET (one-time)"
 find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .install.lock -exec rm -rf {} +
 
 # Detect the type from the contents: gzip (1f8b) = the IBM bundle, zip (504b) = the
-# repository zip. The bundle also holds IBM's installer, which isn't needed.
-case "$(head -c2 "$bundle" | od -An -tx1 | tr -d ' \n')" in
-  1f8b)
-    tar xzf "$bundle" -C "$work" --wildcards 'tm1web-*.zip' || die "no tm1web-*.zip inside the bundle"
+# repository zip, and a plain tar (ustar at byte 257) = the IBM bundle too: Planning
+# Analytics 2.1.2 to 2.1.16's TM1 Web bundles are uncompressed whatever their name says.
+# The bundle also holds IBM's installer, which isn't needed.
+kind=$(head -c2 "$bundle" | od -An -tx1 | tr -d ' \n')
+if [ "$kind" != 1f8b ] && [ "$kind" != 504b ] && [ "$(dd if="$bundle" bs=1 skip=257 count=5 2>/dev/null)" = ustar ]; then
+  kind=tar
+fi
+case "$kind" in
+  1f8b|tar)
+    tar xf "$bundle" -C "$work" --wildcards 'tm1web-*.zip' || die "no tm1web-*.zip inside the bundle"
     zip=$(ls -1 "$work"/tm1web-*.zip | head -1) ;;
   504b) zip=$bundle ;;
   *) die "$SHOWN is neither a tm1web bundle (.tar.gz) nor its repository zip" ;;
