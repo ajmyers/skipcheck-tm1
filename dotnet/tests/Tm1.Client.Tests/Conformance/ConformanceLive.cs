@@ -272,9 +272,6 @@ public static class ConformanceLive
         }
     }
 
-    /// <summary>Runs the scenario; the steps whose expectation failed. Its <c>finally</c> steps always run.
-    /// What a step saves joins <paramref name="names"/>, so the traffic written after it has TM1's made-up
-    /// values as their placeholders too.</summary>
     /// <summary>Whether a scenario or a step applies to a server, as Java's
     /// <c>ConformanceScenarios.applies</c>: every endpoint its <c>requires</c> names is in the
     /// server's <c>$metadata</c>, and the server's product version is at least its <c>tm1From</c> and
@@ -292,6 +289,9 @@ public static class ConformanceLive
         return node["tm1Before"] is not { } before || version.CompareTo(Version.Tm1Version.Parse(before.GetValue<string>())) < 0;
     }
 
+    /// <summary>Runs the scenario; the steps whose expectation failed. Its <c>finally</c> steps always run.
+    /// What a step saves joins <paramref name="names"/>, so the traffic written after it has TM1's made-up
+    /// values as their placeholders too.</summary>
     public static Task<List<string>> Run(Tm1Client client, Traffic traffic, JsonObject scenario, Dictionary<string, string> names) =>
         Run(client, traffic, scenario, names, _ => true);
 

@@ -161,6 +161,8 @@ describe("Java live test parity", () => {
       const source =
         'describe("x", () => {\n  tm1Test.each(scenarios())("creates a cube: $name", f);\n  tm1Test(\n    "lists cubes",\n    f,\n  );\n  it.each(["a"])("lists cubes: %s", f);\n});\n';
       expect(portTests(source)).toEqual({ describes: 1, titles: ["creates a cube: ", "lists cubes", "lists cubes: "] });
+      // .for, as .each: the context it hands the test is how a test skips itself
+      expect(portTests('describe("x", () => {\n  tm1Test.for(scenarios())("runs the scenario: $name", f);\n});\n').titles).toEqual(["runs the scenario: "]);
     });
 
     it("fails on a missing file, a missing test, a test Java doesn't have, and a second describe", () => {

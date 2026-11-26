@@ -1,17 +1,16 @@
 {
 	"specVersion": 1,
 	"name": "encryption",
-	"description": "Encryption at rest on a server that isn't encrypted, with a local key file the server can't make: settings checked, every change refused.",
-	"requires": [
-		"FunctionImport ValidateEncryptionAtRestSettings",
-		"ActionImport ConfigureEncryptionAtRest"
-	],
-	"tm1Before": "11.8.04000",
+	"description": "Encryption at rest on a server that isn't encrypted: every change refused, each step where the server defines it. Before TM1 11.8.040 the server can't make the local key file, so its settings check as invalid and configuring is refused too; from 11.8.040 they check as valid and configuring would convert the server and stop it, so those two steps stop there (encryption-validated checks the settings).",
 	"names": [],
 	"steps": [
 		{
 			"service": "encryption",
 			"method": "validate",
+			"requires": [
+				"FunctionImport ValidateEncryptionAtRestSettings"
+			],
+			"tm1Before": "11.8.04000",
 			"params": [
 				"settings"
 			],
@@ -33,6 +32,10 @@
 		{
 			"service": "encryption",
 			"method": "configure",
+			"requires": [
+				"ActionImport ConfigureEncryptionAtRest"
+			],
+			"tm1Before": "11.8.04000",
 			"params": [
 				"settings"
 			],
@@ -55,6 +58,9 @@
 		{
 			"service": "encryption",
 			"method": "disable",
+			"requires": [
+				"ActionImport DisableEncryptionAtRest"
+			],
 			"params": [],
 			"args": [],
 			"expect": {
@@ -67,6 +73,9 @@
 		{
 			"service": "encryption",
 			"method": "rotateDataEncryptionKey",
+			"requires": [
+				"ActionImport RotateDataEncryptionKey"
+			],
 			"params": [],
 			"args": [],
 			"expect": {
@@ -79,6 +88,9 @@
 		{
 			"service": "encryption",
 			"method": "rotateDataModelKey",
+			"requires": [
+				"ActionImport RotateDataModelKey"
+			],
 			"params": [],
 			"args": [],
 			"expect": {
@@ -91,6 +103,9 @@
 		{
 			"service": "encryption",
 			"method": "encryptFile",
+			"requires": [
+				"ActionImport EncryptDataFile"
+			],
 			"params": [
 				"source",
 				"destination",
@@ -115,6 +130,9 @@
 		{
 			"service": "encryption",
 			"method": "decryptFile",
+			"requires": [
+				"ActionImport DecryptDataFile"
+			],
 			"params": [
 				"source",
 				"destination",

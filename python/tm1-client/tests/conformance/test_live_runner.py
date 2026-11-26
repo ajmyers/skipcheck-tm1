@@ -107,21 +107,32 @@ def test_applies_what_the_server_has_and_is() -> None:
 
 
 def test_skips_the_steps_that_dont_apply_and_sends_nothing_for_them(traffic_dir: Path) -> None:
-    # cubes.json without its two dimension creates: they send nothing, the rest run
+    # cubes.json without its dimension steps, two creates and two finally deletes: they send
+    # nothing, the rest run; in both flavors
     scenario = json.loads((live.SCENARIOS / "cubes.json").read_text(encoding="utf-8"))
+
+    def applies(step: dict[str, Any]) -> bool:
+        return step.get("service") != "dimensions"
+
     names = live.names_for(scenario)
     fake = _tm1(names)
     traffic = live.Traffic(BASE)
     http = httpx2.Client(transport=httpx2.MockTransport(fake.handler), event_hooks={"response": [traffic.record]})
-    live.run(
-        Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)),
-        traffic,
-        scenario,
-        names,
-        lambda step: not (step.get("service") == "dimensions" and step.get("method") == "create"),
-    )
-    steps = [e["step"] for e in traffic.exchanges]
-    assert "steps[0]" not in steps and "steps[1]" not in steps and "steps[2]" in steps
+    live.run(Tm1Client(Tm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic, scenario, names, applies)
+
+    names2 = live.names_for(scenario)
+    fake2 = _tm1(names2)
+    traffic2 = live.Traffic(BASE)
+
+    async def go() -> list[str]:
+        http = httpx2.AsyncClient(transport=httpx2.MockTransport(fake2.handler), event_hooks={"response": [traffic2.arecord]})
+        return await live.arun(AsyncTm1Client(AsyncTm1Session(BASE, auth.basic("admin", "apple"), client=http)), traffic2, scenario, names2, applies)
+
+    asyncio.run(go())
+    for recorded in (traffic, traffic2):
+        steps = [e["step"] for e in recorded.exchanges]
+        assert not {"steps[0]", "steps[1]", "finally[1]", "finally[2]"} & set(steps), steps
+        assert {"steps[2]", "finally[0]"} <= set(steps), steps
 
 
 def _expected(expect: dict[str, Any]) -> httpx2.Response:

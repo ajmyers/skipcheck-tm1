@@ -185,9 +185,6 @@ export function save(step: Step, outcome: Outcome, names: Record<string, string>
   return undefined;
 }
 
-/** Runs the scenario; the steps whose expectation failed. Its `finally` steps always run. What a
- * step saves joins `names`, so the traffic written after it has TM1's made-up values as their
- * placeholders too. */
 /** Whether a scenario or a step applies to a server, as Java's `ConformanceScenarios.applies`:
  * every endpoint its `requires` names is in the server's `$metadata`, and the server's product
  * version is at least its `tm1From` and below its `tm1Before`. */
@@ -197,7 +194,10 @@ export function applies(node: { requires?: string[]; tm1From?: string; tm1Before
   return node.tm1Before === undefined || version.compareTo(Tm1Version.parse(node.tm1Before)) < 0;
 }
 
-/** Runs the steps `applies` accepts: one it refuses sends nothing and isn't checked. */
+/** Runs the scenario; the steps whose expectation failed. Its `finally` steps always run. What a
+ * step saves joins `names`, so the traffic written after it has TM1's made-up values as their
+ * placeholders too. Only the steps `applies` accepts run: one it refuses sends nothing
+ * and isn't checked. */
 export async function run(
   client: unknown,
   traffic: Traffic,
@@ -221,8 +221,8 @@ export async function run(
   } finally {
     for (const [i, step] of (scenario.finally ?? []).entries()) {
       traffic.step = `finally[${i}]`;
-      // A step setting back what a step that didn't run would have read has nothing to send
       if (!applies(step)) continue;
+      // A step setting back what a step that didn't run would have read has nothing to send
       if (step.args.some((a) => a !== null && typeof a === "object" && !Array.isArray(a) && "$fromRead" in a && !kept.has(a.read))) continue;
       await outcome(client, step, names, kept).catch(() => undefined);
     }

@@ -34,3 +34,4 @@ ODataCollectionDecoderTest#streamsALargeCollectionWithoutReadingAheadOfDemand: b
 Tm1SessionTest#observesLoginAndClose: checks the tm1.session.login and tm1.session.close Micrometer observations
 Tm1SessionReloginTest#observesTheReloginWithItsReason: checks the tm1.session.login Micrometer observation's tm1.reason on a re-login
 Tm1SessionPoolTest#observesEvictionsWithTheirReason: checks the tm1.session.pool.evict Micrometer observation's tm1.reason
+ConformanceScenariosTest#saysWhatEachScenarioNeedsInTermsEveryClientReadsAlike: checks the shared scenario files in spec/conformance/live (every requires an endpoint list the newest snapshot defines, every bound a version), which Java reads for all four clients; there is no client code of this one to test

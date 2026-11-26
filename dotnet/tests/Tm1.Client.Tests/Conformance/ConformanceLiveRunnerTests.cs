@@ -221,18 +221,22 @@ public class ConformanceLiveRunnerTests
     [Fact]
     public async Task SkipsTheStepsThatDontApplyAndSendsNothingForThem()
     {
-        // cubes.json without its two dimension creates: they send nothing, the rest run
+        // cubes.json without its dimension steps, two creates and two finally deletes: they send
+        // nothing, the rest run
         var scenario = ConformanceLive.Load("cubes");
         var names = ConformanceLive.NamesFor(scenario);
         var fake = new FakeTm1 { Respond = _ => FakeTm1.Json(new { }) };
         var traffic = new ConformanceLive.Traffic(fake, FakeTm1.Base);
         await ConformanceLive.Run(fake.Client(b => b.HttpHandler(traffic)), traffic, scenario, names, step =>
-            !(step["service"]?.GetValue<string>() == "dimensions" && step["method"]?.GetValue<string>() == "create")
+            step["service"]?.GetValue<string>() != "dimensions"
         );
         var steps = traffic.Exchanges.Select(e => e["step"]!.GetValue<string>()).ToList();
-        Assert.DoesNotContain("steps[0]", steps);
-        Assert.DoesNotContain("steps[1]", steps);
+        foreach (var absent in new[] { "steps[0]", "steps[1]", "finally[1]", "finally[2]" })
+        {
+            Assert.DoesNotContain(absent, steps);
+        }
         Assert.Contains("steps[2]", steps);
+        Assert.Contains("finally[0]", steps);
     }
 
     /// <summary>What a step expects, as TM1's answer to its one request.</summary>

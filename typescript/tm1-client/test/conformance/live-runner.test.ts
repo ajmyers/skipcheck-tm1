@@ -157,7 +157,8 @@ describe("the live conformance runner", () => {
   });
 
   it("skips the steps that don't apply and sends nothing for them", async () => {
-    // cubes.json without its two dimension creates: they send nothing, the rest run
+    // cubes.json without its dimension steps, two creates and two finally deletes: they send
+    // nothing, the rest run
     const names = live.namesFor(scenario);
     const tm1 = new FakeTm1();
     tm1.respond = () => ({});
@@ -167,12 +168,12 @@ describe("the live conformance runner", () => {
       traffic,
       scenario,
       names,
-      (step) => !(step.service === "dimensions" && step.method === "create"),
+      (step) => step.service !== "dimensions",
     );
     const steps = traffic.exchanges.map((e) => e["step"]);
-    expect(steps).not.toContain("steps[0]");
-    expect(steps).not.toContain("steps[1]");
+    for (const absent of ["steps[0]", "steps[1]", "finally[1]", "finally[2]"]) expect(steps).not.toContain(absent);
     expect(steps).toContain("steps[2]");
+    expect(steps).toContain("finally[0]");
   });
 
   /** What a step expects, as TM1's answer to its one request. */
