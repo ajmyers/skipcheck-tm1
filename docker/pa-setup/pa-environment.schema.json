@@ -312,7 +312,7 @@
           "items": {
             "$ref": "#/$defs/engineUser"
           },
-          "description": "Users for every database, in exactly these groups. admin is always there"
+          "description": "Users for every database, in exactly these groups. admin is always there. With cognos and passthrough, they are Cognos users (some of cognos.users), made under their CAMIDs"
         },
         "datastore": {
           "type": [
@@ -342,7 +342,7 @@
           }
         },
         "passthrough": {
-          "description": "Pass-through logins: a TM1 11 server of this file whose users log in to TM1 v12 with their name and password there. Not with oauth2",
+          "description": "Pass-through logins: a TM1 11 server of this file whose users log in to TM1 v12 as they do there: with their name and password, or with cognos as Cognos users (CAMNamespace or CAMPassport). Not with oauth2",
           "oneOf": [
             {
               "const": false

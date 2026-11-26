@@ -96,7 +96,9 @@ grep -qF "TM1_PASSTHROUGH_URL: http://legacy:8010/api/v1/" <<<"$out" || fail "pa
 out=$(tool $'version: 1\ntm1Engine: true' generate) || fail "no passthrough: $out"
 grep -qF "TM1_PASSTHROUGH_URL: none" <<<"$out" || fail "without passthrough the engine isn't told it's off: $out"
 out=$(tool $'version: 1\ncognos: {users: ["admin:adminpw:Admins"]}\ntm1: {servers: {legacy: {}}}\ntm1Engine: {passthrough: {server: legacy}}' generate) || fail "passthrough with cognos: $out"
-grep -qF "TM1_CAM_NAMESPACE: LDAP" <<<"$out" || fail "passthrough with cognos: the engine isn't told the namespace: $out"
+! grep -q "COMPOSE INVALID" <<<"$out" || fail "passthrough with cognos: docker compose config refused it: $out"
+# The TM1 server has the same line: the engine's is the second
+[ "$(grep -cF "TM1_CAM_NAMESPACE: LDAP" <<<"$out")" -eq 2 ] || fail "passthrough with cognos: the engine isn't told the namespace: $out"
 grep -qF "TM1_USERS: admin:ADMIN" <<<"$out" || fail "passthrough with cognos: the administrator isn't one in the engine: $out"
 pass "tm1Engine.passthrough points the engine at a TM1 11 server of the file"
 
