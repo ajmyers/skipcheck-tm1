@@ -503,7 +503,7 @@ Your databases in `tm1-files` are kept across version changes.
 |---|---|
 | `Cannot connect to the Docker daemon` / `docker: command not found` | Docker isn't running. Open Docker Desktop (Mac/Windows) and wait for it to start, or `sudo systemctl start docker` (Linux). |
 | `ERROR: .../tm1s.exe not found ... does not include IBM software` | TM1 couldn't be found. Check your Step 3 choice: is the bundle file in `bundles`? Is `TM1_HOME_DIR` the folder that contains `bin64`? |
-| `no bundle found` | The `bundles` folder (or `TM1_BUNDLE_DIR`) has no `tm1server-*_bundle.tar.gz` (for Planning Analytics 2.1.2 and 2.1.7, no `tm1_linuxi38664h_*_ml.tar.gz`). Check the file name; it must be the **Linux** (`linuxi38664h`) download. |
+| `no bundle found` | The `bundles` folder (or `TM1_BUNDLE_DIR`) has no `tm1server-*_bundle.tar.gz` (for Planning Analytics 2.1.2 to 2.1.7, no `tm1_linuxi38664h_*_ml.tar.gz`). Check the file name; it must be the **Linux** (`linuxi38664h`) download. |
 | `download failed` / `checksum mismatch` | The `TM1_BUNDLE_URL` link expired or is wrong, or the file changed. Create a new link, or update `TM1_BUNDLE_SHA256`. |
 | `port is already allocated` / `address already in use` | Something else is using port 8010, 8011 or 5895, perhaps another TM1. Stop it, or change the left-hand port numbers under `ports:` in `compose.yaml` (e.g. `"9010:8010"`). |
 | `denied`, `pull access denied` or `manifest unknown` for `ghcr.io/ajmyers/tm1-server` | Docker couldn't download the image. Check your internet connection, and that your network allows `ghcr.io`. Or build it yourself (Step 2, choice **S**). |

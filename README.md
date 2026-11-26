@@ -31,24 +31,45 @@ The Java libraries require Java 17+, the Python client Python 3.11+, the .NET cl
 
 ## Supported TM1 versions
 
-TM1 Server 11.8 from **Planning Analytics 2.1.2** (TM1 11.8.02400.7) on. Each client reads what a server supports from the server's own `$metadata`, so one build works with all of them:
+TM1 Server 11.8 from **Planning Analytics 2.1.2** (TM1 11.8.02400.7) on, every 2.1 release to 2.1.25 checked. Each client reads what a server supports from the server's own `$metadata`, so one build works with all of them:
 
 - An operation or parameter the server doesn't define is refused before anything is sent (`Tm1UnsupportedOperationException`, saying which schema the server reports).
 - A parameter whose value is what leaving it out means is left out, such as CheckFeeders' `Unfed` before schema 11.8.32.
 
-[`docker/tm1-server`](docker/tm1-server) runs each of these versions, from IBM's installers for the oldest.
+What changes from release to release, and where, is in [`spec/tm1-versions.md`](spec/tm1-versions.md): each release's TM1 build, schema and `$metadata` document (all committed), and what each document adds. In short: CheckFeeders' `Selection` from 2.1.13 (schema 11.8.32), Reserve and Release from 2.1.17 (11.8.34), encryption at rest from 2.1.18 (11.8.35). Two changes the schema doesn't show: `GET …/CurrentBreakpoint` is refused on 2.1.16 and the releases before it that were tried, and answers on 2.1.19 and 2.1.25 (the clients read it through `$expand` on every release), and from 2.1.17 a Git pull after the remote moves first plans the commit TM1 had. Whether local key file encryption settings check as valid depends on the install, not the release: TM1 makes the key in its install's `bin64/ssl/ibmtm1.kdb`, which a read-only install can't take.
 
-Last checked on 2026-11-26, with every client's live tests ([`scripts/live-test-versions.py`](scripts/live-test-versions.py)):
+[`docker/tm1-server`](docker/tm1-server) runs each of these releases, from IBM's installers for the oldest.
+
+Last checked on 2026-11-26, every client's live tests on each release ([`scripts/live-test-versions.py`](scripts/live-test-versions.py)), from its own bundle or installer:
 
 | Planning Analytics | TM1 | Schema | Live tests |
 |---|---|---|---|
-| 2.1.2 | 11.8.02400.7 | 11.8.20 | Pass, but for `settings`. What its schema lacks is skipped: Reserve and Release, encryption at rest, CheckFeeders' `Selection`. |
-| 2.1.7 | 11.8.02800.9 | 11.8.20 | Pass, but for `settings`, with the same skips as 2.1.2. |
-| 2.1.16 | 11.8.03200.3 | 11.8.32 | Pass, but for `settings`. Reserve and Release and encryption at rest are skipped. |
-| 2.1.19 | 11.8.03500.6 | 11.8.35 | Pass, but for `settings`. |
-| 2.1.25 | 11.8.04000.1 | 11.8.35 | Pass, but for `settings`. |
+| 2.1.2 | 11.8.02400.7 | 11.8.20 | Pass, but for `settings` |
+| 2.1.3 | 11.8.02500.3 | 11.8.20 | Pass |
+| 2.1.4 | 11.8.02700.4 | 11.8.20 | Pass, but for `settings` |
+| 2.1.5 | 11.8.02700.4 | 11.8.20 | Pass, but for `settings` |
+| 2.1.6 | 11.8.02800.9 | 11.8.20 | Pass, but for `settings` |
+| 2.1.7 | 11.8.02800.9 | 11.8.20 | Pass, but for `settings` |
+| 2.1.8 | 11.8.02900.8 | 11.8.20 | Pass |
+| 2.1.9 | 11.8.02900.8 | 11.8.20 | Pass, but for `settings` |
+| 2.1.10 | 11.8.02900.8 | 11.8.20 | Pass, but for `settings` |
+| 2.1.11 | 11.8.03000.9 | 11.8.20 | Pass, but for `settings` |
+| 2.1.12 | 11.8.03100.4 | 11.8.20 | Pass, but for `settings` |
+| 2.1.13 | 11.8.03200.3 | 11.8.32 | Pass |
+| 2.1.14 | 11.8.03200.3 | 11.8.32 | Pass, but for `settings` |
+| 2.1.15 | 11.8.03200.3 | 11.8.32 | Pass, but for `settings` |
+| 2.1.16 | 11.8.03200.3 | 11.8.32 | Pass, but for `settings` |
+| 2.1.17 | 11.8.03400.2 | 11.8.34 | Pass |
+| 2.1.18 | 11.8.03500.4 | 11.8.35 | Pass |
+| 2.1.19 | 11.8.03500.6 | 11.8.35 | Pass, but for `settings` (from its bundle, and from a read-only installed folder) |
+| 2.1.20 | 11.8.03500.6 | 11.8.35 | Pass, but for `settings` |
+| 2.1.21 | 11.8.03700.2 | 11.8.35 | Pass |
+| 2.1.22 | 11.8.03700.2 | 11.8.35 | Pass |
+| 2.1.23 | 11.8.03700.2 | 11.8.35 | Pass, but for `settings` |
+| 2.1.24 | 11.8.03900.1 | 11.8.35 | Pass, but for `settings` |
+| 2.1.25 | 11.8.04000.1 | 11.8.35 | Pass, but for `settings` |
 
-On every version, the `settings` conformance scenario failed in one client's run: TM1 read back one setting it had just been given as empty ([#399](https://github.com/ajmyers/skipcheck-tm1/issues/399)). So each version's run, as the script reports it, failed. Everything else passed, and every client sent TM1 the same requests in every other scenario.
+What a release's schema lacks is skipped there, not failed. "But for `settings`": that conformance scenario failed in one client's run, nearly always .NET's, when TM1 read back a setting it had just been given as empty ([#399](https://github.com/ajmyers/skipcheck-tm1/issues/399)). It isn't a release's: it fails and passes on releases with the same TM1 build (2.1.8 passed and 2.1.9 failed on 11.8.02900.8; 2.1.13 and 2.1.14 on 11.8.03200.3; 2.1.21 and 2.1.23 on 11.8.03700.2), and passes alone. Everything else passed, and every client sent TM1 the same requests in every other scenario.
 
 Planning Analytics 3.x (TM1 v12) is a different engine, run by [`docker/tm1-engine`](docker/tm1-engine), and isn't covered by this table.
 
