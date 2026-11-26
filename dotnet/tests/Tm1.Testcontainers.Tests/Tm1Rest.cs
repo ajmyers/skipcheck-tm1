@@ -16,7 +16,7 @@ namespace Skipcheck.Tm1.Testcontainers.Tests;
 /// from <see cref="Tm1ServerContainer.RestUrl"/> and the container's login instead.</summary>
 public sealed class Tm1Rest : IAsyncDisposable
 {
-    private readonly HttpClient http = new(new HttpClientHandler { UseCookies = false });
+    private readonly HttpClient http;
     private readonly string baseUrl;
     private readonly string authorization;
     private string? cookie;
@@ -26,8 +26,13 @@ public sealed class Tm1Rest : IAsyncDisposable
 
     /// <summary>A session with its own login, e.g. a Cognos user's <c>CognosContainer.CamAuthorization</c>.</summary>
     public Tm1Rest(Tm1ServerContainer tm1, string authorization)
+        : this(tm1.RestUrl, authorization, new HttpClientHandler { UseCookies = false }) { }
+
+    /// <summary>A session that sends through <paramref name="handler"/>, for this class's own tests.</summary>
+    internal Tm1Rest(string baseUrl, string authorization, HttpMessageHandler handler)
     {
-        baseUrl = tm1.RestUrl;
+        http = new HttpClient(handler);
+        this.baseUrl = baseUrl;
         this.authorization = authorization;
     }
 
@@ -55,6 +60,11 @@ public sealed class Tm1Rest : IAsyncDisposable
         if (cookie is null)
         {
             await GetAsync("ActiveUser?$select=Name"); // logs in and keeps the session cookie
+            if (cookie is null)
+            {
+                // without one, TM1 would open a session for this request and never close it
+                throw new InvalidOperationException("TM1 sent no TM1SessionId cookie at logon");
+            }
         }
         using var request = new HttpRequestMessage(HttpMethod.Post, baseUrl + path) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
         request.Headers.TryAddWithoutValidation("Cookie", cookie);

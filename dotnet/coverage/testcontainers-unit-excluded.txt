@@ -1,8 +1,9 @@
-# Java tm1-testcontainers tests (java/tm1-testcontainers/src/test/java: every @Test and
-# @ParameterizedTest of a *Test class, the examples' tests included) the .NET library deliberately
-# doesn't have, as: ClassName#methodName: reason, or ClassName: reason for a whole class. Every
-# other one has a test of the same name in Pascal case in tests/Tm1.Testcontainers.Tests
-# (JavaTestParityTests), with the [Requires…Fact] that skips it where Java's @Requires… does.
+# Java tm1-testcontainers tests (java/tm1-testcontainers/src/test/java: every @Test,
+# @ParameterizedTest, @RepeatedTest and @TestTemplate of a *Test class, the examples' tests
+# included) the .NET library deliberately doesn't have, as: ClassName#methodName: reason, or
+# ClassName: reason for a whole class. Every other one has a test of the same name in Pascal case
+# in tests/Tm1.Testcontainers.Tests (JavaTestParityTests), with the [Requires…Fact] that skips it
+# where Java's @Requires… does; a name several Java classes use has a test here for each.
 # A test belongs here only if it has no meaning in this library; "not ported" isn't a reason.
 
-# None: every Java test is here.
+HttpOrExitWaitStrategyTest: tests Java's own wait class, which has no .NET counterpart: the HTTP wait and its timeout are Testcontainers for .NET's own (returnsOnceThePathAnswersAsWanted and timesOutWhenThePathNeverAnswers would test nothing this package owns), and that wait already stops when the container exits. GenericContainer.StartAsync turns that into Java's message, the exit code and the end of the log; Tm1ServerContainerTests.FailsAtOnceWhenTheContainerExits tests it against Docker (it needs TM1)

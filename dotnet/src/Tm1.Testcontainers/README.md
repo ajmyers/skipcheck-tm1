@@ -100,3 +100,5 @@ It returns the builder, configured, so you can still change it before `Build()`.
 - **`JavaParityTests`** reads the Java sources and checks that every public type, nested record, constant, constructor and method has a .NET counterpart. It also checks that the `[…Fact]` skip messages match Java's word for word.
 - **Configuration tests** need no Docker. They port Java's `*SourceTest`, `AdminServerWiringTest`, `CognosContainerTest` and `PlanningAnalyticsEnvironmentTest`.
 - **Container tests** are skipped without Docker or a source. They port `Tm1ServerContainerTest`, `Tm1WebContainerTest` (with its `Tm1WebSession`), `PawContainerTest`, and `EnvironmentExampleTest`'s reuse test, which is also skipped with reuse off.
+- **Example tests** are in `ExampleTests.cs`. Every Java `*ExampleTest` is ported there.
+- **`JavaTestParityTests`** reads the Java tests and holds these to them. Every Java test has a test of the same name here, or a line in `dotnet/coverage/testcontainers-unit-excluded.txt` saying why not.

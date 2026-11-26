@@ -20,6 +20,9 @@ export default defineConfig({
         ]
       : undefined,
     include: ["test/**/*.test.ts"],
+    // One test file at a time: with their sources set, the container tests of different files would
+    // start Cognos, PAW and several TM1 servers at once, and one of them wants nothing run beside it
+    fileParallelism: false,
     // Container tests wait for TM1 (a bundle's first install takes minutes); the rest are quick
     testTimeout: 10 * 60_000,
     hookTimeout: 10 * 60_000,

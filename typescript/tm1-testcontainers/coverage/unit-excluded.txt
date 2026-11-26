@@ -2,11 +2,21 @@
 # on a test method of a Java test class (java/tm1-testcontainers/src/test/java, the examples'
 # *ExampleTest classes included) that has neither a test of the same name somewhere under test/ nor a
 # line in this file, and on a line that names a class or method Java doesn't have, a test this package
-# has after all, or a method of a class excluded whole.
+# has after all, a class whose every test it has, or a method of a class excluded whole.
 #
 #   ClassName#methodName: reason
 #   ClassName: reason            (the whole class)
 #
+# A name that several Java classes have a test of needs as many tests here, one for each class that
+# isn't excluded for it. A test in a comment, or declared with .skip or .todo, doesn't count.
+#
 # Only for what has no meaning in this package, with a specific reason: a behaviour this package has
 # is ported, under Java's name. A test that needs TM1, TM1 Web, Cognos or PAW is ported with
 # requiresTm1, requiresTm1Web, requiresCognos or requiresPaw, and skipped without one.
+
+# Java's HttpOrExitWaitStrategy does the HTTP wait itself, and these two drive it against a real
+# local server. Here the HTTP wait is Testcontainers for Node's own, which needs Docker to run;
+# ExitAwareWait only wraps it. What it adds is tested in test/exit-aware-wait.test.ts: "returns
+# when the wait it wraps does" and "passes on a failure while the container still runs".
+HttpOrExitWaitStrategyTest#returnsOnceThePathAnswersAsWanted: the HTTP wait is Testcontainers for Node's, not this package's, and can't run without Docker
+HttpOrExitWaitStrategyTest#timesOutWhenThePathNeverAnswers: the timeout is Testcontainers for Node's own, not this package's, and can't run without Docker

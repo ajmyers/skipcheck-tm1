@@ -40,6 +40,9 @@ class Tm1Rest:
         its status."""
         if self._cookie is None:
             self.get("ActiveUser?$select=Name")  # logs in and keeps the session cookie
+            if self._cookie is None:
+                # Without it TM1 would open a session for the POST, and one for every request after
+                raise RuntimeError("TM1 sent no TM1SessionId cookie at logon")
         return httpx2.post(self._base_url + path, content=json, headers=self._session_headers(), timeout=_TIMEOUT)
 
     def model_cube_count(self) -> int:
