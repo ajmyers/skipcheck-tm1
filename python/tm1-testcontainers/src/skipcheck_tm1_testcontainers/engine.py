@@ -28,6 +28,10 @@ if TYPE_CHECKING:
 __all__ = ["Tm1Database", "Tm1EngineContainer", "Tm1Login"]
 
 _INSTALL_PATH = "/opt/ibm/tm1-engine"
+_OTHER_NETWORK = (
+    "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: "
+    "set the network before with_oauth2, or give the Keycloak the same"
+)
 _STARTUP_TIMEOUT = 5 * 60.0
 _COMMAND_TIMEOUT = 3 * 60
 # The image waits up to five minutes for a new database to be ready: longer than that, so its
@@ -169,10 +173,7 @@ class Tm1EngineContainer(GenericContainer):
         joined = getattr(self, "_keycloak", None)
         if joined is not None and joined.network is not network:
             # The Keycloak is the caller's, and may serve others: it isn't moved from here
-            raise RuntimeError(
-                "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: "
-                "set the network before with_oauth2, or give the Keycloak the same"
-            )
+            raise RuntimeError(_OTHER_NETWORK)
         super().with_network(network)
         # At once, not when the engine starts: whatever starts the engine may start what it
         # depends on first, as an environment does, and the datastore must be here by then
@@ -235,14 +236,28 @@ class Tm1EngineContainer(GenericContainer):
         started yet, and stop it after the engine."""
         if keycloak is None:
             raise ValueError("keycloak must not be None")
-        self._keycloak = keycloak
+        if self._keycloak is keycloak:
+            return self
+        if self._keycloak is not None:
+            raise RuntimeError("The engine already takes tokens from another Keycloak, which would start beside this one under the same name: give it one")
+        if keycloak.is_running:
+            # It gets its realm, and its place on the network, when it starts
+            raise RuntimeError(
+                "This Keycloak is already running, without the engine's realm: give with_oauth2 one that isn't started, and the engine starts it"
+            )
+        # Asked for when Keycloak starts, so users added after this call are in it. First: it
+        # refuses a Keycloak that another engine uses
+        keycloak._with_realm(self.OAUTH2_REALM, self, self._realm)
         if keycloak.network is not None:
             self.with_network(keycloak.network)
         else:
-            keycloak.with_network(self.network if self.network is not None else self._own_network)
+            # The engine's own, or a new one if it was taken off it
+            self._join_network()
+            network = self.network
+            assert network is not None
+            keycloak.with_network(network)
+        self._keycloak = keycloak
         self.depends_on(keycloak)
-        # Asked for when Keycloak starts, so users added after this call are in it
-        keycloak._with_realm(self.OAUTH2_REALM, self._realm)
         # Keycloak's address on the network is what its tokens name, however they're fetched, and
         # TM1 has to reach the issuer a token names
         self.with_env("TM1_OAUTH2_ISSUER_URL", f"{keycloak.network_url}/realms/{self.OAUTH2_REALM}")
@@ -433,7 +448,9 @@ class Tm1EngineContainer(GenericContainer):
 
     def _join_network(self) -> None:
         """Puts the engine and its datastore on one network: the one given, or their own. They
-        are on it since it was set (with_network); this holds it if either was moved since."""
+        are on it since it was set (with_network); this holds it if either was moved since. A
+        RuntimeError if the engine's Keycloak was moved to another since with_oauth2: TM1 couldn't
+        reach its issuer."""
         self.with_network(self.network if self.network is not None else self._own_network)
 
     def configure(self) -> None:
@@ -801,6 +818,7 @@ class Tm1Login:
         if self._keycloak is None:
             raise RuntimeError('TM1 takes its own token only where a session is asked for: use session("Bearer " + token()), or authorize for the cookie')
         headers: MutableMapping[str, str] = getattr(request, "headers", request)  # type: ignore[assignment]
+        # Set, not added: headers used again carry the new token alone
         headers["Authorization"] = "Bearer " + self.token()
         return request
 

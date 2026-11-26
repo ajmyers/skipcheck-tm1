@@ -538,6 +538,20 @@ public class PlanningAnalyticsEnvironmentTests
         Assert.Null(beside.Cognos().Keycloak);
         Assert.Same(beside.Keycloak(), beside.Tm1Engine().Keycloak);
 
+        // A server can't take the Keycloak's name on the network
+        Assert.Contains(
+            "A TM1 server can't be named Keycloak beside the environment's Keycloak",
+            Assert.Throws<InvalidOperationException>(() => EngineBuilder().Tm1("Keycloak").Tm1Engine().Tm1EngineOAuth2().Build()).Message
+        );
+        Assert.Contains(
+            "A TM1 server can't be named keycloak beside the environment's Keycloak",
+            Assert
+                .Throws<InvalidOperationException>(() => Builder().Tm1("keycloak").Cognos(cognos => cognos.WithUser("admin", "adminpw")).Keycloak().Build())
+                .Message
+        );
+        // Without a Keycloak the name is free
+        Assert.Contains("keycloak", Builder().Tm1("keycloak").Build().Tm1Servers.Keys);
+
         Assert.Contains(
             "OAuth 2.0 logins are a TM1 v12 engine's: add Tm1Engine() too",
             Assert.Throws<InvalidOperationException>(() => Builder().Tm1("legacy").Tm1EngineOAuth2().Build()).Message

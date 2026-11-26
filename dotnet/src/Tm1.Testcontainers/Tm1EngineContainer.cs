@@ -75,6 +75,9 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
 
     internal const string InstallPath = "/opt/ibm/tm1-engine";
 
+    private const string OtherNetwork =
+        "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: set the network before WithOAuth2, or give the Keycloak the same";
+
     // The datastore is this engine's alone and goes with it: nothing else is given the password
     private const string DatastoreUser = "root";
     private const string DatastorePassword = "tm1datastore";
@@ -211,23 +214,45 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     /// password by <see cref="WithLogin"/>. A test then logs in with <see cref="Tm1Database.OAuth2Login"/>. Logins through
     /// the engine's application (<see cref="Tm1Database.Login()"/>) keep working beside it.
     /// <para>The Keycloak joins the engine's network, unless it has one already, which the engine then joins. It's yours
-    /// to stop: the engine only starts it first.</para></summary>
+    /// to stop: the engine only starts it first. An engine has one Keycloak, and a Keycloak one engine: the same
+    /// Keycloak again changes nothing.</para></summary>
+    /// <exception cref="InvalidOperationException">The engine has another Keycloak; or this one is already running, or
+    /// is another engine's.</exception>
     public Tm1EngineContainer WithOAuth2(KeycloakContainer keycloak)
     {
         ArgumentNullException.ThrowIfNull(keycloak);
-        Keycloak = keycloak;
+        if (ReferenceEquals(Keycloak, keycloak))
+        {
+            return this;
+        }
+        if (Keycloak is not null)
+        {
+            throw new InvalidOperationException(
+                "The engine already takes tokens from another Keycloak, which would start beside this one under the same name: give it one"
+            );
+        }
+        if (keycloak.IsRunning)
+        {
+            // It gets its realm, and its place on the network, when it starts
+            throw new InvalidOperationException(
+                "This Keycloak is already running, without the engine's realm: give WithOAuth2 one that isn't started, and the engine starts it"
+            );
+        }
+        // Asked for when Keycloak starts, so users added after this call are in it. First: it refuses a Keycloak
+        // that another engine uses
+        keycloak.WithRealm(OAuth2Realm, this, Realm);
         if (keycloak.Network is not null)
         {
             WithNetwork(keycloak.Network);
         }
         else
         {
+            // The engine's own, or a new one if it was taken off it
             JoinNetwork();
             keycloak.WithNetwork(Network);
         }
+        Keycloak = keycloak;
         DependsOn(keycloak);
-        // Asked for when Keycloak starts, so users added after this call are in it
-        keycloak.WithRealm(OAuth2Realm, Realm);
         // Keycloak's address on the network is what its tokens name, however they're fetched, and TM1 has to reach
         // the issuer a token names
         WithEnv("TM1_OAUTH2_ISSUER_URL", keycloak.NetworkUrl + "/realms/" + OAuth2Realm);
@@ -448,9 +473,7 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
         if (Keycloak is { } joined && !ReferenceEquals(joined.Network, network))
         {
             // The Keycloak is the caller's, and may serve others: it isn't moved from here
-            throw new InvalidOperationException(
-                "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: set the network before WithOAuth2, or give the Keycloak the same"
-            );
+            throw new InvalidOperationException(OtherNetwork);
         }
         // Null while the base class is still being made
         Datastore?.WithNetwork(network);
@@ -534,6 +557,11 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
             WithNetwork(ownNetwork);
         }
         Datastore.WithNetwork(Network);
+        if (Keycloak is { } joined && !ReferenceEquals(joined.Network, Network))
+        {
+            // Moved since WithOAuth2: TM1 couldn't reach its issuer
+            throw new InvalidOperationException(OtherNetwork);
+        }
     }
 
     /// <summary>Waits until the image has created every instance, application, database and user, and

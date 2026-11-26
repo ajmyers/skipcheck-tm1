@@ -253,8 +253,9 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// (<c>acceptLicense: true</c>); the zip is <c>zip</c> in <c>ibm</c>, or the newest there;</item>
     /// <item><c>tm1Engine</c>: <see cref="EnvironmentBuilder.Tm1Engine()"/>, with each of <c>databases</c> as
     /// <see cref="Tm1EngineContainer.WithDatabase(string, string)"/> in its <c>instance</c>, and <c>users</c> as
-    /// <see cref="Tm1EngineContainer.WithUser"/> (a user's password is checked and not used: TM1 v12 keeps none). It runs
-    /// beside <c>tm1</c>, or alone;</item>
+    /// <see cref="Tm1EngineContainer.WithUser"/>. <c>oauth2</c> is <see cref="EnvironmentBuilder.Tm1EngineOAuth2"/>, and a
+    /// user's password is then their <see cref="Tm1EngineContainer.WithLogin"/> at Keycloak; without it the password is
+    /// checked and not used, as TM1 v12 keeps none. It runs beside <c>tm1</c>, or alone;</item>
     /// <item><c>ibm</c>: each part's source, the folder as <see cref="Testcontainers.Tm1Source.Bundle"/>,
     /// <see cref="Testcontainers.Tm1WebSource.Bundle"/>, <see cref="Testcontainers.Tm1EngineSource.Bundle"/> and <see cref="Testcontainers.CognosSource.Zip"/>. A relative path is from the
     /// file's folder; <c>~</c> is the user's home;</item>
@@ -757,6 +758,15 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
                 {
                     throw new InvalidOperationException(
                         $"A TM1 server can't be named {name} beside a TM1 v12 engine: that's the engine's name, or its datastore's, on the network"
+                    );
+                }
+            }
+            if (KeycloakCustomizer is not null || Tm1EngineOAuth2Set)
+            {
+                foreach (var name in Tm1Names.Where(n => n.Equals(KeycloakContainer.NetworkAlias, StringComparison.OrdinalIgnoreCase)))
+                {
+                    throw new InvalidOperationException(
+                        $"A TM1 server can't be named {name} beside the environment's Keycloak: that's its name on the network"
                     );
                 }
             }

@@ -236,7 +236,10 @@ public sealed class Tm1Login
                 "TM1 takes its own token only where a session is asked for: use SessionAsync(\"Bearer \" + token), or AuthorizeAsync for the cookie"
             );
         }
-        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + await TokenAsync(cancellationToken).ConfigureAwait(false));
+        var token = await TokenAsync(cancellationToken).ConfigureAwait(false);
+        // Set, not added: a request that has one already carries the new token alone
+        request.Headers.Remove("Authorization");
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + token);
         return request;
     }
 

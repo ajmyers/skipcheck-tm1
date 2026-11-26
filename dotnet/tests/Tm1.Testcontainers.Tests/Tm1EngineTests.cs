@@ -3,6 +3,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -219,6 +220,88 @@ public class Tm1EngineWiringTests : TempDir
         var joining = new Tm1EngineContainer(Source).WithOAuth2(placed);
         Assert.Same(network, joining.Network);
         Assert.Same(network, joining.Datastore.Network);
+    }
+
+    [Fact]
+    public void KeycloakImportsTheRealmAsItIsWhenKeycloakStarts()
+    {
+        var keycloak = new KeycloakContainer().WithCommand("start-dev", "--features=token-exchange");
+        var engine = new Tm1EngineContainer(Source).WithOAuth2(keycloak);
+        // Added after WithOAuth2, and still in the realm: it's asked for at Keycloak's start
+        engine.WithUser("analyst").WithLogin("analyst", "analystpw");
+        keycloak.Configure();
+        // The import is added to the command it has: a caller's own options stay
+        Assert.Equal(["start-dev", "--features=token-exchange", "--import-realm"], keycloak.CommandParts);
+        Assert.Equal(["/opt/keycloak/data/import/tm1-realm.json"], keycloak.RealmFiles().Keys);
+        Assert.Equal(engine.Realm(), keycloak.RealmFiles().Values.First());
+        Assert.Contains("\"analyst\"", keycloak.RealmFiles().Values.First(), StringComparison.Ordinal);
+        // And it's what is written into the container
+        Assert.Equal(engine.Realm(), Encoding.UTF8.GetString(keycloak.Contents["/opt/keycloak/data/import/tm1-realm.json"]));
+        // Configured again, as a start after a test's look does: the import isn't said twice
+        keycloak.Configure();
+        Assert.Equal(["start-dev", "--features=token-exchange", "--import-realm"], keycloak.CommandParts);
+        // Without a realm, Keycloak starts as it was
+        var plain = new KeycloakContainer();
+        plain.Configure();
+        Assert.Equal(["start-dev"], plain.CommandParts);
+    }
+
+    [Fact]
+    public void AnEngineHasOneKeycloakOfItsOwnThatItStarts()
+    {
+        var keycloak = new KeycloakContainer();
+        var engine = new Tm1EngineContainer(Source).WithOAuth2(keycloak);
+        // The same again is nothing new
+        Assert.Single(engine.WithOAuth2(keycloak).Dependencies, d => ReferenceEquals(d, keycloak));
+        // A second would start beside the first, under the same name on the network
+        Assert.Contains(
+            "already takes tokens from another Keycloak",
+            Assert.Throws<InvalidOperationException>(() => engine.WithOAuth2(new KeycloakContainer())).Message
+        );
+        Assert.Same(keycloak, engine.Keycloak);
+        // And another engine's realm would replace this one's
+        var second = new Tm1EngineContainer(Source);
+        Assert.Contains("each engine needs a Keycloak of its own", Assert.Throws<InvalidOperationException>(() => second.WithOAuth2(keycloak)).Message);
+        // Refused before anything of the second engine's changed
+        Assert.Null(second.Keycloak);
+        Assert.NotSame(keycloak.Network, second.Network);
+        Assert.False(second.EnvMap.ContainsKey("TM1_OAUTH2_ISSUER_URL"));
+        // An engine taken off its network gets one again, and the Keycloak with it
+        var off = new Tm1EngineContainer(Source).WithNetwork(null).WithOAuth2(new KeycloakContainer());
+        Assert.NotNull(off.Network);
+        Assert.Same(off.Network, off.Keycloak!.Network);
+        Assert.Same(off.Network, off.Datastore.Network);
+        // A Keycloak moved since is found when the engine is configured, not by TM1
+        keycloak.WithNetwork(Network.NewNetwork());
+        Assert.Contains("set the network before WithOAuth2", Assert.Throws<InvalidOperationException>(engine.Configure).Message);
+    }
+
+    [Fact]
+    public async Task AStartThatFailsLeavesItsKeycloakWhereItIs()
+    {
+        // The Keycloak is the caller's: a start that failed neither stops it nor takes away the network
+        // it's on, which the engine made
+        var keycloak = new KeycloakContainer();
+        var engine = new FailsToStart(Source);
+        engine.WithOAuth2(keycloak);
+        var shared = engine.Network;
+        Assert.Same(shared, keycloak.Network);
+        Assert.Equal("can't start", (await Assert.ThrowsAsync<InvalidOperationException>(() => engine.StartAsync())).Message);
+        Assert.Same(shared, engine.Made);
+        Assert.Same(shared, engine.Network);
+        Assert.Same(shared, keycloak.Network);
+        Assert.Same(shared, engine.Datastore.Network);
+        Assert.Same(keycloak, engine.Keycloak);
+        // The engine's own parts are stopped all the same
+        Assert.Equal(1, engine.Stopped);
+        Assert.False(engine.Datastore.IsRunning);
+
+        // A Keycloak moved since WithOAuth2 fails the start, with why, before anything starts
+        var moved = new Tm1EngineContainer(Source).WithOAuth2(new KeycloakContainer());
+        moved.Keycloak!.WithNetwork(Network.NewNetwork());
+        Assert.Contains("set the network before WithOAuth2", (await Assert.ThrowsAsync<InvalidOperationException>(() => moved.StartAsync())).Message);
+        Assert.False(moved.Keycloak.IsRunning);
+        Assert.False(moved.Datastore.IsRunning);
     }
 
     [Fact]

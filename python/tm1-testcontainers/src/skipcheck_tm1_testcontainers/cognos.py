@@ -229,32 +229,49 @@ class KeycloakContainer(GenericContainer):
         self.waiting_for(wait_for_http("/realms/master", self.HTTP_PORT, 200, timeout=3 * 60.0))
         # Realms to import at start, by name: a TM1 v12 engine's, for OAuth 2.0 logins
         self._realms: dict[str, Callable[[], str]] = {}
+        # Who gave each realm: an engine's is its own, and a second engine's would replace it
+        self._realm_owners: dict[str, object] = {}
 
-    def _with_realm(self, name: str, json: Callable[[], str]) -> Self:
+    def _with_realm(self, name: str, owner: object, json: Callable[[], str]) -> Self:
         """A realm for this Keycloak to import when it starts, as JSON. The JSON is asked for when
         Keycloak starts, so whoever gives it can still be changed until then."""
+        has = self._realm_owners.get(name)
+        if has is not None and has is not owner:
+            raise RuntimeError(f"This Keycloak already gives another TM1 v12 engine its realm ({name}): each engine needs a Keycloak of its own")
+        self._realm_owners[name] = owner
         self._realms[name] = json
         return self
+
+    def _realm_files(self) -> dict[str, str]:
+        """The realm files copied in before Keycloak starts, by their path in the container."""
+        return {f"/opt/keycloak/data/import/{name}-realm.json": json() for name, json in self._realms.items()}
 
     def configure(self) -> None:
         """Called before the container is created: has Keycloak import the realms it was given."""
         if not self._realms:
             return
-        self.with_command(["start-dev", "--import-realm"])
-        for name, realm in self._realms.items():
-            destination = f"/opt/keycloak/data/import/{name}-realm.json"
+        # Added to the command it has: a caller's own options stay
+        command = self.command_parts
+        if "--import-realm" not in command:
+            self.with_command([*command, "--import-realm"])
+        for destination, realm in self._realm_files().items():
             # Once, however often this is called: the realm as it is now replaces an earlier copy
             self._transferable_specs[:] = [spec for spec in self._transferable_specs if spec[1] != destination]
-            self.with_copy_into_container(realm().encode(), destination)
+            self.with_copy_into_container(realm.encode(), destination)
 
     def _access_token(self, realm: str, client: str, user: str, password: str) -> str:
         """An access token for a user of a realm, by the password grant, as a program holding the
         user's password gets one."""
-        response = httpx2.post(
-            f"{self.url}/realms/{realm}/protocol/openid-connect/token",
-            data={"grant_type": "password", "client_id": client, "username": user, "password": password},
-            timeout=30,
-        )
+        url = self.url
+        try:
+            response = httpx2.post(
+                f"{url}/realms/{realm}/protocol/openid-connect/token",
+                data={"grant_type": "password", "client_id": client, "username": user, "password": password},
+                timeout=30,
+            )
+        except httpx2.HTTPError as e:
+            # Keycloak, not TM1: whoever asked for the token would say the wrong one
+            raise RuntimeError(f"Couldn't reach Keycloak at {url}") from e
         match = re.search(r'"access_token"\s*:\s*"([^"]+)"', response.text)
         if response.status_code != 200 or match is None:
             raise RuntimeError(f"Keycloak refused {user} (HTTP {response.status_code}): {response.text}")

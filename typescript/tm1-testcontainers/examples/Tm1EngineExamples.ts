@@ -26,7 +26,7 @@ requiresSharedDatabase("reads the server's name", async ({ tm1Database: db }) =>
 
 export async function oauth2(source: Tm1EngineSource): Promise<void> {
   // @start region = oauth2
-  // Starting the engine starts Keycloak first; the Keycloak is yours to stop, after the engine
+  // Starting the engine starts Keycloak first; the Keycloak is yours to stop
   await using keycloak = new KeycloakContainer();
   await using engine = new Tm1EngineContainer(source).withUser("analyst", "Analysts").withLogin("analyst", "analystpw").withOAuth2(keycloak);
   await engine.start();

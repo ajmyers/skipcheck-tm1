@@ -19,6 +19,8 @@ const COMMAND_TIMEOUT = 180;
 /** Creating a database is given longer: at least the image's own wait for the database to be ready. */
 const CREATE_TIMEOUT = 330;
 const REQUEST_TIMEOUT = 30_000;
+const OTHER_NETWORK =
+  "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: set the network before withOAuth2, or give the Keycloak the same";
 
 // The image's own rule: at least three characters, and nothing the commands or a URL would need
 // quoting for
@@ -63,19 +65,6 @@ class Datastore extends GenericContainer {
     this.withEnv("MONGO_INITDB_ROOT_PASSWORD", DATASTORE_PASSWORD);
     // Enough for TM1's metadata; MongoDB would otherwise take half the machine's memory
     this.withCommand("--wiredTigerCacheSizeGB", "0.5");
-  }
-
-  #start: Promise<void> | undefined;
-
-  /** Starts it, and remembers the start while it's under way. */
-  override start(): Promise<void> {
-    this.#start = super.start();
-    return this.#start;
-  }
-
-  /** Resolves once a start that's under way has ended, however it ended. */
-  async startEnded(): Promise<void> {
-    await this.#start?.catch(() => undefined);
   }
 
   /** MongoDB's image is built for every platform, so it runs as the machine's own. */
@@ -143,7 +132,7 @@ export class Tm1EngineContainer extends GenericContainer {
   static readonly OAUTH2_CLIENT = "tm1";
 
   readonly #source: Tm1EngineSource;
-  readonly #datastore: Datastore;
+  readonly #datastore: GenericContainer;
   // instance/database, in the order they were added
   readonly #databases = new Set<string>();
   readonly #users = new Map<string, string[]>();
@@ -207,9 +196,7 @@ export class Tm1EngineContainer extends GenericContainer {
   override withNetwork(network: Network | undefined): this {
     if (this.#keycloak !== undefined && this.#keycloak.getNetwork() !== network) {
       // The Keycloak is the caller's, and may serve others: it isn't moved from here
-      throw new IllegalStateException(
-        "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: set the network before withOAuth2, or give the Keycloak the same",
-      );
+      throw new IllegalStateException(OTHER_NETWORK);
     }
     super.withNetwork(network);
     // At once, not when the engine starts: whatever starts the engine may start what it depends
@@ -248,16 +235,36 @@ export class Tm1EngineContainer extends GenericContainer {
    * Logins through the engine's application ({@link Tm1Database.login}) keep working beside it.
    *
    * The Keycloak joins the engine's network, unless it has one already, which the engine then
-   * joins. It's yours to stop: the engine only starts it first.
+   * joins. It's yours to stop: the engine only starts it first. Give it one that isn't started,
+   * and that no other engine uses: the same one again changes nothing, and another is refused.
+   * @throws IllegalStateException for a Keycloak that's running, or another engine's, or a second
+   * one for this engine
    * @param keycloak the Keycloak to take tokens from */
   withOAuth2(keycloak: KeycloakContainer): this {
     if (!(keycloak instanceof KeycloakContainer)) throw new TypeError("keycloak must be a KeycloakContainer");
-    this.#keycloak = keycloak;
+    if (this.#keycloak === keycloak) return this;
+    if (this.#keycloak !== undefined) {
+      throw new IllegalStateException(
+        "The engine already takes tokens from another Keycloak, which would start beside this one under the same name: give it one",
+      );
+    }
+    if (keycloak.isRunning()) {
+      // It gets its realm, and its place on the network, when it starts
+      throw new IllegalStateException(
+        "This Keycloak is already running, without the engine's realm: give withOAuth2 one that isn't started, and the engine starts it",
+      );
+    }
+    // Asked for when Keycloak starts, so users added after this call are in it. First: it refuses
+    // a Keycloak that another engine uses
+    keycloak.withRealm(Tm1EngineContainer.OAUTH2_REALM, this, () => this.realm());
     if (keycloak.getNetwork() !== undefined) this.withNetwork(keycloak.getNetwork());
-    else keycloak.withNetwork(this.getNetwork());
+    else {
+      // The engine's own, or a new one if it was taken off it
+      this.#joinNetwork();
+      keycloak.withNetwork(this.getNetwork());
+    }
+    this.#keycloak = keycloak;
     this.dependsOn(keycloak);
-    // Asked for when Keycloak starts, so users added after this call are in it
-    keycloak.withRealm(Tm1EngineContainer.OAUTH2_REALM, () => this.realm());
     // Keycloak's address on the network is what its tokens name, however they're fetched, and TM1
     // has to reach the issuer a token names
     this.withEnv("TM1_OAUTH2_ISSUER_URL", keycloak.getNetworkUrl() + "/realms/" + Tm1EngineContainer.OAUTH2_REALM);
@@ -475,12 +482,15 @@ export class Tm1EngineContainer extends GenericContainer {
   /** Starts the datastore, then the engine, on one network, and waits until TM1 is set up. */
   override start(): Promise<void> {
     // Before anything starts: what this depends on, the datastore, is started ahead of configure()
-    this.#joinNetwork();
+    try {
+      this.#joinNetwork();
+    } catch (e) {
+      return Promise.reject(e instanceof Error ? e : new Error(String(e)));
+    }
     return super.start().catch(async (e: unknown) => {
-      // The engine that couldn't start is stopped for us, not what it depends on. What it depends
-      // on starts at once, and one failing ends the start while the datastore's is still under
-      // way: wait for it, or there'd be nothing yet to stop, and a MongoDB left running
-      await this.#datastore.startEnded();
+      // The engine that couldn't start is stopped for us, not what it depends on, whatever was
+      // thrown. What it depends on starts at once, and one failing ends the start while the
+      // datastore's is still under way: its stop waits for that, so no MongoDB is left running
       await this.#datastore.stop().catch(() => undefined);
       throw e;
     });
@@ -550,6 +560,8 @@ export class Tm1EngineContainer extends GenericContainer {
   #joinNetwork(): void {
     if (this.getNetwork() === undefined) this.withNetwork(Network.newNetwork());
     this.#datastore.withNetwork(this.getNetwork());
+    // Moved since withOAuth2: TM1 couldn't reach its issuer
+    if (this.#keycloak !== undefined && this.#keycloak.getNetwork() !== this.getNetwork()) throw new IllegalStateException(OTHER_NETWORK);
   }
 
   /** Runs the image's tm1-engine command, and returns what it printed. */

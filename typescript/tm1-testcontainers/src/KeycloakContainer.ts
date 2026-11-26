@@ -32,6 +32,8 @@ export class KeycloakContainer extends GenericContainer {
 
   // Realms to import at start, by name: a TM1 v12 engine's, for OAuth 2.0 logins
   readonly #realms = new Map<string, () => string>();
+  // Who gave each realm: an engine's is its own, and a second engine's would replace it
+  readonly #owners = new Map<string, object>();
 
   /** Keycloak's image is built for every platform, so it runs as the machine's own. */
   protected override platform(): string | undefined {
@@ -55,16 +57,29 @@ export class KeycloakContainer extends GenericContainer {
   /** A realm for this Keycloak to import when it starts, as JSON. The JSON is asked for when
    * Keycloak starts, so whoever gives it can still be changed until then.
    * @internal */
-  withRealm(name: string, json: () => string): this {
+  withRealm(name: string, owner: object, json: () => string): this {
+    const has = this.#owners.get(name);
+    if (has !== undefined && has !== owner) {
+      throw new IllegalStateException(`This Keycloak already gives another TM1 v12 engine its realm (${name}): each engine needs a Keycloak of its own`);
+    }
+    this.#owners.set(name, owner);
     this.#realms.set(name, json);
     return this;
+  }
+
+  /** The realm files copied in before Keycloak starts, by their path in the container.
+   * @internal */
+  realmFiles(): Map<string, string> {
+    return new Map([...this.#realms].map(([name, json]) => ["/opt/keycloak/data/import/" + name + "-realm.json", json()]));
   }
 
   /** @internal */
   override configure(): void {
     if (this.#realms.size === 0) return;
-    this.withCommand("start-dev", "--import-realm");
-    for (const [name, json] of this.#realms) this.withCopyContentToContainer(json(), "/opt/keycloak/data/import/" + name + "-realm.json");
+    // Added to the command it has: a caller's own options stay
+    const command = [...this.getCommandParts()];
+    if (!command.includes("--import-realm")) this.withCommand(...command, "--import-realm");
+    for (const [path, json] of this.realmFiles()) this.withCopyContentToContainer(json, path);
   }
 
   /** An access token for a user of a realm, by the password grant, as a program holding the

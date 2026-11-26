@@ -660,6 +660,20 @@ describe("PlanningAnalyticsEnvironment", () => {
     expect(both.tm1Engine().getKeycloak()).toBe(both.keycloak());
     expect(both.cognos().getKeycloak()).toBe(both.keycloak());
 
+    // A server can't take the Keycloak's name on the network
+    expect(() => engineBuilder().tm1("Keycloak").tm1Engine().tm1EngineOAuth2().build()).toThrow(
+      "A TM1 server can't be named Keycloak beside the environment's Keycloak: that's its name on the network",
+    );
+    expect(() =>
+      builder()
+        .tm1("keycloak")
+        .cognos((cognos) => cognos.withUser("admin", "adminpw"))
+        .keycloak()
+        .build(),
+    ).toThrow("A TM1 server can't be named keycloak beside the environment's Keycloak");
+    // Without a Keycloak the name is free
+    expect(builder().tm1("keycloak").build().tm1Servers().has("keycloak")).toBe(true);
+
     expect(() => builder().tm1("legacy").tm1EngineOAuth2().build()).toThrow(IllegalStateException);
     expect(() => builder().tm1("legacy").tm1EngineOAuth2().build()).toThrow("OAuth 2.0 logins are a TM1 v12 engine's: add tm1Engine() too");
     expect(() => builder().tm1("legacy").keycloak().build()).toThrow("add cognos(...) or tm1EngineOAuth2() too");
@@ -858,6 +872,76 @@ describe("Tm1Engine wiring", () => {
     const joining = new Tm1EngineContainer(SOURCE).withOAuth2(placed);
     expect(joining.getNetwork()).toBe(network);
     expect(joining.getDatastore().getNetwork()).toBe(network);
+  });
+
+  it("Keycloak imports the realm as it is when Keycloak starts", () => {
+    const keycloak = new KeycloakContainer().withCommand("start-dev", "--features=token-exchange");
+    const engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak);
+    // Added after withOAuth2, and still in the realm: it's asked for at Keycloak's start
+    engine.withUser("analyst").withLogin("analyst", "analystpw");
+    keycloak.configure();
+    // The import is added to the command it has: a caller's own options stay
+    expect(keycloak.getCommandParts()).toEqual(["start-dev", "--features=token-exchange", "--import-realm"]);
+    expect([...keycloak.realmFiles().keys()]).toEqual(["/opt/keycloak/data/import/tm1-realm.json"]);
+    expect([...keycloak.realmFiles().values()][0]).toBe(engine.realm());
+    expect(engine.realm()).toContain('"analyst"');
+    // And it's what is written into the container
+    expect(keycloak.getCopiedContents()).toEqual(keycloak.realmFiles());
+    // Configured again, the import isn't added twice
+    keycloak.configure();
+    expect(keycloak.getCommandParts()).toEqual(["start-dev", "--features=token-exchange", "--import-realm"]);
+    // Without a realm, Keycloak starts as it was
+    const plain = new KeycloakContainer();
+    plain.configure();
+    expect(plain.getCommandParts()).toEqual(["start-dev"]);
+  });
+
+  it("an engine has one Keycloak of its own that it starts", async () => {
+    const keycloak = new KeycloakContainer();
+    const engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak);
+    // The same again is nothing new
+    expect(
+      engine
+        .withOAuth2(keycloak)
+        .getDependencies()
+        .filter((d) => d === keycloak),
+    ).toHaveLength(1);
+    // A second would start beside the first, under the same name on the network
+    expect(() => engine.withOAuth2(new KeycloakContainer())).toThrow(IllegalStateException);
+    expect(() => engine.withOAuth2(new KeycloakContainer())).toThrow("already takes tokens from another Keycloak");
+    expect(engine.getKeycloak()).toBe(keycloak);
+    // And another engine's realm would replace this one's
+    const second = new Tm1EngineContainer(SOURCE);
+    expect(() => second.withOAuth2(keycloak)).toThrow(IllegalStateException);
+    expect(() => second.withOAuth2(keycloak)).toThrow(
+      "This Keycloak already gives another TM1 v12 engine its realm (tm1): each engine needs a Keycloak of its own",
+    );
+    // Refused, it's left as it was
+    expect(second.getKeycloak()).toBeUndefined();
+    expect(second.getDependencies()).toEqual([second.getDatastore()]);
+    expect(second.getEnvMap().has("TM1_OAUTH2_ISSUER_URL")).toBe(false);
+    // One that's already running has neither the realm nor its place on the network
+    const running = new (class extends KeycloakContainer {
+      override isRunning(): boolean {
+        return true;
+      }
+    })();
+    expect(() => new Tm1EngineContainer(SOURCE).withOAuth2(running)).toThrow(
+      "This Keycloak is already running, without the engine's realm: give withOAuth2 one that isn't started, and the engine starts it",
+    );
+    // An engine taken off its network gets one again, and the Keycloak with it
+    const off = new Tm1EngineContainer(SOURCE).withNetwork(undefined).withOAuth2(new KeycloakContainer());
+    expect(off.getNetwork()).toBeInstanceOf(Network);
+    expect(off.getKeycloak()!.getNetwork()).toBe(off.getNetwork());
+    expect(off.getDatastore().getNetwork()).toBe(off.getNetwork());
+    // A Keycloak moved since is found when the engine is configured, not by TM1
+    keycloak.withNetwork(Network.newNetwork());
+    expect(() => engine.configure()).toThrow(IllegalStateException);
+    expect(() => engine.configure()).toThrow("set the network before withOAuth2");
+    // Or started: before anything is, the datastore included
+    const start = vi.spyOn(engine.getDatastore(), "start");
+    await expect(engine.start()).rejects.toThrow("set the network before withOAuth2");
+    expect(start).not.toHaveBeenCalled();
   });
 
   it("gives Keycloak a realm with the users who have a password", () => {
@@ -1163,32 +1247,24 @@ describe("A running Tm1EngineContainer", () => {
 
   it("stops a datastore that was still starting when the engine's start failed", async () => {
     // Keycloak fails at once (here, by a password for someone who isn't a user) while MongoDB is
-    // still starting: the datastore is stopped once it has started, not before
+    // still starting: the engine's start ends only once the datastore's has, so its stop finds
+    // what there is to stop. Each fails before Docker is asked for anything
     const keycloak = new KeycloakContainer();
     const engine = new Tm1EngineContainer(new Tm1EngineSource.PrivateImage("tm1-engine:test")).withLogin("nobody", "pw").withOAuth2(keycloak);
     const datastore = engine.getDatastore();
     const order: string[] = [];
-    // Under each container's own start, so no Docker is asked for anything
-    const start = GenericContainer.prototype.start;
-    const starts = vi.spyOn(GenericContainer.prototype, "start").mockImplementation(async function (this: GenericContainer): Promise<void> {
-      if (this === datastore) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        order.push("datastore started");
-      } else if (this === keycloak) {
-        this.configure();
-      } else {
-        await start.call(this);
-      }
+    vi.spyOn(datastore as unknown as { dependenciesStarted(): Promise<void> }, "dependenciesStarted").mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      order.push("the datastore's start ended");
+      throw new Error("no Docker here");
     });
-    vi.spyOn(datastore, "stop").mockImplementation(async () => {
-      order.push("datastore stopped");
-    });
-    try {
-      await expect(engine.start()).rejects.toThrow("nobody has a password (withLogin) but isn't a user of the engine");
-      expect(order).toEqual(["datastore started", "datastore stopped"]);
-    } finally {
-      starts.mockRestore();
-    }
+    const stop = vi.spyOn(datastore, "stop");
+    await expect(engine.start().finally(() => order.push("the engine's start ended"))).rejects.toThrow(
+      "nobody has a password (withLogin) but isn't a user of the engine",
+    );
+    expect(order).toEqual(["the datastore's start ended", "the engine's start ended"]);
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(datastore.isRunning()).toBe(false);
   });
 
   it("stops the datastore when the engine can't start", async () => {
@@ -1261,5 +1337,44 @@ describe("The wait for TM1 to be set up", () => {
         1,
       ),
     ).rejects.toThrow(/^Timed out after PT0S waiting for TM1 to be set up\. /);
+  });
+});
+
+/** What every container does around its start, without Docker: a container whose start ends
+ * before Docker is asked for anything. */
+describe("GenericContainer", () => {
+  class Slow extends GenericContainer {
+    readonly order: string[] = [];
+
+    constructor(private readonly ms: number) {
+      super("example.com/made-up:1");
+    }
+
+    protected override async dependenciesStarted(): Promise<void> {
+      await new Promise((resolve) => setTimeout(resolve, this.ms));
+      this.order.push("start ended");
+      throw new Error("no Docker here");
+    }
+  }
+
+  it("waits for a start that's under way before it stops", async () => {
+    // Until the start ends there's no container to stop: a stop that found nothing and returned
+    // would leave the container that then came up running
+    const container = new Slow(50);
+    const starting = container.start().catch((e: unknown) => e);
+    await container.stop();
+    container.order.push("stop returned");
+    expect(container.order).toEqual(["start ended", "stop returned"]);
+    expect(String(await starting)).toContain("no Docker here");
+    expect(container.isRunning()).toBe(false);
+    // And a start that failed doesn't fail the stop, nor a later one
+    await container.stop();
+    await container[Symbol.asyncDispose]();
+  });
+
+  it("stops at once when nothing was started", async () => {
+    const container = new Slow(60_000);
+    await container.stop();
+    expect(container.order).toEqual([]);
   });
 });

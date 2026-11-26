@@ -206,8 +206,10 @@ class PlanningAnalyticsEnvironment:
           must say (``acceptLicense: true``); the zip is ``zip`` in ``ibm``, or the newest there;
         * ``tm1Engine``: :meth:`Builder.tm1_engine`, with each of ``databases`` as
           :meth:`Tm1EngineContainer.with_database` in its ``instance``, and ``users`` as
-          :meth:`Tm1EngineContainer.with_user` (a user's password is checked and not used: TM1 v12
-          keeps none). It runs beside ``tm1``, or alone;
+          :meth:`Tm1EngineContainer.with_user`. ``oauth2`` is :meth:`Builder.tm1_engine_oauth2`,
+          and a user's password is then their :meth:`Tm1EngineContainer.with_login` at Keycloak;
+          without it the password is checked and not used, as TM1 v12 keeps none. It runs beside
+          ``tm1``, or alone;
         * ``ibm``: each part's source, the folder as :class:`Tm1Source.Bundle`,
           :class:`Tm1WebSource.Bundle`, :class:`CognosSource.Zip` and :class:`Tm1EngineSource.Bundle`. A relative path is from the
           file's folder; ``~`` is the user's home;
@@ -515,6 +517,10 @@ class PlanningAnalyticsEnvironment:
                         raise RuntimeError(
                             f"A TM1 server can't be named {name} beside a TM1 v12 engine: that's the engine's name, or its datastore's, on the network"
                         )
+            if self._keycloak is not None or self._tm1_engine_oauth2:
+                for name in self._tm1:
+                    if name.lower() == KeycloakContainer.NETWORK_ALIAS.lower():
+                        raise RuntimeError(f"A TM1 server can't be named {name} beside the environment's Keycloak: that's its name on the network")
             if self._reuse and self._tm1_engine is not None:
                 raise RuntimeError(
                     "An environment with a TM1 v12 engine can't be reused: the engine and its datastore belong together, "

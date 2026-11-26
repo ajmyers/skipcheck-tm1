@@ -145,6 +145,10 @@ with closing(keycloak), engine:
   `session(...)` refuses: TM1 doesn't take the provider's token at its session endpoint.
 - **A user with a password must be a user of the engine** (`with_user`), or `admin`. Logins
   through the application (`db.login(user)`) keep working beside it.
+- **One Keycloak for one engine.** `with_oauth2` refuses a Keycloak that's already running, one
+  another engine uses, and a second Keycloak for the same engine; the same one again changes
+  nothing. A Keycloak moved to another network afterwards is refused when the engine is
+  configured or started. Keycloak keeps a command you gave it: `--import-realm` is added to it.
 - **Give the engine a Keycloak that isn't started yet.** The realm is made when Keycloak starts,
   so users and logins added after `with_oauth2` are in it; `with KeycloakContainer() as keycloak`
   would start it too soon, without the realm. The Keycloak joins the engine's network (or the
@@ -215,9 +219,9 @@ checked as `pa-setup` checks it, with the same defaults and messages.
 - **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`,
   `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `keycloak()`, `cam` as `cam_security`,
   `memory`), `paw` (`acceptLicense`, `zip`) and `tm1Engine` (`databases` with their `instance`, and
-  `users` with their groups; a user's password is checked and not used, as TM1 v12 keeps none,
-  unless `oauth2` is on, when it's the user's at Keycloak, `with_login`; `oauth2` as
-  `tm1_engine_oauth2()`).
+  `users` with their groups). `tm1Engine.oauth2` is `tm1_engine_oauth2()`, and a user's password is
+  then their `with_login` at Keycloak; without it the password is checked and not used, as TM1 v12
+  keeps none.
   `cognos.oidc: true` turns OIDC on, as a mapping does.
 - **Sources:** a part's source set on the builder wins; then `ibm`, the folder of IBM downloads;
   then the settings above (pa-setup's `.env` sets the same `*_URL` names); then the part's

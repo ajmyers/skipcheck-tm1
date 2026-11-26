@@ -192,6 +192,11 @@ describe("Tm1Login", () => {
       expect(request.method).toBe("POST");
       await analyst.authorizeWithToken();
       expect(asked.map((a) => a.path)).toEqual(["/realms/tm1/protocol/openid-connect/token", "/realms/tm1/protocol/openid-connect/token"]);
+      // A request used again carries the new token alone, not the old one too
+      const again = await analyst.authorizeWithToken({ headers: { authorization: "Bearer old.old.old", Accept: "application/json" } });
+      expect(new Headers(again.headers).get("Authorization")).toBe("Bearer aaa.bbb.ccc");
+      expect(new Headers(again.headers).get("Accept")).toBe("application/json");
+      expect(new Headers((await analyst.authorizeWithToken(again)).headers).get("Authorization")).toBe("Bearer aaa.bbb.ccc");
     });
 
     it("keeps the session TM1 gives the token's first request", async () => {

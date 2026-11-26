@@ -265,9 +265,10 @@ export class PlanningAnalyticsEnvironment implements Startable {
    *   there;
    * - `tm1Engine`: {@link PlanningAnalyticsEnvironment.Builder.tm1Engine}, with each of `databases`
    *   as {@link Tm1EngineContainer.withDatabase} in its `instance`, and `users` as
-   *   {@link Tm1EngineContainer.withUser} (a user's password is checked and not used: TM1 v12 keeps
-   *   none). With `oauth2`, {@link PlanningAnalyticsEnvironment.Builder.tm1EngineOAuth2}, and each
-   *   user's password as {@link Tm1EngineContainer.withLogin}. It runs beside `tm1`, or alone;
+   *   {@link Tm1EngineContainer.withUser}. `oauth2` is
+   *   {@link PlanningAnalyticsEnvironment.Builder.tm1EngineOAuth2}, and a user's password is then
+   *   their {@link Tm1EngineContainer.withLogin} at Keycloak; without it the password is checked
+   *   and not used, as TM1 v12 keeps none. It runs beside `tm1`, or alone;
    * - `ibm`: each part's source, the folder as {@link Tm1Source.Bundle}, {@link Tm1WebSource.Bundle},
    *   {@link Tm1EngineSource.Bundle} and {@link CognosSource.Zip}. A relative path is from the file's folder; `~` is the user's
    *   home;
@@ -671,6 +672,13 @@ export namespace PlanningAnalyticsEnvironment {
             throw new IllegalStateException(
               `A TM1 server can't be named ${name} beside a TM1 v12 engine: that's the engine's name, or its datastore's, on the network`,
             );
+          }
+        }
+      }
+      if (p.keycloak !== undefined || p.tm1EngineOAuth2) {
+        for (const name of p.tm1.keys()) {
+          if (name.toLowerCase() === KeycloakContainer.NETWORK_ALIAS) {
+            throw new IllegalStateException(`A TM1 server can't be named ${name} beside the environment's Keycloak: that's its name on the network`);
           }
         }
       }

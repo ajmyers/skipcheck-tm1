@@ -320,6 +320,110 @@ def test_keycloak_imports_the_realm_as_it_is_when_keycloak_starts() -> None:
     assert mode == 0o644
     assert json.loads(copied)["users"][0]["username"] == "analyst"
 
+    # Java's: the import is added to the command Keycloak has, so a caller's own options stay
+    own = KeycloakContainer().with_command(["start-dev", "--features=token-exchange"])
+    taking = Tm1EngineContainer(SOURCE).with_oauth2(own)
+    # Added after with_oauth2, and still in the realm: it's asked for at Keycloak's start
+    taking.with_user("analyst").with_login("analyst", "analystpw")
+    own.configure()
+    assert own.command_parts == ["start-dev", "--features=token-exchange", "--import-realm"]
+    assert list(own._realm_files()) == ["/opt/keycloak/data/import/tm1-realm.json"]
+    (realm,) = own._realm_files().values()
+    assert realm == taking._realm() and '"analyst"' in realm
+    own.configure()
+    assert own.command_parts == ["start-dev", "--features=token-exchange", "--import-realm"]
+    # Without a realm, Keycloak starts as it was
+    plain = KeycloakContainer()
+    plain.configure()
+    assert plain.command_parts == ["start-dev"]
+
+
+def test_an_engine_has_one_keycloak_of_its_own_that_it_starts() -> None:
+    keycloak = KeycloakContainer()
+    engine = Tm1EngineContainer(SOURCE).with_oauth2(keycloak)
+    # The same again is nothing new
+    assert engine.with_oauth2(keycloak).dependencies.count(keycloak) == 1
+    # A second would start beside the first, under the same name on the network
+    with pytest.raises(RuntimeError, match="already takes tokens from another Keycloak"):
+        engine.with_oauth2(KeycloakContainer())
+    # And another engine's realm would replace this one's
+    with pytest.raises(RuntimeError, match="each engine needs a Keycloak of its own"):
+        Tm1EngineContainer(SOURCE).with_oauth2(keycloak)
+    # An engine taken off its network gets one again, and the Keycloak with it
+    off = Tm1EngineContainer(SOURCE).with_network(None).with_oauth2(KeycloakContainer())
+    assert off.network is not None
+    assert off.keycloak is not None and off.network is off.keycloak.network
+    assert off.datastore.network is off.network
+    # A Keycloak moved since is found when the engine is configured, not by TM1
+    keycloak.with_network(Network.new_network())
+    with pytest.raises(RuntimeError, match="set the network before with_oauth2"):
+        engine.configure()
+
+
+def test_refuses_a_keycloak_that_is_already_running() -> None:
+    class Running(KeycloakContainer):
+        @property
+        def is_running(self) -> bool:
+            return True
+
+    running = Running()
+    engine = Tm1EngineContainer(SOURCE)
+    with pytest.raises(RuntimeError, match="This Keycloak is already running, without the engine's realm"):
+        engine.with_oauth2(running)
+    # And nothing of it was taken: not the realm, the network or the dependency
+    assert engine.keycloak is None and running not in engine.dependencies and running.network is None
+    assert "TM1_OAUTH2_ISSUER_URL" not in engine.env_map
+    assert running._realm_files() == {}
+
+
+def test_a_failed_start_stops_the_datastore_whatever_was_thrown() -> None:
+    class Failed(BaseException):
+        pass
+
+    keycloak = KeycloakContainer()
+    engine = Tm1EngineContainer(SOURCE).with_oauth2(keycloak)
+    stopped: list[bool] = []
+    engine.datastore.start = lambda: engine.datastore  # type: ignore[method-assign]
+    engine.datastore.stop = lambda *_, **__: stopped.append(True)  # type: ignore[method-assign]
+
+    def failing() -> KeycloakContainer:
+        # What the engine depends on fails, as its Keycloak may
+        raise Failed
+
+    keycloak.start = failing  # type: ignore[method-assign]
+    with pytest.raises(Failed):
+        engine.start()
+    assert stopped == [True]
+
+
+def test_a_token_replaces_the_one_a_request_already_carries(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx2
+
+    keycloak = KeycloakContainer()
+    tokens = iter(["first", "second", "third"])
+    monkeypatch.setattr(keycloak, "_access_token", lambda *_: next(tokens))
+    login = Tm1EngineContainer(SOURCE).with_user("analyst").with_login("analyst", "pw").with_oauth2(keycloak).database("tm1").oauth2_login("analyst")
+    headers = login.authorize_with_token({"Authorization": "Bearer stale"})
+    assert login.authorize_with_token(headers) == {"Authorization": "Bearer second"}
+    request = login.authorize_with_token(httpx2.Request("GET", "http://localhost:1/", headers={"Authorization": "Bearer stale"}))
+    assert request.headers.get_list("authorization") == ["Bearer third"]
+
+
+def test_a_keycloak_that_cant_be_reached_is_named_as_keycloak(monkeypatch: pytest.MonkeyPatch) -> None:
+    import socket
+
+    with socket.socket() as s:
+        s.bind(("localhost", 0))
+        closed = s.getsockname()[1]
+    keycloak = KeycloakContainer()
+    monkeypatch.setattr(KeycloakContainer, "url", f"http://localhost:{closed}")
+    # The engine's own address isn't reached: the token comes first
+    monkeypatch.setattr(Tm1EngineContainer, "url", "http://localhost:1/")
+    login = Tm1EngineContainer(SOURCE).with_user("analyst").with_login("analyst", "pw").with_oauth2(keycloak).database("tm1").oauth2_login("analyst")
+    for ask in (login.token, login.cookie, lambda: login.authorize_with_token({}), lambda: login.authorize({})):
+        with pytest.raises(RuntimeError, match=f"Couldn't reach Keycloak at http://localhost:{closed}"):
+            ask()
+
 
 def test_an_o_auth2_login_asks_for_addresses_only_when_it_needs_them() -> None:
     engine = Tm1EngineContainer(SOURCE).with_user("analyst").with_login("analyst", "pw").with_oauth2(KeycloakContainer())

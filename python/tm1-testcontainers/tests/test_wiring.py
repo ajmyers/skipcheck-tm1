@@ -463,6 +463,10 @@ def test_an_engine_takes_o_auth2_tokens_from_the_environments_keycloak() -> None
     assert beside.cognos().keycloak is None
     assert beside.tm1_engine().keycloak is beside.keycloak()
 
+    # A server can't take the Keycloak's name on the network
+    with pytest.raises(RuntimeError, match="A TM1 server can't be named Keycloak beside the environment's Keycloak"):
+        engine_builder().tm1("Keycloak").tm1_engine().tm1_engine_oauth2().build()
+
     with pytest.raises(RuntimeError, match=r"OAuth 2.0 logins are a TM1 v12 engine's: add tm1_engine\(\) too"):
         builder().tm1("legacy").tm1_engine_oauth2().build()
     with pytest.raises(RuntimeError, match=r"add cognos\(...\) or tm1_engine_oauth2\(\) too"):

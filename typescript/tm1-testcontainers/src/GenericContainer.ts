@@ -284,7 +284,11 @@ export abstract class GenericContainer implements Startable {
     }
   }
 
+  /** Stops and removes the container. A start that's under way is waited for first: until it
+   * ends there's no container to stop, and one that came up after a stop that found nothing would
+   * run on. */
   async stop(): Promise<void> {
+    await this.#starting?.catch(() => undefined);
     const c = this.#container;
     if (!c) return;
     this.#container = undefined;
