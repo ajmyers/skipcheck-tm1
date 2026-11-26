@@ -632,7 +632,51 @@ def configure(config, env=None):
             fields["controlDatabase"] = "tm1-control-" + str(uuid.uuid4())
         for key, value in fields.items():
             put(datastore, key, value, "datastore." + key)
+    oauth2 = oauth2_settings(env)
+    authentication = config.setdefault("authentication", {})
+    if oauth2 == {}:
+        # Asked for by name ("none"): an earlier start's settings don't outlive the variable
+        if "oauth2" in authentication:
+            del authentication["oauth2"]
+            changes.append("authentication.oauth2: removed")
+    elif oauth2:
+        section = authentication.setdefault("oauth2", {})
+        for key, value in oauth2.items():
+            put(section, key, value, "authentication.oauth2." + key)
+        for key in ("idClaims", "friendlyNameClaims"):
+            # Unset here is TM1's own default, not what an earlier start asked for
+            if key not in oauth2 and key in section:
+                del section[key]
+                changes.append(f"authentication.oauth2.{key}: removed")
     return changes
+
+
+def oauth2_settings(env):
+    """TM1_OAUTH2_*, as config.internal.json's authentication.oauth2: None when nothing is asked
+    for (the section is left as it is), {} to take OAuth 2.0 off, else its fields."""
+    def setting(name):
+        return (env.get(name) or "").strip()  # compose passes an unset variable as empty
+
+    def claims(name):
+        return [claim.strip() for claim in setting(name).split(",") if claim.strip()]
+
+    issuer = setting("TM1_OAUTH2_ISSUER_URL")
+    others = [name for name in ("TM1_OAUTH2_AUDIENCE", "TM1_OAUTH2_ID_CLAIMS", "TM1_OAUTH2_NAME_CLAIMS") if setting(name)]
+    if not issuer or issuer.lower() == "none":
+        if others:
+            raise Failure(f"{others[0]} is set without TM1_OAUTH2_ISSUER_URL, the address of the identity provider")
+        return {} if issuer else None
+    if not re.match(r"^https?://[^/s]+", issuer):
+        raise Failure("TM1_OAUTH2_ISSUER_URL must be an http:// or https:// address, as tokens name it in 'iss'")
+    if not setting("TM1_OAUTH2_AUDIENCE"):
+        raise Failure("TM1_OAUTH2_AUDIENCE is needed with TM1_OAUTH2_ISSUER_URL: the audience ('aud') a token "
+                      "must carry for TM1 to take it")
+    fields = {"issuerURL": issuer, "audience": setting("TM1_OAUTH2_AUDIENCE")}
+    if claims("TM1_OAUTH2_ID_CLAIMS"):
+        fields["idClaims"] = claims("TM1_OAUTH2_ID_CLAIMS")
+    if claims("TM1_OAUTH2_NAME_CLAIMS"):
+        fields["friendlyNameClaims"] = claims("TM1_OAUTH2_NAME_CLAIMS")
+    return fields
 
 
 def command_configure(_args):

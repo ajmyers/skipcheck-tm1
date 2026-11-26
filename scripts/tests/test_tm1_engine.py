@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 from conftest import load
@@ -172,6 +173,75 @@ def test_configure_fixes_the_port_and_leaves_tm1s_own_mongodb_alone() -> None:
     assert config["services"]["tm1-gateway"]["serverPort"] == "4444"
     assert config["datastore"] == template()["datastore"]
     assert changes == ["services.tm1-gateway.serverPort: '9999' -> '4444'"]
+
+
+def test_configure_turns_oauth2_on_from_the_settings() -> None:
+    config: dict[str, Any] = {"authentication": {"jwtIssuer": "TM1"}}
+    changes = engine.configure(
+        config,
+        {
+            "TM1_OAUTH2_ISSUER_URL": " http://keycloak:8080/realms/tm1 ",
+            "TM1_OAUTH2_AUDIENCE": "tm1",
+            "TM1_OAUTH2_ID_CLAIMS": "preferred_username, email",
+        },
+    )
+    assert config["authentication"] == {
+        "jwtIssuer": "TM1",
+        "oauth2": {
+            "issuerURL": "http://keycloak:8080/realms/tm1",
+            "audience": "tm1",
+            "idClaims": ["preferred_username", "email"],
+        },
+    }
+    assert "authentication.oauth2.audience: None -> 'tm1'" in changes
+    # The same settings again change nothing
+    again = engine.configure(config, {"TM1_OAUTH2_ISSUER_URL": "http://keycloak:8080/realms/tm1", "TM1_OAUTH2_AUDIENCE": "tm1", "TM1_OAUTH2_ID_CLAIMS": "preferred_username,email"})
+    assert [change for change in again if "oauth2" in change] == []
+
+
+def test_configure_leaves_oauth2_alone_unless_asked() -> None:
+    # A config.internal.json someone mounted, with OAuth 2.0 set by hand
+    mounted = {"issuerURL": "https://login.example.com", "audience": "tm1", "idClaims": ["sub"]}
+    config: dict[str, Any] = {"authentication": {"oauth2": dict(mounted)}}
+    # compose passes an unset variable as empty
+    engine.configure(config, {"TM1_OAUTH2_ISSUER_URL": "", "TM1_OAUTH2_AUDIENCE": ""})
+    assert config["authentication"]["oauth2"] == mounted
+
+
+def test_configure_takes_oauth2_off_when_told_to_and_drops_claims_no_longer_asked_for() -> None:
+    config: dict[str, Any] = {
+        "authentication": {
+            "oauth2": {"issuerURL": "http://old", "audience": "old", "idClaims": ["email"], "friendlyNameClaims": ["name"]}
+        }
+    }
+    changes = engine.configure(config, {"TM1_OAUTH2_ISSUER_URL": "http://keycloak:8080/realms/tm1", "TM1_OAUTH2_AUDIENCE": "tm1", "TM1_OAUTH2_NAME_CLAIMS": "name"})
+    # idClaims unset is TM1's own default (sub), not what an earlier start asked for
+    assert config["authentication"]["oauth2"] == {
+        "issuerURL": "http://keycloak:8080/realms/tm1",
+        "audience": "tm1",
+        "friendlyNameClaims": ["name"],
+    }
+    assert "authentication.oauth2.idClaims: removed" in changes
+
+    changes = engine.configure(config, {"TM1_OAUTH2_ISSUER_URL": "none"})
+    assert "oauth2" not in config["authentication"]
+    assert "authentication.oauth2: removed" in changes
+    # Already off: nothing more to change, however "none" is written
+    assert [c for c in engine.configure(config, {"TM1_OAUTH2_ISSUER_URL": "None"}) if "oauth2" in c] == []
+
+
+@pytest.mark.parametrize(
+    ("env", "message"),
+    [
+        ({"TM1_OAUTH2_AUDIENCE": "tm1"}, "TM1_OAUTH2_AUDIENCE is set without TM1_OAUTH2_ISSUER_URL"),
+        ({"TM1_OAUTH2_ISSUER_URL": "none", "TM1_OAUTH2_ID_CLAIMS": "sub"}, "TM1_OAUTH2_ID_CLAIMS is set without"),
+        ({"TM1_OAUTH2_ISSUER_URL": "keycloak:8080"}, "must be an http:// or https:// address"),
+        ({"TM1_OAUTH2_ISSUER_URL": "http://keycloak:8080/realms/tm1"}, "TM1_OAUTH2_AUDIENCE is needed"),
+    ],
+)
+def test_configure_refuses_oauth2_settings_that_cant_work(env: dict[str, str], message: str) -> None:
+    with pytest.raises(engine.Failure, match=message):
+        engine.configure({}, env)
 
 
 def test_configure_points_tm1_at_a_mongodb_with_a_control_database_of_its_own() -> None:

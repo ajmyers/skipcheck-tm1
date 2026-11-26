@@ -194,10 +194,44 @@ The container sets two things in `config.internal.json`, and logs each change: t
 gateway's port, and the datastore. Everything else in a `config.internal.json` you mount
 is left as it is.
 
-**Not yet in this image:** settings for OAuth 2.0 and pass-through logins, and TLS. You
-can set the two logins in `config.internal.json` yourself, as IBM's guide describes. TLS
-on the gateway isn't supported yet: the container talks to it over plain HTTP to set TM1
-up, check its health and stop it.
+**Not yet in this image:** settings for pass-through logins, and TLS. You can set
+pass-through in `config.internal.json` yourself, as IBM's guide describes. TLS on the
+gateway isn't supported yet: the container talks to it over plain HTTP to set TM1 up,
+check its health and stop it.
+
+## OAuth 2.0 logins
+
+TM1 v12 can take a token from an identity provider (Keycloak, Entra ID, Okta, ...) as a
+login. Point it at the provider:
+
+| Variable | |
+|---|---|
+| `TM1_OAUTH2_ISSUER_URL` | The provider's address, exactly as its tokens name it in `iss`, e.g. `http://keycloak:8080/realms/tm1`. `none` takes OAuth 2.0 off again. |
+| `TM1_OAUTH2_AUDIENCE` | The audience (`aud`) a token must carry. Needed with the issuer. |
+| `TM1_OAUTH2_ID_CLAIMS` | The claims to read the user's name from, in order: `preferred_username,email`. Default: TM1's own, `sub`. |
+| `TM1_OAUTH2_NAME_CLAIMS` | The claims to read a friendly name from |
+
+A client then sends the provider's access token on any request, and gets a session:
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:4444/tm1/api/v1/Databases('tm1')/Cubes"
+```
+
+- **The name in the token must be a user of the database** (`TM1_USERS`), matched without
+  regard to case. A valid token for a name the database doesn't have gets 403. A token
+  TM1 can't accept (wrong audience or issuer, expired, not signed by the provider) gets
+  401.
+- **TM1 must be able to reach the issuer's address from inside the container,** to fetch
+  the provider's keys, and that same address must be what tokens say. With Keycloak in
+  Docker beside it, fix Keycloak's hostname to its name on the network
+  (`KC_HOSTNAME=http://keycloak:8080`, `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true`): a token
+  fetched through its published port then names that issuer too. With the default, such a
+  token says `http://localhost:<port>`, which TM1 can't reach.
+- **Service-to-service logins keep working** beside it (`tm1-engine session`).
+- The settings are written into `config.internal.json` (`authentication.oauth2`) on each
+  start. Without the variables, what's there is left as it is.
+
+Tried with TM1 12.6.7 and Keycloak 26.4.
 
 ## Image
 
