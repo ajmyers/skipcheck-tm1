@@ -2,8 +2,17 @@
 
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { Tm1ServerContainer, Tm1Source } from "@skipcheck/tm1-testcontainers";
-import { EncryptionFileType, LocalKeyFileProviderSettingsPatch, Tm1BadRequestException, Tm1Client } from "../../src/index.js";
+import {
+  EncryptionFileType,
+  LocalKeyFileProviderSettingsPatch,
+  Tm1BadRequestException,
+  Tm1Client,
+  type Tm1Operation,
+  Tm1UnsupportedOperationException,
+} from "../../src/index.js";
+import { Tm1Operations } from "../../src/generated/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { lacks, productVersion } from "./server-assumptions.js";
 
 const LOCAL = LocalKeyFileProviderSettingsPatch.builder().keyRef("/tmp/tm1-client.key").build();
 
@@ -33,28 +42,57 @@ describe("EncryptionService on TM1" + liveReason, () => {
     await server?.stop();
   });
 
-  async function refused(call: () => Promise<unknown>, code: string): Promise<void> {
+  /** TM1's refusal, with its bare code name in the message, where the server defines the operation;
+   * the client's own refusal, sending nothing, where it doesn't. */
+  async function refused(operation: Tm1Operation, call: () => Promise<unknown>, code: string): Promise<void> {
     const e = await call().then(
       () => undefined,
       (x: unknown) => x,
     );
-    expect(e).toBeInstanceOf(Tm1BadRequestException);
+    if (await lacks(tm1, operation)) {
+      expect(e, operation.endpoint()).toBeInstanceOf(Tm1UnsupportedOperationException);
+      return;
+    }
+    expect(e, operation.endpoint()).toBeInstanceOf(Tm1BadRequestException);
     expect((e as Error).message).toContain(code);
   }
 
-  tm1Test("validates settings without changing anything", async () => {
+  /** From TM1 11.8.040 the server makes the local key file itself, and the settings check as valid;
+   * before, the image's missing GSKit command line stops it. */
+  async function makesItsOwnKey(): Promise<boolean> {
+    return (await productVersion(tm1)).isAtLeast("11.8.04000");
+  }
+
+  tm1Test("validates settings without changing anything", async (context) => {
+    const why = await lacks(tm1, Tm1Operations.ValidateEncryptionAtRestSettings);
+    if (why) return context.skip(why);
     const report = await tm1.encryption.validate(LOCAL);
-    expect(report.IsValid).toBe(false);
-    expect(report.Issues).toHaveLength(1);
-    expect(String(report.Issues![0])).toContain("Could not generate a new key using the local GSKit installation");
+    if (await makesItsOwnKey()) {
+      expect(report.IsValid).toBe(true);
+      expect(report.Issues ?? []).toEqual([]);
+    } else {
+      expect(report.IsValid).toBe(false);
+      expect(report.Issues).toHaveLength(1);
+      expect(String(report.Issues![0])).toContain("Could not generate a new key using the local GSKit installation");
+    }
   });
 
   tm1Test("refuses changes with bare code names", async () => {
-    await refused(() => tm1.encryption.configure(LOCAL), "DataModelConversion");
-    await refused(() => tm1.encryption.disable(), "DataModelConversion");
-    await refused(() => tm1.encryption.rotateDataEncryptionKey(), "DataEncryptionKeyRotationFailed");
-    await refused(() => tm1.encryption.rotateDataModelKey(), "RotateDataModelKey");
-    await refused(() => tm1.encryption.encryptFile("tm1s.cfg", "/tmp/tm1s.cfg.enc", EncryptionFileType.Object), "DataFileConversion");
-    await refused(() => tm1.encryption.decryptFile("}clientgroups.cub", "/tmp/clientgroups.cub", EncryptionFileType.Object), "DataFileConversion");
+    // From 11.8.040 the server can make the key, so configuring would really convert it and stop it:
+    // not tried there
+    if (!(await makesItsOwnKey())) await refused(Tm1Operations.ConfigureEncryptionAtRest, () => tm1.encryption.configure(LOCAL), "DataModelConversion");
+    await refused(Tm1Operations.DisableEncryptionAtRest, () => tm1.encryption.disable(), "DataModelConversion");
+    await refused(Tm1Operations.RotateDataEncryptionKey, () => tm1.encryption.rotateDataEncryptionKey(), "DataEncryptionKeyRotationFailed");
+    await refused(Tm1Operations.RotateDataModelKey, () => tm1.encryption.rotateDataModelKey(), "RotateDataModelKey");
+    await refused(
+      Tm1Operations.EncryptDataFile,
+      () => tm1.encryption.encryptFile("tm1s.cfg", "/tmp/tm1s.cfg.enc", EncryptionFileType.Object),
+      "DataFileConversion",
+    );
+    await refused(
+      Tm1Operations.DecryptDataFile,
+      () => tm1.encryption.decryptFile("}clientgroups.cub", "/tmp/clientgroups.cub", EncryptionFileType.Object),
+      "DataFileConversion",
+    );
   });
 });

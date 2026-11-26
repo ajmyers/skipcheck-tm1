@@ -9,7 +9,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
-from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client, Tm1Request
+import pytest
+
+from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Capabilities, Tm1Client, Tm1Request, Tm1Version
 from skipcheck_tm1._sync.services.attribute import AttributeOwner
 from skipcheck_tm1.model import (
     AttributeDefinitionCreate,
@@ -27,6 +29,42 @@ from skipcheck_tm1.model import (
 )
 
 # Dimensions made through the raw session, for tests that aren't about the dimension services
+from ..conftest import REPO
+
+# ---- what the server has: as Java's ServerAssumptions, so a test of what an older server doesn't
+# define is skipped there, not failed. The server's own $metadata decides, as the client decides.
+
+
+def _describe(capabilities: Tm1Capabilities) -> str:
+    return f"the server (schema {capabilities.schema_version}, product version {capabilities.product_version})"
+
+
+def assume_supports(tm1: Tm1Client, operation: Any) -> None:
+    """Skips the rest of the test unless the server defines the operation."""
+    capabilities = tm1.session.capabilities()
+    if not capabilities.supports(operation.capability()):
+        pytest.skip(f"{_describe(capabilities)} doesn't define {operation.endpoint()}")
+
+
+def assume_supports_parameter(tm1: Tm1Client, operation: Any, parameter: str) -> None:
+    """Skips the rest of the test unless the server's operation has the parameter."""
+    capabilities = tm1.session.capabilities()
+    if not capabilities.supports_parameter(operation.capability(), parameter):
+        pytest.skip(f"{_describe(capabilities)} has no parameter {parameter} on {operation.endpoint()}")
+
+
+def product_version(tm1: Tm1Client) -> Tm1Version:
+    """The server's product version."""
+    version = tm1.session.capabilities().product_version
+    assert version is not None
+    return version
+
+
+def own_snapshot(capabilities: Tm1Capabilities) -> bytes:
+    """The committed snapshot of the server's own schema version: every supported version has one."""
+    path = REPO / "java" / "tm1-client" / "src" / "model" / "metadata" / f"tm1-schema-{capabilities.schema_version}.xml"
+    assert path.exists(), f"No metadata snapshot for schema {capabilities.schema_version}"
+    return path.read_bytes()
 
 
 def dim(name: str) -> ODataPath:

@@ -91,6 +91,10 @@ public class DimensionServiceLiveTests
         var (tm1, d) = (made.Tm1, made.Name);
         await tm1.Dimensions.LockAsync(d);
         await tm1.Dimensions.UnlockAsync(d);
+        if (!await ServerAssumptions.SupportsAsync(tm1, Tm1Operations.DimensionReserve))
+        {
+            return; // the server doesn't define it (xUnit 2 can't skip a test once it runs)
+        }
         await tm1.Dimensions.ReserveAsync(d);
         await tm1.Dimensions.ReleaseAsync(d);
     }

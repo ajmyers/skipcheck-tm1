@@ -19,7 +19,9 @@ import {
   Tm1Request,
   type Tm1Client,
 } from "../../src/index.js";
+import { Tm1Operations } from "../../src/generated/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { lacks } from "./server-assumptions.js";
 
 const element = (name: string, type: ElementType): ElementCreate => ElementCreate.builder().name(name).type(type).build();
 const edge = (parent: string, component: string): EdgeCreate => EdgeCreate.builder().parentName(parent).componentName(component).weight(1.0).build();
@@ -129,9 +131,11 @@ describe("ElementService on TM1" + liveReason, () => {
     expect((await edgeOf("Total", "Far")).Weight).toBe(-1.0);
   });
 
-  tm1Test("locks and reserves an element", async () => {
+  tm1Test("locks and reserves an element", async (context) => {
     await tm1.elements.lock(d, d, "North");
     await tm1.elements.unlock(d, d, "North");
+    const why = await lacks(tm1, Tm1Operations.ElementReserve);
+    if (why) return context.skip(why);
     await tm1.elements.reserve(d, d, "North");
     await tm1.elements.release(d, d, "North");
   });

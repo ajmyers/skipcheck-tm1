@@ -9,6 +9,7 @@ from collections.abc import Iterator
 import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client, Tm1Request
+from skipcheck_tm1._generated.operations import Tm1Operations
 from skipcheck_tm1.model import (
     CheckFeedersSelection,
     CubeCreate,
@@ -18,6 +19,7 @@ from skipcheck_tm1.model import (
 
 from .conftest import CONFIGURED, REASON
 from .support import (
+    assume_supports_parameter,
     dim,
     dimension,
     drop,
@@ -65,6 +67,8 @@ def test_traces_a_calculation_and_feeders(tm1: Tm1Client, ruled: tuple[str, str,
 
 
 def test_checks_feeders_under_a_consolidation(tm1: Tm1Client, ruled: tuple[str, str, str]) -> None:
+    # Both needs Selection, which servers before schema 11.8.32 don't have
+    assume_supports_parameter(tm1, Tm1Operations.CUBE_CHECK_FEEDERS, "Selection")
     name, region, measure = ruled
     tm1.session.execute(
         Tm1Request.post(

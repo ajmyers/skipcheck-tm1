@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { readFileSync } from "node:fs";
 import { describe, expect } from "vitest";
 import {
   allOperations,
@@ -20,10 +21,13 @@ import {
   Server,
   Tm1Request,
   type Tm1Session,
+  Tm1Capabilities,
   typeOf,
   View,
 } from "../../src/index.js";
+import { Repo } from "../support/repo.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { ownSnapshot } from "./server-assumptions.js";
 import { sessions } from "./raw-tm1.js";
 
 const rules = async (session: Tm1Session, cube: ODataPath): Promise<string | null | undefined> =>
@@ -167,7 +171,15 @@ describe("The generated model on TM1" + liveReason, () => {
     try {
       const capabilities = await session.capabilities();
       expect(allOperations).not.toEqual([]);
-      expect(allOperations.filter((op) => !capabilities.supports(op.capability())).map((op) => op.endpoint())).toEqual([]);
+      // Every operation the snapshot of the server's own schema defines: an older server lacks what
+      // came later (Reserve in 11.8.34, encryption at rest in 11.8.35)
+      const own = Tm1Capabilities.parse(ownSnapshot(capabilities));
+      expect(allOperations.filter((op) => capabilities.supports(op.capability()) !== own.supports(op.capability())).map((op) => op.endpoint())).toEqual([]);
+      const newest = Tm1Capabilities.parse(readFileSync(Repo.snapshot, "utf8"));
+      expect(
+        allOperations.filter((op) => !newest.supports(op.capability())).map((op) => op.endpoint()),
+        "the newest schema's server has every one",
+      ).toEqual([]);
     } finally {
       await session.close();
     }

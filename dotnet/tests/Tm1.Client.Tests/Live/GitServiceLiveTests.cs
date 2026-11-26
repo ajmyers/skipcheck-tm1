@@ -56,10 +56,14 @@ public class GitServiceLiveTests
             if (remote.Local)
             {
                 remote.CommitCopyOf(dimension, copy);
-                var stale = await tm1.Git.PullAsync("main", none, null, true);
-                // The first pull after the remote moves plans the commit TM1 had
-                Assert.Equal("Add a dimension", stale.Commit!.Summary);
+                // From 11.8.035 the first pull after the remote moves plans the commit TM1 had;
+                // before, it plans the new one at once
                 var pull = await tm1.Git.PullAsync("main", none, null, true);
+                if ((await ServerAssumptions.ProductVersionAsync(tm1)).CompareTo(Skipcheck.Tm1.Client.Version.Tm1Version.Parse("11.8.03500")) >= 0)
+                {
+                    Assert.Equal("Add a dimension", pull.Commit!.Summary);
+                    pull = await tm1.Git.PullAsync("main", none, null, true);
+                }
                 Assert.Equal("Copy " + dimension, pull.Commit!.Summary);
                 Assert.Contains($"Create Dimensions('{copy}')", pull.Operations!);
                 await tm1.Git.ExecuteAsync(pull);

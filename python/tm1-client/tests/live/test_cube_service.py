@@ -11,6 +11,7 @@ from collections.abc import Iterator
 import pytest
 
 from skipcheck_tm1 import ODataQuery, Tm1Client, Tm1NotFoundError, Tm1PreconditionFailedError, Tm1Request
+from skipcheck_tm1._generated.operations import Tm1Operations
 from skipcheck_tm1.model import (
     Cube,
     CubeCreate,
@@ -19,6 +20,7 @@ from skipcheck_tm1.model import (
 
 from .conftest import CONFIGURED, REASON
 from .support import (
+    assume_supports,
     dim,
     dimension,
     drop,
@@ -84,5 +86,6 @@ def test_loads_unloads_locks_and_reserves(tm1: Tm1Client, cube: tuple[str, str, 
     tm1.cubes.load(name)
     tm1.cubes.lock(name)
     tm1.cubes.unlock(name)
+    assume_supports(tm1, Tm1Operations.CUBE_RESERVE)
     tm1.cubes.reserve(name)
     tm1.cubes.release(name)

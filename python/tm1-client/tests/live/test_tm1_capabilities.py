@@ -22,8 +22,8 @@ from skipcheck_tm1 import (
     auth,
 )
 
-from ..conftest import SNAPSHOT
 from .conftest import CONFIGURED, REASON, _builder, session, started_version, target
+from .support import own_snapshot
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
@@ -34,7 +34,8 @@ def test_reads_the_version_and_the_capabilities_the_snapshot_describes() -> None
         if version is not None:
             assert s.version() == version
         capabilities = s.capabilities()
-        snapshot = SNAPSHOT.read_bytes()
+        # The snapshot of the server's own schema: every supported version has one
+        snapshot = own_snapshot(capabilities)
         assert capabilities.schema_version == Tm1Capabilities.parse(snapshot).schema_version
 
         container = next(e for e in ET.fromstring(snapshot).iter() if e.tag.endswith("}EntityContainer"))
@@ -43,7 +44,8 @@ def test_reads_the_version_and_the_capabilities_the_snapshot_describes() -> None
         assert {"EntitySet", "Singleton", "ActionImport"} <= {kind for kind, _ in declared}
         missing = [name for kind, name in declared if kind in kinds and not capabilities.supports(kinds[kind](name))]
         assert missing == []
-        assert capabilities.supports(Tm1Capability.bound_operation("tm1.Cube", "tm1.Reserve"))
+        reserve = Tm1Capability.bound_operation("tm1.Cube", "tm1.Reserve")
+        assert capabilities.supports(reserve) == Tm1Capabilities.parse(snapshot).supports(reserve), "Reserve, from schema 11.8.34"
 
 
 def test_refuses_a_request_the_server_doesnt_define() -> None:
@@ -53,7 +55,7 @@ def test_refuses_a_request_the_server_doesnt_define() -> None:
             s.execute(missing)
         message = str(refused.value)
         assert "added in schema 99.0" in message
-        assert f"reports schema {Tm1Capabilities.parse(SNAPSHOT.read_bytes()).schema_version}" in message
+        assert f"reports schema {s.capabilities().schema_version}" in message
         assert f"product version {s.version()}" in message
 
 

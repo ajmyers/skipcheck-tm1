@@ -28,9 +28,11 @@ public class Tm1CapabilitiesLiveTests
                 .GetString()!;
             Assert.Equal(Tm1Version.Parse(reported), await session.VersionAsync());
             var capabilities = await session.CapabilitiesAsync();
-            var snapshot = XDocument.Load(Repo.Snapshot);
-            var snapshotVersion = Tm1Capabilities.Parse(File.ReadAllText(Repo.Snapshot)).SchemaVersion;
-            Assert.Equal(snapshotVersion, capabilities.SchemaVersion);
+            // The snapshot of the server's own schema: every supported version has one
+            var ownText = ServerAssumptions.OwnSnapshot(capabilities);
+            var own = Tm1Capabilities.Parse(ownText);
+            var snapshot = XDocument.Parse(ownText);
+            Assert.Equal(own.SchemaVersion, capabilities.SchemaVersion);
             var container = snapshot.Descendants().Single(e => e.Name.LocalName == "EntityContainer");
             foreach (var set in container.Elements().Where(e => e.Name.LocalName == "EntitySet"))
             {
@@ -44,7 +46,9 @@ public class Tm1CapabilitiesLiveTests
             {
                 Assert.True(capabilities.Supports(Tm1Capability.UnboundOperation((string)import.Attribute("Name")!)), (string?)import.Attribute("Name"));
             }
-            Assert.True(capabilities.Supports(Tm1Capability.BoundOperation("tm1.Cube", "tm1.Reserve")));
+            // Reserve, from schema 11.8.34
+            var reserve = Tm1Capability.BoundOperation("tm1.Cube", "tm1.Reserve");
+            Assert.Equal(own.Supports(reserve), capabilities.Supports(reserve));
         }
         finally
         {
@@ -62,7 +66,7 @@ public class Tm1CapabilitiesLiveTests
             var missing = Tm1Request.Get<JsonElement>(ODataPath.Of("Bananas")).Requires(Tm1Capability.EntitySet("Bananas").Since("99.0"));
             var e = await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(() => session.ExecuteAsync(missing));
             Assert.Contains("added in schema 99.0", e.Message);
-            Assert.Contains("reports schema " + Tm1Capabilities.Parse(File.ReadAllText(Repo.Snapshot)).SchemaVersion, e.Message);
+            Assert.Contains("reports schema " + (await session.CapabilitiesAsync()).SchemaVersion, e.Message);
             Assert.Contains("product version " + version, e.Message);
         }
         finally

@@ -16,6 +16,7 @@ from skipcheck_tm1 import (
     Tm1PreconditionFailedError,
     Tm1Request,
 )
+from skipcheck_tm1._generated.operations import Tm1Operations
 from skipcheck_tm1.model import (
     Element,
     ElementPatch,
@@ -24,6 +25,7 @@ from skipcheck_tm1.model import (
 
 from .conftest import CONFIGURED, REASON
 from .support import (
+    assume_supports,
     components,
     names,
     numeric,
@@ -85,5 +87,6 @@ def test_locks_and_reserves_an_element(tm1: Tm1Client, elements_dim: str) -> Non
     d = elements_dim
     tm1.elements.lock(d, d, "North")
     tm1.elements.unlock(d, d, "North")
+    assume_supports(tm1, Tm1Operations.ELEMENT_RESERVE)
     tm1.elements.reserve(d, d, "North")
     tm1.elements.release(d, d, "North")

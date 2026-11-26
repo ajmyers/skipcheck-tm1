@@ -17,7 +17,9 @@ import {
   Tm1PreconditionFailedException,
   Tm1Request,
 } from "../../src/index.js";
+import { Tm1Operations } from "../../src/generated/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { lacks } from "./server-assumptions.js";
 
 const element = (name: string): ElementCreate => ElementCreate.builder().name(name).type(ElementType.Numeric).build();
 
@@ -117,10 +119,12 @@ describe("DimensionService on TM1" + liveReason, () => {
     }),
   );
 
-  tm1Test("locks and reserves", () =>
+  tm1Test("locks and reserves", (context) =>
     withDimension(async (name) => {
       await tm1.dimensions.lock(name);
       await tm1.dimensions.unlock(name);
+      const why = await lacks(tm1, Tm1Operations.DimensionReserve);
+      if (why) return context.skip(why);
       await tm1.dimensions.reserve(name);
       await tm1.dimensions.release(name);
     }),

@@ -15,7 +15,9 @@ import {
   Tm1Request,
   type Tm1Client,
 } from "../../src/index.js";
+import { Tm1Operations } from "../../src/generated/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { lacksParameter } from "./server-assumptions.js";
 
 const RULES = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\nFEEDERS;\n['Amount'] => ['Double'];\n";
 const UNFED_RULES = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\n";
@@ -100,7 +102,10 @@ describe("Cube rules on TM1" + liveReason, () => {
     expect((feeders.FedCells ?? []).map((c) => tupleNames(c.Tuple))).toContainEqual(["North", "Double"]);
   });
 
-  tm1Test("checks feeders under a consolidation", async () => {
+  tm1Test("checks feeders under a consolidation", async (context) => {
+    // Both needs Selection, which servers before schema 11.8.32 don't have
+    const why = await lacksParameter(tm1, Tm1Operations.CubeCheckFeeders, "Selection");
+    if (why) return context.skip(why);
     // A value to feed from, written through the raw session as Java's test does
     await tm1.session.execute(
       Tm1Request.post(ODataPath.of("Cubes").key(cube).action("tm1.Update"), {

@@ -82,6 +82,10 @@ public sealed class CubeServiceLiveTests : IAsyncLifetime
         await Cubes.LoadAsync(_cube);
         await Cubes.LockAsync(_cube);
         await Cubes.UnlockAsync(_cube);
+        if (!await ServerAssumptions.SupportsAsync(_tm1, Tm1Operations.CubeReserve))
+        {
+            return; // the server doesn't define it (xUnit 2 can't skip a test once it runs)
+        }
         await Cubes.ReserveAsync(_cube);
         await Cubes.ReleaseAsync(_cube);
     }
