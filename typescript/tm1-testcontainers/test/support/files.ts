@@ -60,6 +60,17 @@ export const Repo = {
   get javaSources(): string {
     return join(this.root, "java", "tm1-testcontainers", "src", "main", "java", "io", "skipcheck", "tm1", "testcontainers");
   },
+  /** The Java module's tests: test/java-test-parity.test.ts holds this package's tests to them. */
+  get javaTests(): string {
+    return join(this.root, "java", "tm1-testcontainers", "src", "test", "java");
+  },
+  get typescriptTests(): string {
+    return join(this.root, "typescript", "tm1-testcontainers", "test");
+  },
+  /** The lists the gates read, such as the Java tests this package doesn't port. */
+  get coverage(): string {
+    return join(this.root, "typescript", "tm1-testcontainers", "coverage");
+  },
   get typescriptSources(): string {
     return join(this.root, "typescript", "tm1-testcontainers", "src");
   },
