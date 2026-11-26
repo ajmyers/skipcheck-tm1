@@ -99,8 +99,8 @@ def plan(env=None):
     env = os.environ if env is None else env
     # Checked here too, though setup doesn't use them: the entrypoint runs this first, so a
     # mistake in them costs no install
-    oauth2_settings(env)
-    if oauth2_settings(env) and passthrough_settings(env):
+    oauth2, passthrough = oauth2_settings(env), passthrough_settings(env)
+    if oauth2 and passthrough:
         raise Failure("TM1_OAUTH2_ISSUER_URL and TM1_PASSTHROUGH_URL are both set, and TM1 takes one of the two "
                       "ways to log in: set one to none")
     instances = {}
@@ -631,15 +631,25 @@ def parse_datastore_url(url):
     }
 
 
-def configure(config, env=None):
-    """Applies the container's settings to a parsed config.internal.json. Returns what it changed."""
+def without_login(url):
+    """An address as it's shown in a log: without a user and password it may carry."""
+    return re.sub(r"(?<=://)[^/@\s]*@", "", str(url))
+
+
+def configure(config, env=None, notices=None):
+    """Applies the container's settings to a parsed config.internal.json. Returns what it changed;
+    what's worth saying though nothing changed (a login left on from an earlier start) goes to
+    notices, so that it doesn't count as a change to write."""
     env = os.environ if env is None else env
     changes = []
+    notices = [] if notices is None else notices
 
     def put(section, key, value, shown=None):
         if section.get(key) != value:
             if key == "pass":
                 changes.append(f"{shown or key}: (changed)")
+            elif key == "serviceRootURL":
+                changes.append(f"{shown or key}: {without_login(section.get(key))!r} -> {without_login(value)!r}")
             else:
                 changes.append(f"{shown or key}: {section.get(key)!r} -> {value!r}")
             section[key] = value
@@ -661,7 +671,7 @@ def configure(config, env=None):
     if oauth2 is None:
         if isinstance(held, dict) and held.get("issuerURL"):
             # Kept from an earlier start or a mounted file: say so, as nothing else would
-            changes.append(f"authentication.oauth2: left on (issuer {held['issuerURL']}); "
+            notices.append(f"authentication.oauth2: left on (issuer {held['issuerURL']}); "
                            "TM1_OAUTH2_ISSUER_URL=none turns OAuth 2.0 logins off")
     elif oauth2 == {}:
         # Asked for by name ("none"): an earlier start's settings don't outlive the variable
@@ -686,7 +696,8 @@ def configure(config, env=None):
     forwarded = authentication.get("http") if isinstance(authentication, dict) else None
     if passthrough is None:
         if isinstance(forwarded, dict) and forwarded.get("serviceRootURL"):
-            changes.append(f"authentication.http: left on (pass-through to {forwarded['serviceRootURL']}); "
+            notices.append(f"authentication.http: left on (pass-through to "
+                           f"{without_login(forwarded['serviceRootURL'])}); "
                            "TM1_PASSTHROUGH_URL=none turns pass-through logins off")
     elif passthrough == {}:
         if isinstance(authentication, dict) and "http" in authentication:
@@ -706,12 +717,17 @@ def configure(config, env=None):
                 changes.append(f"authentication.http.{key}: removed")
     authentication = config.get("authentication")
     if isinstance(authentication, dict):
-        issuer = (authentication.get("oauth2") or {}).get("issuerURL") if isinstance(authentication.get("oauth2"), dict) else None
-        server = (authentication.get("http") or {}).get("serviceRootURL") if isinstance(authentication.get("http"), dict) else None
+        issuer = authentication["oauth2"].get("issuerURL") if isinstance(authentication.get("oauth2"), dict) else None
+        server = authentication["http"].get("serviceRootURL") if isinstance(authentication.get("http"), dict) else None
         if issuer and server:
-            # TM1 would take OAuth 2.0 and never ask the server: say so, rather than leave half of it dead
-            raise Failure(f"OAuth 2.0 logins ({issuer}) and pass-through logins ({server}) are both on, and TM1 takes "
-                          "one of the two: turn one off with TM1_OAUTH2_ISSUER_URL=none or TM1_PASSTHROUGH_URL=none")
+            both = (f"OAuth 2.0 logins ({issuer}) and pass-through logins ({without_login(server)}) are both on. "
+                    "TM1 takes tokens and never asks the server: turn one off with TM1_OAUTH2_ISSUER_URL=none or "
+                    "TM1_PASSTHROUGH_URL=none")
+            if oauth2 or passthrough:
+                # This start turned one on beside the other: half of what was asked for would be dead
+                raise Failure(both)
+            # Both were in the file already, from a hand or an earlier image: left as they are, and said
+            notices.append("authentication: " + both)
     return changes
 
 
@@ -736,23 +752,32 @@ def passthrough_settings(env):
             raise Failure(f"{others[0]} is set without TM1_PASSTHROUGH_URL, the address of the server that "
                           "checks a user's name and password")
         return None
-    if not re.fullmatch(r"https?://[^/\s]+\S*", url):
-        raise Failure("TM1_PASSTHROUGH_URL must be an http:// or https:// address, e.g. a TM1 11 server's "
-                      "REST API: http://tm1-server:8010/api/v1/")
+    # No ? or #: TM1 joins the endpoint onto the address as it is
+    if not re.fullmatch(r"https?://[^/\s?#]+[^\s?#]*", url, re.IGNORECASE):
+        raise Failure("TM1_PASSTHROUGH_URL must be an http:// or https:// address without a query, e.g. a TM1 "
+                      "11 server's REST API: http://tm1-server:8010/api/v1/")
     pointer = setting("TM1_PASSTHROUGH_POINTER") or "/Name"
     if not pointer.startswith("/"):
         raise Failure("TM1_PASSTHROUGH_POINTER is a JSON pointer to the user's name in the server's answer, "
                       "and starts with /: /Name")
     # TM1 joins the two as they are
-    fields = {"serviceRootURL": url if url.endswith("/") else url + "/",
-              "authEndpoint": (setting("TM1_PASSTHROUGH_ENDPOINT") or "ActiveUser").lstrip("/"),
+    def path(name, default):
+        value = (setting(name) or default).lstrip("/")
+        if not value or re.search(r"\s", value):
+            raise Failure(f"{name} is a path on the server, without spaces: {default or 'logout'}")
+        return value
+
+    endpoint = path("TM1_PASSTHROUGH_ENDPOINT", "ActiveUser")
+    fields = {"serviceRootURL": url if url.endswith("/") else url + "/", "authEndpoint": endpoint,
               "authJSONPointer": pointer}
-    finalize = setting("TM1_PASSTHROUGH_FINALIZE") or "ActiveSession/tm1.Close"
+    # TM1 11's own way to close a session is the default only where the rest is TM1 11's: another
+    # server is called for that only when it's asked for
+    finalize = setting("TM1_PASSTHROUGH_FINALIZE") or ("ActiveSession/tm1.Close" if endpoint == "ActiveUser" else "none")
     if finalize.lower() != "none":
         method = (setting("TM1_PASSTHROUGH_FINALIZE_METHOD") or "POST").upper()
         if not re.fullmatch(r"[A-Z]+", method):
             raise Failure("TM1_PASSTHROUGH_FINALIZE_METHOD is an HTTP method: POST")
-        fields["finalizeEndpoint"] = finalize.lstrip("/")
+        fields["finalizeEndpoint"] = path("TM1_PASSTHROUGH_FINALIZE", finalize)
         fields["finalizeMethod"] = method
     elif setting("TM1_PASSTHROUGH_FINALIZE_METHOD"):
         raise Failure("TM1_PASSTHROUGH_FINALIZE_METHOD is set with TM1_PASSTHROUGH_FINALIZE=none")
@@ -800,13 +825,15 @@ def command_configure(_args):
     path = os.path.join(DEPLOYMENT, "config.internal.json")
     with open(path) as file:
         config = json.load(file)
-    changes = configure(config)
+    notices = []
+    changes = configure(config, notices=notices)
+    # Written only for a change: a notice alone leaves the file, which may be read-only, untouched
     if changes:
         with open(path, "w") as file:
             json.dump(config, file, indent="\t")
             file.write("\n")
-        for change in changes:
-            log("config.internal.json: " + change)
+    for line in changes + notices:
+        log("config.internal.json: " + line)
     print("external" if config.get("datastore", {}).get("external") else "embedded")
 
 
