@@ -53,6 +53,7 @@ def test_on_alone_is_one_database_and_no_users(pa_setup: ModuleType, on: str) ->
         "databases": {"tm1": {"instance": "tm1"}},
         "users": [],
         "datastorePort": None,
+        "oauth2": None,
     }
 
 
@@ -99,8 +100,13 @@ tm1Engine:
     ("text", "message"),
     [
         ("tm1Engine: {prot: 1}", "tm1Engine: unknown setting(s) prot"),
-        # Not in pa-setup yet: they come with the logins themselves
+        # OAuth 2.0 is the oauth2 section; pass-through isn't in pa-setup yet
         ("tm1Engine: {login: oauth2}", "tm1Engine: unknown setting(s) login"),
+        ("tm1Engine: {oauth2: {port: 1}}", "tm1Engine.oauth2: unknown setting(s) port"),
+        ("tm1Engine: {oauth2: true}", "tm1Engine.oauth2: needs a user with a password"),
+        ("tm1Engine: {oauth2: true, users: [viewer, 'analyst::Analysts']}", "needs a user with a password"),
+        ("tm1Engine: {oauth2: 0, users: ['a:pw']}", "tm1Engine.oauth2 must be a mapping"),
+        ("tm1Engine: {oauth2: {keycloakPort: 4444}, users: ['a:pw']}", "port(s) 4444 used by more than one service"),
         ("tm1Engine: {passthrough: {server: legacy}}", "unknown setting(s) passthrough"),
         ("tm1Engine: {databases: {}}", "tm1Engine.databases: name at least one database"),
         ("tm1Engine: {databases: [planning]}", "tm1Engine.databases: name at least one database"),
@@ -436,6 +442,140 @@ def test_on_windows_mongodb_keeps_its_data_in_a_volume(pa_setup: ModuleType, mon
     )
 
 
+OAUTH = "tm1Engine: {port: 4500, users: ['analyst:an$pw:Analysts', viewer, 'boss:bosspw:ADMIN'], oauth2: OAUTH2}\n"
+
+
+@pytest.mark.parametrize("on", ["true", "{}", "{keycloakPort: 8181}"])
+def test_oauth2_adds_a_keycloak_of_the_engines_own(pa_setup: ModuleType, on: str) -> None:
+    generated = pa_setup.generate(model(pa_setup, OAUTH.replace("OAUTH2", on)))
+    keycloak, engine = generated["services"]["tm1-engine-keycloak"], generated["services"]["tm1-engine"]
+    # Its hostname is its name on the network: a token names the issuer TM1 can reach,
+    # whichever way it was fetched
+    assert keycloak["environment"]["KC_HOSTNAME"] == "http://tm1-engine-keycloak:8080"
+    assert keycloak["environment"]["KC_HOSTNAME_BACKCHANNEL_DYNAMIC"] == "true"
+    assert keycloak["command"] == ["start-dev", "--import-realm"]
+    assert keycloak["ports"] == ["8181:8080"]
+    assert engine["environment"]["TM1_OAUTH2_ISSUER_URL"] == "http://tm1-engine-keycloak:8080/realms/tm1"
+    assert engine["environment"]["TM1_OAUTH2_AUDIENCE"] == "tm1"
+    assert engine["environment"]["TM1_OAUTH2_ID_CLAIMS"] == "preferred_username"
+    assert engine["depends_on"]["tm1-engine-keycloak"] == {"condition": "service_healthy"}
+    # TM1 still gets names and groups only
+    assert engine["environment"]["TM1_USERS"] == "analyst:Analysts,viewer,boss:ADMIN"
+
+
+def test_the_realm_has_the_audience_tm1_expects_and_the_users_with_a_password(pa_setup: ModuleType) -> None:
+    generated = pa_setup.generate(model(pa_setup, OAUTH.replace("OAUTH2", "true")))
+    content = generated["configs"]["tm1-engine-realm"]["content"]
+    # compose would read a lone $ as a variable of its own
+    assert "an$$pw" in content and "an$pw" not in content.replace("an$$pw", "")
+    realm = json.loads(content.replace("$$", "$"))
+    assert realm["realm"] == "tm1" and realm["enabled"] is True
+    (client,) = realm["clients"]
+    assert client["clientId"] == "tm1" and client["publicClient"] and client["directAccessGrantsEnabled"]
+    (mapper,) = client["protocolMappers"]
+    assert mapper["protocolMapper"] == "oidc-audience-mapper"
+    assert mapper["config"]["included.custom.audience"] == "tm1" and mapper["config"]["access.token.claim"] == "true"
+    # viewer has no password, so nothing to log in to Keycloak with
+    assert [(u["username"], u["credentials"][0]["value"]) for u in realm["users"]] == [
+        ("analyst", "an$pw"),
+        ("boss", "bosspw"),
+    ]
+    assert all(u["enabled"] and u["emailVerified"] and u["email"] for u in realm["users"])
+    (mounted,) = generated["services"]["tm1-engine-keycloak"]["configs"]
+    assert mounted == {"source": "tm1-engine-realm", "target": "/opt/keycloak/data/import/tm1-realm.json"}
+
+
+@pytest.mark.parametrize("off", ["", ", oauth2: false", ", oauth2: null"])
+def test_without_oauth2_the_engine_is_told_its_off(pa_setup: ModuleType, off: str) -> None:
+    # The deployment is kept between runs, so leaving the setting out can't mean off
+    generated = pa_setup.generate(model(pa_setup, f"tm1Engine: {{users: ['analyst:pw:']{off}}}\n"))
+    assert generated["services"]["tm1-engine"]["environment"]["TM1_OAUTH2_ISSUER_URL"] == "none"
+    assert "tm1-engine-keycloak" not in generated["services"] and "configs" not in generated
+    assert "TM1_OAUTH2_AUDIENCE" not in generated["services"]["tm1-engine"]["environment"]
+
+
+def test_with_oauth2_a_two_part_user_is_a_name_and_a_password(pa_setup: ModuleType) -> None:
+    # Without OAuth 2.0 that form is refused: the image reads the second part as a group
+    users = model(pa_setup, "tm1Engine: {users: ['analyst:analystpw'], oauth2: true}\n")["tm1Engine"]["users"]
+    assert users == [{"name": "analyst", "password": "analystpw", "groups": []}]
+    assert "for a group, write analyst::analystpw" in refused(pa_setup, "tm1Engine: {users: ['analyst:analystpw']}\n")
+
+
+def test_prints_where_tokens_come_from_and_who_can_log_in(
+    pa_setup: ModuleType, capsys: pytest.CaptureFixture[str]
+) -> None:
+    pa_setup.urls(model(pa_setup, OAUTH.replace("OAUTH2", "{keycloakPort: 8191}")))
+    out = capsys.readouterr().out
+    assert "http://localhost:8191/realms/tm1   (client tm1; analyst / an$pw, boss / bosspw)" in out
+    assert "setup.sh token analyst" in out
+
+
+def test_counts_the_keycloak_in_the_memory_it_needs(pa_setup: ModuleType) -> None:
+    without = pa_setup.memory_needed(model(pa_setup, "tm1Engine: {users: ['a:pw:']}\n"))
+    assert pa_setup.memory_needed(model(pa_setup, "tm1Engine: {users: ['a:pw'], oauth2: true}\n")) == pytest.approx(without + 0.7)
+
+
+def test_token_asks_the_engines_keycloak_on_the_projects_network(
+    pa_setup: ModuleType, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    asked: list[list[str]] = []
+
+    def run(cmd: list[str], **kwargs: Any) -> Any:
+        asked.append(cmd)
+        return type("Done", (), {"returncode": 0, "stdout": json.dumps({"access_token": "the.token"}), "stderr": ""})()
+
+    monkeypatch.setattr(pa_setup.subprocess, "run", run)
+    read = model(pa_setup, "name: demo\n" + OAUTH.replace("OAUTH2", "true"))
+    assert pa_setup.engine_main(read, "token", ["boss"]) == 0
+    assert capsys.readouterr().out.strip() == "the.token"
+    (cmd,) = asked
+    # On the project's network, where Keycloak has the name its tokens carry
+    assert cmd[cmd.index("--network") + 1] == "demo_default"
+    assert cmd[-1] == "http://tm1-engine-keycloak:8080/realms/tm1/protocol/openid-connect/token"
+    assert "username=boss" in cmd and "password=bosspw" in cmd and "client_id=tm1" in cmd
+    # The first user with a password, when none is named
+    assert pa_setup.engine_main(read, "token", []) == 0
+    assert "username=analyst" in asked[-1] and "password=an$pw" in asked[-1]
+
+
+@pytest.mark.parametrize(
+    ("text", "args", "message"),
+    [
+        ("tm1Engine: {users: ['a:pw:']}", [], "add oauth2: true to tm1Engine"),
+        ("tm1: {servers: {tm1: {}}}", [], "add oauth2: true to tm1Engine"),
+        (OAUTH.replace("OAUTH2", "true"), ["viewer"], "viewer isn't one of tm1Engine.users with a password; they are: analyst, boss"),
+        (OAUTH.replace("OAUTH2", "true"), ["a", "b"], "usage: token"),
+    ],
+)
+def test_token_refuses_what_it_cant_give(
+    pa_setup: ModuleType, monkeypatch: pytest.MonkeyPatch, text: str, args: list[str], message: str
+) -> None:
+    monkeypatch.setattr(pa_setup.subprocess, "run", lambda *a, **k: pytest.fail("nothing should run"))
+    with pytest.raises(pa_setup.ConfigError) as error:
+        pa_setup.engine_main(model(pa_setup, text.strip() + "\n"), "token", args)
+    assert message in str(error.value)
+
+
+def test_token_says_when_keycloak_gives_none(pa_setup: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    done = type("Done", (), {"returncode": 22, "stdout": "", "stderr": "curl: (22) The requested URL returned error: 401"})()
+    monkeypatch.setattr(pa_setup.subprocess, "run", lambda *a, **k: done)
+    with pytest.raises(pa_setup.ConfigError, match="Keycloak gave no token; is the environment up"):
+        pa_setup.engine_main(model(pa_setup, OAUTH.replace("OAUTH2", "true")), "token", [])
+
+
+def test_up_and_down_remove_what_was_taken_out_of_the_file(
+    pa_setup: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    ran: list[list[str]] = []
+    monkeypatch.setattr(pa_setup, "compose", lambda m, *args, check=True: ran.append(list(args)))
+    monkeypatch.setattr(pa_setup, "check_memory", lambda m: None)
+    (tmp_path / "pa-environment.yaml").write_text("version: 1\ntm1Engine: true\n")
+    assert run_main(pa_setup, monkeypatch, tmp_path, "up") == 0
+    assert run_main(pa_setup, monkeypatch, tmp_path, "down") == 0
+    # Keycloak, say, once oauth2 is taken out: it mustn't keep running, or hold the network
+    assert ran == [["up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "1800"], ["down", "--remove-orphans"]]
+
+
 def test_the_example_is_valid_and_fits_the_schema_it_documents(pa_setup: ModuleType) -> None:
     example = yaml.safe_load((SETUP / "examples" / "tm1-engine.yaml").read_text(encoding="utf-8"))
     engine = pa_setup.normalize(example)["tm1Engine"]
@@ -443,6 +583,6 @@ def test_the_example_is_valid_and_fits_the_schema_it_documents(pa_setup: ModuleT
     schema = json.loads((SETUP / "pa-environment.schema.json").read_text(encoding="utf-8"))
     described = schema["properties"]["tm1Engine"]["properties"]
     # Every setting the tool takes is in the schema, and nothing else
-    assert sorted(described) == ["databases", "datastore", "port", "users"]
+    assert sorted(described) == ["databases", "datastore", "oauth2", "port", "users"]
     assert set(example["tm1Engine"]) <= set(described)
     assert {"tm1Engine", "mongo"} <= set(schema["properties"]["images"]["properties"])

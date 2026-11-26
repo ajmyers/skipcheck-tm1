@@ -21,6 +21,8 @@ With a TM1 v12 engine (tm1Engine):
                                   log in and print the session cookie, for curl -b
   pa-setup database create NAME   create a database (INSTANCE/NAME for another instance)
   pa-setup database drop NAME     delete a database
+  pa-setup token [USER]           with tm1Engine.oauth2: an access token for a user, for
+                                  curl -H "Authorization: Bearer ..."
 
 Options: -f FILE (default pa-environment.yaml in the current folder).
 
@@ -56,6 +58,12 @@ ENGINE_INSTANCE = "tm1"
 # The engine's MongoDB is its own, on the project's network only unless a port is asked for
 DATASTORE_USER = "tm1"
 DATASTORE_PASSWORD = "tm1-datastore"
+# OAuth 2.0 logins: the engine's own Keycloak, with this realm, client and audience. Its name on
+# the network is its issuer too: TM1 has to reach the address tokens name
+ENGINE_KEYCLOAK = "tm1-engine-keycloak"
+OAUTH2_REALM = "tm1"
+OAUTH2_CLIENT = "tm1"
+OAUTH2_AUDIENCE = "tm1"
 
 
 class ConfigError(Exception):
@@ -121,7 +129,7 @@ def section(cfg, key):
     return value
 
 
-def parse_user(entry, where, password_optional=False):
+def parse_user(entry, where, password_optional=False, password_used=True):
     """A test user. TM1 v12 keeps no passwords, so there (password_optional) one may be left
     out or empty: analyst, analyst::Analysts or analyst:analystpw:Analysts."""
     if isinstance(entry, str):
@@ -129,7 +137,7 @@ def parse_user(entry, where, password_optional=False):
         if password_optional:
             if len(parts) == 1:
                 parts.append("")
-            elif len(parts) == 2 and parts[1]:
+            elif len(parts) == 2 and parts[1] and not password_used:
                 # The image's own form has groups there; here the second part is a password
                 raise ConfigError(f"{where}: {entry!r} reads as a password, which TM1 v12 doesn't keep: "
                                   f"for a group, write {parts[0]}::{parts[1]}")
@@ -292,7 +300,7 @@ def normalize(cfg):
 
     engine = section(cfg, "tm1Engine")
     if engine is not None:
-        check_keys(engine, ("port", "databases", "users", "datastore"), "tm1Engine")
+        check_keys(engine, ("port", "databases", "users", "datastore", "oauth2"), "tm1Engine")
         raw = engine.get("databases")
         if raw is None:
             raw = {ENGINE_INSTANCE: None}
@@ -318,7 +326,10 @@ def normalize(cfg):
         listed = engine.get("users") or []
         if not isinstance(listed, list):
             raise ConfigError("tm1Engine.users must be a list, e.g. users: [analyst::Analysts]")
-        engine_users = [parse_user(u, f"tm1Engine.users[{i}]", password_optional=True) for i, u in enumerate(listed)]
+        # With OAuth 2.0 logins a password is used, so user:password means what it says
+        wants_oauth2 = engine.get("oauth2") is not None and engine.get("oauth2") is not False
+        engine_users = [parse_user(u, f"tm1Engine.users[{i}]", password_optional=True, password_used=wants_oauth2)
+                        for i, u in enumerate(listed)]
         engine_names = [u["name"].lower() for u in engine_users]
         if len(set(engine_names)) != len(engine_names):
             raise ConfigError("tm1Engine.users: a user is listed twice")
@@ -328,8 +339,21 @@ def normalize(cfg):
         check_keys(datastore, ("port",), "tm1Engine.datastore")
         # Published only when a port is given: the engine reaches it on the project's network
         published = datastore.get("port")
+        oauth2 = engine.get("oauth2")
+        # On with true or a mapping, an empty one too: only absent or false is off
+        if oauth2 is None or oauth2 is False:
+            oauth2 = None
+        else:
+            oauth2 = {} if oauth2 is True else oauth2
+            check_keys(oauth2, ("keycloakPort",), "tm1Engine.oauth2")
+            with_password = [u for u in engine_users if u["password"]]
+            if not with_password:
+                raise ConfigError("tm1Engine.oauth2: needs a user with a password to log in as, "
+                                  "e.g. users: [analyst:analystpw:Analysts]")
+            oauth2 = {"keycloakPort": port(oauth2.get("keycloakPort"), "tm1Engine.oauth2", 8181)}
         engine = {"port": port(engine.get("port"), "tm1Engine", 4444), "databases": databases, "users": engine_users,
-                  "datastorePort": None if published is None else port(published, "tm1Engine.datastore", 27017)}
+                  "datastorePort": None if published is None else port(published, "tm1Engine.datastore", 27017),
+                  "oauth2": oauth2}
         for sname in servers:
             # The engine's two compose services: a server of that name would be replaced by them
             if sname.lower() in ("tm1-engine", "tm1-engine-mongo"):
@@ -338,7 +362,8 @@ def normalize(cfg):
 
     if not (servers or cognos or engine):
         raise ConfigError("nothing to run: add tm1.servers, tm1Engine and/or cognos")
-    ports = ([engine["port"]] + ([engine["datastorePort"]] if engine["datastorePort"] else []) if engine else []) + \
+    ports = ([engine["port"]] + ([engine["datastorePort"]] if engine["datastorePort"] else []) +
+             ([engine["oauth2"]["keycloakPort"]] if engine["oauth2"] else []) if engine else []) + \
         [s["port"] for s in servers.values()] + ([admin["port"]] if admin else []) + \
         ([web["port"]] if web else []) + ([cognos["port"]] if cognos else []) + \
         ([cognos["oidc"]["keycloakPort"]] if cognos and cognos["oidc"] else []) + ([paw["port"]] if paw else [])
@@ -354,8 +379,29 @@ def service_name(server):
     return server.lower()
 
 
+def oauth2_realm(engine):
+    """The realm the engine's Keycloak imports: a client whose tokens carry the audience TM1
+    expects, and the file's users who have a password."""
+    return {
+        "realm": OAUTH2_REALM, "enabled": True,
+        "clients": [{
+            "clientId": OAUTH2_CLIENT, "publicClient": True, "directAccessGrantsEnabled": True,
+            "standardFlowEnabled": False,
+            "protocolMappers": [{
+                "name": "tm1-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
+                "config": {"included.custom.audience": OAUTH2_AUDIENCE, "access.token.claim": "true",
+                           "id.token.claim": "false"}}],
+        }],
+        # Keycloak wants a profile that's complete before it gives a user a token
+        "users": [{"username": u["name"], "enabled": True, "emailVerified": True,
+                   "email": u["name"].lower() + "@example.com", "firstName": u["name"], "lastName": "Test",
+                   "credentials": [{"type": "password", "value": u["password"], "temporary": False}]}
+                  for u in engine["users"] if u["password"]],
+    }
+
+
 def generate(m):
-    services, volumes = {}, {}
+    services, volumes, configs = {}, {}, {}
     ibm = [f"{m['ibm']}:/ibm:ro"] if m["ibm"] else []
     cognos = m["cognos"]
     if cognos and cognos["oidc"]:
@@ -468,16 +514,43 @@ def generate(m):
         if engine["users"]:
             # The image takes user:group:group; TM1 v12 keeps no passwords
             env["TM1_USERS"] = ",".join(":".join([u["name"], *u["groups"]]) for u in engine["users"])
+        depends = {"tm1-engine-mongo": {"condition": "service_healthy"}}
+        if engine["oauth2"]:
+            issuer = f"http://{ENGINE_KEYCLOAK}:8080"
+            # $$: compose reads a lone $ in the file as a variable of its own
+            configs["tm1-engine-realm"] = {"content": json.dumps(oauth2_realm(engine), indent=2).replace("$", "$$")}
+            services[ENGINE_KEYCLOAK] = {
+                "image": m["images"]["keycloak"], "command": ["start-dev", "--import-realm"],
+                # Its hostname is its name on the network, whichever way it's reached: a token
+                # fetched through the published port names the issuer TM1 can reach
+                "environment": {"KC_BOOTSTRAP_ADMIN_USERNAME": "admin", "KC_BOOTSTRAP_ADMIN_PASSWORD": "admin",
+                                "KC_HTTP_ENABLED": "true", "KC_HOSTNAME": issuer,
+                                "KC_HOSTNAME_BACKCHANNEL_DYNAMIC": "true"},
+                "ports": [f"{engine['oauth2']['keycloakPort']}:8080"],
+                "configs": [{"source": "tm1-engine-realm",
+                             "target": f"/opt/keycloak/data/import/{OAUTH2_REALM}-realm.json"}],
+                "healthcheck": {"test": ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"],
+                                "interval": "10s", "timeout": "5s", "retries": 30, "start_period": "30s"},
+            }
+            env.update({"TM1_OAUTH2_ISSUER_URL": f"{issuer}/realms/{OAUTH2_REALM}",
+                        "TM1_OAUTH2_AUDIENCE": OAUTH2_AUDIENCE, "TM1_OAUTH2_ID_CLAIMS": "preferred_username"})
+            depends[ENGINE_KEYCLOAK] = {"condition": "service_healthy"}
+        else:
+            # The deployment is kept between runs: off has to be said, or an earlier run's stays
+            env["TM1_OAUTH2_ISSUER_URL"] = "none"
         services["tm1-engine"] = {
             "image": m["images"]["tm1Engine"], "platform": "linux/amd64",
             # Each database is stopped through TM1 first, which commits it
             "stop_grace_period": "2m", "environment": env, "ports": [f"{engine['port']}:4444"],
             "volumes": ["tm1-engine-cache:/tm1/cache"] + ibm +
             [f"{host_join(files, d)}:/tm1/{d}" for d in ("deployment", "credentials")],
-            "depends_on": {"tm1-engine-mongo": {"condition": "service_healthy"}},
+            "depends_on": depends,
         }
         volumes["tm1-engine-cache"] = {}
-    return {"name": m["name"], "services": services, "volumes": volumes}
+    project = {"name": m["name"], "services": services, "volumes": volumes}
+    if configs:
+        project["configs"] = configs
+    return project
 
 
 HEADER = """# Generated by pa-setup from pa-environment.yaml: change that file and run 'up' again,
@@ -558,6 +631,7 @@ def memory_needed(m):
     if m["tm1Engine"]:
         # The engine's services and MongoDB, then each database's own process
         gb += ENGINE_MEMORY_GB + ENGINE_DATABASE_MEMORY_GB * len(m["tm1Engine"]["databases"])
+        gb += 0.7 if m["tm1Engine"]["oauth2"] else 0  # its Keycloak, as Cognos's
     if m["cognos"]:
         gb += 8 + (0.7 if m["cognos"]["oidc"] else 0)
     if m["paw"]:
@@ -625,6 +699,11 @@ def urls(m):
                          host_join(credentials, instance, "tm1.json"), "as " + " or ".join(names)))
         first = next(iter(engine["databases"]))
         rows.append(("  try it", f"setup.sh session {first}", "a cookie for curl -b"))
+        if engine["oauth2"]:
+            known = [u for u in engine["users"] if u["password"]]
+            rows.append(("  OAuth 2.0", f"http://localhost:{engine['oauth2']['keycloakPort']}/realms/{OAUTH2_REALM}",
+                         f"client {OAUTH2_CLIENT}; " + ", ".join(f"{u['name']} / {u['password']}" for u in known)))
+            rows.append(("  try it", f"setup.sh token {known[0]['name']}", "a token for curl -H 'Authorization: Bearer ...'"))
         rows.append(("  the secrets", "setup.sh credentials --json", "if you can't read those files: the engine writes them as root"))
     width = max(len(r[0]) for r in rows)
     for what, url, login in rows:
@@ -682,7 +761,35 @@ def host_view(m, inventory):
     return inventory
 
 
+def engine_token(m, args):
+    """An access token for one of the file's users, from the engine's Keycloak: fetched on the
+    project's network, where Keycloak has the name its tokens carry."""
+    engine = m["tm1Engine"]
+    if not engine or not engine["oauth2"]:
+        raise ConfigError("this needs OAuth 2.0 logins: add oauth2: true to tm1Engine")
+    if len(args) > 1:
+        raise ConfigError("usage: token [USER]")
+    known = {u["name"]: u["password"] for u in engine["users"] if u["password"]}
+    name = args[0] if args else next(iter(known))
+    if name not in known:
+        raise ConfigError(f"{name} isn't one of tm1Engine.users with a password; they are: {', '.join(known)}")
+    url = f"http://{ENGINE_KEYCLOAK}:8080/realms/{OAUTH2_REALM}/protocol/openid-connect/token"
+    done = subprocess.run(
+        ["docker", "run", "--rm", "--network", f"{m['name']}_default", "--entrypoint", "curl", SELF_IMAGE,
+         "-fsS", "-m", "30", "--data-urlencode", "grant_type=password", "--data-urlencode", f"client_id={OAUTH2_CLIENT}",
+         "--data-urlencode", f"username={name}", "--data-urlencode", f"password={known[name]}", url],
+        capture_output=True, text=True)
+    try:
+        token = json.loads(done.stdout)["access_token"]
+    except (ValueError, KeyError, TypeError):
+        raise ConfigError("Keycloak gave no token; is the environment up? " + (done.stderr or done.stdout).strip())
+    log(token)
+    return 0
+
+
 def engine_main(m, command, args, as_json=False):
+    if command == "token":
+        return engine_token(m, args)
     if command == "credentials":
         if args:
             raise ConfigError("usage: credentials [--json]")
@@ -753,7 +860,7 @@ def main():
     parser = argparse.ArgumentParser(prog="setup", description=__doc__.split("\n\n")[0])
     parser.add_argument("command", nargs="?", default="up",
                         choices=["init", "up", "generate", "urls", "status", "logs", "down",
-                                 "credentials", "session", "database"])
+                                 "credentials", "session", "database", "token"])
     parser.add_argument("services", nargs="*")
     parser.add_argument("--json", action="store_true", help="with credentials: as JSON, secrets included")
     parser.add_argument("-f", "--file", default="pa-environment.yaml")
@@ -775,7 +882,8 @@ def main():
             write_compose(m)
             check_memory(m)
             log(f"Starting {', '.join(generate(m)['services'])}" + (" (Cognos takes a few minutes)" if m["cognos"] else "") + "...")
-            compose(m, "up", "-d", "--wait", "--wait-timeout", "1800")
+            # --remove-orphans: a part taken out of the file doesn't keep running
+            compose(m, "up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "1800")
             if m["paw"]:
                 log("Starting PAW (the first start loads IBM's images, a few minutes)...")
                 run_paw(m, "up")
@@ -788,12 +896,12 @@ def main():
             compose(m, "ps")
         elif a.command == "logs":
             compose(m, "logs", "--tail", "100", *a.services)
-        elif a.command in ("credentials", "session", "database"):
+        elif a.command in ("credentials", "session", "database", "token"):
             return engine_main(m, a.command, a.services, a.json)
         elif a.command == "down":
             if m["paw"]:
                 run_paw(m, "down")
-            compose(m, "down")
+            compose(m, "down", "--remove-orphans")
         return 0
     except ConfigError as e:
         print(f"pa-setup: {e}", file=sys.stderr)

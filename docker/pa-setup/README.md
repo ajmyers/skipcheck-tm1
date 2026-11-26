@@ -36,7 +36,7 @@ the first release.
 | Command | What it does |
 |---|---|
 | `init` | Writes a starting `pa-environment.yaml` |
-| `up` (default) | Writes `compose.yaml`, starts everything, waits until it's healthy, prints the URLs. Safe to rerun after changing the file. |
+| `up` (default) | Writes `compose.yaml`, starts everything, waits until it's healthy, prints the URLs. Safe to rerun after changing the file: a part you took out is stopped and removed. |
 | `urls` | Prints every service's address and login |
 | `status` | Lists the containers and their health |
 | `logs [service...]` | Recent logs, e.g. `logs planning cognos` |
@@ -44,6 +44,7 @@ the first release.
 | `generate` | Only writes `compose.yaml` |
 | `credentials` | With a TM1 v12 engine: every address of the engine as it is now, and where each credential is, as seen from your computer. `--json` for a program (it includes the secrets). |
 | `session [database [user]]` | With an engine: logs in and prints the session cookie, for `curl -b`. Default: the file's first database, as `admin`. |
+| `token [user]` | With `tm1Engine.oauth2`: prints an access token for a user, for `curl -H "Authorization: Bearer ..."`. Default: the first user with a password. |
 | `database create <name>`, `database drop <name>` | With an engine: creates a database (about 13 s, with the file's users) or deletes one. `instance/name` for another instance than `tm1`. A database the file names isn't dropped: `up` would make it again, so take it out of the file first. |
 
 `-f other.yaml` uses another file in the same folder. The generated `compose.yaml` works with plain
@@ -113,8 +114,9 @@ tm1Engine: true            # one database, tm1; log in as admin
 |---|---|---|
 | `tm1Engine.port` | 4444 | TM1's gateway on your computer: the REST API, logins and the management API |
 | `tm1Engine.databases.<name>` | one, `tm1` | A database. Names need at least 3 characters, and `Sales` and `sales` are two. `instance` puts it in another instance than `tm1`: an instance has its own credentials, sessions and URL prefix. |
-| `tm1Engine.users` | | Users for every database: `user`, `user::group,group`, or a mapping with `name` and `groups`. `admin` is always there. The middle part is a password, as in `cognos.users`, and may be empty. |
+| `tm1Engine.users` | | Users for every database: `user`, `user::group,group`, or a mapping with `name` and `groups`. `admin` is always there. The middle part is a password, as in `cognos.users`, and may be empty; with `oauth2` it's what the user logs in with (`user:password` or `user:password:group,group`). |
 | `tm1Engine.datastore.port` | not published | Publishes the engine's MongoDB on your computer only (`127.0.0.1`). `up` prints its login. |
+| `tm1Engine.oauth2` | off | **OAuth 2.0 logins:** `true`, or `keycloakPort` (8181). Adds a Keycloak for the engine, with the users who have a password. |
 
 - **One engine holds every database.** Unlike TM1 11, a database isn't a container: `database
   create` adds one to the running engine in about 13 seconds.
@@ -125,8 +127,24 @@ tm1Engine: true            # one database, tm1; log in as admin
   curl -b "$(./setup.sh session planning analyst)" "http://localhost:4444/tm1/api/v1/Databases('planning')/Cubes"
   ```
 
-  A user's password in the file is accepted and not used: it's there for the logins that will
-  need one (OAuth 2.0 and pass-through, which aren't in pa-setup yet).
+  A user's password in the file is for OAuth 2.0 logins, below. Without them it's accepted
+  and not used.
+- **OAuth 2.0 logins** (`oauth2: true`) add a Keycloak that the engine takes tokens from. It has
+  a realm `tm1`, a client `tm1`, and each user of the file who has a password. A program gets a
+  token from Keycloak with the user's password and sends it to TM1; `token` does the first
+  half for you:
+
+  ```sh
+  curl -H "Authorization: Bearer $(./setup.sh token analyst)" "http://localhost:4444/tm1/api/v1/Databases('planning')/Cubes"
+  ```
+
+  - The name and password logins above still work beside it.
+  - Tokens name the issuer `http://tm1-engine-keycloak:8080/realms/tm1`, Keycloak's address
+    inside the environment, whichever way you fetch them: TM1 has to reach the issuer a token
+    names. `up` prints Keycloak's address on your computer (`http://localhost:8181/realms/tm1`).
+  - It's a Keycloak of the engine's own. `cognos.oidc` has another: Cognos needs its issuer
+    to be an address your browser reaches, and the engine one it reaches itself.
+  - Taking `oauth2` out of the file turns it off again on the next `up`.
 - **Everything the engine stores is in `pa-files/tm1-engine`:** `deployment` (settings, the
   databases and logs), `credentials`, and `datastore` (MongoDB's data). Keep or delete the three
   together: a database's changes since its last save are in MongoDB.
@@ -136,7 +154,7 @@ tm1Engine: true            # one database, tm1; log in as admin
 - **The credential files are written by the engine, as root.** On Linux you may not be able to read
   them: `credentials --json` prints what they hold.
 - **Memory:** about 1 GB for the engine and MongoDB with two databases (0.7 GB just started, 1.1 GB
-  after a day's use, with TM1 12.6.7).
+  after a day's use, with TM1 12.6.7), and about 0.7 GB more for Keycloak with `oauth2`.
 - **TM1 Web, PAW and Cognos security are TM1 11's** here: they need `tm1.servers`.
 
 The engine is the project's [`tm1-engine`](../tm1-engine/README.md) image, which says more about

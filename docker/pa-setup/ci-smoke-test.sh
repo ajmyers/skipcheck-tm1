@@ -77,6 +77,18 @@ for want in "http://localhost:4444/manage/v1/" "http://localhost:4444/tm1/api/v1
 done
 pass "examples/tm1-engine.yaml generates the engine and its MongoDB, and urls lists them"
 
+# 4c. OAuth 2.0 logins: the engine's own Keycloak with its realm, in a compose project docker accepts
+out=$(tool $'version: 1\ntm1Engine: {users: ["analyst:an$pw:Analysts"], oauth2: true}' generate) || fail "oauth2: $out"
+! grep -q "COMPOSE INVALID" <<<"$out" || fail "oauth2: docker compose config refused it: $out"
+for want in "  tm1-engine-keycloak:" "KC_HOSTNAME: http://tm1-engine-keycloak:8080" "8181:8080" \
+  "TM1_OAUTH2_ISSUER_URL: http://tm1-engine-keycloak:8080/realms/tm1" "TM1_OAUTH2_AUDIENCE: tm1" \
+  "target: /opt/keycloak/data/import/tm1-realm.json" "oidc-audience-mapper"; do
+  grep -qF -- "$want" <<<"$out" || fail "oauth2: compose.yaml lacks '$want': $out"
+done
+out=$(tool $'version: 1\ntm1Engine: true' generate) || fail "no oauth2: $out"
+grep -qF "TM1_OAUTH2_ISSUER_URL: none" <<<"$out" || fail "without oauth2 the engine isn't told it's off: $out"
+pass "tm1Engine.oauth2 adds the engine's Keycloak and its realm"
+
 # 5. Bad files fail with exit 2 and say what's wrong
 check_error() {  # check_error <yaml> <expected message>
   local rc=0 out
