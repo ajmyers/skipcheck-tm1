@@ -143,9 +143,10 @@ public sealed interface Tm1Source {
 	}
 
 	/**
-	 * A folder holding IBM's {@code tm1server-*-linuxi38664h_bundle.tar.gz}, mounted
-	 * read-only. The image installs TM1 from it on first start into a shared cache
-	 * volume, so later starts are fast.
+	 * A folder holding IBM's {@code tm1server-*-linuxi38664h_bundle.tar.gz} (or, for
+	 * Planning Analytics 2.1.2 and 2.1.7, its full installer
+	 * {@code tm1_linuxi38664h_*_ml.tar.gz}), mounted read-only. The image installs TM1
+	 * from it on first start into a shared cache volume, so later starts are fast.
 	 *
 	 * @param dir the folder holding the bundle
 	 * @param file the bundle's file name within {@code dir}, or {@code null} for the

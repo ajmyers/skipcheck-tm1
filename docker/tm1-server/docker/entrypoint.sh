@@ -97,9 +97,12 @@ daemon_pid() {  # daemon_pid <pgrep -f pattern>
 have_bundle() {
   [ -n "${TM1_BUNDLE_URL:-}" ] || [ -n "${TM1_BUNDLE:-}" ] && return 0
   compgen -G "${TM1_BUNDLE_DIR:-/ibm}/tm1server-*_bundle.tar.gz" >/dev/null \
-    || compgen -G "${TM1_BUNDLE_DIR:-/ibm}/tm1server-*-linuxi38664h.zip" >/dev/null
+    || compgen -G "${TM1_BUNDLE_DIR:-/ibm}/tm1server-*-linuxi38664h.zip" >/dev/null \
+    || compgen -G "${TM1_BUNDLE_DIR:-/ibm}/tm1_linuxi38664h_*_ml.tar.gz" >/dev/null
 }
-if [ ! -x "$BIN/tm1s.exe" ] && have_bundle; then
+# An install tm1-install didn't finish (it marks it so until it's done) is installed again
+incomplete() { [ "$(cat "$TM1_HOME/.tm1-server-install" 2>/dev/null)" = incomplete ]; }
+if { [ ! -x "$BIN/tm1s.exe" ] || incomplete; } && have_bundle; then
   if mountpoint -q "$TM1_HOME"; then
     # A volume (or folder) is mounted there without an install: install into it, so
     # it's filled once and reused.

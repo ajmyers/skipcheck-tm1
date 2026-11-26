@@ -185,6 +185,14 @@ unpacks the TM1 Server, Admin Server, Tools and Samples components. That's the
 same result as the installer, and it also works where the installer can't run
 (e.g. macOS).
 
+Planning Analytics 2.1.2 and 2.1.7 come only as IBM's older full installer,
+`tm1_linuxi38664h_<ver>_ml.tar.gz`, which has no manifest: its components are
+`zipfiles/linuxi38664h/*-inst.tar.gz`, each rooted at the install folder. The
+container unpacks them all but the language packs, in name order, and writes
+`tm1server_version.txt` and `versions.txt` from the components' names. It's found
+in the bundles folder like a bundle (a `tm1server-*` bundle is preferred when both
+are there), and `TM1_BUNDLE`, `TM1_BUNDLE_URL` and `install` take it too.
+
 **Caching.** Without a mounted install, a bundle is installed into
 `/tm1/cache/<key>`, one folder per bundle. The key comes from the file's name,
 size and date, or for URLs from `TM1_BUNDLE_SHA256` or the URL without its query

@@ -38,6 +38,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/dl"
           echo fake | gzip > "$RUNNER_TEMP/dl/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz"
+          echo fake | gzip > "$RUNNER_TEMP/dl/tm1_linuxi38664h_0.0.0.1_ml.tar.gz"
           echo fake > "$RUNNER_TEMP/dl/tm1server-0.0.0-1-win64_bundle.zip"
 
       - name: setup.sh
@@ -63,6 +64,10 @@ jobs:
             --image ghcr.io/ajmyers/tm1-server:edge --files-dir "$t/files" --samples --base-url "$PWD" --no-start
           test -f "$t/compose.yaml" && test -f "$t/.env.example"
           test -f "$t/bundles/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz"
+          # The older full installer (Planning Analytics 2.1.2, 2.1.7) is taken as a bundle too
+          sh setup.sh --dir "$t-ml" --bundle "$dl/tm1_linuxi38664h_0.0.0.1_ml.tar.gz" \
+            --image ghcr.io/ajmyers/tm1-server:edge --base-url "$PWD" --no-start
+          test -f "$t-ml/bundles/tm1_linuxi38664h_0.0.0.1_ml.tar.gz"
           grep -qx "TM1_SERVER_IMAGE='ghcr.io/ajmyers/tm1-server:edge'" "$t/.env"
           grep -qx "TM1_FILES_DIR='$t/files'" "$t/.env"
           grep -qx "COMPOSE_PROFILES='samples'" "$t/.env"
@@ -128,6 +133,10 @@ jobs:
           $bytes = [IO.File]::ReadAllBytes("$t/.env")
           if ($bytes[0] -eq 0xEF) { throw '.env has a byte-order mark' }
           if (-not (Test-Path "$t/bundles/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz")) { throw 'bundle not copied' }
+          # The older full installer (Planning Analytics 2.1.2, 2.1.7) is taken as a bundle too
+          pwsh -NoProfile -File ./setup.ps1 -Dir "$t-ml" -Bundle "$dl/tm1_linuxi38664h_0.0.0.1_ml.tar.gz" -Image ghcr.io/ajmyers/tm1-server:edge -BaseUrl $PWD -NoStart
+          if ($LASTEXITCODE -ne 0) { throw "setup.ps1 failed for the full installer: $LASTEXITCODE" }
+          if (-not (Test-Path "$t-ml/bundles/tm1_linuxi38664h_0.0.0.1_ml.tar.gz")) { throw 'full installer not copied' }
 
   windows:
     runs-on: windows-latest

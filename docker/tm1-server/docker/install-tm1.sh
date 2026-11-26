@@ -15,12 +15,14 @@
 #   /absolute/path            a bundle file
 #   name                      a bundle file in $TM1_BUNDLE_DIR (default /ibm)
 #   (omitted)                 $TM1_BUNDLE_URL, else $TM1_BUNDLE, else the newest
-#                             tm1server-*_bundle.tar.gz or tm1server-*-linuxi38664h.zip
-#                             in $TM1_BUNDLE_DIR
+#                             tm1server-*_bundle.tar.gz, tm1server-*-linuxi38664h.zip or
+#                             tm1_linuxi38664h_*_ml.tar.gz in $TM1_BUNDLE_DIR
 #
-# A bundle is IBM's tm1server-<ver>-linuxi38664h_bundle.tar.gz, or the repository
-# zip inside it. The type is detected from the file contents, so URLs don't need a
-# file extension. Set TM1_BUNDLE_SHA256 to verify the bundle before installing.
+# A bundle is IBM's tm1server-<ver>-linuxi38664h_bundle.tar.gz, the repository zip
+# inside it, or the older full installer tm1_linuxi38664h_<ver>_ml.tar.gz (the only
+# download for Planning Analytics 2.1.2 and 2.1.7; see unpack-tm1-issetup.py). The
+# type is detected from the file contents, so URLs don't need a file extension. Set
+# TM1_BUNDLE_SHA256 to verify the bundle before installing.
 #
 # Instead of running IBM's installer, the bundle's manifest is followed and each
 # component tarball is unpacked (see unpack-tm1.py). That is what the installer
@@ -47,7 +49,7 @@ done
 newest_in_dir() {
   shopt -s nullglob
   local pattern files
-  for pattern in "tm1server-*_bundle.tar.gz" "tm1server-*-linuxi38664h.zip"; do
+  for pattern in "tm1server-*_bundle.tar.gz" "tm1server-*-linuxi38664h.zip" "tm1_linuxi38664h_*_ml.tar.gz"; do
     # shellcheck disable=SC2206  # the glob in $pattern is meant to expand
     files=("$SRC_DIR"/$pattern)
     if [ ${#files[@]} -gt 0 ]; then printf '%s\n' "${files[@]}" | sort -V | tail -1; return; fi
@@ -134,19 +136,32 @@ fi
 
 log "Installing TM1 Server from $SHOWN into $TARGET (one-time)"
 find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .install.lock -exec rm -rf {} +
+# Until it's done: an install that fails partway (a full disk) leaves this, so the next run
+# installs again rather than refusing a folder it didn't make, or starting half a TM1
+echo incomplete > "$MARKER"
 
-# Detect the type from the contents: gzip (1f8b) = the IBM bundle, zip (504b) = the repository zip.
+# Detect the type from the contents: gzip (1f8b) = the IBM bundle or the older full installer,
+# told apart by its first entries; zip (504b) = the repository zip.
+zip=
 case "$(head -c2 "$bundle" | od -An -tx1 | tr -d ' \n')" in
   1f8b)
-    tar xzf "$bundle" -C "$work" --wildcards 'tm1server-*.zip' || die "no tm1server-*.zip inside the bundle"
-    zip=$(ls -1 "$work"/tm1server-*.zip | head -1) ;;
+    if python3 /usr/local/lib/tm1-server/unpack-tm1-issetup.py detect "$bundle"; then
+      [ -z "${TM1_INSTALLABLES:-}" ] || log "TM1_INSTALLABLES doesn't apply to IBM's full installer: every component but the language packs is installed"
+      TMPDIR=$work python3 /usr/local/lib/tm1-server/unpack-tm1-issetup.py install "$bundle" "$TARGET" >&2 \
+        || die "couldn't install from the full installer $SHOWN"
+    else
+      tar xzf "$bundle" -C "$work" --wildcards 'tm1server-*.zip' || die "no tm1server-*.zip inside the bundle"
+      zip=$(ls -1 "$work"/tm1server-*.zip | head -1)
+    fi ;;
   504b) zip=$bundle ;;
-  *) die "$SHOWN is neither a tm1server bundle (.tar.gz) nor its repository zip" ;;
+  *) die "$SHOWN is neither a tm1server bundle (.tar.gz), its repository zip, nor IBM's full installer (tm1_linuxi38664h_*_ml.tar.gz)" ;;
 esac
 
-unzip -q "$zip" -d "$work/repo"
-# shellcheck disable=SC2086
-python3 /usr/local/lib/tm1-server/unpack-tm1.py "$work/repo" "$TARGET" $INSTALLABLES >&2
+if [ -n "$zip" ]; then
+  unzip -q "$zip" -d "$work/repo"
+  # shellcheck disable=SC2086
+  python3 /usr/local/lib/tm1-server/unpack-tm1.py "$work/repo" "$TARGET" $INSTALLABLES >&2
+fi
 
 chmod -R u+rwX,go+rX "$TARGET"
 find "$TARGET/bin64" -maxdepth 1 \( -name '*.exe' -o -name '*.sh' -o -name 'gsk*' -o -name '*.so*' \) -exec chmod 755 {} +

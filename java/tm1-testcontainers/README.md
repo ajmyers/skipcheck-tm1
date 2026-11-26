@@ -94,7 +94,7 @@ here too. If several are set, the first in this list wins.
 | `TM1_PRIVATE_IMAGE` | An image with TM1 built in, from a **private** registry ([how to build one](../../docker/tm1-server/examples/private-image/Dockerfile)) | ~3 s |
 | `TM1_HOME_DIR` | An installed `tm1_64` folder (the one with `bin64/tm1s.exe`), mounted read-only | ~3 s |
 | `TM1_INSTALL_VOLUME` | A Docker volume holding an install, e.g. compose's `tm1_tm1-install` | ~3 s |
-| `TM1_BUNDLE_DIR` (+ `TM1_BUNDLE`) | A folder holding IBM's `tm1server-*-linuxi38664h_bundle.tar.gz` (and the file to use, if there are several) | ~15 s the first time, then ~5 s |
+| `TM1_BUNDLE_DIR` (+ `TM1_BUNDLE`) | A folder holding IBM's `tm1server-*-linuxi38664h_bundle.tar.gz`, or for Planning Analytics 2.1.2 and 2.1.7 its full installer `tm1_linuxi38664h_*_ml.tar.gz` (and the file to use, if there are several) | ~15 s the first time, then ~5 s |
 | `TM1_BUNDLE_URL` (+ `TM1_BUNDLE_SHA256`) | A download link for the bundle, such as a pre-signed S3 URL. Never logged with its query string. | download + ~15 s, then ~5 s |
 
 Bundles are installed into the Docker volume `tm1-testcontainers-cache`, shared by every

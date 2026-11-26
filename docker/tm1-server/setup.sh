@@ -202,13 +202,13 @@ env_line() {
   printf "%s='%s'\n" "$1" "$2"
 }
 
-BUNDLE_GLOB_HELP="It should be named tm1server-<version>-linuxi38664h_bundle.tar.gz: the Linux download, even on Mac or Windows."
+BUNDLE_GLOB_HELP="It should be named tm1server-<version>-linuxi38664h_bundle.tar.gz (for Planning Analytics 2.1.2 and 2.1.7, tm1_linuxi38664h_<version>_ml.tar.gz): the Linux download, even on Mac or Windows."
 # check_bundle FILE: the IBM Linux bundle, or die explaining what's wrong
 check_bundle() {
   [ -f "$1" ] || die "Bundle file not found: $1" "$BUNDLE_GLOB_HELP"
   name=$(basename "$1")
   case $name in
-    tm1server-*-linuxi38664h_bundle.tar.gz|tm1server-*-linuxi38664h.zip) ;;
+    tm1server-*-linuxi38664h_bundle.tar.gz|tm1server-*-linuxi38664h.zip|tm1_linuxi38664h_*_ml.tar.gz) ;;
     tm1server-*|*tm1*)
       die "$name isn't the Linux TM1 Server download." "$BUNDLE_GLOB_HELP" \
           "Download IBM Planning Analytics TM1 Server for Linux from IBM Passport Advantage or Fix Central." ;;
@@ -315,7 +315,7 @@ HAVE_VOLUME=0; docker volume inspect "$VOLUME" >/dev/null 2>&1 && HAVE_VOLUME=1
 HAVE_ENV_SOURCE=0
 [ -f "$DIR/.env" ] && grep -Eq '^[[:space:]]*(TM1_BUNDLE_URL|TM1_HOME_DIR|TM1_BUNDLE_DIR)=.' "$DIR/.env" && HAVE_ENV_SOURCE=1
 HAVE_BUNDLES=0
-for f in "$DIR"/bundles/tm1server-*_bundle.tar.gz "$DIR"/bundles/tm1server-*-linuxi38664h.zip; do [ -f "$f" ] && HAVE_BUNDLES=1; done
+for f in "$DIR"/bundles/tm1server-*_bundle.tar.gz "$DIR"/bundles/tm1server-*-linuxi38664h.zip "$DIR"/bundles/tm1_linuxi38664h_*_ml.tar.gz; do [ -f "$f" ] && HAVE_BUNDLES=1; done
 
 case $SOURCE in
   '') ;;
@@ -511,7 +511,7 @@ want=$(mktemp); trap 'rm -f "$want"' EXIT
 case $SOURCE in
   bundle)
     # Pin the bundle when bundles/ has others, which would otherwise win if newer
-    n=0; for f in "$DIR"/bundles/tm1server-*; do [ -f "$f" ] && n=$((n + 1)); done
+    n=0; for f in "$DIR"/bundles/tm1server-* "$DIR"/bundles/tm1_linuxi38664h_*_ml.tar.gz; do [ -f "$f" ] && n=$((n + 1)); done
     [ "$n" -le 1 ] || env_line TM1_BUNDLE "$(basename "$BUNDLE")" >>"$want" ;;
   url)
     env_line TM1_BUNDLE_URL "$URL" >>"$want"

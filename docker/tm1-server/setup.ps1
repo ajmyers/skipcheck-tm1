@@ -189,11 +189,11 @@ function Write-Utf8([string]$Path, [string]$Text) {
   [System.IO.File]::WriteAllText($Path, ($Text -replace "`r`n", "`n"), (New-Object System.Text.UTF8Encoding $false))
 }
 
-$BundleHelp = 'It should be named tm1server-<version>-linuxi38664h_bundle.tar.gz: the Linux download, even on Windows.'
+$BundleHelp = 'It should be named tm1server-<version>-linuxi38664h_bundle.tar.gz (for Planning Analytics 2.1.2 and 2.1.7, tm1_linuxi38664h_<version>_ml.tar.gz): the Linux download, even on Windows.'
 function Test-Bundle([string]$File) {
   if (-not (Test-Path -LiteralPath $File -PathType Leaf)) { Fail "Bundle file not found: $File" @($BundleHelp) }
   $name = Split-Path -Leaf $File
-  if ($name -notlike 'tm1server-*-linuxi38664h_bundle.tar.gz' -and $name -notlike 'tm1server-*-linuxi38664h.zip') {
+  if ($name -notlike 'tm1server-*-linuxi38664h_bundle.tar.gz' -and $name -notlike 'tm1server-*-linuxi38664h.zip' -and $name -notlike 'tm1_linuxi38664h_*_ml.tar.gz') {
     if ($name -like '*tm1*') {
       Fail "$name isn't the Linux TM1 Server download." @($BundleHelp,
         'Download IBM Planning Analytics TM1 Server for Linux from IBM Passport Advantage or Fix Central.')
@@ -344,7 +344,8 @@ function Invoke-Setup {
   $haveVolume = DockerOk volume inspect $volume
   $haveEnvSource = [bool]((Env-Get 'TM1_BUNDLE_URL') -or (Env-Get 'TM1_HOME_DIR') -or (Env-Get 'TM1_BUNDLE_DIR'))
   $bundlesDir = Join-Path $Dir 'bundles'
-  $haveBundles = [bool](Get-ChildItem -LiteralPath $bundlesDir -Filter 'tm1server-*' -File -ErrorAction SilentlyContinue)
+  $haveBundles = [bool]((Get-ChildItem -LiteralPath $bundlesDir -Filter 'tm1server-*' -File -ErrorAction SilentlyContinue) +
+    (Get-ChildItem -LiteralPath $bundlesDir -Filter 'tm1_linuxi38664h_*_ml.tar.gz' -File -ErrorAction SilentlyContinue))
 
   switch -Regex ($Source) {
     '^$' { break }
@@ -542,7 +543,7 @@ function Invoke-Setup {
   switch ($Source) {
     'bundle' {
       # Pin the bundle when bundles\ has others, which would otherwise win if newer
-      if (@(Get-ChildItem -LiteralPath $bundlesDir -Filter 'tm1server-*' -File).Count -gt 1) { $want['TM1_BUNDLE'] = Split-Path -Leaf $Bundle }
+      if (@(Get-ChildItem -LiteralPath $bundlesDir -Filter 'tm1server-*' -File).Count + @(Get-ChildItem -LiteralPath $bundlesDir -Filter 'tm1_linuxi38664h_*_ml.tar.gz' -File).Count -gt 1) { $want['TM1_BUNDLE'] = Split-Path -Leaf $Bundle }
     }
     'url' { $want['TM1_BUNDLE_URL'] = $Url; if ($Sha256) { $want['TM1_BUNDLE_SHA256'] = $Sha256 } }
     'folder' { $want['TM1_HOME_DIR'] = To-EnvPath $Tm1Home }
