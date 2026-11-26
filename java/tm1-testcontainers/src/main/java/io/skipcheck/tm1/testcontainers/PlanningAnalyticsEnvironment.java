@@ -128,6 +128,9 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 	/** The network alias Testcontainers gives every container, different each run. */
 	private static final Pattern RANDOM_ALIAS = Pattern.compile("tc-[1-9A-HJ-NP-Za-km-z]{8}");
 
+	/** The TM1 v12 engine's name on the environment's network. */
+	static final String ENGINE_ALIAS = "tm1-engine";
+
 	private static final Pattern IMAGE_NAME = Pattern.compile("imageName=([^,)]+)");
 
 	private final Network network;
@@ -242,7 +245,11 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 			engine = (runs(b.tm1EngineImage, source instanceof Tm1EngineSource.PrivateImage)
 					? new Tm1EngineContainer(image(b.tm1EngineImage, Tm1EngineContainer.DEFAULT_IMAGE), source)
 					: new Tm1EngineContainer(source))
-				.withNetwork(network);
+				.withNetwork(network)
+				// Its name on the network, as in the compose project pa-setup writes
+				.withNetworkAliases(ENGINE_ALIAS);
+			// What the file said first; then, below, what the caller says
+			apply(b.fileTm1Engine, engine);
 		}
 		this.tm1Engine = engine;
 
@@ -294,8 +301,9 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 	 * and {@code users} as {@link Tm1EngineContainer#withUser} (a user's password is
 	 * checked and not used: TM1 v12 keeps none). It runs beside {@code tm1}, or alone;
 	 * <li>{@code ibm}: each part's source, the folder as {@link Tm1Source.Bundle},
-	 * {@link Tm1WebSource.Bundle} and {@link CognosSource.Zip}. A relative path is from
-	 * the file's folder; {@code ~} is the user's home;
+	 * {@link Tm1WebSource.Bundle}, {@link CognosSource.Zip} and
+	 * {@link Tm1EngineSource.Bundle}. A relative path is from the file's folder;
+	 * {@code ~} is the user's home;
 	 * <li>{@code images}: the image each part runs, as a container's image argument. A
 	 * part with no other source takes its image as the private image with IBM's software
 	 * built in ({@link Tm1Source.PrivateImage} and the like).
@@ -330,7 +338,8 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 
 	/**
 	 * Starts every part, in dependency order: Keycloak and Cognos, the Admin Server, the
-	 * TM1 servers, then TM1 Web and PAW. Parts that don't depend on each other start in
+	 * TM1 servers, then TM1 Web and PAW. A TM1 v12 engine starts with its MongoDB, beside
+	 * TM1 11's parts and before PAW. Parts that don't depend on each other start in
 	 * parallel.
 	 */
 	@Override
@@ -672,6 +681,9 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 
 		@Nullable String tm1EngineImage;
 
+		// The file's own settings for the engine, kept when the caller adds theirs
+		@Nullable Consumer<Tm1EngineContainer> fileTm1Engine;
+
 		private Builder() {
 		}
 
@@ -800,6 +812,8 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 
 		/**
 		 * Adds a TM1 v12 engine and configures it: its databases and users, for instance.
+		 * On a builder from {@link PlanningAnalyticsEnvironment#fromConfig}, the file's
+		 * databases and users stay, and the customizer adds to them.
 		 *
 		 * {@snippet class = examples.PlanningAnalyticsEnvironmentExamples region =
 		 * engine}
@@ -896,7 +910,8 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		 * {@code TESTCONTAINERS_REUSE_ENABLE=true}). A later run with the same
 		 * configuration finds them, and objects tests left behind are still there.
 		 * Without the switch it has no effect. See {@link PlanningAnalyticsEnvironment}
-		 * for what's reused and how to start clean.
+		 * for what's reused and how to start clean. An environment with a TM1 v12 engine
+		 * can't be reused: {@link #build()} refuses it, whatever the switch says.
 		 *
 		 * <p>
 		 * With your own {@link #network}, reuse only works if it's the same network each
@@ -930,6 +945,16 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 			if (tm1.isEmpty() && (adminServer != null || tm1Web != null || paw != null || cognos != null)) {
 				throw new IllegalStateException("The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: "
 						+ "add a TM1 server with tm1(name)");
+			}
+			if (tm1Engine != null) {
+				for (String name : tm1.keySet()) {
+					// Two containers would answer to the name on the network
+					if (name.equalsIgnoreCase(Tm1EngineContainer.DATASTORE_ALIAS)
+							|| name.equalsIgnoreCase(ENGINE_ALIAS)) {
+						throw new IllegalStateException("A TM1 server can't be named " + name
+								+ " beside a TM1 v12 engine: that's the engine's name, or its datastore's, on the network");
+					}
+				}
 			}
 			if (reuse && tm1Engine != null) {
 				throw new IllegalStateException("An environment with a TM1 v12 engine can't be reused: the engine "

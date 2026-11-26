@@ -45,12 +45,13 @@ HOST_HOME = os.environ.get("PA_HOST_HOME") or ""
 # default; PA_IMAGE_TAG picks a release, e.g. 1.0.0.
 SELF_IMAGE = os.environ.get("PA_SETUP_IMAGE") or "ghcr.io/ajmyers/pa-setup:edge"
 IMAGE_TAG = os.environ.get("PA_IMAGE_TAG") or "edge"
-NAME = re.compile(r"[A-Za-z0-9_-]+$")
-USER = re.compile(r"[A-Za-z0-9._-]+$")
+# \Z, not $: $ also matches before a newline at the end
+NAME = re.compile(r"[A-Za-z0-9_-]+\Z")
+USER = re.compile(r"[A-Za-z0-9._-]+\Z")
 SEEDS = ("empty", "sdata", "24retail")
 # The tm1-engine image's own rules: names start with a letter or digit, and TM1 wants a
 # database's to have at least three characters
-ENGINE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*$")
+ENGINE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*\Z")
 ENGINE_INSTANCE = "tm1"
 # The engine's MongoDB is its own, on the project's network only unless a port is asked for
 DATASTORE_USER = "tm1"
@@ -103,7 +104,8 @@ def check_keys(section, allowed, where):
 
 def port(value, where, default):
     value = default if value is None else value
-    if not isinstance(value, int) or not 1 <= value <= 65535:
+    # A bool is an int to Python: true isn't port 1
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 65535:
         raise ConfigError(f"{where}: port must be a number from 1 to 65535, not {value!r}")
     return value
 
@@ -111,7 +113,8 @@ def port(value, where, default):
 def section(cfg, key):
     """A component's section: absent or false = off; true = on with defaults."""
     value = cfg.get(key)
-    if value in (None, False):
+    # By what it is, not by equality: 0 isn't off
+    if value is None or value is False:
         return None
     if value is True:
         return {}

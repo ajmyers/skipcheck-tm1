@@ -353,13 +353,16 @@ final class PaEnvironmentFile {
 				pawZip, images);
 		if (engine != null) {
 			Engine wanted = engine;
-			b.tm1Engine(container -> {
+			b.tm1Engine();
+			// Kept apart from the caller's customizer, which a later tm1Engine(...) sets
+			b.fileTm1Engine = container -> {
 				wanted.databases().forEach((name, instance) -> container.withDatabase(instance, name));
 				// TM1 v12 keeps no passwords: a user's is checked and not used
 				wanted.users().forEach(u -> container.withUser(u.name(), u.groups().toArray(new String[0])));
-			});
-			b.tm1EngineImage = image(images, "tm1Engine");
+			};
 		}
+		// Whatever the file's sections: an engine added in code runs the file's image too
+		b.tm1EngineImage = image(images, "tm1Engine");
 		return b;
 	}
 

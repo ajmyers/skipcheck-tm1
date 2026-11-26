@@ -36,10 +36,6 @@ tasks.withType<Test>().configureEach {
 	inputs.dir(examples).withPathSensitivity(PathSensitivity.RELATIVE)
 	// ContainerConformanceTest: the scenarios every language starts, and where each writes what
 	// Docker got, for scripts/compare-containers.py
-	// The pa-environment.yaml files for TM1 v12, beside the scenarios
-	val engineFixtures = rootDir.resolve("testcontainers-conformance/pa-environment")
-	systemProperty("tm1.paEnvironment.engineFixtures", engineFixtures.path)
-	inputs.dir(engineFixtures).withPathSensitivity(PathSensitivity.RELATIVE)
 	val scenarios = rootDir.resolve("testcontainers-conformance/scenarios")
 	systemProperty("tm1.containerConformance.scenarios", scenarios.path)
 	systemProperty("tm1.containerConformance.output", rootDir.resolve("build/container-conformance").path)
