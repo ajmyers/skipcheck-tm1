@@ -43,10 +43,20 @@ def bash(script: str, folder: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def matches(folder: str, line: str) -> bool:
-    pattern = bash('install_pattern "$FOLDER"', folder).stdout
+def pattern(*folders: str) -> str:
+    made = subprocess.run(
+        ["bash", "-c", '. "$0"; install_pattern "$@"', str(PROCESSES), *folders],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert made.returncode == 0 and made.stdout, made.stderr  # an empty one would match anything
+    return made.stdout
+
+
+def matches(folder: str, line: str, *more: str) -> bool:
     return (
-        subprocess.run(["grep", "-qE", pattern], input=line, text=True).returncode == 0
+        subprocess.run(["grep", "-qE", pattern(folder, *more)], input=line, text=True).returncode == 0
     )
 
 
@@ -60,6 +70,14 @@ def test_finds_tm1s_processes_as_run_and_behind_an_emulator() -> None:
         HOME, f"/run/rosetta/rosetta {HOME}/third_party/datastore/mongod.bin --port 27017"
     )
     assert matches(HOME + "/", f"{HOME}/bin/tm1sd.exe"), "a trailing slash is one slash"
+
+
+@needs_bash
+def test_finds_either_of_several_folders() -> None:
+    link = "/opt/ibm/tm1-engine"
+    assert matches(link, f"{link}/bin/tm1sd.exe -z /tm1/deployment", HOME)
+    assert matches(link, f"/run/rosetta/rosetta {HOME}/bin/tm1sd.exe", HOME)
+    assert not matches(link, "/opt/ibm/other/bin/tm1sd.exe", HOME)
 
 
 @needs_bash
@@ -99,13 +117,44 @@ def test_kills_what_runs_from_the_install_behind_its_link(tmp_path: Path) -> Non
             process.wait()
 
 
+def kill_install_with_pkill_stubbed(folder: str) -> list[str]:
+    """kill_install with pkill replaced by a function that records its arguments: a guard that
+    failed would otherwise kill every process the tests can reach."""
+    done = subprocess.run(
+        [
+            "bash",
+            "-c",
+            '. "$0"; pkill() { printf "%s\\n" "$*"; }; kill_install "$FOLDER"',
+            str(PROCESSES),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        env={**os.environ, "FOLDER": folder},
+    )
+    assert done.returncode == 0, done.stderr
+    return done.stdout.splitlines()
+
+
+@needs_pkill
+def test_matches_the_folder_as_given_and_where_its_link_leads(tmp_path: Path) -> None:
+    install = (tmp_path / "cache" / "tm1-v12").resolve()
+    install.mkdir(parents=True)
+    link = tmp_path.resolve() / "tm1-engine"
+    link.symlink_to(install)
+    assert kill_install_with_pkill_stubbed(str(link)) == [
+        f"-KILL -f {pattern(str(link), str(install))}"
+    ]
+    assert kill_install_with_pkill_stubbed(str(install)) == [
+        f"-KILL -f {pattern(str(install))}"
+    ]
+
+
 @needs_pkill
 def test_kills_nothing_for_a_folder_that_isnt_there_or_is_the_root(tmp_path: Path) -> None:
-    bystander = sleeper(tmp_path.resolve())
-    try:
-        assert bash('kill_install "$FOLDER"', str(tmp_path / "nowhere")).returncode == 0
-        assert bash('kill_install "$FOLDER"', "/").returncode == 0
-        assert bystander.poll() is None
-    finally:
-        bystander.kill()
-        bystander.wait()
+    # Its parent missing too: GNU readlink -f resolves a path whose last part alone is missing
+    assert kill_install_with_pkill_stubbed(str(tmp_path / "no" / "where")) == []
+    assert kill_install_with_pkill_stubbed("/") == []
+    assert kill_install_with_pkill_stubbed("") == []
+    (tmp_path / "root").symlink_to("/")
+    assert kill_install_with_pkill_stubbed(str(tmp_path / "root")) == [], "a link to /"
