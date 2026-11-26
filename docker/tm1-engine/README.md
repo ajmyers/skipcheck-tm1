@@ -18,6 +18,40 @@ cookie=$(docker compose exec tm1-engine tm1-engine session)   # log in as admin
 curl -b "$cookie" "http://localhost:4444/tm1/api/v1/Databases('tm1')/Cubes?\$select=Name"
 ```
 
+## Keeping your data
+
+Everything TM1 stores is in two places, and you can put each in **a folder on your
+computer or a Docker volume**:
+
+| What | In the container | With `compose.yaml` |
+|---|---|---|
+| TM1's configuration, databases (the cube files, `databases/<id>/*.cub`) and logs | `/tm1/deployment` | `./tm1-engine-files/deployment` |
+| The root and application credentials | `/tm1/credentials` | `./tm1-engine-files/credentials` |
+| MongoDB's data: TM1's list of instances, databases and applications, and each database's changes since its last save | `/data/db` in the MongoDB container | `./tm1-engine-files/datastore` |
+
+So with compose, the one folder `tm1-engine-files` (or `TM1_ENGINE_FILES_DIR`) is all of it:
+keep, copy or delete it as a whole. To put any of the three elsewhere, set
+`TM1_ENGINE_DEPLOYMENT_DIR`, `TM1_ENGINE_CREDENTIALS_DIR` or `TM1_DATASTORE_DIR` in `.env` to
+another folder, or to the Docker volume `compose.yaml` declares for it
+(`tm1-engine-deployment`, `tm1-engine-credentials`, `tm1-engine-datastore`).
+
+With plain `docker run`, mount a folder or a volume at those paths:
+
+```sh
+docker run -d -p 4444:4444 -v /path/to/ibm-downloads:/ibm:ro -v tm1-engine-cache:/tm1/cache \
+  -v "$PWD/tm1-engine-files/deployment:/tm1/deployment" \
+  -v "$PWD/tm1-engine-files/credentials:/tm1/credentials" \
+  ghcr.io/ajmyers/tm1-engine
+```
+
+Here TM1 runs its own MongoDB ([below](#the-datastore-mongodb)), whose data is inside the
+deployment (`third_party/datastore`), so that one mount holds everything.
+
+**The deployment and the MongoDB data belong together.** A cube's values are in its `.cub`
+file once saved; until then a change is in MongoDB (the database's transaction log), and
+MongoDB is also where TM1 keeps the list of its databases. Keep or remove both. Anything
+you don't mount lives in the container and goes with it, which is what tests want.
+
 ## How TM1 v12 differs from TM1 11
 
 | | TM1 11 (`tm1-server`) | TM1 v12 (`tm1-engine`) |
@@ -44,6 +78,7 @@ to do anything there.
 | `/tm1/deployment` | `config.internal.json`, the databases, and logs (`logs/*.jsonl`) | A new deployment is created if the folder is empty |
 | `/tm1/credentials` | `root.json` and each application's `<instance>/<application>.json` | Mount it with `/tm1/deployment`: TM1 shows an application's secret only once |
 
+Each can be a folder on your computer or a Docker volume ([Keeping your data](#keeping-your-data)).
 **Anything you don't mount stays inside the container.** It survives `docker stop` /
 `docker start`, and is deleted with the container: a disposable TM1, which is what tests
 want.
@@ -74,10 +109,12 @@ Keep the password in the URL to letters and digits: whether TM1 decodes `%40` an
 hasn't been checked. A deployment that has used a MongoDB of yours keeps using it:
 removing `TM1_DATASTORE_URL` later doesn't move it to a MongoDB of TM1's own.
 
-The MongoDB and `/tm1/deployment` belong together: keep or remove both. With the
-deployment kept and the MongoDB gone (`docker compose down -v`, say), TM1 starts empty and
-the container sets it up again, leaving the old databases' files unused in
-`deployment/databases`. If TM1 can't reach or log in to MongoDB, the container stops and
+The MongoDB and `/tm1/deployment` belong together ([Keeping your data](#keeping-your-data)).
+With the deployment kept and the MongoDB data gone, TM1 starts empty and the container sets
+it up again, leaving the old databases' files unused in `deployment/databases`. The other
+way round, a new deployment on a MongoDB that others have used makes a new control
+database there (`tm1-control-<id>`) and leaves the old ones: harmless, but they add up in
+a MongoDB shared by engines that come and go. If TM1 can't reach or log in to MongoDB, the container stops and
 shows what TM1 logged.
 
 ## What it creates

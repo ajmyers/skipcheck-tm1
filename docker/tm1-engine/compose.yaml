@@ -14,8 +14,17 @@
 #   - TM1_ENGINE_BUNDLE_URL: download the package instead (e.g. a pre-signed S3 link)
 #   - TM1_ENGINE_IMAGE: a private image with TM1 built in (or your own build)
 #
-# TM1's files are in ./tm1-engine-files (or TM1_ENGINE_FILES_DIR): deployment/ holds the
-# configuration, databases and logs; credentials/ the root and application credentials.
+# Where your data is kept. By default, all of it in ./tm1-engine-files (or
+# TM1_ENGINE_FILES_DIR), so one folder is the whole thing to keep, copy or delete:
+#   deployment/    TM1's configuration, databases (the cube files) and logs
+#   credentials/   the root and application credentials
+#   datastore/     MongoDB's data: TM1's list of databases, and each one's unsaved changes
+# Each can go elsewhere, to a folder or a Docker volume (set in .env):
+#   TM1_ENGINE_DEPLOYMENT_DIR, TM1_ENGINE_CREDENTIALS_DIR, TM1_DATASTORE_DIR
+#   a path (/data/tm1, ./somewhere)  a folder on your computer
+#   tm1-engine-deployment, tm1-engine-credentials, tm1-engine-datastore
+#                                    the Docker volumes declared at the end of this file
+# The deployment and the datastore belong together: keep or remove both.
 
 services:
   tm1-engine:
@@ -40,8 +49,8 @@ services:
     volumes:
       - tm1-engine-install:/opt/ibm/tm1-engine
       - ${TM1_ENGINE_BUNDLE_DIR:-./bundles}:/ibm:ro
-      - ${TM1_ENGINE_FILES_DIR:-./tm1-engine-files}/deployment:/tm1/deployment
-      - ${TM1_ENGINE_FILES_DIR:-./tm1-engine-files}/credentials:/tm1/credentials
+      - ${TM1_ENGINE_DEPLOYMENT_DIR:-${TM1_ENGINE_FILES_DIR:-./tm1-engine-files}/deployment}:/tm1/deployment
+      - ${TM1_ENGINE_CREDENTIALS_DIR:-${TM1_ENGINE_FILES_DIR:-./tm1-engine-files}/credentials}:/tm1/credentials
 
   # TM1's datastore. Not IBM software: the official MongoDB image, which runs natively
   # on Apple Silicon too. Only TM1 talks to it, so it has no published port.
@@ -59,8 +68,12 @@ services:
       timeout: 5s
       retries: 20
     volumes:
-      - tm1-engine-datastore:/data/db
+      - ${TM1_DATASTORE_DIR:-${TM1_ENGINE_FILES_DIR:-./tm1-engine-files}/datastore}:/data/db
 
 volumes:
+  # The TM1 install, filled once from your package
   tm1-engine-install:
+  # Used only when a *_DIR setting names one, in place of a folder (see the top of this file)
+  tm1-engine-deployment:
+  tm1-engine-credentials:
   tm1-engine-datastore:
