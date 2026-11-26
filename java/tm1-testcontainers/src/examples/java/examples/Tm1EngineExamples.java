@@ -63,8 +63,7 @@ final class Tm1EngineExamples {
 
 	void oauth2(Tm1EngineSource source) throws Exception {
 		// @start region = oauth2
-		// Entering the block starts Keycloak first, then the engine; the Keycloak is
-		// yours to close
+		// Starting the engine starts Keycloak first; the Keycloak is yours to close
 		try (var keycloak = new KeycloakContainer();
 				var engine = new Tm1EngineContainer(source).withUser("analyst", "Analysts")
 					.withLogin("analyst", "analystpw")

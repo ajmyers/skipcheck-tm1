@@ -308,8 +308,10 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 	 * {@code ibm}, or the newest there;
 	 * <li>{@code tm1Engine}: {@link Builder#tm1Engine}, with each of {@code databases} as
 	 * {@link Tm1EngineContainer#withDatabase(String, String)} in its {@code instance},
-	 * and {@code users} as {@link Tm1EngineContainer#withUser} (a user's password is
-	 * checked and not used: TM1 v12 keeps none). It runs beside {@code tm1}, or alone;
+	 * and {@code users} as {@link Tm1EngineContainer#withUser}. {@code oauth2} is
+	 * {@link Builder#tm1EngineOAuth2}, and a user's password is then their
+	 * {@link Tm1EngineContainer#withLogin} at Keycloak; without it the password is
+	 * checked and not used, as TM1 v12 keeps none. It runs beside {@code tm1}, or alone;
 	 * <li>{@code ibm}: each part's source, the folder as {@link Tm1Source.Bundle},
 	 * {@link Tm1WebSource.Bundle}, {@link CognosSource.Zip} and
 	 * {@link Tm1EngineSource.Bundle}. A relative path is from the file's folder;
@@ -977,6 +979,14 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 							|| name.equalsIgnoreCase(ENGINE_ALIAS)) {
 						throw new IllegalStateException("A TM1 server can't be named " + name
 								+ " beside a TM1 v12 engine: that's the engine's name, or its datastore's, on the network");
+					}
+				}
+			}
+			if (keycloak != null || tm1EngineOAuth2) {
+				for (String name : tm1.keySet()) {
+					if (name.equalsIgnoreCase(KeycloakContainer.NETWORK_ALIAS)) {
+						throw new IllegalStateException("A TM1 server can't be named " + name
+								+ " beside the environment's Keycloak: that's its name on the network");
 					}
 				}
 			}

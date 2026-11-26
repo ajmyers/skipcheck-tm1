@@ -112,6 +112,46 @@ class Tm1EngineWiringTest {
 	}
 
 	@Test
+	void keycloakImportsTheRealmAsItIsWhenKeycloakStarts() {
+		var keycloak = new KeycloakContainer().withCommand("start-dev", "--features=token-exchange");
+		var engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak);
+		// Added after withOAuth2, and still in the realm: it's asked for at Keycloak's
+		// start
+		engine.withUser("analyst").withLogin("analyst", "analystpw");
+		keycloak.configure();
+		// The import is added to the command it has: a caller's own options stay
+		assertThat(keycloak.getCommandParts()).containsExactly("start-dev", "--features=token-exchange",
+				"--import-realm");
+		assertThat(keycloak.realmFiles()).containsOnlyKeys("/opt/keycloak/data/import/tm1-realm.json");
+		assertThat(keycloak.realmFiles().values().iterator().next()).isEqualTo(engine.realm()).contains("\"analyst\"");
+		// Without a realm, Keycloak starts as it was
+		var plain = new KeycloakContainer();
+		plain.configure();
+		assertThat(plain.getCommandParts()).containsExactly("start-dev");
+	}
+
+	@Test
+	void anEngineHasOneKeycloakOfItsOwnThatItStarts() {
+		var keycloak = new KeycloakContainer();
+		var engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak);
+		// The same again is nothing new
+		assertThat(engine.withOAuth2(keycloak).getDependencies()).containsOnlyOnce(keycloak);
+		// A second would start beside the first, under the same name on the network
+		assertThatIllegalStateException().isThrownBy(() -> engine.withOAuth2(new KeycloakContainer()))
+			.withMessageContaining("already takes tokens from another Keycloak");
+		// And another engine's realm would replace this one's
+		assertThatIllegalStateException().isThrownBy(() -> new Tm1EngineContainer(SOURCE).withOAuth2(keycloak))
+			.withMessageContaining("each engine needs a Keycloak of its own");
+		// An engine taken off its network gets one again, and the Keycloak with it
+		var off = new Tm1EngineContainer(SOURCE).withNetwork(null).withOAuth2(new KeycloakContainer());
+		assertThat(off.getNetwork()).isNotNull().isSameAs(off.getKeycloak().getNetwork());
+		// A Keycloak moved since is found when the engine is configured, not by TM1
+		keycloak.withNetwork(Network.newNetwork());
+		assertThatIllegalStateException().isThrownBy(engine::configure)
+			.withMessageContaining("set the network before withOAuth2");
+	}
+
+	@Test
 	void givesKeycloakARealmWithTheUsersWhoHaveAPassword() throws Exception {
 		var keycloak = new KeycloakContainer();
 		var engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak)

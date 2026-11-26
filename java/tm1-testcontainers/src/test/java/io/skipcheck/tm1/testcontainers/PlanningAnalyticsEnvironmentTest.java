@@ -419,6 +419,11 @@ class PlanningAnalyticsEnvironmentTest {
 		assertThat(beside.cognos().getKeycloak()).isNull();
 		assertThat(beside.tm1Engine().getKeycloak()).isSameAs(beside.keycloak());
 
+		// A server can't take the Keycloak's name on the network
+		assertThatIllegalStateException()
+			.isThrownBy(() -> engineBuilder().tm1("Keycloak").tm1Engine().tm1EngineOAuth2().build())
+			.withMessageContaining("A TM1 server can't be named Keycloak beside the environment's Keycloak");
+
 		assertThatIllegalStateException().isThrownBy(() -> builder().tm1("legacy").tm1EngineOAuth2().build())
 			.withMessageContaining("OAuth 2.0 logins are a TM1 v12 engine's: add tm1Engine() too");
 		assertThatIllegalStateException().isThrownBy(() -> builder().tm1("legacy").keycloak().build())

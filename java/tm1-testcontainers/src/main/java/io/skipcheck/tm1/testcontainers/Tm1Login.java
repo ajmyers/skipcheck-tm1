@@ -262,7 +262,8 @@ public final class Tm1Login {
 			throw new IllegalStateException("TM1 takes its own token only where a session is asked for: use "
 					+ "session(\"Bearer \" + token()), or authorize for the cookie");
 		}
-		return request.header("Authorization", "Bearer " + token());
+		// Set, not added: a builder used again carries the new token alone
+		return request.setHeader("Authorization", "Bearer " + token());
 	}
 
 	@Override

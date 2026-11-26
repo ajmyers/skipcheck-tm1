@@ -110,6 +110,9 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 
 	static final String INSTALL_PATH = "/opt/ibm/tm1-engine";
 
+	private static final String OTHER_NETWORK = "The engine takes tokens from a Keycloak on another network, which "
+			+ "TM1 couldn't reach from this one: set the network before withOAuth2, or give the Keycloak the same";
+
 	private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(5);
 
 	private static final Duration COMMAND_TIMEOUT = Duration.ofMinutes(3);
@@ -219,8 +222,7 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 		if (joined != null && !Objects.equals(joined.getNetwork(), network)) {
 			// The Keycloak is the caller's, and may serve others: it isn't moved from
 			// here
-			throw new IllegalStateException("The engine takes tokens from a Keycloak on another network, which TM1 "
-					+ "couldn't reach from this one: set the network before withOAuth2, or give the Keycloak the same");
+			throw new IllegalStateException(OTHER_NETWORK);
 		}
 		super.withNetwork(network);
 		// At once, not when the engine starts: whatever starts the engine may start what
@@ -313,17 +315,36 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	 * @param keycloak the Keycloak to take tokens from
 	 * @return this container
 	 */
+	@SuppressWarnings("ReferenceEquality") // the very Keycloak, not one configured like
+											// it
 	public Tm1EngineContainer withOAuth2(KeycloakContainer keycloak) {
-		this.keycloak = Objects.requireNonNull(keycloak, "keycloak");
+		Objects.requireNonNull(keycloak, "keycloak");
+		if (this.keycloak == keycloak) {
+			return self();
+		}
+		if (this.keycloak != null) {
+			throw new IllegalStateException("The engine already takes tokens from another Keycloak, which would "
+					+ "start beside this one under the same name: give it one");
+		}
+		if (keycloak.isRunning()) {
+			// It gets its realm, and its place on the network, when it starts
+			throw new IllegalStateException("This Keycloak is already running, without the engine's realm: "
+					+ "give withOAuth2 one that isn't started, and the engine starts it");
+		}
+		// Asked for when Keycloak starts, so users added after this call are in it.
+		// First:
+		// it refuses a Keycloak that another engine uses
+		keycloak.withRealm(OAUTH2_REALM, this, this::realm);
 		if (keycloak.getNetwork() != null) {
 			withNetwork(keycloak.getNetwork());
 		}
 		else {
+			// The engine's own, or a new one if it was taken off it
+			joinNetwork();
 			keycloak.withNetwork(getNetwork());
 		}
+		this.keycloak = keycloak;
 		dependsOn(keycloak);
-		// Asked for when Keycloak starts, so users added after this call are in it
-		keycloak.withRealm(OAUTH2_REALM, this::realm);
 		// Keycloak's address on the network is what its tokens name, however they're
 		// fetched, and TM1 has to reach the issuer a token names
 		withEnv("TM1_OAUTH2_ISSUER_URL", keycloak.getNetworkUrl() + "/realms/" + OAUTH2_REALM);
@@ -618,8 +639,11 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 		try {
 			super.start();
 		}
-		catch (RuntimeException e) {
-			// Testcontainers stops the engine it couldn't start, not what it depends on
+		catch (Throwable e) {
+			// Testcontainers stops the engine it couldn't start, not what it depends on.
+			// Any
+			// failure: one of what it depends on comes as a checked exception, thrown
+			// unchecked
 			datastore.stop();
 			throw e;
 		}
@@ -631,6 +655,11 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 			withNetwork(Network.newNetwork());
 		}
 		datastore.withNetwork(getNetwork());
+		KeycloakContainer joined = keycloak;
+		if (joined != null && !Objects.equals(joined.getNetwork(), getNetwork())) {
+			// Moved since withOAuth2: TM1 couldn't reach its issuer
+			throw new IllegalStateException(OTHER_NETWORK);
+		}
 	}
 
 	@Override
