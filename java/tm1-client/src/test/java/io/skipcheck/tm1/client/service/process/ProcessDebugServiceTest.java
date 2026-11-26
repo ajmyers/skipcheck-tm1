@@ -181,16 +181,19 @@ class ProcessDebugServiceTest {
 
 	@Test
 	void saysWhereTheRunIs() {
-		tm1().json("{\"ID\":2,\"Enabled\":true}");
+		// Through the context's expand: TM1 before 11.8.035 refuses a GET of the
+		// navigation
+		tm1().json("{\"ID\":\"d1\",\"CurrentBreakpoint\":{\"ID\":2,\"Enabled\":true}}");
 		ProcessDebugContextBreakpoint current = conformance.call("processDebugging", "currentBreakpoint", "d1",
 				ODataQuery.none());
 		assertThat(current.id()).isEqualTo(2);
-		assertThat(tm1().last().key()).isEqualTo("GET ProcessDebugContexts('d1')/CurrentBreakpoint");
+		assertThat(tm1().last().key()).isEqualTo("GET ProcessDebugContexts('d1')?$select=ID&$expand=CurrentBreakpoint");
 
-		tm1().status(204);
+		tm1().json("{\"ID\":\"d1\",\"CurrentBreakpoint\":null}");
 		Object none = conformance.call("processDebugging", "currentBreakpoint", "d1", ODataQuery.none().select("ID"));
 		assertThat(none).isNull();
-		assertThat(tm1().last().target()).isEqualTo("ProcessDebugContexts('d1')/CurrentBreakpoint?$select=ID");
+		assertThat(tm1().last().target())
+			.isEqualTo("ProcessDebugContexts('d1')?$select=ID&$expand=CurrentBreakpoint($select%3DID)");
 
 		tm1().json("{\"value\":[{\"ID\":\"f0\",\"Procedure\":\"Prolog\",\"LineNumber\":3}]}");
 		List<ProcessDebugContextStackFrame> frames = conformance.call("processDebugging", "callStack", "d1",

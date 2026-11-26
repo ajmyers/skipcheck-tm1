@@ -272,15 +272,22 @@ public final class ProcessDebugService {
 	}
 
 	/**
-	 * {@code GET …/CurrentBreakpoint}: the breakpoint the run is paused at.
+	 * The breakpoint the run is paused at, read as the context's
+	 * {@code CurrentBreakpoint}, expanded:
+	 * {@code GET ProcessDebugContexts('id')?$select=ID&$expand=CurrentBreakpoint}. TM1
+	 * before 11.8.035 (Planning Analytics 2.1.2 to 2.1.16) refuses a {@code GET} of the
+	 * navigation itself ("GET not supported on this resource!", 400), though its
+	 * {@code $metadata} declares it; every version tried answers the expand.
 	 * @param id the context's ID
-	 * @param query what to select
+	 * @param query what to select of the breakpoint, applied inside the expand
 	 * @return the breakpoint, or empty if it isn't paused at one
 	 */
 	@Tm1Endpoint("Navigation ProcessDebugContext/CurrentBreakpoint")
 	public Mono<ProcessDebugContextBreakpoint> currentBreakpoint(String id, ODataQuery query) {
-		return session
-			.execute(Tm1Request.get(context(id).nav("CurrentBreakpoint"), query, ProcessDebugContextBreakpoint.class));
+		Objects.requireNonNull(query, "query");
+		return session.execute(Tm1Request.get(context(id),
+				ODataQuery.none().select("ID").expand("CurrentBreakpoint", nested -> query), ProcessDebugContext.class))
+			.mapNotNull(ProcessDebugContext::currentBreakpoint);
 	}
 
 	/**

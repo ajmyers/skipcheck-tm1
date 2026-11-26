@@ -3295,7 +3295,7 @@
 				{
 					"request" : {
 						"method" : "GET",
-						"target" : "ProcessDebugContexts('d1')/CurrentBreakpoint",
+						"target" : "ProcessDebugContexts('d1')?$select=ID&$expand=CurrentBreakpoint",
 						"headers" : {
 							"accept" : "application/json",
 							"odata-maxversion" : "4.0",
@@ -3308,8 +3308,11 @@
 							"content-type" : "application/json"
 						},
 						"json" : {
-							"ID" : 2,
-							"Enabled" : true
+							"ID" : "d1",
+							"CurrentBreakpoint" : {
+								"ID" : 2,
+								"Enabled" : true
+							}
 						}
 					}
 				}
@@ -3344,7 +3347,7 @@
 				{
 					"request" : {
 						"method" : "GET",
-						"target" : "ProcessDebugContexts('d1')/CurrentBreakpoint?$select=ID",
+						"target" : "ProcessDebugContexts('d1')?$select=ID&$expand=CurrentBreakpoint($select%3DID)",
 						"headers" : {
 							"accept" : "application/json",
 							"odata-maxversion" : "4.0",
@@ -3352,8 +3355,14 @@
 						}
 					},
 					"response" : {
-						"status" : 204,
-						"headers" : { }
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"ID" : "d1",
+							"CurrentBreakpoint" : null
+						}
 					}
 				}
 			],
