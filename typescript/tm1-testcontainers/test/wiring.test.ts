@@ -8,6 +8,7 @@ import {
   CognosContainer,
   CognosSource,
   DockerHost,
+  GenericContainer,
   IllegalArgumentException,
   IllegalStateException,
   KeycloakContainer,
@@ -618,6 +619,87 @@ describe("PlanningAnalyticsEnvironment", () => {
     expect(() => PlanningAnalyticsEnvironment.fromConfig(fixture("engine-image-only.yaml")).build().tm1Engine()).toThrow("no TM1 v12 engine");
   });
 
+  it("an engine takes OAuth2 tokens from the environment's Keycloak", () => {
+    const env = engineBuilder()
+      .tm1Engine((engine) => engine.withUser("analyst").withLogin("analyst", "analystpw"))
+      .tm1EngineOAuth2()
+      .build();
+    // Added for the engine, without Cognos
+    const keycloak = env.keycloak();
+    expect(env.tm1Engine().getKeycloak()).toBe(keycloak);
+    expect(keycloak.getNetwork()).toBe(env.network());
+    expect(env.tm1Engine().getNetwork()).toBe(env.network());
+    expect(env.tm1Engine().getDatastore().getNetwork()).toBe(env.network());
+    expect(env.tm1Engine().getEnvMap().get("TM1_OAUTH2_ISSUER_URL")).toBe("http://keycloak:8080/realms/tm1");
+    expect(env.containers()).toEqual([keycloak, env.tm1Engine()]);
+    expect(env.tm1Database("tm1").oauth2Login("analyst").getPassword()).toBe("analystpw");
+    // The engine starts Keycloak first, and Keycloak imports the realm with the user in it
+    expect(env.tm1Engine().getDependencies()).toContain(keycloak);
+    keycloak.configure();
+    expect(keycloak.getCommandParts()).toEqual(["start-dev", "--import-realm"]);
+    expect(keycloak.getCopiedContents().get("/opt/keycloak/data/import/tm1-realm.json")).toContain('"username": "analyst"');
+    // Its tokens name its address on the network, wherever they're fetched from
+    expect(keycloak.getEnvMap().get("KC_HOSTNAME")).toBe("http://keycloak:8080");
+    // A Keycloak that's there for the engine alone gives Cognos no OIDC namespace
+    const beside = engineBuilder()
+      .tm1("legacy")
+      .cognos((cognos) => cognos.withUser("admin", "adminpw"))
+      .tm1Engine((engine) => engine.withLogin("admin", "adminpw"))
+      .tm1EngineOAuth2()
+      .build();
+    expect(beside.cognos().getKeycloak()).toBeUndefined();
+    expect(beside.tm1Engine().getKeycloak()).toBe(beside.keycloak());
+    // One Keycloak for Cognos and the engine alike, when Keycloak was asked for
+    const both = engineBuilder()
+      .tm1("legacy")
+      .cognos((cognos) => cognos.withUser("admin", "adminpw"))
+      .keycloak()
+      .tm1Engine()
+      .tm1EngineOAuth2()
+      .build();
+    expect(both.tm1Engine().getKeycloak()).toBe(both.keycloak());
+    expect(both.cognos().getKeycloak()).toBe(both.keycloak());
+
+    // A server can't take the Keycloak's name on the network
+    expect(() => engineBuilder().tm1("Keycloak").tm1Engine().tm1EngineOAuth2().build()).toThrow(
+      "A TM1 server can't be named Keycloak beside the environment's Keycloak: that's its name on the network",
+    );
+    expect(() =>
+      builder()
+        .tm1("keycloak")
+        .cognos((cognos) => cognos.withUser("admin", "adminpw"))
+        .keycloak()
+        .build(),
+    ).toThrow("A TM1 server can't be named keycloak beside the environment's Keycloak");
+    // Without a Keycloak the name is free
+    expect(builder().tm1("keycloak").build().tm1Servers().has("keycloak")).toBe(true);
+
+    expect(() => builder().tm1("legacy").tm1EngineOAuth2().build()).toThrow(IllegalStateException);
+    expect(() => builder().tm1("legacy").tm1EngineOAuth2().build()).toThrow("OAuth 2.0 logins are a TM1 v12 engine's: add tm1Engine() too");
+    expect(() => builder().tm1("legacy").keycloak().build()).toThrow("add cognos(...) or tm1EngineOAuth2() too");
+  });
+
+  it("from config turns OAuth2 on with the users who have a password", () => {
+    const env = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-oauth2.yaml")).build();
+    const engine = env.tm1Engine();
+    expect(engine.getKeycloak()).toBe(env.keycloak());
+    engine.configure();
+    // TM1 gets names and groups; Keycloak the passwords
+    expect(engine.getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts,boss,viewer,planner:Planners");
+    const db = env.tm1Database("tm1");
+    expect(db.oauth2Login("analyst").getPassword()).toBe("analyst$pw");
+    expect(db.oauth2Login("boss").getPassword()).toBe("bosspw");
+    expect(db.oauth2Login("planner").getPassword()).toBe("plannerpw");
+    expect(() => db.oauth2Login("viewer")).toThrow(IllegalArgumentException);
+
+    // oauth2: false is off, with the passwords in the file left readable
+    const off = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-oauth2-off.yaml")).build();
+    expect(off.tm1Engine().getKeycloak()).toBeUndefined();
+    expect(off.tm1Engine().getEnvMap().has("TM1_OAUTH2_ISSUER_URL")).toBe(false);
+    expect(() => off.keycloak()).toThrow("no Keycloak");
+    expect(() => off.tm1Database("tm1").oauth2Login("analyst")).toThrow("give it a Keycloak with withOAuth2");
+  });
+
   it("an environment with an engine can't be reused", () => {
     // Whatever the developer's switch says: the same code must do the same everywhere
     for (const enabled of [true, false]) {
@@ -758,6 +840,212 @@ describe("Tm1Engine wiring", () => {
     // The shared engine isn't kept between runs, and neither is one of your own
     expect(engine.isShouldBeReused()).toBe(false);
     expect(datastore.isShouldBeReused()).toBe(false);
+  });
+
+  it("takes OAuth2 tokens from a Keycloak on its network", () => {
+    const keycloak = new KeycloakContainer();
+    const engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak);
+    // Keycloak's address on the network is what its tokens name, and what TM1 can reach
+    expect(engine.getEnvMap().get("TM1_OAUTH2_ISSUER_URL")).toBe("http://keycloak:8080/realms/tm1");
+    expect(engine.getEnvMap().get("TM1_OAUTH2_AUDIENCE")).toBe("tm1");
+    expect(engine.getEnvMap().get("TM1_OAUTH2_ID_CLAIMS")).toBe("preferred_username");
+    expect(keycloak.getEnvMap().get("KC_HOSTNAME")).toBe("http://keycloak:8080");
+    expect(keycloak.getNetwork()).toBeInstanceOf(Network);
+    expect(keycloak.getNetwork()).toBe(engine.getNetwork());
+    expect(engine.getDatastore().getNetwork()).toBe(engine.getNetwork());
+    expect(engine.getDependencies()).toContain(keycloak);
+    expect(engine.getDependencies()).toContain(engine.getDatastore());
+    expect(engine.getKeycloak()).toBe(keycloak);
+    expect(new Tm1EngineContainer(SOURCE).getKeycloak()).toBeUndefined();
+    expect(Tm1EngineContainer.OAUTH2_REALM).toBe("tm1");
+    expect(Tm1EngineContainer.OAUTH2_CLIENT).toBe("tm1");
+
+    // Moved off the Keycloak's network, TM1 couldn't reach its issuer
+    expect(() => engine.withNetwork(Network.newNetwork())).toThrow(IllegalStateException);
+    expect(() => engine.withNetwork(Network.newNetwork())).toThrow("set the network before withOAuth2, or give the Keycloak the same");
+    expect(engine.getNetwork()).toBe(keycloak.getNetwork());
+    expect(engine.withNetwork(keycloak.getNetwork())).toBe(engine);
+
+    // A Keycloak that has a network already is joined there, the datastore too
+    const network = Network.newNetwork();
+    const placed = new KeycloakContainer().withNetwork(network);
+    const joining = new Tm1EngineContainer(SOURCE).withOAuth2(placed);
+    expect(joining.getNetwork()).toBe(network);
+    expect(joining.getDatastore().getNetwork()).toBe(network);
+  });
+
+  it("Keycloak imports the realm as it is when Keycloak starts", () => {
+    const keycloak = new KeycloakContainer().withCommand("start-dev", "--features=token-exchange");
+    const engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak);
+    // Added after withOAuth2, and still in the realm: it's asked for at Keycloak's start
+    engine.withUser("analyst").withLogin("analyst", "analystpw");
+    keycloak.configure();
+    // The import is added to the command it has: a caller's own options stay
+    expect(keycloak.getCommandParts()).toEqual(["start-dev", "--features=token-exchange", "--import-realm"]);
+    expect([...keycloak.realmFiles().keys()]).toEqual(["/opt/keycloak/data/import/tm1-realm.json"]);
+    expect([...keycloak.realmFiles().values()][0]).toBe(engine.realm());
+    expect(engine.realm()).toContain('"analyst"');
+    // And it's what is written into the container
+    expect(keycloak.getCopiedContents()).toEqual(keycloak.realmFiles());
+    // Configured again, the import isn't added twice
+    keycloak.configure();
+    expect(keycloak.getCommandParts()).toEqual(["start-dev", "--features=token-exchange", "--import-realm"]);
+    // Without a realm, Keycloak starts as it was
+    const plain = new KeycloakContainer();
+    plain.configure();
+    expect(plain.getCommandParts()).toEqual(["start-dev"]);
+  });
+
+  it("an engine has one Keycloak of its own that it starts", async () => {
+    const keycloak = new KeycloakContainer();
+    const engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak);
+    // The same again is nothing new
+    expect(
+      engine
+        .withOAuth2(keycloak)
+        .getDependencies()
+        .filter((d) => d === keycloak),
+    ).toHaveLength(1);
+    // A second would start beside the first, under the same name on the network
+    expect(() => engine.withOAuth2(new KeycloakContainer())).toThrow(IllegalStateException);
+    expect(() => engine.withOAuth2(new KeycloakContainer())).toThrow("already takes tokens from another Keycloak");
+    expect(engine.getKeycloak()).toBe(keycloak);
+    // And another engine's realm would replace this one's
+    const second = new Tm1EngineContainer(SOURCE);
+    expect(() => second.withOAuth2(keycloak)).toThrow(IllegalStateException);
+    expect(() => second.withOAuth2(keycloak)).toThrow(
+      "This Keycloak already gives another TM1 v12 engine its realm (tm1): each engine needs a Keycloak of its own",
+    );
+    // Refused, it's left as it was
+    expect(second.getKeycloak()).toBeUndefined();
+    expect(second.getDependencies()).toEqual([second.getDatastore()]);
+    expect(second.getEnvMap().has("TM1_OAUTH2_ISSUER_URL")).toBe(false);
+    // One that's already running has neither the realm nor its place on the network
+    const running = new (class extends KeycloakContainer {
+      override isRunning(): boolean {
+        return true;
+      }
+    })();
+    expect(() => new Tm1EngineContainer(SOURCE).withOAuth2(running)).toThrow(
+      "This Keycloak is already running, without the engine's realm: give withOAuth2 one that isn't started, and the engine starts it",
+    );
+    // An engine taken off its network gets one again, and the Keycloak with it
+    const off = new Tm1EngineContainer(SOURCE).withNetwork(undefined).withOAuth2(new KeycloakContainer());
+    expect(off.getNetwork()).toBeInstanceOf(Network);
+    expect(off.getKeycloak()!.getNetwork()).toBe(off.getNetwork());
+    expect(off.getDatastore().getNetwork()).toBe(off.getNetwork());
+    // A Keycloak moved since is found when the engine is configured, not by TM1
+    keycloak.withNetwork(Network.newNetwork());
+    expect(() => engine.configure()).toThrow(IllegalStateException);
+    expect(() => engine.configure()).toThrow("set the network before withOAuth2");
+    // Or started: before anything is, the datastore included
+    const start = vi.spyOn(engine.getDatastore(), "start");
+    await expect(engine.start()).rejects.toThrow("set the network before withOAuth2");
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it("gives Keycloak a realm with the users who have a password", () => {
+    const keycloak = new KeycloakContainer();
+    const engine = new Tm1EngineContainer(SOURCE)
+      .withOAuth2(keycloak)
+      // After withOAuth2: the realm is asked for when Keycloak starts
+      .withUser("analyst", "Analysts")
+      .withUser("viewer")
+      .withLogin("analyst", "an$pw")
+      .withLogin("Admin", "adminpw");
+    // viewer has no password, so nothing to log in to Keycloak with; admin is always a user
+    expect(JSON.parse(engine.realm())).toEqual({
+      realm: "tm1",
+      enabled: true,
+      clients: [
+        {
+          clientId: "tm1",
+          publicClient: true,
+          directAccessGrantsEnabled: true,
+          standardFlowEnabled: false,
+          protocolMappers: [
+            {
+              name: "tm1-audience",
+              protocol: "openid-connect",
+              protocolMapper: "oidc-audience-mapper",
+              config: { "included.custom.audience": "tm1", "access.token.claim": "true", "id.token.claim": "false" },
+            },
+          ],
+        },
+      ],
+      users: [
+        {
+          username: "analyst",
+          enabled: true,
+          emailVerified: true,
+          email: "user1@example.com",
+          firstName: "analyst",
+          lastName: "Test",
+          credentials: [{ type: "password", value: "an$pw", temporary: false }],
+        },
+        {
+          username: "Admin",
+          enabled: true,
+          emailVerified: true,
+          email: "user2@example.com",
+          firstName: "Admin",
+          lastName: "Test",
+          credentials: [{ type: "password", value: "adminpw", temporary: false }],
+        },
+      ],
+    });
+    // TM1 gets names and groups only
+    engine.configure();
+    expect(engine.getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts,viewer");
+    // Keycloak imports the realm as it is when Keycloak starts: nothing before that
+    expect(keycloak.getCommandParts()).toEqual(["start-dev"]);
+    expect(keycloak.getCopiedContents().size).toBe(0);
+    engine.withUser("late").withLogin("late", "latepw");
+    keycloak.configure();
+    expect(keycloak.getCommandParts()).toEqual(["start-dev", "--import-realm"]);
+    expect([...keycloak.getCopiedContents().keys()]).toEqual(["/opt/keycloak/data/import/tm1-realm.json"]);
+    expect(keycloak.getCopiedContents().get("/opt/keycloak/data/import/tm1-realm.json")).toBe(engine.realm());
+    expect(JSON.parse(engine.realm()).users.map((u: { username: string }) => u.username)).toEqual(["analyst", "Admin", "late"]);
+    // Configured again, it's still the one file
+    keycloak.configure();
+    expect(keycloak.getCopiedContents().size).toBe(1);
+    // A Keycloak nothing gave a realm starts as it always did
+    const plain = new KeycloakContainer();
+    plain.configure();
+    expect(plain.getCommandParts()).toEqual(["start-dev"]);
+  });
+
+  it("refuses an OAuth2 login it can't give", async () => {
+    const engine = new Tm1EngineContainer(SOURCE).withUser("analyst").withLogin("analyst", "pw");
+    const database = engine.database("tm1");
+    expect(() => database.oauth2Login("analyst")).toThrow(IllegalStateException);
+    expect(() => database.oauth2Login("analyst")).toThrow("give it a Keycloak with withOAuth2");
+    engine.withOAuth2(new KeycloakContainer());
+    expect(() => database.oauth2Login("viewer")).toThrow(IllegalArgumentException);
+    expect(() => database.oauth2Login("viewer")).toThrow("viewer has no password to log in with: give one with withLogin. Those who have: [analyst]");
+    // A name is one whatever its case: to log in as, and a second password replaces the first
+    expect(database.oauth2Login("ANALYST").getUser()).toBe("analyst");
+    engine.withLogin("Analyst", "second");
+    expect(database.oauth2Login("analyst").getPassword()).toBe("second");
+    expect(JSON.parse(engine.realm()).users).toHaveLength(1);
+    engine.withLogin("analyst", "pw");
+    // Made before the engine has started: it asks for addresses only when it needs them
+    const login = database.oauth2Login("analyst");
+    expect(login.isOAuth2()).toBe(true);
+    expect(login.getPassword()).toBe("pw");
+    expect(login.getClientId()).toBe("tm1");
+    expect(login.getClientSecret()).toBe("");
+    expect(login.getInstance()).toBe("tm1");
+    expect(String(login)).toBe("Tm1Login[analyst in tm1]");
+    // And has no session endpoint to ask
+    await expect(login.session("Bearer x")).rejects.toThrow(IllegalStateException);
+    await expect(login.session("Bearer x")).rejects.toThrow("An OAuth 2.0 login has no session to ask for");
+    expect(() => engine.withLogin("analyst", "")).toThrow(IllegalArgumentException);
+    expect(() => engine.withLogin("two words", "pw")).toThrow(IllegalArgumentException);
+    // A password for someone who isn't a user is a mistake, found when the realm is made
+    const stray = new Tm1EngineContainer(SOURCE).withLogin("nobody", "pw");
+    expect(() => stray.realm()).toThrow(IllegalStateException);
+    expect(() => stray.realm()).toThrow("nobody has a password (withLogin) but isn't a user of the engine: add them with withUser");
   });
 
   it("its datastore is on its network before anything starts", () => {
@@ -957,6 +1245,28 @@ describe("A running Tm1EngineContainer", () => {
     expect(neither.asked.filter((a) => a.includes("database")).length).toBe(2);
   });
 
+  it("stops a datastore that was still starting when the engine's start failed", async () => {
+    // Keycloak fails at once (here, by a password for someone who isn't a user) while MongoDB is
+    // still starting: the engine's start ends only once the datastore's has, so its stop finds
+    // what there is to stop. Each fails before Docker is asked for anything
+    const keycloak = new KeycloakContainer();
+    const engine = new Tm1EngineContainer(new Tm1EngineSource.PrivateImage("tm1-engine:test")).withLogin("nobody", "pw").withOAuth2(keycloak);
+    const datastore = engine.getDatastore();
+    const order: string[] = [];
+    vi.spyOn(datastore as unknown as { dependenciesStarted(): Promise<void> }, "dependenciesStarted").mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      order.push("the datastore's start ended");
+      throw new Error("no Docker here");
+    });
+    const stop = vi.spyOn(datastore, "stop");
+    await expect(engine.start().finally(() => order.push("the engine's start ended"))).rejects.toThrow(
+      "nobody has a password (withLogin) but isn't a user of the engine",
+    );
+    expect(order).toEqual(["the datastore's start ended", "the engine's start ended"]);
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(datastore.isRunning()).toBe(false);
+  });
+
   it("stops the datastore when the engine can't start", async () => {
     const engine = new Tm1EngineContainer(new Tm1EngineSource.PrivateImage("tm1-engine:test"));
     const datastore = engine.getDatastore();
@@ -1027,5 +1337,44 @@ describe("The wait for TM1 to be set up", () => {
         1,
       ),
     ).rejects.toThrow(/^Timed out after PT0S waiting for TM1 to be set up\. /);
+  });
+});
+
+/** What every container does around its start, without Docker: a container whose start ends
+ * before Docker is asked for anything. */
+describe("GenericContainer", () => {
+  class Slow extends GenericContainer {
+    readonly order: string[] = [];
+
+    constructor(private readonly ms: number) {
+      super("example.com/made-up:1");
+    }
+
+    protected override async dependenciesStarted(): Promise<void> {
+      await new Promise((resolve) => setTimeout(resolve, this.ms));
+      this.order.push("start ended");
+      throw new Error("no Docker here");
+    }
+  }
+
+  it("waits for a start that's under way before it stops", async () => {
+    // Until the start ends there's no container to stop: a stop that found nothing and returned
+    // would leave the container that then came up running
+    const container = new Slow(50);
+    const starting = container.start().catch((e: unknown) => e);
+    await container.stop();
+    container.order.push("stop returned");
+    expect(container.order).toEqual(["start ended", "stop returned"]);
+    expect(String(await starting)).toContain("no Docker here");
+    expect(container.isRunning()).toBe(false);
+    // And a start that failed doesn't fail the stop, nor a later one
+    await container.stop();
+    await container[Symbol.asyncDispose]();
+  });
+
+  it("stops at once when nothing was started", async () => {
+    const container = new Slow(60_000);
+    await container.stop();
+    expect(container.order).toEqual([]);
   });
 });

@@ -50,6 +50,7 @@ class _Cognos:
 @dataclass(frozen=True)
 class _EngineUser:
     name: str
+    password: str
     groups: list[str]
 
 
@@ -58,6 +59,7 @@ class _Engine:
     # name -> instance, in the file's order
     databases: dict[str, str]
     users: list[_EngineUser]
+    oauth2: bool
 
 
 def read(path: Path | str) -> PlanningAnalyticsEnvironment.Builder:
@@ -220,8 +222,9 @@ class _Reader:
         engine: _Engine | None = None
         engine_port: int | None = None
         datastore_port: int | None = None
+        engine_keycloak_port: int | None = None
         if engine_section is not None:
-            self._keys(engine_section, ["port", "databases", "users", "datastore"], "tm1Engine")
+            self._keys(engine_section, ["port", "databases", "users", "datastore", "oauth2"], "tm1Engine")
             databases: dict[str, str] = {}
             raw = engine_section.get("databases")
             if raw is None:
@@ -248,25 +251,36 @@ class _Reader:
             if not isinstance(listed_users, list):
                 raise self.error("tm1Engine.users must be a list, e.g. users: [analyst::Analysts]")
             # Every user is checked before any is found twice, as pa_setup does
-            engine_users = [self._engine_user(entry, f"tm1Engine.users[{u}]") for u, entry in enumerate(listed_users)]
+            # With oauth2 in the section a password is meant, so user:password says what it means:
+            # on, or false to keep the passwords with OAuth 2.0 off
+            password_used = engine_section.get("oauth2") is not None
+            engine_users = [self._engine_user(entry, f"tm1Engine.users[{u}]", password_used) for u, entry in enumerate(listed_users)]
             engine_names = [user.name.lower() for user in engine_users]
             if len(set(engine_names)) != len(engine_names):
                 raise self.error("tm1Engine.users: a user is listed twice")
             datastore = engine_section.get("datastore")
             ds = {} if datastore is None or isinstance(datastore, bool) else self._keys(datastore, ["port"], "tm1Engine.datastore")
+            # Before the ports, as pa_setup: a file wrong in both says the same in each reader
+            oauth2 = engine_section.get("oauth2")
+            # On with true or a mapping, an empty one too: only absent or false is off
+            if oauth2 is not None and oauth2 is not False:
+                o = self._keys({} if oauth2 is True else oauth2, ["keycloakPort"], "tm1Engine.oauth2")
+                if all(not user.password for user in engine_users):
+                    raise self.error("tm1Engine.oauth2: needs a user with a password to log in as, e.g. users: [analyst:analystpw:Analysts]")
+                engine_keycloak_port = self._port(o.get("keycloakPort"), "tm1Engine.oauth2", 8181)
             engine_port = self._port(engine_section.get("port"), "tm1Engine", 4444)
             # Published only when a port is given
             datastore_port = None if ds.get("port") is None else self._port(ds.get("port"), "tm1Engine.datastore", 27017)
             for name in servers:
-                # The engine's two compose services in pa-setup: a server of that name would be
+                # The engine's compose services in pa-setup: a server of that name would be
                 # replaced by them
-                if name.lower() in ("tm1-engine", "tm1-engine-mongo"):
+                if name.lower() in ("tm1-engine", "tm1-engine-mongo") or (engine_keycloak_port is not None and name.lower() == "tm1-engine-keycloak"):
                     raise self.error(f"tm1.servers.{name}: that name is the TM1 v12 engine's here; give the server another")
-            engine = _Engine(databases, engine_users)
+            engine = _Engine(databases, engine_users, engine_keycloak_port is not None)
 
         if not servers and cam is None and engine is None:
             raise self.error("nothing to run: add tm1.servers, tm1Engine and/or cognos")
-        ports = [p for p in (engine_port, datastore_port) if p is not None]
+        ports = [p for p in (engine_port, datastore_port, engine_keycloak_port) if p is not None]
         ports += [s.port for s in servers.values()]
         ports += [p for p in (admin, web_port) if p is not None]
         if cam is not None:
@@ -294,10 +308,17 @@ class _Reader:
                 # TM1 v12 keeps no passwords: a user's is checked and not used
                 for user in wanted.users:
                     container.with_user(user.name, *user.groups)
+                if wanted.oauth2:
+                    # With OAuth 2.0 a password is the user's at Keycloak
+                    for user in wanted.users:
+                        if user.password:
+                            container.with_login(user.name, user.password)
 
             b.tm1_engine()
             # Kept apart from the caller's customizer, which a later tm1_engine(...) sets
             b._file_tm1_engine = customize
+            if engine.oauth2:
+                b.tm1_engine_oauth2()
         # Whatever the file's sections: an engine added in code runs the file's image too
         b._tm1_engine_image = _image(images, "tm1Engine")
         return b
@@ -370,7 +391,7 @@ class _Reader:
                 raise self.error(f"{where}: group '{_text(g)}' must be letters, digits, '.', '_' and '-'")
         return User(name, password, tuple(groups))
 
-    def _engine_user(self, entry: Any, where: str) -> _EngineUser:
+    def _engine_user(self, entry: Any, where: str, password_used: bool) -> _EngineUser:
         """pa_setup.parse_user with password_optional: an engine's user, whose password may be left
         out or empty, since TM1 v12 keeps none."""
         name: Any
@@ -378,9 +399,12 @@ class _Reader:
         groups: list[Any] = []
         if isinstance(entry, str):
             parts = entry.split(":")
-            if len(parts) == 2 and parts[1]:
+            if len(parts) == 2 and parts[1] and not password_used:
                 # The image's own form has groups there; here the second part is a password
-                raise self.error(f"{where}: '{entry}' reads as a password, which TM1 v12 doesn't keep: for a group, write {parts[0]}::{parts[1]}")
+                raise self.error(
+                    f"{where}: '{entry}' reads as a password, which TM1 v12 doesn't keep: for a group, write {parts[0]}::{parts[1]}. "
+                    "(A password kept for OAuth 2.0 logins needs oauth2 in the section: oauth2: false keeps it, off.)"
+                )
             if len(parts) > 3:
                 raise self.error(f"{where}: expected user, user::group,group or user:password:group,group, not '{entry}'")
             name = parts[0]
@@ -404,7 +428,7 @@ class _Reader:
         for g in groups:
             if not isinstance(g, str) or not _USER.fullmatch(g):
                 raise self.error(f"{where}: group '{_text(g)}' must be letters, digits, '.', '_' and '-'")
-        return _EngineUser(name, [str(g) for g in groups])
+        return _EngineUser(name, password, [str(g) for g in groups])
 
     def _cfg_value(self, value: Any, where: str) -> str:
         """A tm1s.cfg value as pa_setup writes it, with str(): true is True."""

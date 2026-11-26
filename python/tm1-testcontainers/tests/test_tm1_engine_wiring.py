@@ -4,13 +4,14 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 import pytest
 
-from skipcheck_tm1_testcontainers import Network, RequiresTm1Engine, Tm1EngineContainer, Tm1EngineSource, plugin
-from skipcheck_tm1_testcontainers.engine import database_name
+from skipcheck_tm1_testcontainers import KeycloakContainer, Network, RequiresTm1Engine, Tm1EngineContainer, Tm1EngineSource, plugin
+from skipcheck_tm1_testcontainers.engine import Tm1Login, database_name
 
 SOURCE = Tm1EngineSource.PrivateImage("tm1-engine:test")
 
@@ -73,6 +74,92 @@ def test_runs_its_datastore_on_its_own_network() -> None:
     # Both are this library's, like every container it starts
     assert engine._labels["io.skipcheck.tm1.testcontainers"] == "python"
     assert datastore._labels["io.skipcheck.tm1.testcontainers"] == "python"
+
+
+def test_takes_o_auth2_tokens_from_a_keycloak_on_its_network() -> None:
+    keycloak = KeycloakContainer()
+    engine = Tm1EngineContainer(SOURCE).with_oauth2(keycloak)
+    # Keycloak's address on the network is what its tokens name, and what TM1 can reach
+    assert engine.env_map["TM1_OAUTH2_ISSUER_URL"] == "http://keycloak:8080/realms/tm1"
+    assert engine.env_map["TM1_OAUTH2_AUDIENCE"] == "tm1"
+    assert engine.env_map["TM1_OAUTH2_ID_CLAIMS"] == "preferred_username"
+    assert keycloak.network is not None
+    assert keycloak.network is engine.network
+    assert keycloak.network is engine.datastore.network
+    assert keycloak in engine.dependencies and engine.datastore in engine.dependencies
+    assert engine.keycloak is keycloak
+    assert Tm1EngineContainer(SOURCE).keycloak is None
+
+    # Moved off the Keycloak's network, TM1 couldn't reach its issuer
+    with pytest.raises(RuntimeError, match="set the network before with_oauth2"):
+        engine.with_network(Network.new_network())
+    assert engine.network is keycloak.network and engine.datastore.network is keycloak.network
+    assert engine.with_network(keycloak.network) is engine
+
+    # A Keycloak that has a network already is joined there, the datastore too
+    network = Network.new_network()
+    placed = KeycloakContainer().with_network(network)
+    joining = Tm1EngineContainer(SOURCE).with_oauth2(placed)
+    assert joining.network is network
+    assert joining.datastore.network is network
+
+
+def test_gives_keycloak_a_realm_with_the_users_who_have_a_password() -> None:
+    keycloak = KeycloakContainer()
+    engine = (
+        Tm1EngineContainer(SOURCE)
+        .with_oauth2(keycloak)
+        # After with_oauth2: the realm is asked for when Keycloak starts
+        .with_user("analyst", "Analysts")
+        .with_user("viewer")
+        .with_login("analyst", "an$pw")
+        .with_login("Admin", "adminpw")
+    )
+    realm = json.loads(engine._realm())
+    assert realm["realm"] == "tm1"
+    client = realm["clients"][0]
+    assert client["clientId"] == "tm1"
+    assert client["publicClient"] is True
+    assert client["directAccessGrantsEnabled"] is True
+    mapper = client["protocolMappers"][0]
+    assert mapper["protocolMapper"] == "oidc-audience-mapper"
+    assert mapper["config"]["included.custom.audience"] == "tm1"
+    # viewer has no password, so nothing to log in to Keycloak with; admin is always a user
+    assert len(realm["users"]) == 2
+    assert realm["users"][0]["username"] == "analyst"
+    assert realm["users"][0]["credentials"][0]["value"] == "an$pw"
+    assert realm["users"][0]["email"] == "user1@example.com"
+    assert realm["users"][1]["username"] == "Admin"
+    # TM1 gets names and groups only
+    engine.configure()
+    assert engine.env_map["TM1_USERS"] == "analyst:Analysts,viewer"
+
+
+def test_refuses_an_o_auth2_login_it_cant_give() -> None:
+    engine = Tm1EngineContainer(SOURCE).with_user("analyst").with_login("analyst", "pw")
+    database = engine.database("tm1")
+    with pytest.raises(RuntimeError, match="give it a Keycloak with with_oauth2"):
+        database.oauth2_login("analyst")
+    engine.with_oauth2(KeycloakContainer())
+    with pytest.raises(ValueError, match="viewer has no password to log in with"):
+        database.oauth2_login("viewer")
+    # A name is one whatever its case: to log in as, and a second password replaces the first
+    assert database.oauth2_login("ANALYST").user == "analyst"
+    engine.with_login("Analyst", "second")
+    assert database.oauth2_login("analyst").password == "second"
+    assert len(json.loads(engine._realm())["users"]) == 1
+    engine.with_login("analyst", "pw")
+    assert database.oauth2_login("analyst").is_oauth2
+    assert database.oauth2_login("analyst").password == "pw"
+    assert database.oauth2_login("analyst").client_id == "tm1"
+    with pytest.raises(ValueError):
+        engine.with_login("analyst", "")
+    with pytest.raises(ValueError):
+        engine.with_login("two words", "pw")
+    # A password for someone who isn't a user is a mistake, found when the realm is made
+    stray = Tm1EngineContainer(SOURCE).with_login("nobody", "pw")
+    with pytest.raises(RuntimeError, match="isn't a user of the engine"):
+        stray._realm()
 
 
 def test_its_datastore_is_on_its_network_before_anything_starts() -> None:
@@ -177,6 +264,204 @@ def test_stops_its_datastore_and_closes_its_network_when_removing_the_engine_fai
     with pytest.raises(OSError, match="stuck"):
         engine.stop()
     assert given.closed == 0 and own.closed == 2
+
+
+def test_the_realm_is_exactly_what_keycloak_imports_as_java_writes_it() -> None:
+    engine = Tm1EngineContainer(SOURCE).with_user("analyst").with_login("analyst", "an$pw")
+    assert json.loads(engine._realm()) == {
+        "realm": "tm1",
+        "enabled": True,
+        "clients": [
+            {
+                "clientId": "tm1",
+                "publicClient": True,
+                "directAccessGrantsEnabled": True,
+                "standardFlowEnabled": False,
+                "protocolMappers": [
+                    {
+                        "name": "tm1-audience",
+                        "protocol": "openid-connect",
+                        "protocolMapper": "oidc-audience-mapper",
+                        "config": {"included.custom.audience": "tm1", "access.token.claim": "true", "id.token.claim": "false"},
+                    }
+                ],
+            }
+        ],
+        "users": [
+            {
+                "username": "analyst",
+                "enabled": True,
+                "emailVerified": True,
+                "email": "user1@example.com",
+                "firstName": "analyst",
+                "lastName": "Test",
+                "credentials": [{"type": "password", "value": "an$pw", "temporary": False}],
+            }
+        ],
+    }
+
+
+def test_keycloak_imports_the_realm_as_it_is_when_keycloak_starts() -> None:
+    keycloak = KeycloakContainer()
+    assert keycloak.command_parts == ["start-dev"]
+    keycloak.configure()
+    assert keycloak.command_parts == ["start-dev"] and keycloak._transferable_specs == []
+    # One issuer for the engine and the tests, whichever address they use
+    assert keycloak.env_map["KC_HOSTNAME"] == "http://keycloak:8080"
+
+    engine = Tm1EngineContainer(SOURCE).with_oauth2(keycloak)
+    keycloak.configure()
+    engine.with_user("analyst").with_login("analyst", "pw")
+    # Configured again, as when it starts: the realm of now, once
+    keycloak.configure()
+    assert keycloak.command_parts == ["start-dev", "--import-realm"]
+    ((copied, destination, mode),) = keycloak._transferable_specs
+    assert destination == "/opt/keycloak/data/import/tm1-realm.json"
+    assert mode == 0o644
+    assert json.loads(copied)["users"][0]["username"] == "analyst"
+
+    # Java's: the import is added to the command Keycloak has, so a caller's own options stay
+    own = KeycloakContainer().with_command(["start-dev", "--features=token-exchange"])
+    taking = Tm1EngineContainer(SOURCE).with_oauth2(own)
+    # Added after with_oauth2, and still in the realm: it's asked for at Keycloak's start
+    taking.with_user("analyst").with_login("analyst", "analystpw")
+    own.configure()
+    assert own.command_parts == ["start-dev", "--features=token-exchange", "--import-realm"]
+    assert list(own._realm_files()) == ["/opt/keycloak/data/import/tm1-realm.json"]
+    (realm,) = own._realm_files().values()
+    assert realm == taking._realm() and '"analyst"' in realm
+    own.configure()
+    assert own.command_parts == ["start-dev", "--features=token-exchange", "--import-realm"]
+    # Without a realm, Keycloak starts as it was
+    plain = KeycloakContainer()
+    plain.configure()
+    assert plain.command_parts == ["start-dev"]
+
+
+def test_an_engine_has_one_keycloak_of_its_own_that_it_starts() -> None:
+    keycloak = KeycloakContainer()
+    engine = Tm1EngineContainer(SOURCE).with_oauth2(keycloak)
+    # The same again is nothing new
+    assert engine.with_oauth2(keycloak).dependencies.count(keycloak) == 1
+    # A second would start beside the first, under the same name on the network
+    with pytest.raises(RuntimeError, match="already takes tokens from another Keycloak"):
+        engine.with_oauth2(KeycloakContainer())
+    # And another engine's realm would replace this one's
+    with pytest.raises(RuntimeError, match="each engine needs a Keycloak of its own"):
+        Tm1EngineContainer(SOURCE).with_oauth2(keycloak)
+    # An engine taken off its network gets one again, and the Keycloak with it
+    off = Tm1EngineContainer(SOURCE).with_network(None).with_oauth2(KeycloakContainer())
+    assert off.network is not None
+    assert off.keycloak is not None and off.network is off.keycloak.network
+    assert off.datastore.network is off.network
+    # A Keycloak moved since is found when the engine is configured, not by TM1
+    keycloak.with_network(Network.new_network())
+    with pytest.raises(RuntimeError, match="set the network before with_oauth2"):
+        engine.configure()
+
+
+def test_refuses_a_keycloak_that_is_already_running() -> None:
+    class Running(KeycloakContainer):
+        @property
+        def is_running(self) -> bool:
+            return True
+
+    running = Running()
+    engine = Tm1EngineContainer(SOURCE)
+    with pytest.raises(RuntimeError, match="This Keycloak is already running, without the engine's realm"):
+        engine.with_oauth2(running)
+    # And nothing of it was taken: not the realm, the network or the dependency
+    assert engine.keycloak is None and running not in engine.dependencies and running.network is None
+    assert "TM1_OAUTH2_ISSUER_URL" not in engine.env_map
+    assert running._realm_files() == {}
+
+
+def test_a_failed_start_stops_the_datastore_whatever_was_thrown() -> None:
+    class Failed(BaseException):
+        pass
+
+    keycloak = KeycloakContainer()
+    engine = Tm1EngineContainer(SOURCE).with_oauth2(keycloak)
+    stopped: list[bool] = []
+    engine.datastore.start = lambda: engine.datastore  # type: ignore[method-assign]
+    engine.datastore.stop = lambda *_, **__: stopped.append(True)  # type: ignore[method-assign]
+
+    def failing() -> KeycloakContainer:
+        # What the engine depends on fails, as its Keycloak may
+        raise Failed
+
+    keycloak.start = failing  # type: ignore[method-assign]
+    with pytest.raises(Failed):
+        engine.start()
+    assert stopped == [True]
+
+
+def test_a_token_replaces_the_one_a_request_already_carries(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx2
+
+    keycloak = KeycloakContainer()
+    tokens = iter(["first", "second", "third"])
+    monkeypatch.setattr(keycloak, "_access_token", lambda *_: next(tokens))
+    login = Tm1EngineContainer(SOURCE).with_user("analyst").with_login("analyst", "pw").with_oauth2(keycloak).database("tm1").oauth2_login("analyst")
+    headers = login.authorize_with_token({"Authorization": "Bearer stale"})
+    assert login.authorize_with_token(headers) == {"Authorization": "Bearer second"}
+    request = login.authorize_with_token(httpx2.Request("GET", "http://localhost:1/", headers={"Authorization": "Bearer stale"}))
+    assert request.headers.get_list("authorization") == ["Bearer third"]
+
+
+def test_a_keycloak_that_cant_be_reached_is_named_as_keycloak(monkeypatch: pytest.MonkeyPatch) -> None:
+    import socket
+
+    with socket.socket() as s:
+        s.bind(("localhost", 0))
+        closed = s.getsockname()[1]
+    keycloak = KeycloakContainer()
+    monkeypatch.setattr(KeycloakContainer, "url", f"http://localhost:{closed}")
+    # The engine's own address isn't reached: the token comes first
+    monkeypatch.setattr(Tm1EngineContainer, "url", "http://localhost:1/")
+    login = Tm1EngineContainer(SOURCE).with_user("analyst").with_login("analyst", "pw").with_oauth2(keycloak).database("tm1").oauth2_login("analyst")
+    for ask in (login.token, login.cookie, lambda: login.authorize_with_token({}), lambda: login.authorize({})):
+        with pytest.raises(RuntimeError, match=f"Couldn't reach Keycloak at http://localhost:{closed}"):
+            ask()
+
+
+def test_an_o_auth2_login_asks_for_addresses_only_when_it_needs_them() -> None:
+    engine = Tm1EngineContainer(SOURCE).with_user("analyst").with_login("analyst", "pw").with_oauth2(KeycloakContainer())
+    # Made before the engine has started
+    login = engine.database("tm1").oauth2_login("analyst")
+    assert (login.instance, login.user, login.client_secret) == ("tm1", "analyst", "")
+    assert repr(login) == "Tm1Login[analyst in tm1]"
+    with pytest.raises(RuntimeError, match="An OAuth 2.0 login has no session to ask for"):
+        login.session("Bearer x")
+    # And a login through the application has no token to send on a request
+    application = Tm1Login("http://localhost:1/tm1/auth/v1/", "tm1", "id", "secret", "analyst")
+    assert not application.is_oauth2 and application.password == ""
+    assert application.token_url == "http://localhost:1/tm1/auth/v1/token"
+    with pytest.raises(RuntimeError, match="TM1 takes its own token only where a session is asked for"):
+        application.authorize_with_token({})
+
+
+def test_leaves_its_network_under_a_keycloak_that_is_still_running() -> None:
+    class Recording(Network):
+        closed = 0
+
+        def close(self) -> None:
+            self.closed += 1
+
+    keycloak = KeycloakContainer()
+    engine = Tm1EngineContainer(SOURCE)
+    own = Recording()
+    engine._own_network = own
+    engine.with_network(own).with_oauth2(keycloak)
+    assert keycloak.network is own
+    # The Keycloak is the caller's to stop, after the engine: Docker wouldn't remove the network
+    # from under it
+    keycloak._container = object()
+    engine.stop()
+    assert own.closed == 0
+    keycloak._container = None
+    engine.stop()
+    assert own.closed == 1
 
 
 def test_picks_the_image_as_tm1_server_does(monkeypatch: pytest.MonkeyPatch) -> None:

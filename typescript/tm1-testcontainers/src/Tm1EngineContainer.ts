@@ -3,6 +3,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { Tm1Version } from "@skipcheck/tm1-client";
 import { GenericContainer } from "./GenericContainer.js";
+import { KeycloakContainer } from "./KeycloakContainer.js";
 import { Messages } from "./messages.js";
 import { Network } from "./Network.js";
 import { IllegalArgumentException, IllegalStateException } from "./settings.js";
@@ -18,6 +19,8 @@ const COMMAND_TIMEOUT = 180;
 /** Creating a database is given longer: at least the image's own wait for the database to be ready. */
 const CREATE_TIMEOUT = 330;
 const REQUEST_TIMEOUT = 30_000;
+const OTHER_NETWORK =
+  "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: set the network before withOAuth2, or give the Keycloak the same";
 
 // The image's own rule: at least three characters, and nothing the commands or a URL would need
 // quoting for
@@ -122,11 +125,20 @@ export class Tm1EngineContainer extends GenericContainer {
    * installs it. Remove the volume to clear it. */
   static readonly CACHE_VOLUME = "tm1-engine-testcontainers-cache";
 
+  /** The Keycloak realm an engine with {@link withOAuth2} takes tokens from. */
+  static readonly OAUTH2_REALM = "tm1";
+
+  /** The client of that realm a test asks for tokens as, and the audience its tokens carry. */
+  static readonly OAUTH2_CLIENT = "tm1";
+
   readonly #source: Tm1EngineSource;
   readonly #datastore: GenericContainer;
   // instance/database, in the order they were added
   readonly #databases = new Set<string>();
   readonly #users = new Map<string, string[]>();
+  // The users who can log in through OAuth 2.0, and what with
+  readonly #passwords = new Map<string, string>();
+  #keycloak: KeycloakContainer | undefined;
   #credentials: Credentials | undefined;
   #version: Tm1Version | undefined;
 
@@ -182,6 +194,10 @@ export class Tm1EngineContainer extends GenericContainer {
   /** Puts the engine, and its datastore with it, on a network. They have one of their own unless
    * this is called. */
   override withNetwork(network: Network | undefined): this {
+    if (this.#keycloak !== undefined && this.#keycloak.getNetwork() !== network) {
+      // The Keycloak is the caller's, and may serve others: it isn't moved from here
+      throw new IllegalStateException(OTHER_NETWORK);
+    }
     super.withNetwork(network);
     // At once, not when the engine starts: whatever starts the engine may start what it depends
     // on first, and the datastore must be here by then
@@ -212,6 +228,70 @@ export class Tm1EngineContainer extends GenericContainer {
     if (this.#users.has(name)) throw new IllegalArgumentException("The user " + name + " is already added");
     this.#users.set(name, [...groups]);
     return this;
+  }
+
+  /** Takes OAuth 2.0 logins: tokens from a Keycloak, which gets a realm (`tm1`) with the users
+   * given a password by {@link withLogin}. A test then logs in with {@link Tm1Database.oauth2Login}.
+   * Logins through the engine's application ({@link Tm1Database.login}) keep working beside it.
+   *
+   * The Keycloak joins the engine's network, unless it has one already, which the engine then
+   * joins. It's yours to stop: the engine only starts it first. Give it one that isn't started,
+   * and that no other engine uses: the same one again changes nothing, and another is refused.
+   * @throws IllegalStateException for a Keycloak that's running, or another engine's, or a second
+   * one for this engine
+   * @param keycloak the Keycloak to take tokens from */
+  withOAuth2(keycloak: KeycloakContainer): this {
+    if (!(keycloak instanceof KeycloakContainer)) throw new TypeError("keycloak must be a KeycloakContainer");
+    if (this.#keycloak === keycloak) return this;
+    if (this.#keycloak !== undefined) {
+      throw new IllegalStateException(
+        "The engine already takes tokens from another Keycloak, which would start beside this one under the same name: give it one",
+      );
+    }
+    if (keycloak.isRunning()) {
+      // It gets its realm, and its place on the network, when it starts
+      throw new IllegalStateException(
+        "This Keycloak is already running, without the engine's realm: give withOAuth2 one that isn't started, and the engine starts it",
+      );
+    }
+    // Asked for when Keycloak starts, so users added after this call are in it. First: it refuses
+    // a Keycloak that another engine uses
+    keycloak.withRealm(Tm1EngineContainer.OAUTH2_REALM, this, () => this.realm());
+    if (keycloak.getNetwork() !== undefined) this.withNetwork(keycloak.getNetwork());
+    else {
+      // The engine's own, or a new one if it was taken off it
+      this.#joinNetwork();
+      keycloak.withNetwork(this.getNetwork());
+    }
+    this.#keycloak = keycloak;
+    this.dependsOn(keycloak);
+    // Keycloak's address on the network is what its tokens name, however they're fetched, and TM1
+    // has to reach the issuer a token names
+    this.withEnv("TM1_OAUTH2_ISSUER_URL", keycloak.getNetworkUrl() + "/realms/" + Tm1EngineContainer.OAUTH2_REALM);
+    this.withEnv("TM1_OAUTH2_AUDIENCE", Tm1EngineContainer.OAUTH2_CLIENT);
+    this.withEnv("TM1_OAUTH2_ID_CLAIMS", "preferred_username");
+    return this;
+  }
+
+  /** Gives a user a password to log in with through OAuth 2.0 ({@link withOAuth2}). TM1 v12 keeps
+   * no passwords itself: it's the Keycloak's. The user is one added with {@link withUser}, or
+   * `admin`.
+   * @throws IllegalArgumentException if the name isn't one the image takes, or the password is
+   * empty */
+  withLogin(user: string, password: string): this {
+    if (typeof user !== "string" || !USER.test(user)) throw new IllegalArgumentException("A user's name is letters, digits, '.', '_' and '-': " + user);
+    if (typeof password !== "string" || password === "") throw new IllegalArgumentException("The password of " + user + " must not be empty");
+    // A name is one whatever its case, to Keycloak and to TM1: a second password for it replaces
+    // the first
+    for (const known of [...this.#passwords.keys()]) if (known.toLowerCase() === user.toLowerCase()) this.#passwords.delete(known);
+    this.#passwords.set(user, password);
+    return this;
+  }
+
+  /** The Keycloak the engine takes OAuth 2.0 tokens from, or `undefined` without
+   * {@link withOAuth2}. */
+  getKeycloak(): KeycloakContainer | undefined {
+    return this.#keycloak;
   }
 
   /** Where TM1 comes from. */
@@ -328,6 +408,71 @@ export class Tm1EngineContainer extends GenericContainer {
     throw new IllegalStateException("The instance " + instance + " has no application to log in through");
   }
 
+  /** A login through OAuth 2.0, as a user given a password with withLogin.
+   * @internal */
+  oauth2Login(database: Tm1Database, user: string): Tm1Login {
+    const keycloak = this.#keycloak;
+    if (keycloak === undefined) throw new IllegalStateException("This engine takes no OAuth 2.0 logins: give it a Keycloak with withOAuth2");
+    // A name is one whatever its case, to Keycloak and to TM1
+    for (const [name, password] of this.#passwords) {
+      if (name.toLowerCase() === String(user).toLowerCase()) {
+        return Tm1Login.oauth2(name, { keycloak, realm: Tm1EngineContainer.OAUTH2_REALM, client: Tm1EngineContainer.OAUTH2_CLIENT, database, password });
+      }
+    }
+    throw new IllegalArgumentException(
+      `${user} has no password to log in with: give one with withLogin. Those who have: [${[...this.#passwords.keys()].join(", ")}]`,
+    );
+  }
+
+  /** The realm the Keycloak imports, as JSON: a client whose tokens carry the audience TM1
+   * expects, and the users who have a password.
+   * @internal
+   * @throws IllegalStateException if someone with a password isn't a user of the engine */
+  realm(): string {
+    const users = [...this.#users.keys()].map((name) => name.toLowerCase());
+    for (const user of this.#passwords.keys()) {
+      if (user.toLowerCase() !== "admin" && !users.includes(user.toLowerCase())) {
+        throw new IllegalStateException(user + " has a password (withLogin) but isn't a user of the engine: add them with withUser");
+      }
+    }
+    const client = Tm1EngineContainer.OAUTH2_CLIENT;
+    return JSON.stringify(
+      {
+        realm: Tm1EngineContainer.OAUTH2_REALM,
+        enabled: true,
+        clients: [
+          {
+            clientId: client,
+            publicClient: true,
+            directAccessGrantsEnabled: true,
+            standardFlowEnabled: false,
+            protocolMappers: [
+              {
+                name: "tm1-audience",
+                protocol: "openid-connect",
+                protocolMapper: "oidc-audience-mapper",
+                config: { "included.custom.audience": client, "access.token.claim": "true", "id.token.claim": "false" },
+              },
+            ],
+          },
+        ],
+        // Keycloak wants a profile that's complete before it gives a user a token. The address
+        // isn't made from the name: Keycloak refuses some that a name may be
+        users: [...this.#passwords].map(([username, value], n) => ({
+          username,
+          enabled: true,
+          emailVerified: true,
+          email: "user" + (n + 1) + "@example.com",
+          firstName: username,
+          lastName: "Test",
+          credentials: [{ type: "password", value, temporary: false }],
+        })),
+      },
+      null,
+      2,
+    );
+  }
+
   /** What's passed to the image as TM1_DATABASES: what was added, or the default.
    * @internal */
   configured(): string[] {
@@ -337,9 +482,15 @@ export class Tm1EngineContainer extends GenericContainer {
   /** Starts the datastore, then the engine, on one network, and waits until TM1 is set up. */
   override start(): Promise<void> {
     // Before anything starts: what this depends on, the datastore, is started ahead of configure()
-    this.#joinNetwork();
+    try {
+      this.#joinNetwork();
+    } catch (e) {
+      return Promise.reject(e instanceof Error ? e : new Error(String(e)));
+    }
     return super.start().catch(async (e: unknown) => {
-      // The engine that couldn't start is stopped for us, not what it depends on
+      // The engine that couldn't start is stopped for us, not what it depends on, whatever was
+      // thrown. What it depends on starts at once, and one failing ends the start while the
+      // datastore's is still under way: its stop waits for that, so no MongoDB is left running
       await this.#datastore.stop().catch(() => undefined);
       throw e;
     });
@@ -409,6 +560,8 @@ export class Tm1EngineContainer extends GenericContainer {
   #joinNetwork(): void {
     if (this.getNetwork() === undefined) this.withNetwork(Network.newNetwork());
     this.#datastore.withNetwork(this.getNetwork());
+    // Moved since withOAuth2: TM1 couldn't reach its issuer
+    if (this.#keycloak !== undefined && this.#keycloak.getNetwork() !== this.getNetwork()) throw new IllegalStateException(OTHER_NETWORK);
   }
 
   /** Runs the image's tm1-engine command, and returns what it printed. */

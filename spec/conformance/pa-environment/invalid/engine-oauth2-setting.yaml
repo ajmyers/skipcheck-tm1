@@ -1,0 +1,3 @@
+# error: tm1Engine.oauth2: unknown setting(s) port
+version: 1
+tm1Engine: { users: ['a:pw:'], oauth2: { port: 1 } }

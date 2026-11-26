@@ -243,9 +243,10 @@ internal sealed partial class PaEnvironmentFile
         Engine? engine = null;
         int? enginePort = null;
         int? datastorePort = null;
+        int? engineKeycloakPort = null;
         if (engineSection is not null)
         {
-            Keys(engineSection, ["port", "databases", "users", "datastore"], "tm1Engine");
+            Keys(engineSection, ["port", "databases", "users", "datastore", "oauth2"], "tm1Engine");
             // name and instance, in the file's order
             var databases = new List<(string Name, string Instance)>();
             var raw = Get(engineSection, "databases");
@@ -288,10 +289,13 @@ internal sealed partial class PaEnvironmentFile
                 throw Error("tm1Engine.users must be a list, e.g. users: [analyst::Analysts]");
             }
             // Every user first, then the names, as pa_setup: a bad entry is reported before a name listed twice
+            // With oauth2 in the section a password is meant, so user:password says what it means: on, or false to keep
+            // the passwords with OAuth 2.0 off
+            var passwordUsed = Get(engineSection, "oauth2") is not null;
             var engineUsers = new List<EngineUser>();
             for (var i = 0; i < list.Count; i++)
             {
-                engineUsers.Add(ParseEngineUser(list[i], "tm1Engine.users[" + i + "]"));
+                engineUsers.Add(ParseEngineUser(list[i], "tm1Engine.users[" + i + "]", passwordUsed));
             }
             var engineNames = new HashSet<string>(StringComparer.Ordinal);
             foreach (var user in engineUsers)
@@ -303,18 +307,31 @@ internal sealed partial class PaEnvironmentFile
             }
             var datastore = Get(engineSection, "datastore");
             var ds = datastore is null or bool ? new Map() : Keys(datastore, ["port"], "tm1Engine.datastore");
+            // Before the ports, as pa_setup: a file wrong in both says the same in each reader
+            var oauth2 = Get(engineSection, "oauth2");
+            // On with true or a mapping, an empty one too: only absent or false is off
+            if (oauth2 is not null and not false)
+            {
+                var o = Keys(oauth2 is true ? new Map() : oauth2, ["keycloakPort"], "tm1Engine.oauth2");
+                if (engineUsers.All(u => u.Password.Length == 0))
+                {
+                    throw Error("tm1Engine.oauth2: needs a user with a password to log in as, e.g. users: [analyst:analystpw:Analysts]");
+                }
+                engineKeycloakPort = Port(Get(o, "keycloakPort"), "tm1Engine.oauth2", 8181);
+            }
             enginePort = Port(Get(engineSection, "port"), "tm1Engine", 4444);
             // Published only when a port is given
             datastorePort = Get(ds, "port") is null ? null : Port(Get(ds, "port"), "tm1Engine.datastore", 27017);
             foreach (var (name, _) in servers)
             {
-                // The engine's two compose services in pa-setup: a server of that name would be replaced by them
-                if (name.ToLowerInvariant() is "tm1-engine" or "tm1-engine-mongo")
+                // The engine's compose services in pa-setup: a server of that name would be replaced by them
+                var lowered = name.ToLowerInvariant();
+                if (lowered is "tm1-engine" or "tm1-engine-mongo" || (engineKeycloakPort is not null && lowered == "tm1-engine-keycloak"))
                 {
                     throw Error("tm1.servers." + name + ": that name is the TM1 v12 engine's here; give the server another");
                 }
             }
-            engine = new Engine(databases, engineUsers);
+            engine = new Engine(databases, engineUsers, engineKeycloakPort is not null);
         }
 
         if (servers.Count == 0 && cam is null && engine is null)
@@ -324,6 +341,7 @@ internal sealed partial class PaEnvironmentFile
         var ports = new List<int>();
         AddIfSet(ports, enginePort);
         AddIfSet(ports, datastorePort);
+        AddIfSet(ports, engineKeycloakPort);
         ports.AddRange(servers.Select(s => s.Server.Port));
         AddIfSet(ports, admin);
         AddIfSet(ports, webPort);
@@ -365,7 +383,19 @@ internal sealed partial class PaEnvironmentFile
                 {
                     container.WithUser(user.Name, [.. user.Groups]);
                 }
+                if (engine.OAuth2)
+                {
+                    // With OAuth 2.0 a password is the user's at Keycloak
+                    foreach (var user in engine.Users.Where(u => u.Password.Length > 0))
+                    {
+                        container.WithLogin(user.Name, user.Password);
+                    }
+                }
             };
+            if (engine.OAuth2)
+            {
+                b.Tm1EngineOAuth2();
+            }
         }
         // Whatever the file's sections: an engine added in code runs the file's image too
         b.Tm1EngineImage = Image(images, "tm1Engine");
@@ -549,7 +579,7 @@ internal sealed partial class PaEnvironmentFile
 
     /// <summary>pa_setup.parse_user with password_optional: an engine's user, whose password may be left out or empty,
     /// since TM1 v12 keeps none.</summary>
-    private EngineUser ParseEngineUser(object? entry, string where)
+    private EngineUser ParseEngineUser(object? entry, string where, bool passwordUsed)
     {
         object? name;
         object? password;
@@ -557,10 +587,19 @@ internal sealed partial class PaEnvironmentFile
         if (entry is string text)
         {
             var parts = text.Split(':');
-            if (parts.Length == 2 && parts[1].Length > 0)
+            if (parts.Length == 2 && parts[1].Length > 0 && !passwordUsed)
             {
                 // The image's own form has groups there; here the second part is a password
-                throw Error(where + ": '" + text + "' reads as a password, which TM1 v12 doesn't keep: for a group, write " + parts[0] + "::" + parts[1]);
+                throw Error(
+                    where
+                        + ": '"
+                        + text
+                        + "' reads as a password, which TM1 v12 doesn't keep: for a group, write "
+                        + parts[0]
+                        + "::"
+                        + parts[1]
+                        + ". (A password kept for OAuth 2.0 logins needs oauth2 in the section: oauth2: false keeps it, off.)"
+                );
             }
             if (parts.Length > 3)
             {
@@ -605,7 +644,7 @@ internal sealed partial class PaEnvironmentFile
             }
             groupNames.Add(group);
         }
-        return new EngineUser(userName, groupNames);
+        return new EngineUser(userName, pw, groupNames);
     }
 
     /// <summary>A tm1s.cfg value as pa_setup writes it, with Python's <c>str()</c>: true is True.</summary>
@@ -665,9 +704,9 @@ internal sealed partial class PaEnvironmentFile
     [GeneratedRegex(@"[:\s]")]
     private static partial Regex PasswordBreak();
 
-    private sealed record Engine(List<(string Name, string Instance)> Databases, List<EngineUser> Users);
+    private sealed record Engine(List<(string Name, string Instance)> Databases, List<EngineUser> Users, bool OAuth2);
 
-    private sealed record EngineUser(string Name, List<string> Groups);
+    private sealed record EngineUser(string Name, string Password, List<string> Groups);
 
     private sealed record Server(int Port, string Seed, List<(string Key, string Value)> Cfg);
 

@@ -4,6 +4,7 @@ package io.skipcheck.tm1.testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import java.io.IOException;
 import java.net.URI;
@@ -17,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+
+import tools.jackson.databind.json.JsonMapper;
 
 /** Wiring only: nothing here starts a container. */
 class Tm1EngineWiringTest {
@@ -78,6 +81,131 @@ class Tm1EngineWiringTest {
 		// Both are this library's, like every container it starts
 		assertThat(engine.getLabels()).containsEntry("io.skipcheck.tm1.testcontainers", "java");
 		assertThat(datastore.getLabels()).containsEntry("io.skipcheck.tm1.testcontainers", "java");
+	}
+
+	@Test
+	void takesOAuth2TokensFromAKeycloakOnItsNetwork() {
+		var keycloak = new KeycloakContainer();
+		var engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak);
+		// Keycloak's address on the network is what its tokens name, and what TM1 can
+		// reach
+		assertThat(engine.getEnvMap()).containsEntry("TM1_OAUTH2_ISSUER_URL", "http://keycloak:8080/realms/tm1")
+			.containsEntry("TM1_OAUTH2_AUDIENCE", "tm1")
+			.containsEntry("TM1_OAUTH2_ID_CLAIMS", "preferred_username");
+		assertThat(keycloak.getNetwork()).isNotNull()
+			.isSameAs(engine.getNetwork())
+			.isSameAs(engine.getDatastore().getNetwork());
+		assertThat(engine.getDependencies()).contains(keycloak, engine.getDatastore());
+		assertThat(engine.getKeycloak()).isSameAs(keycloak);
+		assertThat(new Tm1EngineContainer(SOURCE).getKeycloak()).isNull();
+
+		// Moved off the Keycloak's network, TM1 couldn't reach its issuer
+		assertThatIllegalStateException().isThrownBy(() -> engine.withNetwork(Network.newNetwork()))
+			.withMessageContaining("set the network before withOAuth2");
+		assertThat(engine.withNetwork(keycloak.getNetwork())).isSameAs(engine);
+
+		// A Keycloak that has a network already is joined there, the datastore too
+		Network network = Network.newNetwork();
+		var placed = new KeycloakContainer().withNetwork(network);
+		var joining = new Tm1EngineContainer(SOURCE).withOAuth2(placed);
+		assertThat(joining.getNetwork()).isSameAs(network).isSameAs(joining.getDatastore().getNetwork());
+	}
+
+	@Test
+	void keycloakImportsTheRealmAsItIsWhenKeycloakStarts() {
+		var keycloak = new KeycloakContainer().withCommand("start-dev", "--features=token-exchange");
+		var engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak);
+		// Added after withOAuth2, and still in the realm: it's asked for at Keycloak's
+		// start
+		engine.withUser("analyst").withLogin("analyst", "analystpw");
+		keycloak.configure();
+		// The import is added to the command it has: a caller's own options stay
+		assertThat(keycloak.getCommandParts()).containsExactly("start-dev", "--features=token-exchange",
+				"--import-realm");
+		assertThat(keycloak.realmFiles()).containsOnlyKeys("/opt/keycloak/data/import/tm1-realm.json");
+		assertThat(keycloak.realmFiles().values().iterator().next()).isEqualTo(engine.realm()).contains("\"analyst\"");
+		// Without a realm, Keycloak starts as it was
+		var plain = new KeycloakContainer();
+		plain.configure();
+		assertThat(plain.getCommandParts()).containsExactly("start-dev");
+	}
+
+	@Test
+	void anEngineHasOneKeycloakOfItsOwnThatItStarts() {
+		var keycloak = new KeycloakContainer();
+		var engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak);
+		// The same again is nothing new
+		assertThat(engine.withOAuth2(keycloak).getDependencies()).containsOnlyOnce(keycloak);
+		// A second would start beside the first, under the same name on the network
+		assertThatIllegalStateException().isThrownBy(() -> engine.withOAuth2(new KeycloakContainer()))
+			.withMessageContaining("already takes tokens from another Keycloak");
+		// And another engine's realm would replace this one's
+		assertThatIllegalStateException().isThrownBy(() -> new Tm1EngineContainer(SOURCE).withOAuth2(keycloak))
+			.withMessageContaining("each engine needs a Keycloak of its own");
+		// An engine taken off its network gets one again, and the Keycloak with it
+		var off = new Tm1EngineContainer(SOURCE).withNetwork(null).withOAuth2(new KeycloakContainer());
+		assertThat(off.getNetwork()).isNotNull().isSameAs(off.getKeycloak().getNetwork());
+		// A Keycloak moved since is found when the engine is configured, not by TM1
+		keycloak.withNetwork(Network.newNetwork());
+		assertThatIllegalStateException().isThrownBy(engine::configure)
+			.withMessageContaining("set the network before withOAuth2");
+	}
+
+	@Test
+	void givesKeycloakARealmWithTheUsersWhoHaveAPassword() throws Exception {
+		var keycloak = new KeycloakContainer();
+		var engine = new Tm1EngineContainer(SOURCE).withOAuth2(keycloak)
+			// After withOAuth2: the realm is asked for when Keycloak starts
+			.withUser("analyst", "Analysts")
+			.withUser("viewer")
+			.withLogin("analyst", "an$pw")
+			.withLogin("Admin", "adminpw");
+		var realm = JsonMapper.shared().readTree(engine.realm());
+		assertThat(realm.path("realm").asString()).isEqualTo("tm1");
+		var client = realm.path("clients").get(0);
+		assertThat(client.path("clientId").asString()).isEqualTo("tm1");
+		assertThat(client.path("publicClient").asBoolean()).isTrue();
+		assertThat(client.path("directAccessGrantsEnabled").asBoolean()).isTrue();
+		var mapper = client.path("protocolMappers").get(0);
+		assertThat(mapper.path("protocolMapper").asString()).isEqualTo("oidc-audience-mapper");
+		assertThat(mapper.path("config").path("included.custom.audience").asString()).isEqualTo("tm1");
+		// viewer has no password, so nothing to log in to Keycloak with; admin is always
+		// a user
+		assertThat(realm.path("users")).hasSize(2);
+		assertThat(realm.path("users").get(0).path("username").asString()).isEqualTo("analyst");
+		assertThat(realm.path("users").get(0).path("credentials").get(0).path("value").asString()).isEqualTo("an$pw");
+		assertThat(realm.path("users").get(0).path("email").asString()).isEqualTo("user1@example.com");
+		assertThat(realm.path("users").get(1).path("username").asString()).isEqualTo("Admin");
+		// TM1 gets names and groups only
+		engine.configure();
+		assertThat(engine.getEnvMap()).containsEntry("TM1_USERS", "analyst:Analysts,viewer");
+	}
+
+	@Test
+	void refusesAnOAuth2LoginItCantGive() {
+		var engine = new Tm1EngineContainer(SOURCE).withUser("analyst").withLogin("analyst", "pw");
+		var database = engine.database("tm1");
+		assertThatIllegalStateException().isThrownBy(() -> database.oauth2Login("analyst"))
+			.withMessageContaining("give it a Keycloak with withOAuth2");
+		engine.withOAuth2(new KeycloakContainer());
+		assertThatIllegalArgumentException().isThrownBy(() -> database.oauth2Login("viewer"))
+			.withMessageContaining("viewer has no password to log in with");
+		// A name is one whatever its case: to log in as, and a second password replaces
+		// the first
+		assertThat(database.oauth2Login("ANALYST").getUser()).isEqualTo("analyst");
+		engine.withLogin("Analyst", "second");
+		assertThat(database.oauth2Login("analyst").getPassword()).isEqualTo("second");
+		assertThat(JsonMapper.shared().readTree(engine.realm()).path("users")).hasSize(1);
+		engine.withLogin("analyst", "pw");
+		assertThat(database.oauth2Login("analyst").isOAuth2()).isTrue();
+		assertThat(database.oauth2Login("analyst").getPassword()).isEqualTo("pw");
+		assertThat(database.oauth2Login("analyst").getClientId()).isEqualTo("tm1");
+		assertThatIllegalArgumentException().isThrownBy(() -> engine.withLogin("analyst", ""));
+		assertThatIllegalArgumentException().isThrownBy(() -> engine.withLogin("two words", "pw"));
+		// A password for someone who isn't a user is a mistake, found when the realm is
+		// made
+		var stray = new Tm1EngineContainer(SOURCE).withLogin("nobody", "pw");
+		assertThatIllegalStateException().isThrownBy(stray::realm).withMessageContaining("isn't a user of the engine");
 	}
 
 	@Test

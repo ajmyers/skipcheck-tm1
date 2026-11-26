@@ -440,6 +440,59 @@ def test_from_config_keeps_the_files_engine_under_a_customizer_and_its_image_wit
     assert added.tm1_engine().source == Tm1EngineSource.Bundle(FIXTURES / "ibm", None)
 
 
+def test_an_engine_takes_o_auth2_tokens_from_the_environments_keycloak() -> None:
+    env = engine_builder().tm1_engine(lambda engine: engine.with_user("analyst").with_login("analyst", "analystpw")).tm1_engine_oauth2().build()
+    # Added for the engine, without Cognos
+    keycloak = env.keycloak()
+    assert env.tm1_engine().keycloak is keycloak
+    assert keycloak.network is env.network()
+    assert keycloak.network is env.tm1_engine().network
+    assert env.tm1_engine().env_map["TM1_OAUTH2_ISSUER_URL"] == "http://keycloak:8080/realms/tm1"
+    assert env.containers() == [keycloak, env.tm1_engine()]
+    assert env.tm1_database("tm1").oauth2_login("analyst").password == "analystpw"
+
+    # A Keycloak that's there for the engine alone gives Cognos no OIDC namespace
+    beside = (
+        engine_builder()
+        .tm1("legacy")
+        .cognos(lambda cognos: cognos.with_user("admin", "adminpw"))
+        .tm1_engine(lambda engine: engine.with_login("admin", "adminpw"))
+        .tm1_engine_oauth2()
+        .build()
+    )
+    assert beside.cognos().keycloak is None
+    assert beside.tm1_engine().keycloak is beside.keycloak()
+
+    # A server can't take the Keycloak's name on the network
+    with pytest.raises(RuntimeError, match="A TM1 server can't be named Keycloak beside the environment's Keycloak"):
+        engine_builder().tm1("Keycloak").tm1_engine().tm1_engine_oauth2().build()
+
+    with pytest.raises(RuntimeError, match=r"OAuth 2.0 logins are a TM1 v12 engine's: add tm1_engine\(\) too"):
+        builder().tm1("legacy").tm1_engine_oauth2().build()
+    with pytest.raises(RuntimeError, match=r"add cognos\(...\) or tm1_engine_oauth2\(\) too"):
+        builder().tm1("legacy").keycloak().build()
+
+
+def test_from_config_turns_o_auth2_on_with_the_users_who_have_a_password() -> None:
+    env = PlanningAnalyticsEnvironment.from_config(FIXTURES / "engine-oauth2.yaml").build()
+    engine = env.tm1_engine()
+    assert engine.keycloak is env.keycloak()
+    engine.configure()
+    # TM1 gets names and groups; Keycloak the passwords
+    assert engine.env_map["TM1_USERS"] == "analyst:Analysts,boss,viewer,planner:Planners"
+    db = env.tm1_database("tm1")
+    assert db.oauth2_login("analyst").password == "analyst$pw"
+    assert db.oauth2_login("boss").password == "bosspw"
+    assert db.oauth2_login("planner").password == "plannerpw"
+    with pytest.raises(ValueError):
+        db.oauth2_login("viewer")
+
+    # oauth2: false is off, with the passwords in the file left readable
+    off = PlanningAnalyticsEnvironment.from_config(FIXTURES / "engine-oauth2-off.yaml").build()
+    assert off.tm1_engine().keycloak is None
+    assert "TM1_OAUTH2_ISSUER_URL" not in off.tm1_engine().env_map
+
+
 def test_an_environment_with_an_engine_cant_be_reused() -> None:
     # Whatever the developer's switch says: the same code must do the same everywhere
     for enabled in (True, False):

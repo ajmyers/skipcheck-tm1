@@ -1,0 +1,7 @@
+# oauth2: false is OAuth 2.0 off, with the users' passwords kept in the file for when it's on
+version: 1
+ibm: ibm
+tm1Engine:
+  users:
+    - analyst:analystpw
+  oauth2: false

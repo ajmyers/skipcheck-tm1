@@ -1,0 +1,9 @@
+# Java types and members this package doesn't have, or names another way, as:
+#   <Java type> | <reason>
+#   <Java type>.<member> | <reason>
+#   <Java type>.<member or type> -> <Python name> | <reason>
+# Read by api-site/scripts/members.mjs, which fails the docs build on a Java type or member that is neither
+# found by the parity tests' naming rule nor listed here, and on a line here that is wrong or stale.
+PlanningAnalyticsEnvironment.Builder.tm1EngineOAuth2 -> tm1_engine_oauth2 | OAuth is one word: the naming rule alone would make it o_auth2
+Tm1EngineContainer.withOAuth2 -> with_oauth2 | OAuth is one word: the naming rule alone would make it o_auth2
+Tm1Login.isOAuth2 -> is_oauth2 | OAuth is one word: the naming rule alone would make it o_auth2

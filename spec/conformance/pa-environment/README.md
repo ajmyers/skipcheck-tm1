@@ -11,6 +11,8 @@ pa-setup's: [`docker/pa-setup`](../../../docker/pa-setup/README.md).
 | `paw-cognos.yaml` | PAW with Cognos: PAW logs users on through Cognos |
 | `tm1-engine.yaml` | Every `tm1Engine` setting (TM1 v12), with values other than the defaults, beside a TM1 11 server |
 | `engine-image-only.yaml` | `images.tm1Engine` without a `tm1Engine` section: the image of an engine added in code |
+| `engine-oauth2.yaml` | `tm1Engine.oauth2`: OAuth 2.0 logins, and the users with a password |
+| `engine-oauth2-off.yaml` | `oauth2: false` keeps a user's password readable with OAuth 2.0 off |
 | `oidc-true.yaml` | `cognos.oidc: true` turns OIDC on, as a mapping does |
 | `ibm/` | The `ibm` folder of those: empty stand-ins for the PAW Local zip and IBM's TM1 v12 package |
 | `invalid/*.yaml` | Files `fromConfig` refuses. The first line is `# error: <part of the message>` |

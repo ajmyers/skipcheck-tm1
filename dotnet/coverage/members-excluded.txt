@@ -31,6 +31,8 @@ Tm1EngineSource.PRIVATE_IMAGE -> PrivateImageSetting | the PrivateImage record h
 Tm1EngineSource.INSTALL_VOLUME -> InstallVolumeSetting | the InstallVolume record has the name
 Tm1EngineSource.BUNDLE -> BundleSetting | the Bundle record has the name
 Tm1EngineSource.BUNDLE_URL -> BundleUrlSetting | the BundleUrl record has the name
+Tm1EngineContainer.OAUTH2_REALM -> OAuth2Realm | .NET writes OAuth as the name is written, as in WithOAuth2 and OAuth2Login, where the rule for a constant would give Oauth2Realm
+Tm1EngineContainer.OAUTH2_CLIENT -> OAuth2Client | .NET writes OAuth as the name is written, as in WithOAuth2 and OAuth2Login, where the rule for a constant would give Oauth2Client
 CognosSource.PRIVATE_IMAGE -> PrivateImageSetting | the PrivateImage record has the name
 CognosSource.INSTALL_VOLUME -> InstallVolumeSetting | the InstallVolume record has the name
 CognosSource.ZIP -> ZipSetting | the Zip record has the name

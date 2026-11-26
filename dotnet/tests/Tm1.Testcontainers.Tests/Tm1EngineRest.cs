@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -39,6 +40,14 @@ public static class Tm1EngineRest
     {
         using var request = await login.AuthorizeAsync(new HttpRequestMessage(HttpMethod.Delete, database.RestUrl + path));
         return await SendAsync(request);
+    }
+
+    /// <summary>Sends a request of your own making, and gives the cookies the answer sets too.</summary>
+    public static async Task<(HttpStatusCode Status, string Body, IReadOnlyList<string> SetCookies)> SendForCookiesAsync(HttpRequestMessage request)
+    {
+        using var response = await Http.SendAsync(request);
+        IReadOnlyList<string> cookies = response.Headers.TryGetValues("Set-Cookie", out var set) ? [.. set] : [];
+        return (response.StatusCode, await response.Content.ReadAsStringAsync(), cookies);
     }
 
     /// <summary>Sends a request of your own making.</summary>

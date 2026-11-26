@@ -36,6 +36,7 @@ public partial class JavaParityTests
         "token",
         "session",
         "authorize",
+        "authorizeWithToken",
     ];
 
     /// <summary>Java names .NET can't keep: a constant can't share its name with a nested type, a
@@ -291,7 +292,10 @@ public partial class JavaParityTests
         return i == expected.Count;
     }
 
-    private static string Capitalize(string s) => char.ToUpperInvariant(s[0]) + s[1..];
+    /// <summary>A Java method's name in Pascal case; one that starts with <c>oauth</c> is written <c>OAuth</c>, as the
+    /// name is (<c>oauth2Login</c> → <c>OAuth2Login</c>, beside <c>withOAuth2</c> → <c>WithOAuth2</c>).</summary>
+    private static string Capitalize(string s) =>
+        s.StartsWith("oauth", StringComparison.Ordinal) ? "OAuth" + s["oauth".Length..] : char.ToUpperInvariant(s[0]) + s[1..];
 
     private static string Pascal(string constant) =>
         string.Concat(constant.Split('_', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0] + w[1..].ToLowerInvariant()));

@@ -33,6 +33,8 @@ import com.github.dockerjava.api.model.Volume;
 import io.skipcheck.tm1.client.version.Tm1Version;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * A TM1 v12 engine (Planning Analytics 3.x) in Docker, for tests: the {@code tm1-engine}
@@ -97,7 +99,19 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	 */
 	public static final String CACHE_VOLUME = "tm1-engine-testcontainers-cache";
 
+	/** The Keycloak realm an engine with {@link #withOAuth2} takes tokens from. */
+	public static final String OAUTH2_REALM = "tm1";
+
+	/**
+	 * The client of that realm a test asks for tokens as, and the audience its tokens
+	 * carry.
+	 */
+	public static final String OAUTH2_CLIENT = "tm1";
+
 	static final String INSTALL_PATH = "/opt/ibm/tm1-engine";
+
+	private static final String OTHER_NETWORK = "The engine takes tokens from a Keycloak on another network, which "
+			+ "TM1 couldn't reach from this one: set the network before withOAuth2, or give the Keycloak the same";
 
 	private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(5);
 
@@ -135,6 +149,11 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	private final Set<String> databases = new LinkedHashSet<>();
 
 	private final Map<String, List<String>> users = new LinkedHashMap<>();
+
+	// The users who can log in through OAuth 2.0, and what with
+	private final Map<String, String> passwords = new LinkedHashMap<>();
+
+	private @Nullable KeycloakContainer keycloak;
 
 	// Read and cleared under this container's lock: test classes may use the shared
 	// engine at once
@@ -199,6 +218,12 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	 */
 	@Override
 	public Tm1EngineContainer withNetwork(Network network) {
+		KeycloakContainer joined = keycloak;
+		if (joined != null && !Objects.equals(joined.getNetwork(), network)) {
+			// The Keycloak is the caller's, and may serve others: it isn't moved from
+			// here
+			throw new IllegalStateException(OTHER_NETWORK);
+		}
 		super.withNetwork(network);
 		// At once, not when the engine starts: whatever starts the engine may start what
 		// it
@@ -274,6 +299,89 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 			throw new IllegalArgumentException("The user " + name + " is already added");
 		}
 		return self();
+	}
+
+	/**
+	 * Takes OAuth 2.0 logins: tokens from a Keycloak, which gets a realm ({@code tm1})
+	 * with the users given a password by {@link #withLogin}. A test then logs in with
+	 * {@link Tm1Database#oauth2Login}. Logins through the engine's application
+	 * ({@link Tm1Database#login}) keep working beside it.
+	 *
+	 * <p>
+	 * The Keycloak joins the engine's network, unless it has one already, which the
+	 * engine then joins. It's yours to stop: the engine only starts it first.
+	 *
+	 * {@snippet class = examples.Tm1EngineExamples region = oauth2}
+	 * @param keycloak the Keycloak to take tokens from
+	 * @return this container
+	 */
+	@SuppressWarnings("ReferenceEquality") // the very Keycloak, not one configured like
+											// it
+	public Tm1EngineContainer withOAuth2(KeycloakContainer keycloak) {
+		Objects.requireNonNull(keycloak, "keycloak");
+		if (this.keycloak == keycloak) {
+			return self();
+		}
+		if (this.keycloak != null) {
+			throw new IllegalStateException("The engine already takes tokens from another Keycloak, which would "
+					+ "start beside this one under the same name: give it one");
+		}
+		if (keycloak.isRunning()) {
+			// It gets its realm, and its place on the network, when it starts
+			throw new IllegalStateException("This Keycloak is already running, without the engine's realm: "
+					+ "give withOAuth2 one that isn't started, and the engine starts it");
+		}
+		// Asked for when Keycloak starts, so users added after this call are in it.
+		// First:
+		// it refuses a Keycloak that another engine uses
+		keycloak.withRealm(OAUTH2_REALM, this, this::realm);
+		if (keycloak.getNetwork() != null) {
+			withNetwork(keycloak.getNetwork());
+		}
+		else {
+			// The engine's own, or a new one if it was taken off it
+			joinNetwork();
+			keycloak.withNetwork(getNetwork());
+		}
+		this.keycloak = keycloak;
+		dependsOn(keycloak);
+		// Keycloak's address on the network is what its tokens name, however they're
+		// fetched, and TM1 has to reach the issuer a token names
+		withEnv("TM1_OAUTH2_ISSUER_URL", keycloak.getNetworkUrl() + "/realms/" + OAUTH2_REALM);
+		withEnv("TM1_OAUTH2_AUDIENCE", OAUTH2_CLIENT);
+		withEnv("TM1_OAUTH2_ID_CLAIMS", "preferred_username");
+		return self();
+	}
+
+	/**
+	 * Gives a user a password to log in with through OAuth 2.0 ({@link #withOAuth2}). TM1
+	 * v12 keeps no passwords itself: it's the Keycloak's. The user is one added with
+	 * {@link #withUser}, or {@code admin}.
+	 * @param user the user's name
+	 * @param password the password
+	 * @return this container
+	 */
+	public Tm1EngineContainer withLogin(String user, String password) {
+		if (user == null || !USER.matcher(user).matches()) {
+			throw new IllegalArgumentException("A user's name is letters, digits, '.', '_' and '-': " + user);
+		}
+		if (password == null || password.isEmpty()) {
+			throw new IllegalArgumentException("The password of " + user + " must not be empty");
+		}
+		// A name is one whatever its case, to Keycloak and to TM1: a second password for
+		// it
+		// replaces the first
+		passwords.keySet().removeIf(known -> known.equalsIgnoreCase(user));
+		passwords.put(user, password);
+		return self();
+	}
+
+	/**
+	 * The Keycloak the engine takes OAuth 2.0 tokens from.
+	 * @return the Keycloak, or {@code null} without {@link #withOAuth2}
+	 */
+	public @Nullable KeycloakContainer getKeycloak() {
+		return keycloak;
 	}
 
 	/**
@@ -452,6 +560,72 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 		throw new IllegalStateException("The instance " + instance + " has no application to log in through");
 	}
 
+	/** A login through OAuth 2.0, as a user given a password with withLogin. */
+	Tm1Login oauth2Login(Tm1Database database, String user) {
+		KeycloakContainer from = keycloak;
+		if (from == null) {
+			throw new IllegalStateException(
+					"This engine takes no OAuth 2.0 logins: give it a Keycloak with withOAuth2");
+		}
+		// A name is one whatever its case, to Keycloak and to TM1
+		for (Map.Entry<String, String> login : passwords.entrySet()) {
+			if (login.getKey().equalsIgnoreCase(user)) {
+				return new Tm1Login(from, database, login.getKey(), login.getValue());
+			}
+		}
+		throw new IllegalArgumentException(user
+				+ " has no password to log in with: give one with withLogin. Those who have: " + passwords.keySet());
+	}
+
+	/**
+	 * The realm the Keycloak imports: a client whose tokens carry the audience TM1
+	 * expects, and the users who have a password.
+	 */
+	String realm() {
+		for (String user : passwords.keySet()) {
+			if (!user.equalsIgnoreCase("admin") && users.keySet().stream().noneMatch(user::equalsIgnoreCase)) {
+				throw new IllegalStateException(user + " has a password (withLogin) but isn't a user of the engine: "
+						+ "add them with withUser");
+			}
+		}
+		ObjectNode realm = JsonMapper.shared().createObjectNode().put("realm", OAUTH2_REALM).put("enabled", true);
+		ObjectNode client = realm.putArray("clients")
+			.addObject()
+			.put("clientId", OAUTH2_CLIENT)
+			.put("publicClient", true)
+			.put("directAccessGrantsEnabled", true)
+			.put("standardFlowEnabled", false);
+		ObjectNode mapper = client.putArray("protocolMappers")
+			.addObject()
+			.put("name", "tm1-audience")
+			.put("protocol", "openid-connect")
+			.put("protocolMapper", "oidc-audience-mapper");
+		mapper.putObject("config")
+			.put("included.custom.audience", OAUTH2_CLIENT)
+			.put("access.token.claim", "true")
+			.put("id.token.claim", "false");
+		ArrayNode listed = realm.putArray("users");
+		int number = 0;
+		for (Map.Entry<String, String> login : passwords.entrySet()) {
+			// Keycloak wants a profile that's complete before it gives a user a token.
+			// The
+			// address isn't made from the name: Keycloak refuses some that a name may be
+			ObjectNode user = listed.addObject()
+				.put("username", login.getKey())
+				.put("enabled", true)
+				.put("emailVerified", true)
+				.put("email", "user" + ++number + "@example.com")
+				.put("firstName", login.getKey())
+				.put("lastName", "Test");
+			user.putArray("credentials")
+				.addObject()
+				.put("type", "password")
+				.put("value", login.getValue())
+				.put("temporary", false);
+		}
+		return realm.toPrettyString();
+	}
+
 	/** What's passed to the image as TM1_DATABASES: what was added, or the default. */
 	List<String> configured() {
 		return databases.isEmpty() ? List.of(DEFAULT_INSTANCE + "/" + DEFAULT_DATABASE) : List.copyOf(databases);
@@ -465,8 +639,11 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 		try {
 			super.start();
 		}
-		catch (RuntimeException e) {
-			// Testcontainers stops the engine it couldn't start, not what it depends on
+		catch (Throwable e) {
+			// Testcontainers stops the engine it couldn't start, not what it depends on.
+			// Any
+			// failure: one of what it depends on comes as a checked exception, thrown
+			// unchecked
 			datastore.stop();
 			throw e;
 		}
@@ -478,6 +655,11 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 			withNetwork(Network.newNetwork());
 		}
 		datastore.withNetwork(getNetwork());
+		KeycloakContainer joined = keycloak;
+		if (joined != null && !Objects.equals(joined.getNetwork(), getNetwork())) {
+			// Moved since withOAuth2: TM1 couldn't reach its issuer
+			throw new IllegalStateException(OTHER_NETWORK);
+		}
 	}
 
 	@Override

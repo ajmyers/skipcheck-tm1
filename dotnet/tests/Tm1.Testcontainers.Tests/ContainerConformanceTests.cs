@@ -30,6 +30,9 @@ public class ContainerConformanceTests
     [RequiresTm1EngineFact]
     public Task Engine() => Record("engine");
 
+    [RequiresTm1EngineFact]
+    public Task EngineWithOAuth2() => Record("engine-oauth2");
+
     private static async Task Record(string scenario)
     {
         var home = Path.Combine(Repo.Root, "testcontainers-conformance", "scenarios");
@@ -48,6 +51,12 @@ public class ContainerConformanceTests
         if (scenario == "servers-and-web")
         {
             containers.Add(("tm1Web", env.Tm1Web().ContainerId));
+        }
+        if (scenario == "engine-oauth2")
+        {
+            containers.Add(("tm1Engine", env.Tm1Engine().ContainerId));
+            containers.Add(("tm1EngineDatastore", env.Tm1Engine().Datastore.ContainerId));
+            containers.Add(("keycloak", env.Keycloak().ContainerId));
         }
         if (scenario == "engine")
         {

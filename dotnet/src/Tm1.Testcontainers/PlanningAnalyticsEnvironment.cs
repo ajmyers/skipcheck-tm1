@@ -96,9 +96,10 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             ?? (reused ? Testcontainers.Network.Reusable(new ReusableNetwork(() => NetworkPrefix + Identity())) : Testcontainers.Network.NewNetwork());
         Network = network;
         ownsNetwork = b.NetworkSet is null;
-        keycloak = b.KeycloakCustomizer is null
-            ? null
-            : (b.KeycloakImage is null ? new KeycloakContainer() : new KeycloakContainer(b.KeycloakImage)).WithNetwork(network);
+        keycloak =
+            b.KeycloakCustomizer is null && !b.Tm1EngineOAuth2Set
+                ? null
+                : (b.KeycloakImage is null ? new KeycloakContainer() : new KeycloakContainer(b.KeycloakImage)).WithNetwork(network);
         if (b.CognosCustomizer is not null)
         {
             var source = b.Get(
@@ -112,7 +113,9 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             cognos = (
                 Runs(b.CognosImage, source is CognosSource.PrivateImage) ? new CognosContainer(b.CognosImage, source) : new CognosContainer(source)
             ).WithNetwork(network);
-            if (keycloak is not null)
+            // Only when Keycloak was asked for: one that's there for the engine's OAuth 2.0 logins alone doesn't give
+            // Cognos an OIDC namespace nobody wanted
+            if (keycloak is not null && b.KeycloakCustomizer is not null)
             {
                 cognos.WithKeycloak(keycloak);
             }
@@ -208,6 +211,11 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
                 .WithNetwork(network)
                 // Its name on the network, as in the compose project pa-setup writes
                 .WithNetworkAliases(EngineAlias);
+            if (b.Tm1EngineOAuth2Set)
+            {
+                // The environment's one Keycloak: its address on the network is its issuer for Cognos and for the engine alike
+                tm1Engine.WithOAuth2(keycloak!);
+            }
             // What the file said first; then, below, what the caller says
             Apply(b.FileTm1Engine, tm1Engine);
         }
@@ -245,8 +253,9 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// (<c>acceptLicense: true</c>); the zip is <c>zip</c> in <c>ibm</c>, or the newest there;</item>
     /// <item><c>tm1Engine</c>: <see cref="EnvironmentBuilder.Tm1Engine()"/>, with each of <c>databases</c> as
     /// <see cref="Tm1EngineContainer.WithDatabase(string, string)"/> in its <c>instance</c>, and <c>users</c> as
-    /// <see cref="Tm1EngineContainer.WithUser"/> (a user's password is checked and not used: TM1 v12 keeps none). It runs
-    /// beside <c>tm1</c>, or alone;</item>
+    /// <see cref="Tm1EngineContainer.WithUser"/>. <c>oauth2</c> is <see cref="EnvironmentBuilder.Tm1EngineOAuth2"/>, and a
+    /// user's password is then their <see cref="Tm1EngineContainer.WithLogin"/> at Keycloak; without it the password is
+    /// checked and not used, as TM1 v12 keeps none. It runs beside <c>tm1</c>, or alone;</item>
     /// <item><c>ibm</c>: each part's source, the folder as <see cref="Testcontainers.Tm1Source.Bundle"/>,
     /// <see cref="Testcontainers.Tm1WebSource.Bundle"/>, <see cref="Testcontainers.Tm1EngineSource.Bundle"/> and <see cref="Testcontainers.CognosSource.Zip"/>. A relative path is from the
     /// file's folder; <c>~</c> is the user's home;</item>
@@ -562,6 +571,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
 
         internal string? Tm1EngineImage { get; set; }
 
+        internal bool Tm1EngineOAuth2Set { get; private set; }
+
         // The file's own settings for the engine, kept when the caller adds theirs
         internal Action<Tm1EngineContainer>? FileTm1Engine { get; set; }
 
@@ -678,6 +689,15 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             return this;
         }
 
+        /// <summary>Has the TM1 v12 engine take OAuth 2.0 logins, with tokens from the environment's Keycloak, which is
+        /// added if <see cref="Keycloak()"/> wasn't called. Give users a password with <see cref="Tm1EngineContainer.WithLogin"/>,
+        /// in <see cref="Tm1Engine(Action{Tm1EngineContainer})"/>, and log in with <see cref="Testcontainers.Tm1Database.OAuth2Login"/>.</summary>
+        public EnvironmentBuilder Tm1EngineOAuth2()
+        {
+            Tm1EngineOAuth2Set = true;
+            return this;
+        }
+
         /// <summary>Where the engine gets TM1 v12 from, rather than <see cref="Testcontainers.Tm1EngineSource.Discover()"/>.</summary>
         public EnvironmentBuilder Tm1EngineSource(Tm1EngineSource source)
         {
@@ -741,15 +761,30 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
                     );
                 }
             }
+            if (KeycloakCustomizer is not null || Tm1EngineOAuth2Set)
+            {
+                foreach (var name in Tm1Names.Where(n => n.Equals(KeycloakContainer.NetworkAlias, StringComparison.OrdinalIgnoreCase)))
+                {
+                    throw new InvalidOperationException(
+                        $"A TM1 server can't be named {name} beside the environment's Keycloak: that's its name on the network"
+                    );
+                }
+            }
             if (ReuseSet && Tm1EngineCustomizer is not null)
             {
                 throw new InvalidOperationException(
                     "An environment with a TM1 v12 engine can't be reused: the engine and its datastore belong together, and a kept one keeps every database tests left"
                 );
             }
-            if (KeycloakCustomizer is not null && CognosCustomizer is null)
+            if (KeycloakCustomizer is not null && CognosCustomizer is null && !Tm1EngineOAuth2Set)
             {
-                throw new InvalidOperationException("Keycloak gives Cognos its OIDC namespace: add Cognos(...) too");
+                throw new InvalidOperationException(
+                    "Keycloak gives Cognos its OIDC namespace, or a TM1 v12 engine its OAuth 2.0 logins: add Cognos(...) or Tm1EngineOAuth2() too"
+                );
+            }
+            if (Tm1EngineOAuth2Set && Tm1EngineCustomizer is null)
+            {
+                throw new InvalidOperationException("OAuth 2.0 logins are a TM1 v12 engine's: add Tm1Engine() too");
             }
             if (CamNamespaceSet == CognosContainer.Namespace.Oidc && KeycloakCustomizer is null)
             {

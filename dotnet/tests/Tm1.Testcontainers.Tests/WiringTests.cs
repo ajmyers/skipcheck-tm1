@@ -510,6 +510,81 @@ public class PlanningAnalyticsEnvironmentTests
     }
 
     [Fact]
+    public void AnEngineTakesOAuth2TokensFromTheEnvironmentsKeycloak()
+    {
+        var env = EngineBuilder().Tm1Engine(engine => engine.WithUser("analyst").WithLogin("analyst", "analystpw")).Tm1EngineOAuth2().Build();
+        // Added for the engine, without Cognos
+        var keycloak = env.Keycloak();
+        Assert.Same(keycloak, env.Tm1Engine().Keycloak);
+        Assert.Same(env.Network, keycloak.Network);
+        Assert.Same(env.Network, env.Tm1Engine().Network);
+        Assert.Same(env.Network, env.Tm1Engine().Datastore.Network);
+        Assert.Equal("http://keycloak:8080/realms/tm1", env.Tm1Engine().EnvMap["TM1_OAUTH2_ISSUER_URL"]);
+        Assert.Equal<IStartable>([keycloak, env.Tm1Engine()], env.Containers());
+        Assert.Equal("analystpw", env.Tm1Database("tm1").OAuth2Login("analyst").Password);
+        // The engine starts its Keycloak first, with the realm of the users the customizer gave a password
+        Assert.Contains(keycloak, env.Tm1Engine().Dependencies);
+        keycloak.Configure();
+        Assert.Equal(["start-dev", "--import-realm"], keycloak.CommandParts);
+        Assert.Contains("\"analyst\"", Encoding.UTF8.GetString(keycloak.Contents["/opt/keycloak/data/import/tm1-realm.json"]), StringComparison.Ordinal);
+
+        // A Keycloak that's there for the engine alone gives Cognos no OIDC namespace
+        var beside = EngineBuilder()
+            .Tm1("legacy")
+            .Cognos(cognos => cognos.WithUser("admin", "adminpw"))
+            .Tm1Engine(engine => engine.WithLogin("admin", "adminpw"))
+            .Tm1EngineOAuth2()
+            .Build();
+        Assert.Null(beside.Cognos().Keycloak);
+        Assert.Same(beside.Keycloak(), beside.Tm1Engine().Keycloak);
+
+        // A server can't take the Keycloak's name on the network
+        Assert.Contains(
+            "A TM1 server can't be named Keycloak beside the environment's Keycloak",
+            Assert.Throws<InvalidOperationException>(() => EngineBuilder().Tm1("Keycloak").Tm1Engine().Tm1EngineOAuth2().Build()).Message
+        );
+        Assert.Contains(
+            "A TM1 server can't be named keycloak beside the environment's Keycloak",
+            Assert
+                .Throws<InvalidOperationException>(() => Builder().Tm1("keycloak").Cognos(cognos => cognos.WithUser("admin", "adminpw")).Keycloak().Build())
+                .Message
+        );
+        // Without a Keycloak the name is free
+        Assert.Contains("keycloak", Builder().Tm1("keycloak").Build().Tm1Servers.Keys);
+
+        Assert.Contains(
+            "OAuth 2.0 logins are a TM1 v12 engine's: add Tm1Engine() too",
+            Assert.Throws<InvalidOperationException>(() => Builder().Tm1("legacy").Tm1EngineOAuth2().Build()).Message
+        );
+        Assert.Contains(
+            "add Cognos(...) or Tm1EngineOAuth2() too",
+            Assert.Throws<InvalidOperationException>(() => Builder().Tm1("legacy").Keycloak().Build()).Message
+        );
+    }
+
+    [Fact]
+    public void FromConfigTurnsOAuth2OnWithTheUsersWhoHaveAPassword()
+    {
+        var env = PlanningAnalyticsEnvironment.FromConfig(Fixture("engine-oauth2.yaml")).Build();
+        var engine = env.Tm1Engine();
+        Assert.Same(env.Keycloak(), engine.Keycloak);
+        engine.Configure();
+        // TM1 gets names and groups; Keycloak the passwords
+        Assert.Equal("analyst:Analysts,boss,viewer,planner:Planners", engine.EnvMap["TM1_USERS"]);
+        var db = env.Tm1Database("tm1");
+        Assert.Equal("analyst$pw", db.OAuth2Login("analyst").Password);
+        Assert.Equal("bosspw", db.OAuth2Login("boss").Password);
+        Assert.Equal("plannerpw", db.OAuth2Login("planner").Password);
+        Assert.Throws<ArgumentException>(() => db.OAuth2Login("viewer"));
+
+        // oauth2: false is off, with the passwords in the file left readable
+        var off = PlanningAnalyticsEnvironment.FromConfig(Fixture("engine-oauth2-off.yaml")).Build();
+        Assert.Null(off.Tm1Engine().Keycloak);
+        Assert.False(off.Tm1Engine().EnvMap.ContainsKey("TM1_OAUTH2_ISSUER_URL"));
+        Assert.Throws<InvalidOperationException>(off.Keycloak);
+    }
+
+    [Fact]
     public void AnEnvironmentWithAnEngineCantBeReused()
     {
         // Whatever the developer's switch says: the same code must do the same everywhere

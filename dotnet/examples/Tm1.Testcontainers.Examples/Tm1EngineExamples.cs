@@ -47,6 +47,23 @@ public static class Tm1EngineExamples
 
     // @end
 
+    public static async Task<HttpStatusCode> OAuth2(Tm1EngineSource source)
+    {
+        // @start region = oauth2
+        // Starting the engine starts Keycloak first; the Keycloak is yours to stop
+        await using var keycloak = new KeycloakContainer();
+        await using var engine = new Tm1EngineContainer(source).WithUser("analyst", "Analysts").WithLogin("analyst", "analystpw").WithOAuth2(keycloak);
+        await engine.StartAsync();
+        var db = engine.Database("tm1");
+        // A token from Keycloak, with the analyst's password, sent to TM1 as Bearer
+        using var request = new HttpRequestMessage(HttpMethod.Get, db.RestUrl + "Cubes?$select=Name");
+        await db.OAuth2Login("analyst").AuthorizeWithTokenAsync(request);
+        // @end
+        using var http = new HttpClient(new HttpClientHandler { UseCookies = false });
+        using var response = await http.SendAsync(request);
+        return response.StatusCode;
+    }
+
     public static async Task<string> Container(Tm1EngineSource source)
     {
         // @start region = container

@@ -42,16 +42,50 @@ public sealed class Tm1Login
 
     private readonly Lock gate = new();
     private Task<string>? cookie;
+    private readonly string authUrl;
+
+    // An OAuth 2.0 login: where its tokens come from, and a database's address to turn a token into a session at
+    private readonly KeycloakContainer? keycloak;
+    private readonly Tm1Database? database;
 
     internal Tm1Login(string authUrl, string instance, string clientId, string clientSecret, string user)
     {
         ArgumentNullException.ThrowIfNull(user);
-        AuthUrl = authUrl;
+        this.authUrl = authUrl;
         Instance = instance;
         ClientId = clientId;
         ClientSecret = clientSecret;
         User = user;
+        Password = "";
     }
+
+    /// <summary>A login through OAuth 2.0, with tokens from the engine's Keycloak.</summary>
+    internal Tm1Login(KeycloakContainer keycloak, Tm1Database database, string user, string password)
+    {
+        // Addresses are asked of the database when they're needed: a login can be made before the engine has started
+        authUrl = "";
+        this.database = database;
+        this.keycloak = keycloak;
+        Instance = database.Instance;
+        ClientId = Tm1EngineContainer.OAuth2Client;
+        ClientSecret = "";
+        User = user;
+        Password = password;
+    }
+
+    /// <summary>Whether this is a login through OAuth 2.0 (<see cref="Tm1Database.OAuth2Login"/>), rather than through
+    /// the instance's application.</summary>
+    public bool IsOAuth2 => keycloak is not null;
+
+    /// <summary>The user's password at the identity provider, for an OAuth 2.0 login; empty otherwise, as TM1 v12
+    /// keeps none.</summary>
+    public string Password { get; }
+
+    /// <summary>Where a token is asked for: the identity provider's token endpoint for an OAuth 2.0 login, as seen from
+    /// the host, and TM1's own otherwise.</summary>
+    /// <exception cref="InvalidOperationException">An OAuth 2.0 login's Keycloak isn't started.</exception>
+    public string TokenUrl =>
+        keycloak is null ? authUrl + "token" : keycloak.Url + "/realms/" + Tm1EngineContainer.OAuth2Realm + "/protocol/openid-connect/token";
 
     /// <summary>The instance this login is for.</summary>
     public string Instance { get; }
@@ -59,18 +93,19 @@ public sealed class Tm1Login
     /// <summary>The TM1 user this logs in as.</summary>
     public string User { get; }
 
-    /// <summary>The application's client ID.</summary>
+    /// <summary>The application's client ID; for an OAuth 2.0 login, the client its tokens are asked for as.</summary>
     public string ClientId { get; }
 
-    /// <summary>The application's client secret.</summary>
+    /// <summary>The application's client secret; empty for an OAuth 2.0 login, whose client is a public one.</summary>
     public string ClientSecret { get; }
 
     /// <summary>Where a session or a token is asked for, as seen from the host, ending in <c>/</c>,
     /// e.g. <c>http://localhost:54321/tm1/auth/v1/</c>.</summary>
-    public string AuthUrl { get; }
+    public string AuthUrl => database is null ? authUrl : database.Engine.Url + Instance + "/auth/v1/";
 
     /// <summary>The session cookie, <c>TM1SessionId=...</c>, for a <c>Cookie</c> header. Logs in the
-    /// first time, with the application's credentials as Basic authentication, and keeps the session.</summary>
+    /// first time, with the application's credentials as Basic authentication, and keeps the session. An OAuth 2.0
+    /// login sends TM1 a token from the provider, and keeps the session TM1 answers with.</summary>
     /// <exception cref="InvalidOperationException">TM1 refuses the login.</exception>
     public async Task<string> CookieAsync(CancellationToken cancellationToken = default)
     {
@@ -78,7 +113,9 @@ public sealed class Tm1Login
         lock (gate)
         {
             // Not the caller's token: the one login serves every caller of this, whoever asked first
-            login = cookie ??= SessionAsync("Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(ClientId + ":" + ClientSecret)), CancellationToken.None);
+            login = cookie ??= keycloak is not null
+                ? TokenSessionAsync()
+                : SessionAsync("Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(ClientId + ":" + ClientSecret)), CancellationToken.None);
         }
         try
         {
@@ -100,11 +137,17 @@ public sealed class Tm1Login
 
     /// <summary>A bearer token for the application, from TM1's token endpoint (the OAuth 2.0
     /// client-credentials grant). It names no user: send it as <c>Authorization: Bearer</c> with the
-    /// user's name to get a session, as <see cref="SessionAsync"/> does.</summary>
+    /// user's name to get a session, as <see cref="SessionAsync"/> does. For an OAuth 2.0 login, a new access token for the
+    /// user from the identity provider, with the user's password: one TM1 takes as <c>Authorization: Bearer</c> on any
+    /// request.</summary>
     /// <returns>The access token, a JWT.</returns>
-    /// <exception cref="InvalidOperationException">TM1 refuses the application's credentials.</exception>
+    /// <exception cref="InvalidOperationException">TM1 refuses the application's credentials, or the provider the user's.</exception>
     public async Task<string> TokenAsync(CancellationToken cancellationToken = default)
     {
+        if (keycloak is not null)
+        {
+            return await keycloak.AccessTokenAsync(Tm1EngineContainer.OAuth2Realm, ClientId, User, Password, cancellationToken).ConfigureAwait(false);
+        }
         using var request = new HttpRequestMessage(HttpMethod.Post, AuthUrl + "token")
         {
             Content = Json(writer =>
@@ -128,13 +171,34 @@ public sealed class Tm1Login
     /// <c>"Bearer " + await TokenAsync()</c>, and returns the new session's cookie. Each call makes a
     /// session; <see cref="CookieAsync"/> keeps one.</summary>
     /// <returns>The session cookie, <c>TM1SessionId=...</c>.</returns>
-    /// <exception cref="InvalidOperationException">TM1 refuses the login.</exception>
+    /// <exception cref="InvalidOperationException">TM1 refuses the login; or this is an OAuth 2.0 login, whose token TM1
+    /// takes on any request and not here.</exception>
     public async Task<string> SessionAsync(string authorization, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(authorization);
+        if (keycloak is not null)
+        {
+            throw new InvalidOperationException(
+                "An OAuth 2.0 login has no session to ask for: TM1 takes its token on any request (AuthorizeWithTokenAsync), and CookieAsync() keeps the session that gives"
+            );
+        }
         using var request = new HttpRequestMessage(HttpMethod.Post, AuthUrl + "session") { Content = Json(writer => writer.WriteString(UserProperty, User)) };
         request.Headers.TryAddWithoutValidation("Authorization", authorization);
         using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        return await SessionCookieAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The session TM1 gives the first request that carries the provider's token.</summary>
+    private async Task<string> TokenSessionAsync()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, database!.RestUrl + "ActiveUser?$select=Name");
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + await TokenAsync(CancellationToken.None).ConfigureAwait(false));
+        using var response = await SendAsync(request, CancellationToken.None).ConfigureAwait(false);
+        return await SessionCookieAsync(response, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private async Task<string> SessionCookieAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
         var found = response.Headers.TryGetValues("Set-Cookie", out var cookies)
             ? cookies.Select(c => c.Split(';', 2)[0].Trim()).FirstOrDefault(c => c.StartsWith("TM1SessionId=", StringComparison.Ordinal))
             : null;
@@ -154,6 +218,28 @@ public sealed class Tm1Login
     {
         ArgumentNullException.ThrowIfNull(request);
         request.Headers.TryAddWithoutValidation("Cookie", await CookieAsync(cancellationToken).ConfigureAwait(false));
+        return request;
+    }
+
+    /// <summary>Adds this login's token to <paramref name="request"/> as <c>Authorization: Bearer</c>, as a program with
+    /// a token of its own would send it. For an OAuth 2.0 login, a new token from the provider each time; TM1 answers
+    /// with a session cookie.</summary>
+    /// <returns>The same request.</returns>
+    /// <exception cref="InvalidOperationException">A login through the application, whose token TM1 takes only at its
+    /// session endpoint (<see cref="SessionAsync"/>).</exception>
+    public async Task<HttpRequestMessage> AuthorizeWithTokenAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (keycloak is null)
+        {
+            throw new InvalidOperationException(
+                "TM1 takes its own token only where a session is asked for: use SessionAsync(\"Bearer \" + token), or AuthorizeAsync for the cookie"
+            );
+        }
+        var token = await TokenAsync(cancellationToken).ConfigureAwait(false);
+        // Set, not added: a request that has one already carries the new token alone
+        request.Headers.Remove("Authorization");
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + token);
         return request;
     }
 

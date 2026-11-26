@@ -50,12 +50,67 @@ public final class Tm1Login {
 
 	private @Nullable String cookie;
 
+	// An OAuth 2.0 login: where its tokens come from, the user's password there, and a
+	// database's address to turn a token into a session at
+	private final @Nullable KeycloakContainer keycloak;
+
+	private final String password;
+
+	private final @Nullable Tm1Database database;
+
 	Tm1Login(String authUrl, String instance, String clientId, String clientSecret, String user) {
 		this.authUrl = authUrl;
 		this.instance = instance;
 		this.clientId = clientId;
 		this.clientSecret = clientSecret;
 		this.user = Objects.requireNonNull(user, "user");
+		this.keycloak = null;
+		this.password = "";
+		this.database = null;
+	}
+
+	/** A login through OAuth 2.0, with tokens from the engine's Keycloak. */
+	Tm1Login(KeycloakContainer keycloak, Tm1Database database, String user, String password) {
+		// Addresses are asked of the database when they're needed: a login can be made
+		// before
+		// the engine has started
+		this.authUrl = "";
+		this.database = database;
+		this.instance = database.getInstance();
+		this.clientId = Tm1EngineContainer.OAUTH2_CLIENT;
+		this.clientSecret = "";
+		this.user = user;
+		this.keycloak = keycloak;
+		this.password = password;
+	}
+
+	/**
+	 * Whether this is a login through OAuth 2.0 ({@link Tm1Database#oauth2Login}), rather
+	 * than through the instance's application.
+	 * @return {@code true} for an OAuth 2.0 login
+	 */
+	public boolean isOAuth2() {
+		return keycloak != null;
+	}
+
+	/**
+	 * The user's password at the identity provider, for an OAuth 2.0 login; empty
+	 * otherwise, as TM1 v12 keeps none.
+	 * @return the password, or empty
+	 */
+	public String getPassword() {
+		return password;
+	}
+
+	/**
+	 * Where a token is asked for: the identity provider's token endpoint for an OAuth 2.0
+	 * login, as seen from the host, and TM1's own otherwise.
+	 * @return the token endpoint
+	 */
+	public String getTokenUrl() {
+		KeycloakContainer from = keycloak;
+		return from == null ? authUrl + "token"
+				: from.getUrl() + "/realms/" + Tm1EngineContainer.OAUTH2_REALM + "/protocol/openid-connect/token";
 	}
 
 	/**
@@ -96,7 +151,8 @@ public final class Tm1Login {
 	 * @return the instance's authentication root, ending in {@code /}
 	 */
 	public String getAuthUrl() {
-		return authUrl;
+		Tm1Database from = database;
+		return from == null ? authUrl : from.getEngine().getUrl() + instance + "/auth/v1/";
 	}
 
 	/**
@@ -107,6 +163,13 @@ public final class Tm1Login {
 	 * @throws IllegalStateException if TM1 refuses the login
 	 */
 	public synchronized String cookie() {
+		if (cookie == null && keycloak != null) {
+			// TM1 gives a session to the first request that carries the provider's token
+			String anywhere = Objects.requireNonNull(database).getRestUrl() + "ActiveUser?$select=Name";
+			HttpResponse<String> response = send(
+					HttpRequest.newBuilder(URI.create(anywhere)).header("Authorization", "Bearer " + token()));
+			cookie = sessionCookie(response);
+		}
 		if (cookie == null) {
 			String basic = Base64.getEncoder()
 				.encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.UTF_8));
@@ -124,6 +187,10 @@ public final class Tm1Login {
 	 * @throws IllegalStateException if TM1 refuses the application's credentials
 	 */
 	public String token() {
+		KeycloakContainer from = keycloak;
+		if (from != null) {
+			return from.accessToken(Tm1EngineContainer.OAUTH2_REALM, clientId, user, password);
+		}
 		String body = "{\"grant_type\":\"client_credentials\",\"client_id\":\"" + json(clientId)
 				+ "\",\"client_secret\":\"" + json(clientSecret) + "\"}";
 		HttpResponse<String> response = send(HttpRequest.newBuilder(URI.create(authUrl + "token"))
@@ -146,10 +213,18 @@ public final class Tm1Login {
 	 * @throws IllegalStateException if TM1 refuses the login
 	 */
 	public String session(String authorization) {
+		if (keycloak != null) {
+			throw new IllegalStateException("An OAuth 2.0 login has no session to ask for: TM1 takes its token "
+					+ "on any request (authorizeWithToken), and cookie() keeps the session that gives");
+		}
 		HttpResponse<String> response = send(HttpRequest.newBuilder(URI.create(authUrl + "session"))
 			.header("Authorization", Objects.requireNonNull(authorization, "authorization"))
 			.header("Content-Type", "application/json")
 			.POST(HttpRequest.BodyPublishers.ofString("{\"User\":\"" + json(user) + "\"}")));
+		return sessionCookie(response);
+	}
+
+	private String sessionCookie(HttpResponse<String> response) {
 		String found = response.headers()
 			.allValues("Set-Cookie")
 			.stream()
@@ -173,6 +248,24 @@ public final class Tm1Login {
 		return request.header("Cookie", cookie());
 	}
 
+	/**
+	 * Adds this login's token to a request as {@code Authorization: Bearer}, as a program
+	 * with a token of its own would send it. For an OAuth 2.0 login, a new token from the
+	 * provider each time; TM1 answers with a session cookie.
+	 * @param request the request being built
+	 * @return the same builder
+	 * @throws IllegalStateException for a login through the application, whose token TM1
+	 * takes only at its session endpoint ({@link #session})
+	 */
+	public HttpRequest.Builder authorizeWithToken(HttpRequest.Builder request) {
+		if (keycloak == null) {
+			throw new IllegalStateException("TM1 takes its own token only where a session is asked for: use "
+					+ "session(\"Bearer \" + token()), or authorize for the cookie");
+		}
+		// Set, not added: a builder used again carries the new token alone
+		return request.setHeader("Authorization", "Bearer " + token());
+	}
+
 	@Override
 	public String toString() {
 		// Never the secret
@@ -187,7 +280,7 @@ public final class Tm1Login {
 				.send(request.timeout(REQUEST_TIMEOUT).build(), HttpResponse.BodyHandlers.ofString());
 		}
 		catch (IOException e) {
-			throw new UncheckedIOException("Couldn't reach TM1 at " + authUrl, e);
+			throw new UncheckedIOException("Couldn't reach TM1 at " + getAuthUrl(), e);
 		}
 		catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
