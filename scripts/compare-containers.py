@@ -19,10 +19,12 @@ testcontainers-conformance/differences.txt lists, each with its reason. Then eve
 reading of a scenario must be equal, and the first differences are printed. With fewer than two
 logs of a scenario there's nothing to compare: it says so and passes.
 
-    scripts/compare-containers.py [build/container-conformance]
+    scripts/compare-containers.py [--require-all] [build/container-conformance]
 
-Exits 1 if two languages got different containers, or if all four ran and a line of
-differences.txt matched nothing. Standard library only.
+Exits 1 if two languages got different containers, or if every scenario ran in all four and a
+line of differences.txt matched nothing. With --require-all, as ./gradlew containerConformance
+runs it, also if there's no log at all, or a scenario some language ran has no log from another: a
+language that was skipped mustn't pass for one that agreed. Standard library only.
 """
 
 from __future__ import annotations
@@ -37,11 +39,17 @@ from typing import Any
 
 HOME = Path(__file__).resolve().parents[1] / "testcontainers-conformance"
 LANGUAGES = ("java", "python", "dotnet", "typescript")
-KINDS = ("label", "alias", "option")
+KINDS = ("label", "alias")
 # On every container this library starts; its value is the language that started it
 LIBRARY_LABEL = "io.skipcheck.tm1.testcontainers"
 RULE = re.compile(r"^(\w+) (\S+): (.+)$")
 UNORDERED = re.compile(r"^# unordered: (.+)$")
+NO_REASON = ("not ported yet", "not fixed yet", "todo", "tbd")
+# Docker's own notes on a network of whether IPv4 and IPv6 were asked for. Some engines write them
+# and some don't, and a library that says nothing gets none; whether the network has IPv6 is
+# compared itself
+ENGINE_OPTIONS = ("com.docker.network.enable_ipv4", "com.docker.network.enable_ipv6")
+BIND_MODE = re.compile(r"^(ro|rw|z|Z|cached|delegated|consistent|nocopy|r?(shared|slave|private))(,[A-Za-z]+)*$")
 
 
 @dataclass
@@ -61,8 +69,8 @@ class Rule:
 
 
 def rules(text: str) -> list[Rule]:
-    """differences.txt: "<kind> <glob>: reason", one a line, where the kind is label (a label's name),
-    alias (a network alias) or option (a network option's name); # comments."""
+    """differences.txt: "<kind> <glob>: reason", one a line, where the kind is label (a label's name)
+    or alias (a network alias); # comments."""
     found = []
     for number, line in enumerate(text.splitlines(), 1):
         line = line.strip()
@@ -73,7 +81,7 @@ def rules(text: str) -> list[Rule]:
             raise ValueError(
                 f"differences.txt:{number}: write '<{'|'.join(KINDS)}> <glob>: <reason>'"
             )
-        if match[3].strip().lower().rstrip(".") in ("not ported yet", "todo", "tbd"):
+        if match[3].strip().lower().rstrip(".") in NO_REASON:
             raise ValueError(f"differences.txt:{number}: that isn't a reason")
         found.append(Rule(match[1], match[2], match[3]))
     return found
@@ -159,8 +167,12 @@ def _ports(bindings: dict[str, Any] | None) -> dict[str, list[str]]:
 
 
 def _binds(binds: list[str] | None) -> list[str]:
-    """Each bind with its mode: one written without is read-write, which Docker doesn't add."""
-    return sorted(bind if bind.count(":") >= 2 else bind + ":rw" for bind in binds or [])
+    """Each bind with its mode: one written without is read-write, which Docker doesn't add. The
+    mode is told by what it says, not by counting colons: a Windows path has one of its own."""
+    return sorted(
+        bind if BIND_MODE.match(bind.rsplit(":", 1)[-1]) else bind + ":rw"
+        for bind in binds or []
+    )
 
 
 def _labels(labels: dict[str, str] | None, language: str, exclusions: list[Rule]) -> dict[str, str]:
@@ -197,8 +209,9 @@ def _container(
     config = container.get("Config") or {}
     host = container.get("HostConfig") or {}
     networks = (container.get("NetworkSettings") or {}).get("Networks") or {}
-    # Docker adds a container's own ID and hostname to its aliases
-    own = {container["Id"], container["Id"][:12], config.get("Hostname")}
+    # Docker adds a container's own ID to its aliases. Not its hostname: a hostname that was set
+    # (Cognos's) is an alias that was asked for
+    own = {container["Id"], container["Id"][:12]}
     return {
         "image": config.get("Image"),
         "imageId": container.get("Image"),
@@ -234,8 +247,12 @@ def _container(
     }
 
 
-def _started(container: dict[str, Any]) -> str:
-    return str((container.get("State") or {}).get("StartedAt") or "")
+def _started(container: dict[str, Any]) -> tuple[str, str]:
+    """When it started, to sort by. Docker leaves a fraction's last zeros off, so the text itself
+    doesn't sort: 01.5Z would come before 01Z."""
+    stamp = str((container.get("State") or {}).get("StartedAt") or "").rstrip("Z")
+    seconds, _, fraction = stamp.partition(".")
+    return seconds, fraction.ljust(9, "0")
 
 
 def normalize(
@@ -262,8 +279,9 @@ def normalize(
             "ipv6": bool(network.get("EnableIPv6")),
             "attachable": bool(network.get("Attachable")),
             "options": {
-                name: (network.get("Options") or {})[name]
-                for name in _kept("option", network.get("Options"), exclusions)
+                name: value
+                for name, value in sorted((network.get("Options") or {}).items())
+                if name not in ENGINE_OPTIONS
             },
             "labels": _labels(network.get("Labels"), language, exclusions),
             # The scenario's containers, by role; any other is named, as it shouldn't be there
@@ -310,21 +328,26 @@ def compare(readings: dict[str, dict[str, Any]]) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
+    arguments = [argument for argument in argv[1:] if argument != "--require-all"]
+    require_all = "--require-all" in argv[1:]
     root = (
-        Path(argv[1])
-        if len(argv) > 1
+        Path(arguments[0])
+        if arguments
         else Path(__file__).resolve().parents[1] / "build" / "container-conformance"
     )
-    home = Path(argv[2]) if len(argv) > 2 else HOME
-    if not root.is_dir():
+    home = Path(arguments[1]) if len(arguments) > 1 else HOME
+    logs = sorted(root.glob("*/*.json")) if root.is_dir() else []
+    if not logs:
         print(f"No container logs in {root}: nothing to compare")
-        return 0
+        return 1 if require_all else 0
     exclusions = rules((home / "differences.txt").read_text(encoding="utf-8"))
     scenarios: dict[str, dict[str, dict[str, Any]]] = {}
-    for path in sorted(root.glob("*/*.json")):
+    for path in logs:
         definition = home / "scenarios" / f"{path.stem}.yaml"
         if not definition.is_file():
-            print(f"{path.stem}: {path.parent.name} ran a scenario that isn't in {definition.parent}")
+            print(
+                f"{path.stem}: {path.parent.name} ran a scenario that isn't in {definition.parent}"
+            )
             return 1
         log = json.loads(path.read_text(encoding="utf-8"))
         scenarios.setdefault(path.stem, {})[path.parent.name] = normalize(
@@ -333,6 +356,12 @@ def main(argv: list[str]) -> int:
     failed = False
     for scenario, readings in sorted(scenarios.items()):
         problems = compare(readings)
+        missing = [language for language in LANGUAGES if language not in readings]
+        if require_all and missing:
+            failed = True
+            print(
+                f"{scenario}: {', '.join(missing)} didn't run it, and {', '.join(sorted(readings))} did"
+            )
         if len(readings) < 2:
             print(f"{scenario}: only {', '.join(readings)} ran it, nothing to compare")
         elif problems:
@@ -345,8 +374,12 @@ def main(argv: list[str]) -> int:
             print(
                 f"{scenario}: {', '.join(sorted(readings))} got the same {count} container{'s' if count != 1 else ''}"
             )
-    # Only a run of all four can tell that a line is stale: it may be another language's
-    if any(set(readings) >= set(LANGUAGES) for readings in scenarios.values()):
+    # Only a run of every scenario in all four languages can tell that a line is stale: it may be
+    # another language's, or a scenario's that was skipped here for want of its source
+    everything = {path.stem for path in (home / "scenarios").glob("*.yaml")}
+    if everything <= set(scenarios) and all(
+        set(readings) >= set(LANGUAGES) for readings in scenarios.values()
+    ):
         for rule in exclusions:
             if not rule.used:
                 failed = True

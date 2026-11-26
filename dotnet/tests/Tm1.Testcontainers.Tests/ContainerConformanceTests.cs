@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Skipcheck.Tm1.Testcontainers.Xunit;
 
@@ -75,7 +75,12 @@ public class ContainerConformanceTests
 
     private static async Task<string> Docker(params string[] arguments)
     {
-        var start = new ProcessStartInfo("docker") { RedirectStandardOutput = true, UseShellExecute = false };
+        var start = new ProcessStartInfo("docker")
+        {
+            RedirectStandardOutput = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            UseShellExecute = false,
+        };
         foreach (var argument in arguments)
         {
             start.ArgumentList.Add(argument);

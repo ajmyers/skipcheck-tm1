@@ -21,6 +21,11 @@ TM1_BUNDLE_DIR=~/Downloads ./gradlew containerConformance --continue
   (`TM1_WEB_BUNDLE_DIR`, `COGNOS_ZIP_DIR`).
 - Then [`scripts/compare-containers.py`](../scripts/compare-containers.py) compares what each wrote
   to `build/container-conformance/<language>/<scenario>.json`, and prints each difference.
+- A scenario that some language ran and another didn't fails the run, and so does a run where
+  nothing was written (Docker not running, say): a language that was skipped mustn't pass for one
+  that agreed.
+- The tests ask the `docker` command what was started, so it must be on the path and talk to the
+  same Docker as Testcontainers does.
 
 The tests are ordinary tests too: a language's own test run starts the scenarios when it has a TM1
 source. Only the comparison needs all four.
@@ -47,14 +52,18 @@ From `docker inspect` of each container, and `docker network inspect` of the env
   labels, exposed and published ports, hostname, user, working directory, binds, mounts, tmpfs, extra
   hosts, the network mode, **every network it's on and its aliases there**, and whether it's
   privileged, its capabilities, memory, shared memory and restart policy.
-- **The network:** its driver, options, labels, and which containers are on it.
+- **The network:** its driver, options, labels, and which containers are on it. Docker's own notes
+  of whether IPv4 and IPv6 were asked for are left out of the options: some engines write them and
+  some don't. Whether the network has IPv6 is compared.
 - **The order:** which container started before which.
 
 The run's own values are replaced by placeholders: a container's ID and address, the network's name
 and ID. A host port Docker picked reads as `random`.
 
 Every container carries the label `io.skipcheck.tm1.testcontainers`, whose value is the language
-that started it. The comparison requires it to name the language whose log it's in.
+that started it. The comparison requires it to name the language whose log it's in. It's a label
+like any other in all four: `withLabel` can replace it, and it's part of what a reused container is
+found by.
 
 **Not compared**, because `docker inspect` doesn't show them: the readiness check and its timeout,
 and files copied into a container before it starts.
@@ -62,8 +71,8 @@ and files copied into a container before it starts.
 ## Known differences
 
 [`differences.txt`](differences.txt) lists what's left out of every reading, each line with its
-reason: a label, a network alias or a network option that one Testcontainers library adds on its
-own. A line that matches nothing fails the comparison once all four languages have run, so the list
+reason: a label or a network alias that one Testcontainers library adds on its own. A line that
+matches nothing fails the comparison once every scenario has run in all four languages, so the list
 can't go stale. "Not fixed yet" isn't a reason: a real difference is fixed in the package.
 
 ## Adding a scenario

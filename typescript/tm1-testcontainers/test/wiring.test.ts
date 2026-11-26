@@ -358,6 +358,21 @@ describe("PlanningAnalyticsEnvironment", () => {
     expect(new Set(identities).size).toBe(identities.length);
   });
 
+  it("every container names the language that started it", () => {
+    const env = builder()
+      .tm1("planning")
+      .tm1("reporting")
+      .tm1Web()
+      .cognos((cognos) => cognos.withUser("admin", "adminpw"))
+      .keycloak()
+      .build();
+    expect(env.containers()).toHaveLength(6);
+    for (const part of env.containers()) {
+      // The same label in every language, so docker ps finds what this library started
+      expect((part as Tm1ServerContainer).getLabels().get("io.skipcheck.tm1.testcontainers"), String(part)).toBe("typescript");
+    }
+  });
+
   it("starting a reused environment marks every container with its identity", () => {
     const env = builder().tm1("planning").tm1("reporting").tm1Web().reuse(true).build(true);
     env.prepareForReuse();

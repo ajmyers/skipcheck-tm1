@@ -60,4 +60,4 @@ def _record(scenario: str) -> None:
 
 
 def _docker(*arguments: str) -> str:
-    return subprocess.run(["docker", *arguments], check=True, capture_output=True, text=True).stdout.strip()
+    return subprocess.run(["docker", *arguments], check=True, capture_output=True, encoding="utf-8").stdout.strip()

@@ -1,6 +1,7 @@
 # Two TM1 servers in CAM security, with Cognos and its Keycloak for OIDC logins.
 # unordered: tm1/planning tm1/reporting
-# unordered: cognos keycloak
+# unordered: adminServer keycloak
+# unordered: adminServer cognos
 version: 1
 tm1:
   servers:

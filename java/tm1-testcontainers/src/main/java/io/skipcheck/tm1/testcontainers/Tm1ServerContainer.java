@@ -88,7 +88,8 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 
 	/**
 	 * The label on every container this library starts, in every language; its value is
-	 * the language, here {@code java}. {@code docker ps --filter label=...} finds them.
+	 * the language, here {@code java}. {@code docker ps --filter label=...} finds them. A
+	 * label like any other: {@code withLabel} can replace it.
 	 */
 	static final String LIBRARY_LABEL = "io.skipcheck.tm1.testcontainers";
 

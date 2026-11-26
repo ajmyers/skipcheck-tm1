@@ -228,14 +228,65 @@ def test_a_container_of_another_run_on_the_network_is_named() -> None:
     ]
 
 
-def test_a_network_option_is_compared_unless_a_line_leaves_it_out() -> None:
+def test_a_network_option_is_compared_but_not_dockers_note_of_ipv4_and_ipv6() -> None:
     entry = two("java", "a", "b")
-    entry["network"][0]["Options"] = {"com.docker.network.enable_ipv6": "false"}
-    assert read(entry)["network"]["options"] == {
-        "com.docker.network.enable_ipv6": "false"
+    entry["network"][0]["Options"] = {
+        "com.docker.network.enable_ipv4": "true",
+        "com.docker.network.enable_ipv6": "false",
+        "com.docker.network.driver.mtu": "1400",
     }
-    rules = RULES + "option com.docker.network.enable_ipv*: Docker's own note\n"
-    assert read(entry, rules)["network"]["options"] == {}
+    assert read(entry)["network"]["options"] == {"com.docker.network.driver.mtu": "1400"}
+
+
+def test_an_alias_that_is_also_the_hostname_is_compared() -> None:
+    # Cognos: its hostname is set to its alias, and TM1 is pointed at that name
+    def cognos(language: str, *aliases: str) -> dict[str, Any]:
+        return read(log(language, cognos=inspected("a", *aliases, Hostname="cognos")))
+
+    problems = containers.compare(
+        {"java": cognos("java", "cognos"), "python": cognos("python")}
+    )
+    assert [problem.splitlines()[0] for problem in problems] == [
+        "containers.cognos.networks.<network>"
+    ]
+
+
+def test_orders_starts_by_time_whatever_the_length_of_the_fraction() -> None:
+    def started(first: str, second: str) -> list[str]:
+        entry = two("java", "a", "b")
+        entry["containers"]["adminServer"][0]["State"]["StartedAt"] = first
+        entry["containers"]["tm1/planning"][0]["State"]["StartedAt"] = second
+        order = read(entry)["startedBefore"]
+        assert isinstance(order, list)
+        return order
+
+    # Docker leaves a fraction's last zeros off: as text, 01.5Z sorts before 01Z
+    assert started("2026-01-01T00:00:01Z", "2026-01-01T00:00:01.5Z") == [
+        "adminServer before tm1/planning"
+    ]
+    assert started("2026-01-01T00:00:01.12Z", "2026-01-01T00:00:01.123Z") == [
+        "adminServer before tm1/planning"
+    ]
+    assert started("2026-01-01T00:00:01.5Z", "2026-01-01T00:00:01Z") == [
+        "tm1/planning before adminServer"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("bind", "read_as"),
+    [
+        ("cache:/tm1/cache", "cache:/tm1/cache:rw"),
+        ("cache:/tm1/cache:ro", "cache:/tm1/cache:ro"),
+        ("/host/ibm:/ibm:ro,z", "/host/ibm:/ibm:ro,z"),
+        # A Windows path has a colon of its own
+        ("C:\\data:/tm1/data", "C:\\data:/tm1/data:rw"),
+        ("C:\\data:/tm1/data:rw", "C:\\data:/tm1/data:rw"),
+    ],
+)
+def test_reads_a_binds_mode_by_what_it_says(bind: str, read_as: str) -> None:
+    entry = two("java", "a", "b")
+    entry["containers"]["adminServer"][0]["HostConfig"]["Binds"] = [bind]
+    assert read(entry)["containers"]["adminServer"]["binds"] == [read_as]
 
 
 @pytest.mark.parametrize(
@@ -245,6 +296,7 @@ def test_a_network_option_is_compared_unless_a_line_leaves_it_out() -> None:
         "environment TM1_*: not a kind",
         "label org.testcontainers* no reason",
         "label org.testcontainers*: not ported yet",
+        "label org.testcontainers*: Not fixed yet.",
     ],
 )
 def test_refuses_a_line_that_isnt_a_difference_with_a_reason(line: str) -> None:
@@ -266,8 +318,8 @@ def home(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def run(home: Path) -> int:
-    code = containers.main(["", str(home / "logs"), str(home / "home")])
+def run(home: Path, *flags: str) -> int:
+    code = containers.main(["", *flags, str(home / "logs"), str(home / "home")])
     assert isinstance(code, int)
     return code
 
@@ -282,7 +334,7 @@ def test_passes_when_every_language_got_the_same(
                 "net-java"
             ]["Aliases"].append("tc-abc")
         write(home, language, entry)
-    assert run(home) == 0
+    assert run(home, "--require-all") == 0
     assert "dotnet, java, python, typescript got the same 2 containers" in capsys.readouterr().out
 
 
@@ -309,6 +361,35 @@ def test_a_line_that_matched_nothing_fails_once_all_four_ran(
     write(home, "typescript", two("typescript", "4", "8"))
     assert run(home) == 1
     assert "'alias tc-*' matched nothing: remove it" in capsys.readouterr().out
+
+
+def test_a_line_isnt_stale_while_a_scenario_hasnt_run(
+    home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The stale line may be for the scenario that was skipped here, for want of its source
+    (home / "home" / "scenarios" / "cognos.yaml").write_text("version: 1\n")
+    for index, language in enumerate(containers.LANGUAGES):
+        write(home, language, two(language, "1234"[index], "5678"[index]))
+    assert run(home, "--require-all") == 0
+    assert "matched nothing" not in capsys.readouterr().out
+
+
+def test_requiring_all_fails_when_a_language_was_skipped(
+    home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    for index, language in enumerate(containers.LANGUAGES[:3]):
+        write(home, language, two(language, "123"[index], "567"[index]))
+    assert run(home) == 0
+    assert run(home, "--require-all") == 1
+    assert "two: typescript didn't run it, and dotnet, java, python did" in capsys.readouterr().out
+
+
+def test_requiring_all_fails_when_nothing_ran(
+    home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Docker wasn't running, say: every test was skipped, and nothing was compared
+    assert run(home, "--require-all") == 1
+    assert "nothing to compare" in capsys.readouterr().out
 
 
 def test_one_language_alone_has_nothing_to_compare(

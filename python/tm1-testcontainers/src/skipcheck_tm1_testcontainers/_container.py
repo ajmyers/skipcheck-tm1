@@ -33,7 +33,8 @@ from testcontainers.core.wait_strategies import HttpWaitStrategy
 __all__ = ["GenericContainer", "Network", "docker_available", "reuse_enabled"]
 
 REUSE_HASH_LABEL = "io.skipcheck.tm1.testcontainers.hash"
-# On every container this library starts, in every language; its value is the language
+# On every container this library starts, in every language; its value is the language. A label
+# like any other: with_label can replace it, and it's part of what a reused container is found by
 LIBRARY_LABEL = "io.skipcheck.tm1.testcontainers"
 
 
@@ -152,7 +153,7 @@ class GenericContainer(DockerContainer):
         self._transferable_specs: list[Any] = []
         self._dependencies: list[Any] = []
         self._reuse = False
-        self._labels: dict[str, str] = {}
+        self._labels: dict[str, str] = {LIBRARY_LABEL: "python"}
         self._extra_hosts: dict[str, str] = {}
         self._lock = threading.RLock()
 
@@ -297,7 +298,7 @@ class GenericContainer(DockerContainer):
                 host_network = client.find_host_network()
                 if host_network:
                     kwargs["network"] = host_network
-            labels = create_labels(self.image, {**self._labels, LIBRARY_LABEL: "python"})
+            labels = create_labels(self.image, self._labels)
             existing = None
             if reuse:
                 # Not reaped at the end of the session, and found again by its settings

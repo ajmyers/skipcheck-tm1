@@ -1,8 +1,7 @@
 # What scripts/compare-containers.py leaves out of every language's containers, and why.
-# One a line, "<kind> <glob>: <reason>", where the kind is label (a label's name), alias (a network
-# alias) or option (a network option's name).
-# A line that matches nothing fails the comparison once all four languages have run.
+# One a line, "<kind> <glob>: <reason>", where the kind is label (a label's name) or alias (a network
+# alias). A line that matches nothing fails the comparison once every scenario has run in all four
+# languages.
 
 alias tc-*: Testcontainers for Java gives every container on a network a random alias of its own, which nothing here uses
 label org.testcontainers*: each Testcontainers library marks what it starts for its own cleanup (Ryuk), with its own names and a session ID
-option com.docker.network.enable_ipv*: Docker writes these down when a library says whether it wants IPv4 and IPv6, and Testcontainers for Node says nothing; whether the network has IPv6 is compared itself

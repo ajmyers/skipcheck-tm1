@@ -470,6 +470,18 @@ public class PlanningAnalyticsEnvironmentTests
     }
 
     [Fact]
+    public void EveryContainerNamesTheLanguageThatStartedIt()
+    {
+        var env = Builder().Tm1("planning").Tm1("reporting").Tm1Web().Cognos(cognos => cognos.WithUser("admin", "adminpw")).Keycloak().Build();
+        Assert.Equal(6, env.Containers().Count);
+        foreach (var part in env.Containers())
+        {
+            // The same label in every language, so docker ps finds what this library started
+            Assert.Equal("dotnet", ((IGenericContainer)part).Labels["io.skipcheck.tm1.testcontainers"]);
+        }
+    }
+
+    [Fact]
     public void StartingAReusedEnvironmentMarksEveryContainerWithItsIdentity()
     {
         var env = Builder().Tm1("planning").Tm1("reporting").Tm1Web().Reuse(true).Build(true);

@@ -210,15 +210,17 @@ val containerLogs = layout.buildDirectory.dir("container-conformance")
 
 val containerConformancePrepare = tasks.register("containerConformancePrepare") {
 	description = "Checks a TM1 is configured for the container conformance run, and clears the run before's logs."
-	val configured = liveSources.dropLast(1).map { providers.environmentVariable(it) }
-	val names = liveSources.dropLast(1)
+	// Not TM1_URL: a server that's already running has no container to compare
+	val names = liveSources - "TM1_URL"
+	val configured = names.map { providers.environmentVariable(it) }
 	val directory = containerLogs
 	outputs.upToDateWhen { false }
 	doLast {
+		// First, whatever comes next: the comparison mustn't find an earlier run's logs
+		directory.get().asFile.deleteRecursively()
 		if (configured.none { it.isPresent }) {
 			throw GradleException("No TM1 configured: set one of " + names.joinToString(", ") + ". See testcontainers-conformance/README.md.")
 		}
-		directory.get().asFile.deleteRecursively()
 	}
 }
 
@@ -265,7 +267,8 @@ val compareContainers = tasks.register<PythonTask>("compareContainers") {
 	description = "Requires every language's testcontainers to have got the same containers from Docker in the conformance scenarios."
 	python()
 	directory = root
-	commands = listOf(listOf("python", "scripts/compare-containers.py", containerLogs.get().asFile.path))
+	// --require-all: a language that was skipped (no Docker, say) mustn't pass for one that agreed
+	commands = listOf(listOf("python", "scripts/compare-containers.py", "--require-all", containerLogs.get().asFile.path))
 	mustRunAfter(containerConformanceJava, containerConformancePython, containerConformanceDotnet, containerConformanceTypescript)
 }
 

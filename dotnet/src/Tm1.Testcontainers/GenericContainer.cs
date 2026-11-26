@@ -28,7 +28,10 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     private readonly List<IStartable> dependencies = [];
     private readonly Dictionary<string, string> extraHosts = new(StringComparer.Ordinal);
     private readonly List<(string Source, string Target)> copies = [];
-    private readonly Dictionary<string, string> labels = new(StringComparer.Ordinal);
+
+    // The first is on every container this library starts, in every language; its value is the language.
+    // A label like any other: WithLabel can replace it, and it's part of what a reused container is found by
+    private readonly Dictionary<string, string> labels = new(StringComparer.Ordinal) { ["io.skipcheck.tm1.testcontainers"] = "dotnet" };
     private readonly SemaphoreSlim starting = new(1, 1);
     private string[] command = [];
     private string? hostname;
@@ -294,7 +297,6 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     {
         var builder = new ContainerBuilder(DockerImageName)
             .WithEnvironment(env)
-            .WithLabel("io.skipcheck.tm1.testcontainers", "dotnet")
             .WithLabel(labels)
             .WithCreateParameterModifier(p =>
             {
@@ -398,7 +400,7 @@ internal interface IGenericContainer
 
     IReadOnlyList<string> NetworkAliases { get; }
 
-    /// <summary>Its labels, besides the one every container of this library has.</summary>
+    /// <summary>Its labels, with the one every container of this library has.</summary>
     IReadOnlyDictionary<string, string> Labels { get; }
 
     /// <summary>The host files and folders copied in, and where to.</summary>
