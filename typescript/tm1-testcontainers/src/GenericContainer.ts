@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { existsSync, statSync } from "node:fs";
-import { GenericContainer as TcGenericContainer, log, Wait, type StartedTestContainer } from "testcontainers";
+import { text } from "node:stream/consumers";
+import { getContainerRuntimeClient, GenericContainer as TcGenericContainer, log, Wait, type StartedTestContainer, type WaitStrategy } from "testcontainers";
 import { DockerHost } from "./docker.js";
 import { IllegalStateException } from "./settings.js";
 import type { Network } from "./Network.js";
@@ -336,12 +337,53 @@ export abstract class GenericContainer implements Startable {
     if (dirs.length > 0) c = c.withCopyDirectoriesToContainer(dirs);
     if (this.#reuse && DockerHost.reuseEnabled()) c = c.withReuse();
     const w = this.#wait;
-    if (w) c = c.withWaitStrategy(Wait.forHttp(w.path, w.port).forStatusCodeMatching(w.ok)).withStartupTimeout(w.timeout);
+    if (w)
+      c = c
+        .withWaitStrategy(new ExitAwareWait(Wait.forHttp(w.path, w.port, { abortOnContainerExit: true }).forStatusCodeMatching(w.ok)))
+        .withStartupTimeout(w.timeout);
     if (this.#network) {
       // Testcontainers for Node takes only a network that's been created
       c = c.withNetwork(await this.#network.create());
       if (this.#aliases.length > 0) c = c.withNetworkAliases(...this.#aliases);
     }
     return c;
+  }
+}
+
+/** Stops waiting when the container has exited, as Java's wait does, and says why: its exit code
+ * and the end of its log. Testcontainers' own HTTP wait would keep trying until its timeout, so a
+ * TM1 that can't start cost the whole startup timeout before anything said so. */
+class ExitAwareWait implements WaitStrategy {
+  constructor(private readonly inner: WaitStrategy) {}
+
+  async waitUntilReady(...[container, boundPorts, startTime]: Parameters<WaitStrategy["waitUntilReady"]>): Promise<void> {
+    try {
+      await this.inner.waitUntilReady(container, boundPorts, startTime);
+    } catch (e) {
+      const state = await container.inspect().then(
+        (info) => info.State,
+        () => undefined,
+      );
+      if (!state || state.Running) throw e;
+      const client = await getContainerRuntimeClient();
+      const log = await client.container.logs(container, { tail: 30 }).then(
+        (stream) => text(stream),
+        () => "",
+      );
+      throw new Error(`The container exited while starting, with code ${state.ExitCode}. The end of its log:\n${log.trim()}`, { cause: e });
+    }
+  }
+
+  withStartupTimeout(startupTimeoutMs: number): this {
+    this.inner.withStartupTimeout(startupTimeoutMs);
+    return this;
+  }
+
+  isStartupTimeoutSet(): boolean {
+    return this.inner.isStartupTimeoutSet();
+  }
+
+  getStartupTimeout(): number {
+    return this.inner.getStartupTimeout();
   }
 }

@@ -209,7 +209,15 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
             }
             var started = Build();
             container = started;
-            await started.StartAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await started.StartAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (ContainerNotRunningException e)
+            {
+                // As Java's and the other clients': the exit code and the end of the log, in one message
+                throw new InvalidOperationException(await ExitedAsync(started).ConfigureAwait(false), e);
+            }
             await ContainerIsStartedAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -339,6 +347,25 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     }
 
     private sealed record WaitFor(string Path, int Port, Predicate<HttpStatusCode> Ok, TimeSpan Timeout);
+
+    /// <summary>Why a container that exited while starting did: its exit code and the end of its log.</summary>
+    private static async Task<string> ExitedAsync(IContainer exited)
+    {
+        long code;
+        string log;
+        try
+        {
+            code = await exited.GetExitCodeAsync().ConfigureAwait(false);
+            var (stdout, stderr) = await exited.GetLogsAsync().ConfigureAwait(false);
+            log = stdout + stderr;
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            return "The container exited while starting; its exit code and log couldn't be read: " + e.Message;
+        }
+        var lines = log.Split('\n');
+        return $"The container exited while starting, with code {code}. The end of its log:\n" + string.Join('\n', lines[Math.Max(0, lines.Length - 30)..]);
+    }
 }
 
 /// <summary>What <see cref="PlanningAnalyticsEnvironment"/> reads and sets on each of its containers, whatever its type.</summary>

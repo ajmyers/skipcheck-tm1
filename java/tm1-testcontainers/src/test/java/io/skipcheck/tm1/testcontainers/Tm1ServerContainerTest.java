@@ -10,9 +10,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import io.skipcheck.tm1.client.version.Tm1Version;
 
@@ -50,6 +54,22 @@ class Tm1ServerContainerTest {
 		try (var tm1 = new Tm1ServerContainer(shared.getSource()).withExpectedVersion(Tm1Version.parse("99.0"))) {
 			assertThatThrownBy(tm1::start).hasStackTraceContaining("Expected TM1 99.0 but the server from");
 		}
+	}
+
+	@Test
+	void failsAtOnceWhenTheContainerExits(@TempDir Path install) throws Exception {
+		// An install whose programs can't run, as when TM1 lacks a library: the container
+		// exits at once, and start() says so with its log, rather than waiting out the
+		// startup timeout
+		Files.createDirectories(install.resolve("bin64"));
+		Files.writeString(install.resolve("bin64/tm1s.exe"), "not a program");
+		Files.writeString(install.resolve("bin64/tm1admsrv.exe"), "not a program");
+		long started = System.nanoTime();
+		try (var tm1 = new Tm1ServerContainer(new Tm1Source.InstallDir(install))) {
+			assertThatThrownBy(tm1::start).hasStackTraceContaining("The container exited while starting, with code")
+				.hasStackTraceContaining("[tm1-entrypoint] Starting TM1 Admin Server");
+		}
+		assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMinutes(2));
 	}
 
 	private HttpResponse<String> get(Tm1ServerContainer tm1, String path) throws Exception {

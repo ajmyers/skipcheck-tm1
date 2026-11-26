@@ -108,7 +108,9 @@ class _HttpWait(HttpWaitStrategy):
             self._container.reload()
             if self._container.status in ("exited", "dead"):
                 out, err = self._container.get_logs()
-                raise RuntimeError(f"The container stopped while starting:\n{(out + err).decode(errors='replace')[-4000:]}")
+                code = (self._container.get_wrapped_container().attrs.get("State") or {}).get("ExitCode")
+                tail = "\n".join((out + err).decode(errors="replace").splitlines()[-30:])
+                raise RuntimeError(f"The container exited while starting, with code {code}. The end of its log:\n{tail}")
         return super()._try_http_request(url, headers, ssl_context)
 
 
