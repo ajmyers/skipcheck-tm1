@@ -72,9 +72,19 @@ public final class Tm1Request<T> {
 
 	private final @Nullable Tm1Capability requires;
 
+	private final @Nullable Tm1Operation operation;
+
+	private final Map<String, Object> parameterDefaults;
+
 	private Tm1Request(HttpMethod method, ODataPath path, ODataQuery query, Map<String, String> headers,
 			@Nullable Object body, Response response, Class<T> type, @Nullable Duration timeout,
 			@Nullable Tm1Capability requires) {
+		this(method, path, query, headers, body, response, type, timeout, requires, null, Map.of());
+	}
+
+	private Tm1Request(HttpMethod method, ODataPath path, ODataQuery query, Map<String, String> headers,
+			@Nullable Object body, Response response, Class<T> type, @Nullable Duration timeout,
+			@Nullable Tm1Capability requires, @Nullable Tm1Operation operation, Map<String, Object> parameterDefaults) {
 		this.method = Objects.requireNonNull(method, "method");
 		this.path = Objects.requireNonNull(path, "path");
 		this.query = Objects.requireNonNull(query, "query");
@@ -84,6 +94,8 @@ public final class Tm1Request<T> {
 		this.type = Objects.requireNonNull(type, "type");
 		this.timeout = timeout;
 		this.requires = requires;
+		this.operation = operation;
+		this.parameterDefaults = Collections.unmodifiableMap(new LinkedHashMap<>(parameterDefaults));
 	}
 
 	/**
@@ -214,7 +226,8 @@ public final class Tm1Request<T> {
 	 * @return the copy
 	 */
 	public Tm1Request<T> withQuery(ODataQuery query) {
-		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout, requires);
+		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout, requires, operation,
+				parameterDefaults);
 	}
 
 	/**
@@ -226,7 +239,8 @@ public final class Tm1Request<T> {
 	public Tm1Request<T> withHeader(String name, String value) {
 		Map<String, String> next = new LinkedHashMap<>(headers);
 		next.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(value, "value"));
-		return new Tm1Request<>(method, path, query, next, body, response, type, timeout, requires);
+		return new Tm1Request<>(method, path, query, next, body, response, type, timeout, requires, operation,
+				parameterDefaults);
 	}
 
 	/**
@@ -241,20 +255,92 @@ public final class Tm1Request<T> {
 		if (timeout.isNegative() || timeout.isZero()) {
 			throw new IllegalArgumentException("timeout must be positive: " + timeout);
 		}
-		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout, requires);
+		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout, requires, operation,
+				parameterDefaults);
 	}
 
 	/**
 	 * A copy that's only sent if the server defines {@code capability}: before sending,
 	 * the session checks the server's {@code $metadata} and otherwise fails with
 	 * {@link io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException}, without
-	 * calling the server. Service methods for newer endpoints declare it.
+	 * calling the server. Service methods for newer endpoints declare it. It replaces an
+	 * {@linkplain #requires(Tm1Operation) operation} set before, whose parameters are
+	 * then no longer checked.
 	 * @param capability what the request needs the server to define
 	 * @return the copy
 	 */
 	public Tm1Request<T> requires(Tm1Capability capability) {
 		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout,
-				Objects.requireNonNull(capability, "capability"));
+				Objects.requireNonNull(capability, "capability"), null, parameterDefaults);
+	}
+
+	/**
+	 * A copy that's only sent if the server has {@code operation}, as
+	 * {@code requires(operation.capability())}, and only with parameters the server's
+	 * definition of it has. Before sending, the session also checks each of the
+	 * operation's parameters that the body sends (a key named after it, or after it with
+	 * {@code @odata.bind}) against the server's own {@code $metadata}: one the server
+	 * lacks fails the call with
+	 * {@link io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException}, without
+	 * calling the server, unless {@link #withParameterDefault} says what leaving it out
+	 * means and the body sends just that, in which case it's left out. Only an action's
+	 * body is checked; a function's parameters are in its path.
+	 * @param operation the operation the request invokes
+	 * @return the copy
+	 */
+	public Tm1Request<T> requires(Tm1Operation operation) {
+		Objects.requireNonNull(operation, "operation");
+		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout, operation.capability(),
+				operation, parameterDefaults);
+	}
+
+	/**
+	 * A copy that says what the server assumes when {@code parameter} is left out: on a
+	 * server whose {@link #requires(Tm1Operation) operation} lacks the parameter, a body
+	 * that sends {@code value} for it is sent without it, rather than refused, since that
+	 * asks for the same thing.
+	 * @param parameter the parameter's name, such as {@code Selection}
+	 * @param value what the server does without it, as the body would send it, such as
+	 * {@code "Unfed"}
+	 * @return the copy
+	 */
+	public Tm1Request<T> withParameterDefault(String parameter, Object value) {
+		Map<String, Object> next = new LinkedHashMap<>(parameterDefaults);
+		next.put(Objects.requireNonNull(parameter, "parameter"), Objects.requireNonNull(value, "value"));
+		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout, requires, operation, next);
+	}
+
+	/**
+	 * A copy with another body, for the session to send in place of this one's.
+	 * @param body the body to send, or {@code null} for none: only a {@code GET},
+	 * {@code DELETE} or {@code HEAD} can go without one, as the factory methods have it
+	 * @return the copy
+	 * @throws NullPointerException if {@code body} is null and the request is a write
+	 */
+	public Tm1Request<T> withBody(@Nullable Object body) {
+		if (body == null && !(method.equals(HttpMethod.GET) || method.equals(HttpMethod.DELETE)
+				|| method.equals(HttpMethod.HEAD))) {
+			throw new NullPointerException(method + " " + path + " needs a body");
+		}
+		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout, requires, operation,
+				parameterDefaults);
+	}
+
+	/**
+	 * The operation whose parameters are checked against the server, if any.
+	 * @return the operation, or empty
+	 */
+	public Optional<Tm1Operation> operation() {
+		return Optional.ofNullable(operation);
+	}
+
+	/**
+	 * What the server assumes for each parameter left out, by parameter name, as
+	 * {@link #withParameterDefault} sets them.
+	 * @return the defaults, possibly empty
+	 */
+	public Map<String, Object> parameterDefaults() {
+		return parameterDefaults;
 	}
 
 	/**

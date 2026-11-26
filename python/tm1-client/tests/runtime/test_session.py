@@ -14,6 +14,7 @@ import http.server
 import json
 import logging
 import random
+import re
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -23,11 +24,13 @@ import httpx2
 import pytest
 
 from skipcheck_tm1 import (
+    Bind,
     ODataPath,
     ODataQuery,
     Tm1ApiError,
     Tm1AuthenticationError,
     Tm1BadRequestError,
+    Tm1Capabilities,
     Tm1Capability,
     Tm1ErrorKind,
     Tm1ForbiddenError,
@@ -42,6 +45,8 @@ from skipcheck_tm1 import (
     Tm1Version,
     auth,
 )
+from skipcheck_tm1._generated.model import CheckFeedersSelection
+from skipcheck_tm1._generated.operations import Tm1Operations
 from skipcheck_tm1._protocol import Call, async_result
 from skipcheck_tm1.aio import cognos as aio_cognos
 
@@ -863,6 +868,153 @@ def test_refuses_a_request_the_server_cant_serve_in_a_batch_and_still_sends_the_
     assert server.result() == {}
     (sent,) = requests_to(rt, "POST $batch")
     assert "Server" in sent.content.decode() and "Bananas" not in sent.content.decode()
+
+
+CHECK_FEEDERS = "POST Cubes('Sales')/tm1.CheckFeeders"
+
+
+def _without_selection(rt: Runtime) -> None:
+    """A server whose CheckFeeders has no Selection, as before schema 11.8.32."""
+    metadata = re.sub(
+        r'(<Action Name="CheckFeeders".*?)<Parameter Name="Selection".*?</Parameter>', r"\1", SNAPSHOT.read_text(encoding="utf-8"), count=1, flags=re.S
+    )
+    assert metadata != SNAPSHOT.read_text(encoding="utf-8")
+    rt.fake.metadata = metadata.encode("utf-8")
+
+
+def _check_feeders(selection: Any) -> Tm1Request[Any]:
+    return (
+        Tm1Request.post_list(
+            ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"),
+            {"Tuple@odata.bind": ["Dimensions('Region')/Hierarchies('Region')/Elements('Total')"], "Selection": selection},
+            dict,
+        )
+        .requires(Tm1Operations.CUBE_CHECK_FEEDERS)
+        .with_parameter_default("Selection", "Unfed")
+    )
+
+
+def test_sends_every_parameter_the_server_defines(rt: Runtime) -> None:
+    rt.fake.respond = lambda r: {"value": []}
+    rt.run(rt.session().collect(_check_feeders("Both")))
+    (sent,) = requests_to(rt, CHECK_FEEDERS)
+    assert '"Selection":"Both"' in sent.content.decode()
+
+
+def test_refuses_a_parameter_the_server_doesnt_define_without_sending_it(rt: Runtime) -> None:
+    _without_selection(rt)
+    error = rt.raises(Tm1UnsupportedOperationError, lambda: rt.session().collect(_check_feeders("Both")))
+    assert error.missing == "parameter Selection of Cube.CheckFeeders"
+    assert "reports schema 11.8.35" in str(error)
+    assert requests_to(rt, CHECK_FEEDERS) == []
+
+
+def test_leaves_out_a_parameter_the_server_doesnt_define_when_its_value_is_what_leaving_it_out_means(rt: Runtime) -> None:
+    _without_selection(rt)
+    rt.fake.respond = lambda r: {"value": []}
+    rt.run(rt.session().collect(_check_feeders("Unfed")))
+    (sent,) = requests_to(rt, CHECK_FEEDERS)
+    assert "Tuple@odata.bind" in sent.content.decode() and "Selection" not in sent.content.decode()
+
+
+def test_compares_a_default_as_json_whatever_its_type_or_key_order(rt: Runtime) -> None:
+    _without_selection(rt)
+    rt.fake.respond = lambda r: {"value": []}
+    rt.run(rt.session().collect(_check_feeders(5).with_parameter_default("Selection", 5)))
+    rt.run(rt.session().collect(_check_feeders({"B": 2, "A": 1}).with_parameter_default("Selection", {"A": 1, "B": 2})))
+    sent = requests_to(rt, CHECK_FEEDERS)
+    assert len(sent) == 2
+    assert all("Tuple@odata.bind" in s.content.decode() and "Selection" not in s.content.decode() for s in sent)
+
+
+def test_leaves_out_a_parameter_in_a_batch_too(rt: Runtime) -> None:
+    _without_selection(rt)
+    rt.fake.respond = lambda r: {"responses": [{"id": "1", "status": 200, "body": {"value": []}}]}
+    batch = rt.session().batch()
+    unfed = rt.run(batch.session.collect(_check_feeders("Unfed")))
+    both = rt.run(batch.session.collect(_check_feeders("Both")))
+    rt.run(batch.run())
+    assert unfed.result() == []
+    with pytest.raises(Tm1UnsupportedOperationError):
+        both.result()
+    (sent,) = requests_to(rt, "POST $batch")
+    assert "tm1.CheckFeeders" in sent.content.decode() and "Selection" not in sent.content.decode()
+
+
+def test_knows_the_parameters_a_caller_passes_for_each_kind_of_operation() -> None:
+    c = Tm1Capabilities.parse(SNAPSHOT.read_bytes())
+    check_feeders = Tm1Operations.CUBE_CHECK_FEEDERS.capability()
+    assert c.supports_parameter(check_feeders, "Selection")
+    assert not c.supports_parameter(check_feeders, "Cube"), "the binding parameter isn't one a caller passes"
+    # The import Update and the actions Cellset/Update and Cube/Update share a name: only the
+    # import's own parameters count
+    assert c.supports_parameter(Tm1Capability.unbound_operation("Update"), "Cells")
+    assert not c.supports_parameter(Tm1Capability.unbound_operation("Update"), "BeginOrdinal")
+
+
+def test_checks_feeders_with_unfed_on_a_server_without_selection_and_refuses_the_rest(rt: Runtime) -> None:
+    _without_selection(rt)
+    rt.fake.respond = lambda r: {"value": []}
+    cubes = rt.Client(rt.session()).cubes
+    rt.run(cubes.check_feeders("Sales", {"Region": "Total"}, CheckFeedersSelection.UNFED))
+    (sent,) = requests_to(rt, CHECK_FEEDERS)
+    assert "Tuple@odata.bind" in sent.content.decode() and "Selection" not in sent.content.decode()
+    rt.raises(Tm1UnsupportedOperationError, lambda: cubes.check_feeders("Sales", {"Region": "Total"}, CheckFeedersSelection.BOTH))
+    assert len(requests_to(rt, CHECK_FEEDERS)) == 1
+
+
+def test_refuses_a_bound_parameter_the_server_doesnt_define_whatever_the_body_is_built_as(rt: Runtime) -> None:
+    # A server whose CheckFeeders has no Tuple either: a binding is refused, default or not, and the
+    # body is checked as written, here a Bind rather than a key with @odata.bind
+    metadata = re.sub(
+        r'(<Action Name="CheckFeeders".*?)<Parameter Name="Tuple".*?</Parameter>', r"\1", SNAPSHOT.read_text(encoding="utf-8"), count=1, flags=re.S
+    )
+    assert metadata != SNAPSHOT.read_text(encoding="utf-8")
+    rt.fake.metadata = metadata.encode("utf-8")
+    request = (
+        Tm1Request.post_list(
+            ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"),
+            {"Tuple": [Bind(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements").key("Total"))]},
+            dict,
+        )
+        .requires(Tm1Operations.CUBE_CHECK_FEEDERS)
+        .with_parameter_default("Tuple", "x")
+    )
+    error = rt.raises(Tm1UnsupportedOperationError, lambda: rt.session().collect(request))
+    assert error.missing == "parameter Tuple of Cube.CheckFeeders"
+    assert requests_to(rt, CHECK_FEEDERS) == []
+
+
+def test_checks_the_body_as_it_was_queued_in_a_batch(rt: Runtime) -> None:
+    _without_selection(rt)
+    rt.fake.respond = lambda r: {"responses": []}
+    body = {"Tuple@odata.bind": ["Dimensions('Region')/Hierarchies('Region')/Elements('Total')"], "Selection": "Both"}
+    batch = rt.session().batch()
+    both = rt.run(
+        batch.session.collect(
+            Tm1Request.post_list(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"), body, dict).requires(Tm1Operations.CUBE_CHECK_FEEDERS)
+        )
+    )
+    # A change after queueing isn't sent, so it isn't what's checked either
+    del body["Selection"]
+    rt.run(batch.run())
+    with pytest.raises(Tm1UnsupportedOperationError):
+        both.result()
+
+
+def test_sends_the_body_a_request_is_given_with_its_operation_kept() -> None:
+    # Python's own: the session's check replaces a call's body directly, so with_body is held here
+    request = _check_feeders("Both").with_body({"Selection": "Unfed"})
+    assert request.body == {"Selection": "Unfed"}
+    assert request.operation is Tm1Operations.CUBE_CHECK_FEEDERS and request.parameter_defaults == {"Selection": "Unfed"}
+
+
+def test_checks_no_parameters_once_a_requirement_replaces_the_operation(rt: Runtime) -> None:
+    _without_selection(rt)
+    rt.fake.respond = lambda r: json_response(400, {"error": {"code": "278", "message": "Invalid parameter"}})
+    request = _check_feeders("Both").requires(Tm1Capability.bound_operation("tm1.Cube", "tm1.CheckFeeders"))
+    assert request.operation is None
+    rt.raises(Tm1BadRequestError, lambda: rt.session().collect(request))
 
 
 def test_fails_only_the_calls_that_need_them_in_a_batch_when_the_capabilities_cant_be_read(rt: Runtime) -> None:

@@ -336,7 +336,10 @@ public final class CubeService {
 
 	/**
 	 * {@code tm1.CheckFeeders}: the cells under a consolidated cell that are fed, not
-	 * fed, or both, to find missing feeders. Needs schema 11.1.0.
+	 * fed, or both, to find missing feeders. Needs schema 11.1.0. Servers before schema
+	 * 11.8.32 have no {@code Selection} and list only the unfed cells: there
+	 * {@link CheckFeedersSelection#UNFED} works and the others fail with
+	 * {@link io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException}.
 	 * @param name the cube's name
 	 * @param tuple the cell, as for {@link #traceCellCalculation}
 	 * @param selection which cells to list
@@ -352,9 +355,12 @@ public final class CubeService {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("Tuple@odata.bind", bindings(tuple));
 		body.put("Selection", Objects.requireNonNull(selection.json(), "selection"));
+		// Servers before schema 11.8.32 have no Selection, and answer as for Unfed:
+		// so Unfed is sent without it there, and Both and Fed are refused
 		return session.stream(Tm1Request.postList(cube(name).action(operation.name()), body, FedCellDescriptor.class)
 			.withQuery(query)
-			.requires(operation.capability()));
+			.requires(operation)
+			.withParameterDefault("Selection", Objects.requireNonNull(CheckFeedersSelection.UNFED.json())));
 	}
 
 	private static List<String> bindings(Map<String, String> tuple) {

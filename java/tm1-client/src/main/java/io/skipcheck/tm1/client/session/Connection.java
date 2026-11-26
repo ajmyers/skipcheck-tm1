@@ -28,6 +28,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import io.micrometer.common.KeyValue;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
+import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.error.ODataError;
@@ -55,6 +56,7 @@ import reactor.netty.http.client.HttpClientRequest;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * The state every view of one {@link Tm1Session} shares: the HTTP client, the
@@ -210,13 +212,55 @@ final class Connection {
 	}
 
 	/**
-	 * Fails with {@link Tm1UnsupportedOperationException} if the server doesn't define
-	 * {@code capability}.
+	 * The request as it can be sent to this server: it fails with
+	 * {@link Tm1UnsupportedOperationException} if the server doesn't define what it
+	 * {@linkplain Tm1Request#requirement() needs}. For a request that names its
+	 * {@linkplain Tm1Request#operation() action}, each of the action's parameters its
+	 * body sends, as JSON, is checked against the server's definition too. One the server
+	 * lacks fails the same way, unless the request's
+	 * {@linkplain Tm1Request#parameterDefaults() default} for it is what the body sends,
+	 * in which case it's left out of the body.
 	 */
-	Mono<Void> require(Tm1Capability capability) {
+	<T> Mono<Tm1Request<T>> prepare(Tm1Request<T> request) {
+		Optional<Tm1Capability> needed = request.requirement();
+		if (needed.isEmpty()) {
+			return Mono.just(request);
+		}
 		return capabilities().flatMap(c -> {
-			Optional<Tm1UnsupportedOperationException> missing = c.check(capability, root);
-			return missing.isPresent() ? Mono.<Void>error(missing.get()) : Mono.<Void>empty();
+			Optional<Tm1UnsupportedOperationException> missing = c.check(needed.get(), root);
+			if (missing.isPresent()) {
+				return Mono.error(missing.get());
+			}
+			Optional<Tm1Operation> operation = request.operation();
+			Object body = request.body();
+			if (operation.isEmpty() || operation.get().kind() != Tm1Operation.Kind.ACTION || body == null
+					|| body instanceof byte[] || body instanceof Tm1Request.Bytes) {
+				return Mono.just(request);
+			}
+			// The body as it's written, whatever it was built as (a map, a model, a
+			// tree), and
+			// written as it is when sent, failing the same way
+			if (!(mapper.readTree(json(body)) instanceof ObjectNode sent)) {
+				return Mono.just(request);
+			}
+			boolean changed = false;
+			for (Tm1Operation.Parameter parameter : operation.get().parameters()) {
+				String name = parameter.name();
+				if ((!sent.has(name) && !sent.has(name + "@odata.bind")) || c.supportsParameter(needed.get(), name)) {
+					continue;
+				}
+				Object leftOut = request.parameterDefaults().get(name);
+				// Both read from the JSON they're written as, so a Long default matches a
+				// body's 5:
+				// valueToTree keeps the Java type (LongNode), reading back gives IntNode
+				if (sent.has(name + "@odata.bind") || leftOut == null
+						|| !mapper.readTree(json(leftOut)).equals(sent.get(name))) {
+					return Mono.error(c.checkParameter(needed.get(), name, root).orElseThrow());
+				}
+				sent.remove(name);
+				changed = true;
+			}
+			return Mono.just(changed ? request.withBody(sent) : request);
 		});
 	}
 

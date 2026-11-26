@@ -120,9 +120,12 @@ public final class Tm1Session {
 		if (batch != null) {
 			return batch.add(inSandbox(request)).next();
 		}
-		Mono<T> send = async != null && request.response() != Tm1Request.Response.BYTES
-				? connection.async(inSandbox(request), async).next() : connection.execute(inSandbox(request));
-		return request.requirement().map(needed -> connection.require(needed).then(send)).orElse(send);
+		// What it needs, and the parameters the server has, checked first; the body
+		// may lose a parameter the server lacks whose value is what leaving it out
+		// means
+		return connection.prepare(request)
+			.flatMap(ready -> async != null && ready.response() != Tm1Request.Response.BYTES
+					? connection.async(inSandbox(ready), async).next() : connection.execute(inSandbox(ready)));
 	}
 
 	/**
@@ -144,9 +147,9 @@ public final class Tm1Session {
 		if (batch != null) {
 			return batch.add(inSandbox(request));
 		}
-		Flux<T> send = async != null && request.response() == Tm1Request.Response.COLLECTION
-				? connection.async(inSandbox(request), async) : connection.stream(inSandbox(request));
-		return request.requirement().map(needed -> connection.require(needed).thenMany(send)).orElse(send);
+		return connection.prepare(request)
+			.flatMapMany(ready -> async != null && ready.response() == Tm1Request.Response.COLLECTION
+					? connection.async(inSandbox(ready), async) : connection.stream(inSandbox(ready)));
 	}
 
 	/**

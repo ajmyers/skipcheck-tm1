@@ -783,6 +783,16 @@ public class Tm1RequestTest
     }
 
     [Fact]
+    public void KeepsABodyOnAWrite()
+    {
+        var reserve = ODataPath.Of("Cubes").Key("Sales").Action("tm1.Reserve");
+        Assert.Throws<ArgumentNullException>(() => Tm1Request.Post(reserve, null).WithBody(null));
+        Assert.Throws<ArgumentNullException>(() => Tm1Request.Patch(ODataPath.Of("Cubes").Key("x"), new Dictionary<string, object?>()).WithBody(null));
+        Assert.Null(Tm1Request.Delete(ODataPath.Of("Cubes").Key("x")).WithBody(null).Body);
+        Assert.NotNull(Tm1Request.Post(reserve, null).WithBody(new Dictionary<string, object?> { ["A"] = 1 }).Body);
+    }
+
+    [Fact]
     public void DescribesOtherKinds()
     {
         Assert.Equal(Tm1Response.Collection, Tm1Request.List<JsonElement>(ODataPath.Of("Cubes")).Response);

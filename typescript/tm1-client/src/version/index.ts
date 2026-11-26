@@ -257,6 +257,9 @@ export class Tm1Capabilities {
     private readonly singletons: Set<string>,
     private readonly imports: Set<string>,
     private readonly aliases: Map<string, string>,
+    /** Each operation's parameters, by "binding type/name" or by import name, one set per
+     * overload, without the binding parameter. */
+    private readonly parameters: Map<string, Set<string>[]> = new Map(),
   ) {}
 
   /** Reads a `$metadata` document.
@@ -298,6 +301,13 @@ export class Tm1Capabilities {
     const sets = new Set<string>();
     const singletons = new Set<string>();
     const imports = new Set<string>();
+    const parameters = new Map<string, Set<string>[]>();
+    const unbound = new Map<string, Set<string>[]>();
+    const importsOf = new Map<string, string>();
+    const add = (to: Map<string, Set<string>[]>, key: string, names: string[]): void => {
+      if (!to.has(key)) to.set(key, []);
+      to.get(key)!.push(new Set(names));
+    };
     let version: string | undefined;
     for (const schema of schemas) {
       const ns = schema.attributes["Namespace"]!;
@@ -306,7 +316,15 @@ export class Tm1Capabilities {
       }
       for (const kind of ["Action", "Function"]) {
         for (const op of childrenOf(schema, kind)) {
-          if (op.attributes["IsBound"] !== "true") continue;
+          if (op.attributes["IsBound"] !== "true") {
+            // An unbound operation's parameters, by its qualified name, for its import
+            add(
+              unbound,
+              `${ns}.${op.attributes["Name"]}`,
+              childrenOf(op, "Parameter").map((p) => p.attributes["Name"]!),
+            );
+            continue;
+          }
           // An operation is bound to its first parameter: one without it, or without that
           // parameter's type, is bound to nothing
           const binding = childrenOf(op, "Parameter")[0]?.attributes["Type"];
@@ -322,6 +340,14 @@ export class Tm1Capabilities {
           const key = qualify(inner);
           if (!bound.has(key)) bound.set(key, new Set());
           bound.get(key)!.add(op.attributes["Name"]!);
+          if (!collection)
+            add(
+              parameters,
+              key + "/" + op.attributes["Name"],
+              childrenOf(op, "Parameter")
+                .slice(1)
+                .map((p) => p.attributes["Name"]!),
+            );
         }
       }
       for (const t of [...childrenOf(schema, "EntityType"), ...childrenOf(schema, "ComplexType")]) {
@@ -345,11 +371,15 @@ export class Tm1Capabilities {
           for (const item of childrenOf(c, tag)) {
             endpoints.add(`${tag} ${item.attributes["Name"]}`);
             set.add(item.attributes["Name"]!);
+            const imported = item.attributes["Action"] ?? item.attributes["Function"];
+            if (imported !== undefined) importsOf.set(item.attributes["Name"]!, qualify(imported));
           }
         }
       }
     }
-    return new Tm1Capabilities(version, productVersion, endpoints, types, bound, sets, singletons, imports, aliases);
+    // An import's parameters, under its own name, once every schema is read
+    for (const [name, imported] of importsOf) parameters.set(name, unbound.get(imported) ?? []);
+    return new Tm1Capabilities(version, productVersion, endpoints, types, bound, sets, singletons, imports, aliases, parameters);
   }
 
   /** A copy that knows the server's product version, for the message of a refusal. */
@@ -364,6 +394,7 @@ export class Tm1Capabilities {
       this.singletons,
       this.imports,
       this.aliases,
+      this.parameters,
     );
   }
 
@@ -393,6 +424,33 @@ export class Tm1Capabilities {
     if (this.productVersion) message += ", product version " + this.productVersion.toString();
     message += added !== undefined ? "" : ")";
     return new Tm1UnsupportedOperationException(message, missing);
+  }
+
+  /** Whether the server's definition of an operation has `parameter`. For a bound operation, any
+   * operation of that name bound to the type or one of its base types counts; for an operation
+   * import, the operation it imports.
+   * @throws TypeError if `operation` isn't an operation */
+  supportsParameter(operation: Tm1Capability, parameter: string): boolean {
+    let defined: Set<string>[];
+    if (operation.kind === "BoundOperation") {
+      defined = this.hierarchy(operation.type!).flatMap((t) => this.parameters.get(t + "/" + simple(operation.name)) ?? []);
+    } else if (operation.kind === "UnboundOperation") {
+      defined = this.parameters.get(operation.name) ?? [];
+    } else {
+      throw new TypeError(operation.describe() + " isn't an operation");
+    }
+    return defined.some((names) => names.has(parameter));
+  }
+
+  /** Undefined if the server's definition of the operation has the parameter; otherwise the error
+   * saying what's missing and which schema version the server reports, as Java's. */
+  checkParameter(operation: Tm1Capability, parameter: string, server: string): Tm1UnsupportedOperationException | undefined {
+    if (this.supportsParameter(operation, parameter)) return undefined;
+    const missing = `parameter ${parameter} of ${operation.describe()}`;
+    let message = `${missing} isn't defined by the TM1 server at ${server} (`;
+    message += this.schemaVersion !== undefined ? "the server reports schema " + this.schemaVersion : "the server reports no schema version";
+    if (this.productVersion) message += ", product version " + this.productVersion.toString();
+    return new Tm1UnsupportedOperationException(message + ")", missing);
   }
 
   /** How much the server defines, for logs. */

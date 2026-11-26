@@ -110,7 +110,7 @@ public sealed record Tm1Operation
     }
 
     /// <summary>What a request using it needs the server to have, with the version that added it,
-    /// for <see cref="Tm1Request{T}.Requires"/>.</summary>
+    /// for <see cref="Tm1Request{T}.Requires(Version.Tm1Capability)"/>.</summary>
     public Tm1Capability Capability()
     {
         var capability = BindingType is not null ? Tm1Capability.BoundOperation(BindingType, Name) : Tm1Capability.UnboundOperation(Import);

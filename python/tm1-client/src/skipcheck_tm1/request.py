@@ -23,6 +23,7 @@ from pydantic import TypeAdapter
 from ._protocol import Call, Reply, collection
 from .base import Tm1Model, to_odata
 from .odata import Bind, ODataPath, ODataQuery
+from .operation import Tm1Operation
 from .version import Tm1Capability
 
 __all__ = ["Tm1Request"]
@@ -86,6 +87,10 @@ class Tm1Request(Generic[T]):
     timeout: float | None = None
     capability: Tm1Capability | None = None
     content_type: str | None = None
+    operation: Tm1Operation | None = None
+    """The operation whose parameters are checked against the server, as :meth:`requires` sets it."""
+    parameter_defaults: Mapping[str, Any] = field(default_factory=dict)
+    """What the server assumes for each parameter left out, as :meth:`with_parameter_default` sets them."""
 
     # Constructors, as Java's
 
@@ -162,10 +167,37 @@ class Tm1Request(Generic[T]):
             raise ValueError(f"timeout must be positive: {seconds}")
         return replace(self, timeout=float(seconds))
 
-    def requires(self, capability: Tm1Capability) -> Tm1Request[T]:
+    def requires(self, capability: Tm1Capability | Tm1Operation) -> Tm1Request[T]:
         """The request, checked against the server's ``$metadata`` before it's sent: an
-        :class:`~skipcheck_tm1.errors.Tm1UnsupportedOperationError` instead if it lacks it."""
-        return replace(self, capability=capability)
+        :class:`~skipcheck_tm1.errors.Tm1UnsupportedOperationError` instead if it lacks it.
+
+        For an operation, as ``requires(operation.capability())``, and only with parameters the
+        server's definition of it has: each of the operation's parameters the body sends (a key
+        named after it, or after it with ``@odata.bind``) is checked against the server's own
+        ``$metadata``, and one the server lacks fails the call without calling the server, unless
+        :meth:`with_parameter_default` says what leaving it out means and the body sends just that,
+        in which case it's left out. Only an action's body is checked; a function's parameters are
+        in its path."""
+        if isinstance(capability, Tm1Operation):
+            return replace(self, capability=capability.capability(), operation=capability)
+        # A capability replaces an operation set before, whose parameters are then no longer checked
+        return replace(self, capability=capability, operation=None)
+
+    def with_parameter_default(self, parameter: str, value: Any) -> Tm1Request[T]:
+        """A copy that says what the server assumes when ``parameter`` is left out: on a server
+        whose :meth:`requires` operation lacks the parameter, a body that sends ``value`` for it
+        is sent without it, rather than refused, since that asks for the same thing. A session told not
+        to check capabilities checks nothing, and leaves nothing out."""
+        if parameter is None or value is None:
+            raise ValueError("parameter and value")
+        return replace(self, parameter_defaults={**self.parameter_defaults, parameter: value})
+
+    def with_body(self, body: Any) -> Tm1Request[T]:
+        """A copy with another body, for the session to send in place of this one's. Only a GET,
+        DELETE or HEAD can go without one, as the constructors have it: ValueError for a write."""
+        if body is None and self.method.upper() not in ("GET", "DELETE", "HEAD"):
+            raise ValueError(f"{self.method} {self.path} needs a body")
+        return replace(self, body=body)
 
     def requirement(self) -> Tm1Capability | None:
         """What this request needs the server to define, or None."""
@@ -222,6 +254,8 @@ class Tm1Request(Generic[T]):
                 raw=True,
                 requires=self.capability,
                 timeout=self.timeout,
+                checked_operation=self.operation,
+                parameter_defaults=dict(self.parameter_defaults),
             )
         return Call(
             self.method,
@@ -235,6 +269,8 @@ class Tm1Request(Generic[T]):
             raw=raw,
             requires=self.capability,
             timeout=self.timeout,
+            checked_operation=self.operation,
+            parameter_defaults=dict(self.parameter_defaults),
         )
 
     def __str__(self) -> str:

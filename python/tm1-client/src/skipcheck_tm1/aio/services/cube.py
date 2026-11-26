@@ -195,11 +195,15 @@ class CubeService(Service):
         **options: Any,
     ) -> list[FedCellDescriptor]:
         """``tm1.CheckFeeders``: the cells under a consolidated cell that aren't fed, though
-        they have values, chosen by ``selection``."""
+        they have values, chosen by ``selection``. Servers before schema 11.8.32 have no
+        ``Selection`` and list only the unfed cells: there ``UNFED`` works and the others fail with
+        :class:`~skipcheck_tm1.errors.Tm1UnsupportedOperationError`."""
         operation = Tm1Operations.CUBE_CHECK_FEEDERS
         body = {"Tuple@odata.bind": _bindings(tuple), "Selection": _require(selection, "selection").value}
         request = Tm1Request.post_list(_cube(name).action(operation.name), body, FedCellDescriptor)
-        request = request.with_query(ODataQuery.of(query, **options)).requires(operation.capability())
+        # Servers before schema 11.8.32 have no Selection, and answer as for Unfed: so Unfed is sent
+        # without it there, and Both and Fed are refused
+        request = request.with_query(ODataQuery.of(query, **options)).requires(operation).with_parameter_default("Selection", CheckFeedersSelection.UNFED.value)
         return await self._session.collect(request)
 
 

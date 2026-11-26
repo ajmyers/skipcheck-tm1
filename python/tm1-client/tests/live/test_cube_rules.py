@@ -12,6 +12,7 @@ from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client, Tm1Request
 from skipcheck_tm1.model import (
     CheckFeedersSelection,
     CubeCreate,
+    CubePatch,
     ElementType,
 )
 
@@ -27,6 +28,7 @@ from .support import (
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 RULES = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\nFEEDERS;\n['Amount'] => ['Double'];\n"
+UNFED_RULES = "SKIPCHECK;\n['Double'] = N: ['Amount'] * 2;\n"
 
 
 @pytest.fixture
@@ -83,3 +85,35 @@ def test_checks_feeders_under_a_consolidation(tm1: Tm1Client, ruled: tuple[str, 
     )
     cells = tm1.cubes.check_feeders(name, {region: "Total", measure: "Double"}, CheckFeedersSelection.BOTH, expand="Tuple")
     assert any([e.name for e in c.tuple] == ["North", "Double"] and c.fed for c in cells)
+
+
+def test_lists_unfed_cells_on_every_server(tm1: Tm1Client, ruled: tuple[str, str, str]) -> None:
+    # Unfed is what servers without Selection (before schema 11.8.32) list, so it works on every
+    # server: there it's sent without Selection. South written after the feeder is taken out makes
+    # South/Double a cell the rules calculate and nothing feeds (a cell fed once stays fed, so not
+    # North)
+    name, region, measure = ruled
+    tm1.cubes.update(name, CubePatch.builder().rules(UNFED_RULES).build())
+    try:
+        tm1.session.execute(
+            Tm1Request.post(
+                ODataPath.of("Cubes").key(name).action("tm1.Update"),
+                {
+                    "Cells": [
+                        {
+                            "Tuple@odata.bind": [
+                                str(dim(region).nav("Hierarchies").key(region).nav("Elements").key("South")),
+                                str(dim(measure).nav("Hierarchies").key(measure).nav("Elements").key("Amount")),
+                            ]
+                        }
+                    ],
+                    "Value": "5",
+                },
+                None,
+            )
+        )
+        cells = tm1.cubes.check_feeders(name, {region: "Total", measure: "Double"}, CheckFeedersSelection.UNFED, expand="Tuple")
+        assert all(not c.fed for c in cells)
+        assert any([e.name for e in c.tuple] == ["South", "Double"] for c in cells), cells
+    finally:
+        tm1.cubes.update(name, CubePatch.builder().rules(RULES).build())

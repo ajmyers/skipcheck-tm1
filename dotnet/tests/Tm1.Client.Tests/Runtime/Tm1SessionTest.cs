@@ -1123,6 +1123,206 @@ public class Tm1SessionCapabilitiesTest
         Assert.DoesNotContain("Bananas", sent);
     }
 
+    private const string CheckFeedersKey = "POST Cubes('Sales')/tm1.CheckFeeders";
+
+    /// <summary>A server whose CheckFeeders has no Selection, as before schema 11.8.32.</summary>
+    private void WithoutSelection()
+    {
+        var snapshot = File.ReadAllText(Repo.Snapshot);
+        var metadata = new System.Text.RegularExpressions.Regex(
+            "(<Action Name=\"CheckFeeders\".*?)<Parameter Name=\"Selection\".*?</Parameter>",
+            System.Text.RegularExpressions.RegexOptions.Singleline
+        ).Replace(snapshot, "$1", 1);
+        Assert.NotEqual(snapshot, metadata);
+        _tm1.On(MetadataKey, _ => Xml(metadata));
+    }
+
+    private static Tm1Request<JsonElement> CheckFeeders(object selection) =>
+        Tm1Request
+            .PostList<JsonElement>(
+                ODataPath.Of("Cubes").Key("Sales").Action("tm1.CheckFeeders"),
+                new Dictionary<string, object?>
+                {
+                    ["Tuple@odata.bind"] = new List<string> { "Dimensions('Region')/Hierarchies('Region')/Elements('Total')" },
+                    ["Selection"] = selection,
+                }
+            )
+            .Requires(Model.Tm1Operations.CubeCheckFeeders)
+            .WithParameterDefault("Selection", "Unfed");
+
+    [Fact]
+    public void KnowsTheParametersACallerPassesForEachKindOfOperation()
+    {
+        var c = Version.Tm1Capabilities.Parse(File.ReadAllText(Repo.Snapshot));
+        var checkFeeders = Model.Tm1Operations.CubeCheckFeeders.Capability();
+        Assert.True(c.SupportsParameter(checkFeeders, "Selection"));
+        Assert.False(c.SupportsParameter(checkFeeders, "Cube")); // the binding parameter isn't one a caller passes
+        // The import Update and the actions Cellset/Update and Cube/Update share a name: only the
+        // import's own parameters count
+        Assert.True(c.SupportsParameter(Version.Tm1Capability.UnboundOperation("Update"), "Cells"));
+        Assert.False(c.SupportsParameter(Version.Tm1Capability.UnboundOperation("Update"), "BeginOrdinal"));
+    }
+
+    [Fact]
+    public async Task ChecksFeedersWithUnfedOnAServerWithoutSelectionAndRefusesTheRest()
+    {
+        WithoutSelection();
+        _tm1.On(CheckFeedersKey, _ => ScriptedTm1.Json(200, "{\"value\":[]}"));
+        var cubes = new Skipcheck.Tm1.Client.Services.CubeService(_tm1.Session());
+        var total = new Dictionary<string, string> { ["Region"] = "Total" };
+        await cubes.CheckFeedersAsync("Sales", total, Model.CheckFeedersSelection.Unfed).ToListAsync();
+        var sent = Assert.Single(_tm1.Requests(CheckFeedersKey)).Text;
+        Assert.Contains("Tuple@odata.bind", sent);
+        Assert.DoesNotContain("Selection", sent);
+        await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(async () =>
+            await cubes.CheckFeedersAsync("Sales", total, Model.CheckFeedersSelection.Both).ToListAsync()
+        );
+        Assert.Single(_tm1.Requests(CheckFeedersKey));
+    }
+
+    [Fact]
+    public async Task RefusesABoundParameterTheServerDoesntDefineWhateverTheBodyIsBuiltAs()
+    {
+        // A server whose CheckFeeders has no Tuple either: a binding is refused, default or not, and
+        // the body is checked as written, here an anonymous object rather than a dictionary
+        var snapshot = File.ReadAllText(Repo.Snapshot);
+        var metadata = new System.Text.RegularExpressions.Regex(
+            "(<Action Name=\"CheckFeeders\".*?)<Parameter Name=\"Tuple\".*?</Parameter>",
+            System.Text.RegularExpressions.RegexOptions.Singleline
+        ).Replace(snapshot, "$1", 1);
+        Assert.NotEqual(snapshot, metadata);
+        _tm1.On(MetadataKey, _ => Xml(metadata));
+        var request = Tm1Request
+            .PostList<JsonElement>(
+                ODataPath.Of("Cubes").Key("Sales").Action("tm1.CheckFeeders"),
+                new Dictionary<string, object?>
+                {
+                    ["Tuple@odata.bind"] = new[] { "Dimensions('Region')/Hierarchies('Region')/Elements('Total')" },
+                }.ToDictionary(e => e.Key, e => e.Value)
+            )
+            .WithBody(new TupleOnly(["Dimensions('Region')/Hierarchies('Region')/Elements('Total')"]))
+            .Requires(Model.Tm1Operations.CubeCheckFeeders)
+            .WithParameterDefault("Tuple", "x");
+        var u = await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(async () => await _tm1.Session().StreamAsync(request).ToListAsync());
+        Assert.Equal("parameter Tuple of Cube.CheckFeeders", u.Missing);
+        Assert.Empty(_tm1.Requests(CheckFeedersKey));
+    }
+
+    private sealed record TupleOnly([property: System.Text.Json.Serialization.JsonPropertyName("Tuple@odata.bind")] string[] Tuple);
+
+    [Fact]
+    public async Task ChecksTheBodyAsItWasQueuedInABatch()
+    {
+        WithoutSelection();
+        _tm1.On("POST $batch", _ => ScriptedTm1.Json(200, "{\"responses\":[]}"));
+        var body = new Dictionary<string, object?>
+        {
+            ["Tuple@odata.bind"] = new List<string> { "Dimensions('Region')/Hierarchies('Region')/Elements('Total')" },
+            ["Selection"] = "Both",
+        };
+        var batch = _tm1.Session().Batch();
+        var both = batch
+            .Session.StreamAsync(
+                Tm1Request
+                    .PostList<JsonElement>(ODataPath.Of("Cubes").Key("Sales").Action("tm1.CheckFeeders"), body)
+                    .Requires(Model.Tm1Operations.CubeCheckFeeders)
+            )
+            .ToListAsync()
+            .AsTask();
+        // A change after queueing isn't sent, so it isn't what's checked either
+        body.Remove("Selection");
+        await batch.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(() => both.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public async Task ChecksNoParametersOnceARequirementReplacesTheOperation()
+    {
+        WithoutSelection();
+        _tm1.On(CheckFeedersKey, _ => ScriptedTm1.Json(400, "{\"error\":{\"code\":\"278\",\"message\":\"Invalid parameter\"}}"));
+        var request = CheckFeeders("Both").Requires(Version.Tm1Capability.BoundOperation("tm1.Cube", "tm1.CheckFeeders"));
+        Assert.Null(request.Operation);
+        await Assert.ThrowsAsync<Tm1BadRequestException>(async () => await _tm1.Session().StreamAsync(request).ToListAsync());
+    }
+
+    [Fact]
+    public async Task SendsEveryParameterTheServerDefines()
+    {
+        _tm1.On(CheckFeedersKey, _ => ScriptedTm1.Json(200, "{\"value\":[]}"));
+        await _tm1.Session().StreamAsync(CheckFeeders("Both")).ToListAsync();
+        Assert.Contains("\"Selection\":\"Both\"", Assert.Single(_tm1.Requests(CheckFeedersKey)).Text);
+    }
+
+    [Fact]
+    public async Task RefusesAParameterTheServerDoesntDefineWithoutSendingIt()
+    {
+        WithoutSelection();
+        var u = await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(async () => await _tm1.Session().StreamAsync(CheckFeeders("Both")).ToListAsync());
+        Assert.Equal("parameter Selection of Cube.CheckFeeders", u.Missing);
+        Assert.Contains("reports schema 11.8.35", u.Message);
+        Assert.Empty(_tm1.Requests(CheckFeedersKey));
+    }
+
+    [Fact]
+    public async Task LeavesOutAParameterTheServerDoesntDefineWhenItsValueIsWhatLeavingItOutMeans()
+    {
+        WithoutSelection();
+        _tm1.On(CheckFeedersKey, _ => ScriptedTm1.Json(200, "{\"value\":[]}"));
+        await _tm1.Session().StreamAsync(CheckFeeders("Unfed")).ToListAsync();
+        var sent = Assert.Single(_tm1.Requests(CheckFeedersKey)).Text;
+        Assert.Contains("Tuple@odata.bind", sent);
+        Assert.DoesNotContain("Selection", sent);
+    }
+
+    [Fact]
+    public async Task ComparesADefaultAsJsonWhateverItsTypeOrKeyOrder()
+    {
+        WithoutSelection();
+        _tm1.On(CheckFeedersKey, _ => ScriptedTm1.Json(200, "{\"value\":[]}"));
+        await _tm1.Session().StreamAsync(CheckFeeders(5).WithParameterDefault("Selection", 5L)).ToListAsync();
+        await _tm1.Session()
+            .StreamAsync(
+                CheckFeeders(new Dictionary<string, object> { ["B"] = 2, ["A"] = 1 })
+                    .WithParameterDefault("Selection", new Dictionary<string, object> { ["A"] = 1, ["B"] = 2 })
+            )
+            .ToListAsync();
+        var sent = _tm1.Requests(CheckFeedersKey);
+        Assert.Equal(2, sent.Count);
+        Assert.All(sent, s =>
+        {
+            Assert.Contains("Tuple@odata.bind", s.Text);
+            Assert.DoesNotContain("Selection", s.Text);
+        });
+    }
+
+    [Fact]
+    public async Task LeavesOutAParameterInABatchToo()
+    {
+        WithoutSelection();
+        _tm1.On("POST $batch", r =>
+            ScriptedTm1.Json(
+                200,
+                "{\"responses\":["
+                    + string.Join(
+                        ",",
+                        r.Json.GetProperty("requests")
+                            .EnumerateArray()
+                            .Select(q => $"{{\"id\":\"{q.GetProperty("id").GetString()}\",\"status\":200,\"body\":{{\"value\":[]}}}}")
+                    )
+                    + "]}"
+            )
+        );
+        var batch = _tm1.Session().Batch();
+        var unfed = batch.Session.StreamAsync(CheckFeeders("Unfed")).ToListAsync().AsTask();
+        var both = batch.Session.StreamAsync(CheckFeeders("Both")).ToListAsync().AsTask();
+        await batch.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Empty(await unfed.WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAsync<Tm1UnsupportedOperationException>(() => both.WaitAsync(TimeSpan.FromSeconds(5)));
+        var sent = Assert.Single(_tm1.Requests("POST $batch")).Text;
+        Assert.Contains("tm1.CheckFeeders", sent);
+        Assert.DoesNotContain("Selection", sent);
+    }
+
     [Fact]
     public async Task ReadsTheVersionAgainAfterLoggingInAgain()
     {

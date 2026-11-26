@@ -202,7 +202,9 @@ public sealed class CubeService : Tm1Service
         );
 
     /// <summary><c>tm1.CheckFeeders</c>: the cells under a consolidated cell that aren't fed though they
-    /// have values, chosen by <paramref name="selection"/>.</summary>
+    /// have values, chosen by <paramref name="selection"/>. Servers before schema 11.8.32 have no
+    /// <c>Selection</c> and list only the unfed cells: there <see cref="CheckFeedersSelection.Unfed"/> works and
+    /// the others fail with <see cref="Errors.Tm1UnsupportedOperationException"/>.</summary>
     [Tm1Endpoint("Action Cube/CheckFeeders")]
     [Tm1Endpoint("Navigation FedCellDescriptor/Cube")]
     [Tm1Endpoint("Navigation FedCellDescriptor/Tuple")]
@@ -217,7 +219,13 @@ public sealed class CubeService : Tm1Service
         var operation = Tm1Operations.CubeCheckFeeders;
         var body = new Dictionary<string, object?> { ["Tuple@odata.bind"] = Bindings(tuple), ["Selection"] = selection };
         return Session.StreamAsync(
-            Tm1Request.PostList<FedCellDescriptor>(CubePath(name).Action(operation.Name), body).WithQuery(query).Requires(operation.Capability()),
+            // Servers before schema 11.8.32 have no Selection, and answer as for Unfed: so Unfed is sent
+            // without it there, and Both and Fed are refused
+            Tm1Request
+                .PostList<FedCellDescriptor>(CubePath(name).Action(operation.Name), body)
+                .WithQuery(query)
+                .Requires(operation)
+                .WithParameterDefault("Selection", CheckFeedersSelection.Unfed),
             cancellationToken
         );
     }

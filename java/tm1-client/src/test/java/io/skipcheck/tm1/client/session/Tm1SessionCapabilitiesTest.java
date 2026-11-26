@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -15,17 +18,24 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.conformance.ConformanceTm1;
+import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.error.Tm1ProtocolException;
 import io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException;
 import io.skipcheck.tm1.client.metadata.MetadataSnapshot;
+import io.skipcheck.tm1.client.model.CheckFeedersSelection;
+import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.service.cube.CubeService;
+import io.skipcheck.tm1.client.version.Tm1Capabilities;
 import io.skipcheck.tm1.client.version.Tm1Capability;
 import io.skipcheck.tm1.client.version.Tm1Version;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 /** Version and capabilities through the session, against {@link FakeTm1}. */
 class Tm1SessionCapabilitiesTest {
@@ -103,6 +113,174 @@ class Tm1SessionCapabilitiesTest {
 			.satisfies(sent -> assertThat(new String(ConformanceTm1.body(sent).block(), StandardCharsets.UTF_8))
 				.contains("Server")
 				.doesNotContain("Bananas"));
+	}
+
+	@Test
+	void sendsEveryParameterTheServerDefines() {
+		tm1.on(CHECK_FEEDERS, r -> Mono.just(FakeTm1.json(200, "{\"value\":[]}")));
+		StepVerifier.create(tm1.session().stream(checkFeeders("Both"))).verifyComplete();
+		assertThat(sentBody()).contains("\"Selection\":\"Both\"");
+	}
+
+	@Test
+	void refusesAParameterTheServerDoesntDefineWithoutSendingIt() {
+		withoutSelection();
+		StepVerifier.create(tm1.session().stream(checkFeeders("Both")))
+			.expectErrorSatisfies(
+					e -> assertThat(e).isInstanceOfSatisfying(Tm1UnsupportedOperationException.class, u -> {
+						assertThat(u.missing()).isEqualTo("parameter Selection of Cube.CheckFeeders");
+						assertThat(u.getMessage()).contains("reports schema 11.8.35");
+					}))
+			.verify();
+		assertThat(tm1.requests(CHECK_FEEDERS)).isEmpty();
+	}
+
+	@Test
+	void leavesOutAParameterTheServerDoesntDefineWhenItsValueIsWhatLeavingItOutMeans() {
+		withoutSelection();
+		tm1.on(CHECK_FEEDERS, r -> Mono.just(FakeTm1.json(200, "{\"value\":[]}")));
+		StepVerifier.create(tm1.session().stream(checkFeeders("Unfed"))).verifyComplete();
+		assertThat(sentBody()).contains("Tuple@odata.bind").doesNotContain("Selection");
+	}
+
+	@Test
+	void comparesADefaultAsJsonWhateverItsTypeOrKeyOrder() {
+		withoutSelection();
+		tm1.on(CHECK_FEEDERS, r -> Mono.just(FakeTm1.json(200, "{\"value\":[]}")));
+		StepVerifier.create(tm1.session().stream(checkFeeders(5).withParameterDefault("Selection", 5L)))
+			.verifyComplete();
+		Map<String, Object> ab = new LinkedHashMap<>();
+		ab.put("A", 1);
+		ab.put("B", 2);
+		Map<String, Object> ba = new LinkedHashMap<>();
+		ba.put("B", 2);
+		ba.put("A", 1);
+		StepVerifier.create(tm1.session().stream(checkFeeders(ba).withParameterDefault("Selection", ab)))
+			.verifyComplete();
+		assertThat(tm1.requests(CHECK_FEEDERS)).hasSize(2)
+			.allSatisfy(sent -> assertThat(new String(ConformanceTm1.body(sent).block(), StandardCharsets.UTF_8))
+				.contains("Tuple@odata.bind")
+				.doesNotContain("Selection"));
+	}
+
+	@Test
+	void leavesOutAParameterInABatchToo() {
+		withoutSelection();
+		tm1.on("POST $batch", r -> Mono.just(FakeTm1.json(200,
+				"{\"responses\":[{\"id\":\"1\",\"status\":200,\"body\":{\"value\":[]}},{\"id\":\"2\",\"status\":200,\"body\":{\"value\":[]}}]}")));
+		Tm1SessionBatch batch = tm1.session().batch();
+		Flux<JsonNode> unfed = batch.session().stream(checkFeeders("Unfed"));
+		Flux<JsonNode> both = batch.session().stream(checkFeeders("Both"));
+		StepVerifier.create(batch.run()).expectComplete().verify(Duration.ofSeconds(5));
+		StepVerifier.create(unfed).expectComplete().verify(Duration.ofSeconds(5));
+		StepVerifier.create(both).expectError(Tm1UnsupportedOperationException.class).verify(Duration.ofSeconds(5));
+		assertThat(tm1.requests("POST $batch")).singleElement()
+			.satisfies(sent -> assertThat(new String(ConformanceTm1.body(sent).block(), StandardCharsets.UTF_8))
+				.contains("tm1.CheckFeeders")
+				.doesNotContain("Selection"));
+	}
+
+	@Test
+	void knowsTheParametersACallerPassesForEachKindOfOperation() {
+		Tm1Capabilities c = Tm1Capabilities.of(MetadataSnapshot.load(), null);
+		Tm1Capability checkFeeders = Tm1Operations.CUBE_CHECK_FEEDERS.capability();
+		assertThat(c.supportsParameter(checkFeeders, "Selection")).isTrue();
+		assertThat(c.supportsParameter(checkFeeders, "Cube")).as("the binding parameter isn't one a caller passes")
+			.isFalse();
+		// The import Update and the actions Cellset/Update and Cube/Update share a name:
+		// only
+		// the import's own parameters count
+		assertThat(c.supportsParameter(Tm1Capability.unboundOperation("Update"), "Cells")).isTrue();
+		assertThat(c.supportsParameter(Tm1Capability.unboundOperation("Update"), "BeginOrdinal")).isFalse();
+	}
+
+	@Test
+	void checksFeedersWithUnfedOnAServerWithoutSelectionAndRefusesTheRest() {
+		withoutSelection();
+		tm1.on(CHECK_FEEDERS, r -> Mono.just(FakeTm1.json(200, "{\"value\":[]}")));
+		CubeService cubes = new CubeService(tm1.session());
+		Map<String, String> total = Map.of("Region", "Total");
+		StepVerifier.create(cubes.checkFeeders("Sales", total, CheckFeedersSelection.UNFED, ODataQuery.none()))
+			.verifyComplete();
+		assertThat(sentBody()).contains("Tuple@odata.bind").doesNotContain("Selection");
+		StepVerifier.create(cubes.checkFeeders("Sales", total, CheckFeedersSelection.BOTH, ODataQuery.none()))
+			.expectError(Tm1UnsupportedOperationException.class)
+			.verify();
+		assertThat(tm1.requests(CHECK_FEEDERS)).hasSize(1);
+	}
+
+	@Test
+	void refusesABoundParameterTheServerDoesntDefineWhateverTheBodyIsBuiltAs() {
+		// A server whose CheckFeeders has no Tuple either: a binding is refused, default
+		// or
+		// not, and the body is checked as written, here a JSON tree rather than a Map
+		String metadata = MetadataSnapshot.text()
+			.replaceFirst("(?s)(<Action Name=\"CheckFeeders\".*?)<Parameter Name=\"Tuple\".*?</Parameter>", "$1");
+		assertThat(metadata).isNotEqualTo(MetadataSnapshot.text());
+		tm1.on(METADATA, r -> Mono.just(xml(metadata)));
+		ObjectNode body = JsonNodeFactory.instance.objectNode();
+		body.putArray("Tuple@odata.bind").add("Dimensions('Region')/Hierarchies('Region')/Elements('Total')");
+		Tm1Request<JsonNode> request = Tm1Request
+			.postList(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"), body, JsonNode.class)
+			.requires(Tm1Operations.CUBE_CHECK_FEEDERS)
+			.withParameterDefault("Tuple", "x");
+		StepVerifier.create(tm1.session().stream(request))
+			.expectErrorSatisfies(e -> assertThat(e).isInstanceOfSatisfying(Tm1UnsupportedOperationException.class,
+					u -> assertThat(u.missing()).isEqualTo("parameter Tuple of Cube.CheckFeeders")))
+			.verify();
+		assertThat(tm1.requests(CHECK_FEEDERS)).isEmpty();
+	}
+
+	@Test
+	void checksTheBodyAsItWasQueuedInABatch() {
+		withoutSelection();
+		tm1.on("POST $batch", r -> Mono.just(FakeTm1.json(200, "{\"responses\":[]}")));
+		Map<String, Object> body = new HashMap<>(Map.of("Tuple@odata.bind",
+				List.of("Dimensions('Region')/Hierarchies('Region')/Elements('Total')"), "Selection", "Both"));
+		Tm1SessionBatch batch = tm1.session().batch();
+		Flux<JsonNode> both = batch.session()
+			.stream(Tm1Request
+				.postList(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"), body, JsonNode.class)
+				.requires(Tm1Operations.CUBE_CHECK_FEEDERS));
+		// A change after queueing isn't sent, so it isn't what's checked either
+		body.remove("Selection");
+		StepVerifier.create(batch.run()).expectComplete().verify(Duration.ofSeconds(5));
+		StepVerifier.create(both).expectError(Tm1UnsupportedOperationException.class).verify(Duration.ofSeconds(5));
+	}
+
+	@Test
+	void checksNoParametersOnceARequirementReplacesTheOperation() {
+		withoutSelection();
+		tm1.on(CHECK_FEEDERS,
+				r -> Mono.just(FakeTm1.json(400, "{\"error\":{\"code\":\"278\",\"message\":\"Invalid parameter\"}}")));
+		Tm1Request<JsonNode> request = checkFeeders("Both")
+			.requires(Tm1Capability.boundOperation("tm1.Cube", "tm1.CheckFeeders"));
+		assertThat(request.operation()).isEmpty();
+		StepVerifier.create(tm1.session().stream(request)).expectError(Tm1BadRequestException.class).verify();
+	}
+
+	private static final String CHECK_FEEDERS = "POST Cubes('Sales')/tm1.CheckFeeders";
+
+	/** A server whose CheckFeeders has no Selection, as before schema 11.8.32. */
+	private void withoutSelection() {
+		String metadata = MetadataSnapshot.text()
+			.replaceFirst("(?s)(<Action Name=\"CheckFeeders\".*?)<Parameter Name=\"Selection\".*?</Parameter>", "$1");
+		assertThat(metadata).isNotEqualTo(MetadataSnapshot.text());
+		tm1.on(METADATA, r -> Mono.just(xml(metadata)));
+	}
+
+	private static Tm1Request<JsonNode> checkFeeders(Object selection) {
+		return Tm1Request
+			.postList(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"),
+					Map.of("Tuple@odata.bind", List.of("Dimensions('Region')/Hierarchies('Region')/Elements('Total')"),
+							"Selection", selection),
+					JsonNode.class)
+			.requires(Tm1Operations.CUBE_CHECK_FEEDERS)
+			.withParameterDefault("Selection", "Unfed");
+	}
+
+	private String sentBody() {
+		return new String(ConformanceTm1.body(tm1.requests(CHECK_FEEDERS).get(0)).block(), StandardCharsets.UTF_8);
 	}
 
 	@Test
