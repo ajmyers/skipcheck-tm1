@@ -121,7 +121,12 @@ PAW), [`pa-setup`](../pa-setup/README.md) writes a compose project from `pa-envi
 
 **Your files.** Each server's config, database and logs are in
 `tm1-files/<server>/{config,data,logs}` (or set `TM1_FILES_DIR`), created on first
-start. Like a real deployment, one Admin Server serves every TM1 server: the
+start. Any of them can go elsewhere, to a folder or a **Docker volume**: set
+`TM1_CONFIG_DIR`, `TM1_DATA_DIR` or `TM1_LOGS_DIR` in `.env` to a path, or to the volume
+the compose file declares for it (`tm1-config`, `tm1-data`, `tm1-logs`). The sample
+server has `TM1_SDATA_CONFIG_DIR`, `TM1_SDATA_DATA_DIR` and `TM1_SDATA_LOGS_DIR`, with
+the volumes `tm1-sdata-config`, `tm1-sdata-data` and `tm1-sdata-logs`. A database in
+a volume is faster than in a folder on Mac and Windows, and isn't a folder you can open. Like a real deployment, one Admin Server serves every TM1 server: the
 servers register with `tm1-admin` through `TM1_ADMIN_HOST` (see [Roles](#roles)).
 
 The REST API is plain HTTP by default (`UseSSL=F`), so there are no certificates to
