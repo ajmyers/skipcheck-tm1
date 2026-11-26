@@ -33,7 +33,9 @@ IDENTIFIER = "SPDX-License-Identifier: Apache-2.0"
 
 # How a one-line comment is written, by file extension
 COMMENTS = {
-    **dict.fromkeys([".java", ".kt", ".kts", ".cs", ".ts", ".mts", ".mjs", ".js"], "// {}"),
+    **dict.fromkeys(
+        [".java", ".kt", ".kts", ".cs", ".ts", ".mts", ".mjs", ".js"], "// {}"
+    ),
     **dict.fromkeys([".py", ".sh", ".ps1"], "# {}"),
     ".css": "/* {} */",
 }
@@ -56,7 +58,9 @@ def comment(path: Path, first_line: str) -> str | None:
 
 
 def tracked(root: Path) -> list[Path]:
-    listed = subprocess.run(["git", "ls-files", "-z"], cwd=root, capture_output=True, check=True).stdout
+    listed = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=root, capture_output=True, check=True
+    ).stdout
     return [Path(name) for name in listed.decode().split("\0") if name]
 
 
@@ -71,7 +75,9 @@ def missing(root: Path, path: Path, fix: bool) -> bool:
         return False  # binary
     if not text.strip():
         return False
-    mark = "\ufeff" if text.startswith("\ufeff") else ""  # a byte order mark stays first
+    mark = (
+        "\ufeff" if text.startswith("\ufeff") else ""
+    )  # a byte order mark stays first
     newline = "\r\n" if "\r\n" in text else "\n"
     lines = text[len(mark) :].split(newline)
     line = comment(path, lines[0])
@@ -84,25 +90,46 @@ def missing(root: Path, path: Path, fix: bool) -> bool:
         return False
     if fix:
         after = [] if at < len(lines) and not lines[at].strip() else [""]
-        with open(root / path, "w", encoding="utf-8", newline="") as file:  # newline="": line endings as they were
+        with open(
+            root / path, "w", encoding="utf-8", newline=""
+        ) as file:  # newline="": line endings as they were
             file.write(mark + newline.join(lines[:at] + [line] + after + lines[at:]))
     return True
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Check or add the SPDX license line of source files.")
-    parser.add_argument("--fix", action="store_true", help="add the line where it's missing")
-    parser.add_argument("files", nargs="*", type=Path, help="paths from the repository root (default: every tracked file)")
+    parser = argparse.ArgumentParser(
+        description="Check or add the SPDX license line of source files."
+    )
+    parser.add_argument(
+        "--fix", action="store_true", help="add the line where it's missing"
+    )
+    parser.add_argument(
+        "files",
+        nargs="*",
+        type=Path,
+        help="paths from the repository root (default: every tracked file)",
+    )
     options = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
-    lacking = [path for path in (options.files or tracked(root)) if missing(root, path, options.fix)]
+    lacking = [
+        path
+        for path in (options.files or tracked(root))
+        if missing(root, path, options.fix)
+    ]
     if not lacking:
         return 0
     for path in lacking:
-        print(("added the license line: " if options.fix else "no license line: ") + path.as_posix())
+        print(
+            ("added the license line: " if options.fix else "no license line: ")
+            + path.as_posix()
+        )
     if options.fix:
         return 0
-    print(f"{len(lacking)} file(s) lack '{IDENTIFIER}'. Add it with: scripts/license-headers.py --fix", file=sys.stderr)
+    print(
+        f"{len(lacking)} file(s) lack '{IDENTIFIER}'. Add it with: scripts/license-headers.py --fix",
+        file=sys.stderr,
+    )
     return 1
 
 

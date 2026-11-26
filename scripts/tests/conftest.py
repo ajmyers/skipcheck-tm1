@@ -33,7 +33,12 @@ def load(path: str) -> ModuleType:
 def clean_environment(**extra: str) -> dict[str, str]:
     """The environment for a hook: without what CI sets (the hooks do nothing there), and without
     the variables git sets for a hook it runs, which would point these at the wrong repository."""
-    environment = {k: v for k, v in os.environ.items() if k not in ("CI", "GITHUB_ACTIONS", "SKIP_FORMAT_HOOK") and not k.startswith("GIT_")}
+    environment = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("CI", "GITHUB_ACTIONS", "SKIP_FORMAT_HOOK")
+        and not k.startswith("GIT_")
+    }
     environment.update(
         GIT_AUTHOR_NAME="Test",
         GIT_AUTHOR_EMAIL="test@example.invalid",
@@ -46,8 +51,17 @@ def clean_environment(**extra: str) -> dict[str, str]:
     return environment
 
 
-def git(repository: Path, *arguments: str, environment: dict[str, str] | None = None) -> str:
-    result = subprocess.run(["git", *arguments], cwd=repository, env=environment or clean_environment(), capture_output=True, text=True, check=True)
+def git(
+    repository: Path, *arguments: str, environment: dict[str, str] | None = None
+) -> str:
+    result = subprocess.run(
+        ["git", *arguments],
+        cwd=repository,
+        env=environment or clean_environment(),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
     return result.stdout.strip()
 
 

@@ -40,7 +40,9 @@ def fix(root: Path, name: str, content: bytes | str) -> tuple[bool, str]:
         ("docker/x/Dockerfile", f"# {LINE}"),
     ],
 )
-def test_adds_the_line_in_the_files_comment_syntax(tmp_path: Path, name: str, comment: str) -> None:
+def test_adds_the_line_in_the_files_comment_syntax(
+    tmp_path: Path, name: str, comment: str
+) -> None:
     lacked, text = fix(tmp_path, name, "code\n")
     assert lacked and text == f"{comment}\n\ncode\n"
     # And leaves it alone the second time
@@ -49,24 +51,43 @@ def test_adds_the_line_in_the_files_comment_syntax(tmp_path: Path, name: str, co
 
 
 def test_keeps_a_shebang_and_a_dockerfiles_directives_first(tmp_path: Path) -> None:
-    assert fix(tmp_path, "tool.sh", "#!/bin/sh\nset -e\n")[1] == f"#!/bin/sh\n# {LINE}\n\nset -e\n"
-    assert fix(tmp_path, "Dockerfile", "# syntax=docker/dockerfile:1\n# check=error=true\nFROM scratch\n")[1] == (
+    assert (
+        fix(tmp_path, "tool.sh", "#!/bin/sh\nset -e\n")[1]
+        == f"#!/bin/sh\n# {LINE}\n\nset -e\n"
+    )
+    assert fix(
+        tmp_path,
+        "Dockerfile",
+        "# syntax=docker/dockerfile:1\n# check=error=true\nFROM scratch\n",
+    )[1] == (
         f"# syntax=docker/dockerfile:1\n# check=error=true\n# {LINE}\n\nFROM scratch\n"
     )
 
 
 def test_a_script_without_an_extension_is_known_by_its_shebang(tmp_path: Path) -> None:
-    assert fix(tmp_path, "pre-commit", "#!/usr/bin/env bash\nexit 0\n") == (True, f"#!/usr/bin/env bash\n# {LINE}\n\nexit 0\n")
+    assert fix(tmp_path, "pre-commit", "#!/usr/bin/env bash\nexit 0\n") == (
+        True,
+        f"#!/usr/bin/env bash\n# {LINE}\n\nexit 0\n",
+    )
     assert fix(tmp_path, "LICENSE", "Apache License\n") == (False, "Apache License\n")
 
 
 def test_adds_no_second_blank_line(tmp_path: Path) -> None:
-    assert fix(tmp_path, "tool.py", "#!/usr/bin/env python3\n\nimport sys\n")[1] == f"#!/usr/bin/env python3\n# {LINE}\n\nimport sys\n"
+    assert (
+        fix(tmp_path, "tool.py", "#!/usr/bin/env python3\n\nimport sys\n")[1]
+        == f"#!/usr/bin/env python3\n# {LINE}\n\nimport sys\n"
+    )
 
 
 def test_keeps_line_endings_and_a_byte_order_mark(tmp_path: Path) -> None:
-    assert fix(tmp_path, "setup.ps1", "param()\r\nexit 0\r\n")[1] == f"# {LINE}\r\n\r\nparam()\r\nexit 0\r\n"
-    assert fix(tmp_path, "Program.cs", BYTE_ORDER_MARK + "class A {}\n")[1] == f"{BYTE_ORDER_MARK}// {LINE}\n\nclass A {{}}\n"
+    assert (
+        fix(tmp_path, "setup.ps1", "param()\r\nexit 0\r\n")[1]
+        == f"# {LINE}\r\n\r\nparam()\r\nexit 0\r\n"
+    )
+    assert (
+        fix(tmp_path, "Program.cs", BYTE_ORDER_MARK + "class A {}\n")[1]
+        == f"{BYTE_ORDER_MARK}// {LINE}\n\nclass A {{}}\n"
+    )
 
 
 @pytest.mark.parametrize(
@@ -83,7 +104,9 @@ def test_keeps_line_endings_and_a_byte_order_mark(tmp_path: Path) -> None:
         ("gradlew", b"#!/bin/sh\nexit 0\n"),
     ],
 )
-def test_leaves_what_isnt_source_or_isnt_ours(tmp_path: Path, name: str, content: bytes) -> None:
+def test_leaves_what_isnt_source_or_isnt_ours(
+    tmp_path: Path, name: str, content: bytes
+) -> None:
     lacked, _ = fix(tmp_path, name, content)
     assert lacked is False
     assert (tmp_path / name).read_bytes() == content
@@ -101,5 +124,10 @@ def test_the_line_must_come_first_not_just_somewhere(tmp_path: Path) -> None:
 
 
 def test_every_tracked_file_of_this_repository_has_it() -> None:
-    result = subprocess.run([sys.executable, str(REPO / "scripts" / "license-headers.py")], capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        [sys.executable, str(REPO / "scripts" / "license-headers.py")],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     assert result.returncode == 0, result.stdout + result.stderr

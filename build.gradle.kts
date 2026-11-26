@@ -128,7 +128,7 @@ val liveSources = listOf("TM1_PRIVATE_IMAGE", "TM1_HOME_DIR", "TM1_INSTALL_VOLUM
 val liveReports = listOf("python-live", "dotnet-live", "typescript-live")
 
 val liveTestPrepare = tasks.register("liveTestPrepare") {
-	description = "Checks a TM1 is configured for the live tests, and clears the traffic of the run before."
+	description = "Checks a TM1 is configured for the live tests, and clears the run before's traffic and the Python, .NET and TypeScript live reports."
 	val configured = liveSources.map { providers.environmentVariable(it) }
 	val names = liveSources
 	val directory = traffic
@@ -175,7 +175,7 @@ val liveTestTypescript = tasks.register<ToolTask>("liveTestTypescript") {
 	commands = listOf(
 		listOf("npm", "run", "generate", "-w", "tm1-client"),
 		listOf("npm", "run", "test:live", "-w", "tm1-client", "--", "--reporter=default", "--reporter=junit", "--outputFile.junit=" + testResults.file("typescript-live/vitest.xml").asFile.path),
-		listOf("npm", "test", "-w", "tm1-testcontainers"),
+		listOf("npm", "test", "-w", "tm1-testcontainers", "--", "--reporter=default", "--reporter=junit", "--outputFile.junit=" + testResults.file("typescript-live/tm1-testcontainers.xml").asFile.path),
 	)
 	dependsOn(liveTestPrepare)
 	mustRunAfter(liveTestJava, liveTestPython, liveTestDotnet)

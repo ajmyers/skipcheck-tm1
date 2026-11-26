@@ -42,13 +42,13 @@ Last checked on 2026-11-26, with every client's live tests ([`scripts/live-test-
 
 | Planning Analytics | TM1 | Schema | Live tests |
 |---|---|---|---|
-| 2.1.2 | 11.8.02400.7 | 11.8.20 | Pass. What its schema lacks is skipped: Reserve and Release, encryption at rest, CheckFeeders' `Selection`. |
-| 2.1.7 | 11.8.02800.9 | 11.8.20 | Pass, as 2.1.2. |
-| 2.1.16 | 11.8.03200.3 | 11.8.32 | Pass. Reserve and Release and encryption at rest are skipped. |
-| 2.1.19 | 11.8.03500.6 | 11.8.35 | Pass. |
-| 2.1.25 | 11.8.04000.1 | 11.8.35 | Pass. |
+| 2.1.2 | 11.8.02400.7 | 11.8.20 | Pass, but for `settings`. What its schema lacks is skipped: Reserve and Release, encryption at rest, CheckFeeders' `Selection`. |
+| 2.1.7 | 11.8.02800.9 | 11.8.20 | Pass, but for `settings`, with the same skips as 2.1.2. |
+| 2.1.16 | 11.8.03200.3 | 11.8.32 | Pass, but for `settings`. Reserve and Release and encryption at rest are skipped. |
+| 2.1.19 | 11.8.03500.6 | 11.8.35 | Pass, but for `settings`. |
+| 2.1.25 | 11.8.04000.1 | 11.8.35 | Pass, but for `settings`. |
 
-On every version, the `settings` conformance scenario failed in one client's run: TM1 read back one setting it had just been given as empty ([#399](https://github.com/ajmyers/skipcheck-tm1/issues/399)). Everything else passed, and every client sent TM1 the same requests.
+On every version, the `settings` conformance scenario failed in one client's run: TM1 read back one setting it had just been given as empty ([#399](https://github.com/ajmyers/skipcheck-tm1/issues/399)). So each version's run, as the script reports it, failed. Everything else passed, and every client sent TM1 the same requests in every other scenario.
 
 Planning Analytics 3.x (TM1 v12) is a different engine, run by [`docker/tm1-engine`](docker/tm1-engine), and isn't covered by this table.
 

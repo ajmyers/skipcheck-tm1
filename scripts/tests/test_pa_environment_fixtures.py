@@ -16,13 +16,20 @@ import pytest
 from conftest import REPO
 
 FIXTURES = REPO / "spec" / "conformance" / "pa-environment"
-VALID = [FIXTURES / "settings.yaml", FIXTURES / "paw.yaml", FIXTURES / "paw-cognos.yaml", REPO / "docker" / "pa-setup" / "examples" / "everything.yaml"]
+VALID = [
+    FIXTURES / "settings.yaml",
+    FIXTURES / "paw.yaml",
+    FIXTURES / "paw-cognos.yaml",
+    REPO / "docker" / "pa-setup" / "examples" / "everything.yaml",
+]
 INVALID = sorted((FIXTURES / "invalid").glob("*.yaml"))
 
 
 @pytest.fixture(scope="module")
 def pa_setup() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("pa_setup", REPO / "docker" / "pa-setup" / "pa_setup.py")
+    spec = importlib.util.spec_from_file_location(
+        "pa_setup", REPO / "docker" / "pa-setup" / "pa_setup.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules["pa_setup"] = module
@@ -42,7 +49,9 @@ def test_there_are_invalid_files() -> None:
 
 
 @pytest.mark.parametrize("path", INVALID, ids=lambda p: p.name)
-def test_pa_setup_refuses_the_invalid_files_as_the_clients_do(pa_setup: ModuleType, path: Path) -> None:
+def test_pa_setup_refuses_the_invalid_files_as_the_clients_do(
+    pa_setup: ModuleType, path: Path
+) -> None:
     lines = path.read_text(encoding="utf-8").splitlines()
     assert lines[0].startswith("# error: ")
     if "# pa-setup: accepts" in lines[:3]:
