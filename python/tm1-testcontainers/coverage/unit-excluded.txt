@@ -1,0 +1,12 @@
+# Java's tm1-testcontainers tests (java/tm1-testcontainers/src/test/java) that have no test of the
+# same name in tests/, and why. tests/test_java_unit_parity.py reads this.
+#
+#   ClassName#methodName: reason     one test
+#   ClassName: reason                a whole class
+#
+# Only for a test that has no meaning in this package, with a specific reason. A Java test whose
+# behaviour this package has is ported, under Java's name; one that needs TM1, TM1 Web, Cognos or
+# PAW is ported with its requires_… marker, and skips without them. A line for a class or a test
+# Java doesn't have, or one tests/ has after all, fails the gate.
+#
+# None so far: every Java test is here.
