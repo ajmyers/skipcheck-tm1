@@ -326,6 +326,20 @@
               "description": "Publishes the engine's MongoDB on the host"
             }
           }
+        },
+        "oauth2": {
+          "type": [
+            "object",
+            "boolean"
+          ],
+          "additionalProperties": false,
+          "description": "OAuth 2.0 logins: a Keycloak of the engine's own, with a realm, a client and the users who have a password. true, or keycloakPort",
+          "properties": {
+            "keycloakPort": {
+              "$ref": "#/$defs/port",
+              "description": "Keycloak on the host (8181)"
+            }
+          }
         }
       }
     }
