@@ -53,7 +53,7 @@ class MetadataSnapshotTest {
 				later.computeIfAbsent(name.substring(0, dash), v -> new ArrayList<>()).add(name.substring(dash + 1));
 			}
 		}
-		assertThat(versions).contains("11.8.20", "11.8.32", MetadataSnapshot.VERSION);
+		assertThat(versions).contains("11.8.20", "11.8.32", "11.8.34", MetadataSnapshot.VERSION);
 		for (String version : versions) {
 			assertThat(CsdlParser.parse(MetadataSnapshot.text(version).orElseThrow()).schemaVersion()).as(version)
 				.contains(version);
