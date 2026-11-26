@@ -36,23 +36,26 @@ public class ContentServiceLiveTests
         var name = Live.Name();
         var folder = ContentPath.Applications().Child(name);
         await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderCreate.Builder().Name(name).Build());
+        // TM1 keeps a document as }externals/<name>_<second>.<ext>, server-wide: two made with one
+        // name in one second collide (400, code 226), so each test names its own
+        var doc = name + "-notes";
         try
         {
-            var made = await tm1.Contents.CreateAsync(folder, ContentScope.Public, DocumentCreate.Builder().Name("notes.txt").Build());
+            var made = await tm1.Contents.CreateAsync(folder, ContentScope.Public, DocumentCreate.Builder().Name(doc + ".txt").Build());
             Assert.IsType<DocumentReference>(made); // a document made in an application is a reference
-            Assert.Equal("notes.txt.blob", made.Id); // found by ID, the name plus a suffix
+            Assert.Equal(doc + ".txt.blob", made.Id); // found by ID, the name plus a suffix
             var notes = folder.Child(made);
-            await Assert.ThrowsAsync<Tm1NotFoundException>(() => tm1.Contents.GetAsync(folder.Child("notes.txt"))); // not by name
+            await Assert.ThrowsAsync<Tm1NotFoundException>(() => tm1.Contents.GetAsync(folder.Child(doc + ".txt"))); // not by name
             await tm1.Contents.UploadAsync(notes, Encoding.UTF8.GetBytes("hello there"));
             Assert.Equal("hello there", Text(await tm1.Contents.ContentAsync(notes)));
             var document = await tm1.Contents.DocumentAsync(notes);
             Assert.Equal(11, document.Size);
-            Assert.StartsWith("notes_", document.Name); // named by TM1, with a timestamp
+            Assert.StartsWith(doc + "_", document.Name); // named by TM1, with a timestamp
             Assert.EndsWith(".txt", document.Name);
             var blob = ContentPath.Blobs().Child(document.Id!);
             Assert.Equal("hello there", Text(await tm1.Contents.ContentAsync(blob)));
-            var copy = await tm1.Contents.CopyAsync(notes, folder, ContentScope.Public, "copy.txt");
-            Assert.Equal("copy.txt.blob", copy.Id);
+            var copy = await tm1.Contents.CopyAsync(notes, folder, ContentScope.Public, doc + "-copy.txt");
+            Assert.Equal(doc + "-copy.txt.blob", copy.Id);
             // A copy refers to the same document
             Assert.Equal(document.Id, (await tm1.Contents.DocumentAsync(folder.Child(copy.Id!))).Id);
             await tm1.Contents.DeleteAsync(notes);
@@ -117,7 +120,8 @@ public class ContentServiceLiveTests
         await tm1.Contents.CreateAsync(ContentPath.Applications(), ContentScope.Public, FolderCreate.Builder().Name(name).Build());
         try
         {
-            var made = await tm1.Contents.CreateAsync(folder, ContentScope.Public, DocumentCreate.Builder().Name("notes.txt").Build());
+            // A name of its own: see KeepsADocumentInBlobsBehindAReference
+            var made = await tm1.Contents.CreateAsync(folder, ContentScope.Public, DocumentCreate.Builder().Name(name + "-notes.txt").Build());
             var (url, user, password) = Live.Target();
             using var http = new HttpClient();
             using var chunked = new HttpRequestMessage(HttpMethod.Put, url + folder.Child(made.Id!).Path() + "/tm1.DocumentReference/Document/Content")

@@ -4,7 +4,8 @@
 	"description": "An application's folder with a document, a link and a cube reference: made, read, uploaded to and downloaded, copied, moved, made private, deleted.",
 	"names": [
 		"app",
-		"other"
+		"other",
+		"doc"
 	],
 	"steps": [
 		{
@@ -133,15 +134,15 @@
 					"$patch": "DocumentCreate",
 					"json": {
 						"@odata.type": "#ibm.tm1.api.v1.Document",
-						"Name": "notes.txt"
+						"Name": "${doc}.txt"
 					}
 				}
 			],
 			"expect": {
 				"fields": {
 					"@odata.type": "#ibm.tm1.api.v1.DocumentReference",
-					"ID": "notes.txt.blob",
-					"Name": "notes.txt"
+					"ID": "${doc}.txt.blob",
+					"Name": "${doc}.txt"
 				}
 			}
 		},
@@ -174,7 +175,7 @@
 								}
 							]
 						},
-						"notes.txt",
+						"${doc}.txt",
 						{
 							"$enum": "ContentScope",
 							"name": "PUBLIC",
@@ -223,7 +224,7 @@
 								}
 							]
 						},
-						"notes.txt.blob",
+						"${doc}.txt.blob",
 						{
 							"$enum": "ContentScope",
 							"name": "PUBLIC",
@@ -267,7 +268,7 @@
 								}
 							]
 						},
-						"notes.txt.blob",
+						"${doc}.txt.blob",
 						{
 							"$enum": "ContentScope",
 							"name": "PUBLIC",
@@ -311,7 +312,7 @@
 								}
 							]
 						},
-						"notes.txt.blob",
+						"${doc}.txt.blob",
 						{
 							"$enum": "ContentScope",
 							"name": "PUBLIC",
@@ -364,7 +365,7 @@
 								}
 							]
 						},
-						"notes.txt.blob",
+						"${doc}.txt.blob",
 						{
 							"$enum": "ContentScope",
 							"name": "PUBLIC",
@@ -394,11 +395,11 @@
 					"name": "PUBLIC",
 					"json": "PUBLIC"
 				},
-				"copy.txt"
+				"${doc}_copy.txt"
 			],
 			"expect": {
 				"fields": {
-					"ID": "copy.txt.blob"
+					"ID": "${doc}_copy.txt.blob"
 				}
 			}
 		},
@@ -945,7 +946,7 @@
 								}
 							]
 						},
-						"notes.txt.blob",
+						"${doc}.txt.blob",
 						{
 							"$enum": "ContentScope",
 							"name": "PUBLIC",
