@@ -40,10 +40,6 @@ new one; before, the first plans the new one. Tried on every Planning Analytics 
 11.8.03200.3 (2.1.13 to 2.1.16) plans the new one, 11.8.03400.2 (2.1.17) the stale, and no build
 between them was released."""
 
-MAKES_OWN_KEY_FROM = Tm1Version.parse("11.8.04000")
-"""From this TM1 the server makes a local key file itself, so the image's settings check as valid.
-Tried at 11.8.035 (invalid) and 11.8.040 (valid); a build between falls on the older side unverified."""
-
 _SCHEMA_VERSION = re.compile(r'Term="Core\.SchemaVersion">\s*<String>([^<]+)</String>')
 
 

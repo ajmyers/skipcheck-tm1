@@ -51,6 +51,14 @@ else:
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
+INSTALL: str | None = None
+"""Whether the TM1 the tests run against can write to its own install, as Java's
+ServerAssumptions.Install names it: "readOnly" for an installed folder (TM1_HOME_DIR, which
+tm1-testcontainers mounts read-only), "writable" for any other source, and None for a server the
+suite didn't start (TM1_URL)."""
+if not _RUNNING and _SOURCE is not None:
+    INSTALL = "readOnly" if isinstance(_SOURCE, Tm1Source.InstallDir) else "writable"
+
 
 def target() -> tuple[str, str, str]:
     """The REST root and login of the TM1 to test against, starting its container the first time

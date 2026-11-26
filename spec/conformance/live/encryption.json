@@ -1,7 +1,7 @@
 {
 	"specVersion": 1,
 	"name": "encryption",
-	"description": "Encryption at rest on a server that isn't encrypted: every change refused, each step where the server defines it. Before TM1 11.8.040 the server can't make the local key file, so its settings check as invalid and configuring is refused too; from 11.8.040 they check as valid and configuring would convert the server and stop it, so those two steps stop there (encryption-validated checks the settings).",
+	"description": "Encryption at rest on a server that isn't encrypted: every change refused, each step where the server defines it. On a read-only install (an installed folder, TM1_HOME_DIR) TM1 can't make the local key, so its settings check as invalid and configuring is refused too. On a writable one they check as valid and configuring would convert the server and stop it, so those two steps run only on a read-only install (encryption-validated checks the settings on a writable one). Whatever the version (#439).",
 	"names": [],
 	"steps": [
 		{
@@ -10,7 +10,7 @@
 			"requires": [
 				"FunctionImport ValidateEncryptionAtRestSettings"
 			],
-			"tm1Before": "11.8.04000",
+			"install": "readOnly",
 			"params": [
 				"settings"
 			],
@@ -35,7 +35,7 @@
 			"requires": [
 				"ActionImport ConfigureEncryptionAtRest"
 			],
-			"tm1Before": "11.8.04000",
+			"install": "readOnly",
 			"params": [
 				"settings"
 			],

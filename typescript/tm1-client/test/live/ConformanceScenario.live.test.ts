@@ -4,6 +4,7 @@ import { describe, expect } from "vitest";
 import { fetchTransport } from "../../src/index.js";
 import * as live from "../conformance/live.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { sharedInstall } from "./server-assumptions.js";
 
 /** The live conformance scenarios (spec/conformance/live) against a real TM1: each step must meet
  * its expectation, and what the client sent is written to build/conformance-live/typescript for
@@ -19,13 +20,14 @@ describe("live conformance scenarios on TM1" + liveReason, () => {
       // What the server has and is: a scenario or a step for one it isn't is skipped
       const capabilities = await tm1.session.capabilities();
       const version = capabilities.productVersion!;
-      if (!live.applies(scenario, capabilities.endpoints, version)) {
+      const install = sharedInstall();
+      if (!live.applies(scenario, capabilities.endpoints, version, install)) {
         context.skip(
-          `the scenario needs ${JSON.stringify(scenario.requires)} ${scenario.tm1From} ${scenario.tm1Before}; the server is ${version.toString()}, schema ${capabilities.schemaVersion}`,
+          `the scenario needs ${JSON.stringify(scenario.requires)} ${scenario.tm1From} ${scenario.tm1Before} ${scenario.install}; the server is ${version.toString()}, schema ${capabilities.schemaVersion}, install ${install}`,
         );
         return;
       }
-      const failures = await live.run(tm1, traffic, scenario, names, (step) => live.applies(step, capabilities.endpoints, version));
+      const failures = await live.run(tm1, traffic, scenario, names, (step) => live.applies(step, capabilities.endpoints, version, install));
       traffic.write(scenario.name, names);
       expect(failures).toEqual([]);
     } finally {

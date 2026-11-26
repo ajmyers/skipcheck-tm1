@@ -27,12 +27,16 @@ import io.skipcheck.tm1.testcontainers.Tm1Source;
 import reactor.core.publisher.Mono;
 
 /**
- * EncryptionService, on a TM1 of its own, since encryption changes the server. Before TM1
- * 11.8.040 the image's missing GSKit command line stops the local key file provider from
- * making a key, so the settings check as invalid and every change is refused: the test
- * pins how TM1 says so. From 11.8.040 the server makes the key itself, the settings check
- * as valid, and configuring would really convert the server and stop it, so the test
- * doesn't try that.
+ * EncryptionService, on a TM1 of its own, since encryption changes the server. Whether
+ * local key file settings check as valid depends on the install, not the version (#439):
+ * TM1 makes the key in its install's {@code bin64/ssl/ibmtm1.kdb}, so on a writable
+ * install (a bundle's, a volume's) they check as valid, and configuring would really
+ * convert the server and stop it, which the test doesn't try. On a read-only one (an
+ * installed folder, {@code TM1_HOME_DIR}) TM1 can't make the key, the settings check as
+ * invalid and every change is refused: the test pins how TM1 says so. So on a writable
+ * source the run does change the install: a volume of your own
+ * ({@code TM1_INSTALL_VOLUME}), or the bundle cache, keeps the key TM1 made in its
+ * {@code ibmtm1.kdb}.
  */
 @RequiresTm1
 class EncryptionServiceTm1Test {
@@ -65,10 +69,10 @@ class EncryptionServiceTm1Test {
 	}
 
 	@Test
-	void validatesSettingsWithoutChangingAnything() {
+	void validatesLocalKeyFileSettings() {
 		ServerAssumptions.assumeSupports(tm1, Tm1Operations.VALIDATE_ENCRYPTION_AT_REST_SETTINGS);
 		EncryptionAtRestValidationReport report = tm1.encryption().validate(LOCAL).block(WAIT);
-		if (makesItsOwnKey()) {
+		if (ServerAssumptions.install(server.getSource()) == ServerAssumptions.Install.WRITABLE) {
 			assertThat(report.isValid()).isTrue();
 			assertThat(report.issues()).isEmpty();
 		}
@@ -83,7 +87,7 @@ class EncryptionServiceTm1Test {
 	@Test
 	void refusesChangesWithBareCodeNames() {
 		// Configuring with settings the server takes would convert it and stop it, so
-		// only where they check as invalid, whatever the version
+		// only where that server says they're invalid, whatever its install
 		boolean takesThem = ServerAssumptions.capabilities(tm1)
 			.supports(Tm1Operations.VALIDATE_ENCRYPTION_AT_REST_SETTINGS.capability())
 				&& tm1.encryption().validate(LOCAL).block(WAIT).isValid();
@@ -118,11 +122,6 @@ class EncryptionServiceTm1Test {
 			assertThatThrownBy(() -> call.get().block(WAIT)).as(operation.endpoint())
 				.isInstanceOf(Tm1UnsupportedOperationException.class);
 		}
-	}
-
-	/** Whether the server's settings are expected to check as valid. */
-	private static boolean makesItsOwnKey() {
-		return ServerAssumptions.isAtLeast(tm1, ServerAssumptions.MAKES_OWN_KEY_FROM);
 	}
 
 }

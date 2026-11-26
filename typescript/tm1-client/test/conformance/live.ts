@@ -34,6 +34,8 @@ export interface Step {
   requires?: string[];
   tm1From?: string;
   tm1Before?: string;
+  /** The install the step needs, `writable` or `readOnly` (see {@link applies}). */
+  install?: string;
 }
 
 export interface Scenario {
@@ -46,6 +48,7 @@ export interface Scenario {
   requires?: string[];
   tm1From?: string;
   tm1Before?: string;
+  install?: string;
 }
 
 export function scenarios(): Scenario[] {
@@ -186,9 +189,16 @@ export function save(step: Step, outcome: Outcome, names: Record<string, string>
 }
 
 /** Whether a scenario or a step applies to a server, as Java's `ConformanceScenarios.applies`:
- * every endpoint its `requires` names is in the server's `$metadata`, and the server's product
- * version is at least its `tm1From` and below its `tm1Before`. */
-export function applies(node: { requires?: string[]; tm1From?: string; tm1Before?: string }, endpoints: ReadonlySet<string>, version: Tm1Version): boolean {
+ * every endpoint its `requires` names is in the server's `$metadata`, the server's product version
+ * is at least its `tm1From` and below its `tm1Before`, and its install is the `install` named
+ * (`writable` or `readOnly`; undefined, a server the suite didn't start, is neither). */
+export function applies(
+  node: { requires?: string[]; tm1From?: string; tm1Before?: string; install?: string },
+  endpoints: ReadonlySet<string>,
+  version: Tm1Version,
+  install: string | undefined,
+): boolean {
+  if (node.install !== undefined && node.install !== install) return false;
   if ((node.requires ?? []).some((e) => !endpoints.has(e))) return false;
   if (node.tm1From !== undefined && version.compareTo(Tm1Version.parse(node.tm1From)) < 0) return false;
   return node.tm1Before === undefined || version.compareTo(Tm1Version.parse(node.tm1Before)) < 0;

@@ -31,6 +31,7 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import io.skipcheck.tm1.client.ServerAssumptions.Install;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.metadata.Endpoints;
 import io.skipcheck.tm1.client.metadata.MetadataSnapshot;
@@ -426,19 +427,39 @@ class ConformanceScenariosTest {
 			.readTree(
 					"{\"requires\":[\"Action Cube/Reserve\"],\"tm1From\":\"11.8.03000\",\"tm1Before\":\"11.8.04000\"}");
 		Set<String> reserve = Set.of("Action Cube/Reserve");
-		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.03500.6"))).isTrue();
-		assertThat(ConformanceScenarios.applies(scenario, Set.of(), Tm1Version.parse("11.8.03500.6")))
+		Install writable = Install.WRITABLE;
+		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.03500.6"), writable))
+			.isTrue();
+		assertThat(ConformanceScenarios.applies(scenario, Set.of(), Tm1Version.parse("11.8.03500.6"), writable))
 			.as("an endpoint the server lacks")
 			.isFalse();
-		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.02400.7"))).as("too old")
+		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.02400.7"), writable))
+			.as("too old")
 			.isFalse();
-		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.04000.1")))
+		assertThat(ConformanceScenarios.applies(scenario, reserve, Tm1Version.parse("11.8.04000.1"), writable))
 			.as("tm1Before is exclusive")
 			.isFalse();
 		assertThat(ConformanceScenarios.applies(ConformanceCodec.json().readTree("{}"), Set.of(),
-				Tm1Version.parse("11.8.02400.7")))
-			.as("one with neither applies everywhere")
+				Tm1Version.parse("11.8.02400.7"), Install.UNKNOWN))
+			.as("one with none of them applies everywhere")
 			.isTrue();
+	}
+
+	@Test
+	void appliesWhatDependsOnTheInstallToThatInstallOnly() {
+		JsonNode readOnly = ConformanceCodec.json().readTree("{\"install\":\"readOnly\"}");
+		JsonNode writable = ConformanceCodec.json().readTree("{\"install\":\"writable\"}");
+		Tm1Version version = Tm1Version.parse("11.8.03500.6");
+		assertThat(ConformanceScenarios.applies(readOnly, Set.of(), version, Install.READ_ONLY)).isTrue();
+		assertThat(ConformanceScenarios.applies(readOnly, Set.of(), version, Install.WRITABLE)).isFalse();
+		assertThat(ConformanceScenarios.applies(writable, Set.of(), version, Install.WRITABLE)).isTrue();
+		assertThat(ConformanceScenarios.applies(writable, Set.of(), version, Install.READ_ONLY)).isFalse();
+		assertThat(ConformanceScenarios.applies(readOnly, Set.of(), version, Install.UNKNOWN))
+			.as("a server the suite didn't start")
+			.isFalse();
+		assertThat(ConformanceScenarios.applies(writable, Set.of(), version, Install.UNKNOWN))
+			.as("a server the suite didn't start")
+			.isFalse();
 	}
 
 	@Test
@@ -482,10 +503,14 @@ class ConformanceScenariosTest {
 						Tm1Version.parse(node.get(bound).asString());
 					}
 				}
+				if (node.has("install")) {
+					assertThat(node.get("install").asString()).as(where + ": install is writable or readOnly")
+						.isIn("writable", "readOnly");
+				}
 			}
 			// A step that may not run keeps nothing for the steps after it
 			scenario.path("steps").forEach(step -> {
-				if (step.has("requires") || step.has("tm1From") || step.has("tm1Before")) {
+				if (step.has("requires") || step.has("tm1From") || step.has("tm1Before") || step.has("install")) {
 					assertThat(step.has("save") || step.has("keep"))
 						.as(file.getFileName() + " " + step.path("method").asString() + ": saves or keeps")
 						.isFalse();

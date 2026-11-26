@@ -1,11 +1,11 @@
 {
 	"specVersion": 1,
 	"name": "encryption-validated",
-	"description": "From TM1 11.8.040, the same local key file settings check as valid: the server can make the key, so configuring would convert the server and stop it. So only the check runs here, and nothing is changed.",
+	"description": "On a writable install, the same local key file settings check as valid: TM1 makes the key, in its install's bin64/ssl/ibmtm1.kdb, so configuring would convert the server and stop it. So only the check runs here, and the server isn't converted. Whatever the version (#439).",
 	"requires": [
 		"FunctionImport ValidateEncryptionAtRestSettings"
 	],
-	"tm1From": "11.8.04000",
+	"install": "writable",
 	"names": [],
 	"steps": [
 		{

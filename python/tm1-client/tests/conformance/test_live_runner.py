@@ -99,11 +99,21 @@ def test_stops_at_a_step_that_misses_its_expectation_and_still_cleans_up(traffic
 def test_applies_what_the_server_has_and_is() -> None:
     scenario = {"requires": ["Action Cube/Reserve"], "tm1From": "11.8.03000", "tm1Before": "11.8.04000"}
     reserve = {"Action Cube/Reserve"}
-    assert live.applies(scenario, reserve, Tm1Version.parse("11.8.03500.6"))
-    assert not live.applies(scenario, set(), Tm1Version.parse("11.8.03500.6")), "an endpoint the server lacks"
-    assert not live.applies(scenario, reserve, Tm1Version.parse("11.8.02400.7")), "too old"
-    assert not live.applies(scenario, reserve, Tm1Version.parse("11.8.04000.1")), "tm1Before is exclusive"
-    assert live.applies({}, set(), Tm1Version.parse("11.8.02400.7")), "one with neither applies everywhere"
+    assert live.applies(scenario, reserve, Tm1Version.parse("11.8.03500.6"), "writable")
+    assert not live.applies(scenario, set(), Tm1Version.parse("11.8.03500.6"), "writable"), "an endpoint the server lacks"
+    assert not live.applies(scenario, reserve, Tm1Version.parse("11.8.02400.7"), "writable"), "too old"
+    assert not live.applies(scenario, reserve, Tm1Version.parse("11.8.04000.1"), "writable"), "tm1Before is exclusive"
+    assert live.applies({}, set(), Tm1Version.parse("11.8.02400.7"), None), "one with none of them applies everywhere"
+
+
+def test_applies_what_depends_on_the_install_to_that_install_only() -> None:
+    version = Tm1Version.parse("11.8.03500.6")
+    assert live.applies({"install": "readOnly"}, set(), version, "readOnly")
+    assert not live.applies({"install": "readOnly"}, set(), version, "writable")
+    assert live.applies({"install": "writable"}, set(), version, "writable")
+    assert not live.applies({"install": "writable"}, set(), version, "readOnly")
+    assert not live.applies({"install": "readOnly"}, set(), version, None), "a server the suite didn't start"
+    assert not live.applies({"install": "writable"}, set(), version, None), "a server the suite didn't start"
 
 
 def test_skips_the_steps_that_dont_apply_and_sends_nothing_for_them(traffic_dir: Path) -> None:
