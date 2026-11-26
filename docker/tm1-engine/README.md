@@ -314,9 +314,8 @@ curl -H "Authorization: CAMNamespace $(printf %s analyst:analystpw:LDAP | base64
 - An earlier version of this page said TM1 v12 refused the `CAMNamespace` header. It
   doesn't: that 401 came from a TM1 11 server that wasn't in CAM security.
 
-Tried with Cognos Analytics 12.1.1 and its LDAP namespace: a user, an administrator, a
-passport, and a user missing from the database (403). **Not tried: the OIDC namespace.**
-Its CAMIDs are made by the rule `tm1-server` uses for TM1 11.
+Tried with Cognos Analytics 12.1.1: a user, an administrator, and a user missing from the
+database (403), with the LDAP namespace and the OIDC one; a passport with LDAP.
 
 ## Image
 

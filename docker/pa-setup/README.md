@@ -177,9 +177,18 @@ tm1Engine: true            # one database, tm1; log in as admin
   - pa-setup owns the engine's pass-through setting, as its OAuth 2.0 one: one you set by
     hand in the kept `config.internal.json`, to a server outside the file say, is removed on
     the next `up` without `passthrough`.
-  - Tried against a TM1 11 server with users of its own. **Not tried with Cognos (CAM)
-    security**, which every TM1 server gets when the file has `cognos`: TM1 v12 refused the
-    header CAM logins use, so it may not log anyone in. `up` says so.
+  - **With `cognos` in the file** the server is in CAM security, and Cognos's users log in
+    to TM1 v12 as they do to it: `Authorization: CAMNamespace <base64 of
+    user:password:namespace>`, or `CAMPassport` with a passport from a Cognos logon.
+    - The engine's users are then Cognos's, each under its CAMID: `tm1Engine.users` names
+      some of `cognos.users`, with the groups they have in TM1 v12 (it learns none from
+      Cognos). `cognos.cam.admins` are administrators here too.
+    - `setup.sh session` still logs in as the database's own `admin`; for a Cognos user,
+      give its CAMID.
+    - An earlier version of this page said TM1 v12 refused the header CAM logins use. It
+      passes it on.
+  - Tried against a TM1 11 server with users of its own, and in CAM security with the LDAP
+    and the OIDC namespace.
   - `PlanningAnalyticsEnvironment.fromConfig` doesn't read `passthrough` yet: a file with it
     is refused there as an unknown setting.
 - **Everything the engine stores is in `pa-files/tm1-engine`:** `deployment` (settings, the
