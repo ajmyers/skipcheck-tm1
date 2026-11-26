@@ -61,8 +61,8 @@ gone stale fails the gate. "Not ported yet" is not a reason. The gates can't see
 that comes with no new Java test, which is why the test comes first.
 
 **A test that needs TM1 is skipped without one, never left out.** Mark it with the language's
-`RequiresTm1` (`@RequiresTm1`, `@pytest.mark.requires_tm1`, `[RequiresTm1Fact]`, `requiresTm1`), so
-it's collected everywhere and runs wherever a TM1 is configured. Each CI job's summary shows how
+`RequiresTm1` (`@RequiresTm1`, `@pytest.mark.requires_tm1`, `[RequiresTm1Fact]`, `requiresTm1`; tm1-client's
+Java live tests use `@LiveTm1`, which also runs them against a running `TM1_URL`), so it's collected everywhere and runs wherever a TM1 is configured. Each CI job's summary shows how
 many tests ran and how many were skipped (`scripts/test-summary.py` prints the same table locally).
 
 **New code comes with tests that CI runs.** That goes for scripts, hooks and workflows too: they're

@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
 import io.skipcheck.tm1.client.LiveServer;
@@ -177,7 +179,14 @@ final class RawTm1 {
 		}
 		SSLSocketFactory factory = verify ? (SSLSocketFactory) SSLSocketFactory.getDefault()
 				: LiveServer.trustingContext().getSocketFactory();
-		return factory.createSocket(host, port);
+		SSLSocket socket = (SSLSocket) factory.createSocket(host, port);
+		if (verify) {
+			// The host name too, as the JDK's HTTP client and Reactor Netty check it
+			SSLParameters parameters = socket.getSSLParameters();
+			parameters.setEndpointIdentificationAlgorithm("HTTPS");
+			socket.setSSLParameters(parameters);
+		}
+		return socket;
 	}
 
 	/**

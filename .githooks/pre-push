@@ -59,8 +59,9 @@ cleanup() {
 trap cleanup EXIT
 git worktree add -q --detach "$worktree" "${unique[0]}" || { warn "couldn't create a worktree to build in"; exit 1; }
 
-unset TM1_PRIVATE_IMAGE TM1_HOME_DIR TM1_INSTALL_VOLUME TM1_BUNDLE_DIR TM1_BUNDLE TM1_BUNDLE_URL TM1_BUNDLE_SHA256 TM1_SERVER_IMAGE
-unset TM1_URL TM1_USER TM1_PASSWORD TM1_NAMESPACE TM1_VERIFY
+# Every TM1, TM1 Web, PAW and Cognos setting (sources, a running server's TM1_URL and login, the
+# tests' switches): any of them would turn tests on against real servers, once per commit
+while IFS= read -r name; do unset "$name"; done < <(compgen -e | grep -E '^(TM1|PAW|COGNOS)_')
 
 # The layout and lint checks of the other clients, for a commit that touches them: what pytest,
 # npm test and dotnet build check first, without their tests, which take longer than a build per

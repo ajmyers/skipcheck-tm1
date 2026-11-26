@@ -43,8 +43,11 @@ class Tm1SessionPoolTm1Test {
 
 	private Tm1SessionPool pool;
 
+	private String login;
+
 	@BeforeEach
 	void setUp(LiveServer server) {
+		login = server.getUsername();
 		raw = new RawTm1(server);
 		admin = raw.login();
 		context = RawTm1.uniqueContext();
@@ -74,7 +77,7 @@ class Tm1SessionPoolTm1Test {
 		assertThat(name(pool.session(Tm1Identity.impersonating(bob)))).isEqualTo(bob);
 		assertThat(name(pool.session(Tm1Identity.withCredentials(bob, Tm1Authenticator.basic(bob, "b")))))
 			.isEqualTo(bob);
-		assertThat(name(pool.session())).isEqualTo("Admin");
+		assertThat(name(pool.session())).isEqualToIgnoringCase(login);
 		assertThat(pool.stats().held()).isEqualTo(4);
 	}
 

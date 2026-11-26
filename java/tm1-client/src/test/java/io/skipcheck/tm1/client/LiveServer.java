@@ -12,9 +12,10 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLException;
 
 import org.jspecify.annotations.Nullable;
+import org.springframework.http.client.reactive.ClientHttpConnector;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.web.reactive.function.client.WebClient;
 
+import io.netty.channel.ChannelOption;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
@@ -23,6 +24,7 @@ import io.skipcheck.tm1.client.session.Tm1Session;
 import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
 
 /**
  * The TM1 a live test runs against, as {@link LiveTm1} gives it: one already running,
@@ -38,6 +40,11 @@ public final class LiveServer {
 	public static final String URL = "TM1_URL";
 
 	private static final Duration WAIT = Duration.ofSeconds(60);
+
+	/** The trusting connector's pool: idle connections closed before TM1's 90 seconds. */
+	private static final ConnectionProvider TRUSTING_CONNECTIONS = ConnectionProvider.builder("live-tm1-trusting")
+		.maxIdleTime(Duration.ofSeconds(60))
+		.build();
 
 	private final String restUrl;
 
@@ -150,20 +157,34 @@ public final class LiveServer {
 	}
 
 	/**
-	 * A web client for the server: one that trusts any certificate when
-	 * {@code TM1_VERIFY} is {@code false}.
+	 * The client builder with a connector that trusts any certificate when
+	 * {@code TM1_VERIFY} is {@code false}, as the session's own would be otherwise (gzip,
+	 * a connect timeout, idle connections closed before TM1's 90 seconds). Through
+	 * {@code connector}, not a web client: the session sets its connector on any web
+	 * client it's given.
 	 */
-	public WebClient.Builder webClient() {
-		WebClient.Builder web = WebClient.builder();
-		if (!verify) {
-			web.clientConnector(new ReactorClientHttpConnector(secure(HttpClient.create())));
-		}
-		return web;
+	public Tm1Client.Builder trusting(Tm1Client.Builder client) {
+		return verify ? client : client.connector(trustingConnector());
 	}
 
-	/** A session builder for the server: its URL, the login and {@link #webClient()}. */
+	/** The session builder, as {@link #trusting(Tm1Client.Builder)} has it. */
+	public Tm1Session.Builder trusting(Tm1Session.Builder session) {
+		return verify ? session : session.connector(trustingConnector());
+	}
+
+	private static ClientHttpConnector trustingConnector() {
+		return new ReactorClientHttpConnector(HttpClient.create(TRUSTING_CONNECTIONS)
+			.compress(true)
+			.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30_000)
+			.secure(ssl -> ssl.sslContext(insecure())));
+	}
+
+	/**
+	 * A session builder for the server: its URL, the login, and trust as
+	 * {@code TM1_VERIFY} says.
+	 */
 	public Tm1Session.Builder sessionBuilder() {
-		return Tm1Session.builder().baseUrl(restUrl).authenticator(authenticator()).webClient(webClient());
+		return trusting(Tm1Session.builder().baseUrl(restUrl).authenticator(authenticator()));
 	}
 
 	/**
@@ -215,9 +236,12 @@ public final class LiveServer {
 		}
 	}
 
-	/** A client builder for the server: its URL, the login and {@link #webClient()}. */
+	/**
+	 * A client builder for the server: its URL, the login, and trust as
+	 * {@code TM1_VERIFY} says.
+	 */
 	public Tm1Client.Builder clientBuilder() {
-		return Tm1Client.builder().baseUrl(restUrl).authenticator(authenticator()).webClient(webClient());
+		return trusting(Tm1Client.builder().baseUrl(restUrl).authenticator(authenticator()));
 	}
 
 	/** The server's product version, read from it the first time for a running one. */

@@ -116,10 +116,7 @@ class UserAndGroupTm1Test {
 
 	@Test
 	void disconnectsAUser() {
-		Tm1Client asUser = Tm1Client.builder()
-			.baseUrl(server.getRestUrl())
-			.basicAuth(user, "pw")
-			.webClient(server.webClient())
+		Tm1Client asUser = server.trusting(Tm1Client.builder().baseUrl(server.getRestUrl()).basicAuth(user, "pw"))
 			.build();
 		try {
 			asUser.connect().block(WAIT);
