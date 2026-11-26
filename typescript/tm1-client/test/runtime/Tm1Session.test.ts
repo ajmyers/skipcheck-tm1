@@ -1100,6 +1100,37 @@ describe("Tm1Session capabilities", () => {
     expect(tm1.requests(CHECK_FEEDERS)).toHaveLength(1);
   });
 
+  it("refuses a bound parameter the server doesn't define whatever the body is built as", async () => {
+    // A server whose CheckFeeders has no Tuple either: a binding is refused, default or not, and the
+    // body is checked as written, here a class instance rather than a plain object
+    const metadata = SNAPSHOT.replace(/(<Action Name="CheckFeeders"[\s\S]*?)<Parameter Name="Tuple"[\s\S]*?<\/Parameter>/, "$1");
+    expect(metadata).not.toBe(SNAPSHOT);
+    const tm1 = scripted().on(METADATA, () => ScriptedTm1.xml(metadata));
+    class TupleOnly {
+      readonly "Tuple@odata.bind" = ["Dimensions('Region')/Hierarchies('Region')/Elements('Total')"];
+    }
+    const request = Tm1Request.postList(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"), new TupleOnly())
+      .requires(Tm1Operations.CubeCheckFeeders)
+      .withParameterDefault("Tuple", "x");
+    const e = await failure(tm1.session().stream(request).toArray());
+    expect(e).toBeInstanceOf(Tm1UnsupportedOperationException);
+    expect((e as Tm1UnsupportedOperationException).missing).toBe("parameter Tuple of Cube.CheckFeeders");
+    expect(tm1.requests(CHECK_FEEDERS)).toHaveLength(0);
+  });
+
+  it("checks the body as it was queued in a batch", async () => {
+    const tm1 = withoutSelection(scripted()).on("POST $batch", () => ScriptedTm1.json(200, '{"responses":[]}'));
+    const body: Record<string, unknown> = { "Tuple@odata.bind": ["Dimensions('Region')/Hierarchies('Region')/Elements('Total')"], Selection: "Both" };
+    const batch = tm1.session().batch();
+    const both = batch.session
+      .stream(Tm1Request.postList(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"), body).requires(Tm1Operations.CubeCheckFeeders))
+      .toArray();
+    // A change after queueing isn't sent, so it isn't what's checked either
+    delete body["Selection"];
+    await batch.run();
+    expect(await Promise.race([failure(both), settle().then(() => "still waiting")])).toBeInstanceOf(Tm1UnsupportedOperationException);
+  });
+
   it("checks no parameters once a requirement replaces the operation", async () => {
     const tm1 = withoutSelection(scripted()).on(CHECK_FEEDERS, () => ScriptedTm1.json(400, '{"error":{"code":"278","message":"Invalid parameter"}}'));
     const request = checkFeeders("Both").requires(Tm1Capability.boundOperation("tm1.Cube", "tm1.CheckFeeders"));

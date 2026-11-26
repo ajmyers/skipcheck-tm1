@@ -24,6 +24,7 @@ import httpx2
 import pytest
 
 from skipcheck_tm1 import (
+    Bind,
     ODataPath,
     ODataQuery,
     Tm1ApiError,
@@ -950,6 +951,52 @@ def test_checks_feeders_with_unfed_on_a_server_without_selection_and_refuses_the
     assert "Tuple@odata.bind" in sent.content.decode() and "Selection" not in sent.content.decode()
     rt.raises(Tm1UnsupportedOperationError, lambda: cubes.check_feeders("Sales", {"Region": "Total"}, CheckFeedersSelection.BOTH))
     assert len(requests_to(rt, CHECK_FEEDERS)) == 1
+
+
+def test_refuses_a_bound_parameter_the_server_doesnt_define_whatever_the_body_is_built_as(rt: Runtime) -> None:
+    # A server whose CheckFeeders has no Tuple either: a binding is refused, default or not, and the
+    # body is checked as written, here a Bind rather than a key with @odata.bind
+    metadata = re.sub(
+        r'(<Action Name="CheckFeeders".*?)<Parameter Name="Tuple".*?</Parameter>', r"\1", SNAPSHOT.read_text(encoding="utf-8"), count=1, flags=re.S
+    )
+    assert metadata != SNAPSHOT.read_text(encoding="utf-8")
+    rt.fake.metadata = metadata.encode("utf-8")
+    request = (
+        Tm1Request.post_list(
+            ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"),
+            {"Tuple": [Bind(ODataPath.of("Dimensions").key("Region").nav("Hierarchies").key("Region").nav("Elements").key("Total"))]},
+            dict,
+        )
+        .requires(Tm1Operations.CUBE_CHECK_FEEDERS)
+        .with_parameter_default("Tuple", "x")
+    )
+    error = rt.raises(Tm1UnsupportedOperationError, lambda: rt.session().collect(request))
+    assert error.missing == "parameter Tuple of Cube.CheckFeeders"
+    assert requests_to(rt, CHECK_FEEDERS) == []
+
+
+def test_checks_the_body_as_it_was_queued_in_a_batch(rt: Runtime) -> None:
+    _without_selection(rt)
+    rt.fake.respond = lambda r: {"responses": []}
+    body = {"Tuple@odata.bind": ["Dimensions('Region')/Hierarchies('Region')/Elements('Total')"], "Selection": "Both"}
+    batch = rt.session().batch()
+    both = rt.run(
+        batch.session.collect(
+            Tm1Request.post_list(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"), body, dict).requires(Tm1Operations.CUBE_CHECK_FEEDERS)
+        )
+    )
+    # A change after queueing isn't sent, so it isn't what's checked either
+    del body["Selection"]
+    rt.run(batch.run())
+    with pytest.raises(Tm1UnsupportedOperationError):
+        both.result()
+
+
+def test_sends_the_body_a_request_is_given_with_its_operation_kept() -> None:
+    # Python's own: the session's check replaces a call's body directly, so with_body is held here
+    request = _check_feeders("Both").with_body({"Selection": "Unfed"})
+    assert request.body == {"Selection": "Unfed"}
+    assert request.operation is Tm1Operations.CUBE_CHECK_FEEDERS and request.parameter_defaults == {"Selection": "Unfed"}
 
 
 def test_checks_no_parameters_once_a_requirement_replaces_the_operation(rt: Runtime) -> None:

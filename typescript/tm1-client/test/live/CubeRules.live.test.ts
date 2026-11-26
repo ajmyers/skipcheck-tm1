@@ -112,8 +112,16 @@ describe("Cube rules on TM1" + liveReason, () => {
 
   tm1Test("lists unfed cells on every server", async () => {
     // Unfed is what servers without Selection (before schema 11.8.32) list, so it works on every
-    // server: there it's sent without Selection
+    // server: there it's sent without Selection. With a value written, North/Double is a fed cell,
+    // which Both lists and Unfed mustn't
+    await tm1.session.execute(
+      Tm1Request.post(ODataPath.of("Cubes").key(cube).action("tm1.Update"), {
+        Cells: [{ "Tuple@odata.bind": [elementPath(region, "North"), elementPath(measure, "Amount")] }],
+        Value: "5",
+      }),
+    );
     const cells = await tm1.cubes.checkFeeders(cube, tuple("Total", "Double"), CheckFeedersSelection.Unfed, ODataQuery.none().expand("Tuple")).toArray();
     expect(cells.every((c) => c.Fed !== true)).toBe(true);
+    expect(cells.map((c) => tupleNames(c.Tuple))).not.toContainEqual(["North", "Double"]);
   });
 });

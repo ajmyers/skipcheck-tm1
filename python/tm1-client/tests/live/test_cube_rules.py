@@ -87,7 +87,26 @@ def test_checks_feeders_under_a_consolidation(tm1: Tm1Client, ruled: tuple[str, 
 
 def test_lists_unfed_cells_on_every_server(tm1: Tm1Client, ruled: tuple[str, str, str]) -> None:
     # Unfed is what servers without Selection (before schema 11.8.32) list, so it works on every
-    # server: there it's sent without Selection
+    # server: there it's sent without Selection. With a value written, North/Double is a fed cell,
+    # which Both lists and Unfed mustn't
     name, region, measure = ruled
+    tm1.session.execute(
+        Tm1Request.post(
+            ODataPath.of("Cubes").key(name).action("tm1.Update"),
+            {
+                "Cells": [
+                    {
+                        "Tuple@odata.bind": [
+                            str(dim(region).nav("Hierarchies").key(region).nav("Elements").key("North")),
+                            str(dim(measure).nav("Hierarchies").key(measure).nav("Elements").key("Amount")),
+                        ]
+                    }
+                ],
+                "Value": "5",
+            },
+            None,
+        )
+    )
     cells = tm1.cubes.check_feeders(name, {region: "Total", measure: "Double"}, CheckFeedersSelection.UNFED, expand="Tuple")
     assert all(not c.fed for c in cells)
+    assert not any([e.name for e in c.tuple] == ["North", "Double"] for c in cells)

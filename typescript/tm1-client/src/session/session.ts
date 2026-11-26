@@ -249,7 +249,9 @@ export class Tm1Session implements AsyncDisposable {
     if (!capabilities || operation?.kind !== "Action" || request.body === undefined || request.body === null || request.body instanceof Uint8Array)
       return request;
     // The body as it's written, whatever it was built as: a plain object, a model, a class instance
-    const written: unknown = JSON.parse(writeJson(request.body));
+    const text = writeJson(request.body) as string | undefined;
+    if (text === undefined) return request;
+    const written: unknown = JSON.parse(text);
     if (!isPlainObject(written)) return request;
     const sent = checkParameters(capabilities, request.requirement()!, operation, request.parameterDefaults(), written, this.connection.root);
     return sent === written ? request : request.withBody(sent);

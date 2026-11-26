@@ -82,11 +82,14 @@ public sealed class CubeRulesLiveTests : IAsyncLifetime
     public async Task ListsUnfedCellsOnEveryServer()
     {
         // Unfed is what servers without Selection (before schema 11.8.32) list, so it works on every
-        // server: there it's sent without Selection
+        // server: there it's sent without Selection. With a value written, North/Double is a fed
+        // cell, which Both lists and Unfed mustn't
+        await LiveModel.WriteAsync(_tm1, _cube, [LiveModel.Element(Region, "North"), LiveModel.Element(Measure, "Amount")], "5");
         var cells = await Cubes
             .CheckFeedersAsync(_cube, Tuple("Total", "Double"), CheckFeedersSelection.Unfed, ODataQuery.None().Expand("Tuple"))
             .ToListAsync();
         Assert.All(cells, c => Assert.NotEqual(true, c.Fed));
+        Assert.DoesNotContain(cells, c => c.Tuple!.Select(e => e.Name).SequenceEqual(["North", "Double"]));
     }
 
     private Dictionary<string, string> Tuple(string region, string measure) => new() { [Region] = region, [Measure] = measure };

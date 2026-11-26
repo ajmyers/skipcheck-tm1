@@ -280,8 +280,9 @@ public sealed class Tm1Session : IAsyncDisposable
         {
             return request;
         }
-        // The body as it's written, whatever it was built as: a dictionary, a model, an anonymous object
-        if (JsonSerializer.SerializeToNode(request.Body, request.Body.GetType(), Tm1Json.Options) is not System.Text.Json.Nodes.JsonObject sent)
+        // The body as it's written when sent, whatever it was built as (a dictionary, a model, an
+        // anonymous object), failing the same way
+        if (request.Encode().Content is not { } written || System.Text.Json.Nodes.JsonNode.Parse(written) is not System.Text.Json.Nodes.JsonObject sent)
         {
             return request;
         }
